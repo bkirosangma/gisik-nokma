@@ -15,6 +15,7 @@ import {
   createHttpClient,
   createHttpFoundingGateway,
   createHttpInviteAdminGateway,
+  createHttpPeopleGateway,
   createHttpInviteGateway,
   createHttpMyInvitationsGateway,
   createHttpNotificationPreferencesGateway,
@@ -22,6 +23,7 @@ import {
   createOnlineDataSource,
   type FoundingGateway,
   type InviteAdminGateway,
+  type PeopleGateway,
   type InviteGateway,
   type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
@@ -75,6 +77,8 @@ export type AppServices = {
   /** Task 6 (account/help-screens plan). The `/account` mute-list gateway — global, no `workspaceId`. */
   notificationPreferences: NotificationPreferencesGateway;
   ticketLocation: TicketLocator;
+  /** Access plan: the exact-email lookup and the outsider door. */
+  people: PeopleGateway;
 };
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -161,6 +165,7 @@ export function Providers({
       // same-origin, same-session-cookie transport every gateway here uses.
       notificationPreferences: createHttpNotificationPreferencesGateway(http),
       ticketLocation: createHttpTicketLocator(http),
+      people: createHttpPeopleGateway(http),
     };
   }, [services]);
   const value = services ?? constructed;

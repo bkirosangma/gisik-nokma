@@ -15,6 +15,13 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * `canSeeResolved` is the same table written in TypeScript. This file is what
  * keeps them from drifting.
  *
+ * **AMENDED 2026-09-29, owner ruling (A).** The scenario founds its project
+ * (`project.created`), so every admin and member — the `outsider`, who is a
+ * member on no roster, included — is on every project and sees its project-mode
+ * tickets. The cells this file used to assert as "admin/member off the project
+ * cannot see it" now assert the opposite; the no-see witness for the project arm
+ * is the guest. Every explicit-mode cell is unchanged.
+ *
  * Two copies, not three: the SQL used to live inline inside
  * `listVisibleTickets`, and Task 5 EXTRACTED it rather than writing a second
  * expression beside it (see `src/read/visible-where.ts`). Extraction removed a
@@ -33,14 +40,21 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  *
  * - `wsWideTaskId` — the only workspace-mode ticket. Deleting
  *   `v.resolved_mode = 'workspace'` from the member clause fails here.
- * - `otherProjTaskId` — project-mode in a project the OWNER IS NOT ON. The
- *   owner reaches it by bypass alone, so replacing `case 'owner'` with the
- *   member rules fails here.
+ * - `otherProjTaskId` — project-mode in a SECOND project. **AMENDED 2026-09-29,
+ *   owner ruling (A):** an admin and a member are on every founded project, so
+ *   this ticket no longer separates the owner from the member rules (the member
+ *   rules give an owner every project too). What it does now is prove rule A
+ *   reaches a project the viewer's roster does not list: the member and the
+ *   admin see it, and the GUEST — the no-see witness for the project arm —
+ *   does not.
  * - `memberOnlyTaskId` — explicit, listing the member and NOT the owner. The
- *   second cell that isolates the owner bypass.
- * - `admin` on that second project — a viewer whose slice differs from both the
+ *   one cell that isolates the owner bypass: replacing `case 'owner'` with the
+ *   member rules fails here.
+ * - `admin` on that second project — a viewer whose roster differs from the
  *   member's and the outsider's, so `case 'admin'` is exercised and not merely
- *   compiled.
+ *   compiled. Under rule A their SLICE equals the outsider's (both are on every
+ *   project); the roster row is kept so a rule-A implementation that let the
+ *   explicit row overwrite the implicit one still resolves the same set.
  * - **the GUEST on the first project.** Without it the guest's project set is
  *   EMPTY, and `case 'guest'` rewritten as
  *   `(v.resolved_mode = 'project' AND v.project_id = ANY ($n)) OR explicit` —
@@ -67,7 +81,9 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * at is a cell nobody covered. Each cell's ticket is first checked, against
  * `proj_visibility`, to actually stand in the mode its own label names: a
  * ticket that drifted into another mode would keep answering `false` and the
- * cell would keep passing while testing nothing. That guard reads the DATABASE
+ * cell would keep passing while testing nothing. (Under rule A the project-arm
+ * `false` cells are the guest's and the stranger's; a member or admin cell that
+ * answers `false` is an explicit-mode cell.) That guard reads the DATABASE
  * — the one it replaced compared JS literals with the JS literals they were
  * built from and could not fail.
  *
@@ -78,9 +94,11 @@ import { scenarioUsers, seedReadScenario, type ReadScenario } from '../helpers/r
  * explicit not listed — four, in fact). **`admin x explicit, LISTED` is now the
  * one combination no fixture here seeds**: no explicit list names the admin. It
  * exercises no code the identical `member x explicit, listed` cell does not,
- * and the two cells that actually discriminate admin from owner — project-off-it
- * and explicit-not-listed — are both seeded and both asserted false. Named
- * rather than counted as covered.
+ * and the cell that actually discriminates admin from owner —
+ * explicit-not-listed — is seeded and asserted false. (Amended 2026-09-29, owner
+ * ruling (A): `admin x project, off it` used to be the second such cell; an admin
+ * is on every project now, so it is asserted TRUE and no longer discriminates.)
+ * Named rather than counted as covered.
  *
  * **This paragraph used to say "the one combination", and that was FALSE — it
  * was two.** The other was `guest x project`: the cell existed and asserted
@@ -136,8 +154,9 @@ async function seedAugmentation(target: Pool, w: ReadScenario): Promise<Augmenta
   const events: LedgerEvent[] = [
     makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(w.workspaceId, admin) }, type: 'membership.granted', payload: { userId: admin, role: 'admin' } }),
     makeCommitted({ ...ws, entity: { kind: 'project', id: otherProjectId }, type: 'project.created', payload: { name: 'Licences' } }),
-    // The admin is on the SECOND project and on nothing else — the owner is on
-    // neither, which is what makes the owner's reach of it a bypass.
+    // The admin is on the SECOND project's roster and on nothing else. Under
+    // rule A that no longer limits them (they are on every project); the row
+    // stays so the explicit roster row and the implicit one are both in play.
     makeCommitted({ ...ws, entity: { kind: 'project', id: otherProjectId }, type: 'project.member_added', payload: { userId: admin, projectAdmin: false } }),
     // The GUEST, on the FIRST project — the state that makes `guest x project`
     // able to discriminate at all. Reachable through the shipped door:
@@ -289,12 +308,27 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
         ],
       ],
       [
-        'member, on the first project',
+        'member, on the first project (rule A: and the second)',
         world.member,
-        [world.epicId, world.taskInEpicId, world.sharedTaskId, extra.wsWideTaskId, extra.memberOnlyTaskId],
+        [
+          world.epicId,
+          world.taskInEpicId,
+          world.sharedTaskId,
+          extra.wsWideTaskId,
+          extra.memberOnlyTaskId,
+          extra.otherProjTaskId,
+        ],
       ],
-      ['outsider, a member on no project', world.outsider, [extra.wsWideTaskId]],
-      ['admin, on the second project, no bypass', extra.admin, [extra.wsWideTaskId, extra.otherProjTaskId]],
+      [
+        'outsider, a member on no roster (rule A: every project-mode ticket)',
+        world.outsider,
+        [world.epicId, world.taskInEpicId, extra.wsWideTaskId, extra.otherProjTaskId],
+      ],
+      [
+        'admin, on the second roster (rule A: every project-mode ticket, no explicit bypass)',
+        extra.admin,
+        [world.epicId, world.taskInEpicId, extra.wsWideTaskId, extra.otherProjTaskId],
+      ],
       ['guest, explicit only', world.guest, [world.guestTaskId]],
       ['a stranger to the workspace', extra.stranger, []],
     ];
@@ -318,9 +352,11 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     }
 
     // …and the agreement is agreement about something: the six slices are not
-    // all empty and not all equal.
+    // all empty and not all equal. (Under rule A the admin and the outsider
+    // share a slice; the member and the guest do not.)
     expect((await sqlVisibleSet(world.owner)).length).toBe(8);
     expect(await sqlVisibleSet(world.member)).not.toEqual(await sqlVisibleSet(extra.admin));
+    expect(await sqlVisibleSet(extra.admin)).toEqual(await sqlVisibleSet(world.outsider));
     expect(await sqlVisibleSet(world.outsider)).not.toEqual(await sqlVisibleSet(world.guest));
   });
 
@@ -354,25 +390,31 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
       ['null x explicit (listed for others)', slices.stranger, world.guestTaskId, false],
 
       ['guest x workspace', slices.guest, extra.wsWideTaskId, false],
-      ['guest x project', slices.guest, world.epicId, false],
+      ['guest x project, on it', slices.guest, world.epicId, false],
+      // Amended 2026-09-29 (A): the no-see witness for the project arm is a
+      // guest, on or off the project's roster.
+      ['guest x project, off it', slices.guest, extra.otherProjTaskId, false],
       ['guest x explicit, listed', slices.guest, world.guestTaskId, true],
       ['guest x explicit, not listed', slices.guest, world.hiddenTaskId, false],
 
       ['member x workspace', slices.member, extra.wsWideTaskId, true],
       ['member x project, on it', slices.member, world.epicId, true],
-      ['member x project, off it', slices.member, extra.otherProjTaskId, false],
+      // Amended 2026-09-29 (A): was `false`. A member is on every project.
+      ['member x project, off its roster (rule A)', slices.member, extra.otherProjTaskId, true],
       ['member x explicit, listed', slices.member, world.sharedTaskId, true],
       ['member x explicit, not listed', slices.member, world.hiddenTaskId, false],
 
       ['admin x workspace', slices.admin, extra.wsWideTaskId, true],
       ['admin x project, on it', slices.admin, extra.otherProjTaskId, true],
-      ['admin x project, off it', slices.admin, world.epicId, false],
+      // Amended 2026-09-29 (A): was `false`. An admin is on every project.
+      ['admin x project, off its roster (rule A)', slices.admin, world.epicId, true],
       ['admin x explicit, not listed', slices.admin, world.sharedTaskId, false],
 
       ['owner x workspace', slices.owner, extra.wsWideTaskId, true],
-      // The two cells that ISOLATE the bypass: the owner is on neither the
-      // second project nor the member-only list, so a member-rules owner
-      // answers false to both.
+      // The cell that ISOLATES the bypass: the owner is not on the member-only
+      // list, so a member-rules owner answers false. (Amended 2026-09-29 (A):
+      // the second project no longer isolates it — the member rules give an
+      // owner every project too — but the cell still pins the owner's answer.)
       ['owner x project, off it (bypass)', slices.owner, extra.otherProjTaskId, true],
       ['owner x explicit, not listed (bypass)', slices.owner, extra.memberOnlyTaskId, true],
     ];
@@ -419,6 +461,7 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     // the member clause's project disjunct would hand it over here.
     expect(await sqlVisibleSet(world.guest)).toEqual([world.guestTaskId]);
     expect(await sqlVisibleSet(world.guest)).not.toContain(world.epicId);
+    expect(await sqlVisibleSet(world.guest)).not.toContain(extra.otherProjTaskId);
     expect(await canSee(pool, world.guest, world.epicId)).toBe(false);
   });
 
@@ -427,13 +470,29 @@ describe('visibleTicketsWhere agrees with canSee — one decision table, two imp
     expect(memberSet).not.toContain(world.hiddenTaskId);
     expect(memberSet).not.toContain(world.guestTaskId); // explicit lists are exactly the authored list
     expect(memberSet).toEqual(
-      sorted([world.epicId, world.taskInEpicId, world.sharedTaskId, extra.wsWideTaskId, extra.memberOnlyTaskId]),
+      sorted([
+        world.epicId,
+        world.taskInEpicId,
+        world.sharedTaskId,
+        extra.wsWideTaskId,
+        extra.memberOnlyTaskId,
+        extra.otherProjTaskId, // rule A (amended 2026-09-29): every project, on the roster or not
+      ]),
     );
   });
 
-  it('a guest sees only what was explicitly shared; an off-project member sees only the workspace-mode one', async () => {
+  it('a guest sees only what was explicitly shared; a member on no roster sees every project-mode and workspace-mode ticket — rule A', async () => {
     expect(await sqlVisibleSet(world.guest)).toEqual([world.guestTaskId]);
-    expect(await sqlVisibleSet(world.outsider)).toEqual([extra.wsWideTaskId]);
+    // Amended 2026-09-29 (A): was `[wsWideTaskId]`. The outsider sees the
+    // project-mode tickets of both projects and still NONE of the three
+    // explicit ones (none of the lists names them).
+    const outsiderSet = await sqlVisibleSet(world.outsider);
+    expect(outsiderSet).toEqual(
+      sorted([world.epicId, world.taskInEpicId, extra.wsWideTaskId, extra.otherProjTaskId]),
+    );
+    for (const explicitId of [world.sharedTaskId, world.hiddenTaskId, world.guestTaskId, extra.memberOnlyTaskId]) {
+      expect(outsiderSet).not.toContain(explicitId);
+    }
   });
 
   /**

@@ -1,6 +1,8 @@
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import type { SqlParams } from './sql-params.js';
 
+// `ticketAudienceWhere` is the AUDIENCE table alone — the note inherit arm's question.
+// `visibleTicketsWhere` below is the one-ticket question: audience OR assignee (W3).
 /**
  * Plan 4's read-visibility decision table as ONE SQL predicate, for the queries
  * that filter many tickets at once (list, board, search, attention, My Work).
@@ -38,7 +40,7 @@ import type { SqlParams } from './sql-params.js';
  * |---|---|---|---|
  * | null (non-member)       | no          | no                 | no              |
  * | guest                   | no          | no                 | only if listed  |
- * | member / admin          | yes         | only if on project | only if listed  |
+ * | member / admin          | yes         | yes (rule A: on every project) | only if listed  |
  * | owner                   | yes         | yes                | yes             |
  *
  * **The owner row is a separate row, and the plan text's Task 5 table is wrong
@@ -52,7 +54,8 @@ import type { SqlParams } from './sql-params.js';
  * `test/visibility/visible-tickets.test.ts` commented `from the bypass alone`.
  * So owner compiles to `TRUE` here.
  *
- * **Admins get no bypass.** `admin` shares the member `case` deliberately.
+ * **Admins share the member branch**, and since rule A both are on every founded
+ * project through `eff.projects`.
  *
  * ## The role side is compiler-exhaustive; the mode side, here, cannot be
  *
@@ -92,7 +95,7 @@ import type { SqlParams } from './sql-params.js';
  * SELECT: a project-scope roster row survives a revocation by design, and
  * `resolveEffectiveRole`'s early return is what makes it inert (`can-see.ts`).
  */
-export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
+export function ticketAudienceWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
   if (eff.workspaceRole === null) {
     return 'FALSE';
   }
@@ -110,13 +113,37 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
     case 'guest':
       return explicitAudienceWhere(userId, params);
 
-    // member and admin: identical, because an admin gets no read bypass.
+    // member and admin: identical (both on every founded project, rule A).
     case 'admin':
     case 'member': {
       const projects = [...eff.projects.keys()];
       return `(v.resolved_mode = 'workspace' OR (v.resolved_mode = 'project' AND v.project_id = ANY (${params.add(projects)}::text[])) OR ${explicitAudienceWhere(userId, params)})`;
     }
   }
+}
+
+/**
+ * The assignee arm in SQL (W3) — `assigneeSees`' twin. A subquery over `v`,
+ * not `t.assignee_id`, because `listVisibleTickets` joins no `t`
+ * (deviation D6; this file's own note on `LIVE_TICKET_WHERE`, reason 2).
+ */
+export function assigneeArmWhere(userId: string, params: SqlParams): string {
+  return `EXISTS (SELECT 1 FROM proj_tickets asg WHERE asg.ticket_id = v.ticket_id AND asg.assignee_id = ${params.add(userId)} AND NOT EXISTS (SELECT 1 FROM proj_projects adp WHERE adp.project_id = v.project_id AND adp.deleted_at IS NOT NULL))`;
+}
+
+/**
+ * May this viewer see these tickets — the audience table OR the assignee arm.
+ * Requires `proj_visibility` joined as `v`. Every list, board, search,
+ * attention and My Work read calls this; the note inherit arm calls
+ * `ticketAudienceWhere` instead (a note is not opened by an assignment).
+ *
+ * The two constant answers return BEFORE any parameter is bound, exactly as the
+ * audience function's do (see "No parameter it does not use" above).
+ */
+export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
+  if (eff.workspaceRole === null) return 'FALSE';
+  if (eff.workspaceRole === 'owner') return 'TRUE';
+  return `(${ticketAudienceWhere(eff, userId, params)} OR ${assigneeArmWhere(userId, params)})`;
 }
 
 /**
@@ -280,7 +307,8 @@ export function visibleNotesWhere(eff: EffectiveRole, userId: string, params: Sq
       SELECT 1 FROM proj_note_attachments na
       JOIN proj_visibility v ON v.ticket_id = na.ticket_id
       JOIN proj_tickets t ON t.ticket_id = na.ticket_id
-      WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, userId, params)}))`;
+      WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE} AND ${ticketAudienceWhere(eff, userId, params)}))`;
+  // the AUDIENCE, not `visibleTicketsWhere` — a note is not opened by assigning its ticket (W3, case 6.191).
   const arms = [
     `n.author_id = ${user}`,
     isGuest ? null : `n.scope_mode = 'workspace'`,

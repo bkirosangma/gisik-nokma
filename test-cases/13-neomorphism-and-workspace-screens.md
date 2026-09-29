@@ -747,7 +747,7 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   nothing about the count. Replaced with a tautology (`(v.workspace_id = $1 OR TRUE)`), which keeps the
   parameter bound and produces the wrong NUMBER: *"expected 7 to be 1"*. The owner's own answer is `0` by
   construction (every project nameable, so the subtraction empties), asserted because it is what proves
-  the number is a DIFFERENCE and not a count of unnameable things.
+  the number is a DIFFERENCE and not a count of unnameable things. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest. The no-see witness at this door is a guest: `nameRestrictedProjectCount` is nonzero only for a guest.
   — (`apps/server/test/routes/workspace-counts.test.ts`)
 - **13.383** ✅ The accessible-name floor RISES with the card's new controls and falls nowhere, and the
   other two signed-in ratchets do not move. Measured on the real deployed stack, not predicted:
@@ -895,7 +895,7 @@ true the moment the tree changes.
   `project.member_added` landed is named back to them and the one whose roster event was refused is NOT —
   though it exists and they founded it — with the workspace owner told BOTH as the control proving the
   second project is withheld rather than missing. That is the failure a one-event founding form ships, and
-  nothing else in the repo would have caught it.
+  nothing else in the repo would have caught it. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest. The "withheld rather than missing" half above is retired: an admin founder now sees every founded project, so the case pins the rule-A answer (admin sees both, guest sees none) — its subject is retired; the case now pins the rule-A answer.
   — (`apps/server/test/routes/workspace-home-door.test.ts`)
 - **13.389** ✅ `/w/<workspaceId>` joins the three signed-in ratchets as a seventh route, and its FIRST
   run is given teeth it would not otherwise have. `recordAccessibleBaseline` writes ABSENT keys only, so a
@@ -2348,7 +2348,7 @@ the route's half; `13.983` witnesses the mapper's.
 - **13.977** ✅ Refuses `''`, refuses a description of only spaces, refuses over 500; accepts exactly 500; **does not trim** one that has content.
 - **13.978** ✅ The projection stores a served description verbatim, and writes **NULL — not `''`** — where the event made no claim.
 - **13.979** ✅ `visibleProjects` carries the description; an undescribed project reads NULL, never `''`.
-- **13.980** ✅ The description is scoped **exactly as the NAME is** — a viewer outside the project is served no row, so no description; the viewer ON the project gets both.
+- **13.980** ✅ The description is scoped **exactly as the NAME is** — a viewer outside the project is served no row, so no description; the viewer ON the project gets both. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest.
 - **13.981** ✅ Every project row on `GET /v1/me/workspaces` carries `description` as an **always-present key**, `null` for a project nobody described.
 - **13.982** ✅ The mapper passes a string through and turns `null` into an **ABSENT key** — not `''`, not `null`.
 - **13.983** ✅ The mapper **refuses** a project row that omits the key, naming its path *and* the guard's own sentence.

@@ -29,7 +29,9 @@ import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
+import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
@@ -131,6 +133,13 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * Where invitation letters go (access plan W5). OPTIONAL, and absent means a
+   * SILENT `LogInviteMailer`: that is the ~sixty test files' default, which mint
+   * invitations and never asked for mail. `index.ts` always passes
+   * `selectInviteMailer(config)`, so a deployment decides by `SMTP_URL` alone.
+   */
+  inviteMailer?: InviteMailer;
   /**
    * The clock the ATTENTION strip computes against. Optional, and the only
    * dependency here that a test would ever want to freeze: the strip is the one
@@ -629,7 +638,14 @@ export function buildApp(
         // wrong direction is the one this replaces, where uploads were bounded
         // by nothing.
         verdict = eventsLimiter.check(`events:${clientKey}`, now());
-      } else if (method === 'POST' && routeUrl === '/v1/workspaces/:workspaceId/invites') {
+      } else if (
+        method === 'POST' &&
+        (routeUrl === '/v1/workspaces/:workspaceId/invites' ||
+          // Deviation D9: the lookup answers "does this address have an
+          // account" — an address oracle, the same scarcity as minting a
+          // credential, so it spends the same budget.
+          routeUrl === '/v1/workspaces/:workspaceId/people-lookup')
+      ) {
         // The second inherited errand — see `SecurityOptions.rateLimit`.
         // Per IP, not per user: `request.currentUserId` is written by
         // `requireSession`, which is a route-level `preHandler` and therefore
@@ -885,9 +901,18 @@ export function buildApp(
   // events are all refused at the client door by design.
   registerInviteRoutes(
     app,
-    { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
+    {
+      pool: deps.pool,
+      ingest: deps.ingest,
+      serverAppend: deps.serverAppend,
+      webOrigin: deps.webOrigin,
+      mailer: deps.inviteMailer ?? new LogInviteMailer(() => {}),
+      alerter,
+    },
     requireSession,
   );
+  // Access plan Task 6 — the exact-email lookup and the outsider door.
+  registerPeopleRoutes(app, { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend }, requireSession);
   // The CALLER-scoped half of that surface (Task 17): the invitations addressed
   // to the signed-in person's verified email, plus Accept and Decline for them.
   // A separate module rather than four more handlers in `routes/invites.ts`,

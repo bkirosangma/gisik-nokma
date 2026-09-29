@@ -10,7 +10,10 @@ import {
 } from '@gisik-nokma/domain';
 import { Button, Dialog, SegmentedControl, Select, Switch } from '@gisik-nokma/ui';
 import { readNewTicketStart, rememberNewTicketStart } from '../preferences/new-ticket-start.js';
+import { ASSIGN_OUTSIDER_OPTION, OUTSIDER_JOINS_AS_GUEST } from '../people/copy.js';
+import type { LookedUpPerson, LookupPerson } from '../people/types.js';
 import type { EditorSlotComponent } from './editor-slot.js';
+import { OutsiderFinder } from './outsider-finder.js';
 
 /**
  * The Assignee picker's row for nobody, spelled as an OPTION VALUE rather than
@@ -21,6 +24,7 @@ import type { EditorSlotComponent } from './editor-slot.js';
  * be selectable BACK, not merely the state a fresh picker happens to be in.
  */
 const UNASSIGNED = '__unassigned__';
+const OUTSIDER_OPTION = '__outsider__';
 
 /**
  * A ticket type as this dialog is handed it: the label to paint, the RANK
@@ -140,6 +144,13 @@ export type NewTicketDraft = {
    * of nobody the whole chain agrees on.
    */
   assigneeId: string | null;
+  /**
+   * `true` when `assigneeId` names someone OUTSIDER to this workspace, found by
+   * exact email (access plan W6). ABSENT otherwise — never `false` — so a draft
+   * with a member assignee is byte-identical to one before this field existed.
+   * `CreateTicketFlow` reads it to send the claim through the outsider door.
+   */
+  assigneeIsOutsider?: true;
   /**
    * Where the ticket is born (backlog/closed spec §5.4, 2026-09-17; condition
    * LIFTED by the owner 2026-09-23): whatever the "Starts in the backlog?"
@@ -319,6 +330,12 @@ export type NewTicketDialogProps = {
    */
   assigneeCandidatesUnavailable?: string;
   /**
+   * The exact-email lookup (access plan W7). Present → the picker gains
+   * `ASSIGN_OUTSIDER_OPTION`; absent → the picker is exactly the roster, as
+   * before.
+   */
+  lookupPerson?: LookupPerson;
+  /**
    * The workflow states a Starting-status control may offer, keyed by
    * workflow id (starting-status design, 2026-09-23) — the CALLER's read, the
    * same "this component derives nothing" precedent `parentCandidates` and
@@ -415,6 +432,7 @@ export function NewTicketDialog({
   editorSlot,
   assigneeCandidates,
   assigneeCandidatesUnavailable,
+  lookupPerson,
   workflowStates,
   initialSelection,
   stateRefusal,
@@ -741,6 +759,9 @@ export function NewTicketDialog({
    * naming someone.
    */
   const [assigneeId, setAssigneeId] = useState<string>(UNASSIGNED);
+  /** The outsider found by exact email, if one was picked. Drawn as an option so the picker can STATE the value. */
+  const [outsider, setOutsider] = useState<LookedUpPerson | null>(null);
+  const [findingOutsider, setFindingOutsider] = useState(false);
 
   // The SAME "no usable parent" test the submit boundary below already makes
   // for `parentId` — reused, not re-derived, so the two can never disagree
@@ -853,6 +874,12 @@ export function NewTicketDialog({
           assigneeCandidatesUnavailable !== undefined || assigneeId === UNASSIGNED
             ? null
             : assigneeId,
+        ...(assigneeCandidatesUnavailable === undefined &&
+        outsider !== null &&
+        !outsider.inWorkspace &&
+        assigneeId === outsider.userId
+          ? { assigneeIsOutsider: true as const }
+          : {}),
         // The STARTING STATUS (starting-status design, 2026-09-23) — OMITTED
         // in the two cases that would say nothing new: backlog ON (a backlog
         // ticket has no starting status) and a value equal to this workflow's
@@ -1264,9 +1291,26 @@ export function NewTicketDialog({
                 value: person.id,
                 label: person.name,
               })),
+              ...(outsider !== null && !assigneeCandidates.some((person) => person.id === outsider.userId)
+                ? [
+                    {
+                      value: outsider.userId,
+                      label: outsider.name,
+                      ...(outsider.inWorkspace ? {} : { description: OUTSIDER_JOINS_AS_GUEST }),
+                    },
+                  ]
+                : []),
+              ...(lookupPerson === undefined ? [] : [{ value: OUTSIDER_OPTION, label: ASSIGN_OUTSIDER_OPTION }]),
             ]}
             value={assigneeId}
-            onChange={setAssigneeId}
+            onChange={(next) => {
+              if (next === OUTSIDER_OPTION) {
+                setFindingOutsider(true);
+                return;
+              }
+              setFindingOutsider(false);
+              setAssigneeId(next);
+            }}
             searchable
             aria-label="Assignee"
           />
@@ -1282,6 +1326,17 @@ export function NewTicketDialog({
           </p>
         )}
       </label>
+          {assigneeCandidatesUnavailable === undefined && findingOutsider && lookupPerson !== undefined ? (
+            <OutsiderFinder
+              lookup={lookupPerson}
+              onCancel={() => setFindingOutsider(false)}
+              onPick={(person) => {
+                setOutsider(person);
+                setAssigneeId(person.userId);
+                setFindingOutsider(false);
+              }}
+            />
+          ) : null}
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>
         <Button

@@ -36,9 +36,10 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * The guest below really is a guest (via `seedGuest`, the real
  * `membership.granted` event), the ticket really exists and really is not
- * shared with them (`seedTicket`, no `visibility.set`); the member below
- * really is a member of `mine` and really is not a member of `other`
- * (`seedMember`). A refusal that fired because the caller was never signed in,
+ * shared with them (`seedTicket`, no `visibility.set`). (Amended 2026-09-29,
+ * owner ruling (A): the read-404 case used a member of `mine` off `other`; a
+ * member is on every project now, so its no-see viewer is a guest too, and the
+ * member is asserted to READ across projects.) A refusal that fired because the caller was never signed in,
  * or because the project did not exist, would prove nothing about the check
  * each test names — so every earlier guard here is made to pass first, and
  * each refusal case carries its own POSITIVE CONTROL: the same caller and the
@@ -167,7 +168,15 @@ describe('security at the HTTP surface', () => {
     expect(controlBody.results[0]?.status).toBe('committed');
   });
 
-  it("a member reading another project's ticket via direct id is refused as an indistinguishable 404", async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "a member reading
+   * another project's ticket via direct id is refused as an indistinguishable
+   * 404". A member is on every founded project now, so that read is a 200 (the
+   * second half below pins it). The protective intent — a viewer who may not see
+   * a ticket gets a 404 no different from "no such ticket" — is kept with a
+   * GUEST, the viewer rule A leaves without a project.
+   */
+  it('a viewer who may not see a ticket (a guest) reading it via direct id is refused as an indistinguishable 404; a member reads it', async () => {
     const workspaceId = newUlid();
     const mine = newUlid();
     const other = newUlid();
@@ -175,10 +184,11 @@ describe('security at the HTTP surface', () => {
     await seedProject(db.pool, workspaceId, other);
     const otherTicketId = newUlid();
     await seedTicket(db.pool, { workspaceId, projectId: other, ticketId: otherTicketId });
-    const myTicketId = newUlid();
-    await seedTicket(db.pool, { workspaceId, projectId: mine, ticketId: myTicketId });
+    const sharedTicketId = newUlid();
+    await seedTicket(db.pool, { workspaceId, projectId: mine, ticketId: sharedTicketId });
     const { headers, userId } = await signedIn();
-    await seedMember(db.pool, workspaceId, userId, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, workspaceId, userId);
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, sharedTicketId, 'explicit', [userId])]);
 
     const res = await app.inject({
       method: 'GET',
@@ -188,16 +198,40 @@ describe('security at the HTTP surface', () => {
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'not_found' });
 
-    // Positive control: the same caller, the same route, their own project's
-    // ticket — proving the 404 above is the visibility check and not a broken
-    // session, a broken route, or a workspace mismatch.
+    // Indistinguishable from a ticket that does not exist at all: same status,
+    // same body, same content-length. Without this the 404 could still be an
+    // existence oracle.
+    const ghost = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${newUlid()}`,
+      headers,
+    });
+    expect(ghost.statusCode).toBe(404);
+    expect(ghost.json()).toEqual(res.json());
+    expect(ghost.headers['content-length']).toBe(res.headers['content-length']);
+
+    // Positive control: the same caller, the same route, a ticket explicitly
+    // shared with them — proving the 404 above is the visibility check and not a
+    // broken session, a broken route, or a workspace mismatch.
     const controlRes = await app.inject({
       method: 'GET',
-      url: `/v1/workspaces/${workspaceId}/tickets/${myTicketId}`,
+      url: `/v1/workspaces/${workspaceId}/tickets/${sharedTicketId}`,
       headers,
     });
     expect(controlRes.statusCode).toBe(200);
-    expect((controlRes.json() as { ticket: { ticket_id: string } }).ticket.ticket_id).toBe(myTicketId);
+    expect((controlRes.json() as { ticket: { ticket_id: string } }).ticket.ticket_id).toBe(sharedTicketId);
+
+    // Rule A, the other half: a MEMBER of `mine` only reads the ticket in
+    // `other` — a project-mode ticket in a project off their roster.
+    const roster = await signedIn();
+    await seedMember(db.pool, workspaceId, roster.userId, 'member', [{ projectId: mine }]);
+    const memberRes = await app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/tickets/${otherTicketId}`,
+      headers: roster.headers,
+    });
+    expect(memberRes.statusCode).toBe(200);
+    expect((memberRes.json() as { ticket: { ticket_id: string } }).ticket.ticket_id).toBe(otherTicketId);
   });
 
   it('an unauthenticated ingest is a 401 before any permission logic runs', async () => {

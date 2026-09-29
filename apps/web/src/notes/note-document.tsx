@@ -31,6 +31,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { peopleProps } from '../people-props.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
@@ -116,7 +117,7 @@ function NoteDocumentBody({
    */
   onLostAccess?: () => void;
 }) {
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   const user = useCurrentUser();
   /**
    * `useSessionStatus`, not `useCurrentUser`, for the reason
@@ -724,6 +725,7 @@ function NoteDocumentBody({
       */}
       {openTicketId !== null && openTicketProjectId !== null && session.kind === 'signed-in' ? (
         <TicketSheet
+          {...peopleProps(people, note.workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={note.workspaceId}

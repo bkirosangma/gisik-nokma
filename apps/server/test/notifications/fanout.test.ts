@@ -253,7 +253,7 @@ describe('ticket.assigned', () => {
     expect(await rowsFor(ANSELMA)).toHaveLength(1);
   });
 
-  it('an assignee who cannot see the ticket gets nothing — the notification is not a side door (planted defect)', async () => {
+  it('an assignee the gate refuses gets nothing — since W3 the real gate refuses only someone out of the workspace or a vanished ticket (planted defect)', async () => {
     await seedTicket(TICKET, ANSELMA, 'Renew the DLT registration');
     visible.delete(`${ANSELMA}:${TICKET}`);
     await fanout().onCommitted(assigned());
@@ -1017,5 +1017,67 @@ describe('boot wiring (adaptation: the hook is app.ts, not index.ts)', () => {
     await fanout().onCommitted(controlEnv);
     const afterClose = await rowsFor(ANSELMA);
     expect(afterClose.map((r) => r.dedupe_key)).toEqual([`contested-claim:${controlEnv.id}`]);
+  });
+});
+
+/**
+ * Access plan Task 4 (owner ruling 2026-09-29, W4): "Notify on the New ticket
+ * dialog's assignee." The dialog puts the assignee on `ticket.created`
+ * (`packages/app-core/src/views/create-ticket-flow.tsx:327`), and until this
+ * branch nothing read it.
+ */
+describe('11.225–11.227 ticket.created with a birth assignee', () => {
+  const CREATED_TICKET = '01J9GTKC000000000000000000';
+
+  function created(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
+    // The file's own `assigned()` shape, with the birth payload.
+    return makeEnvelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: CREATED_TICKET },
+      workspaceId: WS,
+      actorId: KIRO,
+      payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'Order the tent', assigneeId: ANSELMA },
+      ...overrides,
+    });
+  }
+
+  it('11.225 one assignment row for the birth assignee; CONTROL: born unassigned delivers nothing', async () => {
+    await seedTicket(CREATED_TICKET, ANSELMA, 'Order the tent');
+    visible.add(`${ANSELMA}:${CREATED_TICKET}`);
+    const env = created();
+    await fanout().onCommitted(env);
+    const rows = await rowsFor(ANSELMA);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: 'assignment',
+      dedupe_key: `assignment:${env.id}`,
+      payload: expect.objectContaining({ ticketId: CREATED_TICKET, ticketTitle: 'Order the tent', assignedBy: KIRO }),
+    });
+
+    const { assigneeId: _dropped, ...bare } = env.payload as Record<string, unknown>;
+    await fanout().onCommitted(created({ payload: bare }));
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+  });
+
+  it('11.226 self-assignment and null tell nobody; CONTROL: another person is told', async () => {
+    await seedTicket(CREATED_TICKET, KIRO, 'Order the tent');
+    visible.add(`${KIRO}:${CREATED_TICKET}`);
+    visible.add(`${ANSELMA}:${CREATED_TICKET}`);
+    await fanout().onCommitted(created({ payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x', assigneeId: KIRO } }));
+    await fanout().onCommitted(created({ payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'x', assigneeId: null } }));
+    expect(await rowsFor(KIRO)).toHaveLength(0);
+    await fanout().onCommitted(created());
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+  });
+
+  it('11.227 redelivery is one row; CONTROL: a different event is a second row', async () => {
+    await seedTicket(CREATED_TICKET, ANSELMA, 'Order the tent');
+    visible.add(`${ANSELMA}:${CREATED_TICKET}`);
+    const env = created();
+    await fanout().onCommitted(env);
+    await fanout().onCommitted(env);
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+    await fanout().onCommitted(created());
+    expect(await rowsFor(ANSELMA)).toHaveLength(2);
   });
 });

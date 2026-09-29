@@ -126,6 +126,8 @@ import { listVisibleTickets } from './visible-tickets.js';
  *
  * ## The trigger is the EVENT, never a reconstructed prior audience
  *
+ * **`ticket.assigned` (W3, 2026-09-29)** widens the ticket to its new assignee, and only to them. It reaches this module only for readers `canSee` admits now, so it self-selects exactly as a widening `visibility.set` does. The former assignee is narrowed, never reaches this line, and loses the ticket at their next reconcile.
+ *
  * This module never asks "who could see this before". It cannot: `proj_visibility`
  * keeps no history and neither payload carries a before-image, and re-deriving
  * the pre-event audience here would be a second definition of visibility that
@@ -148,7 +150,7 @@ import { listVisibleTickets } from './visible-tickets.js';
  *   that is the whole reason this shape is legal under 6.82/6.94.
  */
 
-export const GRANT_BACKFILL_TRIGGERS = ['visibility.set', 'ticket.reparented'] as const;
+export const GRANT_BACKFILL_TRIGGERS = ['visibility.set', 'ticket.reparented', 'ticket.assigned'] as const;
 
 /**
  * The most tickets one trigger will name in one notice.

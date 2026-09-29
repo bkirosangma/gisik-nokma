@@ -1888,8 +1888,10 @@ describe('POST …/migrate — a closed ticket may only migrate to a terminal st
  * `ticket.workflow_rebound` per ticket through `ingestClientBatch`, which
  * commits one transaction per event — but it never asked the question the
  * PERMISSION GATE asks per event: `canSee`. `canSeeResolved` answers false for
- * an `admin` on a project-mode ticket whose project they are not on (there is
- * deliberately no admin read bypass), so an admin's migration of a type with
+ * an `admin` on an EXPLICIT-mode ticket whose list omits them (there is
+ * deliberately no admin read bypass; since 2026-09-29, rule A, an admin is on
+ * every project, so a project-mode ticket no longer hides from them and the
+ * fixture below is explicit-mode), so an admin's migration of a type with
  * one ticket they could see and one they could not moved the first, was
  * refused on the second, and answered `refused` — a type split across two
  * workflows under a docblock that called the window unreachable, and a client
@@ -1911,7 +1913,7 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
   let adminAuth: { authorization: string };
   /** In the project the admin IS on — created first, so it sorts first under `ORDER BY ticket_id`. */
   let visibleId = '';
-  /** In the project the admin is NOT on. */
+  /** In the project the admin is NOT on roster-wise, and EXPLICIT-mode naming the owner only (amended 2026-09-29 (A)). */
   let hiddenId = '';
 
   const flow = (id: string, name: string) => ({
@@ -1960,6 +1962,11 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
       makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: TYPE }, type: 'ticket-type.defined', payload: { id: TYPE, name: 'Audit', icon: 'check', rank: 3, workflowId: FROM, fields: [] } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: visibleId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: onProject, parentId: null, title: 'Audit the admin can see' } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: hiddenId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: offProject, parentId: null, title: 'Audit the admin cannot see' } }),
+      // AMENDED 2026-09-29, owner ruling (A): an admin is on EVERY project, so
+      // being off `offProject` no longer hides this ticket. The only thing that
+      // still can is an EXPLICIT list that omits the admin, so this ticket is
+      // explicit-mode and lists the owner alone.
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: hiddenId }, type: 'visibility.set', payload: { ticketId: hiddenId, mode: 'explicit', userIds: [owner.userId] } }),
     ]);
   }, 60_000);
 
@@ -1981,7 +1988,7 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
     return (response.json() as TypePopulationResponse).count;
   }
 
-  it('an admin not on one of the projects is refused UP FRONT with the count, and nothing is appended', async () => {
+  it('an admin who cannot see one of the tickets (explicit-mode, not listed) is refused UP FRONT with the count, and nothing is appended', async () => {
     // The gate's own answer, ticket by ticket, through the ticket door: this
     // is the fact the pre-flight has to ask about, asserted rather than
     // assumed of the seed.

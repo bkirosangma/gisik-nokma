@@ -195,8 +195,9 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // Present ONLY the lost one. `KEPT` exists, is in the same workspace, and is
     // visible; a handler that walked the workspace instead of the request would
     // have every opportunity to mention it, and an implementation that answered
-    // "here is everything you may no longer see" would name every ticket in
-    // every project this member is not on.
+    // "here is everything you may no longer see" would name every ticket
+    // this member may not see (rule A, 2026-09-29: not "in every project they are
+    // not on" — a member is on all of them; the explicit list is what hides one).
     const { statusCode, body } = await reconcile(memberHeaders, [LOST]);
     expect(statusCode).toBe(200);
     expect(body).toEqual({

@@ -40,7 +40,9 @@ import { signInWithPhone } from './session.js';
  *
  * - `owner` — workspace owner, on the project, project admin. Reads everything.
  * - `member` — workspace member, on the project.
- * - `outsider` — workspace member, NOT on the project. The 200-empty cell.
+ * - `outsider` — workspace member, NOT on the project's roster. Since rule A
+ *   (2026-09-29) they still read its project-mode work; the 200-empty cell is
+ *   now the `guest`.
  * - `guest` — workspace-scope role `guest`, on no project; reaches work only
  *   through explicit lists.
  * - `stranger` — a real signed-in user with NO membership anywhere. The 404 cell.

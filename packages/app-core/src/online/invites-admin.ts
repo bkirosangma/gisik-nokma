@@ -12,7 +12,13 @@ import { HttpError, refusalText, type HttpClient } from './http.js';
  * `expiresAt` rides along because an admin who cannot say when the link lapses
  * learns it from the person who could not get in.
  */
-export type MintedInvite = { inviteId: string; url: string; expiresAt: string };
+export type MintedInvite = {
+  inviteId: string;
+  url: string;
+  expiresAt: string;
+  /** Whether the server mailed an EMAIL-channel invitation (access plan W5); always `false` for phone. */
+  emailSent: boolean;
+};
 
 /** One row of the pending list. **No token** — see the gateway's docblock. */
 export type PendingInvite = {
@@ -137,12 +143,15 @@ export function createHttpInviteAdminGateway(http: HttpClient): InviteAdminGatew
       const inviteId = asString(record['inviteId']);
       const url = asString(record['url']);
       const expiresAt = asString(record['expiresAt']);
-      // All three or none. A mint that returned a link with no expiry would be
-      // shown to an admin under copy that promises to say when it lapses.
-      if (inviteId === null || url === null || expiresAt === null) {
+      const emailSent = record['emailSent'];
+      // All four or none. A mint that returned a link with no expiry would be
+      // shown to an admin under copy that promises to say when it lapses; one
+      // that does not say whether it was mailed would leave the result card
+      // guessing (access plan W5).
+      if (inviteId === null || url === null || expiresAt === null || typeof emailSent !== 'boolean') {
         throw new InviteAdminError(200, null);
       }
-      return { inviteId, url, expiresAt };
+      return { inviteId, url, expiresAt, emailSent };
     },
 
     async listPending(workspaceId) {

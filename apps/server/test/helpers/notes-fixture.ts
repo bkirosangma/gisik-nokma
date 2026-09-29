@@ -27,7 +27,9 @@ import { applyCommitted, makeCommitted, resetEntitySeqs } from './apply.js';
  *   being in the workspace" are the same predicate.
  * - `admin` is a workspace admin who is NOT on P. That is deliberate and it is
  *   what gives the matrix its `admin` column a `false` cell: `canSeeResolved`
- *   grants admins no read bypass (`can-see.ts`), so an admin who was also on P
+ *   (AMENDED 2026-09-29, rule A: an admin is now on every founded project, so
+ *   the roster row alone no longer decides it; the `false` cell survives only
+ *   where a note is explicit-scoped). Before rule A an admin who was also on P
  *   could not tell a role gate from a membership one. It is also the only source
  *   of an "admin-reader" (on a workspace note) and an "admin-non-reader" (on a
  *   project note) in ONE person, which is the pair spec §4.2's admin cell needs.

@@ -51,14 +51,14 @@ import { signInWithPhone } from '../helpers/session.js';
  *    asserted and an `admin` positive control in the same workspace. 13.370
  *    drives one type and one role; this drives three and two, because the page
  *    offers three controls and hides them from both non-admin roles.
- * 2. **The visibility consequence that makes the founding form's second event
- *    non-optional.** 6.81 never reads `/v1/me/workspaces`, and its actor is the
- *    workspace OWNER, who `visibleProjects` exempts from its filter. Here the
- *    founder is a workspace ADMIN at the HTTP door, so the filter applies: the
- *    project whose roster event landed is named back to them, and the one whose
- *    roster event was refused is not — though it exists, and they founded it.
- *    That is the failure a one-event founding form would ship, and nothing else
- *    in the repo would have caught it.
+ * 2. **The visibility consequence the founding form's second event USED TO
+ *    have — RETIRED 2026-09-29, owner ruling (A).** Here the founder is a
+ *    workspace ADMIN at the HTTP door, and the case once pinned that the project
+ *    whose roster event landed was named back to them while the one whose roster
+ *    event was refused was not. An admin is on every founded project now, so
+ *    both are named; the second event is no longer what decides visibility, and
+ *    the case pins that answer (with a guest, who is named neither, as the
+ *    control that the list is not simply answering everything to everyone).
  */
 
 let db: TestDatabase;
@@ -237,8 +237,13 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
    * does not have, which is worse than no case: it is a green tick over a
    * property already ticked somewhere else.
    *
-   * What is NOT covered anywhere else, and is the reason this one exists: the
-   * **visibility consequence** that makes the page's second event non-optional.
+   * **AMENDED 2026-09-29, owner ruling (A):** the visibility consequence
+   * described in the next paragraph is RETIRED — an admin is on every founded
+   * project, so the reversed project is named to its founder too. The paragraph
+   * is kept as the record of what this case used to pin.
+   *
+   * What was NOT covered anywhere else, and was the reason this one existed: the
+   * **visibility consequence** that made the page's second event non-optional.
    * 6.81 never reads `/v1/me/workspaces`; it uses the internal door and the
    * workspace OWNER, who is exempt from `visibleProjects`' filter. Here the
    * founder is a workspace ADMIN going through the HTTP door, so the filter
@@ -250,11 +255,13 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
    * The reversed batch is therefore a FIXTURE here rather than the claim: it is
    * how a project that exists and is unnamed to its own founder gets made.
    */
-  it('an ADMIN founder is named their new project only because the second event landed', async () => {
+  it('13.388 AMENDED (A): an ADMIN founder is named their new project whether or not the second event landed — its subject is retired; the case now pins the rule-A answer', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const admin = await signedIn();
     await seedMember(db.pool, workspaceId, admin.userId, 'admin');
+    const guest = await signedIn();
+    await seedGuest(db.pool, workspaceId, guest.userId);
 
     // ── The order the page submits. Both commit, and the second commits
     //    BECAUSE the first already did — `checkProjectExists` reads the row
@@ -288,21 +295,23 @@ describe('13.388 the door refuses the workspace home’s mutations from a non-ad
     // it is asserted rather than described.
     expect(reversed[1]!.status).toBe('committed');
 
-    // ── WHY THE SECOND EVENT IS NOT DECORATION. The founder is a workspace
-    //    ADMIN, not the owner, so `visibleProjects` filters them to
-    //    `eff.projects` — the set `project.member_added` builds. The forward
-    //    project is named to them; the reversed one, whose roster event was
-    //    refused, is NOT, even though it exists and they founded it.
+    // ── AMENDED 2026-09-29, owner ruling (A). This block read "WHY THE SECOND
+    //    EVENT IS NOT DECORATION": the founder is a workspace ADMIN, and
+    //    `visibleProjects` filtered them to `eff.projects` — the set
+    //    `project.member_added` builds — so the reversed project was withheld
+    //    from its own founder. An admin is on every founded project now, so the
+    //    reversed project is named to them as well; a project whose roster event
+    //    was refused is no longer unnamed to the admin who founded it.
     const named = await projectsFor(admin, workspaceId);
-    expect(named.map((p) => p.projectId)).toContain(projectId);
-    expect(named.map((p) => p.projectId)).not.toContain(reversedId);
-    // The control that keeps the line above from passing on an empty answer:
-    // the workspace OWNER is told both, because an owner is exempt from that
-    // filter. So `reversedId` really does exist — it is withheld, not missing.
+    expect(named.map((p) => p.projectId)).toEqual(expect.arrayContaining([projectId, reversedId]));
+    // The owner is told both, as before — so `reversedId` really does exist.
     const ownerSees = await projectsFor(owner, workspaceId);
     expect(ownerSees.map((p) => p.projectId)).toEqual(
       expect.arrayContaining([projectId, reversedId]),
     );
+    // The control that the list is not just answering everything to everyone: a
+    // GUEST holds no project row for either, and is named neither.
+    expect(await projectsFor(guest, workspaceId)).toEqual([]);
   });
 
 });

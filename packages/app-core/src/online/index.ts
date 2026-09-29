@@ -41,6 +41,7 @@ export {
   type MintedInvite,
   type PendingInvite,
 } from './invites-admin.js';
+export { createHttpPeopleGateway, PeopleLookupError, type PeopleGateway } from './people.js';
 export {
   FoundingError,
   createHttpFoundingGateway,

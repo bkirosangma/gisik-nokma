@@ -16,7 +16,7 @@ import { visibleTicketsWhere } from '../read/visible-where.js';
  * function's own docblock already flagged as said twice. So the clause was
  * EXTRACTED to `../read/visible-where.ts` and this function became one of its
  * callers. Everything that was claimed here about exhaustiveness, about the
- * mode side not being compiler-checkable, and about admins getting no bypass
+ * mode side not being compiler-checkable, and about the admin/member branch
  * moved with it — those are claims about the predicate, and leaving them here
  * describing a switch that no longer exists would be the drift the extraction
  * was for.

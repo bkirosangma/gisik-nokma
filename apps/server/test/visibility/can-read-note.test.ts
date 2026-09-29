@@ -22,13 +22,15 @@ import { seedNotesFixture } from '../helpers/notes-fixture.js';
  *
  * ## The cells, and what each one is FOR
  *
- * - `memberIn` is on project P; `memberOut` is a workspace member on no project.
- *   Without both, "project scope means membership" and "project scope means
- *   being in the workspace" are the same predicate.
- * - `admin` is a workspace admin who is NOT on P. That is deliberate and it is
- *   what gives the matrix its `admin` column a `false` cell: `canSeeResolved`
- *   grants admins no read bypass (`can-see.ts`), so an admin who was also on P
- *   could not tell a role gate from a membership one.
+ * - `memberIn` is on project P by a roster row; `memberOut` is a workspace member
+ *   with NO roster row. AMENDED 2026-09-29, owner ruling (A): both read P's
+ *   project-mode notes, because an admin/member is on every founded project. The
+ *   pair still separates a roster row from rule A's implicit membership.
+ * - `admin` is a workspace admin with no roster row on P. Under rule A the admin
+ *   reads P's `project` notes (it used to be the matrix's `false` cell, the "no
+ *   admin read bypass" witness, now retired); the admin's `false` cells are the
+ *   `private`, `explicit` and `inherit`-via-explicit notes. The `project` row's
+ *   no-read witnesses are the guests.
  * - `guestListed` is a guest named in two explicit audiences; `guestUnlisted` is
  *   a guest named in none. A single guest cannot tell "explicit admits guests"
  *   from "explicit admits everyone".
@@ -74,11 +76,14 @@ const EXPECTED: Record<string, Record<U, boolean>> = {
     guestUnlisted: false,
     author: true,
   },
+  // AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+  // project, so `admin` and `memberOut` READ a `project` note. The no-read
+  // witnesses on this row are the two guests, which reach no project by any rule.
   nProject: {
     owner: true,
-    admin: false,
+    admin: true,
     memberIn: true,
-    memberOut: false,
+    memberOut: true,
     guestListed: false,
     guestUnlisted: false,
     author: true,

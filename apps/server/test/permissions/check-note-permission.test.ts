@@ -72,8 +72,11 @@ const ROWS: Array<{ type: string; payload: unknown; note: string; allowed: Notes
   // neither author nor admin → refused, which is the D6 narrowing.
   { type: 'note.renamed', payload: { title: 'x' }, note: 'nWorkspace', allowed: ['author', 'owner', 'admin'] },
   { type: 'note.renamed', payload: { title: 'x' }, note: 'nPrivate', allowed: ['author', 'owner'] },
-  // admin is NOT on P, so this is the admin-NON-reader cell.
-  { type: 'note.body_set', payload: { body: DOC }, note: 'nProject', allowed: ['author', 'owner'] },
+  // AMENDED 2026-09-29, owner ruling (A): the admin is on every founded project,
+  // so this was the admin-NON-reader cell and is now an admin-READER cell. The
+  // admin-non-reader cell lives on `nPrivate` (the row above), which no rule A
+  // arm reaches; memberOut, now a reader of `nProject`, is still not author/admin.
+  { type: 'note.body_set', payload: { body: DOC }, note: 'nProject', allowed: ['author', 'owner', 'admin'] },
   { type: 'note.scope_set', payload: { mode: 'workspace' }, note: 'nExplicit', allowed: ['author', 'owner'] },
   { type: 'note.deleted', payload: {}, note: 'nWorkspace', allowed: ['author', 'owner', 'admin'] },
   // comment.added: readable is ENOUGH — no author requirement.
@@ -108,9 +111,16 @@ describe('18.025 note.created', () => {
     // A guest is refused — and by the ROLE check, before the note check runs.
     const guestRefusal = await created('guestListed', base);
     expect(guestRefusal?.rule).toBe(PERMISSION_ROLE_RULE);
-    // A member on NO project cannot file a note under P.
+    // AMENDED 2026-09-29, owner ruling (A): a member on NO roster row is on every
+    // founded project, so `memberOut` files under P. This read "a member on NO
+    // project cannot file a note under P" and now pins the rule-A answer; the
+    // refusal that used to sit here is the guest's, one line above.
     const notOnProject = await created('memberOut', { ...base, homeProjectId: P, scope: { mode: 'project' } });
-    expect(notOnProject).not.toBeNull();
+    expect(notOnProject).toBeNull();
+    // The no-file witness the line above used to be: a guest reaches no project by
+    // any rule, and is refused the same way under P as anywhere.
+    const guestUnderP = await created('guestUnlisted', { ...base, homeProjectId: P, scope: { mode: 'project' } });
+    expect(guestUnderP?.rule).toBe(PERMISSION_ROLE_RULE);
     // The owner may file under any project of the workspace.
     expect(await created('owner', { ...base, homeProjectId: P, scope: { mode: 'project' } })).toBeNull();
     // `attachTicketId` must be a ticket the actor can SEE: TE is
@@ -167,12 +177,12 @@ describe('18.042 note.created needs a project that EXISTS', () => {
     const forged = await permits('note.created', { ...base, homeProjectId: GHOST }, 'none', newUlid(), 'memberOut');
     expect(forged).not.toBeNull();
     expect(forged?.rule).toBe('project.unknown');
-    // CONTROL for the same actor: a REAL project they are NOT on is refused by
-    // the MEMBERSHIP arm with the note rule, which is a different sentence — so
-    // the refusal above is about existence and not about `memberOut` being
-    // refused everything.
+    // CONTROL for the same actor: a REAL project they hold no roster row on is
+    // ACCEPTED (AMENDED 2026-09-29, owner ruling (A): it was refused by the
+    // MEMBERSHIP arm with the note rule) — so the refusal above is about
+    // existence and not about `memberOut` being refused everything.
     const offProject = await permits('note.created', { ...base, homeProjectId: P }, 'none', newUlid(), 'memberOut');
-    expect(offProject?.rule).toBe('permission.note');
+    expect(offProject).toBeNull();
   });
 });
 

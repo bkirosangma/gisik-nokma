@@ -3,6 +3,7 @@ import { newUlid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { visibleProjects } from '../../src/read/visible-projects.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { testEnvelope } from '../helpers/envelope.js';
 import {
   applyAll,
   seedGuest,
@@ -15,23 +16,52 @@ import {
 import { readMyWork } from '../../src/routes/my-work.js';
 
 /**
+ * A GUEST who holds an explicit project-scope row on one project — the only way
+ * a guest is ever "in" a project, and the only viewer that rule A leaves with a
+ * project list SHORTER than the workspace's. Written through the real
+ * `project.member_added` event, as `seedMember` writes its rosters.
+ */
+async function seedGuestOnProject(
+  pool: import('pg').Pool,
+  workspaceId: string,
+  userId: string,
+  projectId: string,
+): Promise<void> {
+  await seedGuest(pool, workspaceId, userId);
+  await applyAll(pool, [
+    testEnvelope({
+      workspaceId,
+      entity: { kind: 'project', id: projectId },
+      type: 'project.member_added',
+      payload: { userId, projectAdmin: false },
+      actorId: '01J0SEEDADM1N0000000000000',
+    }),
+  ]);
+}
+
+/**
  * Cases 6.138–6.142. Rulings P32 and P38 — who may be told a project's NAME.
  *
  * ## The excluding fixture IS the test
  *
  * A visibility rule is an EXCLUSION, and an exclusion's blast radius is
- * invisible to a suite built around the included case. Every case below drives
- * a viewer who is in project X and NOT in project Y, and asserts BOTH halves in
- * one run: X comes back, Y does not — neither its name nor its id. Asserting
+ * invisible to a suite built around the included case. The exclusion cases
+ * drive a viewer who is in project X and NOT in project Y, and assert BOTH
+ * halves in one run: X comes back, Y does not — neither its name nor its id.
+ *
+ * **AMENDED 2026-09-29, owner ruling (A).** An admin or member is on EVERY
+ * founded project, so the viewer who is in X and not in Y is now a GUEST holding
+ * an explicit row on X (6.140, 6.142); 6.138 and 6.139 pin rule A's answer for
+ * the admin and the member — both projects come back. Asserting
  * only the absence would pass equally against a door that returned nothing at
  * all, which is the shape this project has been bitten by repeatedly.
  *
  * ## Why Y's absence here is a NAME secret and not an existence one
  *
- * An admin or member outside Y can already hold Y's project id: `TicketCard`
- * carries `projectId` (`read/ticket-cards.ts`) and a workspace-mode ticket in
- * ANY project is visible to them (`can-see.ts`, the `workspace` branch). So this
- * list withholding Y is not pretending Y does not exist — it declines to name
+ * A guest outside Y can already hold Y's project id: `TicketCard` carries
+ * `projectId` (`read/ticket-cards.ts`) and an explicit list can name them on a
+ * ticket in Y (`can-see.ts`). So this list withholding Y is not pretending Y
+ * does not exist — it declines to name
  * it, which is precisely the distinction P32 drew. That is why the ticket
  * surface is cited here rather than treated as a leak.
  */
@@ -60,26 +90,30 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     return (await visibleProjects(db.pool, eff, ws)).map((p) => p.projectId);
   }
 
-  it('6.138 THE EXCLUSION — an ADMIN not in project Y gets neither its name nor its id', async () => {
+  it('6.138 AMENDED (A): an ADMIN off every roster is served every founded project — name and id', async () => {
+    // Amended 2026-09-29, owner ruling (A): this case read "an ADMIN not in
+    // project Y gets neither its name nor its id". An admin is on every founded
+    // project now, so the admin who lists only X on their roster still gets Y.
+    // The exclusion this case guarded moved to the guest (6.140).
     const admin = newUlid();
     await seedMember(db.pool, ws, admin, 'admin', [{ projectId: projectX }]);
 
-    // Both directions in one run. Without the first assertion, "Y is absent"
-    // would also pass against a door that answered nothing — and `visibleProjects`
-    // returning `[]` for every viewer is a perfectly plausible wrong build.
-    expect(await namesFor(admin)).toEqual(['Aisles']);
-    expect(await idsFor(admin)).toEqual([projectX]);
-    expect(await idsFor(admin)).not.toContain(projectY);
+    expect((await namesFor(admin)).sort()).toEqual(['Aisles', 'Payroll']);
+    expect((await idsFor(admin)).sort()).toEqual([projectX, projectY].sort());
   });
 
-  it('6.139 THE EXCLUSION — a MEMBER not in project Y gets neither its name nor its id', async () => {
-    // Separately from the admin, because the shipped `canSeeResolved` switch
-    // treats `admin` and `member` in one branch and an implementation could
-    // easily special-case one of them; a single role would not notice.
+  it('6.139 AMENDED (A): a MEMBER off project Y is served Y too — name and id', async () => {
+    // Amended 2026-09-29, owner ruling (A). Separately from the admin, because
+    // the shipped `canSeeResolved` switch treats `admin` and `member` in one
+    // branch and an implementation could easily special-case one of them.
     const member = newUlid();
     await seedMember(db.pool, ws, member, 'member', [{ projectId: projectX }]);
-    expect(await namesFor(member)).toEqual(['Aisles']);
-    expect(await idsFor(member)).not.toContain(projectY);
+    expect((await namesFor(member)).sort()).toEqual(['Aisles', 'Payroll']);
+    expect(await idsFor(member)).toContain(projectY);
+    // A member with NO roster rows at all is on every project too (case 6.184).
+    const bare = newUlid();
+    await seedMember(db.pool, ws, bare, 'member', []);
+    expect((await namesFor(bare)).sort()).toEqual(['Aisles', 'Payroll']);
   });
 
   it('6.140 a GUEST is served only the projects it holds a membership in', async () => {
@@ -90,6 +124,15 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     // defect. The control is the roles above: they are non-empty in the same
     // file, so `[]` here is a fact about this guest and not about the door.
     expect(await namesFor(guest)).toEqual([]);
+
+    // THE EXCLUSION, on the viewer rule A leaves it for (amended 2026-09-29):
+    // a guest holding an explicit row on X is served X and NOT Y. Both halves
+    // in one run, so an `[]` door cannot pass it.
+    const guestOnX = newUlid();
+    await seedGuestOnProject(db.pool, ws, guestOnX, projectX);
+    expect(await namesFor(guestOnX)).toEqual(['Aisles']);
+    expect(await idsFor(guestOnX)).toEqual([projectX]);
+    expect(await idsFor(guestOnX)).not.toContain(projectY);
   });
 
   it('6.142 THE SECOND DOOR — a my-work item in an unnamed project carries its ID and no NAME', async () => {
@@ -98,11 +141,16 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     // viewer CAN see must still appear — with `projectId` and no name. Omitting
     // the item would hide their own assigned work; naming the project would
     // disclose what the list withholds. The map is how those coexist.
+    //
+    // AMENDED 2026-09-29, owner ruling (A). The worker was a member on X only,
+    // and a member is on every project now, so Y WOULD be named for them. The
+    // viewer this case needs — in X, not in Y — is a guest holding an explicit
+    // row on X, with Y's ticket shared to them by an explicit list.
     const worker = newUlid();
-    await seedMember(db.pool, ws, worker, 'member', [{ projectId: projectX }]);
+    await seedGuestOnProject(db.pool, ws, worker, projectX);
 
-    // A ticket in Y — which this member is NOT in — made visible to them
-    // workspace-wide, so they genuinely can see it. That is what makes the
+    // A ticket in Y — which this guest is NOT in — shared to them by an
+    // explicit list, so they genuinely can see it. That is what makes the
     // withheld NAME the only thing at stake here.
     // `seedTicket` seeds BOTH halves of the assignment — the ledger event and
     // the head-row column — because `assembleTicketCards` throws for one
@@ -122,7 +170,7 @@ describe('6.138-6.142 visibleProjects — a project NAME is a disclosure', () =>
     // cannot reach. So the definition is published here rather than the throw
     // softened: a fallback would put a slug where a name goes.
     await seedWorkflowDef(db.pool, ws);
-    await applyAll(db.pool, [setVisibilityEnv(ws, ticket, 'workspace')]);
+    await applyAll(db.pool, [setVisibilityEnv(ws, ticket, 'explicit', [worker])]);
 
     const eff = await resolveEffectiveRole(db.pool, worker, ws);
     const view = await readMyWork(db.pool, eff, worker, ws);
@@ -196,8 +244,20 @@ describe('13.979-13.980 visibleProjects carries a description, scoped as the nam
   });
 
   it('13.980 — the description is scoped EXACTLY as the name is: no row, no description', async () => {
+    // Amended 2026-09-29, owner ruling (A): a member is on every project, so
+    // the viewer with ONE project row and no other is a guest holding an
+    // explicit row on `described`.
     const member = newUlid();
-    await seedMember(db.pool, ws, member, 'member', [{ projectId: described }]);
+    await seedGuest(db.pool, ws, member);
+    await applyAll(db.pool, [
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'project', id: described },
+        type: 'project.member_added',
+        payload: { userId: member, projectAdmin: false },
+        actorId: '01J0SEEDADM1N0000000000000',
+      }),
+    ]);
 
     const rows = await projectsFor(member);
     // Both halves in one run: the project they ARE on arrives with its
@@ -207,5 +267,13 @@ describe('13.979-13.980 visibleProjects carries a description, scoped as the nam
     expect(rows.map((p) => p.projectId)).toEqual([described]);
     expect(rows[0]!.description).toBe('Sprint work for the rollout');
     expect(rows.some((p) => p.projectId === undescribed)).toBe(false);
+
+    // Rule A's other half, same run: a MEMBER on `described` alone is served
+    // BOTH projects, each with its own description.
+    const roster = newUlid();
+    await seedMember(db.pool, ws, roster, 'member', [{ projectId: described }]);
+    const all = new Map((await projectsFor(roster)).map((p) => [p.projectId, p]));
+    expect([...all.keys()].sort()).toEqual([described, undescribed].sort());
+    expect(all.get(undescribed)!.description).toBeNull();
   });
 });

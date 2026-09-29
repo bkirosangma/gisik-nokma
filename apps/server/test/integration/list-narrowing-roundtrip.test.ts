@@ -232,9 +232,12 @@ beforeAll(async () => {
     },
     1,
   );
-  // The founder owns the workspace but is not on the project until this lands;
-  // without it the visibility pass refuses every read below and the assertions
+  // The founder owns the workspace but was not on the project until this landed;
+  // without it the visibility pass refused every read below and the assertions
   // would fire on the wrong guard.
+  // Amended 2026-09-29 (rule A): the owner is on every founded project without this
+  // event, so it no longer gates the reads below. It stays as a fixture: it makes
+  // the founder an explicit project admin, which is what the assertions were built on.
   await post(
     me.headers,
     {

@@ -308,11 +308,13 @@ describe('POST /v1/workspaces — the founding door', () => {
     // reached `proj_memberships` and is being read by the gate.
     expect((projectRes.json() as { results: [{ status: string }] }).results[0]?.status).toBe('committed');
 
-    // The roster step the reserved text names. Without it the founder — owner
-    // of the workspace, but not ON the project — is refused
-    // `NOT_ON_PROJECT_REASON` by the visibility pass, which would make the
-    // assertion below fire before the type check it is about. Every earlier
-    // guard is made to pass first, deliberately.
+    // The roster step the reserved text names. AMENDED 2026-09-29, owner ruling
+    // (A) and deviation D7: this step USED TO be load-bearing — without it the
+    // founder was not ON the project and was refused `NOT_ON_PROJECT_REASON`
+    // before the type check the assertion below is about. An owner is on every
+    // founded project now, so that refusal is unreachable and the step is no
+    // longer needed for the reason it was written; it stays, because the
+    // founding form still submits it and this case is about the type check.
     const roster: SubmittedEvent = {
       id: newUlid(),
       workspaceId,

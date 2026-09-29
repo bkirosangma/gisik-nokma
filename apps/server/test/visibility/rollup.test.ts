@@ -8,6 +8,7 @@ import {
   revokeMember,
   seedGuest,
   seedMember,
+  seedProject,
   seedTicket,
   setVisibilityEnv,
 } from '../helpers/seed.js';
@@ -34,13 +35,25 @@ import {
  *
  * A count that equals a maximum because the fixture is tidy is this project's
  * recorded failure. For the flagship class (a member on one of the two
- * projects) the fixture yields a total of 9 over 6 children they can reach and
- * 3 they cannot — three different numbers, so no two can be swapped without a
- * case noticing. Across the classes the restricted count takes **six distinct
- * values** (0, 2, 3, 5, 8, 9), so a mutation cannot satisfy the suite by moving
+ * projects) the fixture yields a total of 9 over 7 children they can reach and
+ * 2 they cannot — three different numbers, so no two can be swapped without a
+ * case noticing. Across the classes the restricted count takes **five distinct
+ * values** (0, 1, 2, 8, 9), so a mutation cannot satisfy the suite by moving
  * to any one constant. `total === restricted` for an outsider is the one
  * coincidence the semantics FORCE, which is why the discrimination does not
  * rest on that class.
+ *
+ * ## Amended 2026-09-29, owner ruling (A)
+ *
+ * This fixture read "six distinct values (0, 2, 3, 5, 8, 9)" and "9 over 6
+ * reachable and 3 not". Both projects are FOUNDED now (`seedFamily` did not found
+ * them, so the old table passed under rule A only because the projects did not
+ * exist), and an admin/member is on every founded project: a member on A, a
+ * member on A and B, a member with no roster row and an admin with no roster row
+ * all reach the same seven children and are restricted from the same two
+ * explicit ones. The no-see witnesses are the guest (8) and the non-members (9);
+ * the class that took the restricted count to 1 is a member NAMED on the second
+ * explicit list, which keeps five distinct values.
  *
  * ## `restrictedCount` is cross-checked against `canSee`, child by child
  *
@@ -103,15 +116,13 @@ beforeEach(async () => {
  * every resolved mode so that the classes below disagree about them.
  *
  * - 4 × `workspace` — every member, admin and owner; no guest, no outsider.
- * - 2 × `project` on A — a member of A (and the owner).
- * - 1 × `project` on B — a member of B (and the owner).
+ * - 2 × `project` on A — every member and admin (rule A), and the owner.
+ * - 1 × `project` on B — every member and admin (rule A), and the owner.
  * - 1 × `explicit` naming the guest — the guest and the owner.
- * - 1 × `explicit` naming a stranger — the owner alone.
+ * - 1 × `explicit` naming `namedMember` — that one member and the owner.
  *
- * Nine is not a round number on purpose: with eight, a member off every project
- * would have reached four and been refused four, and a swap of the reached and
- * refused counts would have gone unnoticed on exactly the class that is meant
- * to catch the admin-no-bypass rule.
+ * Nine is not a round number on purpose: with eight, the two classes that swap
+ * reached and refused counts would have gone unnoticed.
  */
 async function seedFamily(): Promise<{
   ws: string;
@@ -119,14 +130,21 @@ async function seedFamily(): Promise<{
   prjB: string;
   parent: string;
   guestUser: string;
+  namedMember: string;
 }> {
   const ws = newUlid();
   const prjA = newUlid();
   const prjB = newUlid();
   const parent = newUlid();
   const guestUser = newUlid();
-  const stranger = newUlid();
+  const namedMember = newUlid();
 
+  // Both projects are FOUNDED (AMENDED 2026-09-29, owner ruling A). They were
+  // bare ULIDs, which production cannot produce, and under rule A an unfounded
+  // project puts nobody on it — so every member class below was passing for a
+  // reason no rule gave.
+  await seedProject(db.pool, ws, prjA);
+  await seedProject(db.pool, ws, prjB);
   await seedTicket(db.pool, { workspaceId: ws, projectId: prjA, ticketId: parent });
 
   const child = async (projectId: string): Promise<string> => {
@@ -140,7 +158,7 @@ async function seedFamily(): Promise<{
   for (let i = 0; i < 2; i += 1) modes.push([await child(prjA), 'project', []]);
   modes.push([await child(prjB), 'project', []]);
   modes.push([await child(prjA), 'explicit', [guestUser]]);
-  modes.push([await child(prjA), 'explicit', [stranger]]);
+  modes.push([await child(prjA), 'explicit', [namedMember]]);
 
   await applyAll(
     db.pool,
@@ -149,15 +167,15 @@ async function seedFamily(): Promise<{
     ),
   );
 
-  return { ws, prjA, prjB, parent, guestUser };
+  return { ws, prjA, prjB, parent, guestUser, namedMember };
 }
 
 describe('rollupFor — the total is the parent’s, the restriction is the viewer’s', () => {
   /**
-   * 6.86 — eight viewer classes over ONE fixture, with the honesty claim asserted as a PAIRING: the `total` is the parent’s and identical for everyone, while `restrictedCount` is per-viewer and differs. Either number alone could be satisfied by a wrong implementation.
+   * 6.86 — nine viewer classes (eight until 2026-09-29) over ONE fixture, with the honesty claim asserted as a PAIRING: the `total` is the parent’s and identical for everyone, while `restrictedCount` is per-viewer and differs. Either number alone could be satisfied by a wrong implementation.
    */
-  it('every viewer class reports the SAME total over all nine children while the restricted count differs, six distinct values', async () => {
-    const { ws, prjA, prjB, parent, guestUser } = await seedFamily();
+  it('every viewer class reports the SAME total over all nine children while the restricted count differs, five distinct values', async () => {
+    const { ws, prjA, prjB, parent, guestUser, namedMember } = await seedFamily();
 
     const owner = newUlid();
     const onA = newUlid();
@@ -172,6 +190,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     await seedMember(db.pool, ws, onAB, 'member', [{ projectId: prjA }, { projectId: prjB }]);
     await seedMember(db.pool, ws, offAll, 'member');
     await seedMember(db.pool, ws, adminOffAll, 'admin');
+    await seedMember(db.pool, ws, namedMember, 'member');
     await seedGuest(db.pool, ws, guestUser);
     // A revoked member whose PROJECT-scope row is still standing — the class no
     // mutation would have found on its own, and the one that proves this
@@ -184,7 +203,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     // `uncategorized: 0` — and it read `9` until `seedTicket` began writing a
     // `proj_tickets` head row. Every child here is now `open`: known, and known
     // not to be done. What this case is ABOUT is `restrictedCount`, which is the
-    // only number that varies across the eight viewer classes below and the only
+    // only number that varies across the nine viewer classes below and the only
     // one this fixture is built to drive. `terminal` and `uncategorized` are held
     // constant here on purpose and are exercised in the mixed-family case below,
     // which is where they can actually differ.
@@ -196,11 +215,14 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     });
     const classes: Array<[string, string, RollupView]> = [
       ['owner — the disclosed workspace-wide read', owner, family(0)],
-      ['member on project A', onA, family(3)],
+      // Rule A: a roster row adds nothing. The four classes below reach the same
+      // seven children and are restricted from the two explicit lists.
+      ['member on project A', onA, family(2)],
       ['member on projects A and B', onAB, family(2)],
-      ['member on no project', offAll, family(5)],
-      // Identical to the plain member above: an admin gets NO read bypass.
-      ['workspace admin on no project', adminOffAll, family(5)],
+      ['member with no roster row', offAll, family(2)],
+      ['workspace admin with no roster row', adminOffAll, family(2)],
+      // The one class that differs: named on the second explicit list.
+      ['member named on the second explicit list', namedMember, family(1)],
       ['guest — one explicit list and nothing else', guestUser, family(8)],
       ['non-member', outsider, family(9)],
       ['revoked member, project row surviving', revoked, family(9)],
@@ -221,7 +243,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     // a `restrictedCount` hard-wired to any single constant would satisfy
     // everything above that a broken total did not.
     const restricted = observed.map(([, r]) => r?.restrictedCount);
-    expect([...new Set(restricted)].sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([0, 2, 3, 5, 8, 9]);
+    expect([...new Set(restricted)].sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([0, 1, 2, 8, 9]);
 
     // The INDEPENDENT witness: `canSee`, child by child, for every class. The
     // literal table above cannot catch this function drifting from the one
@@ -245,16 +267,16 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     }
   });
 
-  it('a viewer-filtered total would make a parent look complete: the member sees six of nine, and is told nine', async () => {
+  it('a viewer-filtered total would make a parent look complete: the member sees seven of nine, and is told nine', async () => {
     const { ws, prjA, parent } = await seedFamily();
     const onA = newUlid();
     await seedMember(db.pool, ws, onA, 'member', [{ projectId: prjA }]);
 
     const rollup = await rollupFor(db.pool, onA, parent);
-    expect(rollup).toEqual({ total: 9, terminal: 0, uncategorized: 0, restrictedCount: 3 });
+    expect(rollup).toEqual({ total: 9, terminal: 0, uncategorized: 0, restrictedCount: 2 });
 
-    // Nine children, six this member can reach, three it cannot: three
-    // DIFFERENT numbers, so no two can be swapped silently. The six comes from
+    // Nine children, seven this member can reach, two it cannot: three
+    // DIFFERENT numbers, so no two can be swapped silently. The seven comes from
     // `canSee` rather than from `total - restrictedCount`, which would only
     // restate the line above it.
     const children = (
@@ -265,7 +287,7 @@ describe('rollupFor — the total is the parent’s, the restriction is the view
     ).rows.map((r) => r.ticket_id);
     let reachable = 0;
     for (const id of children) if (await canSee(db.pool, onA, id)) reachable += 1;
-    expect([children.length, reachable, rollup?.restrictedCount]).toEqual([9, 6, 3]);
+    expect([children.length, reachable, rollup?.restrictedCount]).toEqual([9, 7, 2]);
   });
 });
 
