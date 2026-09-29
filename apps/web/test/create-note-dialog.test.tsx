@@ -509,4 +509,31 @@ describe('18.11 The Notes page — creating a note', () => {
     labels = await optionsOf(user, /Scope/);
     expect(labels).toContain('Same as the ticket');
   });
+
+  /**
+   * 18.433 — the dialog re-seeds on OPEN, not on a parent re-render. `NotesPage`
+   * passes `defaultHome` as an inline object, so every page re-render hands the
+   * dialog a fresh one; keyed on identity, that re-render emptied the title a
+   * person was typing (seen as an intermittent browser-run failure: Create stayed
+   * disabled after the title was filled). Mutation: put `defaultHome` back in the
+   * effect's deps and this fails on the empty value.
+   */
+  it('18.433 a parent re-render with an equal defaultHome keeps the typed title', async () => {
+    const user = userEvent.setup();
+    const ui = () => (
+      <Providers services={stubServices({ getMembers: async () => MEMBERS })}>
+        <CreateNoteDialog
+          open
+          onClose={vi.fn()}
+          workspaces={WORKSPACES}
+          defaultHome={{ workspaceId: WS_A, projectId: '' }}
+          onCreated={vi.fn()}
+        />
+      </Providers>
+    );
+    const view = render(ui());
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Typed title');
+    view.rerender(ui());
+    expect((screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement).value).toBe('Typed title');
+  });
 });

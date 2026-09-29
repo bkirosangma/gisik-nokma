@@ -61,7 +61,14 @@ export function CreateNoteDialog({
   const [busy, setBusy] = useState(false);
 
   // Re-seeded every time it OPENS, so a dialog closed half-filled does not hand
-  // the next person the last one's title and audience.
+  // the next person the last one's title and audience. Keyed on the home's and
+  // the ticket's PRIMITIVES, not their objects: `NotesPage` builds `defaultHome`
+  // inline, so a fresh object arrives on every page re-render (a live-list
+  // refresh, another note landing) and re-seeding on identity wiped the title a
+  // person was typing (case 18.433).
+  const defaultWorkspaceId = defaultHome.workspaceId;
+  const defaultProjectId = defaultHome.projectId;
+  const attachTicketId = attachTicket?.ticketId;
   useEffect(() => {
     if (!open) return;
     setTitle('');
@@ -70,7 +77,8 @@ export function CreateNoteDialog({
     setUserIds([]);
     setFailure(null);
     setBusy(false);
-  }, [open, defaultHome, attachTicket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see the primitives above
+  }, [open, defaultWorkspaceId, defaultProjectId, attachTicketId]);
 
   const homeChoices = useMemo(() => homeOptions(workspaces), [workspaces]);
   const scopeChoices = useMemo(() => scopeOptions(home, attachTicket), [home, attachTicket]);
