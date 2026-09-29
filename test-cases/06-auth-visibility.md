@@ -415,3 +415,10 @@ Ids `6.151`–`6.152` are the next free in this section by the controller's 22:0
 - ✅ **6.214 — an assignee who is ALREADY a member is not re-granted: a MEMBER stays a member (never demoted to guest) and the assignment commits;** control: no `membership.granted` is appended. Mutation: grant regardless of membership.
 - ✅ **6.215 — a `userId` that is no account answers 422 `That person has no account.` and appends nothing;** control: a real account's id proceeds. Mutation: skip the `"user"` existence read.
 - ✅ **6.216 — both routes are HTTP-Origin-protected, cookie-authenticated POSTs: each has a `PROTECTED` row and is in the production set (the 13.116 drift guard);** control: a forged-Origin request to each is refused before any session work. Mutation: remove `/v1/workspaces/:workspaceId/assign-outsider` from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+
+## Invite follow-ups and log hygiene (fix-now batch, 2026-09-29)
+
+Case ids 6.240–6.269 belong to this batch (spec `docs/superpowers/specs/2026-09-29-access-and-invite-followups-design.md` §7, §9).
+
+- ✅ **6.240 — `redactRequestUrl` replaces the VALUE of `token`, `code`, `state`, `access_token`, `refresh_token` and `id_token` in the query with `[redacted]` (magic-link verify, OAuth callback with code and state), keeps the invite-path redaction, and leaves an ordinary URL verbatim;** control: `mytoken`, `tokens`, `/v1/token/abc`, `note=token=1` and the other parameters survive. Mutation: make the query redaction a no-op (four tests red).
+- ✅ **6.241 — a real logger writing a real line for `GET /api/auth/magic-link/verify?token=…` records the route and `token=[redacted]` and never the token, and a 5xx alert context carries the redacted URL too;** control: the `incoming request` line, the route and `callbackURL` are present. Mutation: the same no-op.

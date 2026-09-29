@@ -265,6 +265,27 @@ describe('the app error handler', () => {
   });
 
   /**
+   * 6.241 — the alert context also redacts a credential in the QUERY: a 5xx on the magic-link verify route must not page the token to a webhook.
+   */
+  it('6.241 the alert context redacts a query-string credential', async () => {
+    const contexts: string[] = [];
+    const app = buildTestApp({ notify: async (context) => void contexts.push(context) });
+    app.get('/api/auth/magic-link/verify', async () => {
+      throw new Error('boom');
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/auth/magic-link/verify?token=TESTMARKER-not-a-token&callbackURL=%2Fw',
+    });
+
+    expect(response.statusCode).toBe(500);
+    // Control: the route and the non-secret parameter are still there.
+    expect(contexts).toEqual(['GET /api/auth/magic-link/verify?token=[redacted]&callbackURL=%2Fw']);
+    await app.close();
+  });
+
+  /**
    * 13.134 — planted defect: a 400 from a schema refusal is the door WORKING — zero alert contexts are recorded, confirming sub-500s never page.
    */
   it('planted defect: a schema refusal is the door WORKING — 400 keeps its shape and pages nobody', async () => {

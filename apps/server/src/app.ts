@@ -30,7 +30,8 @@ import { registerNotificationPreferencesRoutes } from './routes/notification-pre
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
 import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
-import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { redactRequestUrl } from './http/redact-url.js';
+import { registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -392,7 +393,7 @@ export function buildApp(
               req(request: FastifyRequest) {
                 return {
                   method: request.method,
-                  url: redactInviteToken(request.url),
+                  url: redactRequestUrl(request.url),
                   host: request.headers.host,
                   remoteAddress: request.socket.remoteAddress,
                   remotePort: request.socket.remotePort,
@@ -454,7 +455,7 @@ export function buildApp(
     // `request.url` verbatim, a 5xx anywhere under `/v1/invites/:token` would
     // post an unspent invitation CREDENTIAL to a chat channel, where it outlives
     // the incident in everyone's scrollback.
-    alertWithoutWaiting(alerter, `${request.method} ${redactInviteToken(request.url)}`, error);
+    alertWithoutWaiting(alerter, `${request.method} ${redactRequestUrl(request.url)}`, error);
     return reply.status(INTERNAL_ERROR_BODY.statusCode).send(INTERNAL_ERROR_BODY);
   });
 
