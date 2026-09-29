@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import { ASSIGNEE_OUTSIDE_ROSTER, ASSIGN_OUTSIDER_OPTION, OUTSIDER_ASSIGN, OUTSIDER_EMAIL_LABEL } from '../../src/people/copy.js';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { formatDate } from '../../src/provenance.js';
@@ -201,6 +202,27 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(within(dueDateRow).getByText('set by user_kiro on 18 Aug 2026')).toBeInTheDocument();
     expect(screen.getByTestId('field-assignee').textContent).toContain('user_anselma');
     expect(document.body.textContent).not.toContain('system');
+  });
+
+  it('11.244 people the roster omits (a guest, for a member) are named from the names-only read on claims and the assignee; the roster keeps priority', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => ticketRead(),
+      getWorkflowDef: async () => WF_ERRAND,
+      // The roster names Kiro only; Anselma (the assignee) is omitted from it.
+      getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'member' }],
+      getActorNames: async () => [
+        { id: 'user_anselma', name: 'Anselma Marak' },
+        { id: 'user_kiro', name: 'Someone Else' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(ticketRead(), source);
+    await settled();
+    // Kiro, by the roster's label — priority over the names read's other spelling.
+    expect(within(screen.getByTestId('field-due')).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
+    // Anselma, only the names-only read knows.
+    expect(screen.getByTestId('field-assignee').textContent).toContain('Anselma Marak');
+    expect(screen.getByTestId('field-assignee').textContent).not.toContain('user_anselma');
   });
 
   it('PLANTED DEFECT: every field carries a claim line — a value is never a standing property', async () => {
@@ -1895,6 +1917,77 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
   });
 });
 
+describe('3.989–3.990 the sheet’s outsider arm (access plan Task 7)', () => {
+  const OUT = { userId: 'user_out', name: 'Era Momin', email: 'era@example.test', inWorkspace: false, role: null } as const;
+  const ANSELMA = { userId: 'user_anselma', name: 'Anselma Marak', email: 'anselma@example.test', inWorkspace: true, role: 'member' } as const;
+
+  async function pickVia(finderAnswer: typeof OUT | typeof ANSELMA): Promise<void> {
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: ASSIGN_OUTSIDER_OPTION }));
+    await userEvent.type(screen.getByLabelText(OUTSIDER_EMAIL_LABEL), `${finderAnswer.email}{Enter}`);
+    await userEvent.click(await screen.findByRole('button', { name: OUTSIDER_ASSIGN }));
+  }
+
+  it('3.989 an outsider pick sends ticket.assigned through assignOutsider; CONTROL: a member found goes through ingest', async () => {
+    const assignOutsider = vi.fn(async (_u: string, e: SubmittedEvent): Promise<IngestResult> => ({
+      status: 'committed',
+      eventId: e.id,
+      seq: 2,
+      serverTime: '2026-09-29T10:00:00.000Z',
+    }));
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => OUT, assignOutsider });
+    await settled();
+    await pickVia(OUT);
+    await waitFor(() => expect(assignOutsider).toHaveBeenCalledTimes(1));
+    expect(assignOutsider.mock.calls[0]![0]).toBe('user_out');
+    expect(assignOutsider.mock.calls[0]![1]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: 'user_out' } });
+    expect(source.ingested).toHaveLength(0);
+  });
+
+  it('3.989 CONTROL: someone already in the workspace goes through the ordinary door', async () => {
+    const assignOutsider = vi.fn();
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => ANSELMA, assignOutsider });
+    await settled();
+    await pickVia(ANSELMA);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(assignOutsider).not.toHaveBeenCalled();
+  });
+
+  it('3.989 a member can still clear an assignee the roster hides, once the outsider arm is on; CONTROL: without it the row is read-only', async () => {
+    // Final review (2026-09-29): pulling an outsider in made the assignment
+    // unmanageable by the member who made it (guests are hidden from the roster).
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    const withArm = renderSheet(ghost, sheetSource(ghost), { lookupPerson: async () => OUT, assignOutsider: vi.fn() });
+    await settled();
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: ASSIGNEE_OUTSIDE_ROSTER })).toBeInTheDocument();
+    await userEvent.click(within(listbox).getByRole('option', { name: 'Unassigned' }));
+    await waitFor(() => expect(withArm.ingested).toHaveLength(1));
+    expect(withArm.ingested[0]![0]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: null } });
+  });
+
+  it('3.989 CONTROL: without the outsider arm the same ticket stays read-only', async () => {
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    renderSheet(ghost, sheetSource(ghost));
+    await settled();
+    expect(within(screen.getByTestId('field-assignee')).queryByRole('button')).toBeNull();
+  });
+
+  it('3.990 the outsider door’s refusal is shown verbatim; CONTROL: none on commit', async () => {
+    const reason = 'That person has no account.';
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      lookupPerson: async () => OUT,
+      assignOutsider: async (_u, e) => ({ status: 'refused', eventId: e.id, rule: 'people.outsider', reason }),
+    });
+    await settled();
+    await pickVia(OUT);
+    expect(await screen.findByText(reason, { exact: false })).toBeInTheDocument();
+  });
+});
+
 /**
  * **13.989 — the description is EDITABLE, on the door that already exists.**
  *
@@ -2354,6 +2447,9 @@ describe('F — the subtasks section', () => {
   });
 
   it('16.21 a refused title shows the SERVER’s sentence and KEEPS what was typed', async () => {
+    // The view forwards a blank title on purpose so the server's refusal can be
+    // shown; the suite-wide payload guard would throw at the factory.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
     const read = ticketRead({ rollup: null });
     const source = sheetSource(read, [], []);
     source.ingest = async (events) => {

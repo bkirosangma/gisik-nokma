@@ -246,20 +246,52 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
     expect(since).toContain(read.world.taskInEpicId);
   });
 
-  it('7.146 PLANTED DEFECT: a revocation mid-stream reaches the subscriber as purge frames for exactly what they lost, over the open socket', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "a revocation mid-stream
+   * reaches the subscriber as purge frames for exactly what they lost". It took
+   * `projectLead` off the sibling project and expected a purge for each of that
+   * project's two tickets. Under rule A a member is on every founded project, so
+   * being taken off a roster loses them nothing: both tickets are still theirs
+   * and are NOT retracted (a purge for a ticket they may read would order the
+   * client to forget something the server will go on sending). The only id the
+   * roster boundary still names is one in the lost scope that they can NOT see
+   * now and never held — an explicit list that omits them, the accepted
+   * in-scope leak (`visible-events-for.test.ts` 6.17). That is what this case
+   * now observes over the open socket, with the two held tickets as the
+   * negative and a later event on one of them as the rule-A positive control.
+   * Its old subject — a roster removal that narrows a member — is retired.
+   */
+  it('7.146 AMENDED (A): a project roster removal mid-stream retracts nothing a member holds — the socket stays open, held tickets keep arriving, and only the scope\'s never-held id is named', async () => {
     // `projectLead` and the SIBLING project, deliberately: this case takes
-    // somebody off a project for good, and doing that to `member` or to the
-    // seeded project would change the world every other case in this file — and
-    // every other Plan 5 suite standing on `read-app.ts` — is measuring.
+    // somebody off a project roster for good, and doing that to `member` or to
+    // the seeded project would change the world every other case in this file —
+    // and every other Plan 5 suite standing on `read-app.ts` — is measuring.
     // Nothing else here uses `projectLead`.
+    //
+    // A ticket in the sibling project that is explicit to the owner alone, made
+    // BEFORE the subscription so `projectLead` has never been sent it.
+    const sealedId = newUlid();
+    await submit(read.app, 'owner', [
+      {
+        entity: { kind: 'ticket', id: sealedId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: read.sibling.projectId, parentId: null, title: 'Sealed' },
+      },
+      {
+        entity: { kind: 'ticket', id: sealedId },
+        type: 'visibility.set',
+        payload: { ticketId: sealedId, mode: 'explicit', userIds: [read.userIds.owner] },
+      },
+    ]);
+
     const stream = await connect('projectLead');
     stream.subscribe(read.world.workspaceId, 0);
     await stream.next((frame) => frame.type === 'caught-up');
-    // They hold both of the sibling project's tickets to begin with — without
-    // this the purges below would be instructions to forget something they
-    // never had.
+    // They hold both of the sibling project's tickets to begin with, and have
+    // never been told of the sealed one.
     expect(stream.raw.join('\n')).toContain(read.sibling.ticketId);
     expect(stream.raw.join('\n')).toContain(read.sibling.choreTicketId);
+    expect(stream.raw.join('\n')).not.toContain(sealedId);
 
     await submit(read.app, 'owner', [
       {
@@ -268,52 +300,45 @@ describe('WS /v1/stream — the door, the frames and the heartbeat', () => {
         payload: { userId: read.userIds.projectLead },
       },
     ]);
+    // The scope's never-held explicit-unlisted id is named, by id, over the open
+    // socket…
+    await stream.next((frame) => frame.type === 'purge' && frame.entityId === sealedId);
+    // …and the roster event itself travels (same drain), so the absences below
+    // are read after the drain that would have carried any other purge.
     await stream.next(
-      (frame) => frame.type === 'purge' && frame.entityId === read.sibling.ticketId,
-    );
-    await stream.next(
-      (frame) => frame.type === 'purge' && frame.entityId === read.sibling.choreTicketId,
+      (frame) =>
+        frame.type === 'event' &&
+        frame.envelope.type === 'project.member_removed' &&
+        frame.envelope.entity.id === read.sibling.projectId,
     );
     const purges = stream.frames.filter((frame) => frame.type === 'purge');
     expect(purges.every((frame) => frame.workspaceId === read.world.workspaceId)).toBe(true);
-    // The socket lives on and the subscription with it — a narrowing inside a
-    // workspace is a retraction, not an eviction. `scope-revoked` is the other
-    // instruction and it is NOT this one.
+    // The positive control this branch requires of every negative below: the
+    // SAME filter over the SAME array finds a purge when there is one to find.
+    expect(purges.map((frame) => frame.entityId)).toEqual([sealedId]);
+    expect(purges.map((frame) => frame.entityId)).not.toContain(read.sibling.ticketId);
+    expect(purges.map((frame) => frame.entityId)).not.toContain(read.sibling.choreTicketId);
+    // The socket lives on and the subscription with it. `scope-revoked` is the
+    // other instruction and it is NOT this one.
     expect(stream.socket.readyState).toBe(stream.socket.OPEN);
-    // The positive control this branch requires of every `toEqual([])`: the
-    // SAME filter over the SAME array finds frames when there are frames to
-    // find, so the empty result below is "no scope-revoked" rather than "no
-    // frames at all" or a predicate that matches nothing.
-    expect(purges.length).toBeGreaterThanOrEqual(2);
     expect(stream.frames.filter((frame) => frame.type === 'scope-revoked')).toEqual([]);
 
-    // And the narrowing really narrowed: the next event on a ticket they just
-    // lost does not arrive. The ordering event is a PROJECT founding, not
-    // another ticket: `projectLead` was on the sibling project and no other, so
-    // after the removal there is no ticket left in the workspace they may see —
-    // a ticket-shaped control here would be absent for the same reason the
-    // subject of the test is, and would prove nothing. A project founding
-    // reaches every non-guest member, so it orders the silence without
-    // depending on the visibility this case just took away.
-    const before = stream.raw.length;
-    const freshProjectId = newUlid();
+    // Rule A's positive control: the next event on a ticket they used to hold by
+    // roster STILL arrives. It used to be the proof of narrowing; it is now the
+    // proof there was none.
     await submit(read.app, 'owner', [
       {
         entity: { kind: 'ticket', id: read.sibling.ticketId },
         type: 'ticket.field_set',
         payload: dueDate('2026-09-10'),
       },
-      {
-        entity: { kind: 'project', id: freshProjectId },
-        type: 'project.created',
-        payload: { name: 'Founded after the removal' },
-      },
     ]);
     await stream.next(
-      (frame) => frame.type === 'event' && frame.envelope.entity.id === freshProjectId,
+      (frame) =>
+        frame.type === 'event' &&
+        frame.envelope.entity.id === read.sibling.ticketId &&
+        (frame.envelope.payload as { value?: { date?: string } }).value?.date === '2026-09-10',
     );
-    expect(stream.raw.slice(before).join('\n')).not.toContain('2026-09-10');
-    expect(stream.raw.slice(before).join('\n')).not.toContain(read.sibling.ticketId);
   });
 
   it('7.158 RECORDED, NOT FIXED: a per-TICKET narrowing mid-stream sends no purge at all — the events simply stop, and the replica keeps what it may no longer see', async () => {

@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandl
 import { z } from 'zod';
 import { BACKLOG_STATE_ID, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type {
+  ActorName,
+  ActorNameListResponse,
   MemberListResponse,
   MigrationOutcome,
   PublishedWorkflowDef,
@@ -278,6 +280,47 @@ export async function readMembers(
     // to serve. The predicate and the reasoning live in `auth/synthetic-address.ts`.
     ...(isSyntheticPhoneEmail(row.email) ? {} : { email: row.email }),
   }));
+}
+
+/**
+ * Who acted here, by display name and nothing more — the read behind every
+ * "who did this" label a member sees (owner ruling 2026-09-29: names are not
+ * the sensitive part; emails, phones and roles stay exactly as gated).
+ *
+ * ## Why it is not `readMembers`
+ *
+ * The roster is a DIRECTORY: it feeds pickers, the members screen and the
+ * member count, and it withholds guests from a non-admin (`ROSTER_VISIBLE_CLAUSE`).
+ * A label join needs the guest too — a member reading a note a guest wrote
+ * would otherwise see the author's raw id — but widening the roster would put
+ * the guest in every picker and break the count/list agreement. So the join
+ * reads this instead, and the directory is untouched.
+ *
+ * ## What is left out, and why
+ *
+ * - A blank name: there is nothing to say, and the caller's own fallback
+ *   (roster email, then id) is unchanged.
+ * - A person whose address is synthetic: their name IS their phone number
+ *   (`auth.ts`'s `getTempName`), and the roster withholds that address for
+ *   exactly this reason. Their name travels only where the roster already
+ *   carried it, which is where the client's roster join already finds it.
+ * - Anyone with no CURRENT workspace-scope membership here: a removed person,
+ *   and every other workspace's people. What the product shows for a removed
+ *   person is unchanged (their id).
+ */
+export async function readActorNames(db: Queryable, workspaceId: string): Promise<ActorName[]> {
+  const { rows } = await db.query<{ user_id: string; display_name: string; email: string }>(
+    `SELECT m.user_id, u."name" AS display_name, u."email"
+       FROM proj_memberships m
+       JOIN "user" u ON u."id" = m.user_id
+      WHERE m.workspace_id = $1
+        AND m.scope_kind = 'workspace'
+      ORDER BY m.user_id`,
+    [workspaceId],
+  );
+  return rows
+    .filter((row) => !isSyntheticPhoneEmail(row.email) && (row.display_name ?? '').trim() !== '')
+    .map((row) => ({ userId: row.user_id, displayName: row.display_name.trim() }));
 }
 
 /**
@@ -702,6 +745,23 @@ export function registerBuilderReadRoutes(
         // the door's answer threaded through, never a second resolution.
         members: await readMembers(deps.pool, workspaceId, isWorkspaceAdmin(eff)),
       };
+      return body;
+    },
+  );
+
+  app.get<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/actor-names',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId } = request.params;
+      // The roster's door, and on purpose: 7.91 keeps a guest out of anything
+      // that lists the workspace's people, and this lists them (names only).
+      // Letting a guest see staff names is one enum value here — `'no-guests'`
+      // to the door's member-level answer — and is the owner's call, not this
+      // route's.
+      const eff = await door(request, workspaceId, 'no-guests');
+      if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
+      const body: ActorNameListResponse = { workspaceId, names: await readActorNames(deps.pool, workspaceId) };
       return body;
     },
   );

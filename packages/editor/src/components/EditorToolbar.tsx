@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { getMarkRange } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 import { TablePicker } from './TablePicker.js';
@@ -289,6 +289,25 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
   const [focused, setFocused] = useState(false);
   const tooltipId = useId();
   const show = hovered || focused;
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+
+  // Keep the panel inside the composer that clips it. `.editor-slot` is `overflow: hidden`
+  // (it owns the corners), so a panel wider than the room to its button's right — a long name on a
+  // wrapped row, or the last button — would lose its end to the clip (owner, 2026-09-29: the note
+  // editors showed no tooltip at all). The stylesheet opens it below and left-anchored; this only
+  // shifts it sideways by the overshoot. A bare `TicketEditor` has no `.editor-slot`, nothing clips
+  // it there, and it is left where the stylesheet put it.
+  useLayoutEffect(() => {
+    const tip = tooltipRef.current;
+    const clip = tip?.closest('.editor-slot') ?? null;
+    if (tip === null || clip === null) return;
+    tip.style.transform = '';
+    const t = tip.getBoundingClientRect();
+    const c = clip.getBoundingClientRect();
+    let shift = t.right > c.right ? c.right - t.right : 0;
+    if (t.left + shift < c.left) shift = c.left - t.left;
+    if (shift !== 0) tip.style.transform = `translateX(${shift}px)`;
+  }, [hovered, focused]);
 
   const rawShortcut = SHORTCUTS[control.key] ?? null;
   const shortcutDisplay = rawShortcut === null ? null : formatShortcut(rawShortcut, isMac);
@@ -326,7 +345,7 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
       </button>
       {control.panel}
       {show ? (
-        <span role="tooltip" id={tooltipId} className="ticket-editor__tooltip">
+        <span role="tooltip" id={tooltipId} ref={tooltipRef} className="ticket-editor__tooltip">
           <span className="ticket-editor__tooltip-line">
             <span className="ticket-editor__tooltip-name">{control.name}</span>
             {shortcutDisplay === null ? null : (

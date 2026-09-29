@@ -2,6 +2,23 @@ import type { WorkspaceRole } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 
 /**
+ * The workspace roles that are ON EVERY PROJECT of their workspace — rule A
+ * (owner ruling 2026-09-29: "admins and members see every project in their
+ * workspace by default"; access plan W1).
+ *
+ * The OWNER is here by deviation D1: owner reads were already total
+ * (`canSeeResolved`'s owner arm), but the `ticket.created` door asks the project
+ * set and has no owner exemption (`check-permission.ts:1367`), so without this
+ * an admin could create where the owner could not. A GUEST is not here: a guest
+ * reaches work through explicit lists and assignment (W3), never a project.
+ *
+ * NO DATA IS WRITTEN. The set is read from `proj_projects` on every resolve, so
+ * a member who joined with zero roster rows — all fifteen in production on
+ * 2026-09-29 — is on every project the moment this ships (W2, case 6.184).
+ */
+export const RULE_A_ROLES: ReadonlySet<WorkspaceRole> = new Set<WorkspaceRole>(['owner', 'admin', 'member']);
+
+/**
  * The brand that says an `EffectiveRole` came out of `resolveEffectiveRole`.
  *
  * A real runtime symbol, and deliberately NOT exported: a module that cannot
@@ -81,7 +98,9 @@ type MembershipRow = {
  * ## The role rules
  *
  * A user's workspace role is their workspace-scope row's role, or null. Their
- * project set is every project-scope row, with that row's project-admin flag.
+ * project set is every project-scope row, with that row's project-admin flag,
+ * plus — for `RULE_A_ROLES` — every founded project of the workspace with the
+ * flag off.
  *
  * The plan text carried a second clause: a user holding only project-scope rows,
  * one of which carries role 'guest', resolves to workspace role 'guest'. It is
@@ -144,7 +163,28 @@ export async function resolveEffectiveRole(
     return { [RESOLVED]: true, workspaceRole: null, projects: new Map() };
   }
 
-  return { [RESOLVED]: true, workspaceRole, projects };
+  if (!RULE_A_ROLES.has(workspaceRole)) {
+    return { [RESOLVED]: true, workspaceRole, projects };
+  }
+  // Rule A. Every founded, LIVE project of the workspace. A DELETED project is
+  // excluded (coordinator amendment 2026-09-29, case 6.217): the doors that ask
+  // `canSee` alone — ticket history, attachments, reconcile, the stream — have
+  // no deletion predicate, so including it would widen trash Plan 1's
+  // containment gap from "the project's explicit members" to "every admin and
+  // member". Explicit roster rows below are untouched, so an explicit member of
+  // a deleted project keeps exactly the pre-rule-A answer (case 6.186).
+  //
+  // IMPLICIT FIRST, EXPLICIT SECOND, and the order is load-bearing: an explicit
+  // roster row carries `projectAdmin`, and writing the implicit `false` after it
+  // would strip a project admin of their rights (case 6.181).
+  const { rows: founded } = await db.query<{ project_id: string }>(
+    'SELECT project_id FROM proj_projects WHERE workspace_id = $1 AND deleted_at IS NULL',
+    [workspaceId],
+  );
+  const everyProject = new Map<string, { projectAdmin: boolean }>();
+  for (const row of founded) everyProject.set(row.project_id, { projectAdmin: false });
+  for (const [projectId, flag] of projects) everyProject.set(projectId, flag);
+  return { [RESOLVED]: true, workspaceRole, projects: everyProject };
 }
 
 /**
@@ -155,9 +195,9 @@ export async function resolveEffectiveRole(
  * managing projects and people); anyone else needs that project's
  * `projectAdmin` flag.
  *
- * This is NOT a read bypass. Task 7's `canSee` grants owners and admins no
- * visibility they were not given — do not reach for this function to answer
- * "may they see it".
+ * Reading is `canSee`'s question. Since rule A (2026-09-29) an owner, admin or
+ * member reads every project's project-mode tickets through the project set,
+ * not through this function.
  */
 export function hasProjectAdminRights(eff: EffectiveRole, projectId: string): boolean {
   return (

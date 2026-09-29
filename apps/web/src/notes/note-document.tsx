@@ -16,25 +16,30 @@ import { Button } from '@gisik-nokma/ui';
 import {
   DeleteDialog,
   TicketSheet,
+  actorLabelFrom,
   classifyBatch,
   makeSubmittedFactory,
+  mentionCandidatesOf,
   restoreSeeds,
   restoreUnreachableLine,
   unansweredLine,
   useLiveQuery,
   usePurgedPredicate,
   writeFailureCopy,
+  type Actor,
   type DataSource,
   type RosterMember,
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { peopleProps } from '../people-props.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
+import { ticketChipClickHandler } from './ticket-chip-click.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
 
@@ -114,7 +119,7 @@ function NoteDocumentBody({
    */
   onLostAccess?: () => void;
 }) {
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   const user = useCurrentUser();
   /**
    * `useSessionStatus`, not `useCurrentUser`, for the reason
@@ -340,6 +345,29 @@ function NoteDocumentBody({
   }, [dataSource, note?.workspaceId]);
 
   /**
+   * The names-only read, for the people the roster omits — a guest author, for a
+   * member's roster. Kept apart from `members` on purpose: `members` feeds the
+   * scope picker and the mention list, which must not offer a guest; this feeds
+   * labels only (`actorLabelFrom`). A refusal is an empty list.
+   */
+  const [actorNames, setActorNames] = useState<Actor[]>([]);
+  useEffect(() => {
+    if (note === null) return;
+    let cancelled = false;
+    dataSource.query.getActorNames(note.workspaceId).then(
+      (rows) => {
+        if (!cancelled) setActorNames(rows);
+      },
+      () => {
+        if (!cancelled) setActorNames([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, note?.workspaceId]);
+
+  /**
    * The document as the editor last reported it. `onDraft` fires on every
    * change in note mode, and this is what "Copy as Markdown" and the reading
    * time read — WITHOUT it they would serialise the body the note was LOADED
@@ -501,20 +529,13 @@ function NoteDocumentBody({
     }
   }
 
-  const authorName = useMemo(() => {
-    if (note === null) return '';
-    const author = members.find((member) => member.id === note.authorId);
-    return author?.name?.trim() || author?.email?.trim() || note.authorId;
-  }, [note, members]);
-
-  /** Any author's name from the SAME roster `authorName` reads — History rows name whoever recorded each version, not just the note's own author. */
+  /** Any author's name from the roster, then the names-only read — History rows and comments name whoever wrote them, not just the note's own author. */
   const nameOf = useMemo(
-    () => (authorId: string) => {
-      const member = members.find((candidate) => candidate.id === authorId);
-      return member?.name?.trim() || member?.email?.trim() || authorId;
-    },
-    [members],
+    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? authorId,
+    [members, actorNames],
   );
+
+  const authorName = useMemo(() => (note === null ? '' : nameOf(note.authorId)), [note, nameOf]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   /**
@@ -579,7 +600,7 @@ function NoteDocumentBody({
     workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? null;
 
   return (
-    <div className="gn-note-document" data-testid="note-document">
+    <div className="gn-note-document" data-testid="note-document" onClick={ticketChipClickHandler(openTicket)}>
       {/* An absent level renders NO `<li>` at all, not an empty one — the
           stylesheet's own separator rule (`.gn-breadcrumb__item +
           .gn-breadcrumb__item::before`) draws `/` only BETWEEN two
@@ -672,6 +693,7 @@ function NoteDocumentBody({
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
           editorRef={editorInstanceRef}
+          members={members}
           onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
         />
       </div>
@@ -682,6 +704,7 @@ function NoteDocumentBody({
         nameOf={nameOf}
         canComment
         notes={treeNotes}
+        members={members}
       />
 
       <HistoryPanel
@@ -720,6 +743,7 @@ function NoteDocumentBody({
       */}
       {openTicketId !== null && openTicketProjectId !== null && session.kind === 'signed-in' ? (
         <TicketSheet
+          {...peopleProps(people, note.workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={note.workspaceId}
@@ -811,6 +835,7 @@ function NoteEditorPane({
   onDraftChange,
   onNavigateNote,
   editorRef,
+  members,
   onDraftDiscarded,
 }: {
   note: NoteDetail;
@@ -821,6 +846,14 @@ function NoteEditorPane({
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
   editorRef: TicketEditorSlotProps['editorRef'];
+  /**
+   * The workspace roster `NoteDocument` already loads for the byline — the
+   * `@` picker's people (`mentionCandidatesOf`, the SAME source the ticket
+   * sheet's editors use). Read through a closure at query time, and
+   * `TicketEditor` threads `queryUsers` through a props ref, so a roster that
+   * arrives after the editor mounted is still what the picker searches.
+   */
+  members: RosterMember[];
   /** The banner's Discard: the parent remounts this pane, which then recovers nothing and mounts with the server's body. */
   onDraftDiscarded: () => void;
 }) {
@@ -882,6 +915,7 @@ function NoteEditorPane({
         onSave={autosave.onSave}
         saveState={autosave.saveState}
         placeholder="Write the note…"
+        queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
         queryNotes={async (query: string) => {
           const needle = query.trim().toLowerCase();
           const hits: Array<{ noteId: string; title: string }> = [];

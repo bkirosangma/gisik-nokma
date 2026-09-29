@@ -50,16 +50,13 @@ import { canSee } from '../visibility/can-see.js';
  * member's session, and pins the response byte-for-byte (headers included)
  * against the request that sends none.
  *
- * ## Assignment is not visibility, and both conjuncts are here for that reason
+ * ## Assignment IS enough to see one's own ticket (owner ruling 2026-09-29, W3)
  *
- * `t.assignee_id = $n` says a claim was made about this person. It says nothing
- * about whether they may READ the row, and the two come apart in four reachable
- * ways this route is measured against: a ticket explicitly shared with somebody
- * else, a project-mode ticket in a project the assignee is not on, an assignee
- * REMOVED from that project afterwards, and an audience narrowed by a later
- * `visibility.set`. Every one of them is a row that satisfies the assignee
- * clause and must not appear, so `visibleTicketsWhere` is not a second gate
- * behind the door — it is half of what makes the answer correct.
+ * `visibleTicketsWhere` now ORs the assignee arm, so `t.assignee_id = $n` alone
+ * decides membership of this answer for anyone holding a workspace role. The
+ * predicate stays in the conjunction because it is also the tenancy-free
+ * statement of who may see a row, and removing it would make this the one read
+ * that re-expresses the rule.
  *
  * It is CONSUMED, never re-expressed: Task 5 spent a review making that
  * predicate the single SQL statement of Plan 4's decision table, and a second

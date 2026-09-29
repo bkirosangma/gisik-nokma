@@ -241,57 +241,42 @@ If the list cannot be read, the section says so, rather than showing an empty li
    correct, not a fault.)
 3. Fill in:
    - **Address** — their email address or phone number.
-   - **Channel** — a dropdown offering email, sms and whatsapp.
+   - **Channel** — **email** or **Phone (SMS)**.
    - **Role** — admin, member or guest. (See below.)
-   - **Projects** — this box appears for admin and member, and is hidden for guest.
-4. Press **Send invitation**.
+
+   If the email address you typed belongs to somebody who already has an account, the form says so
+   when you leave the box, and the invitation goes to the address that account signs in with.
+4. Press **Send invitation** (for Phone (SMS) the button reads **Create invite link**). For email, the
+   product sends the invitation to that address, and the next screen says it was emailed. If the email
+   could not be sent, the screen says so, and you send the link yourself.
 5. **The next screen shows you a link, once.** It says: *"Copy it now — it is not stored and cannot be
    shown again."*
 
 > ## Copy that link before you do anything else.
 >
-> It means exactly what it says. That link appears once, on that screen, at that moment. It is not in
-> the pending list. It is nowhere else. Nobody — including you — can look it up again. If you close
-> the tab you have to withdraw the invitation and start over.
->
-> Paste it into an email to the person **first**, then carry on.
+> The link is still shown once. For an emailed invitation you do not need it, but copy it anyway if
+> the email did not go. It appears on that screen, at that moment; it is not in the pending list and
+> nobody — including you — can look it up again. If you close the tab you have to withdraw the
+> invitation and start over.
 
 ### About the "Channel" dropdown
 
-The dropdown offers email, sms and whatsapp, but **the product does not appear to send the invitation
-by any of them.** It makes a link, shows it to you once, and you send it however you like.
-
-So treat "Channel" as a note to yourself about how you intend to reach the person, and plan on sending
-the link by hand.
+**email** sends the invitation for you. **Phone (SMS)** does not send anything yet: it makes the link,
+and you send it by message yourself.
 
 ### About the "Project access" box
 
-It is a dropdown, and it offers **All projects in this workspace** plus one **Only *<project name>***
-entry for each project you can see. Pick a name; the product works out the identifier behind it.
-
-**⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so.** Until 2026-09-21 the box
-was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters and
-numbers that you would have to go and find from somewhere — the manual's own verdict was *"In practice
-this box is not usable by a person."* It is kept here, rather than deleted, so a reader who remembers
-it as an unusable box finds the correction where they last saw it.
-
-Leave it on **All projects in this workspace** unless the invitation really is for one project only.
-
-It is correctly hidden when you pick **guest**, and if you try to invite a guest *and* name projects
-it refuses and tells you to share individual jobs with them instead.
+**Removed on 29 September 2026.** Admins and members now see every project in their workspace, so there
+is nothing to choose. A guest still sees only the jobs shared with them or assigned to them.
 
 ### The four roles
 
 | Role | What it means |
 |---|---|
 | **Owner** | You, if you created the workspace. Sees absolutely everything in the workspace, including jobs shared with only a few named people. There is no way to hide anything from the owner. No way to hand ownership to somebody else was found on any screen, so plan on the founder staying the owner. |
-| **Admin** | **A "can change things" role, not a "can see things" role.** This surprises everybody. An admin can invite people and set up stages and job types — but only sees the projects they have personally been put on, same as anyone else. |
-| **Member** | Ordinary staff. Does the work. Cannot invite people, cannot change how the stages work. |
-| **Guest** | An outsider — a client, your accountant. Sees only the specific jobs somebody has explicitly shared with them. Nothing else. Cannot see the people list. Cannot create jobs. |
-
-**The practical consequence of the admin rule:** if you want somebody to be able to invite people
-*and* see the work, you have to make them an admin *and* get them onto the projects. One does not come
-with the other.
+| **Admin** | Can invite people and set up stages and job types, and sees every project in the workspace. |
+| **Member** | Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the stages work. |
+| **Guest** | An outsider — a client, your accountant. Sees only the jobs somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create jobs. |
 
 **You cannot invite somebody as an owner.** That option is not in the dropdown and the product refuses
 it if it is forced.
@@ -413,6 +398,10 @@ Everything else on that panel is there to read rather than to change: the type a
 all show who claimed the value and when. The controls are the title box at the top, the **Assignee**
 picker, the **Priority** picker, the description box, the **Due** and **Start** date boxes, and the
 **Visibility** pill.
+
+### Assigning somebody who is not in the workspace
+
+In the **Assignee** picker, choose **Assign someone outside this workspace…**, type their email and press **Find**. If an account has exactly that email, it is shown. Press **Assign**, and they join the workspace as a guest who sees only that job. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says **No user with that email.** Anyone who can assign a job can do this.
 
 ### The things you cannot do to a job
 
@@ -1017,7 +1006,7 @@ Exactly five kinds of message, and no more. The list is deliberately closed — 
 a sixth kind.
 
 1. Somebody assigned something to you — *"Anselma Marak assigned this to you"*
-2. Somebody mentioned you — *"Anselma Marak mentioned you"*
+2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
 5. Something has been sitting in one stage too long — *"In Doing since 21 Aug — moved there by
@@ -1691,6 +1680,16 @@ It works the other way too: an attached job appears as a badge in the note's own
 the job's own panel opens right there, over the note — you are not taken to the job's page. Deleting the
 job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on
 this).
+
+### Mentioning somebody in a note
+
+Type `@` and start a person's name, in a note or in its comments: the same list of people the job editors offer
+appears, and picking one drops a mention at the cursor. **A mention notifies the person, once.** Saving the note
+again with the same mention in it does not tell them again; adding someone new tells only the new person, and a
+comment that mentions somebody tells them as soon as it is posted. **Only people who can read the note are told**
+— mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning
+yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
+setting under Account → Notifications, exactly like a mention on a job.
 
 ### Linking to a job or another note
 

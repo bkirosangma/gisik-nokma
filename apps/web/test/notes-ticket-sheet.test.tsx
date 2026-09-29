@@ -1,9 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { NoteDetail, SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
+import type { NoteComment, NoteDetail, SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import type { ProjectRef, RosterMember, TicketRead, WorkspaceRef } from '@gisik-nokma/app-core';
-import { createClientStateCache } from '@gisik-nokma/app-core';
+import { CommentsThread, createClientStateCache } from '@gisik-nokma/app-core';
 import { Providers, type AppServices } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -61,6 +61,8 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import { NoteDocument } from '../src/notes/note-document.js';
+import { ticketSheetPath } from '../src/ticket-location.js';
+import { ticketRefHrefIn } from '../src/ticket-ref-callbacks.js';
 
 function project(id: string, name: string): ProjectRef {
   return { id, name, prefix: 'PJ', archived: false, ticketCount: 0, blockedCount: 0 };
@@ -172,6 +174,7 @@ function mount(
   opts: {
     note?: NoteDetail;
     ticket?: (id: string) => TicketRead;
+    comments?: NoteComment[];
     locate?: (
       workspaceId: string,
       ticketId: string,
@@ -184,6 +187,7 @@ function mount(
       getNote: async (_workspaceId: string, id: string) => (id === NOTE ? (opts.note ?? noteDetail()) : null),
       getMembers: async () => MEMBERS,
       getNotes: async () => [],
+      getNoteComments: async () => opts.comments ?? [],
       getDeletedNotes: async () => [],
       getTicket: async (_workspaceId: string, ticketId: string) => (opts.ticket ?? ticketFor)(ticketId),
       getTicketAttachments: async () => [],
@@ -411,5 +415,112 @@ describe('18.328 deleting the open ticket reloads this note’s own live query',
     await userEvent.click(await screen.findByRole('button', { name: 'Delete ticket' }));
 
     await waitFor(() => expect(noteReads).toBeGreaterThan(before));
+  });
+});
+
+/**
+ * 18.335–18.338 — the REMAINING doors that left `/notes` for a ticket's project
+ * page (owner, 2026-09-29: "opening a ticket from note should only open the
+ * sheet there in the note section itself. not navigate to the project screen").
+ * The byline badge (18.321) already opened the sheet in place; a ticket chip in
+ * the note's BODY and in a note COMMENT still followed its project-page `href`.
+ * Both now go through the SAME `openTicket` the badge uses, via one delegated
+ * click handler on the document root — the chip's `href` stays canonical, so a
+ * modified or middle click still opens the project page in a new tab.
+ */
+const CHIP_KEY = 'CCSO-2000';
+const CHIP_TITLE = 'Chip text';
+
+function chipNode() {
+  return { type: 'ticketRef', attrs: { ticketId: TICKET, projectId: PROJECT, key: CHIP_KEY, title: CHIP_TITLE } };
+}
+function docWithChip() {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'See ' }, chipNode()] }] };
+}
+function commentWithChip(): NoteComment {
+  return {
+    commentId: 'c-chip',
+    authorId: 'u_kiro',
+    body: docWithChip(),
+    recordedAt: '2026-09-24T08:00:00.000Z',
+  };
+}
+
+async function bodyChip(view: ReturnType<typeof render>): Promise<HTMLAnchorElement> {
+  return await waitFor(() => {
+    const chip = view.container.querySelector<HTMLAnchorElement>('a.editor-ticketref');
+    if (chip === null) throw new Error('no body chip yet');
+    return chip;
+  });
+}
+async function commentChip(view: ReturnType<typeof render>): Promise<HTMLAnchorElement> {
+  return await waitFor(() => {
+    const chip = view.container.querySelector<HTMLAnchorElement>('a.gn-comment__ticketref');
+    if (chip === null) throw new Error('no comment chip yet');
+    return chip;
+  });
+}
+
+describe('18.335 a plain click on a ticket chip in the note body or a comment opens the sheet in place', () => {
+  it('18.335 the body chip pushes ?ticket= on this note’s own path, never the project page', async () => {
+    const view = renderDocument(mount({ note: noteDetail({ body: docWithChip() }) }));
+    const chip = await bodyChip(view);
+    // `false` = the click was cancelled, so the browser does NOT also follow the href.
+    expect(fireEvent.click(chip)).toBe(false);
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/notes/${NOTE}?ticket=${TICKET}`, { scroll: false }));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalledWith(expect.stringContaining('/w/'), expect.anything());
+  });
+
+  it('18.335 the comment chip does the same', async () => {
+    const view = renderDocument(mount({ comments: [commentWithChip()] }));
+    const chip = await commentChip(view);
+    // `false` = the click was cancelled, so the browser does NOT also follow the href.
+    expect(fireEvent.click(chip)).toBe(false);
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/notes/${NOTE}?ticket=${TICKET}`, { scroll: false }));
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('18.336 a modified or middle click on a ticket chip is NOT intercepted', () => {
+  it('18.336 Ctrl/Cmd/Shift/Alt and the middle button leave the link alone, on both doors', async () => {
+    const view = renderDocument(mount({ note: noteDetail({ body: docWithChip() }), comments: [commentWithChip()] }));
+    for (const chip of [await bodyChip(view), await commentChip(view)]) {
+      for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+        const notPrevented = fireEvent(
+          chip,
+          new MouseEvent('click', { bubbles: true, cancelable: true, ...modifier }),
+        );
+        expect(notPrevented, `${chip.className} ${JSON.stringify(modifier)}`).toBe(true);
+      }
+    }
+    expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe('18.337 the chip’s href stays the canonical project-page path', () => {
+  it('18.337 both chips keep `ticketSheetPath` as their href, so open-in-new-tab still works', async () => {
+    const view = renderDocument(mount({ note: noteDetail({ body: docWithChip() }), comments: [commentWithChip()] }));
+    const expected = ticketSheetPath({ workspaceId: WORKSPACE, projectId: PROJECT }, TICKET);
+    expect((await bodyChip(view)).getAttribute('href')).toBe(expected);
+    expect((await commentChip(view)).getAttribute('href')).toBe(expected);
+  });
+});
+
+describe('18.338 CONTROL: outside the note document a ticket chip is not intercepted', () => {
+  it('18.338 a comment chip rendered off /notes (the project page’s shared renderer) follows its href', () => {
+    const outside = render(
+      <CommentsThread
+        comments={[{ ...commentWithChip(), files: [] }]}
+        nameOf={() => 'Kiro'}
+        ticketHref={ticketRefHrefIn(WORKSPACE)}
+        composer={null}
+      />,
+    );
+    const chip = outside.container.querySelector<HTMLAnchorElement>('a.gn-comment__ticketref');
+    expect(chip).not.toBeNull();
+    const notPrevented = fireEvent(chip!, new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(notPrevented).toBe(true);
+    expect(push).not.toHaveBeenCalled();
   });
 });

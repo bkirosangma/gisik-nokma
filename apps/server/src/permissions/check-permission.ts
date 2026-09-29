@@ -1266,8 +1266,8 @@ const NOTE_AUTHOR_EVENTS = new Set([
  * `isAdminReader` is `role === 'admin'` — but only AFTER `canReadNote` has
  * already said yes, which is what makes it narrower than the word "admin"
  * suggests. The brainstorm said admins may edit or delete any note; the ticket
- * code gives admins no read bypass at all (`canSeeResolved` treats `admin`
- * exactly like `member`), and this spec follows the CODE. So an admin edits a
+ * code treats `admin` exactly like `member` for reads (`canSeeResolved`; since
+ * rule A both are on every founded project), and this spec follows the CODE. So an admin edits a
  * note they can read and is refused one they cannot — spec §4.2 flags this for
  * the owner, and the PR body repeats it. If the owner wants the broader rule it
  * is one term: `isAdminReader` becomes `role === 'admin'` unconditionally.

@@ -64,7 +64,7 @@ test('18.282 posting a ticket comment with :note Compressor attaches the note; i
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill(title);
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   const noteId = /\/notes\/([^/]+)$/.exec(page.url())?.[1] ?? '';
@@ -114,7 +114,7 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill(noteTitle);
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(noteTitle);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
 
@@ -133,7 +133,12 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   await expect(chip).toBeVisible({ timeout: 10_000 });
   await expect(chip).toHaveAttribute('href', expectedHref);
 
+  // The chip's href stays the ticket's canonical sheet path (asserted above),
+  // but since 18.330 a click on it from a note page opens the sheet IN PLACE:
+  // the path stays `/notes/<id>` and `?ticket=<id>` is appended. This line
+  // asserted the pre-18.330 navigation to `/w/:ws/p/:project?ticket=…`.
+  const notePath = new URL(page.url()).pathname;
   await chip.click();
-  await expect(page).toHaveURL(expectedHref, { timeout: 20_000 });
+  await expect(page).toHaveURL(`${new URL(page.url()).origin}${notePath}?ticket=${ticketId}`, { timeout: 20_000 });
   await expect(page.getByTestId('sheet-crumb-ticket')).toHaveText(key, { timeout: 20_000 });
 });

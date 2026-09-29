@@ -23,9 +23,11 @@ import {
   makeSubmittedFactory,
   matchesBoardCard,
   matchesListRow,
+  actorLabelFrom,
   memberLabel,
   sortByRank,
   useBoard,
+  useActorNames,
   useLiveQuery,
   useTicketList,
   type Actor,
@@ -77,6 +79,7 @@ import {
   toTicketDatesInput,
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
+import { peopleProps } from '../../../../../src/people-props.js';
 import { ticketSheetPath } from '../../../../../src/ticket-location.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../../src/ticket-ref-callbacks.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
@@ -233,7 +236,7 @@ function ProjectBoard() {
   const params = useParams<{ workspaceId: string; projectId: string }>();
   const searchParams = useSearchParams();
   const { workspaceId, projectId } = params;
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   /**
    * The `:ticket` picker's data source and the chip's link (Plan 7 Task 4,
    * spec §14, D26–D28) — passed into `TicketSheet`, which forwards both to
@@ -1483,6 +1486,12 @@ function ProjectBoard() {
   const members = useLiveQuery(dataSource, workspaceId, `${workspaceId}:members`, () =>
     dataSource.query.getMembers(workspaceId),
   );
+  /**
+   * The names-only read (`getActorNames`), for the people the roster omits — a
+   * guest, for a plain member. It feeds `nameOf` only, never `assigneeCandidates`
+   * below: a guest must not be offered as an assignee. One-time, not live.
+   */
+  const actorNames = useActorNames(dataSource, workspaceId);
   const nameOf = useMemo(() => {
     // `memberLabel`, not `member.name` (2026-09-22). The old value was the raw
     // display name, and `?? userId` does NOT save it from a blank one: `''` is
@@ -1496,11 +1505,8 @@ function ProjectBoard() {
     // for the calendar and the timeline), none of them renders a claim, and the
     // system-actor override belongs to claims. Auto-close has no card in either
     // view to be drawn on.
-    const byId = new Map(
-      (members.data ?? []).map((member) => [member.id, memberLabel(member)]),
-    );
-    return (userId: string): string => byId.get(userId) ?? userId;
-  }, [members.data]);
+    return (userId: string): string => actorLabelFrom(userId, members.data, actorNames) ?? userId;
+  }, [members.data, actorNames]);
 
   /**
    * The Assignee picker's options for the New-ticket dialog (owner request
@@ -2222,6 +2228,7 @@ function ProjectBoard() {
     return (
       <>
         <CreateTicketFlow
+          {...peopleProps(people, workspaceId)}
           open={createOpen}
           onOpenChange={(next) => {
             setCreateOpen(next);
@@ -3591,6 +3598,7 @@ function ProjectBoard() {
         // review measured. Recorded so the next reader does not read the gate
         // above as covering the whole page.
         <TicketSheet
+          {...peopleProps(people, workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}

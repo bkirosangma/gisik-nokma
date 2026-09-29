@@ -1,5 +1,5 @@
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
 /**
@@ -202,3 +202,56 @@ if (typeof HTMLElement !== 'undefined') {
     } as typeof Object.defineProperty;
   }
 }
+
+/**
+ * THE DOOR RUNS ON EVERY EVENT A CASE BUILDS (case 18.431).
+ *
+ * `makeSubmittedFactory` mints through `newSubmittedEvent`, so wrapping THAT
+ * one function puts the real payload schema — the one the server's `parseEvent` runs at
+ * ingest, looked up in the real `domainRegistry` — in front of every claim any view
+ * in this suite makes. A payload that the registry would refuse (the scope
+ * editor once built `{ scope: { mode } }` where the schema wants `{ mode }`)
+ * now throws where the event is BUILT, in whichever case builds it.
+ *
+ * Why here and not in each view's test: those tests hand the view a stub
+ * `ingest` and assert `toEqual` on what arrived, so the assertion and the code
+ * are two copies of the same wrong guess and agree with each other. Only the
+ * schema is the contract, and only this hook runs it without a test having to
+ * remember to.
+ *
+ * A case that builds an event ON PURPOSE to be refused sets
+ * `globalThis.__gnAllowRefusedPayloads = true` (cleared after each case); a
+ * file made of such cases calls `vi.unmock('@gisik-nokma/domain')`.
+ *
+ * Id-format issues (`must be a ULID`) are ignored: the fixtures here name
+ * entities `'ws-1'`, and the question this hook answers is the payload's SHAPE.
+ * The flag is cleared by the `afterEach` below so it cannot leak to the next case.
+ */
+const ALLOW_REFUSED = '__gnAllowRefusedPayloads';
+const allowRefusedPayloads = (): boolean => (globalThis as Record<string, unknown>)[ALLOW_REFUSED] === true;
+afterEach(() => {
+  delete (globalThis as Record<string, unknown>)[ALLOW_REFUSED];
+});
+
+vi.mock('@gisik-nokma/domain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@gisik-nokma/domain')>();
+  return {
+    ...actual,
+    newSubmittedEvent: (input: Parameters<typeof actual.newSubmittedEvent>[0]) => {
+      const event = actual.newSubmittedEvent(input);
+      // Only the PAYLOAD is judged: the envelope's ids are fixtures here
+      // (`'ws-1'` is not a ULID) and the door's envelope check is not the
+      // question. A type nobody registered is left alone for the same reason.
+      const registration = actual.domainRegistry.get(event.type, event.version);
+      const parsed = registration?.payloadSchema.safeParse(event.payload);
+      const issues = parsed?.success === false ? parsed.error.issues.filter((i) => i.message !== 'must be a ULID') : [];
+      if (parsed !== undefined && !parsed.success && issues.length > 0 && !allowRefusedPayloads()) {
+        const issue = issues[0];
+        throw new Error(
+          `the door would refuse ${event.type}: invalid-payload at ${issue?.path.join('.') || '(root)'}: ${issue?.message ?? 'invalid'}`,
+        );
+      }
+      return event;
+    },
+  };
+});

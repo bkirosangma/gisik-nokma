@@ -396,9 +396,12 @@ beforeAll(async () => {
     },
     1,
   );
-  // The founder owns the workspace but is not on the PROJECT until this lands,
-  // and `ticket.created` is refused `permission.role` without it — measured,
+  // The founder owns the workspace but was not on the PROJECT until this landed,
+  // and `ticket.created` was refused `permission.role` without it — measured,
   // by the engine's door answering before any read could.
+  // Amended 2026-09-29 (rule A): the owner is on every founded project without this
+  // event, so it no longer gates the reads below. It stays as a fixture: it makes
+  // the founder an explicit project admin, which is what the assertions were built on.
   await post(
     owner.token,
     {

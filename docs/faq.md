@@ -114,9 +114,7 @@ settings screens for stages and job types are behind **Settings**. See
 ## People and roles
 
 **Does the invitation get sent for me?**
-It does not appear to. The Channel dropdown offers email, sms and whatsapp, and nothing was found that
-sends by any of them. What happens is that the product makes a link, shows it to you once, and you
-send it however you like.
+**By email, yes.** Pick **email** and the product sends it, and the screen tells you whether it went. **Phone (SMS)** is not sent for you: copy the link and send it yourself.
 
 **"Copy it now — it is not stored and cannot be shown again." Does it mean that?**
 Absolutely. That link appears once, on that screen, at that moment. It is not in the pending list. It
@@ -124,20 +122,13 @@ is nowhere else. Close the tab and you have to withdraw the invitation and start
 your email before you do anything else.**
 
 **What do I put in the "Project access" box on the invite form?**
-**All projects in this workspace**, unless the invitation is genuinely for one project only — in which
-case pick the project by NAME from the same dropdown. It is a list of names; you never type an
-identifier.
-
-**⚠ It used to ask you to type identifiers, and this answer said to leave it empty.** Until 2026-09-21
-the box was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters
-and numbers you would have to go and find. The old answer is kept here so a reader who remembers it
-finds the correction where they last saw it.
+Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace.
 
 **Is an admin the same as "sees everything"?**
-No, and this surprises everybody. **Admin is a "can change things" role, not a "can see things"
-role.** An admin can invite people and set up stages and job types, but only sees the projects they
-have personally been put on. If you want somebody to manage the workspace *and* see the work, you have
-to do both — one does not come with the other. Only the **owner** automatically sees everything.
+**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those.
+
+**Can I assign a job to somebody who is not in the workspace?**
+Yes. In the **Assignee** picker choose **Assign someone outside this workspace…**, type their exact email and press **Find**. If an account has that email you can press **Assign**, and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email.
 
 **Can I make somebody else an owner, or a co-owner?**
 No. "Owner" is never offered in the invitation dropdown, it is refused if forced, and no way was found
@@ -577,6 +568,13 @@ closed the tab first), so it was kept on your device and is showing now. **Keep*
 words; **Discard** deletes them and shows the note as the server has it, which cannot be undone. The
 bar is only shown to people who can edit the note.
 
+**If I mention someone in a note, do they get told?**
+Yes — type `@` and pick them, in the note or in one of its comments. They get a *mentioned you* message in their Inbox
+that opens the note, or the comment. It is sent once: saving the note again with the same
+mention in it does not tell them again, and mentioning yourself sends nothing. Only people who can read the note
+are told — a note shared with nobody else, or with a list that leaves them out, tells them nothing, and you are
+not shown that. Muting Mentions under Account → Notifications hides these too.
+
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the
@@ -856,10 +854,7 @@ made-up reference, deliberately identical, so that nobody can work out what exis
 refusals they get. The same is true of a job's history and of trying to change one.
 
 **What can a guest see?**
-Only the specific jobs somebody explicitly shared with them. Not the project, not the workspace's
-other work. They see the workspace's name and an empty project list — intended, not broken. They can
-see a child of something shared with them if that child inherits. They cannot open the people list and
-cannot create jobs.
+Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs.
 
 **Can somebody hide who they are?**
 No. History always shows who did what and when, untouched, to anybody entitled to see the job — even

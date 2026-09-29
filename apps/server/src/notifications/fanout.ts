@@ -10,11 +10,13 @@ import {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
+import { canReadNoteById } from '../visibility/can-read-note.js';
 import { canSee } from '../visibility/can-see.js';
 import { deliverToAll, type NotificationTransport } from './transport.js';
 
 /**
- * Turns committed events into messages addressed to people.
+ * Turns committed events into messages addressed to people. `ticket.created` with a
+ * birth `assigneeId` is an assignment too (W4).
  *
  * THE RULING THIS MODULE EXISTS TO HONOUR: the mention gate is SILENT
  * server-side. A mention must never become a probe for who can see a ticket.
@@ -43,6 +45,8 @@ import { deliverToAll, type NotificationTransport } from './transport.js';
 
 const assignedPayloadSchema = z.object({ assigneeId: z.string().nullable() }).passthrough();
 const commentPayloadSchema = z.object({ body: z.record(z.string(), z.unknown()) }).passthrough();
+/** `note.created` carries an OPTIONAL body; `note.body_set` always does. */
+const noteBodyPayloadSchema = z.object({ body: z.record(z.string(), z.unknown()).optional() }).passthrough();
 const fieldSetPayloadSchema = z.object({ fieldId: z.string(), value: z.unknown() }).passthrough();
 /** Amendment 16 pins the event; this shape is the Open-questions pin for Plan 10. */
 const contestedPayloadSchema = z
@@ -61,11 +65,14 @@ const contestedPayloadSchema = z
   .passthrough();
 
 export type CanSeeFn = (db: Queryable, userId: string, ticketId: string) => Promise<boolean>;
+/** The note's own read rule (`visibility/can-read-note.ts`) — NOT the ticket rule. */
+export type CanReadNoteFn = (db: Queryable, userId: string, noteId: string) => Promise<boolean>;
 
 export type FanoutDeps = {
   pool: Queryable;
   transports: NotificationTransport[];
   canSeeTicket?: CanSeeFn;
+  canReadNote?: CanReadNoteFn;
   now?: () => Date;
   log?: (message: string, error?: unknown) => void;
 };
@@ -76,6 +83,7 @@ const EXCERPT_LENGTH = 140;
 
 export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
   const canSeeTicket: CanSeeFn = deps.canSeeTicket ?? ((db, userId, ticketId) => canSee(db, userId, ticketId));
+  const canReadNote: CanReadNoteFn = deps.canReadNote ?? ((db, userId, noteId) => canReadNoteById(db, userId, noteId));
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? ((message: string, error?: unknown) => console.error(message, error));
 
@@ -193,6 +201,85 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     }
   }
 
+  /**
+   * The body a note's PREVIOUS version carried: the nearest earlier
+   * `note.created` / `note.body_set` in the note's own stream, by `seq`. Read from
+   * the ledger (there is no versions table — `read/notes.ts`'s `listNoteHistory`
+   * says why), strictly BEFORE this event, so replaying the fan-out for an event
+   * that is not the newest still compares it with the version it replaced.
+   * `null` when there is none, and a `note.created` written without a body is
+   * `null` too — both mean "no mentions yet".
+   */
+  async function previousBodyOf(env: EventEnvelope): Promise<unknown> {
+    const { rows } = await deps.pool.query<{ body: unknown }>(
+      `SELECT payload -> 'body' AS body
+         FROM events
+        WHERE entity_kind = 'note' AND entity_id = $1 AND seq < $2
+          AND type IN ('note.created', 'note.body_set')
+        ORDER BY seq DESC
+        LIMIT 1`,
+      [env.entity.id, env.seq],
+    );
+    return rows[0]?.body ?? null;
+  }
+
+  async function noteTitleOf(noteId: string): Promise<string> {
+    const { rows } = await deps.pool.query<{ title: string }>('SELECT title FROM proj_notes WHERE note_id = $1', [noteId]);
+    return rows[0]?.title ?? '';
+  }
+
+  /**
+   * Mentions in a NOTE, mirroring `handleMentions` step for step: the same
+   * per-recipient isolation, the same silent gate, the same excerpt and the same
+   * `mention:${env.id}:${userId}` dedupe key. Three differences, each deliberate:
+   *
+   * - **The gate is the note's read rule** (`canReadNoteById`), not `canSee`. A
+   *   mention of someone who cannot read the note creates no row and no log line.
+   * - **Only NEWLY added mentions notify** (`previous` is the body this event
+   *   replaced). A note body is autosaved, so the ticket path's "every mention in
+   *   the document, every time" would tell the same person again on every save.
+   *   Comments are never edited, so their `previous` is `null` and every mention
+   *   in one is new.
+   * - **The payload names a note** (`noteMentionNotificationPayloadSchema`), and
+   *   the kind stays `mention` so the person's mute setting covers it.
+   */
+  async function handleNoteMentions(
+    env: EventEnvelope,
+    doc: unknown,
+    previous: unknown,
+    source: 'note' | 'note-comment',
+  ): Promise<void> {
+    const before = new Set(previous === null ? [] : extractMentionedUserIds(previous));
+    const added = extractMentionedUserIds(doc).filter((userId) => !before.has(userId));
+    if (added.length === 0) return;
+    const excerpt = docToPlainText(doc).slice(0, EXCERPT_LENGTH);
+    const noteTitle = await noteTitleOf(env.entity.id);
+    for (const userId of added) {
+      if (userId === env.actorId) continue;
+      // Per-recipient isolation and a log line that names the EVENT, never the
+      // recipient — the same disclosure argument `handleMentions` makes.
+      try {
+        if (!(await canReadNote(deps.pool, userId, env.entity.id))) continue;
+        await deliverToAll(
+          deps.transports,
+          compose('mention', userId, env.workspaceId, `mention:${env.id}:${userId}`, {
+            noteId: env.entity.id,
+            noteTitle,
+            mentionedBy: env.actorId,
+            eventId: env.id,
+            source,
+            excerpt,
+            clientTime: env.clientTime,
+            serverTime: env.serverTime,
+          }),
+          log,
+        );
+      } catch (error) {
+        log(`notification fan-out failed for one mention recipient on event ${env.id}`, error);
+      }
+    }
+  }
+
   async function handleContested(env: EventEnvelope): Promise<void> {
     const parsed = contestedPayloadSchema.safeParse(env.payload);
     if (!parsed.success) {
@@ -239,11 +326,29 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
   return {
     async onCommitted(env: EventEnvelope): Promise<void> {
       try {
-        if (env.type === 'ticket.assigned') {
+        if (env.type === 'ticket.assigned' || env.type === 'ticket.created') {
+          // `ticket.created` carries the New ticket dialog's birth assignee
+          // (W4, owner ruling 2026-09-29). Same handler, same guards (unassigned,
+          // self), same `canSee` gate — which the assignee arm (W3) now answers
+          // true for them — and the same `assignment:${env.id}` key, so a
+          // redelivery is one row. A payload with no `assigneeId` fails the
+          // handler's parse and addresses nobody: born unassigned.
           await handleAssigned(env);
         } else if (env.type === 'comment.added') {
           const parsed = commentPayloadSchema.safeParse(env.payload);
-          if (parsed.success) await handleMentions(env, parsed.data.body, 'comment');
+          if (!parsed.success) return;
+          if (env.entity.kind === 'note') await handleNoteMentions(env, parsed.data.body, null, 'note-comment');
+          else await handleMentions(env, parsed.data.body, 'comment');
+        } else if (env.type === 'note.created' || env.type === 'note.body_set') {
+          const parsed = noteBodyPayloadSchema.safeParse(env.payload);
+          if (parsed.success && parsed.data.body !== undefined) {
+            await handleNoteMentions(
+              env,
+              parsed.data.body,
+              env.type === 'note.created' ? null : await previousBodyOf(env),
+              'note',
+            );
+          }
         } else if (env.type === 'ticket.field_set') {
           const parsed = fieldSetPayloadSchema.safeParse(env.payload);
           if (

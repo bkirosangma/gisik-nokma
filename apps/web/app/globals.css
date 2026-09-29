@@ -2066,7 +2066,53 @@ input, textarea, select { font-family: inherit; }
    declaration; `nav-phone-disclosure.test.ts` now resolves the cascade. */
 .gn-nav .gn-nav__more-toggle { display: none; }
 
-@media (max-width: 40rem) {
+/* ABOVE the disclosure breakpoint the links are ONE line, always. The row used
+   to `wrap`, which is what put "Settings" alone on a second row whenever the
+   workspace or project name was longer than the seed data's ("Convenience
+   Corner" + "gggg"). The two names are the only data-driven widths in the bar,
+   so THEY give way: each truncates with an ellipsis (`.gn-nav__label` is the
+   text span — `text-overflow` does not apply to the `inline-flex` link itself)
+   while every fixed link keeps its full label at the house size. `min-width:
+   0` is what lets a flex item go below its content width at all. */
+@media (min-width: 70.0625rem) {
+  .gn-nav__links { flex-wrap: nowrap; }
+  .gn-nav__links > a,
+  .gn-nav__more > a { white-space: nowrap; flex: none; }
+  .gn-nav__more > a.gn-nav__workspace,
+  .gn-nav__more > .gn-nav__project {
+    flex: 0 1 auto;
+    max-width: 16rem;
+  }
+  .gn-nav__more > .gn-nav__project > a { max-width: 100%; }
+  /* The floor a name may be squeezed to: 4.5rem is the 0.875rem padding twice
+     plus ~2.75rem of label (five characters and an ellipsis). It is a floor,
+     not a size: at 1121px, the narrowest width this arm serves, the row has
+     220px for the two names (measured) so each keeps ~110px, and the floor
+     only matters if a fixed link ever grows. It is small enough not to pad a
+     short name much (a four-letter project name is 66px; the floor is 72). */
+  .gn-nav__more > a.gn-nav__workspace,
+  .gn-nav__more > .gn-nav__project { min-width: 4.5rem; }
+  .gn-nav__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* THE DISCLOSURE BREAKS AT 70rem, NOT 40rem (owner browser pass 2026-09-29:
+   "Settings" wrapped to a second row at 1280 with a real workspace name).
+   MEASURED before the change, on the dev stack with the shipped 16px labels:
+   the desktop row is brand + Workspaces + workspace name + last project +
+   My Work + Members + Settings + Notes + inbox + avatar. The five fixed links
+   are 463px with their gaps and the corner + brand are 366px, so the row needs
+   ~830px before either data-driven name — and 1024px (which is 64rem) left the
+   links 602px, so the bar was two rows at 1024 and FOUR at 768 (250px tall)
+   even with the short seed names. 70rem is where the fixed links, the corner,
+   the brand and a floor of 4.5rem for each of the two names (they truncate
+   above, `.gn-nav__label`) still fit one line: 1120px. The text stays at the
+   house 16px everywhere; nothing was shrunk to make it fit. */
+@media (max-width: 70rem) {
   .gn-nav .gn-nav__more-toggle { display: inline-flex; align-items: center; }
   .gn-nav__more { display: none; }
   .gn-nav__more[data-open="true"] {
@@ -2077,6 +2123,8 @@ input, textarea, select { font-family: inherit; }
     flex-basis: 100%;
     min-width: 0;
   }
+}
+@media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
      promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
      line") is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)
@@ -3786,6 +3834,10 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+  /* Lets this flex item of `.gn-notes__header` shrink to a 390px viewport;
+     without it its min-content is the two triggers' full width and the filter
+     group (clamped to `max-width: 100%` below) is clamped to THAT, not the page. */
+  min-width: 0;
 }
 
 /* Unit 6b (owner, 2026-09-23: "Any author should not be 2 lines") — the
@@ -3801,22 +3853,39 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__filters {
   display: flex;
   flex: none;
+  /* Never wider than the row it sits in (390px): the triggers below shrink by
+     ellipsis inside this clamp instead of the group overflowing the viewport. */
+  max-width: 100%;
   gap: 0.5rem;
 }
 /* The Select component itself is right everywhere else it is used — its own
    `width: 100%` is meant to fill a container that already constrains its
    width (a form row, a field grid cell). `.gn-notes__filters` gives it no
-   such constraint, so as a bare flex item it shrinks below its label's
-   natural width and the label text wraps — `white-space` is inherited, so
-   setting it once on the trigger reaches the value span with no class of
-   its own to target. `flex: none` keeps the trigger from shrinking at all;
-   `.gn-notes__search`'s own `flex-wrap: wrap` (above) is what already lets
-   a whole filter — both selects together, never a label split mid-word —
-   move to its own line once the row runs out of room, so no separate
-   breakpoint rule is needed for that half. */
+   such constraint, and that is the whole bug (owner, 2026-09-29, screenshot:
+   "Any author" ~550px wide, "Any scope" past the right edge): the group is an
+   unsized `flex: none` box, so its width IS the sum of its triggers' content
+   widths, and a trigger's `width: 100%` then resolves against that sum —
+   every trigger came out as wide as BOTH together and the second overflowed.
+   Unit 6b's `flex: none` (below) made it visible by freezing the group's width
+   to its max-content. `width: auto` sizes each trigger to its own label; the
+   cap keeps a long author name from rebuilding the wide select, and the label
+   is ellipsised rather than wrapped (`white-space` is inherited, so setting
+   `nowrap` once on the trigger reaches the value span with no class of its own
+   to target). The trigger only shrinks once the group is already clamped to
+   its own line; before that `.gn-notes__search`'s `flex-wrap: wrap` moves a
+   whole filter — never a label split mid-word — to its own line, so no
+   separate breakpoint rule is needed for that half. */
 .gn-notes__filters .gn-select__trigger {
-  flex: none;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 16rem;
   white-space: nowrap;
+}
+.gn-notes__filters .gn-select__trigger > :not(.gn-select__chevron) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The results wrapper — replaces the tree's groups while a query is active
@@ -3953,6 +4022,109 @@ input, textarea, select { font-family: inherit; }
   align-items: flex-start;
   gap: 0.5rem;
 }
+/* Owner report 2026-09-29 (screenshot): the checkbox sat ~half a line ABOVE its
+   text and was the browser's native blue box. MEASURED, not assumed: the item's
+   paragraph keeps `.ticket-editor__content p`'s 0.5rem top margin, so the text
+   started 8px down while the 13px native input sat at the top of the row —
+   checkbox centre 8.5px above the first line's centre, single-line and wrapped
+   alike. The label is now one line tall (`1lh`, floored at the 1.5rem touch
+   target) and centres the box on the FIRST line; the item's own paragraphs give
+   up their outer margins so that first line starts at the top of the row. */
+.ticket-editor__content ul[data-type='taskList'] > li > label {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1lh;
+  min-height: 1.5rem;
+  cursor: pointer;
+}
+.ticket-editor__content ul[data-type='taskList'] > li > div > p:first-child { margin-top: 0; }
+.ticket-editor__content ul[data-type='taskList'] > li > div > p:last-child { margin-bottom: 0; }
+/* A done item reads MUTED, never struck through (owner, 2026-09-29: "done items
+   should not be struck through") — the checked box already says "done".
+   `--gn-text-subtle`, NOT `--gn-text-muted`: `-muted` is the legible "secondary
+   label" and measures 1.28:1 from the body text in light and 1.01:1 in dark
+   (`#ebebf5` on a `#f2e9e1` body — slightly BRIGHTER), so a done item was not
+   visibly dimmer. `-subtle` is 2.16:1 from the body text and still >= 5.28:1 on
+   the surface in all six style x theme blocks (case 9.480). */
+.ticket-editor__content ul[data-type='taskList'] > li[data-checked='true'] > div,
+.gn-comment__task > input[type='checkbox']:checked + span {
+  color: var(--gn-text-subtle);
+}
+/* The box: the real `<input type="checkbox">` stays (keyboard toggle, label
+   association, checked state) and is only restyled — the recipe of
+   `.gn-list__column-option`'s box: accent fill + `--gn-text-inverted` mark when
+   checked, `--gn-focus-ring` outline on `:focus-visible`. Shared with the
+   comment body's read-only task item, which drew the same native box. */
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox'],
+.gn-comment__task > input[type='checkbox'] {
+  display: grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1.5px solid var(--gn-border-strong);
+  border-radius: 4px;
+  background: var(--gn-fill-quaternary);
+  cursor: pointer;
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:hover,
+.gn-comment__task > input[type='checkbox']:hover {
+  border-color: var(--gn-accent);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:checked,
+.gn-comment__task > input[type='checkbox']:checked {
+  border-color: var(--gn-accent);
+  background: var(--gn-accent);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:checked::after,
+.gn-comment__task > input[type='checkbox']:checked::after {
+  content: '';
+  width: 0.3125rem;
+  height: 0.5625rem;
+  border: solid var(--gn-text-inverted);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:focus-visible,
+.gn-comment__task > input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+.gn-comment__task > input[type='checkbox']:disabled { cursor: default; }
+/* The comment body's task item is `input + span > p` (a taskItem's child is a
+   paragraph; `ui.css` zeroes its margins). It draws like the composer's row —
+   measured 2026-09-29 on a posted comment against the composer beneath it: the
+   row is 1.5rem tall at least (the composer's label floor), rows abut (no
+   `li + li` gap), and the 16px box is nudged onto the FIRST line by
+   (line-height - box) / 2 = (1.375rem - 1rem) / 2, the body's line-height in
+   `ui.css` — 9.365 recomputes it from there, so changing one without the other
+   fails a test instead of the eye. */
+.gn-comment__task { min-height: 1.5rem; gap: 0.75rem; }
+.gn-comment__task + .gn-comment__task { margin-top: 0; }
+.gn-comment__task > input[type='checkbox'] { margin: 0.1875rem 0 0; margin-left: 0.25rem; }
+/* Horizontal start, measured on the same page 2026-09-29: the composer's 1.5rem label centres the
+   1rem box (inset 4px) and the row's 0.5rem gap follows it (text at 32px). The posted row had the
+   box at 0px and text at 23.2px (`ui.css`'s 0.45rem gap), so a list shifted sideways when sent.
+   inset = (1.5 - 1) / 2 = 0.25rem; gap = 1.5 + 0.5 - 0.25 - 1 = 0.75rem (case 9.482). */
+/* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
+   the unchecked box takes the same coat, the checked one stays a flat accent.
+   The coat alone is NOT an edge: neo's sunken surface IS its surface (`#1b2340`
+   both in dark) and the inset shadow is 5% white, so the box vanished. It keeps
+   `--gn-border-strong` (5.37:1 dark, 4.39:1 light on the neo surface; WCAG 1.4.11
+   asks 3:1, case 9.481). */
+[data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
+[data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked) {
+  border-color: var(--gn-border-strong);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
 
 /* The fenced code block. `.editor-codeblock`'s own `position: relative` is
    editor.css's; this is its surface. `pre code` resets the inline-code rule
@@ -4012,6 +4184,20 @@ input, textarea, select { font-family: inherit; }
 .ticket-editor__content .editor-details {
   background: var(--gn-fill-quaternary);
   border: none;
+}
+/* The fold button's states (the shape and size are editor.css's): the chevron
+   reads as secondary ink until the pointer or keyboard is on it, and the ring
+   is the house focus ring. */
+.ticket-editor__content .editor-details > button {
+  color: var(--gn-text-muted);
+}
+.ticket-editor__content .editor-details > button:hover {
+  background: var(--gn-fill-tertiary);
+  color: inherit;
+}
+.ticket-editor__content .editor-details > button:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
 }
 
 /* Chips: distinguished from plain text and from each other WITHOUT colour
@@ -4366,3 +4552,33 @@ input, textarea, select { font-family: inherit; }
 .gn-deleted-items__row > .gn-refusal { grid-column: 2; margin: 0; }
 
 /* ══ trash-4-ui: end ══ */
+
+/* ══ access-and-invites: begin ══
+   Access plan Tasks 7–8 (2026-09-29). The outsider finder inside the New ticket
+   dialog and the ticket sheet, and the invite form's two status lines. Tokens
+   only (no raw colours); every control 44px tall. */
+.gn-outsider-finder {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.gn-outsider-finder .gn-field__input,
+.gn-outsider-finder .gn-button {
+  min-height: 2.75rem;
+}
+.gn-outsider-finder__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.gn-outsider-finder__found {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.gn-invite-mint__emailed,
+.gn-invite-mint__account {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+/* ══ access-and-invites: end ══ */

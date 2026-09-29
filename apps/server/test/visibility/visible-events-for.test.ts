@@ -5,7 +5,14 @@ import { visibleEventsFor, type SyncItem } from '../../src/visibility/visible-ev
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
-import { applyAll, seedGuest, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import {
+  applyAll,
+  seedGuest,
+  seedMember,
+  seedProject,
+  seedTicket,
+  setVisibilityEnv,
+} from '../helpers/seed.js';
 
 /**
  * Plan 4 Task 11 — `visibleEventsFor`, the sync-down visibility filter.
@@ -111,6 +118,21 @@ function ticketEvent(
   });
 }
 
+/**
+ * A `project.member_added` naming a GUEST: the state a member downgraded to guest
+ * leaves behind (6.92), and the only way a guest holds a project roster row — the
+ * row confers nothing on a guest (`can-see.ts`).
+ */
+function projectRowEnv(workspaceId: string, projectId: string, userId: string): LedgerEvent {
+  return testEnvelope({
+    workspaceId,
+    entity: { kind: 'project', id: projectId },
+    type: 'project.member_added',
+    payload: { userId, projectAdmin: false },
+    actorId: newUlid(),
+  });
+}
+
 function revocationEnv(workspaceId: string, userId: string): LedgerEvent {
   return testEnvelope({
     workspaceId,
@@ -128,18 +150,32 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const other = newUlid();
     const viewer = newUlid();
     const hidden = newUlid();
+    const otherProject = newUlid();
+    // AMENDED 2026-09-29, owner ruling (A). Both projects are FOUNDED now, and
+    // `hidden` was a project-mode ticket in a project this member was not on —
+    // which rule A puts them on. The ticket a member cannot see is an EXPLICIT one
+    // that does not list them (that arm is unchanged), and the old `hidden` shape
+    // is kept as `otherProject`, now a positive control that rule A reaches it.
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, other);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: newUlid() });
     const visibleTicket = newUlid();
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: visibleTicket });
     await seedTicket(db.pool, { workspaceId: ws, projectId: other, ticketId: hidden });
+    await applyAll(db.pool, [setVisibilityEnv(ws, hidden, 'explicit', [newUlid()])]);
+    await seedTicket(db.pool, { workspaceId: ws, projectId: other, ticketId: otherProject });
 
     const seen = await record(ticketEvent(ws, 'ticket.transitioned', visibleTicket, { to: 'doing' }, viewer));
+    const viaRuleA = await record(ticketEvent(ws, 'ticket.transitioned', otherProject, { to: 'doing' }, newUlid()));
     await record(ticketEvent(ws, 'ticket.transitioned', hidden, { to: 'done' }, newUlid()));
 
     const items = await collect(viewer, ws);
     // The positive control: without it, `yield* []` passes the next assertion.
     expect(idsOf(items)).toContain(seen.id);
+    // Rule A: a project-mode ticket in a project the member holds no roster row
+    // on is theirs to receive.
+    expect(idsOf(items)).toContain(viaRuleA.id);
     // Not "the payload is absent" — the ID ITSELF must not appear in ANY field
     // of ANY yielded item. An envelope that named the ticket and withheld the
     // body would still disclose that it exists.
@@ -152,6 +188,9 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const guest = newUlid();
     const shared = newUlid();
     const hidden = newUlid();
+    // Founded (AMENDED 2026-09-29, owner ruling A): the guest is the no-see
+    // witness now, and a witness against an unfounded project would prove nothing.
+    await seedProject(db.pool, ws, prj);
     await seedGuest(db.pool, ws, guest);
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: shared });
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: hidden });
@@ -165,7 +204,20 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(JSON.stringify(items)).not.toContain(hidden);
   });
 
-  it('6.17 losing a PROJECT purges that project’s now-invisible tickets and nothing else', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "losing a PROJECT purges
+   * that project's now-invisible tickets and nothing else" and its member held a
+   * roster row on two projects that were never FOUNDED, so `inLost` fell out of
+   * sight on removal. Under rule A a member is on every founded project: taking a
+   * roster row away takes NOTHING from them, and a guest's project rows confer
+   * nothing to lose. Trigger (4) is now unreachable as a RETRACTION for an admin
+   * or member and inert for a guest. What the roster arm still emits is the ids
+   * in the lost scope the recipient cannot see NOW, which are never-held by
+   * construction (an explicit list that does not name them) — the accepted
+   * in-scope count-leak (6.103's sibling). Recorded for the owner (D7's sibling):
+   * the roster-arm branch is a check no shipped fixture can make retract.
+   */
+  it('6.17 AMENDED (A): losing a PROJECT roster row retracts nothing a member holds — only never-held ids of that scope are named', async () => {
     const ws = newUlid();
     const lost = newUlid();
     const kept = newUlid();
@@ -175,6 +227,8 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const workspaceWide = newUlid();
     const neverHeldInKept = newUlid();
     const neverHeldInLost = newUlid();
+    await seedProject(db.pool, ws, lost);
+    await seedProject(db.pool, ws, kept);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: lost }, { projectId: kept }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: lost, ticketId: inLost });
     await seedTicket(db.pool, { workspaceId: ws, projectId: kept, ticketId: inKept });
@@ -197,6 +251,10 @@ describe('visibleEventsFor — what reaches a replica', () => {
     // device.
     await applyAll(db.pool, [setVisibilityEnv(ws, neverHeldInLost, 'explicit', [newUlid()])]);
     expect(await canSee(db.pool, viewer, neverHeldInLost)).toBe(false);
+    // Rule A, asserted rather than assumed: the project-mode ticket in the lost
+    // project is visible BEFORE the removal, and — the point of the amendment —
+    // still visible AFTER it (checked below through the stream, and here first).
+    expect(await canSee(db.pool, viewer, inLost)).toBe(true);
 
     const removal = await record(
       testEnvelope({
@@ -207,9 +265,12 @@ describe('visibleEventsFor — what reaches a replica', () => {
         actorId: newUlid(),
       }),
     );
+    expect(await canSee(db.pool, viewer, inLost)).toBe(true);
 
     const ids = idsOf(await collect(viewer, ws, removal.workspaceSeq - 1));
-    expect(ids).toContain(`purge:${inLost}`);
+    // THE AMENDMENT: what the member holds is not retracted. `inLost` was the
+    // ticket this case used to expect purged (`purge:${inLost}` present).
+    expect(ids).not.toContain(`purge:${inLost}`);
     // Two positive controls: the other project's ticket survives (so this is
     // not "purge everything"), and the roster event itself still reaches this
     // member (so this is not "yield only purges").
@@ -235,17 +296,72 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(ids).toContain(removal.id);
   });
 
+  it('6.17 AMENDED (A): a GUEST named on tickets keeps every one of them when a project roster row goes', async () => {
+    // The guest arm of the same trigger, on a project the test FOUNDS. A guest's
+    // project rows confer nothing (`can-see.ts`), so losing one takes nothing
+    // away: the tickets an explicit list names them in stay visible and are not
+    // retracted. Standing rows for a guest are what a member downgraded to guest
+    // leaves behind (6.92).
+    const ws = newUlid();
+    const lost = newUlid();
+    const kept = newUlid();
+    const guest = newUlid();
+    const heldInLost = newUlid();
+    const heldInKept = newUlid();
+    await seedProject(db.pool, ws, lost);
+    await seedProject(db.pool, ws, kept);
+    await seedGuest(db.pool, ws, guest);
+    await record(projectRowEnv(ws, lost, guest));
+    await record(projectRowEnv(ws, kept, guest));
+    await seedTicket(db.pool, { workspaceId: ws, projectId: lost, ticketId: heldInLost });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: kept, ticketId: heldInKept });
+    await applyAll(db.pool, [
+      setVisibilityEnv(ws, heldInLost, 'explicit', [guest]),
+      setVisibilityEnv(ws, heldInKept, 'explicit', [guest]),
+    ]);
+    expect(await canSee(db.pool, guest, heldInLost)).toBe(true);
+
+    const removal = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'project', id: lost },
+        type: 'project.member_removed',
+        payload: { userId: guest },
+        actorId: newUlid(),
+      }),
+    );
+    // The premise, asserted rather than assumed: the removal really took nothing.
+    expect(await canSee(db.pool, guest, heldInLost)).toBe(true);
+
+    const ids = idsOf(await collect(guest, ws, removal.workspaceSeq - 1));
+    expect(ids).not.toContain(`purge:${heldInLost}`);
+    expect(ids).not.toContain(`purge:${heldInKept}`);
+    // A guest receives no roster events (the role line, 6.91), so nothing at all
+    // arrives for this window — the answer is "nothing to retract", not a
+    // stream that failed to run: the control is that the very same window is
+    // non-empty for someone the roster reaches.
+    expect(ids).toEqual([]);
+    const member = newUlid();
+    await seedMember(db.pool, ws, member, 'member');
+    expect(idsOf(await collect(member, ws, removal.workspaceSeq - 1))).toContain(removal.id);
+  });
+
   it('6.95 two SCOPE revocations touching one ticket in the same window yield ONE purge for it', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();
     const inProject = newUlid();
+    // AMENDED 2026-09-29, owner ruling (A). The ticket was project-mode in an
+    // unfounded project, so the removal below took it from a member who was on
+    // it. A founded project keeps a member on it, so the ticket the two scans
+    // both reach is an EXPLICIT one that does not name the viewer: invisible now
+    // and before, hence a never-held id — which is all that can be emitted, and
+    // is enough to measure the DEDUP (the property this case is about).
+    await seedProject(db.pool, ws, prj);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: inProject });
-    // Project-mode and this member is on the project, so the ticket is on the
-    // device right now: the tombstone below is a genuine retraction rather than
-    // an id they never held.
-    expect(await canSee(db.pool, viewer, inProject)).toBe(true);
+    await applyAll(db.pool, [setVisibilityEnv(ws, inProject, 'explicit', [newUlid()])]);
+    expect(await canSee(db.pool, viewer, inProject)).toBe(false);
 
     // TWO scope boundaries inside one window, the second scan a SUPERSET of the
     // first: losing the project scans that project, and the revoke/re-grant
@@ -577,21 +693,27 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(JSON.stringify(items)).not.toContain(foreign);
   });
 
-  it('6.101 the per-event purge walk is GONE: a MEMBER is never handed the id of a ticket in a project they were never on', async () => {
+  it('6.101 the per-event purge walk is GONE: a MEMBER is never handed the id of a ticket they cannot see', async () => {
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
     const viewer = newUlid();
     const held = newUlid();
     const foreign = newUlid();
+    // AMENDED 2026-09-29, owner ruling (A): `foreign` was a project-mode ticket in
+    // a project this member was not on, and the project was never founded. Both
+    // projects are founded now and a member is on both, so `foreign` is an
+    // EXPLICIT ticket naming somebody else — the arm rule A leaves unchanged.
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: held });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
+    await applyAll(db.pool, [setVisibilityEnv(ws, foreign, 'explicit', [newUlid()])]);
     // Asserted, so this is a ticket that really was out of reach and not a
     // fixture that forgot to seed one. It measures the RELATIONSHIP the ruling
-    // turns on: `foreign` was never on this device — the viewer is on none of
-    // its project and no list names them — so there is nothing this recipient
-    // holds that its id could name.
+    // turns on: `foreign` was never on this device — no list names the viewer —
+    // so there is nothing this recipient holds that its id could name.
     expect(await canSee(db.pool, viewer, held)).toBe(true);
     expect(await canSee(db.pool, viewer, foreign)).toBe(false);
 
@@ -643,15 +765,23 @@ describe('visibleEventsFor — what reaches a replica', () => {
     const sharedWithGuest = newUlid();
     const foreignParent = newUlid();
     const foreign = newUlid();
+    // AMENDED 2026-09-29, owner ruling (A): `foreign` was project-mode in an
+    // unfounded project the member was not on. Founded, the member is on it, so
+    // `foreign` is now EXPLICIT to a stranger: out of reach of both recipients.
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
     await seedGuest(db.pool, ws, guest);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: held });
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: sharedWithGuest });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreignParent });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: foreign });
-    await applyAll(db.pool, [setVisibilityEnv(ws, sharedWithGuest, 'explicit', [guest])]);
+    await applyAll(db.pool, [
+      setVisibilityEnv(ws, sharedWithGuest, 'explicit', [guest]),
+      setVisibilityEnv(ws, foreign, 'explicit', [newUlid()]),
+    ]);
     // Out of reach of BOTH, and by two different branches of `canSee`: the
-    // member is not on its project, the guest is named by no list. Neither
+    // member is on no list that names it, the guest is named by no list. Neither
     // holds it, so neither may be told its id.
     expect(await canSee(db.pool, viewer, foreign)).toBe(false);
     expect(await canSee(db.pool, guest, foreign)).toBe(false);
@@ -690,16 +820,23 @@ describe('visibleEventsFor — what reaches a replica', () => {
     expect(JSON.stringify(guestItems)).not.toContain(foreign);
   });
 
-  it('6.103 an OWNER re-granted as a member inside one window is told, ticket by ticket, what the owner bypass used to reach', async () => {
+  it('6.103 an OWNER re-granted as a member inside one window is told, ticket by ticket, what ONLY the owner bypass reached', async () => {
     const ws = newUlid();
     const theirs = newUlid();
     const viewer = newUlid();
     const openToAll = newUlid();
     const projectOnly = newUlid();
     const explicitElsewhere = newUlid();
-    // No projects: the owner reads everything in the workspace by the bypass
+    // No roster rows: the owner reads everything in the workspace by the bypass
     // alone (owner decision 2026-08-27), so the downgrade takes real tickets
     // away rather than merely renaming the role.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): `theirs` is FOUNDED, and a member is on
+    // every founded project, so the downgrade to member no longer takes the
+    // project-mode ticket (`projectOnly` — the case used to expect its purge; it
+    // was passing only because the project never existed). What only the owner
+    // bypass reached is the EXPLICIT ticket that names somebody else.
+    await seedProject(db.pool, ws, theirs);
     await seedMember(db.pool, ws, viewer, 'owner');
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: openToAll });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: projectOnly });
@@ -729,10 +866,12 @@ describe('visibleEventsFor — what reaches a replica', () => {
     );
 
     const ids = idsOf(await collect(viewer, ws, opener.workspaceSeq - 1));
-    // GENUINE retractions: the owner bypass was the only thing serving these
-    // two, and a member on no project reaches neither.
-    expect(ids).toContain(`purge:${projectOnly}`);
+    // A GENUINE retraction: the owner bypass was the only thing serving this
+    // ticket, and a member reaches an explicit list only if it names them.
     expect(ids).toContain(`purge:${explicitElsewhere}`);
+    // Rule A: the project-mode ticket survives the downgrade — the member is on
+    // its (founded) project — so naming it would delete something they still read.
+    expect(ids).not.toContain(`purge:${projectOnly}`);
     // The control that separates this from "purge everything you hold": the
     // workspace-mode ticket survives the downgrade and is not named.
     expect(ids).not.toContain(`purge:${openToAll}`);

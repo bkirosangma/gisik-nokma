@@ -34,6 +34,7 @@ export function createFakeDataSource(
     getDeletedItems: async () => [],
     purgedAmong: async () => [],
     getMembers: async () => [],
+    getActorNames: async () => [],
     getBoard: async () => ({ projectId: 'prj_unset', groups: [] }),
     getTickets: async () => ({ projectId: 'prj_unset', rows: [] }),
     getTicket: async () => null,
