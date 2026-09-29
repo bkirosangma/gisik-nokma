@@ -174,6 +174,26 @@ export function redactInviteToken(url: string): string {
 }
 
 /**
+ * Per-phase wall-clock for one mint, in whole milliseconds. Measurement, not
+ * control flow (owner ruling 2026-09-29, S1): the first send after a restart
+ * measured 18 s in production and the per-phase split was unknown. Each `mark`
+ * charges the time since the previous mark to `name`. What it carries is
+ * durations only — never an address, a link or a token.
+ */
+function phaseTimer(): { mark: (name: string) => void; ms: Record<string, number> } {
+  let last = performance.now();
+  const ms: Record<string, number> = {};
+  return {
+    mark(name) {
+      const now = performance.now();
+      ms[name] = Math.round((ms[name] ?? 0) + (now - last));
+      last = now;
+    },
+    ms,
+  };
+}
+
+/**
  * The key one mint serialises on. Email addresses compare case-insensitively
  * (the rule `routes/my-invitations.ts` applies), so they are lower-cased here;
  * a phone number is compared as written.
@@ -410,6 +430,7 @@ export function registerInviteRoutes(
     async (request, reply) => {
       const { workspaceId } = request.params;
       const { address, channel, role, projectIds } = request.body;
+      const timing = phaseTimer();
       const newInviteId = newUlid();
 
       const submitted: SubmittedEvent = {
@@ -455,6 +476,7 @@ export function registerInviteRoutes(
           { ...parsed.event, serverTime: new Date().toISOString(), seq: 0 } satisfies EventEnvelope,
           { db: deps.pool, sessionUserId: request.currentUserId },
         )) === null;
+      timing.mark('gate');
 
       // ONE request at a time per (workspace, channel, address) inside the
       // check-and-mint, so a double submit makes ONE invitation. The lock is a
@@ -465,10 +487,13 @@ export function registerInviteRoutes(
         deps.pool,
         mayDedupe ? mintLockKey(workspaceId, channel, address) : null,
         async (db) => {
+          // Connect, BEGIN and the lock wait: everything since the gate.
+          timing.mark('lock');
           const existing = mayDedupe
             ? await findPendingMatch(db, { workspaceId, channel, role, address, projectIds: projectIds ?? [] })
             : null;
 
+          timing.mark('match');
           if (existing === null) {
             const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
             if (result === undefined) {
@@ -481,6 +506,7 @@ export function registerInviteRoutes(
               return { kind: 'refused' as const, result };
             }
           }
+          timing.mark('ingest');
           const inviteId = existing ?? newInviteId;
 
           // ONLY NOW does a credential exist. See the docblock on ordering: this
@@ -505,13 +531,15 @@ export function registerInviteRoutes(
                    expires_at = EXCLUDED.expires_at`,
             [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
           );
+          timing.mark('token');
           return { kind: 'minted' as const, inviteId, token, expiresAt, deduped: existing !== null };
         },
       );
+      timing.mark('commit');
       if (outcome.kind === 'refused') {
         return reply.code(422).send(outcome.result);
       }
-      const { inviteId, token, expiresAt } = outcome;
+      const { inviteId, token, expiresAt, deduped } = outcome;
 
       // The one and only copy of the raw token leaves here. `expiresAt` rides
       // with it so the admin can be told when the link lapses rather than
@@ -528,10 +556,13 @@ export function registerInviteRoutes(
       let emailSent = false;
       if (channel === 'email') {
         try {
+          const inviterName = await inviterLabel(deps.pool, request.currentUserId);
+          const workspaceName = (await workspaceNameFromLedger(deps.pool, workspaceId)) ?? 'a workspace';
+          timing.mark('lookups');
           await deps.mailer.send({
             to: address,
-            inviterName: await inviterLabel(deps.pool, request.currentUserId),
-            workspaceName: (await workspaceNameFromLedger(deps.pool, workspaceId)) ?? 'a workspace',
+            inviterName,
+            workspaceName,
             role,
             url,
             expiresAt: expiresAt.toISOString(),
@@ -542,6 +573,10 @@ export function registerInviteRoutes(
           alertWithoutWaiting(deps.alerter, `invitation email for invite ${inviteId}`, error);
         }
       }
+      timing.mark('send');
+      // The measurement the owner asked for (S1): where an invite's seconds go.
+      // Durations and ids only.
+      request.log.info({ inviteId, channel, deduped, emailSent, timingMs: timing.ms }, 'invite mint timing');
       return reply.code(201).send({ inviteId, url, expiresAt: expiresAt.toISOString(), emailSent });
     },
   );
