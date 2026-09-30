@@ -1488,7 +1488,10 @@ a.gn-ticket-sheet__crumb--link {
    in `board.tsx`, case 13.523): a card that can be opened but not dragged
    (the read-only path) shows `pointer`; the `[draggable="true"]` rule beneath
    it beats it on specificity, so a draggable card keeps `grab`. */
-.gn-board__card-slot { cursor: pointer; position: relative; }
+/* A dropped card is scrolled to with `scrollIntoView({ block: 'nearest', inline: 'nearest' })`, which stops the
+   moment the card is fully visible — bottom edge 0.09px inside the window reads as "cut off". The margin is where
+   `nearest` stops instead: one spacing step (16px) clear of the window and of the rail, on every side. */
+.gn-board__card-slot { cursor: pointer; position: relative; scroll-margin: var(--gn-space-2); }
 .gn-board__card-slot[draggable="true"] { cursor: grab; }
 /* THE HOVER DEEPENS THE SHADOW, AND ONLY THE SHADOW (owner rulings,
    2026-09-29). The first ruling lifted the card toward the user on hover

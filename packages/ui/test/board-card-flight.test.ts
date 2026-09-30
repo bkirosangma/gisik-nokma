@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { spacing } from '../src/tokens.js';
 import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 
 /**
@@ -51,5 +52,16 @@ describe('20.134 the flight rides the move token and switches off under reduced 
     expect(valueOf(wash, 'inset')).toBe('0');
     expect(valueOf(wash, 'content')).toBe('""');
     expect(valueOf(wash, 'pointer-events')).toBe('none');
+  });
+
+  it('20.160 the landing slot stops with breathing room: scroll-margin of a spacing token on every side, so `nearest` never rests flush against the window or the rail', () => {
+    // Mutations: `scroll-margin: 0`; the declaration dropped.
+    const slot = ruleExactly(CSS, '.gn-board__card-slot');
+    const margin = valueOf(slot, 'scroll-margin');
+    expect(margin).toBe('var(--gn-space-2)');
+    expect(spacing[2]).toBe('1rem'); // the token is the 16px step
+    // CONTROL — the probe reads the right rule (its other declarations are there) and a rule without the margin reads null.
+    expect(valueOf(slot, 'position')).toBe('relative');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot--flight'), 'scroll-margin')).toBeNull();
   });
 });

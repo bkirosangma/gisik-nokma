@@ -687,3 +687,22 @@ describe('20.154 the settle scroll also honours the rail’s own visible box', (
     expect(scrollIntoView.mock.contexts).toContain(slotOf('tk_c'));
   });
 });
+
+describe('20.161 Confirm takes the card out of the waiting look at once', () => {
+  it('20.161 the render right after Confirm has no wash and phase writing, with the ingest still open (CONTROL: before Confirm it was awaiting)', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise, GATED);
+    drag('tk_c', 'doing');
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(slotOf('tk_c')).toHaveClass('gn-board__card-slot--waiting'); // CONTROL
+    expect(slotOf('tk_c')).toHaveAttribute('data-move-phase', 'awaiting');
+
+    await user.type(within(dialog).getByLabelText('Comment (required by this transition)'), 'starting');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    // No waitFor, no await on the ingest: this is the very next render.
+    expect(slotOf('tk_c')).toHaveAttribute('data-move-phase', 'writing');
+    expect(slotOf('tk_c')).not.toHaveClass('gn-board__card-slot--waiting');
+    await act(async () => write.resolve(committed([{ id: 'x' }, { id: 'y' }])));
+  });
+});
