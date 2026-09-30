@@ -3539,11 +3539,12 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* The Deleted group. Separated from the project groups above it by a rule,
-   because it is not a home: it is every home's notes that were removed. */
+   because it is not a home: it is every home's notes that were removed. The
+   rule is a decorative hairline (Plan A D18), not a control's edge. */
 .gn-notes__deleted {
   margin-top: 0.75rem;
   padding-top: 0.5rem;
-  border-top: 1px solid var(--gn-border);
+  border-top: 1px solid var(--gn-fill-secondary);
 }
 
 .gn-notes__restore-failure {

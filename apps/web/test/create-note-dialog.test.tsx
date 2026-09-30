@@ -359,6 +359,36 @@ describe('18.11 The Notes page — creating a note', () => {
   });
 
   /**
+   * 20.303 — Create is the new-note dialog's ONE loud element (styling refresh
+   * Plan B, Task B11): exactly one primary `Button` is on the page while the
+   * dialog is open and it is Create; Cancel is quiet.
+   */
+  it('20.303 Create is the only primary while the new-note dialog is open', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices({
+          getMyWorkspaces: async () => WORKSPACES,
+          getNotes: async () => [],
+          getDeletedNotes: async () => [],
+          getMembers: async () => MEMBERS,
+        })}
+      >
+        <NotesPage />
+      </Providers>,
+    );
+    // CONTROL — the list's own New note is a named button and is NOT a primary (the dialog's Create is the loud one).
+    const open = await screen.findByRole('button', { name: 'New note' });
+    expect(open.classList.contains('gn-button--primary')).toBe(false);
+    await user.click(open);
+    const create = await screen.findByRole('button', { name: 'Create' });
+    const primaries = [...document.querySelectorAll('.gn-button--primary')];
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toBe(create);
+    expect(screen.getByRole('button', { name: 'Cancel' }).classList.contains('gn-button--primary')).toBe(false);
+  });
+
+  /**
    * 18.195 — the scope CHIP on the byline, and the reader's version of it.
    *
    * The control is the reader arm: a chip that opened its editor for everyone
