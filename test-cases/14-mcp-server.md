@@ -662,6 +662,10 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.218 — registering sweeps stale clients (Task 1's rule) — a 31-day-old unused client is gone after the next registration;** control: the new client exists. Mutation: never call the sweep.
 - ✅ **14.219 — a hosted-door request never reaches better-auth's catch-all: `/oauth/token` and `/.well-known/*` are their own routes, not `/api/auth/*`;** control: `/api/auth/get-session` still answers. Mutation: mount the routes under `/api/auth`.
 
+- ✅ **14.237 — registration refuses a `redirect_uris` list with a non-string entry (`["https://claude.ai/api/mcp/auth_callback", 5]`) with 400 `invalid_redirect_uri` — the good entry is NOT registered on its own;** control: the same list without the `5` registers. Mutation: drop the `uris.length !== given.length` clause (a review survivor of Task 2).
+- ✅ **14.238 — registration allows at most 10 redirect URIs (11 → 400 `invalid_redirect_uri`, no client stored);** control: exactly 10 registers. Mutation: remove the count bound.
+- ✅ **14.239 — each redirect URI may be at most 2048 characters (2049 → 400 `invalid_redirect_uri`);** control: exactly 2048 registers. Mutation: remove the length bound.
+
 ## 14.6 Hosted MCP — tokens and revocation
 
 *Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
@@ -673,6 +677,21 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.244 — `refresh_token` returns a NEW access + refresh token, and the old refresh token is dead;** control: the new access token authenticates. Mutation: return the same refresh token.
 - ✅ **14.245 — presenting a used refresh token revokes the whole connection: its latest access token stops authenticating (401) and its latest refresh token is refused;** control: another connection of the same person is untouched. Mutation: skip the family revoke.
 - ✅ **14.246 — two concurrent refreshes with the same token: exactly one succeeds; the other is treated as reuse and the connection is gone;** control: a single refresh succeeds. Mutation: a read-then-write refresh (SELECT used_at, then UPDATE). *(Review Focus 2)*
-- ❌ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
+- ✅ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
 - ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
 - ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+
+## 14.4 Hosted MCP — authorize and consent API
+
+*Remote-MCP plan Task 3 (14.220–14.229; 14.237–14.239 sit in §14.3). Tests: `apps/server/test/mcp/oauth-authorize.test.ts`, `test/http/security-middleware.test.ts` (row for the decision route).*
+
+- ✅ **14.220 — a valid authorize request 302s to `${WEB_ORIGIN}/mcp/connect?request=req_…` and stores a pending row with the challenge, redirect and state;** control: the pending row expires 10 minutes after `now`. Mutation: redirect to the API's own host.
+- ✅ **14.221 — PKCE is required: `code_challenge_method=plain` and a missing `code_challenge` are refused (302 to the client with `error=invalid_request`), no pending row;** control: `S256` with a 43-char challenge is accepted. Mutation: accept `plain`.
+- ✅ **14.222 — the redirect must equal a registered one EXACTLY: a trailing slash, a different case in the path, or an extra query parameter is refused with a 400 JSON error and NO redirect;** control: the exact string is accepted. Mutation: compare after `new URL().href` normalisation.
+- ✅ **14.223 — an unknown `client_id` is a 400 JSON error, never a redirect;** control: a known client proceeds. Mutation: redirect to the supplied `redirect_uri` on an unknown client.
+- ✅ **14.224 — `GET /v1/mcp/oauth/requests/:id` returns the client's name AND the redirect host (`claude.ai`) to the signed-in person, 401 signed out, 404 for an expired request (the pending row is still in the table, only past `expires_at`);** control: a live request answers 200. Mutations: omit `redirectHost`; make `getPending` ignore `expires_at` (a review survivor).
+- ✅ **14.225 — Allow mints a code for the SIGNED-IN person and answers `redirectTo = <redirect_uri>?code=…&state=<state>`; Deny answers `redirectTo = <redirect_uri>?error=access_denied&state=<state>` and mints nothing;** control: a redirect that already has a query keeps it (`…cb?x=1&code=…`). Mutation: drop `state`.
+- ✅ **14.226 — a request is answered once: a second decision (either way) is 409 `already_answered`, and no second code exists;** control: the first decision was 200. Mutation: read the pending row with `getPending` instead of `takePending`.
+- ✅ **14.227 — the decision refuses a cookie POST whose `Origin` is not `WEB_ORIGIN` (403 via the HTTP-Origin hook);** control: the same POST with `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+- ✅ **14.228 — an MCP token (local) cannot decide a consent (403 `mcp_token_may_not_decide`), and the request stays answerable;** control: a better-auth session can. Mutation: drop the `authKind` fence.
+- ✅ **14.229 — `response_type` other than `code` and a `scope` other than `gisik:act` are handled: `token` → `error=unsupported_response_type`; `admin` → `error=invalid_scope`;** control: an absent scope is accepted as `gisik:act`. Mutation: accept any scope.

@@ -69,6 +69,8 @@ function build(security?: SecurityOptions): { app: FastifyInstance; recorder: Re
       serverAppend: async () => [],
       webOrigin: WEB_ORIGIN,
       store: createObjectStoreFromEnv({}),
+      // The hosted MCP door ON, so its routes exist to be measured (14.227).
+      mcpPublicUrl: 'https://api.test',
     },
     security === undefined ? {} : { security },
   );
@@ -233,6 +235,10 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     // precisely what that guard is for. A cookie-authenticated POST that mints
     // a credential, so it belongs to the same category as the invite MINT.
     ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve', 'POST'],
+    // Remote-MCP plan Task 3 (case 14.227): the hosted door's consent DECISION — a
+    // cookie POST that mints an authorization code. Needs the hosted door ON in
+    // `build()` (`mcpPublicUrl`), otherwise the route does not exist to be tested.
+    ['the MCP OAuth consent DECISION', '/v1/mcp/oauth/requests/req_x/decision', '/v1/mcp/oauth/requests/:requestId/decision', 'POST'],
     // Added 2026-09-19 with the DENIAL route. It needs its OWN row rather than a
     // share of approve's, because the drift guard below compares the table and
     // `HTTP_ORIGIN_PROTECTED_ROUTES` for SET EQUALITY in both directions — so
@@ -347,6 +353,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
         serverAppend: async () => [],
         webOrigin: WEB_ORIGIN,
         store: createObjectStoreFromEnv({}),
+        mcpPublicUrl: 'https://api.test',
       },
       {
         security: HTTP_ORIGIN_ON,
@@ -398,6 +405,14 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       // there is no ambient credential to forge (`routes/mcp-device.ts`).
       '/v1/mcp/device/code',
       '/v1/mcp/device/token',
+      // The hosted MCP door's OAuth endpoints (remote-MCP plan Tasks 2 and 5): none
+      // reads a cookie session, so there is no ambient credential to forge. They
+      // take a client's own body — a public-client registration, a code + PKCE
+      // verifier, a refresh token, a token to revoke — and are charged to the MCP
+      // rate-limit bucket instead.
+      '/oauth/register',
+      '/oauth/token',
+      '/oauth/revoke',
       // better-auth's OWN CSRF middleware, not this file's: `auth.ts` wires
       // `disableOriginCheck: false` and `trustedOrigins: [WEB_ORIGIN]`, which
       // is a DIFFERENT check (better-auth's `api/middlewares/origin-check.mjs`)
