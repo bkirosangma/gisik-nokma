@@ -2765,21 +2765,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    attach files in our build") — the prototype's `ctlBg`/`ctlShadow`/
    `accent` "control button" pairing (`desktop.dc.html:1363-1366`), the same
    `--gn-fill-tertiary`/`--gn-shadow-raised`/`--gn-text-accent` mapping this
-   file already documents for that exact prototype trio elsewhere. */
+   file already documents for that exact prototype trio elsewhere.
+   Styling refresh Plan B (Task B2): P-QUIET — the retired accent-on-tint
+   constant (1.09-1.15:1) becomes the quiet outlined pill every secondary
+   control is; its own raised shadow goes with it. */
 .gn-ticket-sheet__attach-file {
   align-self: flex-start;
   margin-top: 0.75rem;
   min-height: 2.75rem;
-  padding: 0 1.125rem;
-  border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  box-shadow: var(--gn-shadow-raised);
-  color: var(--gn-text-accent);
+  padding: 0 1rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--gn-motion-feedback) ease-out;
 }
+.gn-ticket-sheet__attach-file:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: 0.6; }
 .gn-ticket-sheet__attach-file:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -3020,7 +3024,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding: 0.25rem 0.625rem;
   border-radius: 999px;
   background: var(--gn-fill-tertiary);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: none;
   font-size: 0.8125rem;
   line-height: 1.125rem;
 }
@@ -5897,12 +5901,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    values compose against. The unselected segment is therefore bare page and
    carries no fill of its own, which is the "normal" half of the owner's
    description. Geometry (`gap`/`padding`/radius) stays: it is what keeps the
-   two segments apart now that no fill does. */
+   two segments apart now that no fill does.
+   Styling refresh Plan B (Task B2): the track is RECESSED again — the
+   `surface-track` ground and the inset `track` shadow, a pill with 4px around
+   its pill tabs (rule 04: a recessed track holds raised items). It supersedes
+   the 2026-09-15 "no track fill" ruling; `neo` keeps its own pressed tab. */
 .gn-segmented {
   display: flex;
   gap: 2px;
-  padding: 2px;
-  border-radius: var(--gn-radius-control);
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
 }
 /* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
    the 44px floor this repo's own tap-target ratchet enforces (WCAG 2.5.5, and
@@ -5933,18 +5943,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      1rem is the prototype's own `padding:0 16px` on a segment. */
   padding: 0 1rem;
   border: none;
-  border-radius: var(--gn-radius-control);
+  border-radius: 999px;
   background: transparent;
-  color: var(--gn-text);
+  color: var(--gn-text-muted);
   font: inherit;
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
 }
+/* Styling refresh Plan B (Task B2): pill tabs, tier-2 ink at rest; the selected
+   one is raised on the track with the lit-edge `lift` shadow, in `text`. That
+   replaces `--gn-shadow-selected` here, so `neo`'s rule below restates it: neo's
+   `lift` is its outset raised pair, and its selected tab must stay PRESSED. */
 .gn-segmented__item--on {
   background: var(--gn-surface-raised);
+  color: var(--gn-text);
   font-weight: 600;
-  box-shadow: var(--gn-shadow-selected);
+  box-shadow: var(--gn-shadow-lift);
 }
 /* ── OWNER, 2026-09-15: "in the prototype it was sunken style. i want it to
    follow that." Under `neo` the SELECTED segment is PRESSED, not lifted.
@@ -6001,8 +6016,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      have anyway. Kept rather than removed: that identity is an artifact of
      `neo`'s current palette, not a guarantee `STYLE_COLOR_OVERRIDES` states,
      and this line is what stays correct if a future palette edit separates
-     them again.) */
+     them again.)
+
+     Styling refresh Plan B (Task B2, 20.213): the `box-shadow` line IS back.
+     The base rule now reads `--gn-shadow-lift` (hig/minimal's lit-edge raise),
+     and neo's `lift` is its OUTSET raised pair — so without this line neo's
+     selected tab would lift instead of press (B-D3, 10.80). */
   background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-selected);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -6035,13 +6056,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    rule would leave hig/minimal fields with no boundary at all — the exact
    gap 13.291's title names. The brief's own "second edge" justification is
    scoped to neo, where the border is already gone via the override below, so
-   keeping it here costs the brief nothing it was actually after. */
+   keeping it here costs the brief nothing it was actually after.
+   Styling refresh Plan B (Task B2): the field sits RECESSED — the inset
+   `track` shadow (rule 04) — keeping its accessible edge (13.291) and the
+   control radius (B-D2: a multi-line field cannot be a pill). */
 .gn-field__input {
   min-height: 2.75rem;
   padding: 0 0.875rem;
   border: 1px solid var(--gn-border);
   border-radius: var(--gn-radius-control);
   background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-track);
   color: var(--gn-text);
   font: inherit;
   font-size: 1.0625rem;
