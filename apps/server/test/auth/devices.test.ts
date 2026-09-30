@@ -112,6 +112,32 @@ describe('6.300 first sign-in sets gn_device and records it', () => {
   });
 });
 
+describe('6.300 a client cannot re-home its own session', () => {
+  it("6.300 POST /api/auth/update-session with { deviceId } leaves the stored deviceId unchanged; control: the route is live (an empty body is refused 'No fields to update', not a 404)", async () => {
+    const phone = '+919000000300';
+    const signIn = await phoneSignIn(app, otp, phone);
+    expect(signIn.statusCode).toBe(200);
+    const sessionCookie = cookies(signIn.headers)
+      .map((c) => c.split(';')[0]!)
+      .find((c) => c.startsWith('better-auth.session_token='))!;
+    const before = await deviceIdOfLatestSession(phone);
+    expect(before).toBe(valueOf(deviceCookie(signIn.headers)));
+    const call = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: '/api/auth/update-session', payload, headers: { cookie: sessionCookie, origin: 'http://localhost:3001' } });
+
+    // Control: the route is mounted and reachable for this session (nothing to update is a 400 with better-auth's own message).
+    const empty = await call({});
+    expect(empty.statusCode).toBe(400);
+    expect(empty.body).toContain('No fields to update');
+
+    // The claim: a client-chosen deviceId is refused or ignored, and the row is what the sign-in hook wrote.
+    const forged = await call({ deviceId: 'attacker-chosen' });
+    expect(forged.statusCode).not.toBe(200);
+    expect(forged.statusCode).not.toBe(404);
+    expect(await deviceIdOfLatestSession(phone)).toBe(before);
+  });
+});
+
 describe('6.301 the same browser keeps its id', () => {
   it('6.301 reuse, no new Set-Cookie; control: no cookie mints another', async () => {
     const first = await phoneSignIn(app, otp, '+919000000302');
