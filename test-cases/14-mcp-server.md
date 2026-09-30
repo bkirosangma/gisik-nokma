@@ -664,7 +664,7 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 
 ## 14.6 Hosted MCP — tokens and revocation
 
-*Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
+*Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper (now shared, in `apps/server/test/helpers/oauth.ts`) mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
 
 - ✅ **14.240 — `authorization_code` with the right verifier, client and redirect returns an access + refresh token (`expires_in: 3600`, `token_type: "Bearer"`, `scope: "gisik:act"`, `cache-control: no-store`), and the access token authenticates `GET /v1/me/workspaces` as the consenting person;** control: the response has no `id_token`. Mutation: return `expires_in: 86400`.
 - ✅ **14.241 — a wrong `code_verifier` is `invalid_grant` and the code is burnt (a retry with the right verifier also fails);** control: the right verifier on a fresh code succeeds. Mutation: skip `verifyPkceS256`.
@@ -676,3 +676,18 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ❌ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
 - ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
 - ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+
+## 14.8 Hosted MCP — the /mcp endpoint
+
+*Remote-MCP plan Task 7 (14.260–14.269). Tests: `apps/server/test/mcp/mcp-http.test.ts`. Run LOCALLY (CI does not run on a dev PR). Every case runs the real `buildApp`, the real OAuth token exchange and the real nine tools over the API's own routes; nothing is stubbed.*
+
+- ✅ **14.260 — no bearer → 401 with `WWW-Authenticate: Bearer resource_metadata="<public>/.well-known/oauth-protected-resource/mcp"`;** control: the same header on an expired token (one that authenticated a moment earlier). Mutation: answer 401 with no header.
+- ✅ **14.261 — a local (device-flow) token is REFUSED at `/mcp` (401): the hosted door takes hosted tokens only;** control: the same token is accepted by the REST API, and a hosted token of the same person is accepted at `/mcp`. Mutation: accept any resolvable token. *(Keeps the two doors' credentials apart — a leaked local token cannot be pasted into a remote client.)*
+- ✅ **14.262 — `initialize` then `tools/list` return the nine tools with their descriptions, as JSON (`enableJsonResponse`), and NO `mcp-session-id` header (stateless);** control: every tool carries a description. Mutation: set `sessionIdGenerator: () => randomUUID()`.
+- ✅ **14.263 — `tools/call list_workspaces` returns the caller's workspaces (the same JSON as `GET /v1/me/workspaces`);** control: a second person sees their own (none). Mutation: build the session from a fixed user.
+- ✅ **14.264 — `tools/call create_ticket` writes an event with `origin: 'mcp'`, `actorId` = the token's owner;** control: `transition_ticket` refused by the rule engine returns `isError: true` with the server's own reason text. Mutation: catch and reword the error.
+- ✅ **14.265 — `Origin` present and not allowed (`https://evil.example`) → 403 before auth (even with a valid token); absent `Origin` (server-to-server connectors) and `https://claude.ai` are admitted;** control: `https://chatgpt.com` is admitted (reaches the 401). Mutation: skip the Origin check.
+- ✅ **14.266 — a person removed from every workspace (R5 `membership.revoked`) with a live connection gets `list_workspaces` → `{ workspaces: [] }` and a write → the REST refusal, never data;** control: before removal the same calls return data. Mutation: cache the membership on the connection. *(Review Focus 3)*
+- ✅ **14.267 — `GET /mcp` and `DELETE /mcp` → 405 with `Allow: POST`;** control: `POST` answers 200. Mutation: route GET to the transport.
+- ✅ **14.268 — every tool call writes one log line `{ msg: 'mcp tool call', tool, outcome: 'ok'|'error', durationMs, userId }` and no token, argument value or result text;** control: the line exists for a failing call with `outcome: 'error'`. Mutation: log the arguments.
+- ✅ **14.269 — `/mcp` is charged to the MCP rate-limit bucket keyed by the caller;** control: another caller (another `x-forwarded-for`) is unaffected. Mutation: leave `/mcp` unbucketed.

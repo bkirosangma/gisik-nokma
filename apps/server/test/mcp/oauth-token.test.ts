@@ -2,8 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
-import { buildOAuthApp, pkcePair } from '../helpers/oauth.js';
-import { mintCode } from '../../src/mcp/oauth-store.js';
+import { buildOAuthApp, consent as consentFor, type Consent, pkcePair } from '../helpers/oauth.js';
 
 let db: TestDatabase;
 beforeAll(async () => { db = await createTestDatabase(); });
@@ -12,20 +11,8 @@ afterAll(async () => { await db.drop(); });
 const CB = 'https://chatgpt.com/connector_platform_oauth_redirect';
 const CB2 = 'https://chatgpt.com/other_redirect';
 
-type Consent = { clientId: string; verifier: string; code: string };
-
-/**
- * A consent, as far as the token endpoint can tell: a registered client and a
- * minted code bound to (client, redirect, challenge). The code is minted through
- * the store rather than through /oauth/authorize + the decision route so this
- * file does not depend on Task 3; Task 3's own tests cover that half.
- */
-async function consent(app: FastifyInstance, userId: string, opts: { clientId?: string; redirectUris?: string[] } = {}): Promise<Consent> {
-  const clientId = opts.clientId ?? ((await app.inject({ method: 'POST', url: '/oauth/register', payload: { client_name: 'ChatGPT', redirect_uris: opts.redirectUris ?? [CB] } })).json().client_id as string);
-  const { verifier, challenge } = pkcePair();
-  const code = await mintCode(db.pool, { clientId, userId, redirectUri: CB, codeChallenge: challenge }, new Date());
-  return { clientId, verifier, code };
-}
+const consent = (app: FastifyInstance, userId: string, opts: { clientId?: string; redirectUris?: string[] } = {}) =>
+  consentFor(app, db.pool, userId, opts);
 const form = (o: Record<string, string>) => ({ headers: { 'content-type': 'application/x-www-form-urlencoded' }, payload: new URLSearchParams(o).toString() });
 const exchange = (app: FastifyInstance, c: Consent, over: Record<string, string> = {}) =>
   app.inject({ method: 'POST', url: '/oauth/token', ...form({ grant_type: 'authorization_code', code: c.code, code_verifier: c.verifier, client_id: c.clientId, redirect_uri: CB, ...over }) });
