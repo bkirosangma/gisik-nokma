@@ -39,6 +39,7 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e-stack',
   globalSetup: './e2e-stack/global-setup.ts',
+  globalTeardown: './e2e-stack/global-teardown.ts',
   timeout: 90_000,
   // One worker: the specs share one seeded world and one test inbox, and the
   // inbox is purged per sign-in. Parallel workers would race for the link.

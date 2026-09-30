@@ -81,6 +81,8 @@ async function createUser(email: string): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  // Read by `global-teardown.ts` (same process): only sessions and passkeys created from here on are this run's to remove (6.338).
+  process.env['GISIK_E2E_RUN_STARTED_AT'] = new Date().toISOString();
   const { sha } = await assertStackIsTheStack();
   console.log(`[e2e-stack] stack verified, deploy sha ${sha}`);
 
