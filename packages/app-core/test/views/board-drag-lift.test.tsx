@@ -10,7 +10,7 @@ import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
  * Styling refresh Plan A Task 5A — cases 20.101, 20.102, 20.104, 20.105
  * (§20.10). The lift is painted on a `setDragImage` clone, the source slot
  * becomes the placeholder one frame later, and the column under the pointer is
- * outlined (plan D25/D26). jsdom implements no `DragEvent` and drags nothing,
+ * outlined (plan D25/D26; D25's "no placeholder in the target" is superseded by owner feedback 2026-09-30 — see `board-drop-placeholder.test.tsx`). jsdom implements no `DragEvent` and drags nothing,
  * so this file proves the WIRING — what is handed to `setDragImage`, which
  * classes come and go on which events — not the pixels; the browser check
  * (20.121, Task 8) measures those.
