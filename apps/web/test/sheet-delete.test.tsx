@@ -208,10 +208,16 @@ async function openTheSheet(readKey: string | null = null, answer: Answer = COMM
 afterEach(async () => {
   ingested = [];
   listCalls = 0;
-  // Unmount while `window` still exists, and let the editor's scheduled destroy run under whichever clock
-  // is installed, THEN hand the next case real timers: `13.1180` installs a fake clock, and a clock left
-  // installed owns tiptap's `useEditor` destroy timer, which fires after jsdom is torn down when the
-  // suite is slow ("window is not defined", exit 1 with every test green).
+  // THE TIMER, found: it is a LIBRARY timer, Tiptap's deferred `useEditor` destroy — NOT one of this repo's
+  // editor timers (`code-block-copy.ts`, `heading-anchors.ts`, `wiki-link.ts`). In
+  // `@tiptap/react@3.30.5 src/useEditor.ts`, `EditorInstanceManager.scheduleDestroy()` does
+  //   `this.scheduledDestructionTimeout = setTimeout(() => { … currentEditor.destroy() … }, 1)`   (:296, destroy at :303)
+  // and unmount calls it, so the editor is destroyed ONE TICK AFTER the tree unmounts. `Editor.destroy` →
+  // `EditorView.destroyPluginViews` → `PasteRule.ts:282` reads `window`. With `13.1180`'s fake clock still
+  // installed that 1 ms timer belongs to the fake clock and fires (vitest `callTimer`) after jsdom is torn
+  // down when the suite is slow: "window is not defined", exit 1 with every test green.
+  // THE CHOICE (owner, 2026-10-01): flush it inside `act()` in this `afterEach`, while `window` exists, and
+  // then restore real timers — rather than hunting for a way to keep the editor mounted or stubbing tiptap.
   cleanup();
   if (vi.isFakeTimers()) await act(async () => vi.runOnlyPendingTimers());
   vi.useRealTimers();
