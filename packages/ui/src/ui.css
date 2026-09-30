@@ -4543,7 +4543,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    and the `Select` popovers (portalled to the body), so nothing is clipped by
    the overflow. */
 @media (min-width: 64.0625rem) {
-  .workflow-builder-screen { height: calc(100vh - var(--app-nav-offset, 0px) - 4rem); }
+  /* Exactly the window minus the chrome around it (polish 2, case 10.164): the app bar, the breadcrumb's margin and line,
+     and the shell's bottom padding — each published once by `apps/web/app/globals.css`, each read with a `0px` fallback
+     (a host without that chrome is unaffected). The old `- 4rem` ignored the padding and left the PAGE 26px to scroll. */
+  .workflow-builder-screen {
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--gn-builder-crumb-gap, 0px) - var(--gn-builder-crumb-line, 0px) - var(--gn-shell-pad-bottom, 0px));
+  }
   .workflow-builder-screen__layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
   .workflow-builder-screen__left {
     align-self: stretch;

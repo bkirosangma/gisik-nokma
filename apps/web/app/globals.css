@@ -163,7 +163,7 @@ input, textarea, select { font-family: inherit; }
    typed or copied by hand, which is what the `<code>` tag was chosen for. */
 .gn-invite-mint__url { font-family: var(--gn-font-mono); }
 
-.gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 1.25rem 3rem; }
+.gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 1.25rem var(--gn-shell-pad-bottom); }
 .gn-shell__main { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
 @media (max-width: 60rem) {
   .gn-shell { padding: 0 0.75rem 2rem; }
@@ -1043,6 +1043,16 @@ input, textarea, select { font-family: inherit; }
    here: a segmented control is a track that should span the card, not a
    button that should hug its label. */
 .gn-account__appearance { align-items: stretch; gap: 1rem; }
+
+/* At phone width the Style control's three labels (Apple HIG, Minimal, Neomorphic) need ~284px with the shared item's
+   `padding: 0 1rem`, and the card's content is 256px at 320 (12px shell + 20px card padding a side, less the track's own 4px),
+   so the track spilled ~36px out of the card in EVERY style; it only read as a page scroll (scrollWidth 321) in neo, where
+   the selected item is the longest label in weight 600. Half the side padding below 23rem (the card starts being narrower
+   than its labels at about 356px) makes them fit with room to spare. Scoped to this card and this width: the shared
+   `.gn-segmented__item` keeps `0 1rem` for sign-in, inbox, help and the ticket-type editor (20.661). */
+@media (max-width: 23rem) {
+  .gn-account__appearance .gn-segmented__item { padding: 0 0.5rem; }
+}
 
 .gn-account__appearance-group {
   display: flex;
@@ -1984,6 +1994,19 @@ input, textarea, select { font-family: inherit; }
 }
 
 :root { --app-nav-offset: 4.35rem; }
+/* The chrome around the workflow builder's wide screen, each number published ONCE (polish 2, 2026-10-01, case 10.164).
+   `packages/ui/src/ui.css` bounds `.workflow-builder-screen` to `100dvh - app bar - crumb margin - crumb line - shell
+   bottom padding`, and these are the rules that draw the last three: `.gn-shell`'s bottom padding, and the breadcrumb
+   above the screen (`.gn-builder-crumb` — a top margin and ONE line, whose height is pinned here because the nav inherits
+   the body's `line-height: 1.45`, a number the screen's height must not depend on by accident). The old allowance was a
+   literal `4rem`, 26px short at 1512x805 (measured: scrollHeight 831 vs innerHeight 805) because it ignored the padding.
+   Declared before the rules that read them. The narrow shell (`max-width: 60rem`) sets its own 2rem padding, and the
+   screen is only bounded above 64.0625rem, where this one applies. */
+:root {
+  --gn-shell-pad-bottom: 3rem;
+  --gn-builder-crumb-gap: 1.2rem;
+  --gn-builder-crumb-line: 1.45rem;
+}
 .gn-nav__inner {
   display: flex;
   align-items: flex-start;
@@ -3254,7 +3277,7 @@ input, textarea, select { font-family: inherit; }
 
    `margin-top` matches `.gn-page-title`'s own: the crumb sits where a page
    title would, and the title it precedes is the builder's name field. */
-.gn-builder-crumb { margin: 1.2rem 0 0; }
+.gn-builder-crumb { margin: var(--gn-builder-crumb-gap) 0 0; line-height: var(--gn-builder-crumb-line); }
 .gn-builder-crumb a {
   font-size: 0.8125rem;
   line-height: 1.125rem;

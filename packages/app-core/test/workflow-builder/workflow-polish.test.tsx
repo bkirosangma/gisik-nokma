@@ -168,3 +168,103 @@ describe('10.158 the Add rule menu items carry the 44px class', () => {
     for (const item of items) expect(item).toHaveClass('add-rule-menu__item');
   });
 });
+
+/**
+ * Cases 10.166–10.167 — the Add rule menu is a `role="menu"`, so it keeps a menu's promises (polish 2, 2026-10-01: the
+ * controller's browser pass found two real Escape presses left it open with focus on an item).
+ */
+describe('10.166 Escape closes the Add rule menu and returns focus to its trigger', () => {
+  async function openMenuWithFocusOnFirstItem(user: ReturnType<typeof userEvent.setup>) {
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderPanels(store);
+    act(() => store.actions.select({ kind: 'transition', index: 0 }));
+    const trigger = screen.getByRole('button', { name: 'Add rule' });
+    await user.click(trigger);
+    await user.tab();
+    return { trigger, store };
+  }
+
+  it('10.166 the first Escape closes the menu, focuses the trigger and is consumed; the second does nothing and is NOT swallowed', async () => {
+    const user = userEvent.setup();
+    const { trigger } = await openMenuWithFocusOnFirstItem(user);
+    const seen: { key: string; defaultPrevented: boolean }[] = [];
+    const listener = (event: KeyboardEvent) => seen.push({ key: event.key, defaultPrevented: event.defaultPrevented });
+    document.addEventListener('keydown', listener);
+    try {
+      // CONTROL — the menu really is open with focus on an item, so "closed" after the key is the key's doing.
+      expect(screen.getByRole('menu', { name: 'Add rule' })).toBeInTheDocument();
+      expect(document.activeElement).toBe(screen.getAllByRole('menuitem')[0]);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).toBeNull();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(document.activeElement).toBe(trigger);
+      // The press was CONSUMED by the menu: nothing above it (a dialog, a sheet) also acts on it.
+      expect(seen).toEqual([]);
+
+      // Second Escape, menu closed: nothing changes, and the key is NOT swallowed — a surface above still sees it.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      expect(seen).toEqual([{ key: 'Escape', defaultPrevented: false }]);
+    } finally {
+      document.removeEventListener('keydown', listener);
+    }
+  });
+
+  it('10.166 Escape inside the inspector is not swallowed when the menu is closed', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderPanels(store);
+    act(() => store.actions.select({ kind: 'transition', index: 0 }));
+    const seen: boolean[] = [];
+    const listener = (event: KeyboardEvent) => seen.push(event.defaultPrevented);
+    document.addEventListener('keydown', listener);
+    try {
+      // CONTROL — no menu is open, and focus is on another control of the same inspector (the trigger itself).
+      const trigger = screen.getByRole('button', { name: 'Add rule' });
+      trigger.focus();
+      expect(screen.queryByRole('menu')).toBeNull();
+      await user.keyboard('{Escape}');
+      expect(seen).toEqual([false]);
+      // …and it DOES swallow while open (the contrast that makes the line above a reading).
+      await user.click(trigger);
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).toBeNull();
+      expect(seen).toEqual([false]);
+    } finally {
+      document.removeEventListener('keydown', listener);
+    }
+  });
+});
+
+describe('10.167 the Add rule menu moves focus with the arrow keys, Home and End', () => {
+  it('10.167 ArrowDown/ArrowUp step between items and wrap; Home and End jump', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderPanels(store);
+    act(() => store.actions.select({ kind: 'transition', index: 0 }));
+    await user.click(screen.getByRole('button', { name: 'Add rule' }));
+    await user.tab();
+    const items = screen.getAllByRole('menuitem');
+    // CONTROL — focus starts on the first item of a menu with several, so each move below is a move.
+    expect(items.length).toBeGreaterThanOrEqual(3);
+    expect(document.activeElement).toBe(items[0]);
+
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(items[1]);
+    await user.keyboard('{ArrowUp}');
+    expect(document.activeElement).toBe(items[0]);
+    await user.keyboard('{ArrowUp}');
+    expect(document.activeElement).toBe(items[items.length - 1]);
+    await user.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(items[0]);
+    await user.keyboard('{End}');
+    expect(document.activeElement).toBe(items[items.length - 1]);
+    await user.keyboard('{Home}');
+    expect(document.activeElement).toBe(items[0]);
+    // The menu is still open (navigation does not close it) and nothing was added.
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+});
