@@ -1934,7 +1934,7 @@ different questions. `P35`'s own corroboration: the family's other two members, 
 ### The case
 
 - ✅ **13.1147 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
-  Amended 2026-09-30 by 20.261 (styling refresh Plan B): the calendar nav is now a quiet outlined 44px pill (`border: 1px solid var(--gn-border)`), so the pair is asserted per side until Plan B Task B8 restyles the timeline nav to the same values; both sides still declare a `border`.
+  Amended 2026-09-30 by 20.261 (styling refresh Plan B): the calendar nav is now a quiet outlined 44px pill (`border: 1px solid var(--gn-border)`), so the pair is asserted per side until Plan B Task B8 restyles the timeline nav to the same values; both sides still declare a `border`. Amended again 2026-09-30 by 20.271 (styling refresh Plan B Task B8): the timeline nav took the same quiet outlined values, so the pair is asserted on BOTH sides again (`min-height: 2.75rem`, `border: 1px solid var(--gn-border)`, `border-radius: 999px`, transparent, text-muted) and the timeline's own rule declares that 1px border instead of `none`.
   **The assertion is the PRESENCE of the declaration, not the absence of `outset`**, and the difference
   matters: `outset` is what the UA applies *because* the declaration is missing, so a test searching a
   stylesheet for the string `outset` would pass on every tree, broken or fixed. The five values are

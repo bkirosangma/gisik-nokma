@@ -168,3 +168,8 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 
 - ✅ **20.331 — the workspaces page has ONE primary: Create workspace; each invitation's Accept is a quiet outlined control, so N pending invitations do not make N+1 loud elements;** control: Accept is still a `button` named "Accept" (its behaviour and name are unchanged). Mutation: restore `variant="primary"` on Accept.
 - ✅ **20.332 — no workspaces-list rule paints a flat boundary or the retired constant;** control: the scan reads more than 20 rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-workspace-card__door`.
+
+## 20.28 Plan B — the Timeline tab
+
+- ✅ **20.271 — the timeline's Earlier / Today / Later navigation is a quiet outlined 44px control with its hover wash and agrees with the calendar's navigation on every value (the pair 13.1147 compares), and its weeks band and side panel are recessed tracks;** control: the clipped-bar dashed edges and the side-entry marker edge are still declared. Mutation: restore `min-height: 2.25rem` on `.gn-timeline__nav`.
+- ✅ **20.272 — no timeline rule paints a flat boundary or the retired constant;** control: the scan reads more than 25 timeline rules. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-timeline__side`.
