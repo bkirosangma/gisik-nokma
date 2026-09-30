@@ -396,17 +396,6 @@ describe('13.716 the Workspace settings tab', () => {
   });
 
   /**
-   * 13.716 — changing ONLY `Auto-close after` and saving ingests exactly ONE
-   * `workspace.settings_set` whose payload carries `autoCloseAfterDays` and
-   * NOTHING else.
-   *
-   * "And nothing else" is the assertion that matters. A form that echoed the
-   * other two knobs back would submit `{staleDays: 3, dueSoonDays: 14,
-   * autoCloseAfterDays: 14}`, which the projection would apply faithfully — so
-   * the bug would be invisible in the row it wrote and would only surface when
-   * two people edited different knobs at once.
-   */
-  /**
    * 20.343 — Save is the Workspace settings screen's ONE loud element (styling
    * refresh Plan B, Task B15): exactly one primary `Button` is on the page and it
    * is Save. The sidebar and the shell's nav are links, not primaries.
@@ -422,6 +411,17 @@ describe('13.716 the Workspace settings tab', () => {
     expect(primaries[0]).toBe(save);
   });
 
+  /**
+   * 13.716 — changing ONLY `Auto-close after` and saving ingests exactly ONE
+   * `workspace.settings_set` whose payload carries `autoCloseAfterDays` and
+   * NOTHING else.
+   *
+   * "And nothing else" is the assertion that matters. A form that echoed the
+   * other two knobs back would submit `{staleDays: 3, dueSoonDays: 14,
+   * autoCloseAfterDays: 14}`, which the projection would apply faithfully — so
+   * the bug would be invisible in the row it wrote and would only surface when
+   * two people edited different knobs at once.
+   */
   it('13.716 saving only the auto-close change ingests one claim carrying that field alone', async () => {
     const captured: SubmittedEvent[][] = [];
     renderTab('admin', SETTINGS, captured);
