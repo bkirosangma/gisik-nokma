@@ -1432,6 +1432,8 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   that is present and does nothing reads identically to one that works. It is a regression pin on four
   treatments this change does NOT alter; the fifth and sixth rows of the table above are 13.887 and a
   named absence respectively.
+  Amended 2026-09-29 by 20.311 (styling refresh Plan B): the card's resting shadow is now the lit-edge
+  `var(--gn-shadow-lift)` and the header tray is `var(--gn-surface-well)` instead of `var(--gn-surface-sunken)`.
 
 - ✅ **13.889 — the two `Select` fields wear the field pattern's LABEL half, and stay the shared
   `Select`.** `apps/web/test/members-page.test.tsx:1053`. RULED, not decided here: AMENDMENT 2
