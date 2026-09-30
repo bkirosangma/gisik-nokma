@@ -1871,8 +1871,11 @@ describe('13.1142 the ticket sheet collapses its label column at phone width', (
 describe('13.1144 the board\'s whole-board empty state is styled', () => {
   it('13.1144 the container carries the column sibling\'s shape', () => {
     const body = rule('.gn-board--empty');
-    expect(body).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-card\)/);
+    // Amended 2026-09-30 by 20.281 (styling refresh Plan B, Task B9): the
+    // container is the board's own recessed TRACK now, not a fill4 card.
+    expect(body).toMatch(/background:\s*var\(--gn-surface-track\)/);
+    expect(body).toMatch(/box-shadow:\s*var\(--gn-shadow-track\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-track\)/);
     // The sibling's own three, asserted as a family rather than one property:
     // a container that centred differently would read as a different state.
     expect(body).toMatch(/display:\s*flex/);
@@ -1889,10 +1892,13 @@ describe('13.1144 the board\'s whole-board empty state is styled', () => {
 
   it('13.1144 the action takes the shared control constant', () => {
     const body = rule('.gn-board__empty-create');
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
-    expect(body).toMatch(/border:\s*none/);
+    // Amended 2026-09-30 by 20.281 (styling refresh Plan B, Task B9): the
+    // action is QUIET now — New ticket in the header is the screen's one loud
+    // element — so the constant is replaced by the outlined transparent pill.
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-muted\)/);
+    expect(body).toMatch(/border-radius:\s*999px/);
+    expect(body).toMatch(/border:\s*1px solid var\(--gn-border\)/);
     // The 44px standalone floor, the same one `.ticket-type-list__move` carries.
     expect(body).toMatch(/min-height:\s*2\.75rem/);
     // And the NEGATIVE half: a control still carrying the UA's edge is exactly

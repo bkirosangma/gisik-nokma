@@ -1917,6 +1917,7 @@ screen back toward a prototype that never had it — the second half of the find
   pinned by index rather than assumed. **Not painted**: what is asserted is what the rules declare, and
   `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
   run and restored from a sha256-compared backup.
+  Amended 2026-09-30 by 20.281 (styling refresh Plan B Task B9): the container is now the board's recessed track (`surface-track`, `shadow-track`, `radius-track`) rather than the sibling's `fill-quaternary` card shape, and the action is a quiet outlined pill (transparent, `text-muted`, `border: 1px solid var(--gn-border)`, 999px radius) rather than the shared constant; the reset-before-rule order and the 44px floor are unchanged.
 
 ## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1147`
 
