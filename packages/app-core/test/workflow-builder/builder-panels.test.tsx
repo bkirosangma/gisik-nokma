@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
@@ -100,6 +100,29 @@ describe('10.141 both lists render every state and transition with their summari
     // The errand template has both a guarded and an unguarded edge, so both summaries were exercised.
     expect(transitions.some((transition) => transition.rules.length === 0)).toBe(true);
     expect(transitions.some((transition) => transition.rules.length > 0)).toBe(true);
+  });
+
+  it('10.141 the plural "N conditions", the Start chip on the initial state only, and a from-any edge reading "Any state"', () => {
+    const draft = draftFromTemplate(kanban);
+    const store = createDraftStore({
+      ...draft,
+      def: { ...draft.def, transitions: [...draft.def.transitions, { from: '*', to: 'done', rules: [] }] },
+    });
+    store.actions.addRule(0, { kind: 'require-comment' });
+    store.actions.addRule(0, { kind: 'require-evidence' });
+    store.actions.addRule(1, { kind: 'require-comment' });
+    renderPanels(store);
+    const transitions = screen.getByRole('heading', { name: /^Transitions \(/ }).closest('section')!;
+    const rows = within(transitions).getAllByRole('button');
+    expect(rows[0]).toHaveTextContent('2 conditions');
+    expect(rows[1]).toHaveTextContent('1 condition');
+    expect(rows[1]).not.toHaveTextContent('1 conditions');
+    expect(rows[2]).toHaveTextContent('No conditions');
+    expect(rows[4]).toHaveTextContent('Any state → Done');
+    // The Start chip marks the initial state and no other.
+    expect(stateRow('To do')).toHaveTextContent('Start');
+    expect(stateRow('Doing')).not.toHaveTextContent('Start');
+    expect(stateRow('Done')).not.toHaveTextContent('Start');
   });
 
   it("10.141 a state that cannot start tickets carries the \"Can't create here\" tag; one that can does not", () => {
@@ -334,7 +357,7 @@ describe('10.148 the universal transitions are read-only rows', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     const { container } = renderPanels(store);
     const section = screen.getByRole('heading', { name: /^Transitions \(/ }).closest('section')!;
-    const universal = within(section).getAllByRole('listitem').filter((item) => item.hasAttribute('data-universal'));
+    const universal = within(section).getAllByRole('listitem').filter((item) => item.hasAttribute('data-universal')) as HTMLLIElement[];
     expect(universal).toHaveLength(2);
     expect(universal[0]).toHaveTextContent('Start');
     expect(universal[0]).toHaveTextContent('Backlog → To do');
@@ -346,6 +369,9 @@ describe('10.148 the universal transitions are read-only rows', () => {
     expect(items.indexOf(universal[0]!)).toBeGreaterThan(items.length - 3);
     expect(screen.getByRole('heading', { name: `Transitions (${store.getState().def.transitions.length})` })).toBeInTheDocument();
     // CONTROL: a declared row IS a button, and clicking a universal row selects nothing.
+    fireEvent.click(universal[0]!);
+    fireEvent.click(universal[1]!);
+    expect(store.getState().selection).toEqual({ kind: 'none' });
     expect(rowButtons()).toHaveLength(store.getState().def.states.length + store.getState().def.transitions.length);
     expect(container.querySelectorAll('[data-universal]')).toHaveLength(2);
   });
@@ -386,6 +412,13 @@ describe('10.150 empty lists say so', () => {
     expect(screen.getByText(/^No transitions yet — /)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'States (0)' })).toBeInTheDocument();
     expect(rowButtons()).toHaveLength(0);
+    // The universal rows remain even with nothing declared.
+    expect(document.querySelectorAll('[data-universal]')).toHaveLength(2);
+    cleanup();
+    // A viewer who cannot author is not told to draw one.
+    renderPanels(createDraftStore({ ...draft, def: { ...draft.def, states: [], transitions: [] } }), env({ canAuthor: false }));
+    expect(screen.getByText('No transitions yet.')).toBeInTheDocument();
+    expect(screen.queryByText(/draw one/)).not.toBeInTheDocument();
     // CONTROL: with content, neither empty message is shown.
     cleanup();
     renderPanels(createDraftStore(draftFromTemplate(kanban)));

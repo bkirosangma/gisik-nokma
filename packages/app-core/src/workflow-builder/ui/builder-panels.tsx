@@ -1,4 +1,4 @@
-import { universalTransitions, type StateCategory } from '@gisik-nokma/domain';
+import { BACKLOG_STATE, universalTransitions, type StateCategory } from '@gisik-nokma/domain';
 import { Chip, type ChipTone } from '@gisik-nokma/ui';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { ruleCountLabel } from '../summaries.js';
@@ -190,12 +190,12 @@ export function BuilderPanels() {
           <li className="builder-row builder-row--universal" data-universal="start">
             <span className="builder-row__name">Start</span>{' '}
             <span className="builder-row__meta">
-              Backlog → {nameOf(startTarget)}
+              {BACKLOG_STATE.name} → {nameOf(startTarget)}
             </span>
           </li>
           <li className="builder-row builder-row--universal" data-universal="send-to-backlog">
             <span className="builder-row__name">Send to Backlog</span>{' '}
-            <span className="builder-row__meta">Any unfinished state → Backlog</span>
+            <span className="builder-row__meta">Any unfinished state → {BACKLOG_STATE.name}</span>
           </li>
         </ul>
       </section>

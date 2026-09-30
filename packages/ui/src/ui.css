@@ -4285,6 +4285,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    mechanically delete it — the capability is preserved either way, and what is
    refused is the move, which would put the two non-authorable invariants behind
    a selection or below the fold. Three rails below, preserving it as drawn.
+   (Superseded 2026-09-30, W1: the right rail is gone and the grid is two columns;
+   `SystemRulesPanel` stays in the left column, below the States / Transitions lists.)
 
    TWO MORE THINGS THE DRAWING HAS THAT THIS BLOCK NEITHER ADOPTS NOR STYLES,
    named here so the next reader does not have to rediscover them. (1) The

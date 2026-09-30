@@ -2,7 +2,8 @@ import { Button } from '@gisik-nokma/ui';
 import { useBuilderEnv, useBuilderStore, useDraft } from './builder-context.js';
 
 /**
- * The right rail's state inspector.
+ * The state inspector — since 2026-09-30 (W1) the body of an open row in the States list
+ * (`builder-panels.tsx`); it was the right rail's before that rail was retired.
  *
  * ## Two shared components, adopted here rather than re-spelled
  *
