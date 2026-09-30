@@ -1,4 +1,5 @@
-import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/domain';
+import { statesWithBacklog, type IngestResult, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
 import type { DataSource } from '../data-source.js';
 import { PARENT_TERMINAL_RULE } from '../precheck.js';
 import type { MakeSubmitted } from '../submit.js';
@@ -113,6 +114,49 @@ export function reopenStateOptions(
   return transitionOptions(def, currentStateId)
     .filter((option) => !terminal.has(option.toStateId))
     .map((option) => ({ id: option.toStateId, name: option.name }));
+}
+
+/**
+ * What a `ReopenDialog` needs to know about the parent, from its definition and
+ * its current state — the ONE place the offer is derived, so the create flow
+ * (which reads the parent by id) and the ticket sheet (which IS the parent and
+ * already holds both) cannot drift into offering different reopens.
+ *
+ * `parentStateName` goes through `statesWithBacklog` (backlog/closed spec §1.4):
+ * a parent parked in the universal Backlog state has no row in its own published
+ * definition and must still read "Backlog" rather than a bare id. `parentClosed`
+ * reads the flag through `?? null` because the domain field is optional (441
+ * fixtures predate it) — `!== null` alone would treat a pre-flag ticket as closed.
+ */
+export type ReopenOffer = {
+  parentStateName: string;
+  reopenStates: Array<{ id: string; name: string }>;
+  parentClosed: boolean;
+};
+
+export function reopenOfferFor(
+  def: WorkflowDef,
+  ticket: { stateId: string; closed?: { actorId: string; at: string } | null },
+): ReopenOffer {
+  return {
+    parentStateName:
+      statesWithBacklog(def).find((state) => state.id === ticket.stateId)?.name ?? ticket.stateId,
+    reopenStates: reopenStateOptions(def, ticket.stateId),
+    parentClosed: (ticket.closed ?? null) !== null,
+  };
+}
+
+/**
+ * Whether a `parent-refused` outcome means the parent is ALREADY not closed, so
+ * a retry must build `[transition]` alone (Rulings 39 and 50): the batch's
+ * `ticket.reopened` half committed before its transition was refused, or that
+ * half was itself refused `not-closed` because someone else reopened the parent
+ * a second earlier. Either way a retry that still believed the parent closed
+ * would resend `ticket.reopened` into the same refusal and mask the next
+ * target's own answer. Shared by every caller of `reopenAndProceed`.
+ */
+export function parentNoLongerClosed(outcome: Extract<ReopenOutcome, { kind: 'parent-refused' }>): boolean {
+  return outcome.parentReopened || outcome.refusal.rule === REFUSAL_RULES.notClosed;
 }
 
 export type ReopenPlan = {
