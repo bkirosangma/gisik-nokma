@@ -1165,11 +1165,6 @@ function BoardGroupSection({
     onToggleColumn(group.workflowId, stateId, expandedNow);
   };
   /**
-   * The rail's id, which the heading's button points at with `aria-controls`.
-   * Built from the group's own identity rather than from an index, so a
-   * re-ordered board cannot leave a button pointing at a sibling's rail.
-   */
-  /**
    * SPRING-LOADED COLUMNS (owner, 2026-10-01: *"if dragged over a collapsed column and remained for a bit,
    * the column should temporarily open up. if the drag is moved out of the column it may be collapsed
    * again. if it is dropped there, keep column open"*). The one column a drag has held open, or `null`.
@@ -1212,6 +1207,12 @@ function BoardGroupSection({
       document.removeEventListener('drop', clear);
     };
   }, [dropTarget, springOpen, drag]);
+
+  /**
+   * The rail's id, which the heading's button points at with `aria-controls`.
+   * Built from the group's own identity rather than from an index, so a
+   * re-ordered board cannot leave a button pointing at a sibling's rail.
+   */
   const railId = `board-rail-${group.workflowId}-${group.workflowVersion}`;
   /**
    * ⚠ DECISION 1 OF 3, MADE HERE: **every group gets a heading, a lone workflow

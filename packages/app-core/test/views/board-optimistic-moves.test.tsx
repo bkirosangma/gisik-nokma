@@ -8,7 +8,7 @@ import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-so
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
 
 /**
- * Optimistic, animated board moves (owner, 2026-10-01) — cases 20.125–20.131 and 20.133, 20.138.
+ * Optimistic, animated board moves (owner, 2026-10-01) — cases 20.125–20.131, 20.133, 20.135 (the board wires the scroller), 20.138, 20.146.
  *
  * The owner's words: *"the dropped card briefly jumps back to the original column before being instantly
  * moved to the dropped column … assume it is already a success and show the card to move to the new column,
@@ -459,5 +459,65 @@ describe('20.138 after a drop the landing slot scrolls into view — only when i
     } finally {
       delete (window as { matchMedia?: unknown }).matchMedia;
     }
+  });
+});
+
+describe('20.135 the board runs the edge scroller for exactly the life of a card drag', () => {
+  let frames: Array<FrameRequestCallback | null>;
+  let scrollBy: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    frames = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
+      frames[id - 1] = null;
+    });
+    scrollBy = vi.fn();
+    window.scrollBy = scrollBy as unknown as typeof window.scrollBy;
+  });
+  const runFrame = () => {
+    for (const callback of frames.splice(0, frames.length)) callback?.(0);
+  };
+  const dragOverAt = (y: number) => document.dispatchEvent(new MouseEvent('dragover', { bubbles: true, clientX: 300, clientY: y }));
+
+  it('20.135 a card dragstart starts it (a dragover near the top scrolls the page); a drop stops it', async () => {
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    // CONTROL — with no drag under way the very same dragover scrolls nothing.
+    dragOverAt(10);
+    runFrame();
+    expect(scrollBy).not.toHaveBeenCalled();
+
+    const dataTransfer = dragData();
+    fireAt('dragStart', slotOf('tk_c'), dataTransfer);
+    dragOverAt(10);
+    runFrame();
+    expect(scrollBy).toHaveBeenCalled();
+    expect(scrollBy.mock.calls.at(-1)![1]).toBeLessThan(0);
+
+    fireEvent.drop(columnOf('doing'), { dataTransfer });
+    const seen = scrollBy.mock.calls.length;
+    runFrame();
+    runFrame();
+    expect(scrollBy.mock.calls.length).toBe(seen);
+  });
+
+  it('20.135 unmounting the board mid-drag stops the loop', async () => {
+    const onMoved = vi.fn();
+    const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND });
+    const moves: BoardMoveCapability = { dataSource: source, workspaceId: WS, currentUserId: CURRENT_USER, onMoved };
+    const utils = render(<Board board={board()} onOpenTicket={() => {}} moves={moves} />);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /Move to/ }).length).toBeGreaterThan(0));
+    fireAt('dragStart', slotOf('tk_c'), dragData());
+    dragOverAt(10);
+    runFrame();
+    const seen = scrollBy.mock.calls.length;
+    expect(seen).toBeGreaterThan(0); // CONTROL — it was running
+    utils.unmount();
+    runFrame();
+    dragOverAt(10);
+    runFrame();
+    expect(scrollBy.mock.calls.length).toBe(seen);
   });
 });

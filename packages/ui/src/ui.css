@@ -1515,6 +1515,35 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: -1px;
 }
 .gn-board__card-slot--placeholder > .gn-board-card { visibility: hidden; }
+/* A MOVED CARD GLIDES (owner 2026-10-01: "the drop should not be instant. have a smooth animation"). The card
+   is drawn in its landing slot the moment it is dropped, and it FLIPS there from where the pointer let go:
+   `board.tsx` measures the drop point against the slot and sets `--gn-flip-x/-y` (the distance back), and this
+   animation takes the card from that offset to rest — `transform` only, so nothing reflows. It rides the
+   move token (200ms, tokens.ts `motion.move`) and ease-out, like the drop slot above. The same class is the
+   glide BACK when a write is refused. `z-index` keeps it over its neighbours for the flight. */
+.gn-board__card-slot--flight {
+  z-index: 2;
+  animation: gnCardFlight var(--gn-motion-move) var(--gn-motion-ease-out);
+}
+@keyframes gnCardFlight {
+  from { transform: translate(var(--gn-flip-x, 0), var(--gn-flip-y, 0)); }
+}
+/* Reduced motion: the card is simply THERE. Everything else about the move is the same. */
+@media (prefers-reduced-motion: reduce) {
+  .gn-board__card-slot--flight { animation: none; }
+}
+/* A move waiting on its dialog (a comment or field is required): the card sits in its landing slot, faded. The
+   fade is a wash drawn OVER the card, not `opacity` on the slot — the transition dialog is rendered inside
+   the card and an ancestor's `opacity` would fade it (and its scrim) with it. */
+.gn-board__card-slot--waiting::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-track);
+  opacity: 0.6;
+  pointer-events: none;
+}
 /* THE DROP TARGET (plan D25, SUPERSEDED by owner feedback 2026-09-30: D25
    assumed the landing slot was unknowable; it is not — a column is ordered by
    ticket id, see `landingIndex` in board.tsx). A column under a drag is still
