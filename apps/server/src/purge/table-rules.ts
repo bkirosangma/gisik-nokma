@@ -126,6 +126,11 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
   },
   mcp_device_codes: { rule: 'not-entity-bearing', why: 'A person’s device authorisation.' },
   mcp_tokens: { rule: 'not-entity-bearing', why: 'A person’s token.' },
+  oauth_clients: { rule: 'not-entity-bearing', why: 'A registered assistant app (name + redirect URIs).' },
+  oauth_pending_authorizations: { rule: 'not-entity-bearing', why: 'A consent in flight, ten minutes at most.' },
+  oauth_codes: { rule: 'not-entity-bearing', why: 'A person’s one-minute authorization code.' },
+  oauth_connections: { rule: 'not-entity-bearing', why: 'A person’s consent to an assistant app.' },
+  oauth_refresh_tokens: { rule: 'not-entity-bearing', why: 'A person’s refresh token.' },
   user_notification_preferences: { rule: 'not-entity-bearing', why: 'A person’s muted kinds.' },
   proj_ticket_comments: { rule: 'erase', by: ['workspace_id', 'ticket_id'], why: 'Comment bodies.' },
   proj_notes: {
