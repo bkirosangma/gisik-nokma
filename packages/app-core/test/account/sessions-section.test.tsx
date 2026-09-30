@@ -175,3 +175,59 @@ describe('SessionsSection', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+describe('6.348 per-row sign-out names are unique (controller browser pass, devices-2)', () => {
+  const legacy = (key: string, over: Partial<DeviceSummary> = {}) =>
+    device({ key, tag: null, legacy: true, label: 'Chrome on Mac', lastSeenAt: '2026-09-28T10:00:00Z', ...over });
+  const openIdle = async () => userEvent.click(screen.getByRole('button', { name: /Signed in, idle/ }));
+  const signOutNames = () => screen.getAllByRole('button', { name: /^Sign out this device/ }).map((b) => b.getAttribute('aria-label'));
+
+  it('6.348 two rows with the SAME title are told apart by their last activity, and the second is clicked by its own name; control: a third row with a different title keeps the plain name', async () => {
+    const { onSignOutDevice } = mount([
+      CURRENT,
+      legacy('legacy:a'),
+      legacy('legacy:b', { lastSeenAt: '2026-09-25T10:00:00Z' }),
+      IDLE,
+    ]);
+    await openIdle();
+    const names = signOutNames();
+    expect(names).toEqual([
+      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago',
+      'Sign out this device — Older sign-in · Chrome on Mac, last active 5 days ago',
+      'Sign out this device — Safari on iPhone · M5NB',
+    ]);
+    expect(new Set(names).size).toBe(names.length);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out this device — Older sign-in · Chrome on Mac, last active 5 days ago' }));
+    expect(onSignOutDevice).toHaveBeenCalledWith('legacy:b');
+  });
+
+  it('6.348 when the last activity is ALSO equal, the first sign-in date tells them apart; a device that was never seen reads "never active"; control: rows that differ on activity do not gain the date', async () => {
+    const { onSignOutDevice } = mount([
+      CURRENT,
+      legacy('legacy:a', { firstSignedInAt: '2026-09-01T10:00:00Z' }),
+      legacy('legacy:b', { firstSignedInAt: '2026-09-10T10:00:00Z' }),
+      legacy('legacy:c', { lastSeenAt: null }),
+    ]);
+    await openIdle();
+    const names = signOutNames();
+    expect(names).toEqual([
+      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago, first signed in 1 Sep 2026',
+      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago, first signed in 10 Sep 2026',
+      'Sign out this device — Older sign-in · Chrome on Mac, never active',
+    ]);
+    expect(new Set(names).size).toBe(3);
+    await userEvent.click(screen.getByRole('button', { name: /first signed in 10 Sep 2026$/ }));
+    expect(onSignOutDevice).toHaveBeenCalledWith('legacy:b');
+  });
+
+  it('6.348 rows identical in every shown respect still get distinct names (an ordinal), so every button stays addressable', async () => {
+    const { onSignOutDevice } = mount([CURRENT, legacy('legacy:a'), legacy('legacy:b')]);
+    await openIdle();
+    const names = signOutNames();
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(names[1]).toMatch(/2 of 2$/);
+    await userEvent.click(screen.getByRole('button', { name: names[1]! }));
+    expect(onSignOutDevice).toHaveBeenCalledWith('legacy:b');
+  });
+});
