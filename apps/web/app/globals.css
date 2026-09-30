@@ -885,6 +885,9 @@ input, textarea, select { font-family: inherit; }
 .gn-account__device-meta { display: flex; flex-wrap: wrap; column-gap: 0.75rem; row-gap: 0; }
 .gn-account__device-current { font-weight: 600; color: var(--gn-text-accent); }
 .gn-account__idle-toggle { justify-content: flex-start; }
+/* "Not used recently" sits between a passkey's name block and its Delete button: muted, small, and WORDS not colour, so the
+   cue survives every theme and colour-blindness. It is text, not a control, so it carries no 44px target of its own. */
+.gn-account__passkey-stale { flex: none; font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
 .gn-account__chevron {
   flex: none;
   width: 0.5rem;

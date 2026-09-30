@@ -25,15 +25,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * an abbreviated one — an abbreviated fixture is exactly what let the
  * original bug ship undetected.
  */
-const { revokeOtherSessions, fetchMock } = vi.hoisted(() => ({
+const { revokeOtherSessions, fetchMock, listUserPasskeys, addPasskey, deletePasskey } = vi.hoisted(() => ({
   revokeOtherSessions: vi.fn(),
   fetchMock: vi.fn(),
+  listUserPasskeys: vi.fn(),
+  addPasskey: vi.fn(),
+  deletePasskey: vi.fn(),
 }));
 vi.mock('../src/auth-client.js', () => ({
-  authClient: { revokeOtherSessions },
+  // `listUserPasskeys` is present ONLY so a test can prove the list no longer goes through it (6.337).
+  authClient: { revokeOtherSessions, passkey: { listUserPasskeys, addPasskey, deletePasskey } },
 }));
 
-import { createSessionsClient } from '../src/account/account-clients.js';
+import { createPasskeyClient, createSessionsClient } from '../src/account/account-clients.js';
 
 const CHROME_MAC =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -139,5 +143,49 @@ describe('createSessionsClient — sign-out', () => {
     revokeOtherSessions.mockResolvedValue({ error: { message: 'Too many requests' } });
     await expect(client.signOutOthers()).resolves.toEqual({ error: 'Too many requests' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+const serverPasskey = (over: Record<string, unknown> = {}) => ({
+  id: 'p1',
+  name: 'MacBook',
+  provider: 'iCloud Keychain',
+  createdAt: '2026-09-18T10:00:00.000Z',
+  lastUsedAt: '2026-09-30T10:00:00.000Z',
+  notUsedRecently: false,
+  ...over,
+});
+
+describe('createPasskeyClient (devices plan Task 7)', () => {
+  it('6.337 list() reads GET /v1/me/passkeys with the cookie and hands the rows on unchanged, a null name included; control: the plugin\'s listUserPasskeys is never called', async () => {
+    listUserPasskeys.mockReset();
+    fetchMock.mockResolvedValue(reply(200, { passkeys: [serverPasskey(), serverPasskey({ id: 'p2', name: null, lastUsedAt: null, notUsedRecently: true })] }));
+    const list = await createPasskeyClient().list();
+    expect(fetchMock).toHaveBeenCalledWith('/v1/me/passkeys', { credentials: 'include' });
+    expect(list.map((p) => [p.id, p.name, p.provider, p.lastUsedAt, p.notUsedRecently])).toEqual([
+      ['p1', 'MacBook', 'iCloud Keychain', '2026-09-30T10:00:00.000Z', false],
+      ['p2', null, 'iCloud Keychain', null, true],
+    ]);
+    expect(listUserPasskeys).not.toHaveBeenCalled();
+  });
+
+  it('6.337 a refused or failed list read REJECTS (the page then shows "could not be loaded", never "no passkeys yet"); control: a 200 with an empty list resolves []', async () => {
+    const client = createPasskeyClient();
+    fetchMock.mockResolvedValue(reply(200, { passkeys: [] }));
+    await expect(client.list()).resolves.toEqual([]);
+    fetchMock.mockResolvedValue(reply(500));
+    await expect(client.list()).rejects.toThrow();
+    fetchMock.mockRejectedValue(new Error('offline'));
+    await expect(client.list()).rejects.toThrow();
+  });
+
+  it('6.337 add and remove still go through the passkey plugin; a refusal with no message still surfaces', async () => {
+    const client = createPasskeyClient();
+    addPasskey.mockResolvedValue({ data: {}, error: null });
+    await expect(client.add('Work')).resolves.toEqual({ error: null });
+    expect(addPasskey).toHaveBeenCalledWith({ name: 'Work' });
+    deletePasskey.mockResolvedValue({ data: null, error: { status: 400 } });
+    await expect(client.remove('p9')).resolves.toEqual({ error: 'That did not work. Try again.' });
+    expect(deletePasskey).toHaveBeenCalledWith({ id: 'p9' });
   });
 });

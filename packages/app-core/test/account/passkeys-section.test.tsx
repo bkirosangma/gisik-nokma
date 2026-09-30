@@ -1,7 +1,19 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { PasskeysSection } from '../../src/account/passkeys-section.js';
+import type { PasskeySummary } from '../../src/account/passkey-client.js';
+
+const NOW = new Date('2026-10-01T00:00:00Z');
+/** A passkey as `GET /v1/me/passkeys` serves it (devices plan Task 5), with overrides. */
+const pk = (over: Partial<PasskeySummary> & Pick<PasskeySummary, 'id'>): PasskeySummary => ({
+  name: 'MacBook Touch ID',
+  provider: 'iCloud Keychain',
+  createdAt: '2026-09-18T10:00:00Z',
+  lastUsedAt: '2026-09-30T10:00:00Z',
+  notUsedRecently: false,
+  ...over,
+});
 
 /**
  * Account/help-screens plan, Task 8. `PasskeysSection` is framework-free
@@ -22,10 +34,7 @@ describe('PasskeysSection', () => {
     const user = userEvent.setup();
     render(
       <PasskeysSection
-        passkeys={[
-          { id: 'p1', name: 'MacBook Touch ID' },
-          { id: 'p2', name: 'YubiKey' },
-        ]}
+        passkeys={[pk({ id: 'p1' }), pk({ id: 'p2', name: 'YubiKey', provider: 'Security key or other' })]}
         onAdd={vi.fn()}
         onRemove={onRemove}
       />,
@@ -103,7 +112,7 @@ describe('PasskeysSection', () => {
     // still shows what it already knows rather than hiding it.
     render(
       <PasskeysSection
-        passkeys={[{ id: 'p1', name: 'MacBook Touch ID' }]}
+        passkeys={[pk({ id: 'p1' })]}
         onAdd={vi.fn()}
         onRemove={vi.fn()}
         listFailed
@@ -123,5 +132,54 @@ describe('20.363 the passkeys add action is quiet — Account has one primary', 
     expect(add).toHaveClass('gn-button');
     expect(add).toHaveClass('gn-button--ghost');
     expect(add).not.toHaveClass('gn-button--primary');
+  });
+});
+
+describe('6.335/6.336 passkeys grouped by provider (devices plan Task 7)', () => {
+  const passkeys = [
+    pk({ id: 'p3', name: 'YubiKey', provider: 'Security key or other', createdAt: '2026-09-01T10:00:00Z', lastUsedAt: '2026-09-02T10:00:00Z' }),
+    pk({ id: 'p1' }),
+    pk({ id: 'p2', name: null, createdAt: '2026-06-01T10:00:00Z', lastUsedAt: null, notUsedRecently: true }),
+    pk({ id: 'p4', name: 'Work', provider: '1Password', lastUsedAt: '2026-09-30T23:58:00Z' }),
+  ];
+  const mount = (list: PasskeySummary[], onRemove = vi.fn()) =>
+    render(<PasskeysSection passkeys={list} onAdd={vi.fn()} onRemove={onRemove} now={NOW} />);
+
+  it('6.335 passkeys sit under their provider heading with a count ("iCloud Keychain · 2"), providers alphabetical and "Security key or other" last; control: a single provider still shows its heading', () => {
+    mount(passkeys);
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['1Password · 1', 'iCloud Keychain · 2', 'Security key or other · 1']);
+    // a row sits inside ITS provider's group
+    const group = screen.getByRole('heading', { name: 'iCloud Keychain · 2' }).parentElement!;
+    expect(within(group).getByText('MacBook Touch ID')).toBeInTheDocument();
+    expect(within(group).getByText('Unnamed passkey')).toBeInTheDocument();
+    expect(within(group).queryByText('YubiKey')).toBeNull();
+    cleanup();
+    mount([pk({ id: 'only', provider: 'Windows Hello' })]);
+    expect(screen.getByRole('heading', { name: 'Windows Hello · 1' })).toBeInTheDocument();
+  });
+
+  it('6.335 each row reads its name (or "Unnamed passkey"), "Added <date>" and "Last used <relative>" or "Never used"; control: a just-now use reads "Last used just now", an old one the date', () => {
+    mount(passkeys);
+    expect(screen.getAllByText('Added 18 Sep 2026')).toHaveLength(2); // p1 and p4
+    expect(screen.getByText('Added 1 Jun 2026')).toBeInTheDocument();
+    expect(screen.getByText('Last used 14 hours ago')).toBeInTheDocument();
+    expect(screen.getByText('Never used')).toBeInTheDocument();
+    expect(screen.getByText('Last used 2 Sep 2026')).toBeInTheDocument(); // p3: 2 Sep is 28 days before NOW, so the date form
+    expect(screen.getByText('Last used just now')).toBeInTheDocument(); // p4: 2 minutes
+  });
+
+  it('6.336 a passkey with notUsedRecently shows "Not used recently" beside its Delete button; control: a recently used one does not, and the delete control keeps its per-row name', async () => {
+    const onRemove = vi.fn();
+    const user = userEvent.setup();
+    mount(passkeys, onRemove);
+    expect(screen.getAllByText('Not used recently')).toHaveLength(1);
+    const unnamed = screen.getByText('Unnamed passkey').closest('li')!;
+    expect(within(unnamed).getByText('Not used recently')).toBeInTheDocument();
+    const recent = screen.getByText('MacBook Touch ID').closest('li')!;
+    expect(within(recent).queryByText('Not used recently')).toBeNull();
+    // an unnamed row still has a name of its own, distinguishable from a second unnamed one by its added date
+    await user.click(within(unnamed).getByRole('button', { name: /^Delete passkey Unnamed passkey/ }));
+    expect(onRemove).toHaveBeenCalledWith('p2');
   });
 });

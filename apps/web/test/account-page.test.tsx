@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
  * initialization` at import time (documented precedent: `test/sign-in.test.tsx`'s
  * own docblock on this exact mistake). `fetchMock`/`revokeOtherSessions` (devices plan Task 6, replacing
  * Task 7's `listSessions`/`revokeSession`)
- * and `listUserPasskeys`/`addPasskey`/`deletePasskey` (Task 8) join the SAME
+ * and `addPasskey`/`deletePasskey` (Task 8; the passkey LIST is `GET /v1/me/passkeys`, devices plan Task 7) join the SAME
  * `vi.hoisted` call rather than a second one — there is exactly one
  * `vi.mock('../src/auth-client.js', ...)` call in this file, extended here,
  * not duplicated — and are referenced directly as the mock's members below,
@@ -35,7 +35,6 @@ const {
   updateUser,
   fetchMock,
   revokeOtherSessions,
-  listUserPasskeys,
   addPasskey,
   deletePasskey,
   sessionAnswer,
@@ -60,7 +59,6 @@ const {
     updateUser: vi.fn(),
     fetchMock: vi.fn(),
     revokeOtherSessions: vi.fn(),
-    listUserPasskeys: vi.fn(),
     addPasskey: vi.fn(),
     deletePasskey: vi.fn(),
     sessionAnswer: { current: initial as typeof initial | null, initial },
@@ -76,7 +74,7 @@ vi.mock('../src/auth-client.js', () => ({
     // generated client puts them: each server endpoint path
     // (`/passkey/list-user-passkeys`, `/passkey/delete-passkey`) becomes a
     // camelCase member of a `passkey` namespace.
-    passkey: { listUserPasskeys, addPasskey, deletePasskey },
+    passkey: { addPasskey, deletePasskey },
   },
 }));
 
@@ -89,7 +87,7 @@ import { stubServices } from './helpers/stub-services.js';
  * every pre-Task-8 case sets its own `updateUser`/`fetchMock` expectation
  * inside the test body, so those are deliberately left alone.
  *
- * `listUserPasskeys` gets a benign default because the page now reads it on
+ * The passkey list gets a benign default (`servePasskeys([])`) because the page now reads it on
  * EVERY mount — without one, each of the ten older cases would drive the
  * adapter against `undefined` and reach the list's `() => setPasskeys([])`
  * rejection branch, which renders the same empty state a real empty answer
@@ -109,17 +107,37 @@ const serverDevice = (over: Record<string, unknown> = {}) => ({
   legacy: false,
   ...over,
 });
-/** Answers `GET /v1/me/devices` with `devices`, every other read with a 500 and every write with `answer` (default 204). */
+/** What `GET /v1/me/passkeys` answers, in order (the last repeats): rows, a status number, or an Error to reject with. */
+const passkeyAnswers: { queue: Array<unknown[] | number | Error>; reads: number } = { queue: [[]], reads: 0 };
+const servePasskeys = (...answers: Array<unknown[] | number | Error>) => {
+  passkeyAnswers.queue = answers;
+  passkeyAnswers.reads = 0;
+};
+/** One `GET /v1/me/passkeys` row as the server sends it. */
+const serverPasskey = (over: Record<string, unknown> = {}) => ({
+  id: 'p1',
+  name: 'MacBook Touch ID',
+  provider: 'iCloud Keychain',
+  createdAt: '2026-09-18T10:00:00.000Z',
+  lastUsedAt: new Date().toISOString(),
+  notUsedRecently: false,
+  ...over,
+});
+/** Answers `GET /v1/me/devices` with `devices`, `GET /v1/me/passkeys` from `servePasskeys`, every other read with a 500 and every write with `answer` (default 204). */
 function serveDevices(devices: unknown[], answer: ReturnType<typeof reply> = reply(204)) {
-  fetchMock.mockImplementation(async (url: string, init?: { method?: string }) =>
-    (init?.method ?? 'GET') === 'GET'
-      ? url === '/v1/me/devices'
-        ? reply(200, { devices })
-        : // Any OTHER read on the page (the MCP cards mount on /account too) stays refused, as it was before fetch was stubbed.
-          reply(500)
-      : answer,
-  );
+  fetchMock.mockImplementation(async (url: string, init?: { method?: string }) => {
+    if ((init?.method ?? 'GET') !== 'GET') return answer;
+    if (url === '/v1/me/devices') return reply(200, { devices });
+    if (url === '/v1/me/passkeys') {
+      const entry = passkeyAnswers.queue[Math.min(passkeyAnswers.reads++, passkeyAnswers.queue.length - 1)]!;
+      if (entry instanceof Error) throw entry;
+      return typeof entry === 'number' ? reply(entry) : reply(200, { passkeys: entry });
+    }
+    // Any OTHER read on the page (the MCP cards mount on /account too) stays refused, as it was before fetch was stubbed.
+    return reply(500);
+  });
 }
+const passkeyReads = () => passkeyAnswers.reads;
 const deviceReads = () => fetchMock.mock.calls.filter(([url, init]) => url === '/v1/me/devices' && (init?.method ?? 'GET') === 'GET').length;
 
 afterEach(() => vi.unstubAllGlobals());
@@ -129,8 +147,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   revokeOtherSessions.mockReset();
   sessionAnswer.current = sessionAnswer.initial;
-  listUserPasskeys.mockReset();
-  listUserPasskeys.mockResolvedValue({ data: [], error: null });
+  servePasskeys([]);
   addPasskey.mockReset();
   deletePasskey.mockReset();
 });
@@ -140,7 +157,7 @@ function mount() {
     <Providers
       services={stubServices(
         { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
-        // A benign default, matching `listUserPasskeys`'s own precedent above:
+        // A benign default, matching the passkey list's own benign default above:
         // without it, every pre-E5-13 case in this file would drive the
         // notification-preferences read against the unstubbed rejection and
         // render the new `prefsError` alert (ruling E5-13) alongside whatever
@@ -643,14 +660,15 @@ describe('AccountPage — Sessions', () => {
  * answer the right way, and re-lists rather than inventing a row.
  */
 describe('AccountPage — Passkeys', () => {
-  it('shows the empty state, adds a passkey, and lists it after re-reading the server', async () => {
-    listUserPasskeys
-      .mockResolvedValueOnce({ data: [], error: null })
+  it('6.337 shows the empty state, adds a passkey, and lists it after re-reading the server', async () => {
+    servePasskeys(
+      [],
       // The SECOND read answers differently, which is what makes the row's
       // appearance a fact about the re-list rather than about an optimistic
       // local push: a page that appended the typed name itself would show
       // "Work laptop" without ever asking again.
-      .mockResolvedValueOnce({ data: [{ id: 'p1', name: 'Work laptop' }], error: null });
+      [serverPasskey({ id: 'p1', name: 'Work laptop' })],
+    );
     addPasskey.mockResolvedValue({ data: {}, error: null });
     const user = userEvent.setup();
     mount();
@@ -659,19 +677,15 @@ describe('AccountPage — Passkeys', () => {
     await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
     expect(addPasskey).toHaveBeenCalledWith({ name: 'Work laptop' });
     expect(await screen.findByText('Work laptop')).toBeInTheDocument();
-    expect(listUserPasskeys).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('heading', { name: 'iCloud Keychain · 1' })).toBeInTheDocument();
+    expect(passkeyReads()).toBe(2);
   });
 
-  it('deleting a listed passkey calls deletePasskey with that row\'s id and re-reads', async () => {
-    listUserPasskeys
-      .mockResolvedValueOnce({
-        data: [
-          { id: 'p1', name: 'MacBook Touch ID' },
-          { id: 'p2', name: 'YubiKey' },
-        ],
-        error: null,
-      })
-      .mockResolvedValueOnce({ data: [{ id: 'p1', name: 'MacBook Touch ID' }], error: null });
+  it('6.337 deleting a listed passkey calls deletePasskey with that row\'s id and re-reads', async () => {
+    servePasskeys(
+      [serverPasskey({ id: 'p1' }), serverPasskey({ id: 'p2', name: 'YubiKey', provider: 'Security key or other' })],
+      [serverPasskey({ id: 'p1' })],
+    );
     deletePasskey.mockResolvedValue({ data: { status: true }, error: null });
     const user = userEvent.setup();
     mount();
@@ -684,8 +698,20 @@ describe('AccountPage — Passkeys', () => {
     expect(screen.getByText('MacBook Touch ID')).toBeInTheDocument();
   });
 
+  it('6.336 the page shows "Not used recently" for a stale passkey only, beside its Delete button', async () => {
+    servePasskeys([
+      serverPasskey({ id: 'p1' }),
+      serverPasskey({ id: 'p2', name: 'Old key', lastUsedAt: null, notUsedRecently: true }),
+    ]);
+    mount();
+    const stale = (await screen.findByText('Old key')).closest('li')!;
+    expect(within(stale).getByText('Not used recently')).toBeInTheDocument();
+    expect(within(stale).getByText('Never used')).toBeInTheDocument();
+    expect(screen.getAllByText('Not used recently')).toHaveLength(1);
+  });
+
   it('a refusal from the server renders verbatim, and the list is NOT re-read', async () => {
-    listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    servePasskeys([]);
     addPasskey.mockResolvedValue({
       data: null,
       error: { message: 'This authenticator is already registered' },
@@ -701,7 +727,7 @@ describe('AccountPage — Passkeys', () => {
     // Exactly the mount read: a refused add re-lists nothing, so the count
     // discriminates the refusal branch from the success branch above rather
     // than merely observing that some text appeared.
-    expect(listUserPasskeys).toHaveBeenCalledTimes(1);
+    expect(passkeyReads()).toBe(1);
   });
 
   it('a refusal with NO message still surfaces, rather than reading as success', async () => {
@@ -710,7 +736,7 @@ describe('AccountPage — Passkeys', () => {
     // spelling used elsewhere on this page would collapse this to "no error"
     // and show nothing at all — after the person just touched a fingerprint
     // sensor. `refusalOf` in `account-clients.ts` is what this case pins.
-    listUserPasskeys.mockResolvedValue({ data: [], error: null });
+    servePasskeys([]);
     addPasskey.mockResolvedValue({ data: null, error: { status: 400, statusText: 'BAD_REQUEST' } });
     const user = userEvent.setup();
     mount();
@@ -723,14 +749,14 @@ describe('AccountPage — Passkeys', () => {
     /**
      * The rate-limit half of this task, on the `/account` side.
      *
-     * `GET /passkey/list-user-passkeys` is charged to the shared `auth:`
-     * bucket (`apps/server/src/app.ts`; `RATE_LIMIT_AUTH_MAX` is 10 per 60s,
-     * on a key a web container shares across every browser behind it), and it
-     * sits behind better-auth's `sessionMiddleware` — so for a signed-OUT
-     * visitor it is a request that CANNOT succeed, spending everyone's
-     * sign-in budget on a 401. `page.tsx` gates the effect on
-     * `user !== null` for exactly that reason, and this is the case that
-     * would go red if the gate were removed.
+     * The passkey list sits behind a session (`GET /v1/me/passkeys` answers 401
+     * to a signed-OUT visitor), so for one it is a request that CANNOT succeed.
+     * Until devices plan Task 7 it was the plugin's `list-user-passkeys`, charged
+     * to the shared `auth:` bucket (`RATE_LIMIT_AUTH_MAX` 10 per 60s on a key a
+     * web container shares across every browser behind it), which is why the gate
+     * exists; the `/v1/*` read no longer spends that budget, but the gate still
+     * stops a request that cannot succeed. `page.tsx` gates the effect on
+     * `user !== null`, and this is the case that would go red if it were removed.
      *
      * The positive control is the four cases above: with a user, the same
      * page reads the list on mount every time. So a zero here is a fact about
@@ -744,7 +770,8 @@ describe('AccountPage — Passkeys', () => {
     // everyone; Profile and Passkeys do not.
     expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(listUserPasskeys).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => url === '/v1/me/passkeys')).toBe(false);
+    expect(passkeyReads()).toBe(0);
     expect(screen.queryByLabelText('Passkey name')).toBeNull();
     expect(screen.queryByText('You have no passkeys yet.')).toBeNull();
   });
@@ -755,12 +782,17 @@ describe('AccountPage — Passkeys', () => {
    * read that never actually confirmed that. The section now states the
    * read failure instead, distinct from an add/remove `error`.
    */
-  it('E2-23 a failed passkey list read states the refusal, not the named empty state', async () => {
-    listUserPasskeys.mockRejectedValue(new Error('network error'));
+  it('E2-23 / 6.337 a failed passkey list read (a dead network OR a 500) states the refusal, not the named empty state', async () => {
+    servePasskeys(new Error('network error'));
     mount();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Your passkeys could not be loaded.',
     );
+    expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
+    cleanup();
+    servePasskeys(500);
+    mount();
+    expect(await screen.findByText('Your passkeys could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
   });
 });

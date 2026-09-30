@@ -118,7 +118,7 @@ export function createSessionsClient(): SessionsClient {
  *
  * | endpoint path                    | method | client member                    |
  * |----------------------------------|--------|----------------------------------|
- * | `/passkey/list-user-passkeys`    | GET    | `passkey.listUserPasskeys()`     |
+ * | `/passkey/list-user-passkeys`    | GET    | `passkey.listUserPasskeys()` (no longer used for the LIST: devices plan Task 7 reads `GET /v1/me/passkeys`) |
  * | `/passkey/delete-passkey`        | POST   | `passkey.deletePasskey({ id })`  |
  * | `/passkey/update-passkey`        | POST   | `passkey.updatePasskey(...)`     |
  *
@@ -166,17 +166,13 @@ function refusalOf(error: { message?: string | undefined } | null | undefined): 
 export function createPasskeyClient(): PasskeyClient {
   return {
     async list(): Promise<PasskeySummary[]> {
-      const result = await authClient.passkey.listUserPasskeys();
-      return (result.data ?? []).map((passkey) => ({
-        id: passkey.id,
-        // better-auth types the stored label `name?: string | undefined` — it
-        // is absent when neither the client supplied one nor the AAGUID map
-        // resolved a provider. Resolved HERE rather than in `PasskeysSection`
-        // for the reason `PasskeySummary`'s own docblock gives: a component
-        // inventing a label mid-render is the fabrication `deviceLabelOf`'s
-        // "Unknown device" already refuses one seam earlier.
-        name: passkey.name ?? 'Unnamed passkey',
-      }));
+      // `GET /v1/me/passkeys` (devices plan Task 5/7), not the plugin's `listUserPasskeys`: the plugin's schema does not
+      // know `lastUsedAt` (FD5), and this route names the authenticator. It REJECTS on a refusal or a dead network, which
+      // is what lets the page say "could not be loaded" instead of asserting "no passkeys yet" over an unread list (E2-23).
+      const res = await fetch('/v1/me/passkeys', { credentials: 'include' });
+      if (!res.ok) throw new Error(`passkey list refused (${res.status})`);
+      const body = (await res.json()) as { passkeys: PasskeySummary[] };
+      return body.passkeys;
     },
     async add(name: string) {
       // `addPasskey` runs the whole WebAuthn REGISTRATION ceremony:
