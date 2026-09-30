@@ -1029,6 +1029,68 @@ a.gn-ticket-sheet__crumb--link {
 }
 /* `Close all (N)` to the far edge; the name chip and its count read left. */
 .gn-board__column-header > .gn-board__column-action { margin-left: auto; }
+/* Styling refresh Plan A Task 5B (owner rulings 2026-09-29: "all columns are
+   collapsible", plan D27; D13 amended). A collapsed column is the SAME section
+   in a 3.5rem strip, so it is still a drop target: dropping on it moves the
+   ticket into that state. It stretches to the rail's height with a 12rem floor
+   so an empty rail does not leave a stub too small to hit. Declared after
+   `.gn-board__column` so its `flex`/`min-width` win at equal specificity. */
+.gn-board__column--collapsed {
+  flex: 0 0 3.5rem;
+  min-width: 3.5rem;
+  align-self: stretch;
+  min-height: 12rem;
+  padding: 0.25rem;
+}
+/* The strip is one full-size P-GHOST button (44px floor, rule 01): the count on
+   top, the name set vertically beneath it. */
+.gn-board__column-strip {
+  width: 100%;
+  min-height: 2.75rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.gn-board__column-strip:hover,
+.gn-board__column-strip:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-board__column-strip:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-board__column-strip-name {
+  writing-mode: vertical-rl;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  overflow-wrap: anywhere;
+}
+/* The expanded header's collapse control: P-GHOST, icon only, 44x44. It takes the
+   auto margin so it sits at the far edge; after `Close all` it must not add a
+   second auto margin (the two would split the free space between them). */
+.gn-board__column-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: var(--gn-text-muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+.gn-board__column-collapse:hover { background: var(--gn-fill-tertiary); }
+.gn-board__column-collapse:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-board__column-action + .gn-board__column-collapse { margin-left: 0; }
 /* Same spec row, "Count": 13px/18px, label2 (textMuted). Selector kept as
    `.gn-board__count`, not renamed to the spec's own "column-count" wording —
    `board.test.tsx:142` (`badgeTotal`) queries `.gn-board__count` directly, so
