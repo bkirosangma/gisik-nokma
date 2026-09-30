@@ -1978,6 +1978,9 @@ says so rather than letting the assertion imply a stricter claim.
   and compared to the sheet head's — the same evidence by a different route. **Not painted**: the
   measurement above is the finding's own. `ui.css` was reverted to `HEAD` for the RED run and restored
   from a sha256-compared backup. Package suites: ui 420, web 639.
+  **Amended 2026-09-29 by 20.073 (styling refresh Plan A):** the dismiss control is now a ghost icon —
+  transparent at rest, the `fillTertiary` fill on hover/focus with the focus ring; its 44px floor and shared
+  rule are unchanged.
 
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
 
