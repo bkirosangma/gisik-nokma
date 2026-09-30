@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELP_CONTENT } from '@gisik-nokma/app-core';
@@ -60,7 +60,7 @@ let hosted: Record<string, Answer | ((call: Call) => Answer | Promise<Answer>)> 
 let hostedCalls: Call[] = [];
 
 /** A `fetch` that answers from a script, recording every call it was asked to make. */
-function fetchStub(script: (call: Call, n: number) => { status: number; body?: unknown }): void {
+function fetchStub(script: (call: Call, n: number) => { status: number; body?: unknown } | Promise<{ status: number; body?: unknown }>): void {
   let n = 0;
   globalThis.fetch = (async (input: string, init?: RequestInit) => {
     // The REQUEST body is recorded, not just the method and url: a case about a
@@ -73,7 +73,7 @@ function fetchStub(script: (call: Call, n: number) => { status: number; body?: u
     const hostedAnswer = isHosted ? hosted[call.url.split('?')[0]!] ?? hosted['/v1/me/mcp-connections'] : undefined;
     const answer = isHosted
       ? typeof hostedAnswer === 'function' ? await hostedAnswer(call) : hostedAnswer!
-      : script(call, n);
+      : await script(call, n);
     if (isHosted) return { ok: answer.status >= 200 && answer.status < 300, status: answer.status, json: async () => answer.body } as Response;
     n += 1;
     return {
@@ -433,6 +433,24 @@ describe('14.274 hosted connections beside the local tokens', () => {
   });
 });
 
+describe('14.274 zero local tokens, live hosted connections', () => {
+  it('does NOT say "No assistants are connected" while an app is connected; both lists empty does', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    fetchStub(tokensOnly([]));
+    mount();
+    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument(); // both reads have landed
+    await waitFor(() => expect(calls.some((c) => c.method === 'GET')).toBe(true));
+    expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
+    expect(screen.queryByText(/No assistants are connected/)).toBeNull();
+    // CONTROL, same `it`: the same screen with BOTH lists empty says it.
+    cleanup();
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [] } };
+    fetchStub(tokensOnly([]));
+    mount();
+    expect(await screen.findByTestId('mcp-tokens-empty')).toHaveTextContent('No assistants are connected');
+  });
+});
+
 describe('14.275 Disconnect', () => {
   it('keeps the row while the DELETE is in flight and drops it after it resolves', async () => {
     let release!: (a: Answer) => void;
@@ -509,6 +527,39 @@ describe('14.277 the two lists are read independently', () => {
     expect(await screen.findByTestId('mcp-tokens-failed')).toBeInTheDocument();
     expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
     expect(screen.queryByTestId('mcp-connections-failed')).toBeNull();
+  });
+
+  it.each([
+    ['the connections failure arrives AFTER the tokens', 'tokens-first'],
+    ['the connections failure arrives BEFORE the tokens', 'connections-first'],
+  ] as const)('%s — the token list renders either way', async (_label, order) => {
+    const gate = () => {
+      let open!: () => void;
+      const opened = new Promise<void>((resolve) => { open = resolve; });
+      return { opened, open };
+    };
+    const tokensGate = gate();
+    const connectionsGate = gate();
+    hosted['/v1/me/mcp-connections'] = async () => { await connectionsGate.opened; return { status: 500, body: {} }; };
+    fetchStub(async (call) => {
+      if (call.method !== 'GET') return { status: 204 };
+      await tokensGate.opened;
+      return { status: 200, body: { tokens: [LOCAL] } };
+    });
+    mount();
+    if (order === 'tokens-first') {
+      tokensGate.open();
+      expect(await screen.findByTestId('mcp-tokens-list')).toBeInTheDocument();
+      connectionsGate.open();
+    } else {
+      connectionsGate.open();
+      expect(await screen.findByTestId('mcp-connections-failed')).toBeInTheDocument();
+      tokensGate.open();
+    }
+    expect(await screen.findByTestId('mcp-connections-failed')).toBeInTheDocument();
+    expect(await screen.findByTestId('mcp-tokens-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-tokens-failed')).toBeNull();
+    expect(screen.getByTestId(`mcp-tokens-revoke-${ID}`)).toBeInTheDocument();
   });
 
   it('control: both succeed, both lists render', async () => {
