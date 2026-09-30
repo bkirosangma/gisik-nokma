@@ -571,6 +571,55 @@ export const HELP_CONTENT: HelpContent = [
                     "text": ". Signing out really does end it — the next thing you try on that device is refused immediately, not \"at some point later\". That matters if you have signed in on somebody else's laptop."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "To see where else you are signed in, open "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and look under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign-in and devices"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Each browser you have signed in on is one row — for example \"Chrome on Mac\" with a short four-letter code, so two identical browsers can be told apart — with when it was last active and when you first signed in there. The ones used in the last 24 hours are listed first; the rest wait under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Signed in, idle"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", which you can open. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign out this device"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " ends that one; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign out all other devices"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " ends every one except the one you are using. The device you are using cannot be signed out from here — use the account menu."
+                  }
+                ]
               }
             ]
           }
