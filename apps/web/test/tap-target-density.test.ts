@@ -403,7 +403,8 @@ describe('tap-target density — case 13.1141', () => {
       new RegExp(`${PROVENANCE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`),
     );
     expect(m, `no declaration block for ${PROVENANCE}`).not.toBeNull();
-    expect(m?.[1]).toMatch(/min-height:\s*1\.5rem/);
+    // Amended 2026-09-29 (styling refresh Plan A, 20.059): 44px, above the 24px in-list floor the table still declares.
+    expect(m?.[1]).toMatch(/min-height:\s*2\.75rem/);
   });
 
   it('13.1141 and the table classifies it as in-list, naming this protocol', () => {

@@ -3803,10 +3803,15 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
 - **13.1452** ✅ The CARD itself (not only the badge) carries `gn-board-card--p1`/`--p2`/`--p3`, each
   level distinct — the card's OWN tint modifier, separate from the badge's. —
   (`packages/app-core/test/views/board.test.tsx`)
+  **Amended 2026-09-29 by 20.057 (styling refresh Plan A):** the modifier class stays on the card as a
+  hook, but no rule paints a tint any more (the mockup draws none; plan D11). The CSS arm of 13.1451–13.1452 (`components.test.tsx`) now asserts the tint rules and variables are ABSENT.
 - **13.1453** ✅ For all three priorities, all three styles and both themes: the priority ink, the card's
   `text`/`textMuted`, and the move-arrows' ghost button (`textAccent` on `fillTertiary`, itself composited
   over the SAME wash) all clear WCAG AA 4.5:1 on `over(tint, surfaceRaised)` — with the anti-vacuous
   control that the wash actually changes the ground. — (`packages/ui/test/tokens.test.ts`)
+  **Amended 2026-09-29 by 20.057:** the tint is retired; the case now pins every priority ink (P1
+  `danger`, P2 `textMuted`, P3 `textSubtle`) at ≥ 4.5 on `surfaceRaised` in every style × theme, and that
+  the four tint/ink roles are gone.
 - **13.1454**–**13.1455** ✅ The parent-key badge is the meta-line's first child (left of the card's own
   key) and clicking it — `getByRole('button', {name: 'Open parent OPS-12'})` — calls `onOpenTicket` with
   the PARENT's id exactly once. — (`packages/app-core/test/views/board-card-click.test.tsx`)
@@ -3886,6 +3891,8 @@ the generated editor HTML): zero hits, so mobile draws no epic chip and nothing 
   proxy otherwise prints does not carry the `Test Files`/`Tests` lines a kill needs); restored via a
   second edit (never `git checkout`, since the fix itself was still uncommitted), green again
   (`Tests 1 passed | 82 skipped (83)`). — (`packages/ui/test/components.test.tsx`)
+  **Amended 2026-09-29 by 20.055:** the first-match proof now reads the chip's new padding and radius;
+  its margin is 0 (the epic and title are one group).
 - ✅ **13.1468 — a real browser lays the epic chip on its own line, above the title, sized to its
   content rather than the card's full width.** Painted this worktree's `apps/web` on a lane port
   (`next dev -p 3050`, `SERVER_ORIGIN` pointing at the running dev stack's API on `:3000`, session

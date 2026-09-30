@@ -1215,13 +1215,18 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
  * `.gn-board-card--p1 .gn-board-card__priority` would have.
  */
 describe('13.1451-13.1452 the priority tint and the epic chip truncation are real CSS rules', () => {
-  it('each priority modifier paints the tint OVER the opaque surface, never the wash alone', () => {
+  // AMENDED 2026-09-29 by 20.057 (styling refresh Plan A Task 6): the tint is
+  // retired. This arm used to prove each modifier painted the wash OVER the
+  // opaque surface; it now proves the opposite — the modifier classes stay on
+  // the card as hooks (board.test.tsx, 13.1452) and NO rule paints them.
+  it('no priority modifier paints a background any more: the tint is retired', () => {
+    const stripped = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
     for (const level of ['p1', 'p2', 'p3'] as const) {
-      const body = rule(`.gn-board-card--${level}`);
-      expect(body, `.gn-board-card--${level}: ${body}`).toMatch(
-        new RegExp(`linear-gradient\\(var\\(--gn-priority-${level}-tint\\), var\\(--gn-priority-${level}-tint\\)\\), var\\(--gn-surface-raised\\)`),
-      );
+      expect(stripped, `.gn-board-card--${level}`).not.toMatch(new RegExp(`\\.gn-board-card--${level}(?![\\w-])`));
+      expect(stripped, `--gn-priority-${level}-tint`).not.toContain(`--gn-priority-${level}-tint`);
     }
+    // CONTROL — the pending modifier, which IS still painted, is still found by the same scan.
+    expect(stripped).toMatch(/\.gn-board-card--pending(?![\w-])/);
   });
 
   it('the epic title truncates with an ellipsis rather than wrapping or overflowing the card', () => {
@@ -1272,9 +1277,11 @@ describe('13.1467 the epic chip is block-level, sized to its own content, not in
     expect(body, body).toMatch(/display:\s*flex\s*;/);
     expect(body).not.toMatch(/display:\s*inline/);
     expect(body).toMatch(/width:\s*fit-content\s*;/);
-    // The one declaration unique to this rule in the whole file — proof
-    // `rule()`'s first-match regex landed on THIS rule, not a namesake.
-    expect(body).toMatch(/margin:\s*0 0 0\.3rem\s*;/);
+    // The declarations unique to this rule — proof `rule()`'s first-match regex
+    // landed on THIS rule. Amended 2026-09-29 (styling refresh, 20.055): the
+    // chip is now padded 4/8 with radius 8 and no margin of its own.
+    expect(body).toMatch(/padding:\s*0\.25rem 0\.5rem\s*;/);
+    expect(body).toMatch(/border-radius:\s*0\.5rem\s*;/);
   });
 });
 
