@@ -7737,7 +7737,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-comment__quote > * + * { margin-top: 0.4rem; }
 .gn-comment__code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: var(--gn-surface-sunken);
+  /* A recessed well inside the raised comment (P-WELL), not a flat sunken fill. */
+  background: var(--gn-surface-well);
   border-radius: var(--gn-radius-control);
   padding: 0.35rem 0.5rem;
   overflow-x: auto;

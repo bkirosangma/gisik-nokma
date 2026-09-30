@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { relativeTime } from '../src/notes/draft-restore-banner.js';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { DraftRestoreBanner, relativeTime } from '../src/notes/draft-restore-banner.js';
 
 describe('9.428 the draft-restore banner helpers', () => {
   it('9.428 relativeTime names the age at every boundary and never goes negative', () => {
@@ -52,5 +53,17 @@ describe('9.431 H4–H6 in the editor skin', () => {
     for (const tag of ['h4', 'h5', 'h6']) {
       expect(rule(`.ticket-editor__content ${tag}`)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i);
     }
+  });
+});
+
+describe('20.304 the draft banner has one loud action', () => {
+  it('20.304 Keep is the only primary; Discard is quiet', () => {
+    render(<DraftRestoreBanner savedAt={1_000} now={2_000} onKeep={vi.fn()} onDiscard={vi.fn()} />);
+    // CONTROL — both actions are named buttons, so a missing Keep cannot pass as "no primary but one".
+    const keep = screen.getByRole('button', { name: 'Keep' });
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    const primaries = [...document.querySelectorAll('.gn-button--primary')];
+    expect(primaries).toEqual([keep]);
+    expect(discard.classList.contains('gn-button--primary')).toBe(false);
   });
 });
