@@ -813,6 +813,40 @@ a.gn-ticket-sheet__crumb--link {
   color: inherit;
   cursor: pointer;
 }
+/* W1b (2026-10-01, case 10.157): the trigger is bare text, measured 23px tall. HIT-SLOP, the idiom
+   `.gn-board__workflow-toggle` and `.gn-switch` use: a `::before` centred on the control, 2.75rem tall and painting
+   nothing, so the hit box reaches 44px while the drawn box stays exactly as it was. The list is positioned too — it
+   comes after the trigger in the DOM, so as a positioned sibling it paints over the slop's lower 7px and the first
+   menu item keeps its own click. */
+.add-rule-menu__trigger { position: relative; }
+.add-rule-menu__trigger::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
+}
+.add-rule-menu__list { position: relative; }
+/* W1b (case 10.158): the menu items were unstyled UA buttons, 29px tall. A 44px quiet row that washes on hover
+   (P-HOVER), like the panel rows beside it (`.builder-row__head`). */
+.add-rule-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.add-rule-menu__item:hover { background: var(--gn-fill-quaternary); }
+.add-rule-menu__item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
 /* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
    than dropped. Dropping it would make a restricted chain read as a shorter
    one, which is the vanish `invariant 5` forbids and the reason the parent
@@ -4516,13 +4550,34 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    beside the canvas: a row that opens from a canvas click is brought into view
    with `scrollIntoView({ block: 'nearest' })`, which moves THIS column and only
    moves the page when the column itself is off-screen. Stacked (below), the
-   column is plain flow and the component does not scroll at all. */
+   column is plain flow and the component does not scroll at all.
+
+   W1d (2026-10-01, case 10.161): the column used to be `position: sticky; top: 1rem;
+   max-height: calc(100vh - 2rem)` — it stuck UNDER the sticky app bar, its bottom
+   sat below the fold at rest by the height of everything above it (breadcrumb,
+   title row), and the grid row was only as tall as the column, so sticky had no
+   room to travel and the pin held ~32px. Now, side by side, the WHOLE SCREEN is
+   bounded to the viewport below the app bar (`--app-nav-offset`, 4.35rem,
+   published by the web shell; `0px` where no shell publishes it — the same
+   fallback `.gn-help__sidebar` takes; the 4rem is the breadcrumb and its
+   margins above the screen, rounded UP so an error leaves slack rather than a
+   hidden bottom), the layout takes what the header leaves (`flex: 1`, one
+   `minmax(0, 1fr)` row), and the column fills its track and scrolls inside it:
+   `overscroll-behavior: contain` stops the wheel chaining to the page at either
+   end, and the page has (almost) nothing left to scroll, so `scrollIntoView
+   ({ block: 'nearest' })` from a canvas click moves only the column. The canvas
+   keeps its own size but is capped at the track (`max-height: 100%`, just below)
+   so a short window scrolls it inside its card instead of pushing the page. The only
+   positioned descendants of the column's rows are the Add rule menu (in flow)
+   and the `Select` popovers (portalled to the body), so nothing is clipped by
+   the overflow. */
 @media (min-width: 64.0625rem) {
+  .workflow-builder-screen { height: calc(100vh - var(--app-nav-offset, 0px) - 4rem); }
+  .workflow-builder-screen__layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
   .workflow-builder-screen__left {
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
+    align-self: stretch;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 /* The canvas is the card (`:1019`): cardBg + cardShadow + cardR. */
@@ -4533,6 +4588,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding: 0.75rem;
   overflow: auto;
   min-width: 0;
+}
+/* W1d: side by side the canvas keeps its own size but is capped at its grid track, so a short window scrolls it inside
+   its card (it is `overflow: auto`) instead of pushing the page. Declared after the base rule it adjusts. */
+@media (min-width: 64.0625rem) {
+  .workflow-builder-screen__canvas { max-height: 100%; }
 }
 /* One column below the shell's own reading width, and the CANVAS goes first:
    on a narrow screen the thing the screen exists for should not sit below the
@@ -4636,6 +4696,35 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: transparent;
   box-shadow: none;
   padding: 0.5rem;
+}
+/* W1c (2026-10-01, case 10.159): the destructive buttons inside the well — "Remove rule" and "Delete transition"
+   (`transition-inspector.tsx`), "Delete state" (`state-inspector.tsx`) — are QUIET danger buttons: danger ink on a
+   transparent ground, a 1px danger ring on hover, in every style. The filled variant's own geometry (48px, the lift, the 4% hover
+   scale) is the confirm button of a dialog; in neo it read as a large red pill dominating the recessed well. Same
+   shape as `.gn-ticket-sheet__delete`. The variant class stays on the element (still the destructive affordance by
+   class, colour AND label); the class is `builder-quiet-danger`, deliberately NOT in a `builder-row*` family: an
+   element that also carries `gn-button` is exempt from 13.767's rendered == styled set, and a styled-but-exempt class
+   would break that equality. This rule sits one class above `.gn-button--danger` and its `:hover:not(:disabled)`.
+   Danger as ink on `surfaceWell` clears 4.5 in all six style x theme combinations (`tokens.test.ts`, case 10.160).
+   The hover is a RING and not `.gn-button--ghost`'s `fill-quaternary` wash, and that is a measurement: danger ink on the
+   wash over the well is 4.18 (hig/minimal light) and 4.47 (hig/minimal dark), below 4.5, while a ring leaves the ground
+   and so the ink at its rest ratio (4.60 worst). */
+.gn-button.builder-quiet-danger {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  background: transparent;
+  color: var(--gn-danger);
+  box-shadow: none;
+  font-size: inherit;
+}
+.gn-button.builder-quiet-danger:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--gn-danger);
+  transform: none;
+}
+.gn-button.builder-quiet-danger:active:not(:disabled) {
+  box-shadow: none;
+  transform: none;
 }
 
 /* E4-28: a visually-hidden description node, referenced by `aria-describedby`

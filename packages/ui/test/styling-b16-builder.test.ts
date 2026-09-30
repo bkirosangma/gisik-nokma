@@ -93,18 +93,19 @@ describe('10.154 the States / Transitions layout and row declarations', () => {
     expect(valueOf(ruleExactly(css, '.workflow-builder-screen__layout', STACKED), 'grid-template-columns')).toBe('minmax(0, 1fr)');
   });
 
-  it('10.154 the left column is sticky and scrolls ONLY side by side; the base rule carries none of it; the two queries never overlap', () => {
+  it('10.154 the left column scrolls on its own ONLY side by side; the base rule carries none of it; the two queries never overlap', () => {
     const sideBySide = ruleExactly(css, '.workflow-builder-screen__left', SIDE_BY_SIDE);
-    expect(valueOf(sideBySide, 'position')).toBe('sticky');
-    expect(valueOf(sideBySide, 'top')).toBe('1rem');
-    expect(valueOf(sideBySide, 'max-height')).toBe('calc(100vh - 2rem)');
+    // W1d (2026-10-01, case 10.161): no longer sticky — the screen is bounded to the viewport and the column fills its track.
     expect(valueOf(sideBySide, 'overflow-y')).toBe('auto');
+    expect(valueOf(sideBySide, 'overscroll-behavior')).toBe('contain');
+    expect(valueOf(sideBySide, 'align-self')).toBe('stretch');
+    expect(valueOf(sideBySide, 'position')).toBeNull();
 
-    // Stacked, the column is plain flow: the BASE rule (no at-rule) must not carry any of the four.
+    // Stacked, the column is plain flow: the BASE rule (no at-rule) must not carry any of them.
     const base = ruleExactly(css, '.workflow-builder-screen__left');
     // CONTROL — the base rule was found and does carry its own layout, so "absent" below is a reading and not an empty string.
     expect(valueOf(base, 'flex-direction')).toBe('column');
-    for (const property of ['position', 'top', 'max-height', 'overflow-y']) expect(valueOf(base, property), property).toBeNull();
+    for (const property of ['position', 'top', 'max-height', 'overflow-y', 'overscroll-behavior', 'align-self']) expect(valueOf(base, property), property).toBeNull();
 
     // No viewport width matches both queries: min strictly above max, and contiguous (under one px, 1/16 rem).
     const min = Number(/min-width: ([\d.]+)rem/.exec(SIDE_BY_SIDE)?.[1]);
@@ -141,5 +142,140 @@ describe('10.154 the States / Transitions layout and row declarations', () => {
     expect(naming.some((rule) => valueOf(rule.body, 'background') === 'var(--gn-surface-well)')).toBe(true);
     const displayed = naming.filter((rule) => valueOf(rule.body, 'display') !== null);
     if (displayed.length > 0) expect(valueOf(ruleExactly(css, '.builder-row__body[hidden]'), 'display')).toBe('none');
+  });
+});
+
+/**
+ * W1 polish (2026-10-01, cases 10.157–10.161) — the stylesheet half of four owner-approved fixes. Browser-only claims are
+ * 10.162/10.163 (🧪); everything here is a contract on declarations, each asserted by exact value with a control in the same `it`.
+ */
+describe('10.157 the Add rule trigger has a 44px hit box and the drawn box is unchanged', () => {
+  const css = cssOf('ui');
+  const floor = 44;
+  const px = (rem: string | null): number => Number(/^(-?[\d.]+)rem$/.exec(rem ?? '')?.[1]) * 16;
+
+  it('10.157 a transparent ::before, centred, 2.75rem tall, on a positioned trigger', () => {
+    // CONTROL — the trigger's own reset rule is intact (bare: no border, no fill), so the slop is what adds the 44.
+    const reset = ruleExactly(css, ['.gn-board__empty-create', '.add-rule-menu__trigger']);
+    expect(valueOf(reset, 'border')).toBe('none');
+    expect(valueOf(reset, 'padding')).toBe('0');
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__trigger'), 'position')).toBe('relative');
+    const slop = ruleExactly(css, '.add-rule-menu__trigger::before');
+    expect(valueOf(slop, 'content')).toBe("''");
+    expect(valueOf(slop, 'position')).toBe('absolute');
+    expect(px(valueOf(slop, 'height'))).toBeGreaterThanOrEqual(floor);
+    // Centred on the control, so the extra height is split above and below.
+    expect(valueOf(slop, 'top')).toBe('50%');
+    expect(px(valueOf(slop, 'margin-top'))).toBe(-px(valueOf(slop, 'height')) / 2);
+    // It paints nothing.
+    for (const property of ['background', 'border', 'box-shadow']) expect(valueOf(slop, property), property).toBeNull();
+  });
+
+  it('10.157 the list is positioned, so the first item (painted after the trigger) wins the overlap under the trigger\'s slop', () => {
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__list'), 'position')).toBe('relative');
+  });
+});
+
+describe('10.158 the Add rule menu items have a 44px hit box', () => {
+  const css = cssOf('ui');
+  it('10.158 an item is at least 2.75rem tall, a quiet row that washes on hover', () => {
+    const item = ruleExactly(css, '.add-rule-menu__item');
+    // CONTROL — the rule reads as the reset it is (no UA chrome), so the height check reads the real rule.
+    expect(valueOf(item, 'border')).toBe('none');
+    expect(valueOf(item, 'background')).toBe('transparent');
+    expect(valueOf(item, 'min-height')).toBe('2.75rem');
+    expect(valueOf(item, 'width')).toBe('100%');
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__item:hover'), 'background')).toBe('var(--gn-fill-quaternary)');
+  });
+
+  it('10.158 a keyboard-focused item shows the product focus ring (2px, --gn-focus-ring), like the panel row heads beside it', () => {
+    // CONTROL — the row head's focus rule has this exact shape, so "the product ring" is read off a rule that is really there.
+    const head = ruleExactly(css, '.builder-row__head:focus-visible');
+    expect(valueOf(head, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    expect(valueOf(head, 'outline-offset')).toBe('0');
+    const item = ruleExactly(css, '.add-rule-menu__item:focus-visible');
+    expect(valueOf(item, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    expect(valueOf(item, 'outline-offset')).toBe('0');
+  });
+});
+
+describe('10.159 the destructive buttons inside the well are quiet danger buttons', () => {
+  const css = cssOf('ui');
+  const QUIET = '.gn-button.builder-quiet-danger';
+
+  it('10.159 transparent at rest, danger ink, no shadow; the hover is a ring on the same ground, not a fill; 44px kept', () => {
+    // CONTROL — the filled variant this overrides still exists and still fills, so "transparent" below is an override, not an absence.
+    expect(valueOf(ruleExactly(css, '.gn-button--danger'), 'background')).toBe('var(--gn-danger)');
+    const rest = ruleExactly(css, QUIET);
+    expect(valueOf(rest, 'background')).toBe('transparent');
+    expect(valueOf(rest, 'color')).toBe('var(--gn-danger)');
+    expect(valueOf(rest, 'box-shadow')).toBe('none');
+    expect(valueOf(rest, 'min-height')).toBe('2.75rem');
+    const hover = ruleExactly(css, `${QUIET}:hover:not(:disabled)`);
+    // The hover keeps the ground (a wash would put danger ink under 4.5 — `tokens.test.ts` 10.160) and draws a danger ring instead.
+    expect(valueOf(hover, 'background')).toBe('transparent');
+    expect(valueOf(hover, 'box-shadow')).toBe('inset 0 0 0 1px var(--gn-danger)');
+    // The filled variant's lift and scale do not come back on hover or press.
+    expect(valueOf(hover, 'transform')).toBe('none');
+    const press = ruleExactly(css, `${QUIET}:active:not(:disabled)`);
+    expect(valueOf(press, 'box-shadow')).toBe('none');
+    expect(valueOf(press, 'transform')).toBe('none');
+  });
+
+  it('10.159 no rule in the family fills with danger (the overriding rule is the only thing that names the quiet class)', () => {
+    const naming = parseRules(css).filter((rule) => rule.selectors.some((selector) => selector.includes('builder-quiet-danger')));
+    expect(naming.length).toBeGreaterThanOrEqual(3);
+    for (const rule of naming) expect(valueOf(rule.body, 'background'), rule.selectors.join(', ')).not.toBe('var(--gn-danger)');
+  });
+});
+
+describe('10.161 the left column is its own scroll region above the wide breakpoint', () => {
+  const css = cssOf('ui');
+  const SIDE_BY_SIDE = '@media (min-width: 64.0625rem)';
+  const STACKED = '@media (max-width: 64rem)';
+  const BASES = [
+    { selector: '.workflow-builder-screen', properties: ['height'] },
+    { selector: '.workflow-builder-screen__layout', properties: ['flex', 'min-height', 'grid-template-rows'] },
+    { selector: '.workflow-builder-screen__left', properties: ['overflow-y', 'overscroll-behavior', 'align-self', 'position', 'max-height'] },
+    { selector: '.workflow-builder-screen__canvas', properties: ['max-height'] },
+  ];
+
+  it('10.161 the screen is bounded to the viewport below the app bar, the layout takes the rest, the column fills its track and scrolls inside it', () => {
+    const screen = ruleExactly(css, '.workflow-builder-screen', SIDE_BY_SIDE);
+    expect(valueOf(screen, 'height')).toBe('calc(100vh - var(--app-nav-offset, 0px) - 4rem)');
+    const layout = ruleExactly(css, '.workflow-builder-screen__layout', SIDE_BY_SIDE);
+    expect(valueOf(layout, 'flex')).toBe('1 1 auto');
+    expect(valueOf(layout, 'min-height')).toBe('0');
+    expect(valueOf(layout, 'grid-template-rows')).toBe('minmax(0, 1fr)');
+    const left = ruleExactly(css, '.workflow-builder-screen__left', SIDE_BY_SIDE);
+    expect(valueOf(left, 'overflow-y')).toBe('auto');
+    expect(valueOf(left, 'overscroll-behavior')).toBe('contain');
+    expect(valueOf(left, 'align-self')).toBe('stretch');
+    // The canvas keeps its own size but is capped at the track.
+    expect(valueOf(ruleExactly(css, '.workflow-builder-screen__canvas', SIDE_BY_SIDE), 'max-height')).toBe('100%');
+    // CONTROL — the screen is the flex column the layout's `flex: 1` is a child of (so the declarations above mean something).
+    const screenBase = ruleExactly(css, '.workflow-builder-screen');
+    expect(valueOf(screenBase, 'display')).toBe('flex');
+    expect(valueOf(screenBase, 'flex-direction')).toBe('column');
+  });
+
+  it('10.161 every wide declaration is declared AFTER its base rule, none of them is in the base rule, and the stacked block gives the screen, layout and column nothing', () => {
+    const rules = parseRules(css);
+    const indexOf = (selector: string, atRule: string | null) => rules.findIndex((rule) => rule.atRule === atRule && rule.selectors.join(',') === selector);
+    for (const { selector, properties } of BASES) {
+      const base = indexOf(selector, null);
+      const wide = indexOf(selector, SIDE_BY_SIDE);
+      // CONTROL — both rules were found, and the base rule carries real declarations, so "absent" is a reading.
+      expect(base, selector).toBeGreaterThanOrEqual(0);
+      expect(wide, selector).toBeGreaterThan(base);
+      expect(rules[base]?.body.trim().length, selector).toBeGreaterThan(0);
+      for (const property of properties) expect(valueOf(rules[base]!.body, property), `${selector} base ${property}`).toBeNull();
+    }
+    // Stacked: nothing on the column or the screen, and the layout's stacked rule is the one-track arm and nothing else.
+    expect(indexOf('.workflow-builder-screen__left', STACKED)).toBe(-1);
+    expect(indexOf('.workflow-builder-screen', STACKED)).toBe(-1);
+    const stackedLayout = ruleExactly(css, '.workflow-builder-screen__layout', STACKED);
+    expect(valueOf(stackedLayout, 'grid-template-columns')).toBe('minmax(0, 1fr)');
+    for (const property of ['height', 'flex', 'min-height', 'grid-template-rows']) expect(valueOf(stackedLayout, property), property).toBeNull();
   });
 });

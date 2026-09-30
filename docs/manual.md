@@ -113,6 +113,13 @@ initial — and choose **Sign out**. Signing out really does end it — the next
 device is refused immediately, not "at some point later". That matters if you have signed in on somebody
 else's laptop.
 
+To see where else you are signed in, open **Account** and look under **Sign-in and devices**. Each
+browser you have signed in on is one row — for example "Chrome on Mac" with a short four-letter code, so
+two identical browsers can be told apart — with when it was last active and when you first signed in
+there. The ones used in the last 24 hours are listed first; the rest wait under **Signed in, idle**, which
+you can open. **Sign out this device** ends that one; **Sign out all other devices** ends every one except
+the one you are using. The device you are using cannot be signed out from here — use the account menu.
+
 ---
 
 ## §2 — Finding your way around
@@ -1235,6 +1242,9 @@ to show its settings: for a stage, its name, **Set as start** and **Delete state
 rules, **Add rule** and **Delete transition**. Only one row is open at a time — opening another closes
 the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
 canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
+An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide
+screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so
+the canvas and the page do not move while you read down it.
 Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
 them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
 
