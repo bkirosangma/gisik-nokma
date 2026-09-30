@@ -1195,7 +1195,7 @@ You do not have to draw one from scratch. There are three templates plus a blank
 | **Errand with waits** | Has a "Waiting" stage marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods. |
 | **Start blank** | An empty canvas with one starting stage called "New". |
 
-Press **Use this template — [name]** and it copies it in. You then get your own independent copy — it
+Press the template's card (each is one control, named **Use the [name] template**) and it copies it in. You then get your own independent copy — it
 does not stay linked to the template, and changing yours affects nobody else's. You can change it
 before publishing.
 

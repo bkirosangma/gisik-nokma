@@ -6293,15 +6293,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Press "
+                    "text": "Press the template's card (each is one control, named "
                   },
                   {
                     "kind": "bold",
-                    "text": "Use this template — [name]"
+                    "text": "Use the [name] template"
                   },
                   {
                     "kind": "text",
-                    "text": " and it copies it in. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
+                    "text": ") and it copies it in. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
                   }
                 ]
               },
