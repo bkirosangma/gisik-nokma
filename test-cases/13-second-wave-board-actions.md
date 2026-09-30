@@ -358,6 +358,7 @@ its own quotation is the thing a reader stops trusting.
   mixed-case rename reddens only the table — and both are now planted measurements. The regexes carry
   `[A-Za-z]` as a result.
   (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:363`, `:100`)
+  **Amended 2026-09-29 by 20.351 (styling refresh Plan B):** the canvas row pins `box-shadow: var(--gn-shadow-lift)` (P-RAISED), not `shadow-raised`.
 
 - ✅ **13.774 — the inspector's name field carries the shared `gn-field` classes it claims to inherit.**
   A cross-prefix blind spot the equality is structurally unable to see: `.gn-field__input` belongs to the

@@ -3521,9 +3521,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .advisories-panel {
   margin-top: 0.6rem;
   border-left: 3px dashed var(--gn-warning);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
   color: var(--gn-text-muted);
-  border-radius: 6px;
+  border-radius: var(--gn-radius-card);
   padding: 0.5rem 0.75rem;
 }
 /* E4-32 (2026-09-21). The title used to OVERRIDE the panel's own
@@ -3667,7 +3667,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.4rem;
   padding: 0.5rem;
   border-radius: var(--gn-radius-control);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
 }
 /* Same gap as `.ticket-type-list__row` (see its own docblock): `neo` gives
    `surfaceSunken` no colour of its own, so without this the row was
@@ -3947,8 +3947,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   width: 100%;
   padding: 0.6rem 0.75rem;
   border: none;
-  border-radius: 8px;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
   font: inherit;
   color: inherit;
   text-align: left;
@@ -4087,7 +4088,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   margin: 0;
   padding: 0.4rem 0.6rem;
   border-left: 3px solid var(--gn-danger);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
   font-size: 0.8rem;
   color: var(--gn-text);
 }
@@ -4100,7 +4101,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
   border-left: 3px solid var(--gn-danger);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
 }
@@ -4141,7 +4142,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .ticket-type-editor__divergence-hint { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
 .ticket-type-editor__divergence-refused {
   border-left: 3px solid var(--gn-danger);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
 }
@@ -4179,9 +4180,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
 .read-only-banner {
   margin: 0;
-  border-radius: 8px;
+  border-radius: var(--gn-radius-card);
   padding: 0.375rem 0.625rem;
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
   color: var(--gn-text-muted);
   font-size: 0.8rem;
 }
@@ -4360,7 +4362,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-builder-screen__canvas {
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   padding: 0.75rem;
   overflow: auto;
   min-width: 0;
@@ -4385,7 +4387,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.75rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   padding: 1.125rem;
 }
 .state-inspector__title,
@@ -4409,7 +4411,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding: 1.125rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   color: var(--gn-text-muted);
   font-size: 0.85rem;
 }
@@ -7606,17 +7608,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   min-height: 2.75rem; /* 44px, not the prototype's 32px — see this block's own comment */
   min-width: 2.75rem; /* 44px, not the prototype's 36px — see this block's own comment */
   border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-subtle);
   font: inherit;
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
 }
+/* Styling refresh Plan B (Task B16): P-GHOST icon — the reorder arrows are text controls with no edge; hover or focus washes them. */
+.ticket-type-list__move:hover:not(:disabled),
+.ticket-type-list__move:focus-visible {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+}
 .ticket-type-list__move:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  outline-offset: 0;
 }
 .ticket-type-list__move:disabled { opacity: 0.4; cursor: not-allowed; }
 

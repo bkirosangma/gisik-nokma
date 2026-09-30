@@ -1718,6 +1718,13 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * the two roles are the same hex (`neoPaper`), which is why the error hid there
  * and only showed under `hig`. 13.920 composites its chip over `surfaceRaised`
  * for the same reason.
+ *
+ * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the row is now a raised
+ * item (`surface-raised` + `shadow-lift`, P-ROW) rather than a sunken one. The
+ * ground stays the CARD — an even row's stripe still REPLACES the row's own
+ * background (one element paints one background), so it composites over
+ * `.gn-card`'s `surface-raised` exactly as before and every measured reading
+ * below is unchanged; what an even row keeps of P-ROW is its `shadow-lift`.
  */
 describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible', () => {
   const ZEBRA = '.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row';
@@ -2277,6 +2284,11 @@ describe('13.1146 token colours on surfaceSunken are declared pairs', () => {
  * own assertion rather than being folded into a sweep that would pass over it.
  * The tone is not lost by the fix — the panel's own `border-left: 3px dashed
  * var(--gn-warning)` carries it, at 3:1 as a non-text boundary.
+ *
+ * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the panel's ground is
+ * now `surface-well`, not `surface-sunken`, so the inherited-ink arm reads the
+ * `textMuted`/`surfaceWell` pair (declared by Plan A 20.002) instead of
+ * `textMuted`/`surfaceSunken`. The warning-edge and no-own-ink arms are unchanged.
  */
 describe('13.1146 (second arm) the advisories title inherits a declared ink', () => {
   // Read HERE, not reused from the describe above: `UI_CSS_TEXT` is scoped to
@@ -2297,16 +2309,16 @@ describe('13.1146 (second arm) the advisories title inherits a declared ink', ()
     expect(bodyOf('.advisories-panel__title')).not.toMatch(/color:/);
   });
 
-  it('13.1146 the panel it inherits from is a DECLARED pair on sunken', () => {
+  it('13.1146 the panel it inherits from is a DECLARED pair on the well', () => {
     const panel = bodyOf('.advisories-panel');
-    expect(panel).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+    expect(panel).toMatch(/background:\s*var\(--gn-surface-well\)/);
     // The ink the title now inherits, and it must be one the roster holds on
     // this surface — otherwise the fix moves the failure rather than removing
     // it.
     expect(panel).toMatch(/color:\s*var\(--gn-text-muted\)/);
     expect(
-      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceSunken'),
-      'textMuted/surfaceSunken is not a declared pair — the inherited ink is unchecked',
+      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceWell'),
+      'textMuted/surfaceWell is not a declared pair — the inherited ink is unchecked',
     ).toBe(true);
   });
 
