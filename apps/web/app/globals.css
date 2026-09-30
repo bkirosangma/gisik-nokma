@@ -3718,6 +3718,65 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
+/* ── SPLIT SCROLL: the tree and the document scroll separately above 60rem ──
+   (owner, 2026-09-30: "the gn-notes-tree and the gn-notes__document should have
+   separate scrolls".) `width > 60rem` is the EXACT complement of the
+   `max-width: 60rem` block above, so the page is in one regime or the other at
+   every width and the breakpoint stays the ONE the notes page already had (case
+   18.224). AT AND BELOW 60rem none of this exists: the page scrolls as one and
+   the tree is the toggle panel, exactly as before (18.483).
+
+   THE PAGE FILLS THE VIEWPORT BELOW THE BAR so that IT does not scroll and each
+   column has a height to scroll inside. The bar's height is `--app-nav-offset`
+   (`:root`, above) — the same token `.gn-notes__editor`'s `min-height` and the
+   heading `scroll-margin-top` already read, never a second number. `AppNav`
+   renders INSIDE the notes `<main>`, whose own `padding-bottom: 3rem` would
+   otherwise leave exactly 3rem of page scroll, so it is zeroed here (`.gn-shell`
+   itself stays as it is for every other route); the document column gets that
+   3rem back under its last line.
+
+   `grid-template-rows: minmax(0, 1fr)` is load-bearing: a bare auto row is sized
+   by its content and lets a long column push past the viewport instead of
+   scrolling. `overscroll-behavior: contain` so a column that reaches its end does
+   not hand the gesture to the other one or to the page.
+
+   Everything that READS the window's scroll on this page follows the column
+   instead — the reading-progress bar and the table-of-contents scrollspy resolve
+   their scroller from the computed `overflow-y` (`findScroller`,
+   `packages/editor/src/reading/scroller.ts`) and re-resolve on a resize across
+   this breakpoint (cases 9.500–9.501); `scrollIntoView` and the capture-phase
+   popup listeners follow a nested scroller natively (9.502). A heading jumped to
+   lands 1rem under the TOP OF THE COLUMN: the bar is not over this column, so the
+   `calc(var(--app-nav-offset) + 1rem)` the window-scrolled page needs is reset. */
+@media (width > 60rem) {
+  .gn-shell--wide {
+    padding-bottom: 0;
+  }
+  .gn-notes {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--app-nav-offset));
+  }
+  .gn-notes__body {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .gn-notes__tree {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 1rem;
+  }
+  .gn-notes__document {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 3rem;
+  }
+  .gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
+    scroll-margin-top: 1rem;
+  }
+}
+
 /* ── Task 4: the note document, its title, its byline ─────────────────────── */
 
 .gn-note-document {
