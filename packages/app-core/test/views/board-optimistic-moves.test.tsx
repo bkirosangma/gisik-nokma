@@ -296,6 +296,44 @@ describe('20.130 cancelling a dialog-gated move sends the card back', () => {
   });
 });
 
+describe('20.130 a dialog closed while its write is open cannot leave the card stuck faded', () => {
+  it('20.130 Cancel while the write is in flight, then the write fails: the card returns to To do, no wash, no dialog', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    const { source } = await mount(() => write.promise, GATED);
+    drag('tk_c', 'doing');
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.type(within(dialog).getByLabelText('Comment (required by this transition)'), 'starting');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(slotOf('tk_c')).toHaveAttribute('data-move-phase', 'writing');
+
+    // The board never passes `submitting` to the dialog, so Cancel stays live while the write is open.
+    await user.click(within(screen.getByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(idsIn('doing')).toContain('tk_c'); // CONTROL — the write is still open, the card still drawn in Doing
+
+    await act(async () => write.reject(new Error('network unreachable')));
+    expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+    expect(slotOf('tk_c')).not.toHaveClass('gn-board__card-slot--waiting');
+  });
+
+  it('20.130 the same for a refusal: Cancel mid-write, server refuses — back in To do with the refusal under it', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise, GATED);
+    drag('tk_c', 'doing');
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.type(within(dialog).getByLabelText('Comment (required by this transition)'), 'starting');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
+    await act(async () => write.resolve(refused([{ id: 'x' }, { id: 'y' }])));
+    expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
+    expect(within(slotOf('tk_c')).getByRole('alert')).toHaveTextContent('Refused by the server');
+  });
+});
+
 describe('20.131 the ‹ › arrows take the same optimistic path as a drop', () => {
   it('20.131 pressing › moves the card to Doing before the write answers, and a refusal sends it back', async () => {
     const user = userEvent.setup();

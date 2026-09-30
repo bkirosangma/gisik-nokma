@@ -1244,7 +1244,7 @@ The `try/catch/finally` `13.504` added made every local `setState` call in both 
 meantime, which is not rare: a successful move on ANY card (this one or a sibling) calls `moves.onMoved()`
 → `board.reload()`, which can restructure the board and unmount a DIFFERENT card whose own slower `ingest`
 is still in flight. Found in a second-opinion review (the same one that led to `13.505`), fixed with a
-`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s
+`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s [2026-10-01: the `mountedRef` is gone — the per-card session moved to `Board`'s move-state (cases 20.125–20.148), which removes the race by construction.]
 `isCurrent()` and `TransitionDialog`'s own precheck `cancelled` flag already use — while leaving
 `moves.onMoved()` itself unguarded (it reaches the parent and is safe regardless of this component's mount
 state). **React 18 drops the console warning for a setState on an unmounted component, so no assertion in
@@ -1287,7 +1287,7 @@ exact shape this repo has already removed once (`481ad12c`).
 
 **A THIRD review round, requested before declaring the `13.504` follow-up done, found two more real
 issues** — `13.505` above (the `submitFromDialog` transport-failure fix, code changed and
-mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see
+mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see [2026-10-01: the `mountedRef` guard was removed with the session's move to `Board`.]
 above for why). Two further points from that same round were left as documented judgment calls rather
 than code changes: `submitFromDialog` still carries no `try/catch` of its OWN distinct from the transport
 fix already applied (moot — the fix IS the catch); and the client-invented `rule: 'transport'`/
@@ -1492,7 +1492,7 @@ specifically: `role="alert"` already announces the notice to assistive technolog
 position.
 
 **Fix: keep the single rendering site, scroll it into view on the drop path only.** `MoveArrows` gained a
-`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter
+`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter [2026-10-01: the ref is now the `source` field of `Board`'s move session.]
 (defaulting to `'arrow'` — every arrow `onClick` is unchanged); the registry wrapper `registerAttempt`
 registers now passes `'drop'` explicitly. The three notices are wrapped in one `<div
 className="gn-board-card__notice" ref={noticeRef}>` (`display: contents` in `ui.css`, so the wrapper is
@@ -1515,7 +1515,7 @@ about to render AND the triggering attempt's source was `'drop'`.
 
 **Both mutation-witnessed.** (1) The `scrollIntoView` call itself removed: reddened exactly `13.515`
 (`AssertionError: expected "spy" to be called 1 times, but got 0 times`), `13.516` untouched (still nothing
-to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires
+to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires [2026-10-01: the guard now reads `session.source !== 'drop'`.]
 regardless of source): reddened exactly `13.516` (`Number of calls: 1`, expected `0`), `13.515` untouched
 (still correctly called once on its own drop). Both reverted; the 9-case file re-confirmed green
 afterward.

@@ -159,6 +159,8 @@ export type MoveState = {
   sessions: Readonly<Record<string, MoveSession>>;
   pending: PendingMoves;
   patchSession: (ticketId: string, patch: Partial<MoveSession>) => void;
+  /** The session as of the latest render — for an async continuation, whose own closure is from when the write began. */
+  sessionOf: (ticketId: string) => MoveSession;
   /** Lays a move over the board. `from` is the flight's start (the drop point); when absent the card's own slot is measured. */
   beginPending: (move: PendingMove, from?: FlightRect) => void;
   setPhase: (ticketId: string, phase: PendingPhase) => void;
@@ -183,6 +185,10 @@ export function useMoveState(realView: BoardView): MoveState {
   const slots = useRef(new Map<string, HTMLElement>());
   const flights = useRef(new Map<string, FlightRect>());
   const grab = useRef<Grab | null>(null);
+
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  const sessionOf = useCallback((ticketId: string): MoveSession => sessionsRef.current[ticketId] ?? EMPTY_SESSION, []);
 
   const patchSession = useCallback((ticketId: string, patch: Partial<MoveSession>) => {
     setSessions((current) => ({ ...current, [ticketId]: { ...(current[ticketId] ?? EMPTY_SESSION), ...patch } }));
@@ -241,8 +247,8 @@ export function useMoveState(realView: BoardView): MoveState {
   }, [pending, realView]);
 
   return useMemo(
-    () => ({ sessions, pending, patchSession, beginPending, setPhase, dropPending, slots, flights, grab }),
-    [sessions, pending, patchSession, beginPending, setPhase, dropPending],
+    () => ({ sessions, pending, patchSession, sessionOf, beginPending, setPhase, dropPending, slots, flights, grab }),
+    [sessions, pending, patchSession, sessionOf, beginPending, setPhase, dropPending],
   );
 }
 

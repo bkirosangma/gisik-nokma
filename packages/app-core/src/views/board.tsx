@@ -2746,6 +2746,17 @@ function MoveArrows({
   };
 
   /**
+   * A dialog write has failed. If the dialog is still open the card goes back to WAITING in its landing slot,
+   * for a retry or a Cancel. If it was closed while the write was open (the board passes the dialog no
+   * `submitting`, so Cancel and Esc stay live) nobody is left to retry or cancel, and a card washed and
+   * waiting forever would be stuck: release it, and it glides back with the reason under it. The session is
+   * read through `sessionOf` — this closure is from the render that began the write.
+   */
+  const settleFailedDialogWrite = (): void => {
+    if (moveState.sessionOf(card.ticketId).dialog === null) moveState.dropPending(card.ticketId);
+    else moveState.setPhase(card.ticketId, 'awaiting');
+  };
+  /**
    * Mirrors `TicketSheet.submitTransition`'s ORDERING exactly — field claims
    * first, the transition last, one ordered batch, the shipped payload
    * spelling — but deliberately NOT its unguarded shape.
@@ -2805,15 +2816,14 @@ function MoveArrows({
           ? { rule: failed.rule, reason: failed.reason }
           : { rule: failed.code, reason: failed.message },
       );
-      // The dialog stays open with the reason; the card goes back to waiting in its landing slot.
-      moveState.setPhase(card.ticketId, 'awaiting');
+      settleFailedDialogWrite();
     } catch (cause) {
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
       // E5-25: a 401 goes to the session sentence through the same author.
       setTransportError(
         writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
       );
-      moveState.setPhase(card.ticketId, 'awaiting');
+      settleFailedDialogWrite();
     }
   };
 
