@@ -2965,6 +2965,39 @@ input, textarea, select { font-family: inherit; }
    Dressing it as an alarm trains people to click through alarms, which is the
    opposite of informed consent — the text carries the weight, not the colour. */
 
+/* `/mcp/connect` only (owner 2026-09-30: "centre it, as recommended"; the app nav
+   stays OFF — people arrive from an assistant for one decision). `/mcp/authorize`
+   shares `.gn-mcp-authorize` and is deliberately not touched.
+
+   The page is a full-height column and the STAGE (title + card, one block sharing a
+   left edge) centres itself with `margin: auto`. `justify-content: center` would
+   centre too, but when the stage is taller than the viewport it overflows equally
+   ABOVE and below, and the part above the top edge cannot be scrolled to — a
+   clipped card at 390px. Auto margins in a flex column collapse to zero when
+   there is no free space, so a tall stage is top-aligned under the page gutter and
+   scrolls normally. `min-width: 0` lets the stage shrink inside the flex column;
+   `overflow-wrap: anywhere` keeps a long self-reported app name from widening it.
+
+   The vertical padding is LONGHANDS and SYMMETRIC: `.gn-shell` pads 0 above and
+   3rem below, and centring inside that box would sit 1.5rem above the viewport's
+   middle. Longhands rather than a shorthand so the `@media (max-width: 60rem)`
+   `padding: 0 0.75rem 2rem` above keeps supplying the phone's side gutter (this
+   rule is declared later at equal specificity, so its top/bottom win). */
+.gn-mcp-connect {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+.gn-mcp-connect__stage {
+  width: 100%;
+  max-width: 34rem;
+  min-width: 0;
+  margin: auto;
+  overflow-wrap: anywhere;
+}
 .gn-mcp-authorize__card { max-width: 34rem; }
 
 .gn-mcp-authorize__lead { margin: 0 0 1rem; }
@@ -4179,6 +4212,18 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-control);
   padding: 0.75rem 1rem;
+  /* THE COPY BUTTON'S GUTTER (owner screenshot 2026-09-30: a wrapped line ran UNDER the
+     button). The button is `absolute` in this block's corner (editor.css: `right: 0.375rem`),
+     so the block must reserve its box itself. ONE width feeds both sides — the button's
+     `min-width` below and this gutter — and it is sized for the WIDER label, "Copied"
+     (~2.5rem of glyphs at 0.75rem + the button's 2 x 0.5rem padding), so the 1.5s "Copied"
+     flip neither grows the button nor reaches into text. Gutter = width + the 0.375rem
+     inset + 0.5rem of air. The padding is on THIS box, not on the scrolling `pre`: the
+     pre's scrollport therefore ends at the gutter's edge and scrolled text is clipped
+     before it reaches the button, which (absolute in this non-scrolling box) stays pinned.
+     It must follow the `padding` shorthand or the shorthand overwrites it. */
+  --gn-codeblock-copy-width: 4rem;
+  padding-inline-end: calc(var(--gn-codeblock-copy-width) + 0.375rem + 0.5rem);
   margin: 0.5rem 0;
 }
 .ticket-editor__content .editor-codeblock pre {
@@ -4199,7 +4244,15 @@ input, textarea, select { font-family: inherit; }
    :hover/:focus-within on the block. */
 .ticket-editor__content .editor-codeblock__copy {
   opacity: 0;
-  background: var(--gn-fill-tertiary);
+  /* A SOLID ground, never an alpha fill: `--gn-fill-tertiary` let the code show through the
+     button. `--gn-surface` is opaque in every style x theme and `text` on it is a declared 4.5:1
+     pair. `surface-sunken` was the first pick and is refused by case 20.302 (a recessed fill is
+     not a boundary), so the chip's edge is the house `--gn-border` line, as `.gn-field__input`'s. */
+  background: var(--gn-surface);
+  border: 1px solid var(--gn-border);
+  box-sizing: border-box;
+  min-width: var(--gn-codeblock-copy-width);
+  text-align: center;
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
@@ -4417,6 +4470,72 @@ input, textarea, select { font-family: inherit; }
   scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
 }
 
+/* ── SPLIT SCROLL: the tree and the document scroll separately above 60rem ──
+   (owner, 2026-09-30: "the gn-notes-tree and the gn-notes__document should have
+   separate scrolls".) `width > 60rem` is the EXACT complement of the
+   `max-width: 60rem` block (`.gn-notes__tree-toggle`, earlier in this file), so the page is in one regime or the other at
+   every width and the breakpoint stays the ONE the notes page already had (case
+   18.224). AT AND BELOW 60rem none of this exists: the page scrolls as one and
+   the tree is the toggle panel, exactly as before (18.483).
+
+   THE PAGE FILLS THE VIEWPORT BELOW THE BAR so that IT does not scroll and each
+   column has a height to scroll inside. The bar's height is `--app-nav-offset`
+   (`:root`, earlier in this file) — the same token `.gn-notes__editor`'s `min-height` and the
+   heading `scroll-margin-top` already read, never a second number. `AppNav`
+   renders INSIDE the notes `<main>`, whose own `padding-bottom: 3rem` would
+   otherwise leave exactly 3rem of page scroll, so it is zeroed here (`.gn-shell`
+   itself stays as it is for every other route); the document column gets that
+   3rem back under its last line.
+
+   `grid-template-rows: minmax(0, 1fr)` is load-bearing: a bare auto row is sized
+   by its content and lets a long column push past the viewport instead of
+   scrolling. `overscroll-behavior: contain` so a column that reaches its end does
+   not hand the gesture to the other one or to the page.
+
+   Everything that READS the window's scroll on this page follows the column
+   instead — the reading-progress bar and the table-of-contents scrollspy resolve
+   their scroller from the computed `overflow-y` (`findScroller`,
+   `packages/editor/src/reading/scroller.ts`) and re-resolve on a resize across
+   this breakpoint (cases 9.510–9.511); `scrollIntoView` and the capture-phase
+   popup listeners follow a nested scroller natively (9.512). A heading jumped to
+   lands 1rem under the TOP OF THE COLUMN: the bar is not over this column, so the
+   `calc(var(--app-nav-offset) + 1rem)` the window-scrolled page needs is reset.
+
+   DECLARED HERE, AFTER THE BASE RULES IT OVERRIDES, AND NOT NEXT TO THE
+   `max-width: 60rem` BLOCK: a media query adds no specificity, so this block
+   beats an EARLIER equal-specificity rule and loses to a later one. The heading
+   `scroll-margin-top` base rule is in the KB-parity section just above; the first
+   cut of this block sat ~700 lines earlier and its override was silently ignored
+   (case 18.486 pins the order). */
+@media (width > 60rem) {
+  .gn-shell--wide {
+    padding-bottom: 0;
+  }
+  .gn-notes {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--app-nav-offset));
+  }
+  .gn-notes__body {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .gn-notes__tree {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 1rem;
+  }
+  .gn-notes__document {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 3rem;
+  }
+  .gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
+    scroll-margin-top: 1rem;
+  }
+}
+
 /* The heading copy-link button (`packages/editor` `heading-anchors.ts`): its
    presence, size and reveal are in editor.css; this is only colour. Muted at
    rest so it does not compete with the heading, the accent text token on
@@ -4627,5 +4746,62 @@ input, textarea, select { font-family: inherit; }
 .gn-invite-mint__account {
   margin: 0;
   color: var(--gn-text-muted);
+}
+/* The Pending invitations list (owner 2026-09-30, P1: "spacing of the withdraw
+   button from the text needs to be adjusted"). Before this the family had no
+   layout rule at all, so the address, role and lapse date ran together, the
+   button touched them and the `<ul>` showed a bullet.
+
+   The vocabulary is the members table's (B12): a raised panel with the lit-edge
+   `lift` shadow, zebra on the EVEN rows (`.gn-members__row:nth-child(even)`).
+   `overflow: hidden` lets the panel's radius clip the zebra at the corners.
+
+   A row is a WRAPPING flex row, `gap: 1rem`. The address is the row's text and
+   takes the slack (`flex: 1 1 auto; min-width: 0` so a long address shrinks
+   rather than pushing the row wider, `overflow-wrap: anywhere` because an
+   address has no spaces to break at). The role and the lapse are third-tier
+   meta, the `·` between them `aria-hidden` and unselectable. Withdraw keeps its
+   quiet `ghost` variant and is pushed to the far edge with `margin-left: auto`;
+   at 40rem and below the address takes a full line, the meta sits under it, and
+   Withdraw wraps under that, LEFT-aligned (`margin-left: 0`, since an auto
+   margin on a wrapped line would push it right). 2.75rem is the 44px target. */
+.gn-invite-pending {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  border-radius: var(--gn-radius-card);
+  overflow: hidden;
+}
+.gn-invite-pending__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0.6875rem 1.125rem;
+}
+.gn-invite-pending__row:nth-child(even) { background: var(--gn-fill-quaternary); }
+.gn-invite-pending__address {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9375rem;
+  color: var(--gn-text);
+  overflow-wrap: anywhere;
+}
+.gn-invite-pending__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--gn-text-subtle);
+}
+.gn-invite-pending__sep { user-select: none; }
+.gn-invite-pending__withdraw { margin-left: auto; }
+@media (max-width: 40rem) {
+  .gn-invite-pending__address { flex-basis: 100%; }
+  .gn-invite-pending__withdraw { margin-left: 0; }
 }
 /* ══ access-and-invites: end ══ */

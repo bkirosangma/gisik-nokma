@@ -305,6 +305,44 @@ describe('18.11 The Notes page — the shell', () => {
   });
 
   /**
+   * 18.485 — above 60rem the document scrolls in its OWN column, and the window does not
+   * (18.481). Next resets the WINDOW's scroll on a navigation; it does not reset an
+   * element's. `/notes/a` → `/notes/b` is the same route file with a new param; IF App
+   * Router keeps the page mounted the section persists and the next note would
+   * open at the previous note's offset (a rerender with a new `noteId` is what this
+   * drives; whether the real navigation remounts is the browser case 18.493).
+   * CONTROL: an unrelated re-render (same note) leaves the offset alone, and a link
+   * with a `#heading` or `#comment-…` hash is left to the scroll that owns it.
+   * MUTATION TARGET: delete the effect, or drop the hash guard.
+   */
+  it('18.485 opening a different note returns the document column to the top; CONTROL: the same note keeps its place, and a hash link is not reset', async () => {
+    const view = (id: string) => (
+      <Providers services={world({ getNote: async () => null })}>
+        <NotesPage noteId={id} />
+      </Providers>
+    );
+    window.location.hash = '';
+    const { rerender } = render(view('01J9NOTEAAAAAAAAAAAAAAAAAA'));
+    const region = await screen.findByTestId('note-document-region');
+    region.scrollTop = 400;
+    rerender(view('01J9NOTEAAAAAAAAAAAAAAAAAA')); // CONTROL: same note
+    expect(region.scrollTop).toBe(400);
+    rerender(view('01J9NOTEBBBBBBBBBBBBBBBBBB'));
+    expect(screen.getByTestId('note-document-region')).toBe(region); // the rerender kept the same column element
+    await waitFor(() => expect(region.scrollTop).toBe(0));
+
+    window.location.hash = '#a-heading';
+    try {
+      region.scrollTop = 400;
+      rerender(view('01J9NOTECCCCCCCCCCCCCCCCCC'));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(region.scrollTop).toBe(400);
+    } finally {
+      window.location.hash = '';
+    }
+  });
+
+  /**
    * 18.185 — the title comes from a SERVER layout, and there are TWO of them.
    *
    * `document-title.test.tsx:118-124` resolves a page's title mechanism by
