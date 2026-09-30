@@ -121,6 +121,10 @@ describe('hosted MCP metadata and registration', () => {
     for (const [method, url] of [['GET', '/.well-known/oauth-authorization-server'], ['GET', '/.well-known/oauth-protected-resource'], ['POST', '/oauth/register']] as const) {
       expect(app.hasRoute({ method, url }), url).toBe(true);
     }
+    // The token and revoke routes live in an encapsulated scope (their own form
+    // parser), which `hasRoute` on the root cannot see — so ask them directly.
+    expect((await app.inject({ method: 'POST', url: '/oauth/token', payload: { grant_type: 'password' } })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'POST', url: '/oauth/revoke', payload: {} })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/auth/oauth/register' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/api/auth/get-session' })).statusCode).not.toBe(404); // CONTROL
   });

@@ -1,6 +1,17 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { Pool, PoolClient } from 'pg';
 import type { Queryable } from '../db/queryable.js';
-import { registerClient, sweepStaleClients } from '../mcp/oauth-store.js';
+import {
+  connectionForToken,
+  createConnection,
+  issueTokens,
+  registerClient,
+  revokeConnection,
+  sweepStaleClients,
+  takeCode,
+  useRefreshToken,
+} from '../mcp/oauth-store.js';
+import { verifyPkceS256 } from '../mcp/pkce.js';
 
 /** The one scope: "act as me". Present in metadata because clients expect a scope. */
 export const OAUTH_SCOPE = 'gisik:act';
@@ -87,6 +98,83 @@ export function registerMcpOAuthRoutes(
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
+    });
+  });
+  // The token and revoke endpoints take `application/x-www-form-urlencoded` — what
+  // OAuth clients send (RFC 6749 §4.1.3) — so the parser lives in a scope of its
+  // own and does not change how any other route in the app reads a body.
+  app.register(async (scope) => {
+    scope.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
+      done(null, Object.fromEntries(new URLSearchParams(body as string)));
+    });
+
+    const tokenBody = (t: { accessToken: string; refreshToken: string; expiresIn: 3600 }) => ({
+      access_token: t.accessToken,
+      token_type: 'Bearer',
+      expires_in: t.expiresIn,
+      refresh_token: t.refreshToken,
+      scope: OAUTH_SCOPE,
+    });
+
+    scope.post('/oauth/token', async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      const b = (request.body ?? {}) as Record<string, string | undefined>;
+      const bad = (error: string) => reply.code(400).send({ error });
+      const at = now();
+      if (b.grant_type === 'authorization_code') {
+        if (!b.code || !b.code_verifier || !b.client_id || !b.redirect_uri) return bad('invalid_request');
+        // Burnt whatever happens next (14.241): a wrong verifier does not leave the
+        // code standing for a second guess.
+        const row = await takeCode(deps.pool, b.code, at);
+        if (
+          row === null ||
+          row.clientId !== b.client_id ||
+          row.redirectUri !== b.redirect_uri ||
+          !verifyPkceS256(b.code_verifier, row.codeChallenge)
+        ) {
+          return bad('invalid_grant');
+        }
+        const { connectionId } = await createConnection(deps.pool, { userId: row.userId, clientId: row.clientId }, at);
+        return tokenBody(await issueTokens(deps.pool, connectionId, row.userId, at));
+      }
+      if (b.grant_type === 'refresh_token') {
+        if (!b.refresh_token) return bad('invalid_request');
+        // One transaction for "use the old token, mint the new pair". A racing
+        // second refresh with the same token blocks on the first's row lock, sees
+        // it used, and revokes the family AFTER the winner committed — so exactly
+        // one caller sees 200 and the connection is gone afterwards (14.246), rather
+        // than the loser's delete landing between the winner's steps.
+        // `AppDeps.pool` is a `Pool` in production; a `PoolClient` has `release` and
+        // is never handed to this route, but the type admits it.
+        if ('release' in deps.pool) throw new Error('the OAuth token route needs a Pool, not a checked-out client');
+        const client: PoolClient = await (deps.pool as Pool).connect();
+        let issued: ReturnType<typeof tokenBody> | null = null;
+        try {
+          await client.query('BEGIN');
+          const used = await useRefreshToken(client, b.refresh_token, at);
+          if (used.status === 'ok') issued = tokenBody(await issueTokens(client, used.connectionId, used.userId, at));
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          throw err;
+        } finally {
+          client.release();
+        }
+        return issued ?? bad('invalid_grant');
+      }
+      return bad('unsupported_grant_type');
+    });
+
+    // RFC 7009: the answer is 200 whether or not the token was known, so this is
+    // not an oracle for which tokens exist. An access OR a refresh token names its
+    // connection; deleting the connection kills both kinds at once.
+    scope.post('/oauth/revoke', async (request, reply) => {
+      const token = ((request.body ?? {}) as Record<string, string | undefined>).token;
+      if (token) {
+        const connectionId = await connectionForToken(deps.pool, token);
+        if (connectionId !== null) await revokeConnection(deps.pool, connectionId, null);
+      }
+      return reply.code(200).send({});
     });
   });
 }

@@ -662,6 +662,21 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.218 — registering sweeps stale clients (Task 1's rule) — a 31-day-old unused client is gone after the next registration;** control: the new client exists. Mutation: never call the sweep.
 - ✅ **14.219 — a hosted-door request never reaches better-auth's catch-all: `/oauth/token` and `/.well-known/*` are their own routes, not `/api/auth/*`;** control: `/api/auth/get-session` still answers. Mutation: mount the routes under `/api/auth`.
 
+## 14.6 Hosted MCP — tokens and revocation
+
+*Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
+
+- ✅ **14.240 — `authorization_code` with the right verifier, client and redirect returns an access + refresh token (`expires_in: 3600`, `token_type: "Bearer"`, `scope: "gisik:act"`, `cache-control: no-store`), and the access token authenticates `GET /v1/me/workspaces` as the consenting person;** control: the response has no `id_token`. Mutation: return `expires_in: 86400`.
+- ✅ **14.241 — a wrong `code_verifier` is `invalid_grant` and the code is burnt (a retry with the right verifier also fails);** control: the right verifier on a fresh code succeeds. Mutation: skip `verifyPkceS256`.
+- ✅ **14.242 — the code is bound to its client and redirect: another client's id, or a different registered redirect, is `invalid_grant`;** control: the matching pair succeeds. Mutation: ignore `redirect_uri` at the token endpoint.
+- ✅ **14.243 — the code is single-use: a second exchange is `invalid_grant`;** control: the first exchange succeeded. Mutation: `getCode` instead of `takeCode`.
+- ✅ **14.244 — `refresh_token` returns a NEW access + refresh token, and the old refresh token is dead;** control: the new access token authenticates. Mutation: return the same refresh token.
+- ✅ **14.245 — presenting a used refresh token revokes the whole connection: its latest access token stops authenticating (401) and its latest refresh token is refused;** control: another connection of the same person is untouched. Mutation: skip the family revoke.
+- ✅ **14.246 — two concurrent refreshes with the same token: exactly one succeeds; the other is treated as reuse and the connection is gone;** control: a single refresh succeeds. Mutation: a read-then-write refresh (SELECT used_at, then UPDATE). *(Review Focus 2)*
+- ❌ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
+- ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
+- ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+
 ## 14.10 Hosted MCP — member help (hosted remote MCP plan, Task 9; block `14.200`–`14.299`)
 
 *The manual's new "§16 — Connecting Claude or ChatGPT" (`docs/manual.md`). Tests: `packages/app-core/test/help/connecting-assistants.test.ts`; `pnpm check:help` guards its quoted strings and the freshness of the generated copy. The menu names for Claude and ChatGPT were checked on 2026-09-30 against the MCP project's "Connect to remote MCP servers" guide and OpenAI's ChatGPT developer-mode guide and are dated in the text.*

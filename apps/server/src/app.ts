@@ -671,9 +671,11 @@ export function buildApp(
         (routeUrl === '/v1/mcp/device/code' ||
           routeUrl === '/v1/mcp/device/approve' ||
           routeUrl === '/v1/mcp/device/token' ||
-          // The hosted door's public registration endpoint: open to anyone, so it
-          // shares the device flow's bucket rather than having none.
-          routeUrl === '/oauth/register')
+          // The hosted door's public endpoints (register, token, revoke): open to
+          // anyone, so they share the device flow's bucket rather than having none.
+          routeUrl === '/oauth/register' ||
+          routeUrl === '/oauth/token' ||
+          routeUrl === '/oauth/revoke')
       ) {
         // The device flow's own bucket. Without this branch a route under
         // `/v1/mcp/...` matches NO bucket at all, which would leave the
