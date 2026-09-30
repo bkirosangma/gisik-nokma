@@ -620,6 +620,21 @@ a second assistant they did not need.
 `revoke` and the rename path already use), and otherwise says what is true — that the read did not come back,
 that the list is unknown rather than empty, and the one recovery there is.
 
+## 14.2 Hosted MCP — storage
+
+*Remote-MCP plan (`docs/superpowers/plans/2026-09-30-remote-mcp-server.md`) Task 1, block 14.200–14.299. Tests: `apps/server/test/mcp/oauth-store.test.ts`.*
+
+- ✅ **14.200 — the migration adds five tables and three `mcp_tokens` columns, and every EXISTING token row reads `kind='local'`, `expires_at NULL`, `connection_id NULL`;** control: a device-flow token minted after the migration still authenticates `/v1/me/workspaces` with no expiry. Mutation: default `kind` to `'hosted'`.
+- ✅ **14.201 — a hosted access token past `expires_at` is refused by `requireSession` (401), a live one resolves to its owner;** control: a LOCAL token with `expires_at NULL` resolves at any `now`. Mutation: drop the `expires_at` clause from `resolveMcpToken`.
+- ✅ **14.202 — resolving a hosted token stamps its CONNECTION's `last_used`;** control: resolving a local token stamps only `mcp_tokens.last_used`. Mutation: remove the connection update.
+- ✅ **14.203 — a code is single-use and dies after 60 s:** `takeCode` returns the row once, `null` the second time, and `null` at `now + 61 s`;** control: at `now + 59 s` the first take succeeds. Mutation: `SELECT` instead of `DELETE … RETURNING`.
+- ✅ **14.204 — refresh rotation: `useRefreshToken` succeeds once; presenting the same token again returns `reused` AND deletes the connection with its access tokens;** control: a fresh refresh token issued by the first use still works. Mutation: skip the connection delete on reuse.
+- ✅ **14.205 — a connection past `idle_expires_at` refuses refresh (`expired`) and is deleted; a successful refresh slides `idle_expires_at` to `now + 90 d`;** control: at `now + 89 d` refresh succeeds. Mutation: do not slide the window.
+- ✅ **14.206 — `sweepStaleClients` deletes a 31-day-old client with no connection and no pending row, and keeps one with a live connection;** control: a 29-day-old unused client survives. Mutation: ignore connections in the sweep.
+- ✅ **14.207 — nothing raw is stored:** after `mintCode` + `issueTokens`, no column of `oauth_codes`, `mcp_tokens` or `oauth_refresh_tokens` contains the raw code, access or refresh token;** control: each table holds `hashCredential(raw)`. Mutation: store the raw refresh token.
+- ✅ **14.208 — `listMcpTokens` returns local tokens only; hosted access tokens never appear there;** control: a local token still lists with its name. Mutation: drop `WHERE kind = 'local'`.
+- ✅ **14.209 — every new table has a purge rule (`not-entity-bearing`)** — the existing guard `table-rules.test.ts` fails without them;** control: the guard's count of ruled tables rises by exactly five. Mutation: remove `oauth_connections` from `table-rules.ts`.
+
 ## 14.7 Hosted MCP — one tool code path (hosted remote MCP plan, Task 6; block `14.200`–`14.299`)
 
 The hosted `/mcp` route runs the SAME nine tools as the stdio server, from the same package, over an in-process

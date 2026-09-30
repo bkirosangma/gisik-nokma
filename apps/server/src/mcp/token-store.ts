@@ -194,6 +194,10 @@ export async function exchangeDeviceCode(
  * `null` for a token that has never been used, and the screen says "Never used"
  * rather than picking a date. It is an observation and never an authorisation
  * input — no code path reads it to decide anything.
+ *
+ * LOCAL tokens only (`kind = 'local'`). A hosted access token rotates hourly, so
+ * listing them would grow a row an hour; a hosted assistant is listed once, as
+ * its `oauth_connections` row, by `listConnections` in `oauth-store.ts`.
  */
 export async function listMcpTokens(
   db: Queryable,
@@ -205,7 +209,7 @@ export async function listMcpTokens(
     created_at: Date;
     last_used: Date | null;
   }>(
-    'SELECT token_hash, name, created_at, last_used FROM mcp_tokens WHERE user_id = $1 ORDER BY created_at DESC',
+    "SELECT token_hash, name, created_at, last_used FROM mcp_tokens WHERE user_id = $1 AND kind = 'local' ORDER BY created_at DESC",
     [userId],
   );
   return rows.map((r) => ({
@@ -277,8 +281,8 @@ export async function nameMcpToken(
 }
 
 /**
- * The whole read path for a personal access token: hash, look up, answer the
- * user id or null. `null` is the answer for a forged token AND for a revoked
+ * The whole read path for a personal access token (local, or a hosted access
+ * token): hash, look up, answer the user id or null. `null` is the answer for a forged token AND for a revoked
  * one, deliberately and identically — every distinction here is an oracle
  * somebody can query, which is the same reasoning `UNAUTHENTICATED_BODY`
  * records for its own contentlessness.
@@ -288,8 +292,21 @@ export async function resolveMcpToken(
   rawToken: string,
   now: Date,
 ): Promise<string | null> {
+  // One round trip: a HOSTED row (`expires_at` set) past its hour is not found, so
+  // it is refused exactly as a forged token is; a local row has `expires_at NULL`
+  // and never expires. The CTE also stamps the CONNECTION a hosted token belongs
+  // to, because that row — not the hourly access row — is what "Connected
+  // assistants" shows.
   const { rows } = await db.query<{ user_id: string }>(
-    'UPDATE mcp_tokens SET last_used = $2 WHERE token_hash = $1 RETURNING user_id',
+    `WITH hit AS (
+       UPDATE mcp_tokens SET last_used = $2
+        WHERE token_hash = $1 AND (expires_at IS NULL OR expires_at > $2)
+        RETURNING user_id, connection_id
+     ), stamp AS (
+       UPDATE oauth_connections SET last_used = $2
+        WHERE id = (SELECT connection_id FROM hit) RETURNING id
+     )
+     SELECT user_id FROM hit`,
     [hashCredential(rawToken), now],
   );
   return rows[0]?.user_id ?? null;
