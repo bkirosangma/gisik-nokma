@@ -69,3 +69,9 @@ the number you added.
 - ✅ **20.211 — shared fields sit recessed (the `track` inset, keeping their accessible edge); the segmented control is a recessed pill track whose items are pills — text2 at rest, the selected one raised on the `lift` shadow in `text`; the sheet's Attach file is a quiet outlined control; a visibility viewer chip is not raised;** control: every audited rule keeps what the table says it keeps (the field's 1px `border`). Mutation: remove `box-shadow` from `.gn-field__input`.
 - ✅ **20.212 — no shared-field or segmented rule paints a flat boundary, and the three kept rules (the disabled field, neo's sunken field, neo's pressed tab) are still declared unchanged;** control: `stillDeclared` finds all three. Mutation: delete `[data-style="neo"] .gn-segmented__item--on`.
 - ✅ **20.213 — under `neo` the selected segmented tab stays PRESSED: its rule restates `box-shadow: var(--gn-shadow-selected)` (neo's inset), because the base rule now reads `--gn-shadow-lift`, which is neo's OUTSET raised pair (B-D3, 10.80; Plan B Review Focus 4);** control: in hig and minimal the same base rule reads `lift` (raised, not pressed). Mutation: remove `box-shadow` from `[data-style="neo"] .gn-segmented__item--on`.
+
+## 20.23 Plan B — floating surfaces
+
+- ✅ **20.221 — every floating panel rests on `lift-near` with the card radius on the raised ground, and neo reaches its own floating shadow through the token with no `[data-style]` fork;** control: the info tip keeps its 1px `border` edge. Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-popover`.
+- ✅ **20.222 — a floating panel's ground (`surfaceRaised`) differs from the page (`surface`) in hig and minimal, both themes, so a menu stays distinguishable where minimal draws no shadow;** control: under neo the two are the same hex by design (depth is shadow-only). Mutation: none (a token fact, witnessed by a planted equal-ground palette in the test's control).
+
