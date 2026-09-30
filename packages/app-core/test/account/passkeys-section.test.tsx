@@ -113,3 +113,15 @@ describe('PasskeysSection', () => {
     expect(screen.queryByText('Your passkeys could not be loaded.')).not.toBeInTheDocument();
   });
 });
+
+describe('20.363 the passkeys add action is quiet — Account has one primary', () => {
+  it('20.363 Add a passkey is a ghost Button, not a primary', () => {
+    render(<PasskeysSection passkeys={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
+    const add = screen.getByRole('button', { name: 'Add a passkey' });
+    // CONTROL — still a Button, still named for its action.
+    expect(add.tagName).toBe('BUTTON');
+    expect(add).toHaveClass('gn-button');
+    expect(add).toHaveClass('gn-button--ghost');
+    expect(add).not.toHaveClass('gn-button--primary');
+  });
+});

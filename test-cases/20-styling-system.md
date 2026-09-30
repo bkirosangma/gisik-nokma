@@ -196,3 +196,9 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 
 - ✅ **20.291 — My work paints no flat boundary and no retired control constant under `gn-my-work` / `gn-attention`, so it inherits the refresh through the shared layers alone;** control: the scan reads at least 15 rules under those prefixes, including the row-title rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-my-work__title` (replacing its `background: none`).
 - ✅ **20.292 — My work's and the attention list's row titles keep their declared 24px in-list floor (they are the doors, and `DENSE_IN_LIST` names them);** control: the attention item row keeps the same floor. Mutation: set `.gn-my-work__title`'s `min-height` to `1rem`.
+## 20.37 Plan B — the Account page
+
+- ✅ **20.361 — the Account page's sections are raised panels (the P-RAISED shadow) and the Deleted items row actions keep their 44px floor;** control: the row actions' `min-height` is asserted in the same `it`. Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-account__section`.
+- ✅ **20.362 — no account or Deleted-items rule paints a flat boundary or the retired constant;** control: the scan reads more than 30 rules across `.gn-account` and `.gn-deleted-items` and finds both prefixes. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-account__section`.
+- ✅ **20.363 — the passkeys add action is a quiet (ghost) `Button`, not a primary;** control: it is still a `button` named "Add a passkey" with the `gn-button` class. Mutation: restore `variant="primary"` in `passkeys-section.tsx`.
+- ✅ **20.364 — Save name is the Account page's ONE loud element: exactly one primary `Button` is on `/account` and it is Save name;** control: Save name and Add a passkey are both rendered. Mutation: drop `variant="primary"` from Save name in `profile-section.tsx`.
