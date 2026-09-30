@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
 import { normalizeOrigin } from '../http/http-origin.js';
+import { deviceSessionHook } from './device-cookie.js';
 import {
   readSocialProviderEnv,
   socialProvidersFromEnv,
@@ -321,6 +322,18 @@ export function createAuth(deps: AuthDeps) {
      * differently to each, and a config read off the instance cannot.
      */
     socialProviders: deps.socialProviders ?? socialProvidersFromEnv(readSocialProviderEnv()),
+    session: {
+      // Devices plan (Task 1). `returned: false` keeps the raw id out of every better-auth response
+      // (listSessions included) - FD4; `input: false` means no client can set it.
+      additionalFields: {
+        deviceId: { type: 'string', required: false, returned: false, input: false },
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: { before: deviceSessionHook({ secure: new URL(deps.baseUrl).protocol === 'https:' }) },
+      },
+    },
     plugins: [
       phoneNumber({
         sendOTP: async ({ phoneNumber: phone, code }) => {

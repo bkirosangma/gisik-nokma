@@ -87,6 +87,11 @@ function setCookies(headers: Record<string, unknown>): string[] {
   return Array.isArray(raw) ? (raw as string[]) : [String(raw)];
 }
 
+/** Every Set-Cookie except the device cookie (devices plan): the ones sign-in has always set. */
+function sessionCookiesOf(headers: Record<string, unknown>): string[] {
+  return setCookies(headers).filter((cookie) => !cookie.startsWith('gn_device='));
+}
+
 /** The `Cookie` request header a browser would send back, from a `Set-Cookie` response. */
 function cookieHeaderFrom(headers: Record<string, unknown>): string {
   return setCookies(headers)
@@ -184,7 +189,8 @@ describe('phone OTP sign-in', () => {
       payload: { phoneNumber: phone, code: otp.sent.at(-1)?.code },
     });
 
-    const cookies = setCookies(verify.headers);
+    // Amended 2026-10-01 (devices plan, 6.300): `gn_device` rides alongside the session cookie, so "the session cookie" is what is counted.
+    const cookies = sessionCookiesOf(verify.headers);
     expect(cookies).toHaveLength(1);
     const [nameAndValue, ...attributes] = (cookies[0] ?? '').split('; ');
     expect(nameAndValue?.split('=')[0]).toBe('better-auth.session_token');
@@ -215,7 +221,7 @@ describe('phone OTP sign-in', () => {
       });
       expect(verify.statusCode).toBe(200);
 
-      const cookies = setCookies(verify.headers);
+      const cookies = sessionCookiesOf(verify.headers);
       expect(cookies).toHaveLength(1);
       const [nameAndValue, ...attributes] = (cookies[0] ?? '').split('; ');
       expect(nameAndValue?.split('=')[0]).toBe('__Secure-better-auth.session_token');
@@ -316,7 +322,7 @@ describe('email magic link sign-in', () => {
     const follow = await app.inject({ method: 'GET', url: url.pathname + url.search });
     // Verification redirects to the callback and carries the session with it.
     expect(follow.statusCode).toBe(302);
-    expect(setCookies(follow.headers)).toHaveLength(1);
+    expect(sessionCookiesOf(follow.headers)).toHaveLength(1);
 
     const token = follow.headers['set-auth-token'];
     const session = await app.inject({
