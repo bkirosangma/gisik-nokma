@@ -588,6 +588,7 @@ rather than taken next-free.)*
 partial tells a reader nothing about which half they have. Every item below is a decision with a
 reason on record, not an oversight:*
 
+- ✅ **Your passkeys** (devices plan Task 5, 2026-10-01) — `GET /v1/me/passkeys` lists the caller's passkeys (oldest first) with the authenticator's NAME (`providerOf`, `apps/server/src/auth/passkey-providers.ts`: iCloud Keychain, Google Password Manager, Windows Hello, 1Password, Bitwarden, Dashlane, Chrome on Mac; anything else, the all-zero AAGUID and null read "Security key or other" — never a UUID), `createdAt`, `lastUsedAt` and `notUsedRecently` (never used, or 90 days or more ago). Named columns only: no public key, credential id or counter leaves the server. Browser-only (403 for an MCP token). A successful passkey sign-in stamps that passkey's `lastUsedAt` (`apps/server/src/auth/passkey-last-used.ts`, a better-auth `hooks.after` on `/passkey/verify-authentication`; a failed verification stamps nothing). `apps/server/src/routes/me-passkeys.ts`.
 - *Search answers the **top 50, unpaginated**, ordered by `ts_rank_cd` then ticket id, and its
   configuration is `FTS_CONFIG = 'simple'` — **nothing is stemmed, in any language**. Both were
   settled deliberately rather than deferred: stemming one language while not stemming the others
