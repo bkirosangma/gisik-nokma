@@ -372,12 +372,17 @@ describe('20.146 quick moves never lose or duplicate a card', () => {
 
   it('20.146 a second move of the same card while the first is pending is ignored by the latch — one card, one write', async () => {
     const write = deferred<IngestResult[]>();
-    const { source } = await mount(() => write.promise);
+    // `todo → done` is a LEGAL, rules-free edge here — so only the latch (not the gate) can stop the second drop.
+    const OPEN_EDGES: WorkflowDef = { ...WF_ERRAND, transitions: [...WF_ERRAND.transitions, { from: 'todo', to: 'done', rules: [] }] };
+    const { source } = await mount(() => write.promise, OPEN_EDGES);
     drag('tk_c', 'doing');
-    drag('tk_c', 'done'); // refused by the latch: the first write has not answered
+    drag('tk_c', 'done'); // the first write has not answered: the latch ignores this one
     expect(source.ingested).toHaveLength(1);
+    expect(idsIn('doing')).toContain('tk_c');
+    expect(idsIn('done')).not.toContain('tk_c');
     expect(['todo', 'doing', 'done'].flatMap(idsIn).filter((id) => id === 'tk_c')).toHaveLength(1);
     await act(async () => write.resolve(committed([{ id: 'x' }])));
+    expect(source.ingested).toHaveLength(1); // one write in all: the answer did not release a second one either
   });
 });
 
