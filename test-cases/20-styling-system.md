@@ -149,3 +149,9 @@ the number you added.
 
 - ✅ **20.331 — the workspaces page has ONE primary: Create workspace; each invitation's Accept is a quiet outlined control, so N pending invitations do not make N+1 loud elements;** control: Accept is still a `button` named "Accept" (its behaviour and name are unchanged). Mutation: restore `variant="primary"` on Accept.
 - ✅ **20.332 — no workspaces-list rule paints a flat boundary or the retired constant;** control: the scan reads more than 20 rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-workspace-card__door`.
+
+## 20.35 Plan B — settings and the workspace settings form
+
+- ✅ **20.341 — the settings sidebar is a raised panel and the workspace settings form's action row is separated by a decorative hairline;** control: the form's fields keep their accessible edge (B2). Mutation: restore `border-top: 1px solid var(--gn-border)` on the actions row.
+- ✅ **20.342 — no settings rule paints a flat boundary or the retired constant;** control: the scan reads the settings and workspace-settings rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-settings__sidebar`.
+- ✅ **20.343 — Save is the Workspace settings screen's ONE loud element: exactly one primary `Button` is on the tab and it is Save;** control: the tab has rendered and Save is a named `button`. Mutation: drop `variant="primary"` from Save in `workspace-settings-form.tsx`.

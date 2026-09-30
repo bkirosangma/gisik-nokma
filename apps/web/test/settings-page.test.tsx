@@ -406,6 +406,22 @@ describe('13.716 the Workspace settings tab', () => {
    * the bug would be invisible in the row it wrote and would only surface when
    * two people edited different knobs at once.
    */
+  /**
+   * 20.343 — Save is the Workspace settings screen's ONE loud element (styling
+   * refresh Plan B, Task B15): exactly one primary `Button` is on the page and it
+   * is Save. The sidebar and the shell's nav are links, not primaries.
+   */
+  it('20.343 Save is the only primary on the Workspace settings tab', async () => {
+    renderTab('admin', SETTINGS, []);
+    // CONTROL — the tab has rendered (the form's own field is there) and Save is still a named button.
+    expect(await screen.findByLabelText('Stale after')).toHaveValue(3);
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save.tagName).toBe('BUTTON');
+    const primaries = [...document.querySelectorAll('.gn-button--primary')];
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toBe(save);
+  });
+
   it('13.716 saving only the auto-close change ingests one claim carrying that field alone', async () => {
     const captured: SubmittedEvent[][] = [];
     renderTab('admin', SETTINGS, captured);

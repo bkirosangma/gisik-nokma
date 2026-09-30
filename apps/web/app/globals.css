@@ -1332,7 +1332,8 @@ input, textarea, select { font-family: inherit; }
   gap: 0.2rem;
   flex: 0 0 15.5rem; /* not shrinkable, so the 56px this added also moves the sidebar/content wrap threshold right by 56px */
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B15): P-RAISED — the lit-edge `lift` shadow (rule 04). */
+  box-shadow: var(--gn-shadow-lift);
   border-radius: var(--gn-radius-card);
   padding: 0.5rem;
 }
@@ -3204,7 +3205,8 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   margin-top: 1.25rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--gn-border);
+  /* Styling refresh Plan B (Task B15): a decorative hairline (`fill-secondary`, Plan A D18) — a separator, not a boundary, so it is not a 4.27:1 rule. */
+  border-top: 1px solid var(--gn-fill-secondary);
 }
 .gn-workspace-settings__readonly { margin: 0; color: var(--gn-text-muted); }
 
