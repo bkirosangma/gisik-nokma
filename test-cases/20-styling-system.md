@@ -203,6 +203,12 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 - ✅ **20.363 — the passkeys add action is a quiet (ghost) `Button`, not a primary;** control: it is still a `button` named "Add a passkey" with the `gn-button` class. Mutation: restore `variant="primary"` in `passkeys-section.tsx`.
 - ✅ **20.364 — Save name is the Account page's ONE loud element: exactly one primary `Button` is on `/account` and it is Save name;** control: Save name and Add a passkey are both rendered. Mutation: drop `variant="primary"` from Save name in `profile-section.tsx`.
 
+
+## 20.38 Plan B — the Inbox
+
+- ✅ **20.371 — every inbox row is a 44px door and "Load more" is a quiet outlined control (P-QUIET, with its hover fill);** control: the unread dot and badge keep the accent. Mutations: remove `min-height` from `.gn-inbox__row`; and restore `border-radius: 4px` on `.gn-inbox__more`.
+- ✅ **20.372 — no inbox rule paints a flat boundary or the retired constant;** control: the scan reads more than 10 inbox rules. Mutation: replace `.gn-inbox__dot`'s `accent` background with `surface-sunken`.
+
 ## 20.59 Browser — Plan B
 
 **Markers: a case that matched stays `🧪` (manual — `✅` needs a citing test, `check:citations`), a case only partly measured is `🟡`; both carry their evidence inline.** Run on the dev stack built from the release branch (`ctl rebuild` is the controller's verb) after Plan B merges; the lane that wrote these did NOT run them and flips none. The runner flips each case with its evidence: a screenshot per step, the runner's name, and the stack's commit. The Inventory these cases name is the "Inventory — every screen, and who owns it" section of `docs/superpowers/plans/2026-09-29-styling-system-refresh-b-screens.md`, whose route → owner table is `SCREEN_OWNERS` in `packages/ui/test/helpers/style-patterns.ts` (guarded by `packages/ui/test/styling-inventory.test.ts`). The KEPT 24px in-list floor is held per task in the `KEPT` lists of `packages/ui/test/styling-b*.test.ts` and, for the viewport suite, in `DENSE_IN_LIST` of `apps/web/e2e-viewport/tap-targets.ts`. Ids 20.597–20.600 stay reserved.

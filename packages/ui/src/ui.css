@@ -5064,6 +5064,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   align-items: baseline;
   gap: 0.5rem;
   width: 100%;
+  min-height: 2.75rem; /* a door: the 44px floor (styling refresh Plan B, B18) */
   padding: 0.5rem;
   border: none;
   background: transparent;
@@ -5125,15 +5126,24 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: 999px;
   background: var(--gn-accent);
 }
+/* Load more: a quiet outlined control (P-QUIET, styling refresh Plan B B18) —
+   the same coat as `.gn-calendar__today`. The inbox has no primary action. */
 .gn-inbox__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px */
   margin: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+  padding: 0 0.875rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
   background: transparent;
-  color: var(--gn-text);
+  color: var(--gn-text-muted);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
 }
+.gn-inbox__more:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 /* The unread total, on whatever chrome opens the inbox. Text on accent — the
    declared contrast pair, not a hand-picked ink. */
 .gn-inbox__badge {
