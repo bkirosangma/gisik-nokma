@@ -1,112 +1,135 @@
+import { useState } from 'react';
 import { Button } from '@gisik-nokma/ui';
-import { formatDateTime } from '../provenance.js';
-import type { SessionSummary } from './sessions-client.js';
+import { formatDate } from '../provenance.js';
+import { relativeTime } from './relative-time.js';
+import type { DeviceSummary } from './sessions-client.js';
 
 export type SessionsSectionProps = {
-  sessions: SessionSummary[];
-  onRevoke: (token: string) => void;
+  devices: DeviceSummary[];
+  /** Sign ONE other device out, by its one-way key. Never offered for the current device. */
+  onSignOutDevice: (key: string) => void;
+  /** Sign every device but this one out. Offered once, and only when there is another device. */
+  onSignOutOthers: () => void;
   /**
-   * Set when the caller's own `onRevoke` refuses. Ruling E2-24(b): a "Sign
-   * out" refusal used to be read and discarded entirely — the list simply
-   * failed to shrink, with nothing on screen to say why. Same one-prop
-   * shape `PasskeysSection`'s add/remove `error` already carries.
+   * Set when the caller's own sign-out refuses. Ruling E2-24(b): a refusal used to be read and discarded
+   * entirely - the list simply failed to shrink, with nothing on screen to say why. Same one-prop shape
+   * `PasskeysSection`'s add/remove `error` carries.
    */
   error?: string | null;
+  /** The clock the 24-hour split and the relative times read. Injected so a test can pin it. */
+  now?: Date;
 };
 
-/**
- * The `/account` "Sign-in and devices" section, Sessions half (Passkeys is a
- * later task) — framework-free beyond React itself, matching every other
- * view in this package. `deviceLabel` and `isCurrent` are computed entirely
- * by the caller's adapter (`apps/web/src/account/account-clients.ts`); this
- * component only renders what it is handed and calls `onRevoke` with the
- * token, the same "hand the caller a value, let it own the mutation" shape
- * `NotificationsSection`'s `onToggle` and `ProfileSection`'s `onSave` use.
- *
- * The current session renders no revoke control at all — not a disabled
- * one — because there is nothing a disabled control would honestly be
- * offering to do here.
- *
- * "Last active" goes through `formatDateTime` (this package's own
- * `provenance.ts`, already used by `HistoryList`/`VisibilityEditor` for the
- * same "who did what and when" shape) rather than the raw ISO string —
- * Features.md's own clock rule ("every date goes through the domain's one
- * `formatIstInstant`... an ISO slice... would disagree with every other date
- * on the sheet") applies here exactly as it does everywhere else this client
- * shows a moment.
- *
+const ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
- * STYLED as of the Account styling port — this docblock previously disclosed
- * the opposite ("carry no CSS rule in `globals.css` today") and that is no
- * longer true. `globals.css`'s `/account` block styles
- * `gn-account__section`, `__section-title`, `__session-list` and
- * `__session-row`; the list is named explicitly out of the page-wide
- * `.gn-account ul` bullet rule there, since it is a row list now.
+const titleOf = (d: DeviceSummary): string =>
+  d.legacy ? `Older sign-in · ${d.label}` : d.tag === null ? d.label : `${d.label} · ${d.tag}`;
+
+/**
+ * The `/account` "Sign-in and devices" section, Sessions half - framework-free beyond React itself.
  *
- * The note below about `/mcp/tokens` is worth keeping and updating rather
- * than deleting. `.gn-mcp-tokens__row` was rejected as a class to BORROW —
- * it is that route's own namespaced class, not a shared utility — and that
- * still holds: nothing here references it. What the `/account` block does
- * instead is reuse its VALUES (sunken background, wrap, the
- * primary/secondary text split) under `/account`'s own class names, which is
- * the copy that costs nothing and keeps both routes independently editable.
+ * **Amended 2026-09-30 by the devices plan (Task 6; owner ruling FD3 = A).** One row per DEVICE, not per
+ * session. The list splits in two: "Active in the last 24 hours" (the current device is ALWAYS there, however
+ * old its stamp), and a collapsed "Signed in, idle (N)" group for the rest, rendered only when opened. The
+ * heading carries the counts - "Sign-in and devices · N signed in · M active" - where N counts devices (not
+ * sessions) and M is the size of the active group, so the heading and the list never disagree.
  *
- * The revoke button uses the shared `Button` component (`variant="danger"`)
- * rather than a bare `<button>`, matching `ProfileSection`'s own use of
- * `Button` on this page.
+ * A row reads "<browser> on <os> · TAG" (the tag tells two identical browsers apart; a pre-cookie "legacy"
+ * group has none and reads "Older sign-in · <label>"), "This device" on the current one, the relative last
+ * activity, "First signed in <date>", and "N sign-ins" when more than one session shares the device. Dates go
+ * through the domain's one IST clock (`formatDate`), never an ISO slice.
+ *
+ * The current device renders no sign-out control at all - not a disabled one - and the server refuses its key
+ * with 409 besides, so a stale page cannot sign the person out. The per-row action is the quiet ghost button;
+ * the prototype's tinted-danger button cannot be built at accessible contrast from this palette (see the
+ * `/account` block in `globals.css`), and a column of solid red buttons would break the one-loud-element rule.
+ * The accessible name carries the row ("Sign out this device — Chrome on Mac · Q2ZA") so repeated buttons stay
+ * addressable.
+ *
+ * The hedged empty state is on purpose: `/account`'s own effect collapses a FAILED read to `[]`, so an empty
+ * list is either "no devices" or "the read did not answer" and this component cannot tell which.
  */
-export function SessionsSection({ sessions, onRevoke, error = null }: SessionsSectionProps) {
+export function SessionsSection({ devices, onSignOutDevice, onSignOutOthers, error = null, now }: SessionsSectionProps) {
+  const [idleOpen, setIdleOpen] = useState(false);
+  const clock = now ?? new Date();
+  const isActive = (d: DeviceSummary): boolean =>
+    d.isCurrent || (d.lastSeenAt !== null && clock.getTime() - Date.parse(d.lastSeenAt) < ACTIVE_WINDOW_MS);
+  const active = devices.filter(isActive);
+  const idle = devices.filter((d) => !isActive(d));
+
+  const row = (d: DeviceSummary) => {
+    const title = titleOf(d);
+    return (
+      <li key={d.key} className="gn-account__session-row">
+        <span className="gn-account__row-text">
+          <span className="gn-account__device-title">{title}</span>
+          <span className="gn-account__row-meta gn-account__device-meta">
+            {d.isCurrent ? <span className="gn-account__device-current">This device</span> : null}
+            {d.lastSeenAt !== null ? <span>{relativeTime(d.lastSeenAt, clock)}</span> : null}
+            <span>{`First signed in ${formatDate(d.firstSignedInAt)}`}</span>
+            {d.sessionCount > 1 ? <span>{`${d.sessionCount} sign-ins`}</span> : null}
+          </span>
+        </span>
+        {!d.isCurrent ? (
+          <Button
+            variant="ghost"
+            aria-label={`Sign out this device — ${title}`}
+            onClick={() => onSignOutDevice(d.key)}
+          >
+            Sign out this device
+          </Button>
+        ) : null}
+      </li>
+    );
+  };
+
   return (
     <section className="gn-account__section gn-account__sessions">
-      <h2 className="gn-account__section-title">Sign-in and devices</h2>
+      <h2 className="gn-account__section-title">
+        {devices.length === 0
+          ? 'Sign-in and devices'
+          : `Sign-in and devices · ${devices.length} signed in · ${active.length} active`}
+      </h2>
       {error !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {error}
         </p>
       ) : null}
-      {sessions.length === 0 ? (
-        // THE WORDING HEDGES ON PURPOSE. `/account`'s own effect collapses a
-        // FAILED read to `[]` (its docblock discloses this), so an empty list
-        // here is either "no sessions" or "the read did not answer" and this
-        // component cannot tell which. "to show" is therefore the honest
-        // claim; "You have no other devices" would assert a fact about the
-        // account that an empty array does not establish. The prototype has
-        // no empty state to port — its rows are always seeded.
+      {devices.length === 0 ? (
         <p className="gn-account__note">No signed-in devices to show.</p>
       ) : (
-        <ul className="gn-account__session-list">
-          {sessions.map((session) => (
-            <li key={session.token} className="gn-account__session-row">
-              <span className="gn-account__row-text">
-                <span>{session.deviceLabel}</span>
-                <span className="gn-account__row-meta">
-                  {session.isCurrent
-                    ? 'This device'
-                    : `Last active ${formatDateTime(session.updatedAt)}`}
-                </span>
-              </span>
-              {!session.isCurrent ? (
-                // SOLID, though the prototype draws this control TINTED. The
-                // tint was built and then removed on a measurement: `danger`
-                // text on `surfaceSunken` is 3.84:1 and on `surfaceRaised`
-                // 4.29:1, both under the 4.5 this 0.9375rem label owes, while
-                // the solid variant's `dangerText on danger` is 5.0511:1 and is
-                // the only one of the three `CONTRAST_PAIRS` actually gates.
-                // The full table is on the `/account` block in `globals.css`.
-                <Button variant="danger" onClick={() => onRevoke(session.token)}>
-                  Sign out
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        <>
+          {active.length > 0 ? (
+            <div className="gn-account__device-group">
+              <h3 className="gn-account__group-title">Active in the last 24 hours</h3>
+              <ul className="gn-account__session-list">{active.map(row)}</ul>
+            </div>
+          ) : null}
+          {idle.length > 0 ? (
+            <div className="gn-account__device-group">
+              <Button
+                variant="ghost"
+                className="gn-account__idle-toggle"
+                aria-expanded={idleOpen}
+                onClick={() => setIdleOpen((open) => !open)}
+              >
+                <span aria-hidden="true" className="gn-account__chevron" data-open={idleOpen} />
+                {`Signed in, idle (${idle.length})`}
+              </Button>
+              {idleOpen ? <ul className="gn-account__session-list">{idle.map(row)}</ul> : null}
+            </div>
+          ) : null}
+          {devices.length > 1 ? (
+            <Button variant="ghost" onClick={onSignOutOthers}>
+              Sign out all other devices
+            </Button>
+          ) : null}
+        </>
       )}
-      {/* Prototype copy, kept because it is TRUE of this product: history is
-          append-only, so revoking a session does not retract what it
-          recorded. */}
+      {/* Prototype copy, kept because it is TRUE of this product: history is append-only, so signing a device
+          out does not retract what it recorded. */}
       <p className="gn-account__note">
-        Signing a device out does not remove what it recorded — those claims stay, attributed to
-        it.
+        Signing a device out does not remove what it recorded — those claims stay, attributed to it.
       </p>
     </section>
   );

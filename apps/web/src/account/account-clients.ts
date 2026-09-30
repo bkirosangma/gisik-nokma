@@ -1,46 +1,22 @@
 import type {
   PasskeyClient,
   PasskeySummary,
+  DeviceSummary,
   SessionsClient,
-  SessionSummary,
 } from '@gisik-nokma/app-core';
 import { authClient } from '../auth-client.js';
 
 /**
- * `authClient.listSessions`/`authClient.revokeSession` — better-auth's core
- * session routes, present without any extra plugin (confirmed in the
- * installed `better-auth@1.7.2` package: `dist/api/routes/session.mjs`
- * declares `listSessions`/`revokeSession` unconditionally, and the client's
- * `PathToObject`/`CamelCase` machinery, `dist/client/path-to-object.d.mts`,
- * maps their server paths `/list-sessions`/`/revoke-session` to exactly
- * these two camelCase client method names — there is no separate
- * `client/index.d.mts` listing to grep for the plan's own check to find,
- * because base-client methods are generated from the server's endpoint map
- * rather than hand-declared).
+ * **Sign-in and devices (devices plan Task 6, 2026-10-01).** The list is read from the server's own
+ * `GET /v1/me/devices` - one row per `gn_device`, with a one-way `key` and a four-character `tag` - and NOT from
+ * `authClient.listSessions`: better-auth's list would carry the raw device id if it were a returned field (plan
+ * FD4), and a session is not the unit a person thinks in. The server sends the user agent; the LABEL
+ * ("Chrome on Mac") is computed here by `deviceLabelOf`, below. Signing ONE other device out is a server route
+ * (`POST /v1/me/devices/:key/sign-out`, scoped to the caller); signing every other device out stays
+ * better-auth's own `revokeOtherSessions`.
  *
- * Two things the plan's assumed shape got wrong, found by reading the
- * installed `.d.mts` rather than trusting the assumption:
- *
- * 1. `listSessions()`'s resolved `data` array items type `createdAt`/
- *    `updatedAt`/`expiresAt` as `Date`, not `string` — the server handler's
- *    own return type flows through to the client type unchanged, and
- *    better-auth's fetch client revives ISO date strings back into real
- *    `Date` instances on the way in (`dist/client/parser.mjs`,
- *    `parseDates: true` by default). `SessionSummary.createdAt`/`updatedAt`
- *    are `string` (this package's own abstract type, matching what
- *    `SessionsSection` hands to `formatDateTime` for display), so `list()`
- *    below calls `.toISOString()` on each. `apps/web/test/account-page.test.tsx`'s
- *    mock of this module constructs real `Date` instances for these fields
- *    for exactly this reason — a mock built from a STRING literal would stop
- *    this conversion from ever running against the shape it actually exists
- *    to convert, the same gap a `Date | string`-accepting version of this
- *    conversion would have left standing on the untested branch.
- * 2. The current session's own token is `authClient.useSession().data
- *    .session.token` (verified against `getSession`'s declared return type,
- *    `{ session: Session, user: User } | null`) — passed into
- *    `createSessionsClient` by the caller (`apps/web/app/account/page.tsx`)
- *    rather than read in here, so this module stays about the two session
- *    routes only.
+ * Moving the list off `/api/auth/*` also spends one fewer unit of the shared `auth:` rate-limit bucket per
+ * `/account` load (see the table in `apps/web/app/account/page.tsx`): `/v1/*` reads are not charged.
  */
 
 /**
@@ -95,27 +71,29 @@ function deviceLabelOf(userAgent: string | null | undefined): string {
   return `${browser} on ${os}`;
 }
 
-export function createSessionsClient(currentToken: string | null): SessionsClient {
+const SIGN_OUT_REFUSED = 'That device could not be signed out. Try again.';
+
+export function createSessionsClient(): SessionsClient {
   return {
-    async list(): Promise<SessionSummary[]> {
-      const result = await authClient.listSessions();
-      return (result.data ?? []).map((session) => ({
-        token: session.token,
-        createdAt: session.createdAt.toISOString(),
-        updatedAt: session.updatedAt.toISOString(),
-        deviceLabel: deviceLabelOf(session.userAgent),
-        isCurrent: session.token === currentToken,
-      }));
+    async list(): Promise<DeviceSummary[]> {
+      const res = await fetch('/v1/me/devices', { credentials: 'include' });
+      // A refused read is an empty list, the silent-omission footing every other `/account` read has.
+      if (!res.ok) return [];
+      const { devices } = (await res.json()) as {
+        devices: Array<Omit<DeviceSummary, 'label'> & { userAgent: string | null }>;
+      };
+      return devices.map(({ userAgent, ...device }) => ({ ...device, label: deviceLabelOf(userAgent) }));
     },
-    async revoke(token: string) {
-      // A refused revoke's `error` is read here and discarded by the caller
-      // (`apps/web/app/account/page.tsx`'s `revokeSession`) — unlike
-      // `ProfileSection`'s save refusal, nothing on screen tells a caller a
-      // "Sign out" click was refused; the list simply fails to shrink.
-      // Disclosed as a named absence in `Features.md`'s bullet rather than
-      // silently decided; a `role="alert"` treatment matching Profile's own
-      // is a small addition if a reviewer wants it.
-      const result = await authClient.revokeSession({ token });
+    async signOutDevice(key: string) {
+      // The refusal is surfaced (ruling E2-24(b)): a 404/409/500 must not leave the list merely failing to shrink.
+      const res = await fetch(`/v1/me/devices/${encodeURIComponent(key)}/sign-out`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return { error: res.ok ? null : SIGN_OUT_REFUSED };
+    },
+    async signOutOthers() {
+      const result = await authClient.revokeOtherSessions();
       return { error: result.error?.message ?? null };
     },
   };

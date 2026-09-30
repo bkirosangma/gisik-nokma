@@ -113,6 +113,13 @@ initial — and choose **Sign out**. Signing out really does end it — the next
 device is refused immediately, not "at some point later". That matters if you have signed in on somebody
 else's laptop.
 
+To see where else you are signed in, open **Account** and look under **Sign-in and devices**. Each
+browser you have signed in on is one row — for example "Chrome on Mac" with a short four-letter code, so
+two identical browsers can be told apart — with when it was last active and when you first signed in
+there. The ones used in the last 24 hours are listed first; the rest wait under **Signed in, idle**, which
+you can open. **Sign out this device** ends that one; **Sign out all other devices** ends every one except
+the one you are using. The device you are using cannot be signed out from here — use the account menu.
+
 ---
 
 ## §2 — Finding your way around
