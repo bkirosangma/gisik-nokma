@@ -123,13 +123,18 @@ the number you added.
 - ✅ **20.232 — no shell rule paints a flat boundary or the retired accent constant, and neo's pressed current item is still declared;** control: `stillDeclared` finds the neo rule. Mutation: restore `background: var(--gn-fill-tertiary); color: var(--gn-text-accent)` on the current item.
 - ✅ **20.233 — under `neo` a current nav `<button>` is pressed in exactly like a current `<a>`: the `sunken` ground and the `sunken` shadow are the declarations that WIN the cascade for `[data-style="neo"] .gn-nav button[aria-current='page']` (the base current-item rule raises `a` and `button` alike, so a neo rule for `a` alone left the account menu's current item raised);** control: the same probe reads `surface-raised` / `lift` where neo is not in play and `sunken` for a neo `<a>`. Mutation: delete the `button` selector from the neo rule (deleting, not adding: a declaration added before the real one is a no-op, the last one wins).
 
-## 20.32 Plan B — members and invitations
-
-- ✅ **20.311 — the members table is a raised panel with a recessed header band; Send invitation is the screen's one loud element (the shared primary);** control: the zebra rows keep their `fill-quaternary`. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-members__th`.
-- ✅ **20.312 — no members or invite rule paints a flat boundary or the retired constant;** control: the scan reads more than 15 member rules. Mutation: plant the retired constant into `.gn-members`.
-
 ## 20.25 Plan B — the project page's chrome
 
 - ✅ **20.241 — the project header's groups are 16px apart; the contested-claim banner is a recessed well keeping its contested edge; the saved-filter rename field is recessed like every field; the sync notice's Dismiss is a quiet outlined control;** control: the filter chip's remove control keeps its 24px in-list floor. Mutation: restore `border-radius: 6px` on `.gn-sync-notices__dismiss`.
 - ✅ **20.242 — no project-chrome rule (`gn-project`, `gn-filters`, `gn-saved-filters`, `gn-contest-banner`, `gn-sync-`) paints a flat boundary or the retired constant;** control: the scan reads more than 40 rules under those prefixes. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-contest-banner`.
 
+## 20.32 Plan B — members and invitations
+
+- ✅ **20.311 — the members table is a raised panel with a recessed header band; Send invitation is the screen's one loud element (the shared primary);** control: the zebra rows keep their `fill-quaternary`. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-members__th`.
+- ✅ **20.312 — no members or invite rule paints a flat boundary or the retired constant;** control: the scan reads more than 15 member rules. Mutation: plant the retired constant into `.gn-members`.
+
+## 20.33 Plan B — the workspace home and the door-card hover
+
+- ✅ **20.321 — every card-shaped door (workspace card, project card, the home's section cards) answers hover with the deeper `lift-near` shadow above its neighbours and press with `lift-press` in the feedback time — SHADOW ONLY, no scale (owner ruling 2026-09-29) — one vocabulary replacing Round 21's brightness pair, with no per-theme arm, each card's transition naming `box-shadow` alone;** control: no rule anywhere in `globals.css` still declares `filter: brightness(` on a card door (the Archive button's brightness rules are gone too). Mutation: restore `filter: brightness(0.97)` on the door hover rule.
+- ✅ **20.322 — no door-card rule transforms or filters anything (every rule whose selector names `.gn-workspace-card`, `.gn-project-card`, either card's `__door`, or `.gn-workspace-home__link` declares neither `transform` nor `filter`, other than `none`), so the Delete dialog their overflow menu opens is never inside a containing block, and no guard or reduced-motion arm is needed (Plan A D21, retired);** control: the scan covers at least the six hover/press/rest rules this task writes. Mutation: put `transform: scale(1.025)` back on the project card's hover rule.
+- ✅ **20.323 — the workspace home's section cards and the project-founding panel rest on the raised `lift` shadow;** control: `.gn-project-card` keeps `position: relative` (its door's `::after` hit area depends on it). Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-project-founding`.
