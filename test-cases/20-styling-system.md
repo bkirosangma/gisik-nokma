@@ -48,3 +48,9 @@ the number you added.
 
 - ✅ **20.031 — every `Card` rests on the `lift` shadow (lit top edge, shadow falling down) instead of the one-layer `raised`, so every static panel in the product takes rule 04 at once — neo unchanged, since neo's `lift` IS its `raised` (20.013);** control: no rule anywhere names `.gn-card:hover` or `.gn-card:active` (a Card is never itself interactive, `card.tsx:5`). Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-card`.
 - ✅ **20.032 — a `Dialog` panel floats on the `lift-near` shadow with the `track` radius (24/28), since it sits above a scrim;** control: the sheet's own rule is untouched by this task (Task 7 owns it). Mutation: remove the `box-shadow` from `.gn-dialog`.
+
+## 20.21 Plan B — inventory and roster
+
+- ✅ **20.201 — every `page.tsx` under `apps/web/app` has a named styling owner (a Plan A or Plan B task), so a route added later without one fails this test rather than shipping unstyled;** control: a planted extra route is reported by `unownedRoutes`, and a planted owner with no route is reported as stale. Mutation: delete `apps/web/app/inbox/page.tsx`'s entry from `SCREEN_OWNERS`.
+- ✅ **20.202 — the roster helper reads a pattern exactly: a planted rule carrying every P-TRACK declaration passes, and the same rule missing one declaration fails naming that property;** control: `expectRow` throws on a selector list that matches no rule. Mutation: make `expectRow` skip the `box-shadow` key.
+- ✅ **20.203 — the flat-boundary scanner finds a `surface-sunken` background and the retired `fill-tertiary` + `text-accent` control constant among rules naming a prefix, ignores comments, and honours the kept list;** control: a rule under an unrelated prefix is not reported. Mutation: drop the `text-accent` half of the constant check.
