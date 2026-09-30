@@ -66,7 +66,45 @@ export type RosterRow = {
   /** Declarations beyond (or instead of) the pattern's — a row the plan's table spells out. */
   declarations?: Record<string, string>;
   atRule?: string;
+  /**
+   * `P-QUIET` / `P-GHOST` rows are also checked for their COMPANION hover rule
+   * (`HOVER_COMPANIONS`). A row skips it only by naming a reason:
+   * `hover: 'none: <why>'`, so an opt-out is visible in the roster.
+   */
+  hover?: string;
 };
+
+/**
+ * The "And" column of the Pattern table for the two patterns that have one.
+ * `${s}` is one of the row's selectors; each rule is `selectors` (a list, in
+ * order) → declarations.
+ */
+const HOVER_COMPANIONS: Partial<Record<PatternName, ReadonlyArray<{ selectors: (s: string) => string[]; declarations: Record<string, string> }>>> = {
+  'P-QUIET': [{ selectors: (s) => [`${s}:hover:not(:disabled)`], declarations: { background: 'var(--gn-fill-quaternary)' } }],
+  'P-GHOST': [
+    {
+      selectors: (s) => [`${s}:hover:not(:disabled)`, `${s}:focus-visible`],
+      declarations: { background: 'var(--gn-fill-tertiary)', color: 'var(--gn-text-muted)' },
+    },
+    { selectors: (s) => [`${s}:focus-visible`], declarations: { outline: '2px solid var(--gn-focus-ring)', 'outline-offset': '0' } },
+  ],
+};
+
+function expectHoverCompanion(row: RosterRow, css: string): void {
+  const companions = row.pattern === undefined ? undefined : HOVER_COMPANIONS[row.pattern];
+  if (companions === undefined) return;
+  if (row.hover !== undefined) {
+    if (!/^none: \S/.test(row.hover)) throw new Error(`row ${String(row.selectors)}: an opt-out must read 'none: <reason>', got '${row.hover}'`);
+    return;
+  }
+  const bases = typeof row.selectors === 'string' ? [row.selectors] : row.selectors;
+  for (const companion of companions) {
+    const body = ruleExactly(css, bases.flatMap((base) => companion.selectors(base)), row.atRule ?? null);
+    for (const [property, value] of Object.entries(companion.declarations)) {
+      expect(valueOf(body, property), `${String(row.selectors)} (${row.pattern} hover companion): ${property}`).toBe(value);
+    }
+  }
+}
 
 export function cssOf(sheet: 'ui' | 'globals'): string {
   return sheet === 'ui' ? readUiCss() : readGlobalsCss();
@@ -79,6 +117,7 @@ export function expectRow(row: RosterRow, css: string = cssOf(row.sheet)): void 
   for (const [property, value] of Object.entries(expected)) {
     expect(valueOf(body, property), `${String(row.selectors)} (${row.pattern ?? 'custom'}): ${property}`).toBe(value);
   }
+  expectHoverCompanion(row, css);
 }
 
 /**
