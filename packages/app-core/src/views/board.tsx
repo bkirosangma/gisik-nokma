@@ -27,6 +27,7 @@ import type {
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { arrowTargets } from './board-arrows.js';
+import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
 import {
   NO_COLLAPSE_CHOICES,
@@ -359,6 +360,17 @@ export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column — epics appe
  * payload genuinely is nothing more than the ticket id as text.
  */
 export const DRAG_TICKET_FORMAT = 'text/plain';
+
+/**
+ * A second, card-only `dataTransfer` type (styling refresh Plan A Task 5A).
+ * `DRAG_TICKET_FORMAT` is `'text/plain'`, and any text selection dragged across
+ * the page carries `text/plain` too. During `dragenter` a page can read a
+ * drag's `types` but not its data, so the column highlight cannot ask "is this
+ * a ticket id?" — it keys on this marker instead, which `dragstart` sets with
+ * an empty value. The drop still reads the ticket id from
+ * `DRAG_TICKET_FORMAT`, exactly as before.
+ */
+export const DRAG_CARD_MARKER = 'application/x-gisik-card';
 
 /**
  * Ticket id → the exact `attemptMove` closure that card's own `MoveArrows`
@@ -925,9 +937,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
  * the plain read-only board and `BoardGroupWithMoves` below. `arrows` is the
  * ONLY axis of difference between the two paths: precomputed by the caller
  * as `(card, fromStateId) => ReactNode`, or `null` when no move capability
- * is wired, so this component itself stays hook-free and renders identically
- * either way except for what `arrows` hands back per card.
+ * is wired, so it renders identically either way except for what `arrows` hands
+ * back per card. (It holds one piece of view state, the column being dragged
+ * over — Task 5A — which is inert without `onDropCard`.)
  */
+/** True when a drag carries a board card (the marker `dragstart` sets), not merely `text/plain`. */
+function isCardDrag(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer.types ?? []).includes(DRAG_CARD_MARKER);
+}
+
 function BoardGroupSection({
   group,
   expanded,
@@ -942,10 +960,9 @@ function BoardGroupSection({
   group: BoardGroup;
   /**
    * Whether this group's columns are on screen. OWNED BY `Board` and threaded
-   * through unchanged — this component stays hook-free (`BoardGroupSection`
-   * vs. `BoardGroupWithMoves`'s own docblock), so the state cannot live here,
-   * and it must not: the default depends on emptiness, and the two paths below
-   * would then each have to derive it.
+   * through unchanged — the state does not live here, and must not: the
+   * default depends on emptiness, and the two paths below would then each have
+   * to derive it.
    */
   expanded: boolean;
   /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
@@ -957,8 +974,7 @@ function BoardGroupSection({
    * Board-prototype-port Task 14. `null` on the plain, `moves`-less path —
    * the SAME "capability absent, not a dead stub" precedent `arrows` itself
    * already sets immediately above. Non-null, a column becomes a real drop
-   * target: `BoardGroupSection` itself stays hook-free (`BoardGroupSection`
-   * vs. `BoardGroupWithMoves`'s own docblock) and knows nothing about
+   * target: `BoardGroupSection` knows nothing about
    * `moveOutcome` or the registry — it only has somewhere to hand the event
    * and a `toStateId`, mirroring exactly how it already treats `arrows`.
    */
@@ -979,6 +995,15 @@ function BoardGroupSection({
   /** `Board`'s own `today`, threaded through unchanged — see its prop docblock. */
   today?: string;
 }) {
+  /**
+   * The column being dragged over (Task 5A, plan D25) — a board drop changes
+   * state, it does not reorder, so the column is OUTLINED rather than given a
+   * placeholder at an index it would not honour. `dragleave` fires whenever the
+   * pointer moves onto a child, so entering is counted per column and the
+   * highlight clears only when the count returns to zero.
+   */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const depthRef = useRef(new Map<string, number>());
   /**
    * The rail's id, which the heading's button points at with `aria-controls`.
    * Built from the group's own identity rather than from an index, so a
@@ -1054,7 +1079,17 @@ function BoardGroupSection({
         the columns, their per-column empty copy and their `Add a ticket` with
         it (`13.1409`).
       */}
-      <div className="gn-board__rail" id={railId} hidden={!expanded}>
+      <div
+        className="gn-board__rail"
+        id={railId}
+        hidden={!expanded}
+        // A card's `dragend` bubbles here from its slot: that covers Esc and a
+        // drop outside every column, neither of which fires `drop`.
+        onDragEnd={() => {
+          depthRef.current.clear();
+          setDropTarget(null);
+        }}
+      >
         {group.columns.map((column) => (
           <section
             key={column.stateId}
@@ -1062,7 +1097,8 @@ function BoardGroupSection({
             aria-label={column.name}
             data-testid={`board-column-${column.stateId}`}
             className={
-              column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column'
+              (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
+              (column.stateId === dropTarget ? ' gn-board__column--drop-target' : '')
             }
             /*
              * Board-prototype-port Task 14. `preventDefault()` on
@@ -1073,7 +1109,38 @@ function BoardGroupSection({
              * itself uses immediately below.
              */
             onDragOver={onDropCard === null ? undefined : (event) => event.preventDefault()}
-            onDrop={onDropCard === null ? undefined : (event) => onDropCard(event, column.stateId)}
+            onDragEnter={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    if (!isCardDrag(event)) return;
+                    depthRef.current.set(column.stateId, (depthRef.current.get(column.stateId) ?? 0) + 1);
+                    setDropTarget(column.stateId);
+                  }
+            }
+            onDragLeave={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    if (!isCardDrag(event)) return;
+                    const depth = (depthRef.current.get(column.stateId) ?? 0) - 1;
+                    if (depth > 0) {
+                      depthRef.current.set(column.stateId, depth);
+                      return;
+                    }
+                    depthRef.current.delete(column.stateId);
+                    setDropTarget((current) => (current === column.stateId ? null : current));
+                  }
+            }
+            onDrop={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    depthRef.current.delete(column.stateId);
+                    setDropTarget(null);
+                    onDropCard(event, column.stateId);
+                  }
+            }
           >
             <header className="gn-board__column-header">
               <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
@@ -1437,9 +1504,12 @@ function BoardCardSlot({
   today?: string;
 }) {
   const draggedRef = useRef(false);
+  // The placeholder (Task 5A): the source slot, one frame after `dragstart`.
+  const [placeholder, setPlaceholder] = useState(false);
+  const frameRef = useRef<number | null>(null);
   return (
     <li
-      className="gn-board__card-slot"
+      className={placeholder ? 'gn-board__card-slot gn-board__card-slot--placeholder' : 'gn-board__card-slot'}
       data-testid={`ticket-card-${card.ticketId}`}
       draggable={arrows !== null}
       onDragStart={
@@ -1449,6 +1519,26 @@ function BoardCardSlot({
               draggedRef.current = true;
               event.dataTransfer.setData(DRAG_TICKET_FORMAT, card.ticketId);
               event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData(DRAG_CARD_MARKER, '');
+              const cardElement = event.currentTarget.firstElementChild;
+              if (cardElement instanceof HTMLElement) setCardDragImage(event, cardElement);
+              // One frame later, NOT now: restyling the source synchronously would put the
+              // hidden card into the browser's snapshot (Chromium can cancel the drag).
+              frameRef.current = requestAnimationFrame(() => {
+                frameRef.current = null;
+                setPlaceholder(true);
+              });
+            }
+      }
+      // Fires on a drop, on Esc and on a refused drop. `draggedRef` is NOT touched
+      // here: it is cleared on the next `mousedown`, never on `dragend` (docblock above).
+      onDragEnd={
+        arrows === null
+          ? undefined
+          : () => {
+              if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+              frameRef.current = null;
+              setPlaceholder(false);
             }
       }
       onMouseDown={() => {

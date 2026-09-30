@@ -1377,6 +1377,46 @@ a.gn-ticket-sheet__crumb--link {
   box-shadow: var(--gn-shadow-lift-press);
   transition-duration: var(--gn-motion-feedback);
 }
+/* THE DRAG LIFT (owner ruling 2026-09-29: the full lift toward the user —
+   scale 1.03, a deeper spreading shadow, a 2.5° tilt — happens ONLY while a
+   card is dragged). Painted on the detached drag-image clone
+   (`board-drag-image.ts`), because a native drag moves a browser snapshot and
+   CSS on the source never follows the pointer (plan D26). The wrapper sits
+   off-screen and pads the clone so the shadow's 40px/64px fall is inside the
+   snapshot rather than clipped at the card's edge. The clone is never an
+   ancestor of a dialog, so its transform needs no guard (D21, retired). */
+.gn-board-drag-image {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  padding: 1.5rem 3rem 5.5rem;
+  pointer-events: none;
+}
+.gn-board-drag-image > .gn-board-card {
+  transform: rotate(2.5deg) scale(1.03);
+  box-shadow: var(--gn-shadow-lift-drag);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-board-drag-image > .gn-board-card { transform: none; }
+}
+/* THE PLACEHOLDER (owner ruling 2026-09-29: "sized to the dragged card, no
+   layout jump"). The source slot stays in place with its box untouched — no
+   height, padding, margin or border here — its card hidden and a recessed,
+   dashed outline drawn in the card's shape. The dashed `border` grey clears
+   3:1, so the outline still reads where minimal draws no shadow. */
+.gn-board__card-slot--placeholder {
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-card);
+  outline: 1px dashed var(--gn-border);
+  outline-offset: -1px;
+}
+.gn-board__card-slot--placeholder > .gn-board-card { visibility: hidden; }
+/* THE DROP TARGET (plan D25): a board drop changes state, it does not
+   reorder, so the column is outlined rather than given a placeholder at an
+   index it would not honour. Inside the edge so the rail does not shift.
+   The accent — rule 03's one accent, saved for the action; this is it. */
+.gn-board__column--drop-target { outline: 2px solid var(--gn-accent); outline-offset: -2px; }
 .gn-board-card__title {
   font: inherit;
   font-weight: 600;

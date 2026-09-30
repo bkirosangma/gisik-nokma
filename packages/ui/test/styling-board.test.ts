@@ -112,3 +112,45 @@ describe('20.046 the column header and the rail sit on the 8pt grid', () => {
     expect(rulesNaming(CSS, '.gn-board__column-header')).toHaveLength(1);
   });
 });
+
+describe('20.103 the drag clone is tilted and lifted', () => {
+  it('20.103 rotate + scale + lift-drag, padded off-screen wrapper, reduced motion drops the transform', () => {
+    const clone = ruleExactly(CSS, DRAG_CLONE);
+    expect(valueOf(clone, 'transform')).toBe('rotate(2.5deg) scale(1.03)');
+    expect(valueOf(clone, 'box-shadow')).toBe('var(--gn-shadow-lift-drag)');
+    const wrapper = ruleExactly(CSS, '.gn-board-drag-image');
+    expect(valueOf(wrapper, 'position')).toBe('fixed');
+    expect(valueOf(wrapper, 'top')).toBe('-10000px');
+    expect(valueOf(wrapper, 'left')).toBe('-10000px');
+    expect(valueOf(wrapper, 'padding')).toBe('1.5rem 3rem 5.5rem');
+    expect(valueOf(wrapper, 'pointer-events')).toBe('none');
+    const reduced = ruleExactly(CSS, DRAG_CLONE, REDUCE);
+    expect(valueOf(reduced, 'transform')).toBe('none');
+    // CONTROL — reduced motion keeps the shadow: it restates no box-shadow.
+    expect(valueOf(reduced, 'box-shadow')).toBeNull();
+  });
+});
+
+describe('20.104 the placeholder keeps the card box', () => {
+  it('20.104 hidden card, recessed outline, no box-changing declaration', () => {
+    const slot = ruleExactly(CSS, '.gn-board__card-slot--placeholder');
+    expect(valueOf(slot, 'background')).toBe('var(--gn-surface-track)');
+    expect(valueOf(slot, 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(slot, 'border-radius')).toBe('var(--gn-radius-card)');
+    expect(valueOf(slot, 'outline')).toBe('1px dashed var(--gn-border)');
+    expect(valueOf(slot, 'outline-offset')).toBe('-1px');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot--placeholder > .gn-board-card'), 'visibility')).toBe('hidden');
+    // CONTROL — nothing that changes the box.
+    for (const property of ['height', 'min-height', 'padding', 'margin', 'border']) {
+      expect(valueOf(slot, property), property).toBeNull();
+    }
+  });
+});
+
+describe('20.105 the drop target is an outline, inside the edge', () => {
+  it('20.105 accent outline, negative offset', () => {
+    const target = ruleExactly(CSS, '.gn-board__column--drop-target');
+    expect(valueOf(target, 'outline')).toBe('2px solid var(--gn-accent)');
+    expect(valueOf(target, 'outline-offset')).toBe('-2px');
+  });
+});
