@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HELP_CONTENT } from '@gisik-nokma/app-core';
 import McpTokensPage from '../app/mcp/tokens/page.js';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -470,7 +471,13 @@ describe('14.276 the Connect an assistant panel', () => {
     await user.click(screen.getByTestId('mcp-public-url-copy'));
     expect(writeText).toHaveBeenCalledWith('https://pm-api.artsourced.in/mcp');
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'How to connect' })).toHaveAttribute('href', '/help#connecting-claude-or-chatgpt');
+    // The href is DERIVED from the generated manual, the way the Help browser builds a section's
+    // DOM id (`${document.id}-${section.id}`), so the link and the section cannot drift apart (14.282).
+    const manual = HELP_CONTENT.find((doc) => doc.id === 'manual');
+    const section = manual?.sections.find((s) => s.title.startsWith('Connecting Claude or ChatGPT') || s.id === '16-connecting-claude-or-chatgpt');
+    expect(section?.id).toBe('16-connecting-claude-or-chatgpt');
+    expect(screen.getByRole('link', { name: 'How to connect' }).getAttribute('href')).toBe(`/help#manual-${section?.id}`);
+    expect(`/help#manual-${section?.id}`).toBe('/help#manual-16-connecting-claude-or-chatgpt'); // the literal, pinned once
     expect(screen.getByRole('heading', { name: 'Connect an assistant' })).toBeInTheDocument();
   });
 

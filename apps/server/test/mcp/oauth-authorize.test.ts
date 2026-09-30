@@ -4,6 +4,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { buildOAuthApp, pkcePair } from '../helpers/oauth.js';
 import { TEST_WEB_ORIGIN } from '../helpers/app.js';
+import type { SecurityOptions } from '../../src/app.js';
 
 let db: TestDatabase;
 beforeAll(async () => { db = await createTestDatabase(); });
@@ -11,8 +12,8 @@ afterAll(async () => { await db.drop(); });
 
 const CB = 'https://claude.ai/api/mcp/auth_callback';
 
-async function client(app: FastifyInstance, uris = [CB]) {
-  return (await app.inject({ method: 'POST', url: '/oauth/register', payload: { client_name: 'Claude', redirect_uris: uris } })).json().client_id as string;
+async function client(app: FastifyInstance, uris = [CB], ip?: string) {
+  return (await app.inject({ method: 'POST', url: '/oauth/register', payload: { client_name: 'Claude', redirect_uris: uris }, ...(ip ? { headers: { 'x-forwarded-for': ip } } : {}) })).json().client_id as string;
 }
 function authorizeUrl(q: Record<string, string | undefined>) {
   const base: Record<string, string | undefined> = { response_type: 'code', code_challenge_method: 'S256', scope: 'gisik:act', ...q };
@@ -221,5 +222,26 @@ describe('authorize and the consent API', () => {
     const d2 = await decide(first.app, r2.requestId, u.token, true);
     const c2 = new URL(d2.json().redirectTo).searchParams.get('code')!;
     expect((await exchange(first.app, r2.clientId, c2, r2.verifier)).statusCode).toBe(200);
+  });
+});
+
+describe('the authorize door is rate limited', () => {
+  it('14.258 /oauth/authorize is charged to the MCP rate-limit bucket (it writes a pending row per call)', async () => {
+    const security: SecurityOptions = {
+      webOrigin: null,
+      trustProxy: true,
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 2, signInMax: 100, windowSec: 60 },
+    };
+    const { app } = buildOAuthApp(db, { security });
+    const id = await client(app, [CB], '203.0.113.9');
+    const { challenge } = pkcePair();
+    const go = (ip: string) =>
+      app.inject({ method: 'GET', url: authorizeUrl({ client_id: id, redirect_uri: CB, code_challenge: challenge }), headers: { 'x-forwarded-for': ip } });
+    const before = await pendingCount();
+    expect((await go('198.51.100.1')).statusCode).toBe(302);
+    expect((await go('198.51.100.1')).statusCode).toBe(302);
+    expect((await go('198.51.100.1')).statusCode).toBe(429);
+    expect(await pendingCount()).toBe(before + 2); // the refused call wrote nothing
+    expect((await go('198.51.100.2')).statusCode).toBe(302); // CONTROL — another client key
   });
 });

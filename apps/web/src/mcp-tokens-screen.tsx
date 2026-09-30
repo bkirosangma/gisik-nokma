@@ -526,7 +526,7 @@ export function McpTokensScreen({
                   <Button data-testid="mcp-public-url-copy" onClick={copyUrl}>
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
-                  <Link href="/help#connecting-claude-or-chatgpt">How to connect</Link>
+                  <Link href="/help#manual-16-connecting-claude-or-chatgpt">How to connect</Link>
                 </div>
               </section>
             )}

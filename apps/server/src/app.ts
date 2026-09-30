@@ -668,15 +668,18 @@ export function buildApp(
         // one bounds the door, which is what a limiter is for.
         verdict = inviteLimiter.check(`invite:${clientKey}`, now());
       } else if (
-        method === 'POST' &&
+        (method === 'GET' && routeUrl === '/oauth/authorize') ||
+        (method === 'POST' &&
         (routeUrl === '/v1/mcp/device/code' ||
           routeUrl === '/v1/mcp/device/approve' ||
           routeUrl === '/v1/mcp/device/token' ||
           // The hosted door's public endpoints (register, token, revoke): open to
           // anyone, so they share the device flow's bucket rather than having none.
+          // `GET /oauth/authorize` is charged too (the first clause above): it is
+          // unauthenticated and writes a pending-consent row per call.
           routeUrl === '/oauth/register' ||
           routeUrl === '/oauth/token' ||
-          routeUrl === '/oauth/revoke')
+          routeUrl === '/oauth/revoke'))
       ) {
         // The device flow's own bucket. Without this branch a route under
         // `/v1/mcp/...` matches NO bucket at all, which would leave the
