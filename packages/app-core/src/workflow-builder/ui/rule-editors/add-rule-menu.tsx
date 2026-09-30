@@ -54,6 +54,7 @@ export function AddRuleMenu(props: { transitionIndex: number }) {
               <button
                 type="button"
                 role="menuitem"
+                className="add-rule-menu__item"
                 onClick={() => {
                   store.actions.addRule(props.transitionIndex, defaultRuleFor(entry.kind, draft.def));
                   setOpen(false);

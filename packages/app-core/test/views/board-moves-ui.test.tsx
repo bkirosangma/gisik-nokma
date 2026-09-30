@@ -250,10 +250,12 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
     render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
     await settled();
 
-    const moveButton = screen.getByRole('button', { name: 'Move to Doing' });
-    await user.click(moveButton);
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveClass('gn-refusal--server'));
 
+    // The refused card was drawn in Doing while the write was open, then glided back: it is a NEW element,
+    // so the button is looked up again rather than clicked through a stale reference to the detached one.
+    const moveButton = screen.getByRole('button', { name: 'Move to Doing' });
     await user.click(moveButton);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveClass('gn-refusal--transport'));
     const alert = screen.getByRole('alert');

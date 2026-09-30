@@ -860,6 +860,44 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
+/* ── Sign-in and devices, one row per device (devices plan Task 6, 2026-10-01) ─
+   The card keeps its raised panel and the row its 44px / transparent / gap-separated shape above. What this adds:
+   two groups (owner ruling FD3 = A) - "Active in the last 24 hours" as a quiet group title over its list, and the
+   collapsed "Signed in, idle (N)" toggle, the ghost button with the same border-drawn chevron the workflow panels
+   use (`.builder-row__chevron`, rotated when open). The device row is ONE bold line (the label and its tag) over a
+   wrapping meta line: "This device" (the one accent on the row - layout rule 03), the relative activity, "First
+   signed in" and the sign-in count. The per-row action is the quiet ghost `Button`, never a column of solid red ones. */
+.gn-account__device-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.gn-account__group-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+}
+.gn-account__device-title { font-weight: 600; }
+.gn-account__device-meta { display: flex; flex-wrap: wrap; column-gap: 0.75rem; row-gap: 0; }
+.gn-account__device-current { font-weight: 600; color: var(--gn-text-accent); }
+.gn-account__idle-toggle { justify-content: flex-start; }
+.gn-account__chevron {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--gn-text-muted);
+  border-bottom: 2px solid var(--gn-text-muted);
+  transform: rotate(-45deg);
+}
+.gn-account__chevron[data-open="true"] { transform: rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .gn-account__chevron { transition: transform 150ms ease-out; }
+}
+
 /* ── Notifications — the switch MOVED OUT of this file (2026-09-18). ───────
    These were FIVE rule bodies plus a reduced-motion arm — the base track, the
    `::after` knob, `:checked`, `:checked::after` and `:focus-visible`, all scoped

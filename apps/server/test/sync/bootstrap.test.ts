@@ -511,6 +511,10 @@ describe('GET /v1/sync/bootstrap', () => {
     // reproducing here — cast the replacement rather than fight the type.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (db.pool as any).connect = async (...args: unknown[]) => {
+      // `pool.query` (e.g. requireSession's throttled lastSeenAt stamp) reaches `connect` in the CALLBACK form,
+      // whose result is undefined; pass it through untouched and record only the promise-form connections.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (typeof args[args.length - 1] === 'function') return (originalConnect as any)(...args);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = await (originalConnect as any)(...args);
       const originalQuery = client.query.bind(client);
@@ -730,6 +734,10 @@ describe('GET /v1/sync/bootstrap', () => {
     const queries: string[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (db.pool as any).connect = async (...args: unknown[]) => {
+      // `pool.query` (e.g. requireSession's throttled lastSeenAt stamp) reaches `connect` in the CALLBACK form,
+      // whose result is undefined; pass it through untouched and record only the promise-form connections.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (typeof args[args.length - 1] === 'function') return (originalConnect as any)(...args);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = await (originalConnect as any)(...args);
       const originalQuery = client.query.bind(client);

@@ -9,6 +9,7 @@ import { makeRequireSession } from '../../src/auth/require-session.js';
 import { registerAuthRoutes } from '../../src/auth/routes.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
+import { approveDeviceCode, exchangeDeviceCode, mintDeviceCode } from '../../src/mcp/token-store.js';
 
 /** Long enough that better-auth does not warn, and obviously not a credential. */
 const TEST_SECRET = 'test-secret-not-used-anywhere-real';
@@ -222,5 +223,112 @@ describe('requireSession', () => {
     const response = await app.inject({ method: 'GET', url: '/protected' });
     expect(response.statusCode).toBe(401);
     expect(patLookups).toEqual([]);
+  });
+});
+
+/**
+ * Cases 6.307-6.310 - `lastSeenAt` and `currentSessionId` (devices plan Task 2, 2026-10-01). A second bare app
+ * over the REAL pool (the stub above answers every query with no rows), with an injected clock.
+ */
+describe('devices plan: lastSeenAt and currentSessionId', () => {
+  let clock = new Date('2026-10-01T00:00:00Z');
+  let stampApp: FastifyInstance;
+  let failingApp: FastifyInstance;
+  let stampOtp: LogOtpSender;
+  let failOtp: LogOtpSender;
+  const PROBE = '/probe';
+
+  function buildApp(database: Queryable, sender: LogOtpSender): FastifyInstance {
+    const auth = createAuth({
+      pool: db.pool,
+      otpSender: sender,
+      magicLinkSender: new LogMagicLinkSender(() => {}),
+      baseUrl: BASE_URL,
+      secret: TEST_SECRET,
+      webOrigin: 'http://localhost:3001',
+    });
+    const built = Fastify();
+    registerAuthRoutes(built, auth);
+    built.get(PROBE, { preHandler: makeRequireSession(auth, database, () => clock) }, async (request) => ({
+      userId: request.currentUserId,
+      sessionId: request.currentSessionId,
+      authKind: request.authKind,
+    }));
+    return built;
+  }
+
+  beforeAll(async () => {
+    stampOtp = new LogOtpSender(() => {});
+    failOtp = new LogOtpSender(() => {});
+    stampApp = buildApp(db.pool, stampOtp);
+    // Every query passes through EXCEPT the lastSeenAt stamp, which throws.
+    const failing = {
+      query: (text: string, values?: unknown[]) =>
+        /UPDATE session SET "lastSeenAt"/.test(text) ? Promise.reject(new Error('stamp down')) : db.pool.query(text, values),
+    } as unknown as Queryable;
+    failingApp = buildApp(failing, failOtp);
+    await stampApp.ready();
+    await failingApp.ready();
+  });
+  afterAll(async () => {
+    await stampApp.close();
+    await failingApp.close();
+  });
+
+  const sessionIdOf = async (token: string): Promise<string> => {
+    // The bearer token is `<session token>.<signature>`; the row is keyed on the first part.
+    const r = await db.pool.query(`SELECT id FROM session WHERE token = $1`, [token.split('.')[0]]);
+    return r.rows[0].id as string;
+  };
+  const lastSeen = async (sessionId: string): Promise<Date | null> => {
+    const r = await db.pool.query(`SELECT "lastSeenAt" FROM session WHERE id = $1`, [sessionId]);
+    return r.rows[0].lastSeenAt as Date | null;
+  };
+  const hit = (target: FastifyInstance, token: string) =>
+    target.inject({ method: 'GET', url: PROBE, headers: { authorization: `Bearer ${token}` } });
+
+  it('6.307 null -> stamped; 4m59s later -> unchanged; 6.308 exactly 5m -> restamped (both sides of the boundary)', async () => {
+    const { token } = await signInWithPhone(stampApp, stampOtp, '+919000000307');
+    const sid = await sessionIdOf(token);
+    // CONTROL - a fresh session has never been stamped.
+    expect(await lastSeen(sid)).toBeNull();
+
+    clock = new Date('2026-10-01T00:00:00Z');
+    expect((await hit(stampApp, token)).statusCode).toBe(200);
+    expect(await lastSeen(sid)).toEqual(clock);
+    const first = clock;
+
+    clock = new Date(first.getTime() + 299_000); // 4 m 59 s: inside the throttle, nothing written
+    expect((await hit(stampApp, token)).statusCode).toBe(200);
+    expect(await lastSeen(sid)).toEqual(first);
+
+    clock = new Date(first.getTime() + 300_000); // exactly 5 m: the next request stamps (6.308)
+    expect((await hit(stampApp, token)).statusCode).toBe(200);
+    expect(await lastSeen(sid)).toEqual(clock);
+  });
+
+  it('6.309 currentSessionId is the session row id for a session request, null for an MCP token; currentUserId unchanged in both', async () => {
+    const { token, userId } = await signInWithPhone(stampApp, stampOtp, '+919000000309');
+    const sid = await sessionIdOf(token);
+    const viaSession = (await hit(stampApp, token)).json() as { userId: string; sessionId: string | null; authKind: string };
+    expect(viaSession).toEqual({ userId, sessionId: sid, authKind: 'session' });
+
+    const grant = await mintDeviceCode(db.pool, clock);
+    expect(await approveDeviceCode(db.pool, grant.userCode, userId, clock)).toBe('approved');
+    const exchanged = await exchangeDeviceCode(db.pool, grant.deviceCode, clock);
+    if (exchanged.status !== 'issued') throw new Error(`exchange did not issue a token: ${exchanged.status}`);
+    const viaToken = (await hit(stampApp, exchanged.token)).json() as { userId: string; sessionId: string | null; authKind: string };
+    expect(viaToken).toEqual({ userId, sessionId: null, authKind: 'mcp-token' });
+  });
+
+  it('6.310 a failing stamp is swallowed: the request still answers 200; control: the same request through the working app stamped', async () => {
+    const { token } = await signInWithPhone(failingApp, failOtp, '+919000000310');
+    const sid = await sessionIdOf(token);
+    clock = new Date('2026-10-01T06:00:00Z');
+    const res = await hit(failingApp, token);
+    expect(res.statusCode).toBe(200);
+    expect(await lastSeen(sid)).toBeNull(); // the stamp really was refused...
+    expect((await hit(stampApp, token)).statusCode).toBe(200); // ...and the same session stamps fine through the working app
+    expect(await lastSeen(sid)).toEqual(clock);
   });
 });

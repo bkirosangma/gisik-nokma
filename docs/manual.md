@@ -113,6 +113,13 @@ initial — and choose **Sign out**. Signing out really does end it — the next
 device is refused immediately, not "at some point later". That matters if you have signed in on somebody
 else's laptop.
 
+To see where else you are signed in, open **Account** and look under **Sign-in and devices**. Each
+browser you have signed in on is one row — for example "Chrome on Mac" with a short four-letter code, so
+two identical browsers can be told apart — with when it was last active and when you first signed in
+there. The ones used in the last 24 hours are listed first; the rest wait under **Signed in, idle**, which
+you can open. **Sign out this device** ends that one; **Sign out all other devices** ends every one except
+the one you are using. The device you are using cannot be signed out from here — use the account menu.
+
 ---
 
 ## §2 — Finding your way around
@@ -767,6 +774,15 @@ was an epic, *"Nothing in the backlog — epics appear in the List."*
 Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a
 column, press the **‹** or **›** arrow on the card, or open it and press **Move…** (§7).
 
+**A card moves the moment you let go.** Drop it (or press an arrow) and the card slides into its new
+column straight away, while the change is saved in the background. If the change is refused or cannot be
+saved, the card slides back to where it was and says why underneath. A move that needs a comment shows
+the card in its new place, faded, until you confirm; cancel and it slides back. With your system set to
+reduce motion the card simply appears. While you drag, the page scrolls when you bring the card near its
+top or bottom edge, and the board scrolls sideways near its left or right edge. Hold a card over a
+collapsed column for a moment and it opens; move away and it closes again; drop the card there and it
+stays open.
+
 A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
 that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
 tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
@@ -1226,6 +1242,9 @@ to show its settings: for a stage, its name, **Set as start** and **Delete state
 rules, **Add rule** and **Delete transition**. Only one row is open at a time — opening another closes
 the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
 canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
+An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide
+screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so
+the canvas and the page do not move while you read down it.
 Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
 them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
 

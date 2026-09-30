@@ -18,6 +18,12 @@ declare module 'fastify' {
      */
     currentUserId: string;
     /**
+     * The better-auth SESSION row this request authenticated as (devices plan Task 2), or `null` for the
+     * `'mcp-token'` branch, which has no session. Lets a route tell "this device" from another without
+     * re-reading the cookie. Written only by `requireSession`; same untyped-absence caveat as `currentUserId`.
+     */
+    currentSessionId: string | null;
+    /**
      * WHICH branch of `requireSession` resolved `currentUserId` — `'session'`
      * for a real better-auth session (cookie or its own bearer token),
      * `'mcp-token'` for the personal-access-token fallback. Written only by
@@ -102,6 +108,18 @@ export function makeRequireSession(auth: Auth, db: Queryable, now: () => Date = 
     if (session) {
       request.currentUserId = session.user.id;
       request.authKind = 'session';
+      request.currentSessionId = session.session.id;
+      // `lastSeenAt` is an observation for the devices list, throttled to one write per 5 minutes per
+      // session (FD2: `updatedAt` moves at most daily). A failed stamp must never fail the request.
+      try {
+        await db.query(
+          `UPDATE session SET "lastSeenAt" = $2
+            WHERE id = $1 AND ("lastSeenAt" IS NULL OR "lastSeenAt" <= $2::timestamptz - interval '5 minutes')`,
+          [session.session.id, now()],
+        );
+      } catch (cause) {
+        request.log.warn({ err: cause }, 'lastSeenAt stamp failed');
+      }
       return;
     }
 
@@ -111,6 +129,7 @@ export function makeRequireSession(auth: Auth, db: Queryable, now: () => Date = 
       if (userId !== null) {
         request.currentUserId = userId;
         request.authKind = 'mcp-token';
+        request.currentSessionId = null;
         return;
       }
     }

@@ -571,6 +571,55 @@ export const HELP_CONTENT: HelpContent = [
                     "text": ". Signing out really does end it — the next thing you try on that device is refused immediately, not \"at some point later\". That matters if you have signed in on somebody else's laptop."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "To see where else you are signed in, open "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and look under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign-in and devices"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Each browser you have signed in on is one row — for example \"Chrome on Mac\" with a short four-letter code, so two identical browsers can be told apart — with when it was last active and when you first signed in there. The ones used in the last 24 hours are listed first; the rest wait under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Signed in, idle"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", which you can open. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign out this device"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " ends that one; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign out all other devices"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " ends every one except the one you are using. The device you are using cannot be signed out from here — use the account menu."
+                  }
+                ]
               }
             ]
           }
@@ -4090,6 +4139,19 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A card moves the moment you let go."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Drop it (or press an arrow) and the card slides into its new column straight away, while the change is saved in the background. If the change is refused or cannot be saved, the card slides back to where it was and says why underneath. A move that needs a comment shows the card in its new place, faded, until you confirm; cancel and it slides back. With your system set to reduce motion the card simply appears. While you drag, the page scrolls when you bring the card near its top or bottom edge, and the board scrolls sideways near its left or right edge. Hold a card over a collapsed column for a moment and it opens; move away and it closes again; drop the card there and it stays open."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "A card shows the title, who it is on, whether it is blocked, its progress, the "
                   },
@@ -6519,7 +6581,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Only one row is open at a time — opening another closes the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas. Two moves are listed at the bottom of "
+                    "text": ". Only one row is open at a time — opening another closes the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas. An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so the canvas and the page do not move while you read down it. Two moves are listed at the bottom of "
                   },
                   {
                     "kind": "bold",

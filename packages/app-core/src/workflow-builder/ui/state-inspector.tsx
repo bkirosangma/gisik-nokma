@@ -57,7 +57,7 @@ export function StateInspector(props: { stateId: string }) {
           >
             Set as start
           </Button>
-          <Button variant="danger" onClick={() => store.actions.removeState(state.id)}>
+          <Button variant="danger" className="builder-quiet-danger" onClick={() => store.actions.removeState(state.id)}>
             Delete state
           </Button>
         </div>
