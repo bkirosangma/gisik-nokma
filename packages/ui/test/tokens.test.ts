@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
+import { over } from './helpers/contrast.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
@@ -1569,12 +1570,18 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     expect(contrastRatio(colorOf('light', 'danger'), colorOf('light', 'surface'))).toBeLessThan(4.5);
     for (const style of ['hig', 'minimal', 'neo'] as const) {
       for (const theme of ['light', 'dark'] as const) {
+        const well = colorOf(theme, 'surfaceWell', style);
         expect(
-          contrastRatio(colorOf(theme, 'danger', style), colorOf(theme, 'surfaceWell', style)),
+          contrastRatio(colorOf(theme, 'danger', style), well),
           `${style}/${theme}: danger as ink on surfaceWell — the quiet danger buttons' ground`,
         ).toBeGreaterThanOrEqual(4.5);
+        // The HOVER state keeps this same ground (a danger ring, no wash — see the control below), so the ratio above IS the hover ratio.
       }
     }
+    // CONTROL — why the hover is a ring and not `.gn-button--ghost`'s `fillQuaternary` wash: danger ink on that wash over the
+    // well is 4.18 in hig/minimal light (4.47 dark), below 4.5. If a token edit lifts it, this fails and says the wash is back on the table.
+    const lightWell = colorOf('light', 'surfaceWell', 'hig');
+    expect(contrastRatio(colorOf('light', 'danger', 'hig'), over(colorOf('light', 'fillQuaternary', 'hig'), lightWell))).toBeLessThan(4.5);
   });
 });
 
