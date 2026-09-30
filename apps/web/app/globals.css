@@ -1555,7 +1555,8 @@ input, textarea, select { font-family: inherit; }
    for "Project access" will be; nothing below styles a cell for them. */
 .gn-members {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B12): P-RAISED — the lit-edge `lift` shadow (rule 04). */
+  box-shadow: var(--gn-shadow-lift);
   border-radius: var(--gn-radius-card);
   /* The prototype's own (`:658`), and it is load-bearing rather than
      decorative: the table below is 820px wide, so on a phone the CARD scrolls
@@ -1635,7 +1636,8 @@ input, textarea, select { font-family: inherit; }
   line-height: 1.125rem;
   font-weight: 600;
   color: var(--gn-text-muted);
-  background: var(--gn-surface-sunken);
+  /* Styling refresh Plan B (Task B12): P-WELL — a recessed header band inside the raised table (rule 04); the `well` ground replaces the 1.14:1 `surface-sunken`. */
+  background: var(--gn-surface-well);
   padding: 0.6875rem 1.125rem;
 }
 .gn-members__th--person { width: 34%; }
