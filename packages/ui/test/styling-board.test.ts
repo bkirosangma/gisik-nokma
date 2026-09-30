@@ -154,3 +154,31 @@ describe('20.105 the drop target is an outline, inside the edge', () => {
     expect(valueOf(target, 'outline-offset')).toBe('-2px');
   });
 });
+
+describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
+  it('20.116 strip width, full-size ghost button, vertical name, ghost collapse icon', () => {
+    const collapsed = ruleExactly(CSS, '.gn-board__column--collapsed');
+    expect(valueOf(collapsed, 'flex')).toBe('0 0 3.5rem');
+    expect(valueOf(collapsed, 'min-width')).toBe('3.5rem');
+    expect(valueOf(collapsed, 'align-self')).toBe('stretch');
+    expect(valueOf(collapsed, 'min-height')).toBe('12rem');
+    const strip = ruleExactly(CSS, '.gn-board__column-strip');
+    expect(valueOf(strip, 'width')).toBe('100%');
+    expect(valueOf(strip, 'min-height')).toBe('2.75rem');
+    expect(valueOf(strip, 'background')).toBe('transparent');
+    expect(valueOf(ruleExactly(CSS, ['.gn-board__column-strip:hover', '.gn-board__column-strip:focus-visible']), 'background')).toBe(
+      'var(--gn-fill-tertiary)',
+    );
+    const name = ruleExactly(CSS, '.gn-board__column-strip-name');
+    expect(valueOf(name, 'writing-mode')).toBe('vertical-rl');
+    expect(valueOf(name, 'color')).toBe('var(--gn-text-muted)');
+    const toggle = ruleExactly(CSS, '.gn-board__column-collapse');
+    expect(valueOf(toggle, 'min-width')).toBe('2.75rem');
+    expect(valueOf(toggle, 'min-height')).toBe('2.75rem');
+    expect(valueOf(toggle, 'border')).toBe('none');
+    expect(valueOf(toggle, 'margin-left')).toBe('auto');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__column-action + .gn-board__column-collapse'), 'margin-left')).toBe('0');
+    // CONTROL — an expanded column is still the 18rem lane.
+    expect(valueOf(ruleExactly(CSS, '.gn-board__column'), 'flex')).toBe('0 0 18rem');
+  });
+});

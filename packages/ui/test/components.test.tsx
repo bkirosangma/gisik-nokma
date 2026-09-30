@@ -929,8 +929,12 @@ describe('Select panel/option styling', () => {
   // that requires a literal backslash in the stylesheet text and can never
   // match real CSS — verified empirically (a raw string matches, a
   // pre-escaped one does not) before writing these.
-  it('the neo panel gets shadow-only elevation, matching the row-shadow precedent', () => {
-    expect(rule('[data-style="neo"] .gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-raised\)/);
+  // Amended 2026-09-30 by 20.221 (styling refresh Plan B): the neo fork is gone. The BASE rule
+  // reads `--gn-shadow-lift-near`, which resolves to neo's own larger raised pair through the
+  // token, so the panel is still shadow-only under neo without a `[data-style]` restatement.
+  it('the neo panel gets shadow-only elevation, through the base rule and the token', () => {
+    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-lift-near\)/);
+    expect(UI_CSS).not.toMatch(/\[data-style="neo"\]\s+\.gn-select__panel\s*\{/);
   });
 
   it('the active/focused option row uses a focus-ring outline, not a background-fill misuse of focusRing', () => {

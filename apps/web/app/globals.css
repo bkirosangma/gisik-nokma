@@ -1915,13 +1915,14 @@ input, textarea, select { font-family: inherit; }
    host's half. The SAME raised surface and shadow `.gn-select__panel` uses
    (`packages/ui/src/ui.css`) — a picker reads as the same kind of floating
    control wherever the product draws one, rather than the browser's bare
-   `Canvas` colour the wiki-link and ticket-ref popups drew before this. */
+   `Canvas` colour the wiki-link and ticket-ref popups drew before this.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .mention-popup,
 .wikilink-popup,
 .ticketref-popup {
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   padding: 0.25rem;
 }
 .mention-popup__item,
@@ -2199,6 +2200,7 @@ input, textarea, select { font-family: inherit; }
   box-shadow: 0 0 0 0.125rem var(--gn-surface);
 }
 
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-nav__menu {
   position: absolute;
   inset-inline-end: 0;
@@ -2209,7 +2211,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.375rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   /* Above page content. The nav is the topmost chrome and this hangs off it. */
   z-index: 50;
 }
@@ -3409,7 +3411,8 @@ input, textarea, select { font-family: inherit; }
    `.gn-skip`'s own docblock already names) round control — neutral chrome,
    not the brand hue: `--gn-brand` is reserved for the identity mark
    (sign-in tile, nav tile, favicon), and this is a functional control. Same
-   surface/shadow pair `.gn-nav__menu` uses for its own floating panel. */
+   surface/shadow pair `.gn-nav__menu` uses for its own floating panel.
+   Styling refresh Plan B (Task B3): the round launcher floats above the page, so it rests on `lift-near`. */
 .gn-toc-launcher__button {
   position: relative;
   width: 2.75rem;
@@ -3418,7 +3421,7 @@ input, textarea, select { font-family: inherit; }
   border-radius: 999px;
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3431,7 +3434,8 @@ input, textarea, select { font-family: inherit; }
 
 /* Opens UPWARD from the button, since the button itself sits at the
    viewport's bottom edge — `.gn-nav__menu`'s own floating-panel geometry
-   (surface/radius/shadow), turned to open the other way. */
+   (surface/radius/shadow), turned to open the other way.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-toc-launcher__panel {
   position: absolute;
   left: 0;
@@ -3443,7 +3447,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.75rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
 }
 
 /* One workspace's own branch of the tree — a plain spacing rule; the visible
@@ -4279,11 +4283,13 @@ input, textarea, select { font-family: inherit; }
    editor.css's system `Canvas` colour keyword and `currentColor` border
    (packages/editor cannot reach these tokens; this file can). Unscoped, to
    match editor.css's own unscoped `.wikilink-preview` rule — the card is
-   appended to `document.body`, outside `.ticket-editor__content`. */
+   appended to `document.body`, outside `.ticket-editor__content`.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .wikilink-preview {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   border: none;
+  border-radius: var(--gn-radius-card);
 }
 
 /* Images: the frame the three wrap modes (editor.css) never got. One rule —
@@ -4350,11 +4356,13 @@ input, textarea, select { font-family: inherit; }
    the web skin section" — editor.css stays colour-free by its own header
    rule). This file's override never reaches the mobile WebView (its bundle
    loads editor.css alone) — see that file's own comment on the same rule
-   for why the split is structured this way regardless. */
+   for why the split is structured this way regardless.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .table-toolbar {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   border: none;
+  border-radius: var(--gn-radius-card);
 }
 .table-toolbar__sep { background: var(--gn-border); opacity: 1; }
 .table-toolbar__btn:hover:not(:disabled) { background: var(--gn-fill-tertiary); }
@@ -4473,10 +4481,12 @@ input, textarea, select { font-family: inherit; }
    never subtle (`--gn-text-muted` is the contrast-gated secondary ink). */
 .gn-delete-dialog__note { margin: 0; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.5; }
 .gn-delete-dialog > .gn-refusal { margin: 0; }
-/* Cancel first, the destructive confirm last and rightmost; 12px apart and 44px
-   tall so neither is a near-miss for the other on touch. */
+/* Cancel first, the destructive confirm last and rightmost; 12px apart so
+   neither is a near-miss for the other on touch. Styling refresh Plan B (Task
+   B3): the buttons size THEMSELVES now (the 48px danger and the 44px quiet, the
+   shared Button's variants) — the `.gn-button` size override this row held, at
+   (0,2,0), out-ranked the danger variant and pinned the confirm at 44px. */
 .gn-delete-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
-.gn-delete-dialog__actions .gn-button { min-height: 2.75rem; padding-inline: 1rem; }
 
 /* The card pages' "where it went" line after a delete (spec §6.3's route back
    named at the moment it matters). Plain text ink, never a tint. */
@@ -4504,6 +4514,7 @@ input, textarea, select { font-family: inherit; }
 .gn-card-menu__trigger:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text); }
 .gn-card-menu__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-card-menu__trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-card-menu__list {
   position: absolute;
   top: calc(100% + 0.25rem);
@@ -4512,9 +4523,9 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   padding: 0.375rem;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
 }
 /* Items in plain text ink, deliberately NOT `--gn-danger` for Delete…: danger text
    on a raised surface measured 4.29:1 (`sessions-section.tsx`'s own record),

@@ -35,6 +35,13 @@ import {
   rememberWorkflowCollapse,
   type WorkflowCollapseChoices,
 } from '../preferences/workflow-collapse.js';
+import {
+  NO_COLUMN_CHOICES,
+  columnCollapseKey,
+  readColumnCollapse,
+  rememberColumnCollapse,
+  type ColumnCollapseChoices,
+} from '../preferences/column-collapse.js';
 import { BulkCloseDialog, type BulkCloseTicket } from './bulk-close-dialog.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
@@ -531,6 +538,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    * for the Rule of Hooks reason `moveRegistryRef`'s own docblock gives.
    */
   const [groupChoices, setGroupChoices] = useState<WorkflowCollapseChoices>(NO_COLLAPSE_CHOICES);
+  /**
+   * The COLUMNS a person collapsed to a strip (styling refresh Plan A Task 5B;
+   * owner ruling 2026-09-29, "all columns are collapsible"), keyed by
+   * `columnCollapseKey(workflowId, stateId)`. Choices only, like `groupChoices`
+   * and for the same reason, and a separate memory: collapsing every column
+   * never collapses the group, and collapsing the group never touches these.
+   * There is no default rule here — an absent key is an expanded column.
+   */
+  const [columnChoices, setColumnChoices] = useState<ColumnCollapseChoices>(NO_COLUMN_CHOICES);
 
   /**
    * Reads the memory ONCE per project, and the two choices here are both about
@@ -557,7 +573,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    */
   useHydrationLayoutEffect(() => {
     setGroupChoices(readWorkflowCollapse(currentUserId ?? '', board.projectId));
+    setColumnChoices(readColumnCollapse(currentUserId ?? '', board.projectId));
   }, [currentUserId, board.projectId]);
+
+  /** Records the person's choice for ONE column (`expanded` is the state they asked for) and writes it through. */
+  const toggleColumn = (workflowId: string, stateId: string, expanded: boolean): void => {
+    const next = { ...columnChoices, [columnCollapseKey(workflowId, stateId)]: expanded };
+    setColumnChoices(next);
+    rememberColumnCollapse(currentUserId ?? '', board.projectId, next);
+  };
 
   /**
    * Is this group collapsed BY ITS DEFAULT — i.e. by the owner's rule and not by
@@ -882,6 +906,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             group={group}
             expanded={expanded}
             onToggleWorkflow={() => toggleGroup(group)}
+            columnChoices={columnChoices}
+            onToggleColumn={toggleColumn}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             moves={moves}
@@ -895,6 +921,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             group={group}
             expanded={expanded}
             onToggleWorkflow={() => toggleGroup(group)}
+            columnChoices={columnChoices}
+            onToggleColumn={toggleColumn}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             arrows={null}
@@ -950,6 +978,8 @@ function BoardGroupSection({
   group,
   expanded,
   onToggleWorkflow,
+  columnChoices,
+  onToggleColumn,
   onOpenTicket,
   onCreateTicket,
   arrows,
@@ -967,6 +997,14 @@ function BoardGroupSection({
   expanded: boolean;
   /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
   onToggleWorkflow: () => void;
+  /**
+   * The person's COLUMN choices (Task 5B), owned by `Board` for the reason
+   * `expanded` is: one memory, and both render paths must agree. `false` under
+   * `columnCollapseKey(workflowId, stateId)` is a column collapsed to a strip.
+   */
+  columnChoices: ColumnCollapseChoices;
+  /** `expanded` is the state the person asked for. `Board`'s `toggleColumn` records and remembers it. */
+  onToggleColumn: (workflowId: string, stateId: string, expanded: boolean) => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
@@ -1004,6 +1042,30 @@ function BoardGroupSection({
    */
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const depthRef = useRef(new Map<string, number>());
+  /**
+   * Focus follows a column toggle (Task 5B): the control that was pressed
+   * unmounts with its branch, so focus would fall to `<body>`. The handler
+   * records where it should land; the layout effect below moves it after the
+   * branch has swapped.
+   */
+  const pendingFocusRef = useRef<{ stateId: string; target: 'strip' | 'collapse' } | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  useHydrationLayoutEffect(() => {
+    const pending = pendingFocusRef.current;
+    if (pending === null) return;
+    pendingFocusRef.current = null;
+    const section = [...(railRef.current?.querySelectorAll('section') ?? [])].find(
+      (candidate) => candidate.getAttribute('data-testid') === `board-column-${pending.stateId}`,
+    );
+    const control = section?.querySelector(
+      pending.target === 'strip' ? '.gn-board__column-strip' : '.gn-board__column-collapse',
+    );
+    if (control instanceof HTMLElement) control.focus();
+  });
+  const setColumnExpanded = (stateId: string, expandedNow: boolean): void => {
+    pendingFocusRef.current = { stateId, target: expandedNow ? 'collapse' : 'strip' };
+    onToggleColumn(group.workflowId, stateId, expandedNow);
+  };
   /**
    * The rail's id, which the heading's button points at with `aria-controls`.
    * Built from the group's own identity rather than from an index, so a
@@ -1082,6 +1144,7 @@ function BoardGroupSection({
       <div
         className="gn-board__rail"
         id={railId}
+        ref={railRef}
         hidden={!expanded}
         // A card's `dragend` bubbles here from its slot: that covers Esc and a
         // drop outside every column, neither of which fires `drop`.
@@ -1090,7 +1153,11 @@ function BoardGroupSection({
           setDropTarget(null);
         }}
       >
-        {group.columns.map((column) => (
+        {group.columns.map((column) => {
+          // No `column.category` test: every column collapses (plan D27, resolved).
+          const collapsed = columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false;
+          const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
+          return (
           <section
             key={column.stateId}
             role="region"
@@ -1098,6 +1165,7 @@ function BoardGroupSection({
             data-testid={`board-column-${column.stateId}`}
             className={
               (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
+              (collapsed ? ' gn-board__column--collapsed' : '') +
               (column.stateId === dropTarget ? ' gn-board__column--drop-target' : '')
             }
             /*
@@ -1142,6 +1210,25 @@ function BoardGroupSection({
                   }
             }
           >
+            {collapsed ? (
+              /* THE STRIP (Task 5B): the same section, still a drop target, holding one
+                 control. The name is `aria-hidden` because the button's own name already
+                 says it; there is no `aria-controls`, since the list it would control is
+                 not rendered. */
+              <button
+                type="button"
+                className="gn-board__column-strip"
+                aria-expanded="false"
+                aria-label={`Expand ${column.name}, ${column.cards.length} ${column.cards.length === 1 ? 'ticket' : 'tickets'}`}
+                onClick={() => setColumnExpanded(column.stateId, true)}
+              >
+                <span className="gn-board__count">{column.cards.length}</span>
+                <span className="gn-board__column-strip-name" aria-hidden="true">
+                  {column.name}
+                </span>
+              </button>
+            ) : (
+              <>
             <header className="gn-board__column-header">
               <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
@@ -1181,8 +1268,20 @@ function BoardGroupSection({
                   Close all ({column.cards.length})
                 </button>
               ) : null}
+              <button
+                type="button"
+                className="gn-board__column-collapse"
+                aria-expanded="true"
+                aria-controls={cardsId}
+                aria-label={`Collapse ${column.name}`}
+                onClick={() => setColumnExpanded(column.stateId, false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14.5 6.5 9 12l5.5 5.5" />
+                </svg>
+              </button>
             </header>
-            <ul className="gn-board__cards">
+            <ul className="gn-board__cards" id={cardsId}>
               {column.cards.map((card) => (
                 <BoardCardSlot
                   key={card.ticketId}
@@ -1267,8 +1366,11 @@ function BoardGroupSection({
                 ) : null}
               </div>
             ) : null}
+              </>
+            )}
           </section>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -1295,6 +1397,8 @@ function BoardGroupWithMoves({
   group,
   expanded,
   onToggleWorkflow,
+  columnChoices,
+  onToggleColumn,
   onOpenTicket,
   onCreateTicket,
   moves,
@@ -1316,6 +1420,9 @@ function BoardGroupWithMoves({
   expanded: boolean;
   /** See the prop of the same name on `BoardGroupSection`. */
   onToggleWorkflow: () => void;
+  /** See the props of the same names on `BoardGroupSection` — forwarded for the reason `expanded` is. */
+  columnChoices: ColumnCollapseChoices;
+  onToggleColumn: (workflowId: string, stateId: string, expanded: boolean) => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   moves: BoardMoveCapability;
@@ -1381,6 +1488,8 @@ function BoardGroupWithMoves({
       group={group}
       expanded={expanded}
       onToggleWorkflow={onToggleWorkflow}
+      columnChoices={columnChoices}
+      onToggleColumn={onToggleColumn}
       onOpenTicket={onOpenTicket}
       onCreateTicket={onCreateTicket}
       arrows={

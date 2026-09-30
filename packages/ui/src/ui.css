@@ -1029,6 +1029,68 @@ a.gn-ticket-sheet__crumb--link {
 }
 /* `Close all (N)` to the far edge; the name chip and its count read left. */
 .gn-board__column-header > .gn-board__column-action { margin-left: auto; }
+/* Styling refresh Plan A Task 5B (owner rulings 2026-09-29: "all columns are
+   collapsible", plan D27; D13 amended). A collapsed column is the SAME section
+   in a 3.5rem strip, so it is still a drop target: dropping on it moves the
+   ticket into that state. It stretches to the rail's height with a 12rem floor
+   so an empty rail does not leave a stub too small to hit. Declared after
+   `.gn-board__column` so its `flex`/`min-width` win at equal specificity. */
+.gn-board__column--collapsed {
+  flex: 0 0 3.5rem;
+  min-width: 3.5rem;
+  align-self: stretch;
+  min-height: 12rem;
+  padding: 0.25rem;
+}
+/* The strip is one full-size P-GHOST button (44px floor, rule 01): the count on
+   top, the name set vertically beneath it. */
+.gn-board__column-strip {
+  width: 100%;
+  min-height: 2.75rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.gn-board__column-strip:hover,
+.gn-board__column-strip:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-board__column-strip:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-board__column-strip-name {
+  writing-mode: vertical-rl;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  overflow-wrap: anywhere;
+}
+/* The expanded header's collapse control: P-GHOST, icon only, 44x44. It takes the
+   auto margin so it sits at the far edge; after `Close all` it must not add a
+   second auto margin (the two would split the free space between them). */
+.gn-board__column-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: var(--gn-text-muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+.gn-board__column-collapse:hover { background: var(--gn-fill-tertiary); }
+.gn-board__column-collapse:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-board__column-action + .gn-board__column-collapse { margin-left: 0; }
 /* Same spec row, "Count": 13px/18px, label2 (textMuted). Selector kept as
    `.gn-board__count`, not renamed to the spec's own "column-count" wording —
    `board.test.tsx:142` (`badgeTotal`) queries `.gn-board__count` directly, so
@@ -3630,6 +3692,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-select__panel {
   position: absolute;
   z-index: 30;
@@ -3638,22 +3701,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   overflow-y: auto;
   margin: 0;
   padding: 0.25rem;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
-}
-[data-style="neo"] .gn-select__panel {
-  /* Currently redundant with the base rule above, which already carries
-     `box-shadow: var(--gn-shadow-raised)` (unlike `.ticket-type-list__row`/
-     `.fields-editor__row`, whose BASE rules have no shadow at all — there
-     the neo override is the only place the shadow exists, not the case
-     here). Kept as an explicit anchor rather than removed: neo gives
-     surface/surfaceRaised/surfaceSunken no colour of its own, so the panel's
-     entire visual separation from the page depends on this shadow value
-     staying present — a future edit to the base rule that dropped or
-     changed it would need this line to still say so, and the test above
-     pins this selector existing for that reason. */
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
 }
 
 /* Popover (spec 2026-09-22) — the visibility menu's container. The same
@@ -3662,14 +3712,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    draft's `--overlay` guess: `--gn-surface-overlay`/`--gn-shadow-overlay`
    are the full-screen scrim/dialog pair, a different role), because both
    are anchored surfaces over the sheet and two treatments for one role is
-   the drift this file's comments exist to prevent. */
+   the drift this file's comments exist to prevent.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-popover {
   position: absolute;
   z-index: 30;
   padding: 0.75rem;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   max-width: min(22rem, calc(100vw - 2rem));
 }
 
@@ -7060,7 +7111,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--gn-shadow-raised` resolves to `none` and the panel became 13px of text
    painted over the number input beneath it with no boundary at all.
    The hairline is what draws the edge in every style and theme; the shadow
-   stays as the thing that lifts the panel off the page where shadows exist. */
+   stays as the thing that lifts the panel off the page where shadows exist.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-infotip__panel {
   position: absolute;
   top: calc(100% + 0.375rem);
@@ -7071,9 +7123,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   max-width: 18rem;
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--gn-border);
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   color: var(--gn-text);
   font-size: 0.8125rem;
   line-height: 1.125rem;
