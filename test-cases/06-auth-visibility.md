@@ -534,6 +534,14 @@ Covering test: `apps/server/test/routes/me-devices.test.ts` (real app, real Post
 - ✅ **6.319 — the current device's key answers 409 `current_device` and deletes nothing;** control: another device → 204 (6.317). Mutation: remove the current-device guard (red: 6.319, 6.317).
 - ✅ **6.320 — an MCP-token caller gets 403 on both routes** (devices are a browser concept); control: a session caller → 200. Mutation: allow `authKind === 'mcp-token'` (red: 6.320).
 
+### Task 4 — the daily expired-session delete (6.321–6.323)
+
+Covering tests: `apps/server/test/ops/expired-sessions.test.ts` (real Postgres, injected `now`), `apps/server/test/ops/backup-daemon-main.test.ts` (spawned daemon), `pnpm check:env`.
+
+- ✅ **6.321 — `deleteExpiredSessions(pool, now)` deletes every session with `expiresAt <= now` and returns the count;** control: a session expiring 1 s after `now` survives, and a second sweep returns 0. Mutations: `<=`→`<`, delete everything, return 0 (red: 6.321).
+- ✅ **6.322 — the worker schedules a job `expired-sessions` whose delay is `SESSION_SWEEP_INTERVAL_MS` (default 86400000; empty = default; 0 refused by name, aborting the whole scheduler);** control: empty arms, and a bad `PURGE_SWEEP_INTERVAL_MS` is still refused beside it. Mutations: drop the job, refuse under the wrong variable name, empty not treated as unset (red: 6.322).
+- ✅ **6.323 — `.env.example` documents `SESSION_SWEEP_INTERVAL_MS`;** control: `pnpm check:env` exits 1 naming it once the line is removed (run by hand, LOCAL: "SESSION_SWEEP_INTERVAL_MS (first seen in apps/server/src/ops/backup-daemon-main.ts…)").
+
 ### Task 6 — Account → Sign-in and devices, one row per device (6.330–6.334, 6.339)
 
 Covering tests: `packages/app-core/test/account/relative-time.test.ts`, `packages/app-core/test/account/sessions-section.test.tsx`, `apps/web/test/account-clients.test.ts`, `apps/web/test/account-page.test.tsx`. **Departure from the plan, per owner ruling FD3=A (the card wins):** the plan's own section test expected idle rows visible with two sign-out buttons while collapsed; under 6.339 idle rows are not rendered until the group is opened. Amends 11.220 in place.
