@@ -213,6 +213,24 @@ describe('the unconditional security headers', () => {
     'referrer-policy': 'strict-origin-when-cross-origin',
   };
 
+  /**
+   * 14.236 — the hosted-MCP consent page must not be frameable: a page that can
+   * be embedded is a page whose Allow button can be clickjacked. The rule is the
+   * app-wide `/:path*`, so the case measures that its pattern REACHES
+   * `/mcp/connect?request=x` rather than trusting the source string.
+   */
+  it('14.236 the consent page is covered by x-frame-options: DENY', async () => {
+    vi.resetModules();
+    vi.stubEnv('SERVER_ORIGIN', 'https://pm-api.artsourced.in');
+    const fresh = (await import('../next.config.js')).default;
+    const groups = (await fresh.headers?.()) ?? [];
+    const covering = groups.filter((group) => group.source === '/:path*'); // CONTROL — the pattern that matches every path, `/mcp/connect?request=x` included
+    expect(covering).toHaveLength(1);
+    expect(covering[0]!.headers.find((h) => h.key === 'x-frame-options')?.value).toBe('DENY');
+    const scopedElsewhere = groups.filter((group) => group.source !== '/:path*' && group.headers.some((h) => h.key === 'x-frame-options'));
+    expect(scopedElsewhere).toEqual([]);
+  });
+
   it('13.260 sends all three over http AND https — they carry no protocol condition', async () => {
     // Both inputs, in one case. Either alone passes for a function that gates
     // everything on the protocol, which is exactly the shape this replaced.

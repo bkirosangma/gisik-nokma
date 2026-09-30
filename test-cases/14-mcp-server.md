@@ -680,6 +680,9 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
 - ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
 - ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+- ✅ **14.255 — `verifyPkceS256` refuses a verifier shorter than 43 or longer than 128 characters, or with a character outside the RFC 7636 unreserved set, even when that verifier's OWN S256 challenge is presented;** control: 43 and 128 characters are accepted. Mutation: delete the `/^[A-Za-z0-9._~-]{43,128}$/` test line. *(A survivor of Task 5's review.)*
+- ✅ **14.256 — `/oauth/token` and `/oauth/revoke` are each charged to the MCP rate-limit bucket (`mcpMax: 2` → the third call from one client is 429);** control: another client key is not limited. Mutations: drop `/oauth/token` from the bucket condition in `app.ts`; drop `/oauth/revoke` from it. *(A survivor of Task 5's review.)*
+- ✅ **14.257 — a refresh whose new token pair cannot be issued (a trigger rejects the insert) answers 500 and leaves the old refresh token UNUSED — the transaction rolled back;** control: with the fault removed the same token refreshes (200) and authenticates. Mutation: delete the `BEGIN`/`COMMIT` around the refresh in `routes/mcp-oauth.ts`. *(A survivor of Task 5's review.)*
 
 ## 14.4 Hosted MCP — authorize and consent API
 
@@ -695,3 +698,15 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.227 — the decision refuses a cookie POST whose `Origin` is not `WEB_ORIGIN` (403 via the HTTP-Origin hook);** control: the same POST with `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
 - ✅ **14.228 — an MCP token (local) cannot decide a consent (403 `mcp_token_may_not_decide`), and the request stays answerable;** control: a better-auth session can. Mutation: drop the `authKind` fence.
 - ✅ **14.229 — `response_type` other than `code` and a `scope` other than `gisik:act` are handled: `token` → `error=unsupported_response_type`; `admin` → `error=invalid_scope`;** control: an absent scope is accepted as `gisik:act`. Mutation: accept any scope.
+
+## 14.5 Hosted MCP — the consent page
+
+*Remote-MCP plan Task 4 (14.230–14.236). Tests: `apps/web/test/mcp-connect-page.test.tsx`, `apps/web/test/next-config.test.ts`.*
+
+- ✅ **14.230 — signed out, `/mcp/connect?request=req_x` shows a Sign in link to `/sign-in?next=%2Fmcp%2Fconnect%3Frequest%3Dreq_x` and no Allow button;** control: signed in, Allow appears. Mutation: link to `/sign-in` without `next`.
+- ✅ **14.231 — signed in, the page shows the consent copy verbatim with the app name AND the redirect host from the API;** control: a different name/host pair renders its own values. Mutation: drop the host.
+- ✅ **14.232 — Allow POSTs `{ allow: true }` to the decision route and navigates to the returned `redirectTo` (`window.location.assign`);** control: the button is disabled while the POST is in flight (no double submit) and nothing navigates before it resolves. Mutation: navigate before the POST resolves.
+- ✅ **14.233 — Deny POSTs `{ allow: false }` and navigates to the returned `redirectTo`;** control: Allow is not called. Mutation: Deny posts `allow: true`.
+- ✅ **14.234 — a 404 request shows "This connection request has expired. Go back to your assistant and connect again." and no buttons; a 409 shows the server's message verbatim;** control: a live request shows buttons. Mutation: render the buttons on 404.
+- ✅ **14.235 — Allow is the page's ONE primary button; Deny is the quiet (ghost) Button;** control: both are real `<button>`s with accessible names "Allow" and "Deny". Mutation: make Deny primary.
+- ✅ **14.236 — the page is not frameable: `next.config.ts` headers for `/:path*` (which covers `/mcp/connect`) include `x-frame-options: DENY` (FD4);** control: the pattern matches `/mcp/connect?request=x`. Mutation: scope the header to `/workspaces/:path*`.
