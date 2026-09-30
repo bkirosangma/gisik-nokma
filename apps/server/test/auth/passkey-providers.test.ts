@@ -27,3 +27,12 @@ describe('6.324 AAGUID → provider', () => {
     expect(providerOf('fbfc3007-154e-4ecc-8c0b-6e020557d7bd')).not.toBe(UNKNOWN_PROVIDER);
   });
 });
+
+describe('6.342 AAGUID lookup tolerates padding', () => {
+  it('6.342 a padded, upper-case AAGUID is still "iCloud Keychain"; control: padding around an unknown one is still the fallback', () => {
+    expect(providerOf(' FBFC3007-154E-4ECC-8C0B-6E020557D7BD ')).toBe('iCloud Keychain');
+    expect(providerOf('\tfbfc3007-154e-4ecc-8c0b-6e020557d7bd\n')).toBe('iCloud Keychain');
+    expect(providerOf('  12345678-1234-1234-1234-123456789abc ')).toBe(UNKNOWN_PROVIDER);
+  });
+});
+

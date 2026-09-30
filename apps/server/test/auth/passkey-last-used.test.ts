@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
+import { passkeyLastUsedHook } from '../../src/auth/passkey-last-used.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js';
@@ -119,3 +120,44 @@ describe('passkey last-used stamp', () => {
     expect(Math.abs(s['pk-two']!.getTime() - before)).toBeLessThan(10_000);
   });
 });
+
+/**
+ * Cases 6.340/6.341 - the hook's two guards, called directly with a fabricated context. A real ceremony cannot reach either:
+ * verify-authentication always creates the session for the credential's OWNER, and a different path never carries a passkey
+ * assertion. The guards are still the code's stated intent, so they are pinned where they can be reached.
+ */
+describe('passkey last-used hook guards', () => {
+  const sessionFor = (userId: string) => ({ newSession: { user: { id: userId } } });
+
+  it("6.340 a verify that created a session for user A stamps nothing on ANOTHER user's passkey; control: the same call with A's own credential stamps A's", async () => {
+    const before = otp.sent.length;
+    await app.inject({ method: 'POST', url: '/api/auth/phone-number/send-otp', payload: { phoneNumber: '+919100000062' } });
+    const res = await app.inject({ method: 'POST', url: '/api/auth/phone-number/verify', payload: { phoneNumber: '+919100000062', code: otp.sent[before]?.code } });
+    const bobId = (res.json() as { user: { id: string } }).user.id;
+    const alicesKey = await enrol('pk-alice-guard', aliceId);
+    const bobsKey = await enrol('pk-bob-guard', bobId);
+    await db.pool.query(`UPDATE passkey SET "lastUsedAt" = NULL`);
+    const hook = passkeyLastUsedHook(db.pool);
+    // session for ALICE, body presents BOB's credential id
+    await hook({ path: '/passkey/verify-authentication', body: { response: { id: bobsKey.credentialId } }, context: sessionFor(aliceId) });
+    expect((await stamps())['pk-bob-guard']).toBeNull();
+    expect((await stamps())['pk-alice-guard']).toBeNull();
+    // control: alice's own credential, same session
+    await hook({ path: '/passkey/verify-authentication', body: { response: { id: alicesKey.credentialId } }, context: sessionFor(aliceId) });
+    expect((await stamps())['pk-alice-guard']).not.toBeNull();
+    expect((await stamps())['pk-bob-guard']).toBeNull();
+  });
+
+  it('6.341 the hook stamps only for /passkey/verify-authentication: another path carrying a credential id AND a new session stamps nothing; control: the right path stamps', async () => {
+    const key = await enrol('pk-path-guard', aliceId);
+    await db.pool.query(`UPDATE passkey SET "lastUsedAt" = NULL`);
+    const hook = passkeyLastUsedHook(db.pool);
+    const body = { response: { id: key.credentialId } };
+    await hook({ path: '/sign-in/email', body, context: sessionFor(aliceId) });
+    await hook({ path: '/passkey/verify-registration', body, context: sessionFor(aliceId) });
+    expect((await stamps())['pk-path-guard']).toBeNull();
+    await hook({ path: '/passkey/verify-authentication', body, context: sessionFor(aliceId) });
+    expect((await stamps())['pk-path-guard']).not.toBeNull();
+  });
+});
+

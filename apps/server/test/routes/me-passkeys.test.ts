@@ -1,5 +1,6 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import type { FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { registerMePasskeyRoutes } from '../../src/routes/me-passkeys.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import { createAuth } from '../../src/auth/auth.js';
@@ -113,3 +114,38 @@ describe('GET /v1/me/passkeys', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/me/passkeys' })).statusCode).toBe(401);
   });
 });
+
+describe('GET /v1/me/passkeys - the 90-day boundary against an injected clock', () => {
+  it('6.343 a passkey last used EXACTLY 90 days before `now` is notUsedRecently; one millisecond younger is not, one older is; control: never used is', async () => {
+    const NOW = new Date('2026-10-01T00:00:00.000Z');
+    const DAY90 = 90 * 24 * 60 * 60 * 1000;
+    const f = Fastify();
+    registerMePasskeyRoutes(
+      f,
+      { pool: db.pool, now: () => NOW },
+      async (request) => {
+        (request as unknown as { authKind: string; currentUserId: string }).authKind = 'session';
+        (request as unknown as { authKind: string; currentUserId: string }).currentUserId = aliceId;
+      },
+    );
+    await f.ready();
+    // alice's earlier fixtures (real-clock lastUsedAt) are replaced so the only rows are this case's
+    await db.pool.query(`DELETE FROM passkey WHERE "userId" = $1`, [aliceId]);
+    const insert = (id: string, lastUsed: Date | null, created: string) =>
+      db.pool.query(
+        `INSERT INTO passkey (id, name, "publicKey", "userId", "credentialID", counter, "deviceType", "backedUp", "createdAt", aaguid, "lastUsedAt")
+         VALUES ($1, $1, 'k', $2, $1, 0, 'singleDevice', false, $3, NULL, $4)`,
+        [id, aliceId, created, lastUsed],
+      );
+    await insert('b-exact', new Date(NOW.getTime() - DAY90), '2026-09-01T00:00:01Z');
+    await insert('b-younger', new Date(NOW.getTime() - DAY90 + 1), '2026-09-01T00:00:02Z');
+    await insert('b-older', new Date(NOW.getTime() - DAY90 - 1), '2026-09-01T00:00:03Z');
+    await insert('b-never', null, '2026-09-01T00:00:04Z');
+    const res = await f.inject({ method: 'GET', url: '/v1/me/passkeys' });
+    expect(res.statusCode).toBe(200);
+    const byId = Object.fromEntries(((res.json() as { passkeys: Row[] }).passkeys).map((r) => [r.id, r.notUsedRecently]));
+    expect(byId).toEqual({ 'b-exact': true, 'b-younger': false, 'b-older': true, 'b-never': true });
+    await f.close();
+  });
+});
+
