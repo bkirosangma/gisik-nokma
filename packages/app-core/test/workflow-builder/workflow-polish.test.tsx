@@ -176,19 +176,24 @@ describe('10.158 the Add rule menu items carry the 44px class', () => {
 describe('10.166 Escape closes the Add rule menu and returns focus to its trigger', () => {
   async function openMenuWithFocusOnFirstItem(user: ReturnType<typeof userEvent.setup>) {
     const store = createDraftStore(draftFromTemplate(errand));
-    renderPanels(store);
+    const { container } = renderPanels(store);
     act(() => store.actions.select({ kind: 'transition', index: 0 }));
     const trigger = screen.getByRole('button', { name: 'Add rule' });
     await user.click(trigger);
     await user.tab();
-    return { trigger, store };
+    return { trigger, store, container };
   }
 
   it('10.166 the first Escape closes the menu, focuses the trigger and is consumed; the second does nothing and is NOT swallowed', async () => {
     const user = userEvent.setup();
-    const { trigger } = await openMenuWithFocusOnFirstItem(user);
+    const { trigger, container } = await openMenuWithFocusOnFirstItem(user);
     const seen: { key: string; defaultPrevented: boolean }[] = [];
     const listener = (event: KeyboardEvent) => seen.push({ key: event.key, defaultPrevented: event.defaultPrevented });
+    // On the React root itself (still reached after the menu's own handler ran): the press is marked HANDLED — the contract
+    // `Dialog` and `Sheet` document ("a child that handles Escape must call `preventDefault()`").
+    const atRoot: boolean[] = [];
+    const rootListener = (event: KeyboardEvent) => atRoot.push(event.defaultPrevented);
+    container.addEventListener('keydown', rootListener);
     document.addEventListener('keydown', listener);
     try {
       // CONTROL — the menu really is open with focus on an item, so "closed" after the key is the key's doing.
@@ -202,13 +207,16 @@ describe('10.166 Escape closes the Add rule menu and returns focus to its trigge
       expect(document.activeElement).toBe(trigger);
       // The press was CONSUMED by the menu: nothing above it (a dialog, a sheet) also acts on it.
       expect(seen).toEqual([]);
+      expect(atRoot).toEqual([true]);
 
       // Second Escape, menu closed: nothing changes, and the key is NOT swallowed — a surface above still sees it.
       await user.keyboard('{Escape}');
       expect(screen.queryByRole('menu')).toBeNull();
       expect(document.activeElement).toBe(trigger);
       expect(seen).toEqual([{ key: 'Escape', defaultPrevented: false }]);
+      expect(atRoot).toEqual([true, false]);
     } finally {
+      container.removeEventListener('keydown', rootListener);
       document.removeEventListener('keydown', listener);
     }
   });
