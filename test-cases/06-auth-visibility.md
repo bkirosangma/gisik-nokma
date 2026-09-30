@@ -493,3 +493,19 @@ Case ids 6.280–6.288 belong to this task (6.289–6.299 reserved, unused). Own
 - ✅ **6.286 — the removed person reaches nothing through the arm: not their assigned ticket, not its inheriting child (Task 5);** control: `proj_tickets` still names them, and they saw both before. Mutation: 6.276's. — `apps/server/test/routes/members-remove.test.ts`
 - ✅ **6.287 — the Members page shows `Remove from workspace…` on another member's row to an admin, never on the admin's own row, never on the last owner's row, and never to a non-admin;** control: the role picker still renders beside it. Mutation: render the item unconditionally.
 - ✅ **6.288 — confirming the dialog calls the gateway once, the row disappears on success, and a refusal is shown in the rule's own words in the page's existing refusal region;** control: Cancel calls nothing. Mutation: close the dialog before the call resolves and swallow the refusal.
+
+## Devices and passkeys (devices plan, 2026-09-30)
+
+Plan `docs/superpowers/plans/2026-09-30-devices-and-passkeys.md`; owner rulings 2026-09-30 (design *"yes"*, spec *"approved"*, FD3 *"A, as recommended"*, *"plan approved"*). Block 6.300–6.359 is this plan's (6.300–6.339 and 6.355–6.357 used; 6.340–6.354 and 6.358–6.359 free). Tasks 1–3 are the server half; `LOCAL` runs only, CI does not run on a task branch.
+
+### Task 1 — the device cookie and `session."deviceId"` (6.300–6.306)
+
+Covering tests: `apps/server/test/auth/devices.test.ts`. **Amended in place:** three `sign-in-flows.test.ts` cases asserted "exactly ONE Set-Cookie" on a sign-in; `gn_device` now rides beside the session cookie, so they count the session cookie (`sessionCookiesOf`).
+
+- ✅ **6.300 — a first sign-in (phone OTP) sets `gn_device` (HttpOnly, SameSite=Lax, Path=/, Max-Age 31536000, not Secure over http) and the new session row's `deviceId` equals the cookie's value;** control: the session cookie is still set as before. Mutation: stop writing `deviceId` in the hook (red: 6.300, 6.301, 6.302, 6.305).
+- ✅ **6.301 — a second sign-in from the SAME browser (request carries `gn_device`) reuses that id: no new `gn_device` Set-Cookie, and the second session's `deviceId` equals the first's;** control: a sign-in without the cookie mints a different id, and the second sign-in really happened (status 200, two sessions - a refused request would otherwise pass vacuously). Mutation: always mint a new id (red: 6.301).
+- ✅ **6.302 — magic-link verify and passkey sign-in also record `deviceId`;** control: phone OTP (6.300). Magic link runs through its real routes; **the passkey path is pinned through the ONE `databaseHooks.session.create.before` hook** called with a passkey-verify context (a real WebAuthn assertion cannot be produced in the server suite - the real round trip is 6.357, browser). Mutation: register the hook only for phone paths (red: 6.302 both, 6.305).
+- ✅ **6.303 — a request cookie that is not 43 base64url characters is ignored and replaced** (a new id minted, Set-Cookie sent, status 200); control: a well-formed cookie is kept (6.301). Mutation: accept any cookie value (red: 6.303).
+- ✅ **6.304 — over https the cookie gains `Secure`;** control: over http it does not (6.300). Mutation: hard-code `secure: false` (red: 6.304).
+- ✅ **6.305 — a session created with no endpoint context (`ctx === null`) is created with `deviceId` NULL and the hook does not throw;** control: with context it is set. Mutation: dereference `ctx` unguarded (red: 6.305).
+- ✅ **6.306 — the migration is additive: the new columns exist with the planned types, NULLable with no default, and a session row written the old way (none of the new columns named) reads back NULL in both;** control: the exact column list. Mutation: `NOT NULL DEFAULT ''` on `deviceId` (red: 6.306).
