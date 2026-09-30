@@ -18,7 +18,11 @@ const ROWS: RosterRow[] = [
   { sheet: 'ui', selectors: '.read-only-banner', pattern: 'P-WELL' },
   { sheet: 'ui', selectors: '.workflow-builder-screen__canvas', pattern: 'P-RAISED' },
   { sheet: 'ui', selectors: ['.state-inspector', '.transition-inspector'], pattern: 'P-RAISED' },
-  { sheet: 'ui', selectors: '.inspector-panel__hint', pattern: 'P-RAISED' },
+  // W1 (2026-09-30, case 10.154): the States / Transitions panels replace the right-hand inspector (and its hint card).
+  { sheet: 'ui', selectors: '.builder-panel', pattern: 'P-RAISED' },
+  { sheet: 'ui', selectors: '.builder-row__body', pattern: 'P-WELL' },
+  { sheet: 'ui', selectors: '.builder-row__head:hover', pattern: 'P-HOVER' },
+  { sheet: 'ui', selectors: '.builder-row__head', declarations: { 'min-height': '2.75rem', background: 'transparent' } },
 ];
 const KEPT = [
   '.state-mapping-dialog__confirm:disabled',
@@ -40,7 +44,7 @@ const PREFIXES = [
   '.workflow-',
   '.state-',
   '.transition-inspector',
-  '.inspector-panel',
+  '.builder-',
   '.icon-picker',
   '.publish-controls',
 ];

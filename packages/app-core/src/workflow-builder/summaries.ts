@@ -51,3 +51,9 @@ export function summarizeRule(rule: Rule, ctx: SummaryContext): string {
 export function summarizeRules(rules: Rule[], ctx: SummaryContext): string[] {
   return rules.map((rule) => summarizeRule(rule, ctx));
 }
+
+/** The one-line count a transition row carries while collapsed: what it asks of the mover, in number. */
+export function ruleCountLabel(count: number): string {
+  if (count === 0) return 'No conditions';
+  return count === 1 ? '1 condition' : `${count} conditions`;
+}

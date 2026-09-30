@@ -10,7 +10,7 @@ import { createDraftStore, type DraftStore } from '../../src/workflow-builder/dr
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
-import { InspectorPanel } from '../../src/workflow-builder/ui/inspector-panel.js';
+import { BuilderPanels } from '../../src/workflow-builder/ui/builder-panels.js';
 import { AddRuleMenu, defaultRuleFor } from '../../src/workflow-builder/ui/rule-editors/add-rule-menu.js';
 
 const kanban = WORKFLOW_TEMPLATES.find((template) => template.id === 'simple-kanban')!;
@@ -30,17 +30,14 @@ function env(overrides: Partial<BuilderEnvironment> = {}): BuilderEnvironment {
 function renderPanel(store: DraftStore, environment = env()) {
   return render(
     <BuilderProvider store={store} env={environment}>
-      <InspectorPanel />
+      <BuilderPanels />
     </BuilderProvider>,
   );
 }
 
-describe('InspectorPanel', () => {
-  it('hints when nothing is selected', () => {
-    renderPanel(createDraftStore(draftFromTemplate(kanban)));
-    expect(screen.getByText('Select a state or a transition to edit it.')).toBeInTheDocument();
-  });
-});
+// 2026-09-30 (W1): the right-hand `InspectorPanel` and its "Select a state or a transition to edit it."
+// hint are gone — the inspectors now mount inside the open row of `BuilderPanels` (builder-panels.test.tsx,
+// 10.141-10.151). These suites render `BuilderPanels` so the same inspectors are exercised where they live.
 
 describe('StateInspector', () => {
   it('renames the selected state', async () => {

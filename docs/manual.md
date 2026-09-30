@@ -1220,6 +1220,15 @@ It is a drawing canvas. Each stage is a box. **Add state** makes a new one. Each
 **To connect two stages, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a job can go this way".
 
+**The left-hand column lists everything, and each row opens in place.** Above the system rules you will
+find a **States** list and a **Transitions** list, each with a count. Press a row and it opens right there
+to show its settings: for a stage, its name, **Set as start** and **Delete state**; for an arrow, its
+rules, **Add rule** and **Delete transition**. Only one row is open at a time — opening another closes
+the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
+canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
+Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
+them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
+
 Boxes and arrows are not hard. It is the vocabulary around them that trips people, not the drawing.
 
 > **Get Category right.** It is the one bit of setup where getting it wrong quietly breaks things

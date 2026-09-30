@@ -6466,6 +6466,91 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "The left-hand column lists everything, and each row opens in place."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Above the system rules you will find a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "States"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " list and a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Transitions"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " list, each with a count. Press a row and it opens right there to show its settings: for a stage, its name, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Set as start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete state"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; for an arrow, its rules, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add rule"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete transition"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Only one row is open at a time — opening another closes the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas. Two moves are listed at the bottom of "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Transitions"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " but cannot be opened, because every workflow has them and nobody can change them: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (out of the Backlog) and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Send to Backlog"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "Boxes and arrows are not hard. It is the vocabulary around them that trips people, not the drawing."
                   }

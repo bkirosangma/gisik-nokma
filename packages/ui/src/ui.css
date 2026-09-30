@@ -4435,18 +4435,31 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: var(--gn-shadow-sunken);
 }
 
-/* Three rails. The drawing has two; the rail it drops is the one the ruling
-   above protects. The right rail keeps the prototype's own 320px = 20rem, the
-   left takes the 18rem `.ticket-type-editor__layout` already gives its aside,
-   and the gap is the prototype's 22px. */
+/* Two columns since 2026-09-30 (W1): the right rail is gone — its inspectors
+   now expand in place inside the States/Transitions lists in the left column
+   (`builder-panels.tsx`). The left keeps a little more than the 18rem it had,
+   because it now carries the inspectors' fields and the rule editors; the canvas
+   takes everything the old right rail gave back. */
 .workflow-builder-screen__layout {
   display: grid;
-  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem);
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
   gap: 1.375rem;
   align-items: start;
 }
-.workflow-builder-screen__left,
-.workflow-builder-screen__right { display: flex; flex-direction: column; gap: 0.875rem; min-width: 0; }
+.workflow-builder-screen__left { display: flex; flex-direction: column; gap: 0.875rem; min-width: 0; }
+/* Side by side, the left column is its own scroll container and stays in view
+   beside the canvas: a row that opens from a canvas click is brought into view
+   with `scrollIntoView({ block: 'nearest' })`, which moves THIS column and only
+   moves the page when the column itself is off-screen. Stacked (below), the
+   column is plain flow and the component does not scroll at all. */
+@media (min-width: 64.0625rem) {
+  .workflow-builder-screen__left {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
 /* The canvas is the card (`:1019`): cardBg + cardShadow + cardR. */
 .workflow-builder-screen__canvas {
   background: var(--gn-surface-raised);
@@ -4457,8 +4470,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   min-width: 0;
 }
 /* One column below the shell's own reading width, and the CANVAS goes first:
-   on a narrow screen the thing the screen exists for should not sit below two
-   rails of commentary. */
+   on a narrow screen the thing the screen exists for should not sit below the
+   lists and commentary. */
 @media (max-width: 64rem) {
   .workflow-builder-screen__layout { grid-template-columns: minmax(0, 1fr); }
   .workflow-builder-screen__canvas { order: -1; }
@@ -4493,16 +4506,71 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .transition-inspector__rule-summary { font-size: 0.85rem; }
 
-/* The empty selection. A sentence where a card will be, so the rail does not
-   jump in height the moment something is selected. */
-.inspector-panel__hint {
-  margin: 0;
-  padding: 1.125rem;
+/* The States / Transitions panels (W1, 2026-09-30). A panel is a raised card
+   (P-RAISED); a row is a 44px disclosure that lifts to a quiet fill on hover
+   (P-HOVER) and opens onto a recessed well (P-WELL) holding the existing
+   inspector. The inspector's own raised card would be a card in a well, so it is
+   flattened inside the body: the well is its surface. */
+.builder-panel {
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
   box-shadow: var(--gn-shadow-lift);
-  color: var(--gn-text-muted);
-  font-size: 0.85rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.builder-panel__title { margin: 0; padding: 0 0.5rem; font-size: 0.9rem; }
+.builder-panel__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.builder-panel__list--universal { border-top: 1px solid var(--gn-fill-secondary); padding-top: 0.25rem; }
+.builder-panel__empty,
+.builder-panel__note { margin: 0; padding: 0 0.5rem; color: var(--gn-text-muted); font-size: 0.85rem; }
+.builder-row__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.builder-row__head:hover { background: var(--gn-fill-quaternary); }
+.builder-row__head:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.builder-row__chevron {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--gn-text-muted);
+  border-bottom: 2px solid var(--gn-text-muted);
+  transform: rotate(-45deg);
+}
+.builder-row[data-open="true"] > .builder-row__head > .builder-row__chevron { transform: rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .builder-row__chevron { transition: transform 150ms ease; }
+}
+.builder-row__name { font-weight: 600; overflow-wrap: anywhere; }
+.builder-row__meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; color: var(--gn-text-muted); font-size: 0.8125rem; }
+.builder-row--universal { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; min-height: 2.75rem; padding: 0.5rem; }
+.builder-row__body[hidden] { display: none; }
+.builder-row__body {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.5rem;
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-card);
+}
+.builder-row__body .state-inspector,
+.builder-row__body .transition-inspector {
+  background: transparent;
+  box-shadow: none;
+  padding: 0.5rem;
 }
 
 /* E4-28: a visually-hidden description node, referenced by `aria-describedby`

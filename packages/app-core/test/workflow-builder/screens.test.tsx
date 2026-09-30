@@ -28,8 +28,11 @@ describe('WorkflowBuilderScreen', () => {
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
     expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
-    expect(await screen.findByText('To do')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
-    expect(screen.getByText('Select a state or a transition to edit it.')).toBeInTheDocument();
+    expect(await screen.findByTestId('state-node-todo')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
+    // W1 (2026-09-30): the right inspector and its "Select a state…" hint are gone; the lists took its place.
+    expect(screen.queryByText('Select a state or a transition to edit it.')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'States (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Transitions (4)' })).toBeInTheDocument();
   });
 
   it('edits the workflow name into the def', async () => {
@@ -64,7 +67,9 @@ describe('WorkflowBuilderScreen', () => {
     );
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await user.click(screen.getByRole('button', { name: 'Add state' }));
-    expect(await screen.findByText('New state')).toBeInTheDocument();
+    // W1: the new state is a canvas node AND a row in the States list.
+    expect(await screen.findAllByText('New state')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'States (4)' })).toBeInTheDocument();
   });
 
   it('says so when workspace data cannot load', async () => {

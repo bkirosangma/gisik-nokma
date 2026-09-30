@@ -170,7 +170,9 @@ describe('read-only workflow views for non-admins', () => {
         expect(button).toBeDisabled();
         continue;
       }
-      expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
+      // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
+      // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head/);
     }
     expect(gateway.submitted).toEqual([]);
   });
@@ -297,7 +299,7 @@ describe('no authoring action is reachable by any path the builder screen offers
   it('shows the member every control the admin gets, and disables every one of them', async () => {
     renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await screen.findByText('Later'); // the canvas nodes mount a tick after the screen
+    await screen.findByTestId('state-node-later'); // the canvas nodes mount a tick after the screen
     const memberControls = valueControls();
     // Enumerated, not counted alone: 1 workflow-name textbox + 5 category
     // pickers (Select trigger buttons, since Phase 2 Wave B Task 1) + 5
@@ -317,7 +319,7 @@ describe('no authoring action is reachable by any path the builder screen offers
   it('control: the admin render has the SAME controls, every one enabled except the two the starting-status design disables structurally', async () => {
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await screen.findByText('Later');
+    await screen.findByTestId('state-node-later');
     const adminControls = valueControls();
     expect(adminControls).toHaveLength(16);
     // "Tickets can start here" on the start state and on a terminal state
@@ -358,7 +360,7 @@ describe('no authoring action is reachable by any path the builder screen offers
     const user = userEvent.setup();
     renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await screen.findByText('Later');
+    await screen.findByTestId('state-node-later');
 
     function everyButtonIsAJump(): void {
       for (const button of screen.queryAllByRole('button')) {
@@ -370,7 +372,9 @@ describe('no authoring action is reachable by any path the builder screen offers
           expect(button).toBeDisabled();
           continue;
         }
-        expect(button.className).toMatch(/(issues|advisories)-panel__jump/);
+        // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
+      // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head/);
       }
     }
 
@@ -400,7 +404,7 @@ describe('no authoring action is reachable by any path the builder screen offers
     const user = userEvent.setup();
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await screen.findByText('Later');
+    await screen.findByTestId('state-node-later');
     // The paired control for `everyButtonIsAJump`: on the admin's opening
     // screen the SAME predicate is false, because Add state and Publish are
     // there. A predicate that held for both roles would be measuring nothing.
@@ -418,7 +422,7 @@ describe('no authoring action is reachable by any path the builder screen offers
     const user = userEvent.setup();
     const memberGateway = renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
-    await screen.findByText('Later');
+    await screen.findByTestId('state-node-later');
     for (const name of screen.queryAllByRole('button').map((button) => button.textContent ?? '')) {
       const button = screen.queryAllByRole('button').find((candidate) => candidate.textContent === name);
       if (button !== undefined) await user.click(button);
