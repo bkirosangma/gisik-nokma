@@ -149,3 +149,7 @@ the number you added.
 
 - ✅ **20.261 — the calendar's navigation arrows and Today are quiet outlined 44px controls (each with its hover wash), its legend a raised panel, its grid a recessed track, and its weekday row sits on that track without a fill of its own;** control: the grid keeps its `gap: 1px; padding: 1px` and the day rows keep `gap: 1px` over raised day cells, so the track still shows through as the day lines. Mutation: restore `min-height: 2.25rem` on `.gn-calendar__nav`.
 - ✅ **20.262 — no calendar rule paints a flat boundary or the retired constant;** control: the scan reads more than 25 calendar rules, and the unplaceable item keeps its dashed state edge. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-calendar__weekday-head`.
+## 20.34 Plan B — the workspaces list and invitations
+
+- ✅ **20.331 — the workspaces page has ONE primary: Create workspace; each invitation's Accept is a quiet outlined control, so N pending invitations do not make N+1 loud elements;** control: Accept is still a `button` named "Accept" (its behaviour and name are unchanged). Mutation: restore `variant="primary"` on Accept.
+- ✅ **20.332 — no workspaces-list rule paints a flat boundary or the retired constant;** control: the scan reads more than 20 rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-workspace-card__door`.

@@ -388,3 +388,28 @@ describe('Task 8 fix round 1 — the restyle is pinned, not just the banner\'s b
     });
   });
 });
+
+describe('20.331 one loud element on /workspaces', () => {
+  it("20.331 Create workspace is the only primary; each invitation's Accept is quiet", async () => {
+    mount([WAITING, UNNAMED]);
+    const banner = await screen.findByRole('region', { name: '2 invitations are waiting' });
+    const accepts = [
+      within(banner).getByRole('button', { name: 'Accept the invitation to Convenience Corner' }),
+      within(banner).getByRole('button', {
+        name: 'Accept the invitation to a workspace that has not been named yet',
+      }),
+    ];
+    // CONTROL — Accept is still a `button` with the same accessible name and text (13.378 presses it by name).
+    for (const button of accepts) {
+      expect(button.tagName).toBe('BUTTON');
+      expect(button).toHaveTextContent('Accept');
+      expect(button).toHaveClass('gn-button--ghost');
+      expect(button).not.toHaveClass('gn-button--primary');
+    }
+    // The page's one primary is the founding form's Create workspace
+    // (`workspaces/page.tsx`, rendered unconditionally).
+    const primaries = [...document.querySelectorAll('.gn-button--primary')];
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toHaveTextContent('Create workspace');
+  });
+});
