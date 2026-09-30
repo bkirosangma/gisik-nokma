@@ -842,7 +842,8 @@ describe('R1(c) at the component layer', () => {
     expect(body).not.toMatch(/background:\s*var\(--gn-danger\)/);
 
     expect(body).toMatch(/border:\s*none/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    // Amended 2026-09-29 (styling refresh, 20.077): a pill, rule 05.
+    expect(body).toMatch(/border-radius:\s*999px/);
 
     // The prototype's `min-height:44px` (`:1372`), kept in rem so it scales with
     // the reader's text size, and pinned so a re-transcription is a red rather
@@ -2003,10 +2004,10 @@ describe('13.1148 the overlay dismiss control meets the 44px standalone floor', 
     expect(body).toMatch(/justify-content:\s*center/);
   });
 
-  it('13.1148 it takes the prototype\'s circle and fill', () => {
+  it('13.1148 it takes the circle, transparent at rest (the fill moved to hover — styling refresh 20.073)', () => {
     const body = rule(CLOSE);
     expect(body).toMatch(/border-radius:\s*999px/);
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/background:\s*transparent/);
   });
 
   it('13.1148 the header\'s two controls answer the size question the same way', () => {
