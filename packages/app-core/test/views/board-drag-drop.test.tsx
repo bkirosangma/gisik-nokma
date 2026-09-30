@@ -162,7 +162,7 @@ describe('Board drag-and-drop — the positive control (declared, rules-free edg
    */
   it('a second drop after the first settles still submits — the registry holds the LATEST attemptMove', async () => {
     const { source, moves, onMoved } = movesFor();
-    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    const { rerender } = render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
     await settled();
 
     const first = fakeDataTransfer();
@@ -170,14 +170,25 @@ describe('Board drag-and-drop — the positive control (declared, rules-free edg
     dropOnColumn('doing', first);
     await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
 
+    // The refetch `onMoved` starts: the read now shows the card in Doing. (The card is drawn there from
+    // the drop on — an optimistic move — so a second drop has to be a move the card can still make: on
+    // to Waiting, a rules-free edge, rather than the no-op of dropping it on the column it is already in.)
+    rerender(
+      <Board
+        board={{ projectId: 'prj_1', groups: [{ ...errandGroup([]), columns: errandGroup([]).columns.map((column) => (column.stateId === 'doing' ? { ...column, cards: [boardCardSeed()] } : column)) }] }}
+        onOpenTicket={() => {}}
+        moves={moves}
+      />,
+    );
+
     const second = fakeDataTransfer();
     dragCard(boardCardSeed().ticketId, second);
-    dropOnColumn('doing', second);
+    dropOnColumn('waiting', second);
     await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(2));
 
     expect(source.ingested).toHaveLength(2);
     expect(source.ingested[0]![0]!.payload).toEqual({ to: 'doing' });
-    expect(source.ingested[1]![0]!.payload).toEqual({ to: 'doing' });
+    expect(source.ingested[1]![0]!.payload).toEqual({ to: 'waiting' });
   });
 });
 
