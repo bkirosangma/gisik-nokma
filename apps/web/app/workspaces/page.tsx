@@ -722,8 +722,11 @@ function InvitationBanner() {
                       invitations do not present two identically-named buttons —
                       the accessible-name floor this shell ratchets is about
                       exactly that. */}
+                  {/* Styling refresh Plan B (Task B14, B-D4): Accept is the quiet
+                      (ghost) `Button`, not a primary. It renders once PER
+                      pending invitation, so a primary here made N + 1 loud
+                      elements beside Create workspace; rule 01 wants one. */}
                   <Button
-                    variant="primary"
                     type="button"
                     disabled={busy !== null}
                     aria-label={`Accept the invitation to ${workspace}`}
