@@ -1515,11 +1515,45 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: -1px;
 }
 .gn-board__card-slot--placeholder > .gn-board-card { visibility: hidden; }
-/* THE DROP TARGET (plan D25): a board drop changes state, it does not
-   reorder, so the column is outlined rather than given a placeholder at an
-   index it would not honour. Inside the edge so the rail does not shift.
-   The accent — rule 03's one accent, saved for the action; this is it. */
+/* THE DROP TARGET (plan D25, SUPERSEDED by owner feedback 2026-09-30: D25
+   assumed the landing slot was unknowable; it is not — a column is ordered by
+   ticket id, see `landingIndex` in board.tsx). A column under a drag is still
+   OUTLINED — inside the edge so the rail does not shift, in rule 03's one
+   accent, saved for the action; this is it. The outline is KEPT beside the
+   placeholder because it is the only signal a collapsed strip (no list, so no
+   placeholder) and a drag from another workflow group have, and because the
+   placeholder's own recessed look is nearly flat under minimal (no shadow). A
+   LEGAL target also holds `.gn-board__drop-placeholder` at the true landing
+   slot; an ILLEGAL one is `--drop-refused` instead and takes no outline. */
 .gn-board__column--drop-target { outline: 2px solid var(--gn-accent); outline-offset: -2px; }
+/* The landing slot: the source placeholder's own recessed look (above), at the
+   dragged card's measured height (inline `height`). It opens over the move
+   token — 200ms, ease-out — from a zero-height slot, its negative margin
+   cancelling the flex gap until it is open, so the cards below slide down
+   rather than jump. Never hit-tested: the drop lands on the column. */
+.gn-board__drop-placeholder {
+  flex: none;
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-card);
+  outline: 1px dashed var(--gn-border);
+  outline-offset: -1px;
+  pointer-events: none;
+  animation: gnDropSlot var(--gn-motion-move) var(--gn-motion-ease-out);
+}
+@keyframes gnDropSlot {
+  from { height: 0; margin-bottom: -0.5rem; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-board__drop-placeholder { animation: none; }
+}
+/* CAN'T DROP HERE (owner 2026-09-30): a target with no legal move from the
+   dragged card's state. Muted, and `not-allowed` — the same as the drag's own
+   `dropEffect = 'none'`, which is what actually draws the cursor mid-drag. The
+   card-slot rule has to be named: its `[draggable]` `grab` is more specific
+   than a bare descendant. */
+.gn-board__column--drop-refused { opacity: 0.55; cursor: not-allowed; }
+.gn-board__column--drop-refused .gn-board__card-slot { cursor: not-allowed; }
 .gn-board-card__title {
   font: inherit;
   font-size: 0.9375rem;
