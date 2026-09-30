@@ -191,3 +191,8 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 - ✅ **20.302 — no notes, comment or editor-chrome rule paints a flat boundary or the retired constant;** control: the scan reads more than 60 rules under `gn-notes` and more than 10 under `gn-comment`, and with no kept list it reports exactly neo's unchecked task-list box (a control's own sunken coat, kept, and it still carries `border-strong`). Mutations: delete `border-color` from that neo rule; and plant `background: var(--gn-surface-sunken)` into `.gn-notes__deleted`.
 - ✅ **20.303 — Create is the new-note dialog's ONE loud element: exactly one primary `Button` is on the page while it is open and it is Create;** control: the list's New note is a named button and is not a primary. Mutation: drop `variant="primary"` from Create in `create-note-dialog.tsx`.
 - ✅ **20.304 — Keep is the draft-restore banner's one loud action; Discard is quiet;** control: both are named buttons. Mutation: add `variant="primary"` to Discard in `draft-restore-banner.tsx`.
+
+## 20.30 Plan B — My work
+
+- ✅ **20.291 — My work paints no flat boundary and no retired control constant under `gn-my-work` / `gn-attention`, so it inherits the refresh through the shared layers alone;** control: the scan reads at least 15 rules under those prefixes, including the row-title rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-my-work__title` (replacing its `background: none`).
+- ✅ **20.292 — My work's and the attention list's row titles keep their declared 24px in-list floor (they are the doors, and `DENSE_IN_LIST` names them);** control: the attention item row keeps the same floor. Mutation: set `.gn-my-work__title`'s `min-height` to `1rem`.
