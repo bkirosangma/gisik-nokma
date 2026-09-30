@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReadingMeta } from './reading-meta.js';
-import { findScroller } from './scroller.js';
+import { findScroller, sameScroller, type Scroller } from './scroller.js';
 
 /**
  * The sticky table of contents for a long document (spec §8.2), ported from
@@ -58,10 +58,6 @@ export function ReadingTOC({ headings, scrollContainerRef }: ReadingTOCProps): R
     if (headings.length < MIN_HEADINGS) return;
     const root = scrollContainerRef.current;
     if (root === null) return;
-    // The IntersectionObserver root is the scroller ONLY when one element
-    // scrolls; the window scrolls on the note page, and an observer rooted at
-    // a non-scrolling, page-tall element would call every heading visible.
-    const scroller = findScroller(root);
     const targets = headings
       .map((h) => root.querySelector(`#${CSS.escape(h.id)}`))
       .filter((el): el is Element => el !== null);
@@ -70,21 +66,43 @@ export function ReadingTOC({ headings, scrollContainerRef }: ReadingTOCProps): R
     // that cannot observe is not a failure, it is an unhighlighted list.
     if (typeof IntersectionObserver === 'undefined') return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) return;
-        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        const id = visible[0]?.target.id;
-        if (id !== undefined && id !== '') setActiveId(id);
-      },
-      // The top margin pulls the trigger zone down so the highlight moves as a
-      // heading APPROACHES the top of the reading area, not only once it has
-      // passed it.
-      { root: scroller.kind === 'element' ? scroller.element : null, rootMargin: '-10% 0px -70% 0px', threshold: 0 },
-    );
-    for (const target of targets) observer.observe(target);
-    return () => observer.disconnect();
+    // The IntersectionObserver root is the scroller ONLY when one element
+    // scrolls (the note page's document column above 60rem); at and below it
+    // the window scrolls, and an observer rooted at a non-scrolling, page-tall
+    // element would call every heading visible.
+    const observe = (scroller: Scroller): IntersectionObserver => {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.filter((entry) => entry.isIntersecting);
+          if (visible.length === 0) return;
+          visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+          const id = visible[0]?.target.id;
+          if (id !== undefined && id !== '') setActiveId(id);
+        },
+        // The top margin pulls the trigger zone down so the highlight moves as a
+        // heading APPROACHES the top of the reading area, not only once it has
+        // passed it.
+        { root: scroller.kind === 'element' ? scroller.element : null, rootMargin: '-10% 0px -70% 0px', threshold: 0 },
+      );
+      for (const target of targets) observer.observe(target);
+      return observer;
+    };
+    let scroller = findScroller(root);
+    let observer = observe(scroller);
+    // The scroller changes under an open page when the viewport crosses the
+    // breakpoint (`scroller.ts`): re-root only when the answer differs.
+    const onResize = (): void => {
+      const next = findScroller(root);
+      if (sameScroller(scroller, next)) return;
+      observer.disconnect();
+      scroller = next;
+      observer = observe(scroller);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      observer.disconnect();
+    };
   }, [headings, scrollContainerRef]);
 
   if (headings.length < MIN_HEADINGS) return null;

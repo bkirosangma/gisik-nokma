@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { findScroller, readingProgress, scrollEventTarget } from './scroller.js';
+import { findScroller, readingProgress, sameScroller, scrollEventTarget } from './scroller.js';
 
 /**
  * The thin reading-progress bar, ported from the knowledge-base app's
@@ -8,8 +8,9 @@ import { findScroller, readingProgress, scrollEventTarget } from './scroller.js'
  * ## WHAT CHANGED FROM THE SOURCE
  *
  * - **The ref names the reading surface, not the scroller** — see
- *   `scroller.ts`: gisik's page scrolls the window, so `scrollTop` on the
- *   surface would pin the bar at 0.
+ *   `scroller.ts`: gisik's note page scrolls the window at and below 60rem and
+ *   its document column above, so `scrollTop` on the surface would pin the bar
+ *   at 0; the scroller is re-resolved on a window `resize`.
  * - **`transform: scaleX`, not an animated `width`** — no layout per frame.
  *   The transition is dropped under `prefers-reduced-motion` (the skin's rule).
  * - **`requestAnimationFrame`-coalesced** scroll and resize updates, and state
@@ -36,8 +37,8 @@ export function ReadingProgress({ scrollContainerRef, resetKey }: ReadingProgres
     setProgress(0);
     const surface = scrollContainerRef.current;
     if (surface === null) return;
-    const scroller = findScroller(surface);
-    const target = scrollEventTarget(scroller);
+    let scroller = findScroller(surface);
+    let target = scrollEventTarget(scroller);
     let frame = 0;
     const update = (): void => {
       frame = 0;
@@ -46,9 +47,22 @@ export function ReadingProgress({ scrollContainerRef, resetKey }: ReadingProgres
     const schedule = (): void => {
       if (frame === 0) frame = requestAnimationFrame(update);
     };
+    // The scroller can change under an open page (the note page's window →
+    // document column at 60rem, see `scroller.ts`): move the scroll listener to
+    // whichever element scrolls now, then redraw against it.
+    const onResize = (): void => {
+      const next = findScroller(surface);
+      if (!sameScroller(scroller, next)) {
+        target.removeEventListener('scroll', schedule);
+        scroller = next;
+        target = scrollEventTarget(scroller);
+        target.addEventListener('scroll', schedule, { passive: true });
+      }
+      schedule();
+    };
     update();
     target.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
+    window.addEventListener('resize', onResize);
     // The surface grows as the note is written or images load; the window's
     // `resize` does not see that.
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
@@ -56,7 +70,7 @@ export function ReadingProgress({ scrollContainerRef, resetKey }: ReadingProgres
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
       target.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener('resize', onResize);
       observer?.disconnect();
     };
   }, [scrollContainerRef, resetKey]);

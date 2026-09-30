@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -206,5 +208,158 @@ describe('9.408 ReadingTOC scrollspy root', () => {
     const paneHost = mountToc(true);
     render(<ReadingTOC headings={THREE} scrollContainerRef={paneHost.ref} />);
     expect(seen).toEqual([paneHost.host]);
+  });
+});
+
+/**
+ * 9.500–9.502 — the scroller is re-resolved when the viewport crosses the
+ * breakpoint at which it changes (notes split-scroll, 2026-09-30).
+ *
+ * The note page scrolls the WINDOW at and below 60rem and the DOCUMENT COLUMN
+ * above it. `findScroller` answers correctly for whichever regime the page
+ * MOUNTED in (9.405–9.408), but both readers resolved it once: a window resized
+ * (or a tablet rotated) across 60rem left them listening to the regime they
+ * started in — a progress bar frozen at 0 and a scrollspy that never moves.
+ * jsdom has no layout, so the regime is flipped the way 9.406 sets it up: the
+ * ancestor's inline `overflow-y`, then a window `resize`.
+ */
+function paneProgressFixture() {
+  vi.stubGlobal('innerHeight', 800);
+  const pane = document.createElement('div');
+  Object.defineProperty(pane, 'scrollHeight', { value: 1000 });
+  Object.defineProperty(pane, 'clientHeight', { value: 500 });
+  document.body.append(pane);
+  const surface = document.createElement('div');
+  let top = 0;
+  surface.getBoundingClientRect = () => rect(top, 2000);
+  pane.append(surface);
+  return { pane, ref: { current: surface }, setTop: (value: number) => (top = value) };
+}
+
+describe('9.500 ReadingProgress follows the scroller across a regime change', () => {
+  it('9.500 window → column on a resize that makes an ancestor scroll, and back; the regime it left is ignored', async () => {
+    const { pane, ref, setTop } = paneProgressFixture();
+    render(<ReadingProgress scrollContainerRef={ref} />);
+    const bar = screen.getByRole('progressbar');
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
+
+    // CONTROL (same `it`): at mount nothing scrolls but the window, so the pane is ignored and the window is read.
+    pane.scrollTop = 250;
+    fireEvent.scroll(pane);
+    await settle();
+    expect(bar.getAttribute('aria-valuenow')).toBe('0');
+    setTop(-600); // half of the surface's 1200px range
+    fireEvent.scroll(window);
+    await vi.waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('50'));
+
+    // The viewport grows past the breakpoint: the column now scrolls.
+    pane.style.overflowY = 'auto';
+    pane.scrollTop = 100; // 100 / (1000 − 500) = 20 %
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    await vi.waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('20'));
+    pane.scrollTop = 250;
+    fireEvent.scroll(pane);
+    await vi.waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('50'));
+    setTop(0);
+    act(() => {
+      fireEvent.scroll(window); // the window moving is not the column
+    });
+    await settle();
+    expect(bar.getAttribute('aria-valuenow')).toBe('50');
+
+    // …and back below the breakpoint: the window again, the column ignored.
+    pane.style.overflowY = '';
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    await vi.waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('0'));
+    pane.scrollTop = 400;
+    fireEvent.scroll(pane);
+    await settle();
+    expect(bar.getAttribute('aria-valuenow')).toBe('0');
+    setTop(-1200);
+    fireEvent.scroll(window);
+    await vi.waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('100'));
+  });
+});
+
+describe('9.501 ReadingTOC re-roots its scrollspy across a regime change', () => {
+  it('9.501 observes the column after a resize makes it scroll and the viewport after it stops; a resize that changes nothing does not rebuild', () => {
+    const roots: Array<Element | Document | null | undefined> = [];
+    let disconnects = 0;
+    class FakeObserver {
+      constructor(_cb: unknown, options: IntersectionObserverInit) {
+        roots.push(options.root);
+      }
+      observe() {}
+      disconnect() {
+        disconnects += 1;
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
+    const { host, ref } = mountToc(false);
+    render(<ReadingTOC headings={THREE} scrollContainerRef={ref} />);
+    expect(roots).toEqual([null]); // CONTROL: the window regime at mount
+
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    expect(roots).toEqual([null]); // unchanged regime: no rebuild
+    expect(disconnects).toBe(0);
+
+    host.style.overflowY = 'auto';
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    expect(roots).toEqual([null, host]);
+    expect(disconnects).toBe(1);
+
+    host.style.overflowY = '';
+    act(() => {
+      fireEvent(window, new Event('resize'));
+    });
+    expect(roots).toEqual([null, host, null]);
+    expect(disconnects).toBe(2);
+  });
+});
+
+describe('9.502 every popup that repositions on scroll listens in the CAPTURE phase', () => {
+  /**
+   * `scroll` does not bubble, so a listener on `window` hears an ELEMENT's scroll
+   * only in the capture phase. Above 60rem the note scrolls inside
+   * `.gn-notes__document`, not the window: a popup whose listener were bubble-phase
+   * would stay where it was while its anchor moved. The four binders are read as
+   * source (they need an editor view and a layout to run for real — the 🧪 case
+   * 18.491 measures them) and the PRIMITIVE is proved live below: a capture
+   * listener on `window` fires for an element's scroll, a bubble one does not.
+   */
+  const FILES = [
+    'src/extensions/suggestion-popup-position.ts',
+    'src/extensions/wiki-link.ts',
+    'src/components/LinkEditorPopover.tsx',
+    'src/components/TableFloatingToolbar.tsx',
+  ];
+
+  it('9.502 the primitive holds, and each binder registers `window` scroll with capture: true', () => {
+    const pane = document.createElement('div');
+    document.body.append(pane);
+    const captured = vi.fn();
+    const bubbled = vi.fn();
+    window.addEventListener('scroll', captured, true);
+    window.addEventListener('scroll', bubbled, false);
+    pane.dispatchEvent(new Event('scroll'));
+    window.removeEventListener('scroll', captured, true);
+    window.removeEventListener('scroll', bubbled, false);
+    expect(captured).toHaveBeenCalledTimes(1);
+    expect(bubbled).not.toHaveBeenCalled(); // the control that makes the line above mean something
+
+    for (const file of FILES) {
+      const source = readFileSync(join(__dirname, '..', file), 'utf8');
+      const registrations = [...source.matchAll(/window\.addEventListener\(\s*'scroll'\s*,[^)]*\)/g)].map((m) => m[0]);
+      expect(registrations.length, file).toBeGreaterThan(0);
+      for (const registration of registrations) expect(registration, file).toMatch(/,\s*true\s*\)$/);
+    }
   });
 });
