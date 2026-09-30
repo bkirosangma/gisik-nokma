@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -205,9 +205,22 @@ async function openTheSheet(readKey: string | null = null, answer: Answer = COMM
   await screen.findByRole('button', { name: 'Delete' });
 }
 
-afterEach(() => {
+afterEach(async () => {
   ingested = [];
   listCalls = 0;
+  // THE TIMER, found: it is a LIBRARY timer, Tiptap's deferred `useEditor` destroy — NOT one of this repo's
+  // editor timers (`code-block-copy.ts`, `heading-anchors.ts`, `wiki-link.ts`). In
+  // `@tiptap/react@3.30.5 src/useEditor.ts`, `EditorInstanceManager.scheduleDestroy()` does
+  //   `this.scheduledDestructionTimeout = setTimeout(() => { … currentEditor.destroy() … }, 1)`   (:296, destroy at :303)
+  // and unmount calls it, so the editor is destroyed ONE TICK AFTER the tree unmounts. `Editor.destroy` →
+  // `EditorView.destroyPluginViews` → `PasteRule.ts:282` reads `window`. With `13.1180`'s fake clock still
+  // installed that 1 ms timer belongs to the fake clock and fires (vitest `callTimer`) after jsdom is torn
+  // down when the suite is slow: "window is not defined", exit 1 with every test green.
+  // THE CHOICE (owner, 2026-10-01): flush it inside `act()` in this `afterEach`, while `window` exists, and
+  // then restore real timers — rather than hunting for a way to keep the editor mounted or stubbing tiptap.
+  cleanup();
+  if (vi.isFakeTimers()) await act(async () => vi.runOnlyPendingTimers());
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -431,6 +444,12 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
     expect(ingested[1]![0]!.type).toBe('ticket.restored');
     expect(ingested[1]![0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
     expect(ingested[1]![0]!.payload).toEqual({});
+  });
+
+  it('13.1180 GUARD — the case above leaves no fake clock behind for the next one', () => {
+    // Deterministic form of the load-only flake: the fake clock `13.1180` installs must be gone by the time
+    // the next case starts, or tiptap's destroy timer outlives the jsdom environment. Placed straight after it.
+    expect(vi.isFakeTimers()).toBe(false);
   });
 
   it('13.1180 CONTROL — dismissing the STRIP posts nothing', async () => {

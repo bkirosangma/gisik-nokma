@@ -634,7 +634,13 @@ plus a partial index → a filter at every view-serving SELECT.
   passed`). The strip's Undo carries a **distinct accessible name** (`Undo the deletion of <title>`)
   because the toast's control is called "Undo" too; the visible word is unchanged and the accessible name
   contains it, so WCAG 2.5.3 holds, and a page-wide `getByRole('button', {name: 'Undo'})` stays
-  unambiguous. — (`apps/web/test/sheet-delete.test.tsx`)
+  unambiguous. **Flake fix (2026-10-01):** this case's fake clock was never uninstalled, and the timer it
+  then owned is a LIBRARY one — Tiptap's deferred `useEditor` destroy (`@tiptap/react` `useEditor.ts`,
+  `scheduleDestroy`, a 1 ms `setTimeout`), not one of the repo's own editor timers (`code-block-copy.ts`,
+  `heading-anchors.ts`, `wiki-link.ts`) — so under load it fired after jsdom was torn down (`window is not
+  defined` at `PasteRule.ts:282`, vitest exit 1 with every test green). The file's `afterEach` now
+  unmounts, flushes that destroy inside `act()` while `window` exists, and restores real timers; a GUARD
+  case straight after this one asserts `vi.isFakeTimers()` is `false`. — (`apps/web/test/sheet-delete.test.tsx`)
 
 - **13.1183** ✅ **`Delete` ASKS FIRST (ruling E2-35, 2026-09-21).** The footer's control performed the
   delete on ONE press, while the product reaches **the same soft delete** on many tickets through a whole
