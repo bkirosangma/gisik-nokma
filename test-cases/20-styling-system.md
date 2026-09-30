@@ -64,6 +64,12 @@ the number you added.
 - ✅ **20.202 — the roster helper reads a pattern exactly: a planted rule carrying every P-TRACK declaration passes, and the same rule missing one declaration fails naming that property;** control: `expectRow` throws on a selector list that matches no rule. Mutation: make `expectRow` skip the `box-shadow` key.
 - ✅ **20.203 — the flat-boundary scanner finds a `surface-sunken` background and the retired `fill-tertiary` + `text-accent` control constant among rules naming a prefix, ignores comments, and honours the kept list;** control: a rule under an unrelated prefix is not reported. Mutation: drop the `text-accent` half of the constant check.
 
+## 20.22 Plan B — shared fields and the segmented control
+
+- ✅ **20.211 — shared fields sit recessed (the `track` inset, keeping their accessible edge); the segmented control is a recessed pill track whose items are pills — text2 at rest, the selected one raised on the `lift` shadow in `text`; the sheet's Attach file is a quiet outlined control; a visibility viewer chip is not raised;** control: every audited rule keeps what the table says it keeps (the field's 1px `border`). Mutation: remove `box-shadow` from `.gn-field__input`.
+- ✅ **20.212 — no shared-field or segmented rule paints a flat boundary, and the three kept rules (the disabled field, neo's sunken field, neo's pressed tab) are still declared unchanged;** control: `stillDeclared` finds all three. Mutation: delete `[data-style="neo"] .gn-segmented__item--on`.
+- ✅ **20.213 — under `neo` the selected segmented tab stays PRESSED: its rule restates `box-shadow: var(--gn-shadow-selected)` (neo's inset), because the base rule now reads `--gn-shadow-lift`, which is neo's OUTSET raised pair (B-D3, 10.80; Plan B Review Focus 4);** control: in hig and minimal the same base rule reads `lift` (raised, not pressed). Mutation: remove `box-shadow` from `[data-style="neo"] .gn-segmented__item--on`.
+
 ## 20.24 Plan B — the app shell and navigation
 
 - ✅ **20.231 — the navigation's current item is raised (the `lift` shadow on the raised ground, `text` at 600) instead of accent-coloured, its links transition in the feedback time with a 12px radius, the bar and the theme toggle rest on `lift`, the skip link floats near, and the account menu's sign-out separator is a decorative hairline;** control: the non-current links keep `text-muted`. Mutation: restore `color: var(--gn-text-accent)` on the current item.
