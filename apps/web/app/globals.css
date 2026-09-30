@@ -55,7 +55,8 @@ textarea:focus::placeholder {
   border-radius: var(--gn-radius-control);
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B4): lift-near — it floats above the bar when focused (rule 04). */
+  box-shadow: var(--gn-shadow-lift-near);
 }
 .gn-skip:focus {
   left: 0.75rem;
@@ -1828,7 +1829,8 @@ input, textarea, select { font-family: inherit; }
   top: 0;
   z-index: 20;
   background: var(--gn-surface);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B4): P-RAISED's lit-edge `lift` shadow — the sticky bar's depth (rule 04). */
+  box-shadow: var(--gn-shadow-lift);
 }
 /* Raised off the page, on request — same `--gn-shadow-raised` role as
    `.gn-theme-toggle` and `.gn-card` above, reused rather than a bespoke
@@ -2245,7 +2247,8 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__menu .gn-nav__menu-item--signout {
   margin-top: 0.375rem;
   padding-top: 0.375rem;
-  border-top: 1px solid var(--gn-border);
+  /* Styling refresh Plan B (Task B4): a decorative hairline (`fill-secondary`, Plan A D18) — a separator, not a boundary, so it is not a 4.27:1 rule. */
+  border-top: 1px solid var(--gn-fill-secondary);
   border-radius: 0 0 var(--gn-radius-control) var(--gn-radius-control);
 }
 /* E2-45 — a sign-out that failed says so where the control is. The colour,
@@ -2318,13 +2321,14 @@ input, textarea, select { font-family: inherit; }
    colour, so outside the token-discipline scanner's remit. */
 .gn-nav a,
 .gn-nav__more-toggle {
-  border-radius: 0.375rem;
+  /* Styling refresh Plan B (Task B4): 12px radius (rule 05) and the feedback-time transition (rule 12). */
+  border-radius: 0.75rem;
   padding-inline: 0.875rem;
   font-weight: 500;
   letter-spacing: -0.1px;
   color: var(--gn-text-muted);
   text-decoration: none;
-  transition: background .15s ease, color .15s ease;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
   /* A `<button>` brings chrome an `<a>` never had — a `ButtonFace` ground, an
      outset border and a default cursor. `.gn-nav__more-toggle` is the one nav
      button with no `.gn-button`, so nothing else clears them, and at 390 px it
@@ -2345,16 +2349,21 @@ input, textarea, select { font-family: inherit; }
    affordance beyond the tap-target box above. Same PAIR `.gn-button` (ghost,
    the ubiquitous default) already puts on screen everywhere — background
    `--gn-fill-tertiary`, foreground `--gn-text-accent` — so this introduces no
-   contrast pair the token-discipline gate has not already measured. */
+   contrast pair the token-discipline gate has not already measured.
+
+   Styling refresh Plan B (Task B4): the current item is RAISED, not accent-
+   coloured — the raised ground on the lit-edge `lift` shadow, `text` at 600
+   (rule 03: the accent is saved for each page's own action). */
 .gn-nav a[aria-current='page'],
 .gn-nav button[aria-current='page'] {
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
-  font-weight: 700;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  color: var(--gn-text);
+  font-weight: 600;
   /* Matches `.gn-nav a`'s own fixed radius above, not `--gn-radius-control` —
      see that rule's docblock. Restated here for `button[aria-current='page']`,
      which the base `.gn-nav a` rule does not reach. */
-  border-radius: 0.375rem;
+  border-radius: 0.75rem;
 }
 /* `neo`'s pressed-tab look — the current item reads as a depressed surface,
    not a flat fill. Same pattern `[data-style="neo"] .gn-field__input` already
@@ -2379,7 +2388,8 @@ input, textarea, select { font-family: inherit; }
    none (flat by design, `SHADOWS.minimal` is empty in both roles), `neo` as
    the two-layer lift `.gn-card` gets. */
 .gn-theme-toggle {
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B4): P-RAISED's lit-edge `lift` shadow (rule 04). */
+  box-shadow: var(--gn-shadow-lift);
 }
 /* The scope note beside the always-items when no workspace is in the route
    (Round 19b) — muted, one line, no surface, the same treatment
