@@ -1182,6 +1182,8 @@ function BoardGroupSection({
     verdictOf(dropTarget) === 'legal'
       ? dropTarget
       : null;
+  // Clearing `dropTarget` (leave, drop, Esc, dragend) is what puts a sprung column back: `armed` goes null and this
+  // effect's first line closes whatever was open. Nothing else needs to reach `setSpringOpen`.
   const [springOpen, setSpringOpen] = useState<string | null>(null);
   useEffect(() => {
     setSpringOpen(null);
@@ -1197,7 +1199,6 @@ function BoardGroupSection({
     const clear = (): void => {
       depthRef.current.clear();
       setDropTarget(null);
-      setSpringOpen(null);
       setDrag(null);
     };
     document.addEventListener('dragend', clear);
@@ -1293,7 +1294,6 @@ function BoardGroupSection({
         onDragEnd={() => {
           depthRef.current.clear();
           setDropTarget(null);
-          setSpringOpen(null);
           setDrag(null);
         }}
       >

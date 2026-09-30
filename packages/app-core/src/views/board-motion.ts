@@ -66,7 +66,7 @@ export function createEdgeScroller(): { begin: () => void; end: () => void } {
   let frame: number | null = null;
   let active = false;
 
-  const velocity = (): { x: number; y: number; rail: Element | null } => {
+  const scrollStep = (): { x: number; y: number; rail: Element | null } => {
     if (pointer === null) return { x: 0, y: 0, rail: null };
     let y = 0;
     const fromTop = pointer.y;
@@ -91,7 +91,7 @@ export function createEdgeScroller(): { begin: () => void; end: () => void } {
 
   const tick = (): void => {
     frame = null;
-    const { x, y, rail } = velocity();
+    const { x, y, rail } = scrollStep();
     if (x === 0 && y === 0) return;
     if (y !== 0) window.scrollBy(0, y);
     if (x !== 0 && rail !== null) rail.scrollLeft += x;
@@ -106,7 +106,7 @@ export function createEdgeScroller(): { begin: () => void; end: () => void } {
       y: mouse.clientY,
       rail: target instanceof Element ? target.closest('.gn-board__rail') : null,
     };
-    const { x, y } = velocity();
+    const { x, y } = scrollStep();
     if (x === 0 && y === 0) stopLoop();
     else if (frame === null) frame = window.requestAnimationFrame(tick);
   };
