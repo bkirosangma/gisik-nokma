@@ -1793,6 +1793,7 @@ judge corrected the finding's "only sweep" absolute — `e2e-viewport/responsive
   `inline-block` (its rule sets no `display`), so a min size applies to it, unlike the `padding: 0` bare
   buttons elsewhere in the file whose height is their line box. `ui.css` and `e2e-viewport/tap-targets.ts`
   were each reverted to `HEAD` for the RED run and restored from sha256-compared backups.
+  **Amended 2026-09-29 by 20.059:** the floor is now 44px (a ghost control in the card's footer); the `DENSE_IN_LIST` classification is kept, and a 44px target satisfies it.
 
 ### ⚠ Clause (b) of the membership rule is UNMET, recorded rather than implied
 
