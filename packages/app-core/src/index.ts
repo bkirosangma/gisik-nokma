@@ -382,7 +382,8 @@ export {
 // (`createSessionsClient`) is an `apps/web`-local export, matching how
 // `NotificationPreferencesGateway` above is named here while its own HTTP
 // implementation lives at the package root's `./online` instead.
-export type { SessionsClient, SessionSummary } from './account/sessions-client.js';
+export type { SessionsClient, DeviceSummary } from './account/sessions-client.js';
+export { relativeTime } from './account/relative-time.js';
 export {
   SessionsSection,
   type SessionsSectionProps,

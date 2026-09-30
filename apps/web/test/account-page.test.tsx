@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import type { DeletedItem } from '@gisik-nokma/domain';
 
@@ -16,7 +16,8 @@ vi.mock('next/navigation', () => ({
  * statement in this file, so a factory closing over a module-level binding
  * declared below it throws `ReferenceError: Cannot access 'updateUser' before
  * initialization` at import time (documented precedent: `test/sign-in.test.tsx`'s
- * own docblock on this exact mistake). `listSessions`/`revokeSession` (Task 7)
+ * own docblock on this exact mistake). `fetchMock`/`revokeOtherSessions` (devices plan Task 6, replacing
+ * Task 7's `listSessions`/`revokeSession`)
  * and `listUserPasskeys`/`addPasskey`/`deletePasskey` (Task 8) join the SAME
  * `vi.hoisted` call rather than a second one — there is exactly one
  * `vi.mock('../src/auth-client.js', ...)` call in this file, extended here,
@@ -32,8 +33,8 @@ vi.mock('next/navigation', () => ({
  */
 const {
   updateUser,
-  listSessions,
-  revokeSession,
+  fetchMock,
+  revokeOtherSessions,
   listUserPasskeys,
   addPasskey,
   deletePasskey,
@@ -57,8 +58,8 @@ const {
   };
   return {
     updateUser: vi.fn(),
-    listSessions: vi.fn(),
-    revokeSession: vi.fn(),
+    fetchMock: vi.fn(),
+    revokeOtherSessions: vi.fn(),
     listUserPasskeys: vi.fn(),
     addPasskey: vi.fn(),
     deletePasskey: vi.fn(),
@@ -70,8 +71,7 @@ vi.mock('../src/auth-client.js', () => ({
     signOut: vi.fn(),
     useSession: () => ({ data: sessionAnswer.current }),
     updateUser,
-    listSessions,
-    revokeSession,
+    revokeOtherSessions,
     // Task 8. Nested under `passkey` because that is where better-auth's
     // generated client puts them: each server endpoint path
     // (`/passkey/list-user-passkeys`, `/passkey/delete-passkey`) becomes a
@@ -86,7 +86,7 @@ import { stubServices } from './helpers/stub-services.js';
 
 /**
  * Task 8. Only the three passkey mocks and the session answer are touched:
- * every pre-Task-8 case sets its own `updateUser`/`listSessions` expectation
+ * every pre-Task-8 case sets its own `updateUser`/`fetchMock` expectation
  * inside the test body, so those are deliberately left alone.
  *
  * `listUserPasskeys` gets a benign default because the page now reads it on
@@ -95,7 +95,39 @@ import { stubServices } from './helpers/stub-services.js';
  * rejection branch, which renders the same empty state a real empty answer
  * does. That is a passing test for the wrong reason in ten places at once.
  */
+/** A `Response`-shaped answer for the stubbed `fetch` (the devices list and per-device sign-out are plain fetches). */
+const reply = (status: number, body: unknown = {}) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+/** One `GET /v1/me/devices` row as the server sends it (the adapter derives `label` from `userAgent`). */
+const serverDevice = (over: Record<string, unknown> = {}) => ({
+  key: 'k1',
+  tag: '7F3K',
+  userAgent: null,
+  isCurrent: false,
+  lastSeenAt: new Date().toISOString(),
+  firstSignedInAt: '2026-09-05T00:00:00.000Z',
+  sessionCount: 1,
+  legacy: false,
+  ...over,
+});
+/** Answers `GET /v1/me/devices` with `devices`, every other read with a 500 and every write with `answer` (default 204). */
+function serveDevices(devices: unknown[], answer: ReturnType<typeof reply> = reply(204)) {
+  fetchMock.mockImplementation(async (url: string, init?: { method?: string }) =>
+    (init?.method ?? 'GET') === 'GET'
+      ? url === '/v1/me/devices'
+        ? reply(200, { devices })
+        : // Any OTHER read on the page (the MCP cards mount on /account too) stays refused, as it was before fetch was stubbed.
+          reply(500)
+      : answer,
+  );
+}
+const deviceReads = () => fetchMock.mock.calls.filter(([url, init]) => url === '/v1/me/devices' && (init?.method ?? 'GET') === 'GET').length;
+
+afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
+  fetchMock.mockReset();
+  serveDevices([]);
+  vi.stubGlobal('fetch', fetchMock);
+  revokeOtherSessions.mockReset();
   sessionAnswer.current = sessionAnswer.initial;
   listUserPasskeys.mockReset();
   listUserPasskeys.mockResolvedValue({ data: [], error: null });
@@ -519,102 +551,75 @@ describe('AccountPage — Your workspaces', () => {
   });
 });
 
+/**
+ * **Rewritten 2026-10-01 by the devices plan (Task 6):** the section lists DEVICES read from
+ * `GET /v1/me/devices` (a plain `fetch`, stubbed here) and signs one out with
+ * `POST /v1/me/devices/:key/sign-out`; "Sign out all other devices" is better-auth's `revokeOtherSessions`.
+ */
 describe('AccountPage — Sessions', () => {
-  it('lists sessions and lets you revoke a non-current one', async () => {
-    // `createdAt`/`updatedAt` as real `Date` instances, not string literals —
-    // matching what the real `authClient.listSessions()` actually resolves
-    // (its fetch client revives ISO date strings back into `Date` on the way
-    // in; see `apps/web/src/account/account-clients.ts`'s docblock). A string
-    // literal here would let the adapter's `.toISOString()` conversion go
-    // completely unexercised while still typechecking and still passing.
-    //
-    // The `userAgent` below is a REAL, full Chrome-on-Mac string, not the
-    // hand-abbreviated `'Mozilla/5.0 Chrome Mac'` this fixture originally
-    // carried — that abbreviation put the browser token BEFORE the OS token,
-    // which is backwards from every real UA string, and is exactly what let
-    // `deviceLabelOf`'s original ordered-regex bug ship undetected (see
-    // `account-clients.ts`'s docblock and `test/account-clients.test.ts`,
-    // which drives that function directly against 9 real UA strings).
-    listSessions.mockResolvedValue({
-      data: [
-        {
-          token: 'current-token',
-          createdAt: new Date('2026-09-01T00:00:00Z'),
-          updatedAt: new Date('2026-09-14T00:00:00Z'),
-          userAgent:
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
-      ],
-      error: null,
-    });
-    revokeSession.mockResolvedValue({ error: null });
+  const CHROME_MAC =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  it('6.334 lists devices from GET /v1/me/devices (not authClient.listSessions) and signs ONE other device out by key; control: the list is re-read after', async () => {
+    serveDevices([
+      serverDevice({ key: 'k-current', tag: '7F3K', isCurrent: true, userAgent: CHROME_MAC }),
+      serverDevice({ key: 'k/other', tag: 'Q2ZA', userAgent: null }),
+    ]);
     const user = userEvent.setup();
     mount();
-    expect(await screen.findByText('Chrome on Mac')).toBeInTheDocument();
-    expect(screen.getByText('Unknown device')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
+    expect(await screen.findByText('Chrome on Mac · 7F3K')).toBeInTheDocument();
+    expect(screen.getByText('Unknown device · Q2ZA')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/v1/me/devices', { credentials: 'include' });
+    const readsBefore = deviceReads();
+    await user.click(screen.getByRole('button', { name: /^Sign out this device/ }));
+    await waitFor(() => expect(deviceReads()).toBe(readsBefore + 1));
+    expect(fetchMock).toHaveBeenCalledWith('/v1/me/devices/k%2Fother/sign-out', { method: 'POST', credentials: 'include' });
+    expect(revokeOtherSessions).not.toHaveBeenCalled();
+  });
+
+  it('6.334 "Sign out all other devices" calls better-auth revokeOtherSessions, then re-reads the list', async () => {
+    serveDevices([serverDevice({ key: 'a', tag: 'AAAA', isCurrent: true }), serverDevice({ key: 'b', tag: 'BBBB' })]);
+    revokeOtherSessions.mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Sign out all other devices' }));
+    expect(revokeOtherSessions).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(deviceReads()).toBe(2));
   });
 
   /**
-   * RULING E2-24(b) — before this ruling `revokeSession`'s `{ error }` was
-   * read and discarded (`await sessionsClient.revoke(token);`): a refusal
-   * left the list simply failing to shrink, with nothing on screen to say
-   * why. The re-read count is compared as a DELTA around the click, not an
-   * absolute total — `listSessions`, unlike `listUserPasskeys`, is not
-   * reset between cases in this file, so an absolute count would silently
-   * include every earlier case's calls. `revokeSession`'s own `if
-   * (result.error === null) sessionsClient.list()…` must not fire on a
-   * refusal, or the session would appear to remain purely by coincidence of
-   * a re-list rather than because the refusal was actually honoured.
+   * RULING E2-24(b) - a refusal shows on screen and the list is NOT re-read (a re-list would make the
+   * device appear to remain purely by coincidence rather than because the refusal was honoured).
    */
-  it('a revoke refusal renders verbatim and the list is NOT re-read', async () => {
-    listSessions.mockResolvedValue({
-      data: [
-        { token: 'current-token', createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-14T00:00:00Z'), userAgent: null },
-        { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
-      ],
-      error: null,
-    });
-    revokeSession.mockResolvedValue({ error: { message: 'Session not found' } });
+  it('6.334 a refused per-device sign-out renders an alert and the list is NOT re-read', async () => {
+    serveDevices([serverDevice({ key: 'a', tag: 'AAAA', isCurrent: true }), serverDevice({ key: 'b', tag: 'BBBB' })], reply(409, { error: 'current_device' }));
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('button', { name: 'Sign out' });
-    const callsBeforeRevoke = listSessions.mock.calls.length;
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Session not found');
-    expect(listSessions.mock.calls.length).toBe(callsBeforeRevoke);
+    await user.click(await screen.findByRole('button', { name: /^Sign out this device/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('That device could not be signed out. Try again.');
+    expect(deviceReads()).toBe(1);
   });
 
-  it('renders "Last active" through the FULL pipeline — mocked Date, adapter\'s toISOString, then formatDateTime', async () => {
-    // Round 1 fixed the adapter's Date→string conversion; round 2 added a
-    // formatDateTime assertion, but only by feeding SessionsSection a
-    // hand-written string directly (packages/app-core/test/account/
-    // sessions-section.test.tsx), which never runs through this adapter's
-    // own `.toISOString()` call. Neither round on its own would catch a
-    // mutation IN THE ADAPTER — `.toISOString()` swapped for `String(value)`
-    // or `.toDateString()` — because nothing downstream of the mocked `Date`
-    // here read what the adapter actually produced. This case does: a real
-    // `Date` goes in, and the exact `formatDateTime` string comes out the
-    // other end of the real, un-mocked `account-clients.ts` and
-    // `SessionsSection`. Expected string confirmed by running
-    // `formatDateTime('2026-09-10T00:00:00.000Z')` directly, not computed by
-    // hand (same value `sessions-section.test.tsx`'s own case pins, for the
-    // same source instant, converted through `.toISOString()` first here).
-    listSessions.mockResolvedValue({
-      data: [
-        {
-          token: 'other-token',
-          createdAt: new Date('2026-09-05T00:00:00Z'),
-          updatedAt: new Date('2026-09-10T00:00:00Z'),
-          userAgent: null,
-        },
-      ],
-      error: null,
-    });
+  it('6.334 a refused "sign out all other devices" shows better-auth\'s own message and does not re-read', async () => {
+    serveDevices([serverDevice({ key: 'a', tag: 'AAAA', isCurrent: true }), serverDevice({ key: 'b', tag: 'BBBB' })]);
+    revokeOtherSessions.mockResolvedValue({ error: { message: 'Too many requests' } });
+    const user = userEvent.setup();
     mount();
-    expect(await screen.findByText('Last active 10 Sep 2026, 05:30 IST')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Sign out all other devices' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many requests');
+    expect(deviceReads()).toBe(1);
+  });
+
+  it('6.334 a refused device read renders the hedged empty state, not a crash', async () => {
+    fetchMock.mockResolvedValue(reply(401, { error: 'unauthorized' }));
+    mount();
+    expect(await screen.findByText('No signed-in devices to show.')).toBeInTheDocument();
+  });
+
+  it('6.331 renders "first signed in" through the IST clock and never the raw ISO string', async () => {
+    serveDevices([serverDevice({ key: 'a', tag: 'AAAA', isCurrent: true, firstSignedInAt: '2026-09-10T00:00:00.000Z' })]);
+    mount();
+    expect(await screen.findByText('First signed in 10 Sep 2026')).toBeInTheDocument();
     expect(screen.queryByText(/2026-09-10/)).not.toBeInTheDocument();
   });
 });
@@ -738,7 +743,7 @@ describe('AccountPage — Passkeys', () => {
     // has not mounted yet. `<h1>Your account</h1>` and Appearance render for
     // everyone; Profile and Passkeys do not.
     expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument();
-    await waitFor(() => expect(listSessions).toHaveBeenCalled());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(listUserPasskeys).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Passkey name')).toBeNull();
     expect(screen.queryByText('You have no passkeys yet.')).toBeNull();
