@@ -5679,16 +5679,25 @@ describe('19.228–19.232 the ticket sheet asks through DeleteDialog', () => {
  * refusal is printed as before) kills 16.130 and 16.131; M-b "Cancel still adds"
  * (onCancel sends the child) kills 16.131; M-c "add without the reopen batch"
  * (accept sends only the child) kills 16.130.
+ *
+ * Fix round 1 (controller, 2026-09-30): two mutations survived because the
+ * fixture had no `closed` flag, so the production path (`[ticket.reopened,
+ * ticket.transitioned]`) never ran. 16.133 and 16.134 use a door that models
+ * the flag. Mutations: M-d `parentClosed: false` at accept kills 16.133 and
+ * 16.134; M-e dropping the `parentNoLongerClosed` re-arm kills 16.134; M-f
+ * dropping the reopened half from the batch kills 16.133 and 16.134.
  */
 describe('16.130–16.132 Add subtask under a terminal parent offers the reopen', () => {
   const PARENT_TERMINAL_REASON =
     '"File the GST return" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 
-  function doneRead(): TicketRead {
+  /** `closed` is the flag a real Done parent carries (16.133/16.134); 16.130–16.132 keep the bare terminal fixture. */
+  function doneRead(closed: { actorId: string; at: string } | null = null): TicketRead {
     return ticketRead({
       ticket: ticketStateSeed({
         stateId: 'done',
         stateCategory: 'terminal',
+        closed,
         fields: {
           title: {
             value: 'File the GST return',
@@ -5702,12 +5711,32 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
     });
   }
 
-  /** A door that enforces `hierarchy.parent-terminal` against the parent's CURRENT state. */
-  function guardedSource(read: TicketRead, startsTerminal: boolean) {
-    const parent = { terminal: startsTerminal, stateId: read.ticket.stateId };
+  /**
+   * A door that enforces `hierarchy.parent-terminal` against the parent's CURRENT
+   * state, and — when the read carries `closed` — the closed flag the way the
+   * engine does: a CLOSED ticket has no legal transition (`closed-ticket`), so
+   * only a `ticket.reopened` ahead of the transition clears it, and a
+   * `ticket.reopened` on a ticket that is NOT closed is refused `not-closed`.
+   * `refuseTransitionTo` names targets the parent's own rules refuse (a rule
+   * refusal of the transition, AFTER the reopen half has committed).
+   */
+  function guardedSource(read: TicketRead, startsTerminal: boolean, refuseTransitionTo: string[] = []) {
+    const parent = { terminal: startsTerminal, closed: (read.ticket.closed ?? null) !== null, stateId: read.ticket.stateId };
     const answer = (event: SubmittedEvent): IngestResult => {
-      if (event.type === 'ticket.transitioned' && event.entity.id === TICKET) {
-        parent.stateId = (event.payload as { to: string }).to;
+      if (event.type === 'ticket.reopened' && event.entity.id === TICKET) {
+        if (!parent.closed) {
+          return { status: 'refused', eventId: event.id, rule: 'not-closed', reason: 'This ticket is not closed.' };
+        }
+        parent.closed = false;
+      } else if (event.type === 'ticket.transitioned' && event.entity.id === TICKET) {
+        const to = (event.payload as { to: string }).to;
+        if (parent.closed) {
+          return { status: 'refused', eventId: event.id, rule: 'closed-ticket', reason: 'A closed ticket cannot be moved.' };
+        }
+        if (refuseTransitionTo.includes(to)) {
+          return { status: 'refused', eventId: event.id, rule: 'transition.guard', reason: `${to} is not open today.` };
+        }
+        parent.stateId = to;
         parent.terminal = false;
       } else if (event.type === 'ticket.created' && parent.terminal) {
         return { status: 'refused', eventId: event.id, rule: 'hierarchy.parent-terminal', reason: PARENT_TERMINAL_REASON };
@@ -5772,7 +5801,7 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
     await waitFor(() => expect(source.ingested).toHaveLength(3));
     const [refusedCreate, parentBatch, childBatch] = source.ingested;
     expect(refusedCreate![0]!.type).toBe('ticket.created');
-    expect(parentBatch![0]!.type).toBe('ticket.transitioned');
+    expect(parentBatch!.map((e) => e.type)).toEqual(['ticket.transitioned']);
     expect(parentBatch![0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
     expect(parentBatch![0]!.payload).toMatchObject({ to: 'doing' });
     expect(childBatch![0]).toBe(refusedCreate![0]);
@@ -5809,5 +5838,86 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
     await pressAddSubtask('Book the venue');
     await screen.findByRole('dialog', { name: 'Reopen parent?' });
     expect(screen.queryByTestId('sheet-subtask-refusal')).toBeNull();
+  });
+
+  const CLOSED = { actorId: 'user_kiro', at: '2026-08-20T19:00:00.000Z' };
+
+  async function chooseAndAccept(label: string): Promise<void> {
+    await userEvent.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: label }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+  }
+
+  it('16.133 a CLOSED Done parent: the accept batch is [ticket.reopened, ticket.transitioned] then the same child; the unflagged parent still sends [transitioned] alone (control)', async () => {
+    // CONTROL — the unflagged fixture of 16.130: NOT closed, so the batch is the transition alone
+    // (a `ticket.reopened` here would be refused `not-closed` by this door and the child never added).
+    const bare = doneRead();
+    const control = guardedSource(bare, true);
+    renderSheet(bare, control.source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+    await waitFor(() => expect(control.source.ingested).toHaveLength(3));
+    expect(control.source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.transitioned']);
+    cleanup();
+
+    // THE CASE — the flag a real Done parent carries.
+    const read = doneRead(CLOSED);
+    const { source, parent } = guardedSource(read, true);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+
+    await waitFor(() => expect(source.ingested).toHaveLength(3));
+    const [refusedCreate, parentBatch, childBatch] = source.ingested;
+    expect(refusedCreate![0]!.type).toBe('ticket.created');
+    // The reopen half first, then the transition — ONE batch, in that order.
+    expect(parentBatch!.map((e) => e.type)).toEqual(['ticket.reopened', 'ticket.transitioned']);
+    expect(parentBatch![0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(parentBatch![0]!.payload).toEqual({});
+    expect(parentBatch![1]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(parentBatch![1]!.payload).toEqual({
+      to: 'doing',
+      cause: { kind: 'reopened-for-child', childTicketId: refusedCreate![0]!.entity.id },
+    });
+    expect(childBatch![0]).toBe(refusedCreate![0]);
+    expect(parent).toMatchObject({ stateId: 'doing', closed: false, terminal: false });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    expect(screen.queryByTestId('sheet-subtask-refusal')).toBeNull();
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
+  });
+
+  it('16.134 a refused reopen keeps the dialog open with the refusal and adds nothing; the retry to another target sends the transition alone', async () => {
+    const read = doneRead(CLOSED);
+    // The parent's own rules refuse Doing — after the batch's `ticket.reopened` has committed.
+    const { source, parent } = guardedSource(read, true, ['doing']);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+
+    // Refused create, then the two-event parent batch — and NO child retry.
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.reopened', 'ticket.transitioned']);
+    const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Refused by the server — transition.guard: doing is not open today.');
+    expect(parent).toMatchObject({ closed: false, stateId: 'done' });
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('Book the venue');
+
+    // CONTROL — a second target on the same list succeeds and adds the child. The reopen already
+    // committed, so the retry must NOT resend `ticket.reopened` (this door refuses it `not-closed`).
+    await chooseAndAccept('To do');
+    await waitFor(() => expect(source.ingested).toHaveLength(4));
+    const [, , retry, child] = source.ingested;
+    expect(retry!.map((e) => e.type)).toEqual(['ticket.transitioned']);
+    expect(retry![0]!.payload).toMatchObject({ to: 'todo' });
+    expect(child![0]).toBe(source.ingested[0]![0]);
+    expect(parent.stateId).toBe('todo');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
   });
 });

@@ -1706,7 +1706,7 @@ one that would have been lost had the case been written to match what the code h
 The sheet's Add subtask refused under a Done parent with *"…Adding live work reopens it — choose a state to
 reopen it to…"* and drew no chooser; the create flow opened `ReopenDialog`. The sheet now takes the SAME guarded
 path (`submitChildEvent` → `reopenAndProceed`, `flows/guarded-child-event.ts`), with the offer derived from the
-parent's own definition (`reopenOfferFor`). Block `16.130`–`16.139`; `16.133`–`16.139` unspent.
+parent's own definition (`reopenOfferFor`). Block `16.130`–`16.139`; `16.135`–`16.139` unspent.
 
 - **16.130** ✅ Done parent → Add subtask → the "Reopen parent?" dialog names the parent and its state, carries the
   server's refusal, and offers exactly the parent's reopen states (Doing, To do; not Waiting, not Done). Choosing
@@ -1721,4 +1721,23 @@ parent's own definition (`reopenOfferFor`). Block `16.130`–`16.139`; `16.133`�
 **Mutations, run after the commit:** M-a skip the dialog branch (the `needs-reopen` arm falls to the refusal
 line) → kills `16.130`, `16.131`, `16.132`; M-b dialog Cancel still adds → kills `16.131`; M-c accept without the
 reopen batch (child event only) → kills `16.130`.
+
+**Fix round 1 (controller, 2026-09-30) — the production path, `16.133`–`16.134`.** Two controller mutations survived
+`16.130`–`16.132`: `parentClosed: false` at accept and dropping the `parentNoLongerClosed` re-arm. Cause: the Done
+fixture carried no `closed` flag, so the accept batch never held the parent's `ticket.reopened` half. These two cases
+use a door that models the flag (`closed-ticket` refuses a transition on a closed ticket; `ticket.reopened` on an
+unclosed one is `not-closed`).
+
+- **16.133** ✅ A CLOSED Done parent: choosing Doing sends, in order, the refused create, then ONE batch
+  `[ticket.reopened (payload {}), ticket.transitioned (to Doing, cause reopened-for-child)]` on the parent, then the SAME
+  child envelope; the parent ends live and unclosed, the dialog closes, the title clears. CONTROL in the same `it`: the
+  unflagged fixture of `16.130` still sends `[ticket.transitioned]` alone.
+- **16.134** ✅ A refused reopen (the parent's rules refuse Doing after the `ticket.reopened` committed) keeps the dialog
+  open showing the refusal verbatim, adds nothing and keeps the title; the retry to To do sends
+  `[ticket.transitioned]` ALONE (never a second `ticket.reopened` — `not-closed`) and then the child. CONTROL: the
+  second target succeeds and adds the child.
+
+**Mutations, run after the commit:** `parentClosed: false` at accept → kills `16.133` and `16.134`; the
+`parentNoLongerClosed` re-arm dropped → kills `16.134`; the reopened half dropped from the batch → kills `16.133` and
+`16.134`.
 
