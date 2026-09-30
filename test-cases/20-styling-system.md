@@ -81,8 +81,9 @@ the number you added.
 ## 20.21 Plan B — inventory and roster
 
 - ✅ **20.201 — every `page.tsx` under `apps/web/app` has a named styling owner (a Plan A or Plan B task), so a route added later without one fails this test rather than shipping unstyled;** control: a planted extra route is reported by `unownedRoutes`, and a planted owner with no route is reported as stale. Mutation: delete `apps/web/app/inbox/page.tsx`'s entry from `SCREEN_OWNERS`.
-- ✅ **20.202 — the roster helper reads a pattern exactly: a planted rule carrying every P-TRACK declaration passes, and the same rule missing one declaration fails naming that property;** control: `expectRow` throws on a selector list that matches no rule. Mutation: make `expectRow` skip the `box-shadow` key.
+- ✅ **20.202 — the roster helper reads a pattern exactly: a planted rule carrying every P-TRACK declaration passes, and the same rule missing one declaration fails naming that property;** control: `expectRow` throws on a selector list that matches no rule. Mutation: make `expectRow` skip the `box-shadow` key. Amended 2026-09-30 by 20.204 (styling refresh Plan B): for a `P-QUIET`/`P-GHOST` row `expectRow` also reads the companion hover rule (see 20.204), so a pattern row is no longer blind to its hover half.
 - ✅ **20.203 — the flat-boundary scanner finds a `surface-sunken` background and the retired `fill-tertiary` + `text-accent` control constant among rules naming a prefix, ignores comments, and honours the kept list;** control: a rule under an unrelated prefix is not reported. Mutation: drop the `text-accent` half of the constant check.
+- ✅ **20.204 — the roster helper also reads the companion hover rule of a `P-QUIET` or `P-GHOST` row, exactly as the Plan B pattern table writes it (`S:hover:not(:disabled)` → `fill-quaternary` for a quiet control; `S:hover:not(:disabled), S:focus-visible` → `fill-tertiary` + `text-muted` and `S:focus-visible` → the 2px `focus-ring` outline for a ghost one), and a row may skip it only by naming a reason (`hover: 'none: <why>'`);** control: a planted row with its hover rule passes, a planted row with a reason-less opt-out throws. Mutation: delete `.gn-sync-notices__dismiss:hover:not(:disabled)` from `ui.css` (the rest of the row stays green), or make `expectRow` skip the hover check.
 
 ## 20.22 Plan B — shared fields and the segmented control
 
@@ -116,3 +117,9 @@ the number you added.
 
 - ✅ **20.311 — the members table is a raised panel with a recessed header band; Send invitation is the screen's one loud element (the shared primary);** control: the zebra rows keep their `fill-quaternary`. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-members__th`.
 - ✅ **20.312 — no members or invite rule paints a flat boundary or the retired constant;** control: the scan reads more than 15 member rules. Mutation: plant the retired constant into `.gn-members`.
+
+## 20.25 Plan B — the project page's chrome
+
+- ✅ **20.241 — the project header's groups are 16px apart; the contested-claim banner is a recessed well keeping its contested edge; the saved-filter rename field is recessed like every field; the sync notice's Dismiss is a quiet outlined control;** control: the filter chip's remove control keeps its 24px in-list floor. Mutation: restore `border-radius: 6px` on `.gn-sync-notices__dismiss`.
+- ✅ **20.242 — no project-chrome rule (`gn-project`, `gn-filters`, `gn-saved-filters`, `gn-contest-banner`, `gn-sync-`) paints a flat boundary or the retired constant;** control: the scan reads more than 40 rules under those prefixes. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-contest-banner`.
+

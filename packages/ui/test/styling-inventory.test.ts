@@ -7,7 +7,7 @@ import {
   unownedRoutes,
 } from './helpers/style-patterns.js';
 
-/** Styling refresh Plan B, Task B1 — cases 20.201–20.203 (§20.21). */
+/** Styling refresh Plan B, Task B1 — cases 20.201–20.204 (§20.21). */
 describe('20.201 every route has a styling owner', () => {
   it('20.201 the live tree has 25 routes, all owned, none stale', () => {
     const routes = listPageRoutes();
@@ -45,5 +45,36 @@ describe('20.203 the flat-boundary scanner', () => {
     expect(flatBoundaryOffenders(css, ['.gn-aa'], ['.gn-aa__row:disabled'])).toEqual(['.gn-aa__row', '.gn-aa__btn']);
     // CONTROL — another prefix is not this screen's business.
     expect(flatBoundaryOffenders(css, ['.gn-aa'], [])).not.toContain('.gn-bb');
+  });
+});
+
+describe('20.204 the roster helper reads the hover companion of a quiet or ghost row', () => {
+  const quiet =
+    '.gn-zz { min-height: 2.75rem; border: 1px solid var(--gn-border); border-radius: 999px; background: transparent; color: var(--gn-text-muted); }';
+  const quietHover = '.gn-zz:hover:not(:disabled) { background: var(--gn-fill-quaternary); }';
+  const ghost =
+    '.gn-gg { min-height: 2.75rem; border: none; border-radius: 999px; background: transparent; color: var(--gn-text-subtle); }';
+  const ghostHover =
+    '.gn-gg:hover:not(:disabled), .gn-gg:focus-visible { background: var(--gn-fill-tertiary); color: var(--gn-text-muted); }\n' +
+    '.gn-gg:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }';
+  const quietRow = { sheet: 'ui', selectors: '.gn-zz', pattern: 'P-QUIET' } as const;
+  const ghostRow = { sheet: 'ui', selectors: '.gn-gg', pattern: 'P-GHOST' } as const;
+
+  it('20.204 a quiet row without its hover rule throws; with it, and a ghost row likewise', () => {
+    expect(() => expectRow(quietRow, `${quiet}\n${quietHover}`)).not.toThrow();
+    expect(() => expectRow(quietRow, quiet)).toThrow(/found 0/);
+    // a hover rule that paints the wrong fill is read, not merely found
+    expect(() => expectRow(quietRow, `${quiet}\n${quietHover.replace('fill-quaternary', 'fill-tertiary')}`)).toThrow(/background/);
+    expect(() => expectRow(ghostRow, `${ghost}\n${ghostHover}`)).not.toThrow();
+    expect(() => expectRow(ghostRow, ghost)).toThrow(/found 0/);
+    expect(() => expectRow(ghostRow, `${ghost}\n${ghostHover.split('\n')[0]}`)).toThrow(/found 0/);
+    // CONTROL — an opt-out with a reason skips the companion; one without a reason is refused.
+    expect(() => expectRow({ ...quietRow, hover: 'none: a disabled-only control' }, quiet)).not.toThrow();
+    expect(() => expectRow({ ...quietRow, hover: 'none:' }, quiet)).toThrow(/reason/);
+    expect(() => expectRow({ ...quietRow, hover: 'skip' }, quiet)).toThrow(/reason/);
+    // CONTROL — a non-quiet, non-ghost pattern needs no companion.
+    expect(() =>
+      expectRow({ sheet: 'ui', selectors: '.gn-zz', pattern: 'P-HOVER' }, '.gn-zz { background: var(--gn-fill-quaternary); }'),
+    ).not.toThrow();
   });
 });

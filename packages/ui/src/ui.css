@@ -5101,14 +5101,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.5rem;
   padding: 0.5rem;
 }
+/* Styling refresh Plan B (Task B5): the rename field is recessed like every field (Task B2). */
 .gn-saved-filters__name {
   flex: 1;
   min-width: 0;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
+  box-shadow: var(--gn-shadow-track);
 }
 .gn-saved-filters__submit {
   padding: 0.25rem 0.75rem;
@@ -5139,16 +5141,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    names these tokens: a class with no rule is a colour signal that silently
    does not apply, which is the failure `inbox-css-binding.test.tsx` was written
    after measuring. `test/sync-ux-css-binding.test.tsx` in app-core ties these
-   selectors to what the three components actually render, by set equality. */
+   selectors to what the three components actually render, by set equality.
+   Styling refresh Plan B (Task B5): P-WELL — a recessed notice; the 1px `contested` edge stays, it is state (B-D5). */
 .gn-contest-banner {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   border: 1px solid var(--gn-contested);
-  border-radius: 6px;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
   color: var(--gn-text);
   padding: 0.75rem 0.9rem;
+  box-shadow: var(--gn-shadow-track);
 }
 .gn-contest-banner__item {
   display: flex;
@@ -5240,16 +5244,20 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding-left: 0.6rem;
 }
 .gn-sync-notices__text { flex: 1; color: var(--gn-text); font-size: 0.85rem; }
+/* Styling refresh Plan B (Task B5): P-QUIET — the sync notice's Dismiss. */
 .gn-sync-notices__dismiss {
   min-height: 2.75rem;
-  padding: 0 0.9rem;
+  padding: 0 1rem;
   background: transparent;
-  color: var(--gn-text);
+  color: var(--gn-text-muted);
   border: 1px solid var(--gn-border);
-  border-radius: 6px;
+  border-radius: 999px;
   font: inherit;
   cursor: pointer;
+  font-weight: 600;
+  transition: background-color var(--gn-motion-feedback) ease-out;
 }
+.gn-sync-notices__dismiss:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-sync-notices__dismiss:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* ── The in-app manual and FAQ ────────────────────────────────────────────────
@@ -6418,8 +6426,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    would mean moving `.gn-shell` itself, which would shift every route in the
    product for one page's inset — `.gn-workspaces`' own docblock already made
    and recorded this exact trade-off for its own axis, and this rule inherits
-   that reasoning on both axes rather than re-deriving it. */
-.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+   that reasoning on both axes rather than re-deriving it.
+   Styling refresh Plan B (Task B5): 16px between the header's groups (rule 02). */
+.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
 /* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
