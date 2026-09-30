@@ -346,7 +346,7 @@ same way).
   rows but not the ghost-button composite reddens exactly three cases (200/203 pass) — the pinned-hex
   case, the composite/sunken case, and 13.284's own label-contrast case one describe block up, which is
   the live CSS site this derivation exists to protect; restored, re-verified 203/203 green.* — (`packages/ui/test/tokens.test.ts`)
-- **13.361** ✅ Sign-in markup/CSS fidelity to the export. **Dispatch item 4 (card width/padding, field/
+- **13.361** ✅ Sign-in markup/CSS fidelity to the export. **Dispatch item 4 (card width/padding, field/ *Amended 2026-09-29 by 20.391 (styling refresh Plan B): the not-found recovery link's ink assertion reads the declared `--gn-text-muted` (a P-QUIET control) in place of `--gn-text-accent`; the "not the retired `--gn-accent`" half is unchanged.*
   button/segment geometry) needed no fix, confirmed rather than assumed**: card `26rem`/`1.5rem` padding
   already equal the export's `416px`/`24px`; `.gn-field__input`/`.gn-button` `2.75rem` min-height already
   equals the export's `44px`; neo's control radius (`14px`) already equals the export's `--ctlR`; the

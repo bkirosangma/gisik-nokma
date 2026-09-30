@@ -5618,8 +5618,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__results {
   padding: 1rem 1.125rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
 }
 /* 17/22/600 with NO bottom margin — the 12px to the list below is the list's
    own `margin-top` in the reference, which is where it stays. */
@@ -5659,8 +5659,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-size: 1.0625rem;
   line-height: 1.375rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
 }
 
 /* The document tabs, now the first thing in the sidebar rather than a row above
@@ -5864,7 +5864,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    solid token is what lets every ink composited over this hover be a DECLARED
    pair — `CONTRAST_PAIRS` forbids naming an alpha fill, so the previous hover
    ground could only ever be checked by hand. */
-.gn-help__group-toggle:hover { background: var(--gn-surface-sunken); }
+.gn-help__group-toggle:hover { background: var(--gn-fill-quaternary); }
 .gn-help__group-title { flex: 1; }
 /* 0.8rem = 12.8px, the guide's. It clears the 12px floor
    `apps/web/e2e-viewport/type-scale.ts` derives from this product's own scale
@@ -5961,7 +5961,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.35;
   font-weight: 400;
 }
-.gn-help__nav-link:hover { background: var(--gn-surface-sunken); }
+.gn-help__nav-link:hover { background: var(--gn-fill-quaternary); }
 /* The SELECTOR is `location`, not `page`. `.gn-settings__sidebar
    a[aria-current='page']` next door links real routes; these link places inside
    this page, which is the distinction ARIA draws between the two values, and
@@ -6078,8 +6078,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   margin: 1rem 0;
   padding: 0.875rem 1rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
   font-size: 1.0625rem;
   line-height: 1.375rem;
   text-wrap: pretty;
@@ -6090,7 +6090,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    body stack had, one element down. `0.92em` stays: the size contrast is
    deliberate and is why `type-scale.ts` skips `code`/`kbd`/`pre` descendants
    rather than measuring them against the label floor. */
-.gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-sunken); font-family: var(--gn-font-mono); font-size: 0.92em; }
+.gn-help__code { padding: 0.05rem 0.3rem; border-radius: 0.25rem; background: var(--gn-surface-well); font-family: var(--gn-font-mono); font-size: 0.92em; }
 /* `textAccent`, not `accent` — Round 2d (2026-09-09) accent-as-text audit.
    Inline documentation link text, on the same ambient `--gn-surface` as
    `.gn-help__toc-link` above. */
@@ -6135,7 +6135,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    measured value — and it is safe to widen because `.gn-help__table-scroll`
    above gives the table its own horizontal scroll box. */
 .gn-help__table th, .gn-help__table td { padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; font-size: 1.0625rem; line-height: 1.375rem; }
-.gn-help__table th { background: var(--gn-surface-sunken); }
+.gn-help__table th { background: var(--gn-surface-well); }
 
 /* `.gn-help__h2` is the LAST rule in this query, and it is now load-bearing for
    more than itself. `.gn-help__tabs { flex-direction: column }` stood beside it
