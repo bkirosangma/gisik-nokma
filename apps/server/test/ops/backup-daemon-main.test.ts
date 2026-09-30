@@ -100,6 +100,30 @@ describe('backup-daemon-main — one scheduler for all six jobs', () => {
     expect(armed.stdout).toContain(SCHEDULED);
   }, 90_000);
 
+  it('6.322 refuses SESSION_SWEEP_INTERVAL_MS=0 before arming any job, naming the variable; control: the default (empty) and a valid value arm', async () => {
+    const refused = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      SESSION_SWEEP_INTERVAL_MS: '0',
+    });
+    expect(refused.stdout).not.toContain(SCHEDULED);
+    expect(refused.stderr).toContain('SESSION_SWEEP_INTERVAL_MS');
+    // CONTROL — empty means the default, a valid value is accepted, and the purge job is still scheduled beside it.
+    const armed = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      SESSION_SWEEP_INTERVAL_MS: '',
+    });
+    expect(armed.stdout).toContain(SCHEDULED);
+    const purgeStillChecked = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      SESSION_SWEEP_INTERVAL_MS: '86400000',
+      PURGE_SWEEP_INTERVAL_MS: '0',
+    });
+    expect(purgeStillChecked.stderr).toContain('PURGE_SWEEP_INTERVAL_MS');
+  }, 120_000);
+
   it('19.159 refuses BACKUP_RETENTION_DAYS=abc before arming any job, naming the variable', async () => {
     const refused = await runDaemon({
       DATABASE_URL: db.url,
