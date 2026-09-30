@@ -193,14 +193,18 @@ describe('20.114 a collapsed column is still a drop target', () => {
     const user = userEvent.setup();
     const { source, onMoved, rerenderBoard } = setup(boardOf(errand()));
     await settled();
-    await user.click(collapseButton(columnIn('Errand', 'done'), 'Done'));
 
-    // CONTROL first: the same drop on an EXPANDED column makes the same move.
+    // CONTROL first: the same drop on an EXPANDED column makes the same move. (A Done card goes back to To
+    // do — a different ticket from the one dropped on the strip below, because a moved card is drawn in its
+    // target at once and this file's workflow has no edge for moving it on.)
     const controlTransfer = fakeDataTransfer();
-    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_doing'), { dataTransfer: controlTransfer });
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_d1'), { dataTransfer: controlTransfer });
     fireEvent.drop(columnIn('Errand', 'todo'), { dataTransfer: controlTransfer });
     await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
     expect(source.ingested[0]![0]!.payload).toEqual({ to: 'todo' });
+    // The refetch: the read agrees the control card is in To do. Then Done collapses to its strip.
+    rerenderBoard(boardOf(errand(columns({ todo: [card('tk_d1')], done: [card('tk_d2')] }))));
+    await user.click(collapseButton(columnIn('Errand', 'done'), 'Done'));
 
     const dataTransfer = fakeDataTransfer();
     fireEvent.dragStart(screen.getByTestId('ticket-card-tk_doing'), { dataTransfer });
@@ -209,9 +213,9 @@ describe('20.114 a collapsed column is still a drop target', () => {
     expect(source.ingested[1]![0]!.payload).toEqual({ to: 'done' });
 
     // The reload: the card now lives in Done, and the strip still shows collapsed.
-    rerenderBoard(boardOf(errand(columns({ doing: [], done: [card('tk_d1'), card('tk_d2'), card('tk_doing')] }))));
+    rerenderBoard(boardOf(errand(columns({ todo: [card('tk_d1')], doing: [], done: [card('tk_d2'), card('tk_doing')] }))));
     const strip = stripButton(columnIn('Errand', 'done'));
-    expect(strip.getAttribute('aria-label')).toBe('Expand Done, 3 tickets');
+    expect(strip.getAttribute('aria-label')).toBe('Expand Done, 2 tickets');
     expect(strip.getAttribute('aria-expanded')).toBe('false');
   });
 });
