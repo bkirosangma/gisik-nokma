@@ -38,4 +38,16 @@ describe('20.134 the flight rides the move token and switches off under reduced 
     // The dialog lives inside the slot: an `opacity` on the slot would fade it too.
     expect(CSS).not.toMatch(/\.gn-board__card-slot--waiting\s*\{[^}]*opacity/);
   });
+
+  it('20.151 the wash is really there: a visible opacity, a ground, over the whole card, and it never takes a pointer event', () => {
+    // Mutation `fade wash removed`: `opacity: 0.6` -> `opacity: 0` in `.gn-board__card-slot--waiting::after`.
+    const wash = ruleExactly(CSS, '.gn-board__card-slot--waiting::after');
+    const opacity = Number(valueOf(wash, 'opacity'));
+    expect(opacity).toBeGreaterThan(0);
+    expect(opacity).toBeLessThan(1); // CONTROL — a wash that is fully opaque would hide the card it is meant to fade
+    expect(valueOf(wash, 'background')).toContain('var(--gn-');
+    expect(valueOf(wash, 'inset')).toBe('0');
+    expect(valueOf(wash, 'content')).toBe('""');
+    expect(valueOf(wash, 'pointer-events')).toBe('none');
+  });
 });

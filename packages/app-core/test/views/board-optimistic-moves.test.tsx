@@ -1,8 +1,10 @@
-import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
+import { FLIGHT_MAX_AGE_MS } from '../../src/views/board-motion.js';
+import { PENDING_TTL_MS, useMoveState, type PendingMove } from '../../src/views/board-move-state.js';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
@@ -546,6 +548,22 @@ describe('20.135 the board runs the edge scroller for exactly the life of a card
     expect(scrollBy.mock.calls.length).toBe(seen);
   });
 
+  it('20.159 a dragstart that is not a card drag (a text or file drag) does not begin it (CONTROL: a card dragstart does)', async () => {
+    // Mutation `scroller begun for any drag`: board root `onDragStart` calls `scrollerRef.current?.begin()` without the `isCardDrag(event)` guard.
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    const foreign = dragData();
+    foreign.setData('text/plain', 'some selected text'); // no DRAG_CARD_MARKER
+    fireEvent.dragStart(columnOf('todo'), { dataTransfer: foreign });
+    dragOverAt(10);
+    runFrame();
+    expect(scrollBy).not.toHaveBeenCalled();
+
+    fireAt('dragStart', slotOf('tk_c'), dragData());
+    dragOverAt(10);
+    runFrame();
+    expect(scrollBy).toHaveBeenCalled(); // CONTROL — the very same dragover, once a CARD drag has begun
+  });
+
   it('20.135 unmounting the board mid-drag stops the loop', async () => {
     const onMoved = vi.fn();
     const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND });
@@ -562,5 +580,110 @@ describe('20.135 the board runs the edge scroller for exactly the life of a card
     dragOverAt(10);
     runFrame();
     expect(scrollBy.mock.calls.length).toBe(seen);
+  });
+});
+
+/** Per-element rectangles for the survivor cases: tk_c settles at (400,200), tk_a at (40,100), everything else at the origin. */
+function plantLandingRects(rects: Record<string, { left: number; top: number }> = { 'ticket-card-tk_c': { left: 400, top: 200 }, 'ticket-card-tk_a': { left: 40, top: 100 } }) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const at = rects[this.getAttribute('data-testid') ?? ''] ?? { left: 0, top: 0 };
+    return { left: at.left, top: at.top, right: at.left + 280, bottom: at.top + 120, width: 280, height: 120, x: at.left, y: at.top, toJSON: () => ({}) } as DOMRect;
+  });
+}
+
+describe('20.149 a dialog confirming a card already drawn in its target leaves no flight behind', () => {
+  const move = (overrides: Partial<PendingMove> = {}): PendingMove => ({
+    ticketId: 'tk_c',
+    workflowId: 'wf-errand',
+    fromStateId: 'todo',
+    toStateId: 'doing',
+    phase: 'awaiting',
+    ...overrides,
+  });
+
+  it('20.149 re-asserting the entry for the same target sets no flight; aiming it at a NEW column does', () => {
+    // Mutation `beginPending always flies`: `if (pendingRef.current[move.ticketId]?.toStateId !== move.toStateId) {` -> `if (true) {`.
+    const view = board();
+    const { result } = renderHook(() => useMoveState(view));
+    result.current.slots.current.set('tk_c', document.createElement('li')); // a measurable slot: the flight has somewhere to start from
+
+    act(() => result.current.beginPending(move(), { left: 10, top: 20, at: Date.now() }));
+    expect(result.current.flights.current.has('tk_c')).toBe(true); // CONTROL — the first assertion of a target flies
+    result.current.flights.current.delete('tk_c'); // the card's mount in Doing consumed it
+
+    act(() => result.current.beginPending(move({ phase: 'writing' }))); // Confirm: the same card, the same target
+    expect(result.current.flights.current.has('tk_c')).toBe(false);
+
+    act(() => result.current.beginPending(move({ toStateId: 'done', phase: 'writing' })));
+    expect(result.current.flights.current.has('tk_c')).toBe(true); // a real change of column still flies
+  });
+});
+
+describe('20.150 a committed move that no read ever confirms releases the card after the TTL, through the real timer', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('20.150 still in Doing one ms before PENDING_TTL_MS, back in To do at it (CONTROL: it was committed and kept)', async () => {
+    // Mutation `setPhase committed sets no timestamp`: drop `...(phase === 'committed' ? { settledAt: Date.now() } : {})` from `setPhase`.
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    drag('tk_c', 'doing');
+    await act(async () => write.resolve(committed([{ id: 'x' }])));
+    expect(slotOf('tk_c')).toHaveAttribute('data-move-phase', 'committed'); // CONTROL — committed, and no rerender ever brings a read that agrees
+    await act(async () => void vi.advanceTimersByTime(PENDING_TTL_MS - 1));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']);
+    await act(async () => void vi.advanceTimersByTime(1));
+    expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+  });
+});
+
+describe('20.152 a flight nobody claimed in time is discarded at mount', () => {
+  it('20.152 a flight older than FLIGHT_MAX_AGE_MS does not fly (CONTROL: a fresh one, same drop, does)', async () => {
+    // Mutation `stale flight still flies`: delete `if (Date.now() - from.at > FLIGHT_MAX_AGE_MS) return;` from the `BoardCardSlot` layout effect.
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    plantLandingRects();
+    drag('tk_a', 'doing');
+    expect(slotOf('tk_a')).toHaveClass('gn-board__card-slot--flight'); // CONTROL
+
+    // Every Date.now() now moves the clock on: the drop stamps the flight, the card's mount reads it a call later.
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += FLIGHT_MAX_AGE_MS + 1));
+    drag('tk_c', 'doing');
+    expect(idsIn('doing')).toContain('tk_c'); // it still moved at once
+    expect(slotOf('tk_c')).not.toHaveClass('gn-board__card-slot--flight');
+  });
+});
+
+describe('20.153 a flight is consumed by the mount that claims it', () => {
+  it('20.153 a SECOND mount of the same ticket within the window does not fly (CONTROL: the first mount did)', async () => {
+    // Mutation `flight not consumed`: delete `flights.current.delete(card.ticketId);` from the `BoardCardSlot` layout effect.
+    const { rerender } = await mount(() => committed([{ id: 'x' }]));
+    plantLandingRects();
+    drag('tk_c', 'doing', { x: 600, y: 500 });
+    expect(slotOf('tk_c')).toHaveClass('gn-board__card-slot--flight'); // CONTROL — the mount that claimed it flew
+    await act(async () => {});
+    // A read agrees and the overlay retires; a LATER read has someone else moving the card on to Done: a fresh mount in Done.
+    rerender(board({ todo: ['tk_a', 'tk_z'], doing: ['tk_b', 'tk_c', 'tk_d'], done: [] }));
+    rerender(board({ todo: ['tk_a', 'tk_z'], doing: ['tk_b', 'tk_d'], done: ['tk_c'] }));
+    expect(idsIn('done')).toEqual(['tk_c']);
+    expect(slotOf('tk_c')).not.toHaveClass('gn-board__card-slot--flight');
+  });
+});
+
+describe('20.154 the settle scroll also honours the rail’s own visible box', () => {
+  it('20.154 a slot inside the window but past its rail’s edge is scrolled to (CONTROL: inside both, it is left alone)', async () => {
+    // Mutation `settle scroll ignores the rail`: `isOffscreen(rect, {...})` called without the third (rail box) argument.
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    const box = (left: number, top: number) =>
+      ({ left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('gn-board__rail')) return { ...box(0, 0), right: 300, bottom: 600, width: 300, height: 600 } as DOMRect; // the rail shows x 0..300
+      return this.getAttribute('data-testid') === 'ticket-card-tk_c' ? box(500, 100) : box(10, 100); // tk_c: in the window, past the rail
+    });
+    drag('tk_a', 'doing'); // inside both
+    expect(scrollIntoView.mock.contexts).not.toContain(slotOf('tk_a')); // CONTROL
+    drag('tk_c', 'doing');
+    expect(scrollIntoView.mock.contexts).toContain(slotOf('tk_c'));
   });
 });

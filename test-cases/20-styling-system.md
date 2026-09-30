@@ -12,10 +12,10 @@ in the table below. Take from your block, never from the tip.
 
 | Plan | Block |
 |---|---|
-| A Foundation, board, sheet | `20.001`–`20.150` |
+| A Foundation, board, sheet | `20.001`–`20.160` |
 | B Every other screen | `20.201`–`20.600` |
 
-Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12). `20.149`–`20.150` stay free.
+Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12) and the survivors of their mutation review take `20.149`–`20.159` (§20.12, same day; the block was widened from `20.150` into the unallocated `20.151`–`20.200`). `20.160` stays free.
 
 **Write cases as `- ✅ **20.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -168,6 +168,17 @@ Owner, 2026-10-01: *"the dropped card briefly jumps back to the original column 
 - ✅ **20.146 — quick moves never lose or duplicate a card: two different cards moved while the first write is open each appear once in their target; a second move of the SAME card while its first is pending is ignored by the latch (one card, one write — the edge is legal, so only the latch can stop it):** control: one card in each target afterwards. Mutation: drop the `submitting` latch.
 - 🧪 **20.147 — real browser: hold a dragged card over a collapsed column — it opens after a beat, closes when the pointer leaves, and a drop there keeps it open across a reload;** control: a drop on an illegal strip shows "can't drop" and never opens. Measured by the controller.
 - 🧪 **20.148 — real browser: the flight, the waiting wash behind a dialog, the spring-open column and the drop placeholder read cleanly in hig, minimal and neo (no clipped card over a neighbouring column, the scrim not shifted);** control: the same board with "reduce motion" shows no flight. Measured by the controller.
+- ✅ **20.149 — a dialog confirming a card already drawn in its target leaves NO flight in `moveState.flights` (re-asserting the entry for the same target sets none; a flight left behind would fly the card again at its next remount within 3 s):** control: the first assertion of a target, and a move to a different one, do set a flight. Mutation: `beginPending always flies` (`if (true)`).
+- ✅ **20.150 — a move that committed and whose read never agrees releases the card after `PENDING_TTL_MS` through the real `setPhase` → timer path (fake timers: still in Doing at TTL−1, back in To do at TTL), not only when `settledAt` is handed to `retireAgreed`:** control: at TTL−1 the card is still in Doing with phase `committed`. Mutation: `setPhase committed sets no timestamp`.
+- ✅ **20.151 — the awaiting wash is really there: `.gn-board__card-slot--waiting::after` has an opacity strictly between 0 and 1, a token ground, `inset: 0`, empty content and `pointer-events: none`:** control: a wash at 1 would hide the card, so the upper bound is pinned too. Mutation: `fade wash removed` (`opacity: 0`).
+- ✅ **20.152 — a flight older than `FLIGHT_MAX_AGE_MS` is discarded when its card mounts: the card still moves at once but carries no `gn-board__card-slot--flight`:** control: an ordinary drop of another card in the same board flies. Mutation: `stale flight still flies`.
+- ✅ **20.153 — a flight is consumed by the mount that claims it: a second mount of the same ticket within the window (a later read moving the card on to another column) does not fly:** control: the first landing carried the flight class. Mutation: `flight not consumed`.
+- ✅ **20.154 — the settle scroll follows the card: a landing slot inside the window but past its rail's visible box gets `scrollIntoView`, as the rail box is passed to `isOffscreen`:** control: a slot inside both is left alone. Mutation: `settle scroll ignores the rail`.
+- ✅ **20.155 — only a column collapsed by choice springs: a card held 600 ms+ over an OPEN legal column and dropped never writes an explicit "open" into the collapse memory:** control: in the same drag, collapsed Done springs open and its stored choice is unchanged. Mutation: `open column springs too`.
+- ✅ **20.156 — a `dragend` that reaches only the document (the source card was unmounted by the optimistic drop) clears the drop outline, not just the spring:** control: the outline is on the open legal column before the event. Mutation: `drag-end cleanup does not clear drop target`.
+- ✅ **20.157 — a `dragleave` whose `relatedTarget` is OUTSIDE the column is a real leave even while the depth count is above zero (clears the outline and closes a sprung column):** control: a leave whose target is inside the column keeps it open. Mutation: `relatedTarget leave test dropped`.
+- ✅ **20.158 — a `dragleave` between two children of the SAME column (`relatedTarget` inside) is not a leave: the outline and the sprung column stay:** control: a leave to a column outside then closes it. Mutation: `any dragleave is a leave`. Why an older case missed it: jsdom has no `DragEvent`, so RTL's `fireEvent.dragLeave(el, { relatedTarget })` builds a bare `Event` that drops `relatedTarget` (the cases above that pass it get `undefined`, so `leftForGood` was false in every one), and each held the depth at 1, where the count alone ends the drag; these two cases plant `relatedTarget` by hand at depth 2–3.
+- ✅ **20.159 — the edge scroller begins only for a CARD drag: a `dragstart` without `DRAG_CARD_MARKER` (a text or file drag) adds no document `dragover` listener and scrolls nothing:** control: a card `dragstart` followed by the same `dragover` scrolls. Mutation: `scroller begun for any drag`.
 
 ## 20.23 Plan B — floating surfaces
 

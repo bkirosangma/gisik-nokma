@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
@@ -209,6 +209,94 @@ describe('20.143 Esc / dragend puts a sprung column back', () => {
     await wait(SPRING_DELAY_MS);
     expect(isCollapsed('done')).toBe(false);
     act(() => void document.dispatchEvent(new Event('dragend', { bubbles: true })));
+    expect(isCollapsed('done')).toBe(true);
+  });
+});
+
+/**
+ * A `dragleave` that really carries its `relatedTarget`: jsdom has no `DragEvent`, so RTL builds a bare `Event`
+ * and drops that init field (the cases above that pass `relatedTarget` get `undefined`). Planted by hand.
+ */
+function leave(element: Element, dataTransfer: DataTransfer, relatedTarget: EventTarget | null): void {
+  const event = createEvent.dragLeave(element, { dataTransfer });
+  Object.defineProperty(event, 'relatedTarget', { value: relatedTarget });
+  fireEvent(element, event);
+}
+
+/** Enter `stateId`'s column and then one of its descendants (a bubbling dragenter counts as a second enter): the depth count is 2. */
+function enterTwice(dataTransfer: DataTransfer, stateId: string): void {
+  fireEvent.dragEnter(columnOf(stateId), { dataTransfer });
+  fireEvent.dragEnter(columnOf(stateId).firstElementChild!, { dataTransfer });
+}
+const WAITING_KEY = columnCollapseKey('wf-errand', 'waiting');
+const DONE_OUTLINE = 'gn-board__column--drop-target';
+
+describe('20.155 only a column collapsed by choice springs', () => {
+  it('20.155 a card held over an OPEN legal column and dropped writes nothing to the memory (CONTROL: Done, collapsed, springs in the same drag)', async () => {
+    // Mutation `open column springs too`: drop the `columnChoices[...] === false &&` term of `armed`.
+    const { onMoved } = await mount();
+    const dataTransfer = dragOnto('tk_doing', 'done');
+    await wait(SPRING_DELAY_MS);
+    expect(isCollapsed('done')).toBe(false); // CONTROL — the spring machinery is live in this very drag
+    leave(columnOf('done'), dataTransfer, columnOf('waiting'));
+    expect(isCollapsed('done')).toBe(true);
+
+    fireEvent.dragEnter(columnOf('waiting'), { dataTransfer });
+    await wait(SPRING_DELAY_MS * 2);
+    fireEvent.drop(columnOf('waiting'), { dataTransfer });
+    vi.useRealTimers();
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
+    const projects = (stored() as { projects: Record<string, Record<string, boolean>> }).projects;
+    expect(projects[PROJECT]![WAITING_KEY]).toBeUndefined();
+    expect(projects[PROJECT]![DONE_KEY]).toBe(false);
+  });
+});
+
+describe('20.156 a dragend that reaches only the document clears the drop outline, not just the spring', () => {
+  it('20.156 the outline on an open legal column is gone after a document-level dragend (CONTROL: it was there)', async () => {
+    // Mutation `drag-end cleanup does not clear drop target`: drop `setDropTarget(null);` from the document-level `clear`.
+    await mount();
+    dragOnto('tk_doing', 'waiting');
+    expect(columnOf('waiting').classList.contains(DONE_OUTLINE)).toBe(true); // CONTROL
+    act(() => void document.dispatchEvent(new Event('dragend', { bubbles: true })));
+    expect(columnOf('waiting').classList.contains(DONE_OUTLINE)).toBe(false);
+  });
+});
+
+describe('20.157 a dragleave to a target outside the column is a real leave even when the depth count is still above zero', () => {
+  it('20.157 depth 3: a leave to a sibling INSIDE keeps the sprung column open, a leave to a column OUTSIDE closes it', async () => {
+    // Mutation `relatedTarget leave test dropped`: `const leftForGood = next instanceof Node && !event.currentTarget.contains(next);` -> `const leftForGood = false;`.
+    await mount();
+    const dataTransfer = dragOnto('tk_doing', 'done');
+    fireEvent.dragEnter(columnOf('done').firstElementChild!, { dataTransfer });
+    fireEvent.dragEnter(columnOf('done').firstElementChild!, { dataTransfer });
+    await wait(SPRING_DELAY_MS);
+    expect(isCollapsed('done')).toBe(false);
+    const inner = columnOf('done').firstElementChild!;
+    leave(inner, dataTransfer, columnOf('done')); // CONTROL — target inside the column, depth 3 -> 2
+    expect(isCollapsed('done')).toBe(false);
+    leave(inner, dataTransfer, columnOf('doing')); // depth 2 -> 1, but the pointer is gone for good
+    expect(isCollapsed('done')).toBe(true);
+    expect(columnOf('done').classList.contains(DONE_OUTLINE)).toBe(false);
+  });
+});
+
+describe('20.158 a dragleave between two children of the same column is not a leave', () => {
+  it('20.158 depth 2: a leave whose target is inside the column keeps the outline and the sprung column (CONTROL: then a real leave closes it)', async () => {
+    // Mutation `any dragleave is a leave`: `if (depth > 0 && !leftForGood) {` -> `if (false) {`.
+    await mount();
+    const dataTransfer = dragData();
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_doing'), { dataTransfer });
+    enterTwice(dataTransfer, 'done');
+    await wait(SPRING_DELAY_MS);
+    expect(isCollapsed('done')).toBe(false);
+    const inner = columnOf('done').firstElementChild!;
+    leave(inner, dataTransfer, columnOf('done').querySelector('ul') ?? columnOf('done'));
+    expect(isCollapsed('done')).toBe(false);
+    expect(columnOf('done').classList.contains(DONE_OUTLINE)).toBe(true);
+
+    leave(inner, dataTransfer, columnOf('doing')); // CONTROL — a leave to a column outside does close it
+    leave(columnOf('done'), dataTransfer, columnOf('doing'));
     expect(isCollapsed('done')).toBe(true);
   });
 });
