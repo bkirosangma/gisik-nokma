@@ -772,6 +772,47 @@ export const primitives = {
    * reused rather than duplicated. 11.42:1 on `navyBase`, 9.41:1 on `navyRaised`.
    */
   accentEdgeDark: '#bcd4f7',
+  /**
+   * ## The styling refresh's depth (Plan A Task 2, 2026-09-29) — hig only
+   *
+   * Every value is the owner-approved mockup's own rgba, converted to 8-digit
+   * hex (alpha × 255, rounded): `Main.dc.html:133-140` (dark) and `:146-153`
+   * (light), `Sheet.dc.html:118`/`:127` (the sheet). Names start `shadow`, so
+   * case 13.338's sweep (`tokens.test.ts:229`) sees every one. neo reuses its
+   * OWN primitives above (`shadowNeo*`) and minimal draws none.
+   */
+  shadowLitLight: '#ffffffe6',
+  shadowLitNearLight: '#ffffffff',
+  shadowFallLight1: '#273a631f',
+  shadowFallLight2: '#273a6338',
+  shadowFallNearLight1: '#273a6314',
+  shadowFallNearLight2: '#273a632e',
+  shadowFallNearLight3: '#273a6347',
+  shadowFallPressLight1: '#273a6324',
+  shadowFallPressLight2: '#273a6333',
+  shadowTrackLight: '#b0988459',
+  shadowTrackLitLight: '#ffffff99',
+  shadowActionLitLight: '#ffffff47',
+  shadowActionFallLight: '#273a6340',
+  shadowActionGlowLight: '#33629f73',
+  shadowActionLitNearLight: '#ffffff66',
+  shadowActionGlowNearLight: '#33629f80',
+  shadowActionPressLight: '#1016254d',
+  shadowSheetLight: '#273a6359',
+  shadowLitDark: '#f2e9e112',
+  shadowLitNearDark: '#f2e9e11f',
+  shadowFallDark1: '#00000080',
+  shadowFallDark2: '#00000099',
+  shadowFallNearDark1: '#00000059',
+  shadowFallNearDark2: '#0000008c',
+  shadowTrackDark: '#00000073',
+  shadowTrackLitDark: '#ffffff0a',
+  shadowActionLitDark: '#ffffff73',
+  shadowActionLitNearDark: '#ffffff8c',
+  shadowActionFallNearDark: '#000000a6',
+  shadowActionPressDark: '#141a2e73',
+  shadowActionPressFallDark: '#00000066',
+  shadowSheetLitDark: '#f2e9e114',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -1135,13 +1176,14 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
 };
 
 /** `radius.card` / `radius.control` → `--gn-radius-card` / `--gn-radius-control`. Not a colour, so plain CSS length strings, no primitive/discipline concerns. */
-export type RadiusRole = 'card' | 'control';
+export type RadiusRole = 'card' | 'control' | 'track';
 
+/** `track` (styling refresh, 2026-09-29) = card + 8: a track pads its cards by 8px, and rule 05 says inner radius = outer − padding (16 = 24 − 8; neo 20 = 28 − 8). */
 /** `hig` and `minimal` share the shipped radii; `neo`'s are the export's own, larger values. */
 export const radii: Record<StyleName, Record<RadiusRole, string>> = {
-  hig: { card: '16px', control: '8px' },
-  minimal: { card: '16px', control: '8px' },
-  neo: { card: '20px', control: '14px' },
+  hig: { card: '16px', control: '8px', track: '24px' },
+  minimal: { card: '16px', control: '8px', track: '24px' },
+  neo: { card: '20px', control: '14px', track: '28px' },
 };
 
 export function radiusOf(style: StyleName, role: RadiusRole): string {
@@ -1192,6 +1234,31 @@ export function fontStackOf(role: FontRole): string {
 /** `sans` → `--gn-font-sans`. */
 export function fontVariableName(role: FontRole): string {
   return `--gn-font-${role}`;
+}
+
+/**
+ * The 8-pt grid and the motion constants (styling refresh Plan A Task 2,
+ * rules "02 Spacing — 24 around, 16 between groups, 8 between lines" and
+ * "06 Motion — feedback in 100ms, done in 300; 150–300ms, ease-out"). Neither
+ * varies by style or theme, so — like the fonts — they are emitted ONCE under
+ * the bare `:root` (`themeStylesheet`'s first block), never per style×theme.
+ */
+export const spacing = { 1: '0.5rem', 2: '1rem', 3: '1.5rem' } as const;
+export type SpaceStep = keyof typeof spacing;
+export function spaceVariableName(step: SpaceStep): string {
+  return `--gn-space-${step}`;
+}
+
+export const motion = {
+  feedback: '100ms',
+  move: '200ms',
+  lift: '220ms',
+  done: '300ms',
+  'ease-out': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+} as const;
+export type MotionKey = keyof typeof motion;
+export function motionVariableName(key: MotionKey): string {
+  return `--gn-motion-${key}`;
 }
 
 /**
@@ -1276,13 +1343,29 @@ export function fontVariableName(role: FontRole): string {
  * names `fillQuaternary`, so 13.338's actual guarantee is unaffected), but
  * the sweep no longer covers every shadow layer by construction.
  */
-export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact' | 'selected';
+export type ShadowRole =
+  | 'raised'
+  | 'sunken'
+  | 'overlay'
+  | 'sunken-compact'
+  | 'selected'
+  | 'lift'
+  | 'lift-near'
+  | 'lift-press'
+  | 'lift-drag'
+  | 'track'
+  | 'action'
+  | 'action-near'
+  | 'action-press'
+  | 'sheet';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
   x: number;
   y: number;
   blur: number;
+  /** Optional fourth length (styling refresh Task 2): a negative spread keeps a long, soft fall from widening past the card. */
+  spread?: number;
   colour: PrimitiveName;
   inset?: boolean;
 };
@@ -1320,6 +1403,65 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 0, y: 3, blur: 8, colour: 'shadowHigLight' },
         { x: 0, y: 3, blur: 1, colour: 'fillWarmHig4' },
       ],
+      /** Styling refresh (Plan A Task 2) — `Main.dc.html:146` `lift`. */
+      lift: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallLight1' },
+        { x: 0, y: 8, blur: 16, spread: -8, colour: 'shadowFallLight2' },
+      ],
+      /** `:148` `near` — the lift TOWARD the user: brighter lit edge, 3-layer spreading fall. */
+      'lift-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearLight', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallNearLight1' },
+        { x: 0, y: 12, blur: 24, spread: -6, colour: 'shadowFallNearLight2' },
+        { x: 0, y: 28, blur: 48, spread: -16, colour: 'shadowFallNearLight3' },
+      ],
+      /** `:149` `press`. */
+      'lift-press': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallPressLight1' },
+        { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallPressLight2' },
+      ],
+      /**
+       * Added 2026-09-29 (owner kanban rulings; Task 5A). The DRAGGED card is
+       * lifted furthest toward the user: `lift-near`'s lit edge, with a fall that
+       * reaches further and softer (40px down, 64px blur). The mockup draws no
+       * drag state, so this reuses the mockup's own primitives and adds none.
+       */
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearLight', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallLight1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallLight2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallNearLight3' },
+      ],
+      /** `:150` `recess` — the track, lit from above (dark top inset, light bottom lip). */
+      track: [
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackLight', inset: true },
+        { x: 0, y: -1, blur: 0, colour: 'shadowTrackLitLight', inset: true },
+      ],
+      /** `:153` `btnShadow`. */
+      action: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowActionFallLight' },
+        { x: 0, y: 8, blur: 16, spread: -6, colour: 'shadowActionGlowLight' },
+      ],
+      /** `:151` `btnNear`. */
+      'action-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitNearLight', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallPressLight2' },
+        { x: 0, y: 10, blur: 20, spread: -6, colour: 'shadowActionGlowLight' },
+        { x: 0, y: 20, blur: 36, spread: -14, colour: 'shadowActionGlowNearLight' },
+      ],
+      /** `:152` `btnPress` — pushed back into its track. */
+      'action-press': [
+        { x: 0, y: 2, blur: 4, colour: 'shadowActionPressLight', inset: true },
+        { x: 0, y: 1, blur: 1, colour: 'shadowFallPressLight2' },
+      ],
+      /** `Sheet.dc.html:127` `sheetShadow` — lit inner left edge, shadow falls to the left. */
+      sheet: [
+        { x: 1, y: 0, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowSheetLight' },
+      ],
     },
     dark: {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
@@ -1328,11 +1470,56 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       'sunken-compact': [],
       /** `--segOnShadow` hig dark (`desktop.dc.html:43`) — ONE layer only, not two; see the docblock above. */
       selected: [{ x: 0, y: 3, blur: 8, colour: 'shadowHigDark' }],
+      lift: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallDark1' },
+        { x: 0, y: 8, blur: 16, spread: -8, colour: 'shadowFallDark2' },
+      ],
+      'lift-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearDark', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallNearDark1' },
+        { x: 0, y: 12, blur: 24, spread: -6, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 28, blur: 48, spread: -16, colour: 'shadowFallDark2' },
+      ],
+      'lift-press': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallDark1' },
+      ],
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearDark', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallNearDark1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallDark2' },
+      ],
+      track: [
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackDark', inset: true },
+        { x: 0, y: -1, blur: 0, colour: 'shadowTrackLitDark', inset: true },
+      ],
+      action: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallDark1' },
+        { x: 0, y: 8, blur: 16, spread: -6, colour: 'shadowFallNearDark2' },
+      ],
+      'action-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitNearDark', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackDark' },
+        { x: 0, y: 10, blur: 20, spread: -6, colour: 'shadowFallDark2' },
+        { x: 0, y: 20, blur: 36, spread: -14, colour: 'shadowActionFallNearDark' },
+      ],
+      'action-press': [
+        { x: 0, y: 2, blur: 4, colour: 'shadowActionPressDark', inset: true },
+        { x: 0, y: 1, blur: 1, colour: 'shadowActionPressFallDark' },
+      ],
+      sheet: [
+        { x: 1, y: 0, blur: 0, colour: 'shadowSheetLitDark', inset: true },
+        { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowFallDark2' },
+      ],
     },
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
-    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
   },
   neo: {
     light: {
@@ -1363,6 +1550,47 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       selected: [
         { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
         { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
+      lift: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Toward the user: the same pair, thrown further. */
+      'lift-near': [
+        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -10, y: -10, blur: 24, colour: 'shadowNeoHighlightLight' },
+      ],
+      'lift-press': [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
+      'lift-drag': [
+        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -14, y: -14, blur: 32, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** The track IS neo's `sunken` tray. */
+      track: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkLight', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      action: [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
+      ],
+      'action-near': [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Pushed in: neo's own `selected` inset. */
+      'action-press': [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      sheet: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
       ],
     },
     dark: {
@@ -1399,12 +1627,54 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
         { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
       ],
+      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
+      lift: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Toward the user: the same pair, thrown further. */
+      'lift-near': [
+        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -10, y: -10, blur: 24, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      'lift-press': [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
+      'lift-drag': [
+        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -14, y: -14, blur: 32, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** The track IS neo's `sunken` tray. */
+      track: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkDark', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      action: [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      'action-near': [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Pushed in: neo's own `selected` inset. */
+      'action-press': [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      sheet: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
     },
   },
 };
 
 function shadowLayerCss(layer: ShadowLayer): string {
-  return `${layer.inset ? 'inset ' : ''}${layer.x}px ${layer.y}px ${layer.blur}px ${primitives[layer.colour]}`;
+  const spread = layer.spread === undefined ? '' : ` ${layer.spread}px`;
+  return `${layer.inset ? 'inset ' : ''}${layer.x}px ${layer.y}px ${layer.blur}px${spread} ${primitives[layer.colour]}`;
 }
 
 /** The CSS `box-shadow` value for one style×theme×role — `'none'` when that combination has no layers. */
@@ -1599,7 +1869,7 @@ export function cssVariableName(role: TokenRole): string {
   return `--gn-${role.replace(/[A-Z]/g, (upper) => `-${upper.toLowerCase()}`)}`;
 }
 
-const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
+const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control', 'track'];
 /**
  * EXPORTED (round 3 fix round 1, 2026-09-16) so `tokens.test.ts` can build its
  * own "every var(--gn-…) names a declared role" check directly from THIS
@@ -1630,7 +1900,22 @@ const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
  * updated to add `'selected'` in the same change that added it here, which
  * is what makes 13.411's coverage of this role real rather than assumed.
  */
-export const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'];
+export const SHADOW_ROLES: readonly ShadowRole[] = [
+  'raised',
+  'sunken',
+  'overlay',
+  'sunken-compact',
+  'selected',
+  'lift',
+  'lift-near',
+  'lift-press',
+  'lift-drag',
+  'track',
+  'action',
+  'action-near',
+  'action-press',
+  'sheet',
+];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {
@@ -1702,7 +1987,13 @@ export function themeStylesheet(): string {
        `declarationsFor`, where it would belong — lands later in source order
        and wins the tie against this base at equal specificity, which is the
        direction an override has to resolve. */
-    `:root { ${FONT_ROLES.map((role) => `${fontVariableName(role)}: ${fontStackOf(role)};`).join(' ')} }`,
+    `:root { ${FONT_ROLES.map((role) => `${fontVariableName(role)}: ${fontStackOf(role)};`).join(' ')} ${(
+      Object.keys(spacing) as unknown as SpaceStep[]
+    )
+      .map((step) => `${spaceVariableName(step)}: ${spacing[step]};`)
+      .join(' ')} ${(Object.keys(motion) as MotionKey[])
+      .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
+      .join(' ')} }`,
     `:root { ${declarationsFor('hig', 'light')} }`,
     `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('hig', 'dark')} } }`,
