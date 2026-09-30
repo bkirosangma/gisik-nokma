@@ -509,3 +509,12 @@ Covering tests: `apps/server/test/auth/devices.test.ts`. **Amended in place:** t
 - ✅ **6.304 — over https the cookie gains `Secure`;** control: over http it does not (6.300). Mutation: hard-code `secure: false` (red: 6.304).
 - ✅ **6.305 — a session created with no endpoint context (`ctx === null`) is created with `deviceId` NULL and the hook does not throw;** control: with context it is set. Mutation: dereference `ctx` unguarded (red: 6.305).
 - ✅ **6.306 — the migration is additive: the new columns exist with the planned types, NULLable with no default, and a session row written the old way (none of the new columns named) reads back NULL in both;** control: the exact column list. Mutation: `NOT NULL DEFAULT ''` on `deviceId` (red: 6.306).
+
+### Task 2 — `currentSessionId` and a throttled `lastSeenAt` (6.307–6.310)
+
+Covering tests: `apps/server/test/auth/require-session.test.ts` (second describe, real pool, injected clock).
+
+- ✅ **6.307 — an authenticated session request stamps `lastSeenAt` when it is NULL or older than 5 minutes;** control: a fresh session reads NULL first, and a request 4 m 59 s after the stamp writes nothing. Mutation: stamp on every request (red: 6.307); threshold 4 or 6 minutes (red: 6.307).
+- ✅ **6.308 — exactly 5 minutes after the stamp, the next request stamps again** (boundary, both sides in the one `it` with 6.307's 4 m 59 s). Mutation: `<=` to `<` (red: 6.307/6.308 `it`).
+- ✅ **6.309 — `request.currentSessionId` is the better-auth session row's id for a session request and `null` for an MCP-token request;** control: `currentUserId` and `authKind` are unchanged in both. Mutation: null for sessions; the token as the id in the MCP branch (both red: 6.309).
+- ✅ **6.310 — a failing stamp query is swallowed (logged at warn) and the request still answers 200;** control: the same session stamps through the working app. Mutation: rethrow from the catch (red: 6.310).
