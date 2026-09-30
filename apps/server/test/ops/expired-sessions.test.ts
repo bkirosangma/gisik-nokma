@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { deleteExpiredSessions } from '../../src/ops/expired-sessions.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
@@ -28,4 +29,11 @@ it('6.321 deletes every session with expiresAt <= now and returns the count; con
   expect(left.rows.map((r) => r.id)).toEqual(['live']);
   // A second sweep finds nothing: the count is what was deleted, not what was scanned.
   expect(await deleteExpiredSessions(db.pool, now)).toBe(0);
+});
+
+it('6.323 .env.example documents SESSION_SWEEP_INTERVAL_MS with the daily default; control: the sibling PURGE_SWEEP_INTERVAL_MS line is read the same way', () => {
+  const example = readFileSync(new URL('../../../../.env.example', import.meta.url), 'utf8');
+  const valueOf = (name: string) => new RegExp(`^${name}=(.*)$`, 'm').exec(example)?.[1];
+  expect(valueOf('PURGE_SWEEP_INTERVAL_MS')).toBe('3600000');
+  expect(valueOf('SESSION_SWEEP_INTERVAL_MS')).toBe('86400000');
 });

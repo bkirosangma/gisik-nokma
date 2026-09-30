@@ -540,7 +540,7 @@ Covering tests: `apps/server/test/ops/expired-sessions.test.ts` (real Postgres, 
 
 - ✅ **6.321 — `deleteExpiredSessions(pool, now)` deletes every session with `expiresAt <= now` and returns the count;** control: a session expiring 1 s after `now` survives, and a second sweep returns 0. Mutations: `<=`→`<`, delete everything, return 0 (red: 6.321).
 - ✅ **6.322 — the worker schedules a job `expired-sessions` whose delay is `SESSION_SWEEP_INTERVAL_MS` (default 86400000; empty = default; 0 refused by name, aborting the whole scheduler);** control: empty arms, and a bad `PURGE_SWEEP_INTERVAL_MS` is still refused beside it. Mutations: drop the job, refuse under the wrong variable name, empty not treated as unset (red: 6.322).
-- ✅ **6.323 — `.env.example` documents `SESSION_SWEEP_INTERVAL_MS`;** control: `pnpm check:env` exits 1 naming it once the line is removed (run by hand, LOCAL: "SESSION_SWEEP_INTERVAL_MS (first seen in apps/server/src/ops/backup-daemon-main.ts…)").
+- ✅ **6.323 — `.env.example` documents `SESSION_SWEEP_INTERVAL_MS`;** control: the sibling PURGE line reads the same way; `pnpm check:env` also exits 1 naming it once the line is removed (checked by hand, LOCAL). Test: `expired-sessions.test.ts`. Mutation: remove the line (red: 6.323).
 
 ### Task 6 — Account → Sign-in and devices, one row per device (6.330–6.334, 6.339)
 
