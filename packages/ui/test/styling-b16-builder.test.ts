@@ -229,6 +229,40 @@ describe('10.159 the destructive buttons inside the well are quiet danger button
   });
 });
 
+/**
+ * The whole chrome the screen sits inside, as `apps/web/app/globals.css` publishes it (polish 2, 2026-10-01, case 10.164):
+ * the sticky app bar, the breadcrumb block above the screen (its top margin and its line box) and the shell's bottom padding.
+ * Every term reads its token with a `0px` fallback — the same convention `--app-nav-offset` has — so this file carries no
+ * second copy of any number; `apps/web/test/builder-screen-chrome.test.ts` pins the values the tokens resolve to.
+ */
+const CHROME_TERMS = [
+  'var(--app-nav-offset, 0px)',
+  'var(--gn-builder-crumb-gap, 0px)',
+  'var(--gn-builder-crumb-line, 0px)',
+  'var(--gn-shell-pad-bottom, 0px)',
+];
+const SCREEN_HEIGHT = `calc(100dvh - ${CHROME_TERMS.join(' - ')})`;
+
+describe('10.164 the wide screen is exactly the window minus the real chrome, so the page itself has nothing to scroll', () => {
+  const css = cssOf('ui');
+  it('10.164 height = 100dvh minus the app bar, the breadcrumb (margin + line) and the shell padding, in the side-by-side block only', () => {
+    const wide = ruleExactly(css, '.workflow-builder-screen', '@media (min-width: 64.0625rem)');
+    const height = valueOf(wide, 'height') ?? '';
+    // CONTROL — the declaration exists and is a calc, so each term check below reads a real expression.
+    expect(height).toMatch(/^calc\(100dvh - /);
+    // The viewport, bounded (not `auto`, not a bare `100vh` that ignores the dynamic toolbar)…
+    expect(height.startsWith('calc(100dvh')).toBe(true);
+    // …and ALL four chrome terms, each by name: the app bar, the breadcrumb's margin, its line, the bottom padding.
+    for (const term of CHROME_TERMS) expect(height, term).toContain(term);
+    expect(height).toBe(SCREEN_HEIGHT);
+    // No literal length is left in it (the old `- 4rem` was a second copy of a measurement that was 26px short).
+    expect(height.replace(/var\([^)]*\)/g, '')).not.toMatch(/\d+(\.\d+)?(rem|px)/);
+    // The stacked block declares no height for the screen (unchanged) — the page scrolls there, as it always did.
+    const stacked = parseRules(css).filter((rule) => rule.atRule === '@media (max-width: 64rem)' && rule.selectors.join(',') === '.workflow-builder-screen');
+    expect(stacked).toEqual([]);
+  });
+});
+
 describe('10.161 the left column is its own scroll region above the wide breakpoint', () => {
   const css = cssOf('ui');
   const SIDE_BY_SIDE = '@media (min-width: 64.0625rem)';
@@ -242,7 +276,8 @@ describe('10.161 the left column is its own scroll region above the wide breakpo
 
   it('10.161 the screen is bounded to the viewport below the app bar, the layout takes the rest, the column fills its track and scrolls inside it', () => {
     const screen = ruleExactly(css, '.workflow-builder-screen', SIDE_BY_SIDE);
-    expect(valueOf(screen, 'height')).toBe('calc(100vh - var(--app-nav-offset, 0px) - 4rem)');
+    // Whole-expression pin; the terms are read one by one in 10.164 just below.
+    expect(valueOf(screen, 'height')).toBe(SCREEN_HEIGHT);
     const layout = ruleExactly(css, '.workflow-builder-screen__layout', SIDE_BY_SIDE);
     expect(valueOf(layout, 'flex')).toBe('1 1 auto');
     expect(valueOf(layout, 'min-height')).toBe('0');

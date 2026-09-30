@@ -1488,7 +1488,10 @@ a.gn-ticket-sheet__crumb--link {
    in `board.tsx`, case 13.523): a card that can be opened but not dragged
    (the read-only path) shows `pointer`; the `[draggable="true"]` rule beneath
    it beats it on specificity, so a draggable card keeps `grab`. */
-.gn-board__card-slot { cursor: pointer; position: relative; }
+/* A dropped card is scrolled to with `scrollIntoView({ block: 'nearest', inline: 'nearest' })`, which stops the
+   moment the card is fully visible — bottom edge 0.09px inside the window reads as "cut off". The margin is where
+   `nearest` stops instead: one spacing step (16px) clear of the window and of the rail, on every side. */
+.gn-board__card-slot { cursor: pointer; position: relative; scroll-margin: var(--gn-space-2); }
 .gn-board__card-slot[draggable="true"] { cursor: grab; }
 /* THE HOVER DEEPENS THE SHADOW, AND ONLY THE SHADOW (owner rulings,
    2026-09-29). The first ruling lifted the card toward the user on hover
@@ -4559,9 +4562,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    room to travel and the pin held ~32px. Now, side by side, the WHOLE SCREEN is
    bounded to the viewport below the app bar (`--app-nav-offset`, 4.35rem,
    published by the web shell; `0px` where no shell publishes it — the same
-   fallback `.gn-help__sidebar` takes; the 4rem is the breadcrumb and its
-   margins above the screen, rounded UP so an error leaves slack rather than a
-   hidden bottom), the layout takes what the header leaves (`flex: 1`, one
+   fallback `.gn-help__sidebar` takes; minus the breadcrumb's margin and line and
+   the shell's bottom padding, also published by the shell — polish 2, case 10.164:
+   the first cut was a literal `4rem` for all three, 26px short, which left the PAGE
+   that much to scroll), the layout takes what the header leaves (`flex: 1`, one
    `minmax(0, 1fr)` row), and the column fills its track and scrolls inside it:
    `overscroll-behavior: contain` stops the wheel chaining to the page at either
    end, and the page has (almost) nothing left to scroll, so `scrollIntoView
@@ -4572,7 +4576,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    and the `Select` popovers (portalled to the body), so nothing is clipped by
    the overflow. */
 @media (min-width: 64.0625rem) {
-  .workflow-builder-screen { height: calc(100vh - var(--app-nav-offset, 0px) - 4rem); }
+  /* Exactly the window minus the chrome around it (polish 2, case 10.164): the app bar, the breadcrumb's margin and line,
+     and the shell's bottom padding — each published once by `apps/web/app/globals.css`, each read with a `0px` fallback
+     (a host without that chrome is unaffected). The old `- 4rem` ignored the padding and left the PAGE 26px to scroll. */
+  .workflow-builder-screen {
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--gn-builder-crumb-gap, 0px) - var(--gn-builder-crumb-line, 0px) - var(--gn-shell-pad-bottom, 0px));
+  }
   .workflow-builder-screen__layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
   .workflow-builder-screen__left {
     align-self: stretch;

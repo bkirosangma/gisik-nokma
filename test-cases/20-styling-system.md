@@ -12,10 +12,10 @@ in the table below. Take from your block, never from the tip.
 
 | Plan | Block |
 |---|---|
-| A Foundation, board, sheet | `20.001`–`20.160` |
+| A Foundation, board, sheet | `20.001`–`20.170` |
 | B Every other screen | `20.201`–`20.600` |
 
-Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12) and the survivors of their mutation review take `20.149`–`20.159` (§20.12, same day; the block was widened from `20.150` into the unallocated `20.151`–`20.200`). `20.160` stays free.
+Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12) and the survivors of their mutation review take `20.149`–`20.159` (§20.12, same day; the block was widened from `20.150` into the unallocated `20.151`–`20.200`). the browser-pass follow-up (2026-10-01) takes `20.160`–`20.161` (§20.12). `20.162`–`20.170` stay free.
 
 **Write cases as `- ✅ **20.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -179,6 +179,8 @@ Owner, 2026-10-01: *"the dropped card briefly jumps back to the original column 
 - ✅ **20.157 — a `dragleave` whose `relatedTarget` is OUTSIDE the column is a real leave even while the depth count is above zero (clears the outline and closes a sprung column):** control: a leave whose target is inside the column keeps it open. Mutation: `relatedTarget leave test dropped`.
 - ✅ **20.158 — a `dragleave` between two children of the SAME column (`relatedTarget` inside) is not a leave: the outline and the sprung column stay:** control: a leave to a column outside then closes it. Mutation: `any dragleave is a leave`. Older coverage: the depth-count half is already killed by `20.105` and `20.110` (`board-drop-placeholder.test.tsx`) when the FULL suite runs against this mutation; what no older case could express is the `relatedTarget`-INSIDE half, because jsdom has no `DragEvent` and RTL's `fireEvent.dragLeave(el, { relatedTarget })` builds a bare `Event` that drops the field (`leftForGood` was false in every older case, `20.140`'s included), so these two cases plant `relatedTarget` by hand at depth 2–3.
 - ✅ **20.159 — the edge scroller begins only for a CARD drag: a `dragstart` without `DRAG_CARD_MARKER` (a text or file drag) adds no document `dragover` listener and scrolls nothing:** control: a card `dragstart` followed by the same `dragover` scrolls. Mutation: `scroller begun for any drag`.
+- ✅ **20.160 — the settled card lands with breathing room: `.gn-board__card-slot` carries `scroll-margin: var(--gn-space-2)` (16px, every side), so the `scrollIntoView({ block: 'nearest', inline: 'nearest' })` of 20.138 stops 16px clear of the window and of the rail instead of flush against it (measured in the browser pass: bottom 0.09px inside a 420px window read as cut off):** control: the rule's other declaration reads back and a rule without the margin reads null. Mutations: `scroll-margin: 0`; the declaration dropped.
+- ✅ **20.161 — guard: Confirm lays the `writing` entry in the same tick as the click — the render right after it has `data-move-phase="writing"` and no `gn-board__card-slot--waiting`, with the ingest still open and nothing awaited:** control: the card was `awaiting` with the wash before Confirm. Mutation: `submitFromDialog` lays its entry only after an async step (a 50 ms macrotask before `beginPending`) — the existing 20.129 waits for the ingest to be called and could not tell. **This passed on the unchanged code: it pins the behaviour, it does not fix the browser pass's B4 finding 3 (the wash seen ~2 s after Confirm), which is not reproduced in jsdom and stays open** (nothing else in `ui.css` dims a `writing` slot; the dialog stays open until the write answers).
 
 ## 20.23 Plan B — floating surfaces
 
@@ -320,3 +322,10 @@ Owner 2026-09-30 ("both, as recommended"), from browser check B (20.594). Block 
 
 - ✅ **20.381 — the MCP consent and refusal notices are recessed wells keeping their tone edges (accent, danger), each MCP token is a raised row (P-ROW), and the tokens refusal is a well (P-WELL);** control: the authorize code field keeps its `border-strong` edge. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-mcp-tokens__row`.
 - ✅ **20.382 — no sign-in, invite or MCP rule paints a flat boundary or the retired constant;** control: the scan reads more than 30 rules across the four prefixes and neo's sign-in mark is still declared (kept: neo's raised brand tile). Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-mcp-authorize__consent` (by replacing its well background).
+
+## 20.66 Polish 2 (2026-10-01)
+
+From the browser pass of #834: neo at 320px had a 1px horizontal page scroll. Block `20.661`–`20.665`.
+
+- ✅ **20.661 — the Account page's Appearance control fits its card at 320px: below 23rem `.gn-account__appearance .gn-segmented__item` takes `padding: 0 0.5rem`;** the cause was not a neo rule (there is none) but the Style control's three labels needing ~284px with the shared item's `0 1rem` in a 256px card, so the track spilled ~36px out of the card in every style and, with neo selected, the bold *Neomorphic* label tipped the page to `scrollWidth` 321. Control: the shared `.gn-segmented__item` keeps `padding: 0 1rem`, the override exists only inside the media query, and it carries no `min-height` (the 44px floor stands). Mutations: remove the rule; padding back to `1rem`; breakpoint `20rem`; the rule leaking out of the media query; the shared item squeezed. — `apps/web/test/account-appearance-reflow.test.ts`
+- 🧪 **20.662 — in a browser at 320px, in hig, minimal and neo (light and dark), with each of the three Style options selected:** `document.scrollingElement.scrollWidth` is 320 and every `.gn-segmented__item` of the Appearance card ends inside the card (right edge ≤ 284 at 320). (Controller, after a rebuild. Static check on the real stylesheets in headless Chromium: all five option/style combinations → `scrollWidth` 320, Neomorphic's right edge 284.)
