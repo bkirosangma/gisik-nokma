@@ -117,6 +117,14 @@ describe('20.101 a dragged card hands the browser a lifted image', () => {
     const card = slot.firstElementChild as HTMLElement;
     card.getBoundingClientRect = () =>
       ({ left: 10, top: 10, width: 288, height: 120, right: 298, bottom: 130, x: 10, y: 10, toJSON: () => ({}) }) as DOMRect;
+    // PLANT the attributes the strip exists for: the seeded card carries none of its own, and a
+    // strip test over a haystack with nothing to strip cannot fail (mutation-tested, Task 5A).
+    card.setAttribute('id', 'planted-card');
+    card.setAttribute('data-testid', 'planted-card');
+    const inner = document.createElement('span');
+    inner.setAttribute('id', 'planted-inner');
+    inner.setAttribute('data-testid', 'planted-inner');
+    card.append(inner);
     const dataTransfer = liftingDataTransfer();
     dragStartAt(slot, dataTransfer, 30, 20);
 
@@ -132,6 +140,9 @@ describe('20.101 a dragged card hands the browser a lifted image', () => {
     expect(clone.classList.contains('gn-board-card')).toBe(true);
     expect(clone.style.width).toBe('288px');
     expect(wrapper.querySelectorAll('[id], [data-testid]')).toHaveLength(0);
+    // CONTROL — the plant is real: the source card still carries what the clone lost.
+    expect(card.getAttribute('data-testid')).toBe('planted-card');
+    expect(card.querySelector('[data-testid="planted-inner"]')).not.toBeNull();
     // CONTROL — the clone did not steal the test id: the real card is still the only one.
     expect(screen.getAllByTestId(`ticket-card-${TICKET}`)).toHaveLength(1);
     // The wrapper goes on the next task, after the browser's snapshot.
