@@ -429,8 +429,8 @@ input, textarea, select { font-family: inherit; }
    `--gn-focus-ring` pair. (Hover used to be `--gn-surface-sunken`, painted
    directly on this box — the same role `.gn-table__row--clickable` uses for
    exactly this. Round 2 replaced it with a brightness filter painted on
-   `.gn-card` itself, not this element; see the comment on that rule below
-   for why. The door's full-card box still matters for hover — not because
+   `.gn-card` itself, not this element, and Plan B B13 with the lift shadow on
+   `.gn-card`; see the comment on that rule below for why. The door's full-card box still matters for hover — not because
    it paints anything now, but because `.gn-card`'s `:has()` selector only
    fires while the pointer is somewhere inside THIS box.) */
 /* Round 22 (owner: "it should be same for the workspace card in the
@@ -441,7 +441,12 @@ input, textarea, select { font-family: inherit; }
    content height. Declares NOTHING else, and in particular no `border-radius`:
    this class exists beside `.gn-card` on the same element, which is precisely
    the position case 13.355 was written about. */
-.gn-workspace-card { height: 100%; }
+.gn-workspace-card {
+  height: 100%;
+  /* Styling refresh Plan B (Task B13): P-LIFT — the shadow deepens on hover (rule below), and `z-index` needs a positioned card. */
+  position: relative;
+  transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
+}
 .gn-workspace-card__door {
   display: flex;
   flex-direction: column;
@@ -467,74 +472,45 @@ input, textarea, select { font-family: inherit; }
   margin: -0.75rem;
   padding: 1.25rem;
 }
-/* Round 2 owner correction, REPLACING the `background: var(--gn-surface-
-   sunken)` hover this used to carry. Under `neo` — the shipped default —
-   `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex (see
-   `tokens.ts`), so that swap traded a colour for an identical colour and
-   rendered NOTHING: measured, not assumed, by reading the three neo values
-   side by side. The prototype's own hover treatment is not a background
-   swap at all — its card is a `<button>`, and the only rule it carries is a
-   brightness `filter` (`desktop.dc.html:85-86`), asymmetric on purpose:
-   light gets DARKER (0.97), dark gets LIGHTER (1.18). Owner ruling: match
-   both numbers and both directions exactly, not a normalised "always
-   darken" or "always lighten".
+/* The door cards' ONE hover: the shadow deepens, and nothing else moves.
 
-   WHERE THE FILTER GOES, and why not on `.gn-workspace-card__door` itself.
-   In the prototype the card IS the button, so `background` and `filter`
-   live on one element. Here they are split: `.gn-card` (`packages/ui/src/
-   ui.css`) paints the card's actual background, and `.gn-workspace-card__
-   door` is a `<Link>` nested inside it (`app/workspaces/page.tsx`). A
-   `filter` on the door would filter only the door's own painted box — which
-   has no background of its own, `.gn-card` supplies it — and leave the
-   card's real background untouched: a half-applied effect, visible as
-   nothing happening, same failure mode as the swap this replaces. `filter`
-   has to sit on `.gn-card`, the element that actually paints the surface
-   this is meant to brighten/darken.
+   HISTORY, kept because it explains the selector. Round 2 (owner correction)
+   replaced a `--gn-surface-sunken` swap — which rendered nothing under `neo`,
+   where `surface`, `surfaceRaised` and `surfaceSunken` are the same hex — with
+   the prototype's brightness `filter` (`desktop.dc.html:85-86`: 0.97 in light,
+   1.18 in dark). Round 20 added `.gn-project-card__door` to it. Styling
+   refresh Plan B (Task B13, owner rulings 2026-09-29) REPLACES that pair with
+   P-LIFT, shadow only: hover takes `lift-near` above the neighbouring cards,
+   press settles on `lift-press` in the feedback time. `lift-near` is per theme
+   through the token, so there is no per-theme arm and no `prefers-color-scheme`
+   block. Nothing transforms and nothing filters, and that is the point: a
+   `filter` or a `transform` makes the card the containing block of every
+   `position: fixed` descendant, and the overflow menu on these cards opens the
+   Delete dialog INSIDE the card (trash Plan 4 D5), so the old brightness hover
+   trapped that dialog while the card was hovered. With none left there is no
+   guard and no reduced-motion arm to write (a shadow change is not motion;
+   Plan A D21, retired).
 
-   `.gn-card:has(> .gn-workspace-card__door:hover)` reaches it WITHOUT the
+   WHERE IT GOES. The hover must be on `.gn-card` (the element that paints the
+   surface and its shadow), not on the door, which is a `<Link>` nested inside
+   it. `.gn-card:has(> .gn-workspace-card__door:hover)` reaches it WITHOUT the
    `.gn-workspace-list .gn-card` descendant selector `neo-card-radius.test.ts`
-   (case 13.355) forbids: `:has()` is scoped by the child class already
-   unique to this component (`.gn-workspace-card__door` renders nowhere
-   else), so no `.gn-workspace-list` ancestor qualifier is needed at all —
-   this selector does not contain that banned text in any form, checked with
-   `grep -n "gn-workspace-list .gn-card"` after writing it. `:focus-visible`
-   is UNCHANGED below: it is a separate rule, on the door, and this edit
-   does not touch it.
+   (case 13.355) forbids: `:has()` is scoped by a child class unique to its own
+   component. The project card's door is not full-bleed (see its own rule), so
+   the pointer has to be over the card's BODY rather than its actions strip:
+   hovering Archive does not lift the card. `z-index: 1` needs a positioned
+   card, which `.gn-workspace-card` and `.gn-project-card` both are.
 
-   Three declarations, not two, because "system" (the default theme choice,
-   `theme-toggle.tsx`) tracks OS preference at runtime with no `data-theme`
-   attribute present at all — a rule keyed only to `[data-theme="dark"]`
-   would silently give System-dark users the light (darkening) filter. The
-   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) …`
-   arm is the same OS-preference pattern `tokens.ts`'s `themeStylesheet()`
-   already uses for the token stylesheet itself, reused here for parity
-   rather than invented fresh. `filter` creates a containing block and a new
-   stacking context on `.gn-card`, but only for that element's own
-   descendants — `.gn-workspace-card__door`'s focus outline and `.gn-card`'s
-   own `box-shadow` (`ui.css`) both stay attached to boxes already inside
-   that same element, so neither is clipped or displaced; verified in a real
-   browser, not assumed (see the round-2 report). */
-/* Round 20 adds `.gn-project-card__door` to all three arms rather than writing
-   a second set of rules for the workspace home. The two doors want the SAME
-   measured treatment — the owner ruled these numbers and directions once — and
-   a copy would be a second place for them to drift. The `:has()` scoping
-   argument above transfers unchanged: `.gn-project-card__door` is a child class
-   unique to its own component, so no ancestor qualifier is needed and the
-   selector `neo-card-radius.test.ts` forbids is still not written anywhere.
-   The project card's door is not full-bleed (see its own rule), so the pointer
-   has to be over the card's BODY rather than its actions strip for this to
-   fire — which is correct: hovering Archive should not light up the door. */
+   Styling refresh Plan B (Task B13): P-LIFT — one hover vocabulary. */
 .gn-card:has(> .gn-workspace-card__door:hover),
-.gn-card:has(> .gn-project-card__door:hover) { filter: brightness(0.97); }
-[data-theme="dark"] .gn-card:has(> .gn-workspace-card__door:hover),
-[data-theme="dark"] .gn-card:has(> .gn-project-card__door:hover) {
-  filter: brightness(1.18);
+.gn-card:has(> .gn-project-card__door:hover) {
+  box-shadow: var(--gn-shadow-lift-near);
+  z-index: 1;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gn-card:has(> .gn-workspace-card__door:hover),
-  :root:not([data-theme="light"]) .gn-card:has(> .gn-project-card__door:hover) {
-    filter: brightness(1.18);
-  }
+.gn-card:has(> .gn-workspace-card__door:active),
+.gn-card:has(> .gn-project-card__door:active) {
+  box-shadow: var(--gn-shadow-lift-press);
+  transition-duration: var(--gn-motion-feedback);
 }
 .gn-workspace-card__door:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -1079,8 +1055,10 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 1.4rem 0 0; }
 .gn-workspace-home__link {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B13): P-RAISED — the lit-edge `lift` shadow, with the P-LIFT transition (hover and press below). */
+  box-shadow: var(--gn-shadow-lift);
   border-radius: var(--gn-radius-card);
+  transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
   padding: 1rem 1.1rem;
   display: flex;
   flex-direction: column;
@@ -1088,27 +1066,28 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text);
   text-decoration: none;
 }
-/* The section cards (My Work, Members, Ticket types, Workflows) lighten on
-   hover exactly as the workspace and project cards do (Round 21, owner: "also
-   lighten the setting cards").
+/* The section cards (My Work, Members, Ticket types, Workflows) answer the
+   pointer exactly as the workspace and project cards do: ONE hover vocabulary
+   across every card-shaped door (Round 21, owner: "also lighten the setting
+   cards"). Round 21 did it with a brightness pair; Styling refresh Plan B
+   (Task B13, owner rulings 2026-09-29) replaced the pair with P-LIFT, shadow
+   only: hover deepens the shadow to `lift-near` above the neighbouring cards,
+   press settles on `lift-press` in the feedback time. No filter, no transform,
+   no per-theme arm.
 
-   This REPLACES a background swap to `--gn-surface-sunken`, which was the odd
-   one out: three card surfaces on two pages answered the pointer by brightening
-   and this one answered by changing its fill, so the same gesture produced two
-   different kinds of feedback depending on which card was under it. The
-   brightness pair is the same measured 0.97/1.18 — not re-chosen — for the
-   reason the project card's action button reuses it too: one hover vocabulary
-   across every card-shaped door in the product.
-
-   Applied to the link ITSELF, not via `.gn-card:has(...)`: unlike a project
-   card this element IS the raised surface (it carries its own
-   `--gn-surface-raised` and `--gn-shadow-raised` above) and holds no sibling
-   control, so there is no inner door to scope the hover to and nothing on the
-   card that must stay unlit. */
-.gn-workspace-home__link:hover { filter: brightness(0.97); }
-[data-theme="dark"] .gn-workspace-home__link:hover { filter: brightness(1.18); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gn-workspace-home__link:hover { filter: brightness(1.18); }
+   Applied to the link ITSELF, not via `.gn-card:has(...)`: this element IS the
+   raised surface (it carries its own `--gn-surface-raised` and
+   `--gn-shadow-lift` above) and holds no sibling control, so there is no inner
+   door to scope the hover to. It is a grid item and `z-index` only applies to
+   a positioned one, hence `position: relative` on the hover. */
+.gn-workspace-home__link:hover {
+  box-shadow: var(--gn-shadow-lift-near);
+  position: relative;
+  z-index: 1;
+}
+.gn-workspace-home__link:active {
+  box-shadow: var(--gn-shadow-lift-press);
+  transition-duration: var(--gn-motion-feedback);
 }
 .gn-workspace-home__link:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-workspace-home__link-label { font-size: 1.05rem; font-weight: 600; }
@@ -1165,7 +1144,7 @@ input, textarea, select { font-family: inherit; }
    a blocked chip stands taller than one without. Round 21's `align-items: start`
    on the grid — which pinned every card to its own content height — was removed
    in the same change. */
-.gn-project-card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; position: relative; height: 100%; }
+.gn-project-card { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.875rem; position: relative; height: 100%; transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out); }
 /* Dimmed IN PLACE rather than moved to a list of its own — the reference's
    0.72. Round 21 sorts archived cards to the END of the grid (owner ruling),
    so the dimming is no longer what marks them out of sequence; it is what
@@ -1276,32 +1255,15 @@ input, textarea, select { font-family: inherit; }
    (Round 21, owner: "on hover over the archive button, light up the button and
    the card body stays normal").
 
+   The button's own cue is now the ghost `Button`'s hover fill (Plan A Task 3),
+   so this strip carries no hover rule of its own: Round 21's brightness filter
+   on `.gn-project-card__actions .gn-button` is DELETED (Styling refresh Plan B,
+   Task B13), one hover vocabulary instead of a second one for this button.
+
    The second half needed no change and is worth stating so nobody "fixes" it:
    the card's own hover is `.gn-card:has(> .gn-project-card__door:hover)`, whose
    `>` combinator matches only the DOOR as a direct child, so hovering this
-   button was already inert on the card. What was missing is the button's own
-   cue — `.gn-button` carries no `:hover` rule anywhere in the product
-   (`packages/ui/src/ui.css`), so before this the pointer produced nothing at
-   all here.
-
-   SCOPED to this actions strip rather than added to `.gn-button` globally: a
-   bare `.gn-button:hover` would introduce a hover treatment to every button in
-   the product in one commit, which is a product-wide visual decision and not
-   what was asked for. The brightness PAIR is the card hover's own measured
-   0.97/1.18 rather than a second set of numbers — one hover vocabulary on this
-   page, so the button and the card it sits in cannot drift apart. `:disabled`
-   is excluded: the button is disabled while a submission is in flight, and a
-   control that lights under the pointer while refusing the click is telling
-   two different stories at once. */
-.gn-project-card__actions .gn-button:hover:not(:disabled) { filter: brightness(0.97); }
-[data-theme="dark"] .gn-project-card__actions .gn-button:hover:not(:disabled) {
-  filter: brightness(1.18);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gn-project-card__actions .gn-button:hover:not(:disabled) {
-    filter: brightness(1.18);
-  }
-}
+   button is inert on the card. */
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
@@ -1438,7 +1400,8 @@ input, textarea, select { font-family: inherit; }
   padding: 1rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-raised);
+  /* Styling refresh Plan B (Task B13): P-RAISED — the lit-edge `lift` shadow. */
+  box-shadow: var(--gn-shadow-lift);
 }
 .gn-project-founding__field { flex: 1; min-width: 13.75rem; }
 
