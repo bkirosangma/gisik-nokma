@@ -922,8 +922,9 @@ a.gn-ticket-sheet__crumb--link {
    rail" row. Renamed from `.gn-board__columns` — grep confirmed the only
    referents anywhere in the repo were this file and board.tsx itself
    (nothing under apps/web/test, packages/app-core/test or packages/ui/test
-   names `.gn-board__columns`), so the rename is not a breaking one. */
-.gn-board__rail { display: flex; gap: 0.875rem; align-items: flex-start; overflow-x: auto; padding-bottom: 0.5rem; }
+   names `.gn-board__columns`), so the rename is not a breaking one.
+   Styling refresh (Plan A Task 5): 16px between columns (rule 02, "16 between groups"), and 24px below the cards so a lifted card's falling shadow (`lift-near`, 28px down) is not clipped by this box's `overflow-x: auto`, which clips vertically too. */
+.gn-board__rail { display: flex; gap: 1rem; align-items: flex-start; overflow-x: auto; padding-bottom: 1.5rem; }
 /* The workflow heading's disclosure (owner request, 2026-09-23: *"in the
    board, the workflow is collapsible"*). The control lives INSIDE the `<h2>`
    rather than beside it, which is the WAI-ARIA disclosure pattern and keeps
@@ -976,24 +977,24 @@ a.gn-ticket-sheet__crumb--link {
    reads BOTH halves: the attribute selectors out of these rules, and the
    attributes the component writes. */
 .gn-board__rail[hidden] { display: none; }
-/* Same spec row, "Column": trayBg (surfaceSunken) + trayShadow (the sunken
-   inset, matching `.gn-field__input`/`.ticket-type-list__row`'s own
-   `--gn-shadow-sunken` under neo), radius cardR, 12px padding, a fixed
-   288px/18rem lane. `display: flex; flex-direction: column; gap: 0.625rem`
-   is new here too (10px, the spec's own "gap 10px") — it is what lays the
-   header out above the card list with a controlled gap instead of the
-   header's own margin doing that job alone; see that rule's own comment for
-   why its margin-bottom was removed once this gap existed. */
+/* A board column is a RECESSED TRACK (styling refresh Plan A Task 5; the
+   owner-approved board, `Main.dc.html:66`): the `surfaceTrack` ground, the
+   `track` inset lit from above (rule 04 — light from above, the recess catches
+   it on its lower lip), radius 24 (neo 28), padding 8 — so the card inside,
+   radius 16 (neo 20), obeys rule 05 (inner = outer − padding). Before this the
+   column was `surface-sunken`, a flat fill measured at 1.14:1 on the paper
+   (case 20.001): it vanished. 8px between cards (rule 02). The lane stays a
+   fixed 18rem in a scrolling rail (plan D13). Pattern P-TRACK. */
 .gn-board__column {
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
-  border-radius: var(--gn-radius-card);
-  padding: 0.75rem;
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-track);
+  padding: 0.5rem;
   min-width: 18rem;
   flex: 0 0 18rem;
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 /* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
    2026-09-16) — no rule was ever added for it. `board.tsx:409` renders the
@@ -1022,9 +1023,12 @@ a.gn-ticket-sheet__crumb--link {
    intact) — only the empty declaration is gone. */
 .gn-board__column-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
 }
+/* `Close all (N)` to the far edge; the name chip and its count read left. */
+.gn-board__column-header > .gn-board__column-action { margin-left: auto; }
 /* Same spec row, "Count": 13px/18px, label2 (textMuted). Selector kept as
    `.gn-board__count`, not renamed to the spec's own "column-count" wording —
    `board.test.tsx:142` (`badgeTotal`) queries `.gn-board__count` directly, so
@@ -1033,8 +1037,8 @@ a.gn-ticket-sheet__crumb--link {
    values already clear `LABEL_FLOOR_PX` (12px, `apps/web/e2e-viewport/
    type-scale.ts:113`) — the ratchet those specs hold counts offenders BELOW
    that floor, so this move cannot add one. */
-.gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
-.gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-subtle); }
+.gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 /* Board prototype port Task 7 (2026-09-16), spec Board `:354-399`, "Empty
    column"/"Empty icon"/"Empty copy"/"Empty action" rows — the PER-COLUMN
    empty state, a different granularity from `.gn-board__empty-*` above (the
@@ -1204,8 +1208,18 @@ a.gn-ticket-sheet__crumb--link {
    against. The board card now shares every other card's corner, and `neo`
    stays internally consistent rather than drawing one surface squarer than
    the rest. Case 13.464 asserts the ABSENCE of a `border-radius` declaration
-   here, so a future round cannot quietly reintroduce the literal. */
-.gn-board-card { padding: 0.875rem; }
+   here, so a future round cannot quietly reintroduce the literal.
+   Styling refresh (Plan A Task 5): 16px padding (the mockup's card, `Main.dc.html:72`), a flex column with 8px between lines — Task 6 adds 16 between groups — and the lit-edge `lift` shadow. Still NO radius here (13.464): the card token gives 16 (neo 20), which is the track's 24 (28) minus its 8px padding, rule 05. */
+.gn-board-card {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: var(--gn-shadow-lift);
+  /* Shadow only (owner ruling 2026-09-29): nothing on a resting, hovered or
+     pressed card moves, so the transition names box-shadow alone. */
+  transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
+}
 /* The priority card tint (owner request, 2026-09-23: "the entire card
    surface is tinted by priority"). TWO layers, not one: a `linear-gradient`
    of the alpha wash repeated as both stops, painted OVER the opaque
@@ -1337,8 +1351,32 @@ a.gn-ticket-sheet__crumb--link {
    in `board.tsx`, case 13.523): a card that can be opened but not dragged
    (the read-only path) shows `pointer`; the `[draggable="true"]` rule beneath
    it beats it on specificity, so a draggable card keeps `grab`. */
-.gn-board__card-slot { cursor: pointer; }
+.gn-board__card-slot { cursor: pointer; position: relative; }
 .gn-board__card-slot[draggable="true"] { cursor: grab; }
+/* THE HOVER DEEPENS THE SHADOW, AND ONLY THE SHADOW (owner rulings,
+   2026-09-29). The first ruling lifted the card toward the user on hover
+   (`scale(1.025)`); after the kanban-UX video the owner ruled "hover = shadow
+   only" — the full lift (scale, deeper shadow, tilt) happens only while a card
+   is DRAGGED, on the drag image (Task 5A). So on hover the shadow spreads,
+   softens and falls further (`lift-near`, three layers) and press settles it
+   (`lift-press`, within 100ms); nothing scales.
+
+   Keyed on the SLOT — the element whose click opens the ticket — never on
+   `.gn-card`, which is not interactive (pattern P-LIFT). The slot is
+   positioned and raised a layer while hovered so the deeper shadow draws
+   ABOVE the next card, not under it.
+
+   No `:not(:has(.gn-dialog__scrim))` guard (plan D21, retired): a box-shadow
+   and a z-index create no containing block, so the transition dialog
+   `MoveArrows` renders inside this card stays viewport-fixed. Do NOT add a
+   transform here without bringing that guard back. No `will-change` either
+   (20.026). No reduced-motion arm: nothing here moves. */
+.gn-board__card-slot:hover { z-index: 1; }
+.gn-board__card-slot:hover > .gn-board-card { box-shadow: var(--gn-shadow-lift-near); }
+.gn-board__card-slot:active > .gn-board-card {
+  box-shadow: var(--gn-shadow-lift-press);
+  transition-duration: var(--gn-motion-feedback);
+}
 .gn-board-card__title {
   font: inherit;
   font-weight: 600;
