@@ -722,7 +722,7 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* One card per section, the prototype's own: raised surface, card radius,
-   raised shadow — the same three tokens `.gn-settings__sidebar` already uses.
+   the lift shadow (P-RAISED) — the same three tokens `.gn-settings__sidebar` uses.
    `align-items: flex-start` so a `Button` inside a card keeps its own width
    instead of stretching the full 680px; rows and lists opt back in to full
    width below. No `margin-top`: the column's `gap` is the only thing that
@@ -735,7 +735,7 @@ input, textarea, select { font-family: inherit; }
   padding: 1.25rem;
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
 }
 
 /* The Profile card is the one the prototype gives a wider inner gap (14px vs

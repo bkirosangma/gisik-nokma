@@ -128,6 +128,21 @@ describe('AccountPage — the global settings shell', () => {
   });
 
   /**
+   * 20.364 — Save name is the Account page's ONE loud element (styling refresh
+   * Plan B, Task B17): exactly one primary `Button` is on the page and it is
+   * Save name; the passkeys section's add action beside it is quiet.
+   */
+  it('20.364 Save name is the only primary on /account', async () => {
+    mount();
+    // CONTROL — the page has rendered both sections, so "one primary" is not "nothing rendered".
+    const save = await screen.findByRole('button', { name: 'Save name' });
+    expect(await screen.findByRole('button', { name: 'Add a passkey' })).toBeInTheDocument();
+    const primaries = [...document.querySelectorAll('.gn-button--primary')];
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]).toBe(save);
+  });
+
+  /**
    * Both Appearance controls became labelled SEGMENTED controls with the
    * owner's 2026-09-15 reference (a `tablist`, not a single button), so these
    * queries moved with them. Still asserted at the PAGE level rather than

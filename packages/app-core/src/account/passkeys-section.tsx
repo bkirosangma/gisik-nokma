@@ -143,8 +143,8 @@ export function PasskeysSection({
           className="gn-field__input"
         />
       </label>
+      {/* Quiet, not primary: Save name is the Account page's one loud element (styling refresh Plan B, B17). */}
       <Button
-        variant="primary"
         onClick={() => {
           onAdd(name);
           // Cleared BEFORE the ceremony resolves, on purpose: `onAdd` is a
