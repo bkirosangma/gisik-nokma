@@ -409,7 +409,7 @@
    can be wrong for. */
 .gn-dialog {
   border-radius: var(--gn-radius-track);
-  /* Styling refresh Plan A Task 4: a dialog sits above a scrim, so it floats on the near lift (24px; neo 28px). Beats the `.gn-dialog, .gn-sheet` group's `overlay` by source order at equal specificity; the sheet is untouched (Task 7). */
+  /* Styling refresh Plan A Task 4: a dialog sits above a scrim, so it floats on the near lift (24px; neo 28px). Beats the `.gn-dialog, .gn-sheet` group's `overlay` by source order at equal specificity; the sheet took its own `sheet` shadow in Task 7. */
   box-shadow: var(--gn-shadow-lift-near);
   width: min(34rem, 92vw);
   animation: gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -432,10 +432,13 @@
    `ease` would also have been defensible and is not what the reference says: the
    curve is doing real work here — it is fast at the start and settles, which is
    what stops a 28px move from reading as a snap at this duration. */
+/* Styling refresh (Plan A Task 7): docked to the right edge, so only its LEFT corners round (track radius, 24/28); the `sheet` shadow lights its inner left edge and falls away to the left (`Sheet.dc.html:26`, `:127`). Both win over the `.gn-dialog, .gn-sheet` group's `overlay` shadow on source order; `.gn-sheet--full` comes later still and keeps `border-radius: 0; box-shadow: none`. */
 .gn-sheet {
   width: min(40rem, 94vw);
   height: 100%;
   max-height: none;
+  border-radius: var(--gn-radius-track) 0 0 var(--gn-radius-track);
+  box-shadow: var(--gn-shadow-sheet);
   animation: gnSlide 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -533,8 +536,9 @@
 
 /* The `Full screen` pill itself, transcribed from the prototype's control
    (`desktop.dc.html:1119`): 32px minimum height, 12px padding, fully round,
-   the control-surface fill and its shadow, accent ink at 13px/600, and a 7px
-   gap to its icon. */
+   13px/600, and a 7px gap to its icon. AMENDED (styling refresh Plan A Task 7):
+   its control-surface fill, shadow and accent ink are gone — it is a quiet
+   outlined control now, declared below. */
 .gn-sheet__full {
   display: inline-flex;
   align-items: center;
@@ -547,11 +551,11 @@
      been found by the post-merge verification instead of here. */
   min-height: 2.75rem;
   padding: 0 0.75rem;
-  border: none;
+  /* Styling refresh (Plan A Task 7): a QUIET control (pattern P-QUIET) — transparent, `textMuted` ink, the accessible `border` edge, no shadow. It was a `fillTertiary` pill with accent ink and a raised shadow. */
+  border: 1px solid var(--gn-border);
   border-radius: 999px;
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
-  box-shadow: var(--gn-shadow-raised);
+  background: transparent;
+  color: var(--gn-text-muted);
   font-size: 0.8125rem;
   font-weight: 600;
   font-family: inherit;
@@ -563,8 +567,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1.1rem;
+  /* Styling refresh (Plan A Task 7): 24 around, 16 below, 8 between items (`Sheet.dc.html:29`). SHARED with `.gn-dialog`, so every dialog takes the same spacing, deliberately. */
+  gap: 0.5rem;
+  padding: 1.5rem 1.5rem 1rem;
 }
 /* ⚠ THE DIALOG'S TITLE KEEPS ITS OLD STEP, and this comment exists because the FIRST version of
    this change took it away without saying so. The rule below was a SHARED one —
@@ -580,7 +585,8 @@
   margin: 0;
 }
 
-/* The sheet's title, at the AUTHORITY'S type step — `font-size:22px;
+/* AMENDED (styling refresh Plan A Task 7): the step below is now 26px/32px at 700 with −0.01em tracking (`Sheet.dc.html:40`) — the loud element of a sheet that has no primary; the 22/28/600 quoted in this paragraph is the step it replaced. The static title and the editable input carry the same numbers.
+   The sheet's title, at the AUTHORITY'S type step — `font-size:22px;
    line-height:28px;font-weight:600` (`desktop.dc.html@6d7b67c0a52c:1116`), where
    it was 1.05rem with the heading's own weight. The prototype's heading is the
    most prominent thing on the screen and ours was the same size as body text,
@@ -625,9 +631,10 @@
    No material tokens are involved — a type step is style-agnostic — so this is
    correct in `hig`, `minimal` and `neo` without a per-style fork. */
 .gn-sheet__title {
-  font-size: 1.375rem;
-  line-height: 1.75rem;
-  font-weight: 600;
+  font-size: 1.625rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 /* The sheet header's own column: the location breadcrumb ABOVE the title, as
@@ -824,9 +831,10 @@ a.gn-ticket-sheet__crumb--link {
    title wraps its box rather than pushing the header's actions off screen. */
 .gn-ticket-sheet__title-input {
   font-family: inherit;
-  font-size: 1.375rem;
-  line-height: 1.75rem;
-  font-weight: 600;
+  font-size: 1.625rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: inherit;
   background: none;
   border: none;
@@ -875,12 +883,20 @@ a.gn-ticket-sheet__crumb--link {
   line-height: 1;
   border: none;
   border-radius: 999px;
-  background: var(--gn-fill-tertiary);
+  background: transparent;
   color: var(--gn-text-muted);
   cursor: pointer;
+  transition: background-color var(--gn-motion-feedback) ease-out;
 }
+/* Styling refresh (Plan A Task 7): the overlay dismiss control is a GHOST icon (pattern P-GHOST; the mockup's header icons, `Sheet.dc.html:30-35`): transparent at rest, a soft fill and the focus ring when pointed at or focused. */
+.gn-dialog__close:hover,
+.gn-dialog__close:focus-visible,
+.gn-sheet__close:hover,
+.gn-sheet__close:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-dialog__close:focus-visible,
+.gn-sheet__close:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-dialog__body,
-.gn-sheet__body { padding: 1rem 1.1rem; overflow-y: auto; }
+.gn-sheet__body { padding: 0 1.5rem 1.5rem; overflow-y: auto; }
 
 /* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
    wraps a `Chip` (tone `terminal`) rather than restyling it, so its colour
@@ -2598,9 +2614,10 @@ a.gn-ticket-sheet__crumb--link {
   align-items: center;
   gap: 0.6rem;
   justify-content: space-between;
-  margin-top: 1.2rem;
+  margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--gn-border);
+  /* A decorative hairline (plan D18): the `border` grey is an EDGE for controls (4.27:1) and read as a heavy rule here. */
+  border-top: 1px solid var(--gn-fill-secondary);
 }
 /* `Delete`, transcribed from the prototype's own control (`desktop.dc.html:1372`):
    `min-height:44px;padding:0 18px;border:none;border-radius:var(--ctlR);
@@ -2634,11 +2651,14 @@ a.gn-ticket-sheet__crumb--link {
   min-height: 2.75rem;
   padding: 0 1.125rem;
   border: none;
-  border-radius: var(--gn-radius-control);
+  /* Styling refresh (Plan A Task 7): a pill (rule 05) with a soft fill on hover, still danger ink on transparent. */
+  border-radius: 999px;
   background: transparent;
   color: var(--gn-danger);
   cursor: pointer;
+  transition: background-color var(--gn-motion-feedback) ease-out;
 }
+.gn-ticket-sheet__delete:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ⚠ `align-self`, `text-align` and `justify-content` are here because this block
    MOVED into the grid's `field-state` `<dd>` on 2026-09-22 (spec decision 1). That
@@ -2783,7 +2803,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    and not `--refusal`'s danger tone, because nothing failed — the server answered.
    Body text, with the family's paragraph reset. */
 .gn-ticket-sheet__absent { margin: 0; }
-.gn-ticket-sheet__fields { margin: 0.8rem 0 0; }
+/* Styling refresh (Plan A Task 7): the fields sit in a WELL (pattern P-WELL; `Sheet.dc.html:53`) — a recessed group inside the raised sheet, lit from above like the board's tracks. The striped rows inside take the card radius minus this 8px padding (rule 05), so the stripes nest in every style (hig 16 → 8, neo 20 → 12). */
+.gn-ticket-sheet__fields {
+  margin: 1.5rem 0 0;
+  padding: 0.5rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
+}
 /* THE FIELD GRID, at the prototype's metrics (spec 2026-09-22 decision 12,
    `desktop.dc.html:3755-3756`): a label column that may grow to 9.375rem, a value
    column allowed to SHRINK (`minmax(0, 1fr)` — `0` rather than `auto`, for the
@@ -2806,17 +2833,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    height, so those two declarations are the one part of the plan's CSS this change
    does not carry. */
 .gn-ticket-sheet__field { display: grid; grid-template-columns: minmax(6rem, 9.375rem) minmax(0, 1fr); gap: 0; padding: 0; }
-.gn-ticket-sheet__field dt { color: var(--gn-text-muted); font-size: 0.9375rem; padding: 0.75rem 0 0.75rem 0.75rem; display: flex; align-items: flex-start; }
+.gn-ticket-sheet__field dt { color: var(--gn-text-subtle); font-size: 0.8125rem; padding: 0.75rem 0 0.75rem 0.75rem; display: flex; align-items: flex-start; }
 .gn-ticket-sheet__field dd { margin: 0; padding: 0.75rem 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end; text-align: right; min-width: 0; }
-.gn-ticket-sheet__field--tinted dt { background: var(--gn-fill-quaternary); border-radius: 0.5rem 0 0 0.5rem; }
-.gn-ticket-sheet__field--tinted dd { background: var(--gn-fill-quaternary); border-radius: 0 0.5rem 0.5rem 0; }
+.gn-ticket-sheet__field--tinted dt { background: var(--gn-fill-quaternary); border-radius: calc(var(--gn-radius-card) - 0.5rem) 0 0 calc(var(--gn-radius-card) - 0.5rem); }
+.gn-ticket-sheet__field--tinted dd { background: var(--gn-fill-quaternary); border-radius: 0 calc(var(--gn-radius-card) - 0.5rem) calc(var(--gn-radius-card) - 0.5rem) 0; }
 /* The shared eyebrow the sheet's section headings wear (spec 2026-09-22 decision
    11; the prototype's `SUBTASKS` / `COMMENTS` captions). `text-transform` is PAINT
    and not content — the words are unchanged, so every `getByText` on them still
-   matches. `.gn-comments__heading` already declared exactly these five
+   matches (Task 7 of the styling refresh has since changed the look itself: sentence-case 15px/600 in `text`). `.gn-comments__heading` already declared exactly these five
    declarations; this rule is the NAME being made shared, not a look being
    changed. */
-.gn-ticket-sheet__caption { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+/* Styling refresh (Plan A Task 7): the caption is SENTENCE-CASE 15px/600 in `text` — no uppercase tracking — and the field labels above are the third tier (13px `textSubtle`). This class is shared with Subtasks, Notes and the Comments heading, so all of them take it. */
+.gn-ticket-sheet__caption { margin: 0; font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; color: var(--gn-text); text-transform: none; letter-spacing: 0; }
 /* The description block — FULL WIDTH and ABOVE the grid, not a row inside it
    (spec 2026-09-22 decision 1): the prototype draws the editor across the whole
    panel, and its own label is the caption the composer is NAMED BY. */
@@ -7584,7 +7612,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* ⚠ THE SIX DECLARATIONS THAT STOOD HERE ARE GONE, NOT MOVED. They were the
    eyebrow transcription — `0.8125rem`, `1.125rem`, `margin: 0`,
    `var(--gn-text-muted)`, `uppercase`, `letter-spacing: 0.6px` — and
-   `.gn-ticket-sheet__caption` above now declares the same six for the sheet's
+   `.gn-ticket-sheet__caption` above now declares them (since restyled, styling
+   refresh Plan A Task 7: sentence-case 15px/600) for the sheet's
    shared section headings, which this heading wears BESIDE this class
    (`comments-thread.tsx`). Two identical rules for one element is the drift this
    file's comments exist to prevent, and the element keeps this class as its own

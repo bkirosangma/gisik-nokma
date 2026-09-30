@@ -569,7 +569,7 @@ plus a partial index → a filter at every view-serving SELECT.
 
 ### What is BUILT, and the two cases that carry it
 
-- **16.84** ✅ — **`Delete` is a history-retaining removal with an undo.**
+- **16.84** ✅ — **`Delete` is a history-retaining removal with an undo.** *Amended 2026-09-29 by 20.077: Delete is a pill (radius = height ÷ 2) with a soft hover fill; still danger ink on transparent, borderless, 44px.*
   `packages/app-core/test/views/ticket-sheet.test.tsx` (the sheet's half) and
   `apps/web/test/sheet-delete.test.tsx` (the CALL SITE's half — the sentence, and the Undo posting
   `ticket.restored` for the id it was offered for). **The sheet emits, closes ITSELF, and hands the
