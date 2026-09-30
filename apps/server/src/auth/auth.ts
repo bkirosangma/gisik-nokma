@@ -2,11 +2,13 @@ import { newUlid } from '@gisik-nokma/domain';
 import { betterAuth } from 'better-auth';
 import { bearer, magicLink, phoneNumber } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
+import { createAuthMiddleware } from 'better-auth/api';
 import type { Pool } from 'pg';
 import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
 import { normalizeOrigin } from '../http/http-origin.js';
 import { deviceSessionHook } from './device-cookie.js';
+import { passkeyLastUsedHook } from './passkey-last-used.js';
 import {
   readSocialProviderEnv,
   socialProvidersFromEnv,
@@ -328,6 +330,10 @@ export function createAuth(deps: AuthDeps) {
       additionalFields: {
         deviceId: { type: 'string', required: false, returned: false, input: false },
       },
+    },
+    // Devices plan Task 5: a passkey sign-in stamps that passkey's `lastUsedAt` (the plugin's schema does not know it).
+    hooks: {
+      after: createAuthMiddleware(async (ctx) => passkeyLastUsedHook(deps.pool)(ctx)),
     },
     databaseHooks: {
       session: {
