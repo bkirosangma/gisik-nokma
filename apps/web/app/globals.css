@@ -2929,7 +2929,8 @@ input, textarea, select { font-family: inherit; }
 /* ── The MCP approval screen ──────────────────────────────────────────────────
    Tokens only, as everywhere in this file.
 
-   The consent block is `--gn-surface-sunken` with an `--gn-accent` rule, NOT
+   The consent block is a recessed well (`--gn-surface-well`, styling refresh
+   Plan B B19) with an `--gn-accent` rule, NOT
    `--gn-danger` or `--gn-warning`, and that is the same decision the 404's
    reasoning block records: a warning colour "would tell the reader something
    has gone wrong, when the whole point of the paragraph is that the product is
@@ -2945,8 +2946,8 @@ input, textarea, select { font-family: inherit; }
   margin: 0 0 1.25rem;
   padding: 0.9rem 1rem;
   border-left: 3px solid var(--gn-accent);
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
 }
 
 .gn-mcp-authorize__consent-label {
@@ -3031,14 +3032,14 @@ input, textarea, select { font-family: inherit; }
   margin: 1rem 0 0;
   padding: 0.75rem 0.9rem;
   border-left: 3px solid var(--gn-danger);
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
   color: var(--gn-text);
 }
 
 /* ── /mcp/tokens — the revoke surface (MCP plan Task 12) ────────────────────
-   Same restraint as the approval screen one directory over: `surface-sunken`
-   and `border`, never `--gn-danger`. Revoking your own assistant is a normal,
+   Same restraint as the approval screen one directory over: a raised row and a
+   recessed well, never `--gn-danger`. Revoking your own assistant is a normal,
    reversible-by-re-approving thing to do, and dressing it as a destructive
    action trains people to flinch at a control they are supposed to use. The
    sentence above the list carries the weight, not the colour. */
@@ -3071,8 +3072,9 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   padding: 0.85rem 1rem;
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
 }
 
 .gn-mcp-tokens__row + .gn-mcp-tokens__row { margin-top: 0.6rem; }
@@ -3088,7 +3090,8 @@ input, textarea, select { font-family: inherit; }
 /* The secondary line, and it stays at 1rem rather than shrinking: this is the
    fact a person reads to decide whether to revoke, and the pre-launch review
    already recorded 12.5px labels as a type-scale finding. `text-muted` on
-   `surface-sunken` is a declared pair in CONTRAST_PAIRS. */
+   `surface-raised` (the row's ground since styling refresh Plan B B19) is a
+   declared pair in CONTRAST_PAIRS. */
 .gn-mcp-tokens__used {
   color: var(--gn-text-muted);
   font-size: 1rem;
@@ -3120,8 +3123,9 @@ input, textarea, select { font-family: inherit; }
 .gn-mcp-tokens__refusal {
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
   color: var(--gn-text);
 }
 
