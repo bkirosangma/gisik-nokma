@@ -750,6 +750,28 @@ export const primitives = {
   priorityInkP3Dark: '#7ad8f5',
   priorityTintP3Light: '#146b8a0d',
   priorityTintP3Dark: '#7ad8f50d',
+  /**
+   * ## The styling refresh's grounds (Plan A Task 1, 2026-09-29)
+   *
+   * Transcribed from the owner-approved mockup (`Main.dc.html:130`, `:143`;
+   * `Sheet.dc.html:111`, `:120`). The TRACK is the recessed ground that HOLDS
+   * raised items on the page (a board column); the WELL is the recessed ground
+   * INSIDE a raised panel (the sheet's field group). Both measure below 1.5:1
+   * against the ground around them (1.08 / 1.10), on purpose: they are
+   * identified by the `track` shadow (Task 2), not by fill — rule 04, "light
+   * from above". Under neo both roles resolve to the neo surface, as every neo
+   * ground does (depth is shadow-only there, `STYLE_COLOR_OVERRIDES` below).
+   */
+  trackWarm: '#e8ded4',
+  trackNavy: '#10152a',
+  wellWarm: '#f3ece5',
+  wellNavy: '#1a213b',
+  /**
+   * The primary button's DARK edge (`Main.dc.html:132`, `accentEdge`). The
+   * light edge is `textAccentLight` (`#2d5488`, above) byte-for-byte, so it is
+   * reused rather than duplicated. 11.42:1 on `navyBase`, 9.41:1 on `navyRaised`.
+   */
+  accentEdgeDark: '#bcd4f7',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -759,6 +781,14 @@ export const TOKEN_ROLES = [
   'surfaceRaised',
   'surfaceSunken',
   'surfaceOverlay',
+  /**
+   * The recessed TRACK and WELL grounds — styling refresh Plan A Task 1. A
+   * track holds raised items on the page ground (board columns); a well is a
+   * recessed group inside a raised panel (the sheet's fields). Text on both is
+   * a declared pair at 4.5 (see `CONTRAST_PAIRS`).
+   */
+  'surfaceTrack',
+  'surfaceWell',
   'text',
   'textMuted',
   /**
@@ -875,6 +905,12 @@ export const TOKEN_ROLES = [
   'brand',
   'accent',
   'accentText',
+  /**
+   * The primary button's EDGE (rule 03: "edge ≥ 3:1") and its hover fill.
+   * Declared ≥ 3 on `surface`/`surfaceRaised`, and `accentText` on it ≥ 4.5,
+   * because the hovered primary paints its fill with this role.
+   */
+  'accentEdge',
   'danger',
   'dangerText',
   'warning',
@@ -954,6 +990,8 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'warmRaised',
     surfaceSunken: 'warmSunken',
     surfaceOverlay: 'overlayWarmHig',
+    surfaceTrack: 'trackWarm',
+    surfaceWell: 'wellWarm',
     text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
@@ -971,6 +1009,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     brand: 'brandOrange',
     accent: 'blue600',
     accentText: 'onColorWarmLight',
+    accentEdge: 'textAccentLight',
     danger: 'red600',
     dangerText: 'onColorWarmLight',
     warning: 'amber700',
@@ -995,6 +1034,8 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'navyRaised',
     surfaceSunken: 'navySunken',
     surfaceOverlay: 'overlayNavyHig',
+    surfaceTrack: 'trackNavy',
+    surfaceWell: 'wellNavy',
     text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
@@ -1012,6 +1053,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     brand: 'brandOrange',
     accent: 'blue300',
     accentText: 'onColorWarmDark',
+    accentEdge: 'accentEdgeDark',
     danger: 'red300',
     dangerText: 'redInk',
     warning: 'amber300',
@@ -1068,6 +1110,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoPaper',
       surfaceSunken: 'neoPaper',
       surfaceOverlay: 'overlayWarmNeo',
+      surfaceTrack: 'neoPaper',
+      surfaceWell: 'neoPaper',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
       danger: 'neoLightDanger',
@@ -1082,6 +1126,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoNavyRaised',
       surfaceSunken: 'neoNavySunken',
       surfaceOverlay: 'overlayNavyNeo',
+      surfaceTrack: 'neoNavy',
+      surfaceWell: 'neoNavy',
       fillTertiary: 'fillNavyNeo3',
       fillQuaternary: 'fillNavyNeo4',
     },
@@ -1515,6 +1561,25 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'border', bg: 'surface', minimum: 3 },
   { fg: 'borderStrong', bg: 'surface', minimum: 3 },
   { fg: 'focusRing', bg: 'surface', minimum: 3 },
+  /**
+   * Styling refresh Plan A Task 1 (2026-09-29). The two recessed grounds carry
+   * the three text tiers (rule 03), the primary's edge clears the non-text 3:1
+   * on the grounds a button sits on (rule 03, "edge ≥ 3:1"), the hovered
+   * primary's label clears 4.5 on its hover fill, and the quiet controls'
+   * accessible edge (`border`) is declared on the raised and well grounds it
+   * now also sits on — it was only ever declared on `surface`.
+   */
+  { fg: 'text', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'textMuted', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'text', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'textMuted', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'accentEdge', bg: 'surface', minimum: 3 },
+  { fg: 'accentEdge', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'accentText', bg: 'accentEdge', minimum: 4.5 },
+  { fg: 'border', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'border', bg: 'surfaceWell', minimum: 3 },
 ];
 
 /**
