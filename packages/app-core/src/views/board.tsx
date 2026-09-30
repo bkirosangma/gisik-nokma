@@ -1852,7 +1852,11 @@ function BoardCardView({
           {card.priority.value}
         </span>
         {card.dueDate !== null ? (
-          <>
+          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `·` and the
+             due label wrap TOGETHER, so a separator is never left alone at the
+             end of one line with its date at the start of the next. The
+             markup's text is unchanged and the `·` stays `aria-hidden`. */
+          <span className="gn-board-card__due-unit">
             <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
@@ -1860,7 +1864,7 @@ function BoardCardView({
             >
               {formatDate(card.dueDate.date)}
             </span>
-          </>
+          </span>
         ) : null}
       </p>
       {/* The card's FOOTER (styling refresh Plan A Task 6): "who · when" and

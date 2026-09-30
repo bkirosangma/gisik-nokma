@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import {
   PRIORITIES,
   newUlid,
@@ -597,6 +597,72 @@ function fieldRowClass(index: number): string {
   return index % 2 === 1
     ? 'gn-ticket-sheet__field gn-ticket-sheet__field--tinted'
     : 'gn-ticket-sheet__field';
+}
+
+/**
+ * The title control: a `<textarea>` that starts one row tall and GROWS with its
+ * content, styled as a heading (`.gn-ticket-sheet__title-input`).
+ *
+ * WHY NOT AN `<input>` (visual-fixes V2, 2026-09-30). The title is 26px/700 and
+ * the header's free width is about 400px beside the Full screen pill and the
+ * close button — a 60-character title needs roughly 870px. An `<input>` never
+ * wraps, so no flex arrangement can show every character of it; only a wrapping
+ * control can.
+ *
+ * WHAT A TEXTAREA CHANGES, AND IS HELD BACK HERE: a text input strips line breaks
+ * from what is pasted into it and a textarea keeps them, so `onChange` folds
+ * every run of `\r`/`\n` into one space; Enter is the caller's commit key and
+ * its `preventDefault` means it never inserts a newline. The height is set from
+ * `scrollHeight` (rather than `field-sizing: content`) so it works in every
+ * browser the web and desktop shells run in, and it is re-fitted when the width
+ * changes (full screen, a resized window), which re-wraps the text.
+ */
+function TitleField({
+  value,
+  disabled,
+  onChange,
+  onBlur,
+  onKeyDown,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+  onBlur: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+}): ReactElement {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = (): void => {
+    const el = ref.current;
+    if (el === null) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(fit, [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      className="gn-ticket-sheet__title-input"
+      rows={1}
+      aria-label="Ticket title"
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value.replace(/[\r\n]+/g, ' '))}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+    />
+  );
 }
 
 export function TicketSheet({
@@ -2855,7 +2921,7 @@ export function TicketSheet({
         THE HEADER'S OWN COLUMN: the location breadcrumb, then the title as a
         CONTROL. Both are the prototype's (`desktop.dc.html:1101-1116` — a
         `<nav>` of crumbs, then a borderless `<input>` carrying the title in
-        22px/600), and they are one `titleSlot` rather than two props because
+        22px/600; ours is `TitleField`, a wrapping one-row `<textarea>`), and they are one `titleSlot` rather than two props because
         the prototype draws them as one flex column with a 6px gap, and two
         independent slots could not express that.
 
@@ -2950,15 +3016,14 @@ export function TicketSheet({
             text a reader may not have touched invents a step.
 
             `aria-label` rather than a visible label: the field sits where a
-            heading sat, and the visible text is the title itself.
+            heading sat, and the visible text is the title itself. `TitleField`
+            is a one-row textarea that grows with its content, so a long title
+            wraps instead of being clipped beside the header's actions.
           */}
-          <input
-            className="gn-ticket-sheet__title-input"
-            type="text"
-            aria-label="Ticket title"
+          <TitleField
             value={titleDraft ?? ticketRead.title}
             disabled={titleSaving}
-            onChange={(event) => setTitleDraft(event.target.value)}
+            onChange={setTitleDraft}
             onBlur={() => {
               if (titleDraft !== null) void submitTitle(titleDraft);
             }}

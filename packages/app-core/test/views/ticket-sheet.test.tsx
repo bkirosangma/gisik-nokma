@@ -4003,6 +4003,59 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
   });
 });
 
+describe('TicketSheet — the title wraps (20.604)', () => {
+  it('20.604 the title is a one-row textarea, and line breaks are folded into one space', async () => {
+    const user = userEvent.setup();
+    renderSheet(ticketRead());
+    await settled();
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field.getAttribute('rows')).toBe('1');
+    fireEvent.change(field, { target: { value: 'Line one\r\nLine two\n\nLine three' } });
+    expect((field as HTMLTextAreaElement).value).toBe('Line one Line two Line three');
+    // CONTROL — a title with no line break is left exactly as typed.
+    await user.clear(field);
+    await user.type(field, 'One plain title');
+    expect((field as HTMLTextAreaElement).value).toBe('One plain title');
+  });
+
+  it('20.604 Enter commits the title and never inserts a newline', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLTextAreaElement;
+    await user.clear(field);
+    await user.type(field, 'Filed for August{Enter}');
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]?.[0]?.payload).toEqual({ fieldId: 'title', value: 'Filed for August' });
+    expect(field.value).not.toContain('\n');
+  });
+
+  it('20.604 the height is fitted to the content, and re-fitted as the content changes', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'scrollHeight');
+    // jsdom lays nothing out: stand in a content height of 2px per character.
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return this.value.length * 2;
+      },
+    });
+    try {
+      renderSheet(ticketRead());
+      await settled();
+      const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLTextAreaElement;
+      fireEvent.change(field, { target: { value: 'x'.repeat(60) } });
+      await waitFor(() => expect(field.style.height).toBe('120px'));
+      // CONTROL — a shorter title shrinks it again.
+      fireEvent.change(field, { target: { value: 'x'.repeat(10) } });
+      await waitFor(() => expect(field.style.height).toBe('20px'));
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', descriptor);
+      else delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+});
+
 /**
  * 16.86 — the INLINE TITLE EDITOR.
  *
