@@ -25,6 +25,8 @@ import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
+import { registerMcpConnectionRoutes } from './routes/mcp-connections.js';
+import { registerMcpHttpRoute } from './routes/mcp-http.js';
 import { registerMcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
@@ -667,15 +669,23 @@ export function buildApp(
         // one bounds the door, which is what a limiter is for.
         verdict = inviteLimiter.check(`invite:${clientKey}`, now());
       } else if (
-        method === 'POST' &&
+        (method === 'GET' && routeUrl === '/oauth/authorize') ||
+        (method === 'POST' &&
         (routeUrl === '/v1/mcp/device/code' ||
           routeUrl === '/v1/mcp/device/approve' ||
           routeUrl === '/v1/mcp/device/token' ||
           // The hosted door's public endpoints (register, token, revoke): open to
           // anyone, so they share the device flow's bucket rather than having none.
+          // `GET /oauth/authorize` is charged too (the first clause above): it is
+          // unauthenticated and writes a pending-consent row per call.
           routeUrl === '/oauth/register' ||
           routeUrl === '/oauth/token' ||
-          routeUrl === '/oauth/revoke')
+          routeUrl === '/oauth/revoke' ||
+          // The hosted MCP endpoint itself (14.269): unauthenticated callers reach the
+          // token lookup, and an authenticated one drives nine tools, so it is
+          // charged here — per IP like its neighbours, since the bearer is only
+          // resolved inside the handler.
+          routeUrl === '/mcp'))
       ) {
         // The device flow's own bucket. Without this branch a route under
         // `/v1/mcp/...` matches NO bucket at all, which would leave the
@@ -1019,6 +1029,7 @@ export function buildApp(
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
 
   registerMcpTokenRoutes(app, { pool: deps.pool }, requireSession);
+  registerMcpConnectionRoutes(app, { pool: deps.pool, publicUrl: deps.mcpPublicUrl ?? null }, requireSession);
   // The hosted MCP door — present only when the API knows its own public URL.
   if (deps.mcpPublicUrl) {
     registerMcpOAuthRoutes(
@@ -1026,6 +1037,12 @@ export function buildApp(
       { pool: deps.pool, webOrigin: deps.webOrigin, publicUrl: deps.mcpPublicUrl },
       requireSession,
     );
+    registerMcpHttpRoute(app, {
+      pool: deps.pool,
+      publicUrl: deps.mcpPublicUrl,
+      // The two hosts that call this door from a browser-shaped context, and our own web.
+      allowedOrigins: ['https://claude.ai', 'https://chatgpt.com', deps.webOrigin],
+    });
   }
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears

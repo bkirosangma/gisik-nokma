@@ -80,6 +80,41 @@ describe('hosted MCP metadata and registration', () => {
     expect((await reg(app, { client_name: 'x', redirect_uris: ['https://chatgpt.com/cb?x=1'] })).statusCode).toBe(201);
   });
 
+  it('14.237 a non-string redirect entry refuses the whole registration', async () => {
+    const { app } = buildOAuthApp(db);
+    const before = (await db.pool.query(`SELECT count(*)::int n FROM oauth_clients`)).rows[0].n as number;
+    for (const uris of [['https://claude.ai/api/mcp/auth_callback', 5], [null, 'https://claude.ai/api/mcp/auth_callback'], ['https://claude.ai/api/mcp/auth_callback', { u: 1 }]]) {
+      const res = await reg(app, { client_name: 'x', redirect_uris: uris });
+      expect(res.statusCode, JSON.stringify(uris)).toBe(400);
+      expect(res.json().error).toBe('invalid_redirect_uri');
+    }
+    expect((await db.pool.query(`SELECT count(*)::int n FROM oauth_clients`)).rows[0].n).toBe(before); // the good entry was not registered on its own
+    expect((await reg(app, { client_name: 'x', redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] })).statusCode).toBe(201); // CONTROL
+  });
+
+  it('14.238 at most ten redirect URIs', async () => {
+    const { app } = buildOAuthApp(db);
+    const many = (n: number) => Array.from({ length: n }, (_, i) => `https://a.example/cb${i}`);
+    const before = (await db.pool.query(`SELECT count(*)::int n FROM oauth_clients`)).rows[0].n as number;
+    const res = await reg(app, { client_name: 'x', redirect_uris: many(11) });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_redirect_uri');
+    expect((await db.pool.query(`SELECT count(*)::int n FROM oauth_clients`)).rows[0].n).toBe(before);
+    const ok = await reg(app, { client_name: 'x', redirect_uris: many(10) }); // CONTROL
+    expect(ok.statusCode).toBe(201);
+    expect(ok.json().redirect_uris).toHaveLength(10);
+  });
+
+  it('14.239 each redirect URI is at most 2048 characters', async () => {
+    const { app } = buildOAuthApp(db);
+    const uriOfLength = (n: number) => `https://a.example/${'p'.repeat(n - 'https://a.example/'.length)}`;
+    expect(uriOfLength(2048)).toHaveLength(2048);
+    const res = await reg(app, { client_name: 'x', redirect_uris: [uriOfLength(2049)] });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_redirect_uri');
+    expect((await reg(app, { client_name: 'x', redirect_uris: [uriOfLength(2048)] })).statusCode).toBe(201); // CONTROL
+  });
+
   it('14.216 registration is charged to the MCP rate-limit bucket', async () => {
     const security: SecurityOptions = {
       webOrigin: null,

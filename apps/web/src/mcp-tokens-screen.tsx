@@ -43,6 +43,20 @@ type TokenRow = {
 };
 
 /**
+ * A hosted connection (remote-MCP plan Task 8) — an assistant APP the person
+ * connected by pasting the server's URL into it, as opposed to a token made by
+ * the device-code flow. The name is the app's own claim, so the web address it
+ * redirects to always travels with it.
+ */
+type ConnectionRow = {
+  id: string;
+  clientName: string;
+  redirectHost: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+/**
  * The approval date, in the product's timezone.
  *
  * The product's zone explicitly, not the viewer's locale default: a ledger whose
@@ -125,6 +139,17 @@ export function McpTokensScreen({
   const [loadFailed, setLoadFailed] = useState(false);
   /** The server's own words for the failed read, when it sent any. */
   const [loadRefusal, setLoadRefusal] = useState<string | null>(null);
+  /**
+   * The hosted connections, read INDEPENDENTLY of the tokens above (14.277): one
+   * door failing must not blank the other, so each list has its own value and
+   * its own failure flag rather than sharing a `Promise.all`.
+   */
+  const [connections, setConnections] = useState<ConnectionRow[] | null>(null);
+  const [connectionsFailed, setConnectionsFailed] = useState(false);
+  /** The address to paste into an assistant app, or null when the hosted door is off. */
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   /** The row whose name is being edited, or null. ONE at a time: two open editors would be two unsaved drafts against one list. */
@@ -156,9 +181,73 @@ export function McpTokensScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadConnections = useCallback((): void => {
+    void http.get('/v1/me/mcp-connections').then(
+      (body) => {
+        setConnectionsFailed(false);
+        // A body without the list is a failed read, not an empty one — the same
+        // rule as the tokens read above: unknown is not empty.
+        const list = (body as { connections?: ConnectionRow[] } | null)?.connections;
+        if (Array.isArray(list)) setConnections(list);
+        else {
+          setConnectionsFailed(true);
+          setConnections(null);
+        }
+      },
+      () => {
+        setConnectionsFailed(true);
+        setConnections(null);
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
-    if (session.kind === 'signed-in') load();
-  }, [session.kind, load]);
+    if (session.kind !== 'signed-in') return;
+    load();
+    loadConnections();
+    void http.get('/v1/mcp/public-url').then(
+      (body) => setPublicUrl((body as { url?: string | null } | null)?.url ?? null),
+      () => setPublicUrl(null), // no panel is better than a wrong address
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.kind, load, loadConnections]);
+
+  /**
+   * Disconnect one hosted assistant. The row leaves the list only AFTER the DELETE
+   * resolves (14.275): removing it first would show a disconnection that may not
+   * have happened, on the one screen whose subject is who still has access.
+   */
+  const disconnect = (id: string): void => {
+    setRefusal(null);
+    setDisconnecting(id);
+    void http.del(`/v1/me/mcp-connections/${id}`).then(
+      () => {
+        setDisconnecting(null);
+        setConnections((rows) => (rows === null ? rows : rows.filter((row) => row.id !== id)));
+      },
+      (cause: unknown) => {
+        setDisconnecting(null);
+        if (cause instanceof HttpError && cause.status === 404) {
+          setRefusal('That connection is already gone. The list below is up to date.');
+          loadConnections();
+          return;
+        }
+        setRefusal(
+          (cause instanceof HttpError ? refusalText(cause.body) : null) ??
+            'That could not be disconnected, and the server did not say why. Try again in a moment.',
+        );
+      },
+    );
+  };
+
+  const copyUrl = (): void => {
+    if (publicUrl === null) return;
+    void navigator.clipboard.writeText(publicUrl).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const revoke = (id: string): void => {
     setRefusal(null);
@@ -231,6 +320,8 @@ export function McpTokensScreen({
   };
 
   const Heading = heading;
+  // One level below the screen's own heading, so the outline stays a tree.
+  const SubHeading = heading === 'h1' ? 'h2' : 'h3';
   const onAccount = variant === 'account';
   // See the docblock: all three follow from ONE decision, so they cannot be
   // configured into disagreeing about which page this is.
@@ -271,12 +362,7 @@ export function McpTokensScreen({
               </p>
             ) : tokens === null ? (
               <p data-testid="mcp-tokens-loading">Loading…</p>
-            ) : tokens.length === 0 ? (
-              <p className="gn-mcp-tokens__empty" data-testid="mcp-tokens-empty">
-                No assistants are connected. One appears here after you approve it on the{' '}
-                <Link href="/mcp/authorize">connect page</Link>.
-              </p>
-            ) : (
+            ) : tokens.length > 0 ? (
               <ul className="gn-mcp-tokens__list" data-testid="mcp-tokens-list">
                 {tokens.map((token) => (
                   <li className="gn-mcp-tokens__row" key={token.id}>
@@ -372,6 +458,77 @@ export function McpTokensScreen({
                   </li>
                 ))}
               </ul>
+            ) : null}
+
+            {/* The hosted connections (Task 8), a list of their own: its failure and
+                its emptiness are its own, so neither door can hide the other. */}
+            {connectionsFailed ? (
+              <p role="status" className="gn-mcp-tokens__load-error" data-testid="mcp-connections-failed">
+                Your connected assistant apps could not be loaded — reload to try again. The list is
+                unknown, not empty.
+              </p>
+            ) : connections !== null && connections.length > 0 ? (
+              <section aria-labelledby="mcp-connections-title" className="gn-mcp-tokens__hosted">
+                <SubHeading id="mcp-connections-title" className="gn-mcp-tokens__subtitle">
+                  Assistant apps you connected
+                </SubHeading>
+                <ul className="gn-mcp-tokens__list" data-testid="mcp-connections-list">
+                  {connections.map((connection) => (
+                    <li className="gn-mcp-tokens__row" key={connection.id}>
+                      <span className="gn-mcp-tokens__when">
+                        <span className="gn-mcp-tokens__name">
+                          {connection.clientName} · {connection.redirectHost}
+                        </span>
+                        Connected {approvedOn(connection.createdAt)}
+                        <span className="gn-mcp-tokens__used">
+                          {connection.lastUsedAt === null
+                            ? 'Never used'
+                            : `Last used ${approvedOn(connection.lastUsedAt)}`}
+                        </span>
+                      </span>
+                      <Button
+                        data-testid={`mcp-connections-disconnect-${connection.id}`}
+                        aria-label={`Disconnect ${connection.clientName} (${connection.redirectHost})`}
+                        onClick={() => disconnect(connection.id)}
+                        disabled={disconnecting !== null}
+                      >
+                        {disconnecting === connection.id ? 'Disconnecting…' : 'Disconnect'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {tokens !== null && tokens.length === 0 && connections !== null && connections.length === 0 ? (
+              <p className="gn-mcp-tokens__empty" data-testid="mcp-tokens-empty">
+                No assistants are connected. One appears here after you approve it on the{' '}
+                <Link href="/mcp/authorize">connect page</Link>.
+              </p>
+            ) : null}
+
+            {/* The address to paste into an assistant app — from the server, so no
+                build-time variable can put a wrong one on screen. Absent when the
+                hosted door is off. */}
+            {publicUrl === null ? null : (
+              <section aria-labelledby="mcp-connect-title" className="gn-mcp-tokens__hosted">
+                <SubHeading id="mcp-connect-title" className="gn-mcp-tokens__subtitle">
+                  Connect an assistant
+                </SubHeading>
+                <p className="gn-mcp-tokens__what">
+                  Paste this address into your assistant&rsquo;s &ldquo;add connector&rdquo; screen, then sign in and
+                  choose Allow.
+                </p>
+                <div className="gn-mcp-tokens__connect">
+                  <code className="gn-mcp-tokens__url" data-testid="mcp-public-url">
+                    {publicUrl}
+                  </code>
+                  <Button data-testid="mcp-public-url-copy" onClick={copyUrl}>
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                  <Link href="/help#manual-16-connecting-claude-or-chatgpt">How to connect</Link>
+                </div>
+              </section>
             )}
 
             {/* Stated once, plainly, rather than as a per-row tooltip nobody

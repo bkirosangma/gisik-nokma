@@ -3147,6 +3147,15 @@ input, textarea, select { font-family: inherit; }
 
 .gn-mcp-tokens__signed-out { margin: 0; }
 
+/* The hosted-connections list and the Connect panel (remote-MCP plan Task 8).
+   Sections of the same card, separated by space rather than a second card — a
+   card holding a card is the shape `.gn-mcp-tokens__card--account` exists to
+   avoid. No font-size: the subtitle inherits the weight-only emphasis `__name` uses. */
+.gn-mcp-tokens__hosted { margin-top: 1.5rem; }
+.gn-mcp-tokens__subtitle { margin: 0 0 0.75rem; font-weight: 600; }
+.gn-mcp-tokens__connect { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.gn-mcp-tokens__url { overflow-wrap: anywhere; }
+
 .gn-mcp-tokens__refusal {
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;

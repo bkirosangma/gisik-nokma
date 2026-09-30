@@ -4,11 +4,16 @@ import type { Queryable } from '../db/queryable.js';
 import {
   connectionForToken,
   createConnection,
+  createPending,
+  getClient,
+  getPending,
   issueTokens,
+  mintCode,
   registerClient,
   revokeConnection,
   sweepStaleClients,
   takeCode,
+  takePending,
   useRefreshToken,
 } from '../mcp/oauth-store.js';
 import { verifyPkceS256 } from '../mcp/pkce.js';
@@ -17,6 +22,9 @@ import { verifyPkceS256 } from '../mcp/pkce.js';
 export const OAUTH_SCOPE = 'gisik:act';
 
 const CLIENT_NAME_MAX = 60;
+/** Registration bounds: a client asks for a handful of redirects, each a URL — not a paragraph. */
+const REDIRECT_URIS_MAX = 10;
+const REDIRECT_URI_MAX_LENGTH = 2048;
 
 /**
  * A redirect URI a client may register: `https://…`, or a loopback `http://` for
@@ -40,14 +48,14 @@ export function isAllowedRedirect(raw: string): boolean {
 /**
  * The hosted MCP door's OAuth 2.1 authorization server (remote-MCP plan, spec
  * `2026-09-30-remote-mcp-server-design.md` §5). Registered ONLY when
- * `MCP_PUBLIC_URL` is set (`app.ts`). This task: the two metadata documents and
- * RFC 7591 public-client registration; authorize / decision / token / revoke are
- * added to this same function by later tasks.
+ * `MCP_PUBLIC_URL` is set (`app.ts`). The two metadata documents, RFC 7591
+ * public-client registration, `authorize` and the consent decision API (the web
+ * page `/mcp/connect` is the human half), and the token and revoke endpoints.
  */
 export function registerMcpOAuthRoutes(
   app: FastifyInstance,
   deps: { pool: Queryable; webOrigin: string; publicUrl: string; now?: () => Date },
-  _requireSession: preHandlerHookHandler,
+  requireSession: preHandlerHookHandler,
 ): void {
   const now = deps.now ?? (() => new Date());
   const issuer = deps.publicUrl.replace(/\/$/, '');
@@ -79,7 +87,12 @@ export function registerMcpOAuthRoutes(
     const body = (request.body ?? {}) as { client_name?: unknown; redirect_uris?: unknown };
     const given = Array.isArray(body.redirect_uris) ? (body.redirect_uris as unknown[]) : [];
     const uris = given.filter((u): u is string => typeof u === 'string');
-    if (uris.length === 0 || uris.length !== given.length || !uris.every(isAllowedRedirect)) {
+    if (
+      uris.length === 0 ||
+      uris.length !== given.length ||
+      uris.length > REDIRECT_URIS_MAX ||
+      !uris.every((u) => u.length <= REDIRECT_URI_MAX_LENGTH && isAllowedRedirect(u))
+    ) {
       return reply.code(400).send({ error: 'invalid_redirect_uri' });
     }
     // The name is self-reported, so it is a label and never an identity: the
@@ -100,6 +113,83 @@ export function registerMcpOAuthRoutes(
       response_types: ['code'],
     });
   });
+  const withQuery = (base: string, add: Record<string, string>) => {
+    const u = new URL(base);
+    for (const [k, v] of Object.entries(add)) u.searchParams.set(k, v);
+    return u.toString();
+  };
+
+  // The browser lands here from the assistant app. Nothing is granted: this
+  // validates the request, parks it as a ten-minute pending consent and sends
+  // the person to the web page, where they sign in and answer.
+  app.get('/oauth/authorize', async (request, reply) => {
+    const q = request.query as Record<string, string | undefined>;
+    const client = q.client_id ? await getClient(deps.pool, q.client_id) : null;
+    // An unknown client or an unregistered redirect is NEVER answered with a
+    // redirect — that would make this endpoint an open redirector (RFC 6749 §4.1.2.1).
+    if (client === null) {
+      return reply.code(400).send({ error: 'invalid_client', message: 'Unknown assistant app. Go back and connect again.' });
+    }
+    // EXACT string equality — never URL-normalised.
+    if (!q.redirect_uri || !client.redirectUris.includes(q.redirect_uri)) {
+      return reply.code(400).send({ error: 'invalid_redirect_uri', message: 'This assistant app sent an address it did not register.' });
+    }
+    const redirectUri = q.redirect_uri;
+    const back = (error: string) =>
+      reply.redirect(withQuery(redirectUri, { error, ...(q.state ? { state: q.state } : {}) }), 302);
+    if (q.response_type !== 'code') return back('unsupported_response_type');
+    if (q.scope !== undefined && q.scope !== OAUTH_SCOPE) return back('invalid_scope');
+    if (q.code_challenge_method !== 'S256' || !q.code_challenge || !/^[A-Za-z0-9_-]{43}$/.test(q.code_challenge)) {
+      return back('invalid_request');
+    }
+    const { requestId } = await createPending(
+      deps.pool,
+      { clientId: client.clientId, redirectUri, state: q.state ?? null, codeChallenge: q.code_challenge },
+      now(),
+    );
+    return reply.redirect(`${deps.webOrigin}/mcp/connect?request=${encodeURIComponent(requestId)}`, 302);
+  });
+
+  // What the consent page shows. The client's name is self-reported, so the
+  // redirect host always travels with it.
+  app.get<{ Params: { requestId: string } }>(
+    '/v1/mcp/oauth/requests/:requestId',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const p = await getPending(deps.pool, request.params.requestId, now());
+      if (p === null) return reply.code(404).send({ error: 'unknown_request' });
+      const client = await getClient(deps.pool, p.clientId);
+      return { requestId: p.requestId, clientName: client?.clientName ?? 'An assistant app', redirectHost: new URL(p.redirectUri).host };
+    },
+  );
+
+  app.post<{ Params: { requestId: string }; Body: { allow?: unknown } }>(
+    '/v1/mcp/oauth/requests/:requestId/decision',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      // A credential must not be able to mint another credential: an assistant
+      // holding a token could otherwise approve a fresh, unlimited connection.
+      if (request.authKind === 'mcp-token') return reply.code(403).send({ error: 'mcp_token_may_not_decide' });
+      if (typeof request.body?.allow !== 'boolean') return reply.code(400).send({ error: 'invalid' });
+      // Answered once: the take deletes the row, so a replay finds nothing.
+      const p = await takePending(deps.pool, request.params.requestId, now());
+      if (p === null) {
+        return reply.code(409).send({
+          error: 'already_answered',
+          message: 'This request has already been answered. Go back to your assistant and connect again.',
+        });
+      }
+      const state: Record<string, string> = p.state === null ? {} : { state: p.state };
+      if (!request.body.allow) return { redirectTo: withQuery(p.redirectUri, { error: 'access_denied', ...state }) };
+      const code = await mintCode(
+        deps.pool,
+        { clientId: p.clientId, userId: request.currentUserId, redirectUri: p.redirectUri, codeChallenge: p.codeChallenge },
+        now(),
+      );
+      return { redirectTo: withQuery(p.redirectUri, { code, ...state }) };
+    },
+  );
+
   // The token and revoke endpoints take `application/x-www-form-urlencoded` — what
   // OAuth clients send (RFC 6749 §4.1.3) — so the parser lives in a scope of its
   // own and does not change how any other route in the app reads a body.
