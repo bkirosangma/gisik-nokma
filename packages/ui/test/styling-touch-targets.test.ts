@@ -143,6 +143,8 @@ describe('20.618 the exemptions on the KEPT list stay exempt for a stated reason
     // CONTROL — the shared Select's trigger, the real target, keeps the 44px floor (`.gn-field__input`).
     expectRow({ sheet: 'ui', selectors: '.gn-field__input', declarations: { 'min-height': FLOOR } });
     // The native <select> the measurement saw at 20px is React Aria's HiddenSelect: the shared component renders it visually hidden.
+    // RATIFIED by the owner/controller 2026-09-30: the 20px native selects on Notes and Members are exempt; the visible 44px trigger is the target. No behaviour change.
+    // It is not a `DENSE_IN_LIST` entry (`apps/web/e2e-viewport/tap-targets.ts`): that list is the 24px IN-LIST floor, and this select is in no list.
     const source = readSelectSource();
     expect(source).toMatch(/<HiddenSelect /);
     // Inline links in running text (footer, sign-in, legal pages: 19px) are exempt (WCAG 2.5.8) and are given no hit-slop.
