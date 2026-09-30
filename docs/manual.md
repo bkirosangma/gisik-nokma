@@ -780,6 +780,15 @@ was an epic, *"Nothing in the backlog — epics appear in the List."*
 Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a
 column, press the **‹** or **›** arrow on the card, or open it and press **Move…** (§7).
 
+**A card moves the moment you let go.** Drop it (or press an arrow) and the card slides into its new
+column straight away, while the change is saved in the background. If the change is refused or cannot be
+saved, the card slides back to where it was and says why underneath. A move that needs a comment shows
+the card in its new place, faded, until you confirm; cancel and it slides back. With your system set to
+reduce motion the card simply appears. While you drag, the page scrolls when you bring the card near its
+top or bottom edge, and the board scrolls sideways near its left or right edge. Hold a card over a
+collapsed column for a moment and it opens; move away and it closes again; drop the card there and it
+stays open.
+
 A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
 that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
 tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
