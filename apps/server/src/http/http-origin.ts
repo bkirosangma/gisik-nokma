@@ -189,6 +189,8 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // Disconnecting a hosted assistant (remote-MCP plan Task 8) — the same denial-of-
   // service-by-ambient-cookie as the token revoke above.
   '/v1/me/mcp-connections/:id',
+  // Signing another of the caller's devices out — the same denial-of-service-by-ambient-cookie (devices plan Task 3).
+  '/v1/me/devices/:key/sign-out',
   // A cookie-authenticated POST that MINTS A CREDENTIAL — the same category as
   // the invite route three lines up, and the reason that one is here.
   '/v1/mcp/device/approve',
