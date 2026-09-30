@@ -2965,6 +2965,39 @@ input, textarea, select { font-family: inherit; }
    Dressing it as an alarm trains people to click through alarms, which is the
    opposite of informed consent — the text carries the weight, not the colour. */
 
+/* `/mcp/connect` only (owner 2026-09-30: "centre it, as recommended"; the app nav
+   stays OFF — people arrive from an assistant for one decision). `/mcp/authorize`
+   shares `.gn-mcp-authorize` and is deliberately not touched.
+
+   The page is a full-height column and the STAGE (title + card, one block sharing a
+   left edge) centres itself with `margin: auto`. `justify-content: center` would
+   centre too, but when the stage is taller than the viewport it overflows equally
+   ABOVE and below, and the part above the top edge cannot be scrolled to — a
+   clipped card at 390px. Auto margins in a flex column collapse to zero when
+   there is no free space, so a tall stage is top-aligned under the page gutter and
+   scrolls normally. `min-width: 0` lets the stage shrink inside the flex column;
+   `overflow-wrap: anywhere` keeps a long self-reported app name from widening it.
+
+   The vertical padding is LONGHANDS and SYMMETRIC: `.gn-shell` pads 0 above and
+   3rem below, and centring inside that box would sit 1.5rem above the viewport's
+   middle. Longhands rather than a shorthand so the `@media (max-width: 60rem)`
+   `padding: 0 0.75rem 2rem` above keeps supplying the phone's side gutter (this
+   rule is declared later at equal specificity, so its top/bottom win). */
+.gn-mcp-connect {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+.gn-mcp-connect__stage {
+  width: 100%;
+  max-width: 34rem;
+  min-width: 0;
+  margin: auto;
+  overflow-wrap: anywhere;
+}
 .gn-mcp-authorize__card { max-width: 34rem; }
 
 .gn-mcp-authorize__lead { margin: 0 0 1rem; }
