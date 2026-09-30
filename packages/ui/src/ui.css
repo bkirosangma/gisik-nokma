@@ -3692,6 +3692,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-select__panel {
   position: absolute;
   z-index: 30;
@@ -3700,22 +3701,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   overflow-y: auto;
   margin: 0;
   padding: 0.25rem;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
-}
-[data-style="neo"] .gn-select__panel {
-  /* Currently redundant with the base rule above, which already carries
-     `box-shadow: var(--gn-shadow-raised)` (unlike `.ticket-type-list__row`/
-     `.fields-editor__row`, whose BASE rules have no shadow at all — there
-     the neo override is the only place the shadow exists, not the case
-     here). Kept as an explicit anchor rather than removed: neo gives
-     surface/surfaceRaised/surfaceSunken no colour of its own, so the panel's
-     entire visual separation from the page depends on this shadow value
-     staying present — a future edit to the base rule that dropped or
-     changed it would need this line to still say so, and the test above
-     pins this selector existing for that reason. */
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
 }
 
 /* Popover (spec 2026-09-22) — the visibility menu's container. The same
@@ -3724,14 +3712,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    draft's `--overlay` guess: `--gn-surface-overlay`/`--gn-shadow-overlay`
    are the full-screen scrim/dialog pair, a different role), because both
    are anchored surfaces over the sheet and two treatments for one role is
-   the drift this file's comments exist to prevent. */
+   the drift this file's comments exist to prevent.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-popover {
   position: absolute;
   z-index: 30;
   padding: 0.75rem;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   max-width: min(22rem, calc(100vw - 2rem));
 }
 
@@ -7122,7 +7111,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--gn-shadow-raised` resolves to `none` and the panel became 13px of text
    painted over the number input beneath it with no boundary at all.
    The hairline is what draws the edge in every style and theme; the shadow
-   stays as the thing that lifts the panel off the page where shadows exist. */
+   stays as the thing that lifts the panel off the page where shadows exist.
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
 .gn-infotip__panel {
   position: absolute;
   top: calc(100% + 0.375rem);
@@ -7133,9 +7123,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   max-width: 18rem;
   padding: 0.5rem 0.625rem;
   border: 1px solid var(--gn-border);
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift-near);
   color: var(--gn-text);
   font-size: 0.8125rem;
   line-height: 1.125rem;
