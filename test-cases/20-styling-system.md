@@ -192,6 +192,10 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 - ✅ **20.303 — Create is the new-note dialog's ONE loud element: exactly one primary `Button` is on the page while it is open and it is Create;** control: the list's New note is a named button and is not a primary. Mutation: drop `variant="primary"` from Create in `create-note-dialog.tsx`.
 - ✅ **20.304 — Keep is the draft-restore banner's one loud action; Discard is quiet;** control: both are named buttons. Mutation: add `variant="primary"` to Discard in `draft-restore-banner.tsx`.
 
+## 20.30 Plan B — My work
+
+- ✅ **20.291 — My work paints no flat boundary and no retired control constant under `gn-my-work` / `gn-attention`, so it inherits the refresh through the shared layers alone;** control: the scan reads at least 15 rules under those prefixes, including the row-title rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-my-work__title` (replacing its `background: none`).
+- ✅ **20.292 — My work's and the attention list's row titles keep their declared 24px in-list floor (they are the doors, and `DENSE_IN_LIST` names them);** control: the attention item row keeps the same floor. Mutation: set `.gn-my-work__title`'s `min-height` to `1rem`.
 ## 20.37 Plan B — the Account page
 
 - ✅ **20.361 — the Account page's sections are raised panels (the P-RAISED shadow) and the Deleted items row actions keep their 44px floor;** control: the row actions' `min-height` is asserted in the same `it`. Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-account__section`.
