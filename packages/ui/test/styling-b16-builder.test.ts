@@ -187,6 +187,16 @@ describe('10.158 the Add rule menu items have a 44px hit box', () => {
     expect(valueOf(item, 'width')).toBe('100%');
     expect(valueOf(ruleExactly(css, '.add-rule-menu__item:hover'), 'background')).toBe('var(--gn-fill-quaternary)');
   });
+
+  it('10.158 a keyboard-focused item shows the product focus ring (2px, --gn-focus-ring), like the panel row heads beside it', () => {
+    // CONTROL — the row head's focus rule has this exact shape, so "the product ring" is read off a rule that is really there.
+    const head = ruleExactly(css, '.builder-row__head:focus-visible');
+    expect(valueOf(head, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    expect(valueOf(head, 'outline-offset')).toBe('0');
+    const item = ruleExactly(css, '.add-rule-menu__item:focus-visible');
+    expect(valueOf(item, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    expect(valueOf(item, 'outline-offset')).toBe('0');
+  });
 });
 
 describe('10.159 the destructive buttons inside the well are quiet danger buttons', () => {
