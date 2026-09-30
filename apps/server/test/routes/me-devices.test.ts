@@ -65,6 +65,7 @@ let aliceA2: Browser;
 let aliceB1: Browser;
 let aliceB2: Browser;
 let bob: Browser;
+let bobOnAlicesBrowser: Browser;
 let aliceId: string;
 
 async function insertSession(id: string, userId: string, deviceId: string | null, ua: string, ip: string, expiresAt: string, createdAt = '2026-09-01T00:00:00Z') {
@@ -88,6 +89,8 @@ beforeAll(async () => {
   aliceB1 = await signIn('+919000000401');
   aliceB2 = await signIn('+919000000401', aliceB1.deviceId);
   bob = await signIn('+919000000402');
+  // A shared computer: bob signs in on the very browser alice's device B uses, so the two share one gn_device value.
+  bobOnAlicesBrowser = await signIn('+919000000402', aliceB1.deviceId);
   aliceId = aliceA1.userId;
   // Device B's two sessions carry explicit, distinguishable times (6.311); neither authenticates a request below, so nothing re-stamps them.
   await db.pool.query(`UPDATE session SET "createdAt" = '2026-09-20T10:00:00Z', "lastSeenAt" = '2026-09-21T10:00:00Z' WHERE token = $1`, [aliceB1.token.split('.')[0]]);
@@ -167,7 +170,11 @@ describe('6.315 pre-V1 sessions group by user agent + address', () => {
 
 describe('6.316 the current device', () => {
   it('6.316 isCurrent is true on the caller session\'s device only, and it is listed first; control: another browser flips it', async () => {
+    // Make another device the most recently seen one, so only the current-first rule can put the caller on top.
+    await db.pool.query(`UPDATE session SET "lastSeenAt" = now() + interval '1 hour' WHERE id = 'legacy-2'`);
     const asA = await list(aliceA2);
+    await db.pool.query(`UPDATE session SET "lastSeenAt" = NULL WHERE id = 'legacy-2'`);
+    expect(asA.find((d) => !d.isCurrent)!.lastSeenAt > asA[0]!.lastSeenAt).toBe(true);
     expect(asA[0]!.key).toBe(deviceKey(aliceA1.deviceId));
     expect(asA.filter((d) => d.isCurrent).map((d) => d.key)).toEqual([deviceKey(aliceA1.deviceId)]);
     const asB = await list(aliceB2);
@@ -225,6 +232,10 @@ describe('6.317 sign out another device', () => {
     expect(after.rows.find((r) => r.deviceId === aliceA1.deviceId)?.n).toBe(countOf(aliceA1.deviceId));
     expect(after.rows.find((r) => r.deviceId === null)?.n).toBe(countOf(null)); // the legacy rows survive
     expect((await get(bob)).statusCode).toBe(200);
+    // bob is signed in on the SAME browser (same gn_device): the sign-out is alice's sessions only, never his.
+    expect((await get(bobOnAlicesBrowser)).statusCode).toBe(200);
+    const bobLeft = await db.pool.query(`SELECT count(*)::int AS n FROM session WHERE "userId" = $1 AND "deviceId" = $2`, [bob.userId, aliceB1.deviceId]);
+    expect(bobLeft.rows[0].n).toBe(1);
     // and that browser is signed out on its next request
     expect((await get(aliceB2)).statusCode).toBe(401);
     // the route cannot sign out a legacy group's... (a legacy key is an ordinary key of the caller's own)
