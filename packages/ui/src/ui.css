@@ -4296,8 +4296,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    rather than with a typography-and-surface port. (2) The `.transition-inspector`
    card renders four MORE families that are still at zero CSS — `add-rule-menu*`,
    `restrict-to-editor*`, `require-field-editor*`, `require-different-user-editor*`
-   — and `template-gallery*` is the same shape on the sibling `/workflows/new`
-   route. **Named as a gap with an owner, not fixed here:** the prototype draws
+   — (`template-gallery*` WAS the same shape until 2026-09-30, now styled as
+   doors just below). **Named as a gap with an owner, not fixed here:** the prototype draws
    no rule-authoring UI at all (0 hits for `Add rule`/`Remove rule`/`Restrict`),
    so there is no drawn design to fit them to, and the audit's own `isBuilder`
    row named three families rather than seven. **Owner: whoever next touches the

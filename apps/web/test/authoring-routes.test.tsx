@@ -329,10 +329,12 @@ describe('the second action reaches the history route, and that route renders th
 });
 
 /**
- * Case `13.1150` — E4-10 — the template gallery's four buttons are the shared
- * `Button`, not bare `<button>`s painting as raw user-agent chrome.
+ * Case `13.1150` — E4-10 — the template gallery's controls are styled, not bare
+ * `<button>`s painting as raw user-agent chrome. **Amended 2026-09-30 (cases
+ * 20.620–20.625): "Start blank" is still the shared `Button`; the three template
+ * cards are now `template-gallery__door` controls (P-LIFT doors), not `Button`s.**
  *
- * They carried **no `className` at all**, so nothing in the product's three
+ * The four carried **no `className` at all**, so nothing in the product's three
  * stylesheets matched them: measured **143×29** ×3 and **95×29**, flagged by
  * the UA-chrome detector (`borderTopStyle === 'outset'` or the UA's
  * `rgb(239,239,239)` fill) on the route. **Round 1's `P1` population was "each
@@ -343,12 +345,13 @@ describe('the second action reaches the history route, and that route renders th
  * Asserted at the ROUTE rather than on the component, because the finding's
  * population is what the route renders; the case above already reads these four
  * by accessible name and this one reads their classes. **The single assertion
- * that can fail is the class**, and it is asserted as the exact pair the shared
- * component emits (`gn-button` + its variant) rather than as a substring, so a
- * hand-rolled `className="gn-button"` without the variant — which would render
- * unbordered and unfilled — reddens here.
+ * that can fail is the class**: for "Start blank" it is asserted as the exact
+ * pair the shared component emits (`gn-button` + its variant) rather than as a
+ * substring, so a hand-rolled `className="gn-button"` without the variant —
+ * which would render unbordered and unfilled — reddens here; for the three
+ * cards it is `template-gallery__door` and NOT `gn-button`.
  */
-describe('13.1150 the template gallery uses the shared Button', () => {
+describe('13.1150 the template gallery: Start blank is the shared Button, the templates are doors', () => {
   it('13.1150 Start blank carries the shared component\'s classes and the three templates are doors', async () => {
     render(
       <Providers
