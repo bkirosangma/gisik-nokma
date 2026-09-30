@@ -31,6 +31,7 @@
     "@fastify/multipart": "^9.0.0",
     "@fastify/websocket": "^11.0.0",
     "@gisik-nokma/domain": "workspace:*",
+    "@gisik-nokma/mcp-server": "workspace:*",
     "@gisik-nokma/rule-engine": "workspace:*",
     "@huggingface/tokenizers": "^0.2.0",
     "better-auth": "^1.7.2",

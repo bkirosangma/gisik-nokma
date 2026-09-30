@@ -619,3 +619,15 @@ a second assistant they did not need.
 **The sentence carries the server's own words when it sent any** (`refusalText(cause.body)`, the same narrowing
 `revoke` and the rename path already use), and otherwise says what is true — that the read did not come back,
 that the list is unknown rather than empty, and the one recovery there is.
+
+## 14.7 Hosted MCP — one tool code path (hosted remote MCP plan, Task 6; block `14.200`–`14.299`)
+
+The hosted `/mcp` route runs the SAME nine tools as the stdio server, from the same package, over an in-process
+`fetch` that calls the API's own routes. This section is the seam that makes that true; the route itself is
+Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/plans/2026-09-30-remote-mcp-server.md`).
+
+- ✅ **14.250 — `@gisik-nokma/mcp-server` exports `registerTools`, `allTools` and `lazySession`, and `allTools` still yields the nine tools in their pinned order;** control: the same `it` reads the nine names in order. Mutation: drop `registerTools` from the index. — (`packages/mcp-server/test/exports.test.ts`)
+- ✅ **14.251 — `inProcessFetch` turns a `fetch('http://in-process/v1/me/workspaces', { headers: { authorization } })` into `app.inject` and returns a real `Response` with the route's status, JSON body and headers;** control: a 404 route comes back as a 404 `Response` (not a throw) and a call with no credential comes back 401. Mutation: always return status 200. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- ✅ **14.252 — the in-process request carries the OUTER caller's `remoteAddress` and `x-forwarded-for` (FD7): the rate-limit key seen by the events route is the outer key, not `127.0.0.1`;** control: two different outer callers land in two buckets and the same caller spends its own. Mutation: omit `remoteAddress` from `inject` (and, for the `trustProxy` case, omit the `x-forwarded-for` header). — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- ✅ **14.253 — a tool run through `hostedSession` writes an event with `origin: 'mcp'` and `actorId` = the token's owner;** control: a read tool returns the same JSON the REST route returns. Mutation: build the session with a different `userId`. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- 🧪 **14.254 — the server's build includes the package: `pnpm turbo run build --filter=@gisik-nokma/server...` builds `@gisik-nokma/mcp-server` first, and `apps/server/Dockerfile` needs no change (its manifest COPY already lists `packages/mcp-server/package.json`, line 44);** control: `pnpm deploy --prod --filter=@gisik-nokma/server <dir>` leaves `<dir>/node_modules/@gisik-nokma/mcp-server/dist/index.js`, and `import('@gisik-nokma/mcp-server')` from `<dir>` yields three functions. Mutation: remove the workspace dependency. — build check, run 2026-09-30 by executor lane B (command output in the Task 6 commit message; not a vitest case).
