@@ -4460,38 +4460,45 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    file: raising a `ctlBg` control to neo's raised shadow is an open decision
    left to the repo owner, not a call one page's task makes piecemeal.
    `inline-flex` + centring is what makes `min-height` do anything, the same
-   reason `.gn-button`'s own rule needs it. */
+   reason `.gn-button`'s own rule needs it.
+   Styling refresh Plan B (Task B7): P-QUIET — the metrics above are superseded:
+   the arrows are quiet outlined 44px pills in text2, washed on hover. */
 .gn-calendar__nav {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.25rem; /* 36px */
+  min-height: 2.75rem; /* 44px */
   padding: 0 0.75rem; /* 12px */
-  border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
   font: inherit;
   cursor: pointer;
 }
+.gn-calendar__nav:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 /* "Today" row: `min-height:36px; padding:0 14px; transparent; accent;
    15px/600` — a DIFFERENT ground from the arrow buttons beside it (own class,
    not a `.gn-calendar__nav` reuse), joined into the focus-visible group below
-   so the keyboard ring is not silently dropped from a reachable control. */
+   so the keyboard ring is not silently dropped from a reachable control.
+   Styling refresh Plan B (Task B7): P-QUIET — an outlined 44px pill in text2
+   like the arrows beside it, washed on hover. */
 .gn-calendar__today {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.25rem; /* 36px */
+  min-height: 2.75rem; /* 44px */
   padding: 0 0.875rem; /* 14px */
-  border: none;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
   background: transparent;
-  color: var(--gn-text-accent);
+  color: var(--gn-text-muted);
   font: inherit;
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
 }
+.gn-calendar__today:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-calendar__nav:focus-visible,
 .gn-calendar__today:focus-visible,
 .gn-calendar__fold:focus-visible,
@@ -4525,7 +4532,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    (`.gn-list__column-option`, `:796`) already use for the identical prototype
    vocabulary; `ctlR` → `--gn-radius-control` (the
    PILL-shaped legend card takes the smaller control radius, not `cardR`,
-   exactly as the spec table names it — not a typo carried over). */
+   exactly as the spec table names it — not a typo carried over).
+   Styling refresh Plan B (Task B7): P-RAISED — the legend rests on `lift` with
+   the card radius, like every other raised panel. */
 .gn-calendar__legend {
   display: flex;
   flex-wrap: wrap;
@@ -4534,9 +4543,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   margin: 0 0.5rem 0.5rem;
   padding: 0.4375rem 0.875rem; /* 7px 14px */
   border: none;
-  border-radius: var(--gn-radius-control);
+  border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
 }
 /* "Legend label": `12px/16px`. Colour is left unset (inherits `--gn-text`
    from `.gn-calendar`) — the metric names no colour for the label text
@@ -4588,26 +4597,32 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `flex-direction: column` + `gap: 1px` is what turns the weekday head and
    each week section into hairline-separated rows on the tray ground showing
    through the 1px gap — the same idiom `padding: 1px` + `gap: 1px` gives the
-   day cells below. */
+   day cells below.
+   Styling refresh Plan B (Task B7): the ground is now the recessed TRACK
+   (`surface-track` / `shadow-track` / `radius-track`) instead of the sunken
+   tray; the 1px gap and padding are unchanged, so the track still shows
+   through as the day lines. */
 .gn-calendar__grid {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding: 1px;
-  border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  border-radius: var(--gn-radius-track);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
   min-height: 26.25rem; /* 420px */
 }
 /* "Weekday head": `trayBg; padding 9px 10px; 12px/16px; 600; label2;
    uppercase; 0.5px`. `label2` → `--gn-text-muted`. `trayBg` matches the
    `.gn-calendar__grid` ground it sits on exactly, so this row paints no
    hairline against its own wrapper — only the day cells below do, where
-   `cardBg`/`fill4` differ from the tray. */
+   `cardBg`/`fill4` differ from the tray.
+   Styling refresh Plan B (Task B7): the row has no fill of its own — the
+   weekday names sit directly on the grid's track. */
 .gn-calendar__weekday-head {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--gn-surface-sunken);
+  background: transparent;
 }
 .gn-calendar__weekday {
   padding: 0.5625rem 0.625rem; /* 9px 10px */

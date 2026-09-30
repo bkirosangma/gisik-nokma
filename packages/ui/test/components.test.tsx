@@ -1940,6 +1940,10 @@ describe('13.1147 the timeline nav declares a border, so no UA bevel survives', 
     // Asserted as a PAIR with the sibling rule rather than as literals: the
     // finding's remedy is that the two views' navs agree, so a later edit that
     // re-diverges one of them is the regression to catch.
+    // Amended 2026-09-30 by 20.261 (styling refresh Plan B, Task B7): the
+    // calendar nav is now P-QUIET (an outlined 44px pill), so the pair is
+    // spelled per side until Task B8 restyles the timeline nav to the same
+    // values; what stays true of both is that a border IS declared.
     const timeline = rule('.gn-timeline__nav');
     const calendar = rule('.gn-calendar__nav');
     for (const property of [
@@ -1950,8 +1954,18 @@ describe('13.1147 the timeline nav declares a border, so no UA bevel survives', 
       /color:\s*var\(--gn-text-accent\)/,
     ]) {
       expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
+    }
+    for (const property of [
+      /min-height:\s*2\.75rem/,
+      /border:\s*1px solid var\(--gn-border\)/,
+      /border-radius:\s*999px/,
+      /background:\s*transparent/,
+      /color:\s*var\(--gn-text-muted\)/,
+    ]) {
       expect(calendar, `calendar nav: ${String(property)}`).toMatch(property);
     }
+    expect(timeline).toMatch(/border:/);
+    expect(calendar).toMatch(/border:/);
   });
 
   it('13.1147 the family\'s other two members were already carrying it', () => {
