@@ -198,3 +198,8 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 - ✅ **20.362 — no account or Deleted-items rule paints a flat boundary or the retired constant;** control: the scan reads more than 30 rules across `.gn-account` and `.gn-deleted-items` and finds both prefixes. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-account__section`.
 - ✅ **20.363 — the passkeys add action is a quiet (ghost) `Button`, not a primary;** control: it is still a `button` named "Add a passkey" with the `gn-button` class. Mutation: restore `variant="primary"` in `passkeys-section.tsx`.
 - ✅ **20.364 — Save name is the Account page's ONE loud element: exactly one primary `Button` is on `/account` and it is Save name;** control: Save name and Add a passkey are both rendered. Mutation: drop `variant="primary"` from Save name in `profile-section.tsx`.
+
+## 20.38 Plan B — the Inbox
+
+- ✅ **20.371 — every inbox row is a 44px door and "Load more" is a quiet outlined control (P-QUIET, with its hover fill);** control: the unread dot and badge keep the accent. Mutations: remove `min-height` from `.gn-inbox__row`; and restore `border-radius: 4px` on `.gn-inbox__more`.
+- ✅ **20.372 — no inbox rule paints a flat boundary or the retired constant;** control: the scan reads more than 10 inbox rules. Mutation: replace `.gn-inbox__dot`'s `accent` background with `surface-sunken`.
