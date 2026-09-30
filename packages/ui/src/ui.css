@@ -560,6 +560,9 @@
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  /* Visual-fixes V2 (2026-09-30): the pill keeps its INTRINSIC size — it neither shrinks nor wraps its label when a long title takes the header's free width. */
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .gn-dialog__header,
@@ -610,7 +613,7 @@
    **⛔ THE PARAGRAPH ABOVE WAS TRUE WHEN WRITTEN AND IS NOT ANY MORE —
    corrected 2026-09-20.** The owner ruled the title editable and it is now
    built: the ticket sheet's MAIN render passes `titleSlot` and its header
-   carries an `<input>` instead of this `<h2>`.
+   carries an `<input>` instead of this `<h2>` (a wrapping one-row `<textarea>` since 2026-09-30 — see `.gn-ticket-sheet__title-input`).
 
    ⚠ **AN EARLIER VERSION OF THIS CORRECTION SAID `.gn-sheet__title` "no longer
    reaches the ticket sheet at all … which today is no product caller", AND THAT
@@ -827,8 +830,16 @@ a.gn-ticket-sheet__crumb--link {
 
    The type step is `.gn-sheet__title`'s, restated rather than shared (see that
    rule's note). The resets are what make a field read as a heading: no border,
-   no fill, no padding, and `width:100%` inside a `min-width:0` column so a long
-   title wraps its box rather than pushing the header's actions off screen. */
+   no fill, no padding, and `width:100%` inside a `min-width:0` column so the
+   title takes the header's free width rather than pushing the header's actions
+   off screen.
+
+   AMENDED (visual-fixes V2, 2026-09-30): the control is a one-row `<textarea>`
+   that grows with its content (`TitleField`, `ticket-sheet.tsx`), NOT an
+   `<input>` — an input never wraps, and a 60-character title at this step needs
+   about 870px against roughly 400px of free header width, so it was clipped.
+   `overflow-wrap:anywhere` lets an unbroken string wrap too; `resize:none` and
+   `overflow:hidden` because the height is the component's, not the user's. */
 .gn-ticket-sheet__title-input {
   font-family: inherit;
   font-size: 1.625rem;
@@ -839,8 +850,13 @@ a.gn-ticket-sheet__crumb--link {
   background: none;
   border: none;
   padding: 0;
+  margin: 0;
   width: 100%;
   min-width: 0;
+  display: block;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 /* A field with no border has no focus ring either, and a keyboard user editing
    the title has to be able to see where they are. The outline is drawn INSIDE
@@ -1573,6 +1589,13 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-board-card__key { color: var(--gn-text-subtle); font-weight: 500; font-variant-numeric: tabular-nums; }
 .gn-board-card__meta-sep { color: var(--gn-text-subtle); }
+/* The `·` and the due label as ONE unbreakable unit (visual-fixes V1, 2026-09-30). The keys row is a wrapping flex row, and the separator was its own flex item, so on a full-field card it could be left alone at the end of one line with its date on the next. `nowrap` keeps the pair together; the gap is the row's own 0.5rem so the unwrapped row `key · priority · due` is spaced exactly as before. */
+.gn-board-card__due-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
 /* The owner's `›` between parent and key; pulled in by 4px on each side so the
    8px row gap does not leave it floating (`Main.dc.html:97`). */
 .gn-board-card__parent-sep { margin: 0 -0.25rem; color: var(--gn-text-subtle); }
