@@ -272,7 +272,7 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
   - the whole-board and per-column empty states (`ui.css:1015-1133`);
   - the List's `.gn-row-action`/`.gn-list__bulk-close`, which today share a rule with the board's Close (`ui.css:1511-1514`), a group this plan SPLITS;
   - fields, menus, popovers, toasts and the app shell.
-- **D25 — The TARGET column gets a track highlight, not an inserted placeholder** (Task 5A, added 2026-09-29).
+- **D25 — The TARGET column gets a track highlight, not an inserted placeholder** (Task 5A, added 2026-09-29). **SUPERSEDED by owner feedback 2026-09-30** (board drag fixes D2; cases 20.106–20.110): the landing slot IS knowable — a column is ordered by `ticket_id` — so a legal target now also holds a same-size placeholder at that slot and an illegal one shows "can't drop here"; the accent outline stays. The reasoning below is the record of what was believed on 2026-09-29.
   - The owner asked for "a drag placeholder sized to the dragged card". The placeholder IS built, at the card's SOURCE slot: the slot stays in the DOM with its box unchanged and its contents hidden, so the source column does not jump.
   - In the column being dragged over there is NO inserted placeholder. A board drop changes a ticket's STATE (`onDropCard(event, column.stateId)`, `board.tsx:1076`). It does not reorder: the drop handler reads only a ticket id and a state id (`board.tsx:1305-1307`), and the card lands wherever the column's own order puts it. A placeholder at an index would claim a position the drop won't honour. Inserting one on `dragenter` would also cause the very layout jump the ruling removes.
   - Instead the column shows a 2px accent outline inside its edge while a card is over it. The accent is rule 03's "one accent, saved for the action", and this is the action.
@@ -1996,7 +1996,7 @@ Owner, 2026-09-29: *"yes, update the mockup and the styling plan"*. The ruling:
 - the full lift toward the user (scale ~1.03, a deeper spreading shadow and a 2–3° tilt) happens ONLY while a card is being dragged;
 - a drag placeholder sized to the dragged card's height, so the layout does not jump.
 
-Native HTML5 drag-and-drop stays (D26). The lift is painted on a `setDragImage` clone. The placeholder is the source slot itself, and the column being dragged over gets a highlight rather than an inserted placeholder (D25).
+Native HTML5 drag-and-drop stays (D26). The lift is painted on a `setDragImage` clone. The placeholder is the source slot itself, and the column being dragged over gets a highlight rather than an inserted placeholder (D25 — superseded by owner feedback 2026-09-30: a legal target also gets a landing placeholder).
 
 **Files:**
 - Create: `packages/app-core/src/views/board-drag-image.ts`.
@@ -2244,7 +2244,7 @@ frameRef.current = requestAnimationFrame(() => {
   outline-offset: -1px;
 }
 .gn-board__card-slot--placeholder > .gn-board-card { visibility: hidden; }
-/* THE DROP TARGET (plan D25): a board drop changes state, it does not
+/* THE DROP TARGET (plan D25 — superseded by owner feedback 2026-09-30, see `ui.css`): a board drop changes state, it does not
    reorder, so the column is outlined rather than given a placeholder at an
    index it would not honour. Inside the edge so the rail does not shift.
    The accent — rule 03's one accent, saved for the action; this is it. */

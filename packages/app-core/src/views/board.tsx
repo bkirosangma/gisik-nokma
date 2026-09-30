@@ -927,6 +927,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             onCreateTicket={onCreateTicket}
             arrows={null}
             onDropCard={null}
+            canDropOn={null}
             bulkCloseFor={null}
             today={today}
           />
@@ -970,6 +971,38 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
  * over — Task 5A — which is inert without `onDropCard`.)
  */
 /** True when a drag carries a board card (the marker `dragstart` sets), not merely `text/plain`. */
+/**
+ * The card being dragged, as its OWN workflow group knows it (board drag fixes
+ * D2, owner 2026-09-30). During `dragover`/`dragenter` a browser hides a drag's
+ * DATA and shows only its `types`, so a target column cannot ask which card is
+ * over it, or how tall — the source slot tells the group at `dragstart`, and the
+ * group clears it on `drop` and `dragend`. `height` is measured BEFORE the source
+ * turns into a placeholder, so the target's placeholder is the card's own size.
+ */
+type BoardDrag = { ticketId: string; fromStateId: string; height: number };
+
+/**
+ * Where a card WILL sit once it lands in `cards` (a target column's cards, not
+ * containing it): the number of cards ahead of it. A board column is ordered by
+ * `ticket_id`, text order — the server read (`apps/server/src/routes/board.ts:120`,
+ * `ORDER BY t.ticket_id`), the offline replica's enumeration
+ * (`packages/sync-client/src/replica/replica.ts:1883`, `ORDER BY ticket_id`,
+ * pushed into columns in that order at `replica-data-source.ts:1526`) and the
+ * client mapper (`online/mappers.ts:713`, `.map` — order kept) all agree, and the
+ * board renders `column.cards` as given, so a live-query repaint after the move
+ * puts the card exactly here (nothing patches the board optimistically — the
+ * online source refetches). A ticket's entity id must match `ULID_REGEX`
+ * (`packages/domain/src/envelope.ts:120`, pattern at `ids.ts:9`) — 26 characters
+ * of `[0-9A-Z]` — so JS `<` gives the same order as Postgres's default collation
+ * (`ticket_id text`, `proj-tickets.sql:74`, no `COLLATE`) and SQLite's binary
+ * one. NOT arrival order and NOT age: a card created earlier lands ABOVE a
+ * later one because its id sorts first.
+ */
+function landingIndex(cards: readonly BoardCardData[], ticketId: string): number {
+  const ahead = cards.findIndex((card) => card.ticketId > ticketId);
+  return ahead === -1 ? cards.length : ahead;
+}
+
 function isCardDrag(event: DragEvent<HTMLElement>): boolean {
   return Array.from(event.dataTransfer.types ?? []).includes(DRAG_CARD_MARKER);
 }
@@ -984,6 +1017,7 @@ function BoardGroupSection({
   onCreateTicket,
   arrows,
   onDropCard,
+  canDropOn,
   bulkCloseFor,
   today,
 }: {
@@ -1018,6 +1052,15 @@ function BoardGroupSection({
    */
   onDropCard: ((event: DragEvent<HTMLElement>, toStateId: string) => void) | null;
   /**
+   * Whether a card in `fromStateId` may move to `toStateId` at all (board drag
+   * fixes D2) — `moveOutcome`'s own availability, the decision the arrows use,
+   * handed over as a question so this component still knows nothing about
+   * workflows. `null` where `onDropCard` is (no workflow definition yet, or no
+   * move capability): a column then cannot tell a legal target from an illegal
+   * one and draws neither a placeholder nor a refusal.
+   */
+  canDropOn: ((fromStateId: string, toStateId: string) => boolean) | null;
+  /**
    * The column-level bulk close (spec §8.3's Board bullet, second wave Task
    * 10). `null` on the plain, `moves`-less path — the SAME "capability absent,
    * not a dead stub" precedent `arrows` and `onDropCard` set above, and the
@@ -1034,21 +1077,41 @@ function BoardGroupSection({
   today?: string;
 }) {
   /**
-   * The column being dragged over (Task 5A, plan D25) — a board drop changes
-   * state, it does not reorder, so the column is OUTLINED rather than given a
-   * placeholder at an index it would not honour. `dragleave` fires whenever the
-   * pointer moves onto a child, so entering is counted per column and the
-   * highlight clears only when the count returns to zero.
+   * The column being dragged over (Task 5A) — OUTLINED, and (board drag fixes
+   * D2, owner 2026-09-30, superseding plan D25's "outline only": the landing slot
+   * is knowable, see `landingIndex`) a LEGAL target also holds a same-size
+   * placeholder at that slot, while an illegal one draws the "can't drop here"
+   * state instead. `dragleave` fires whenever the pointer moves onto a child, so
+   * entering is counted per column and all of it clears only when the count
+   * returns to zero.
    */
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const depthRef = useRef(new Map<string, number>());
+  /** The card being dragged from THIS group, or `null` (another group's drag shows nothing here). */
+  const [drag, setDrag] = useState<BoardDrag | null>(null);
+  /** What a column is to the drag over it: its own column, a legal target, an illegal one, or unknown. */
+  const verdictOf = (stateId: string): 'own' | 'legal' | 'refused' | 'unknown' =>
+    drag === null || canDropOn === null
+      ? 'unknown'
+      : drag.fromStateId === stateId
+        ? 'own'
+        : canDropOn(drag.fromStateId, stateId)
+          ? 'legal'
+          : 'refused';
   /**
    * Focus follows a column toggle (Task 5B): the control that was pressed
    * unmounts with its branch, so focus would fall to `<body>`. The handler
    * records where it should land; the layout effect below moves it after the
    * branch has swapped.
    */
-  const pendingFocusRef = useRef<{ stateId: string; target: 'strip' | 'collapse' } | null>(null);
+  const pendingFocusRef = useRef<{
+    stateId: string;
+    target: 'strip' | 'collapse';
+    /** Where the page and the rail were BEFORE the toggle (board drag fixes D3). */
+    scrollX: number;
+    scrollY: number;
+    railLeft: number;
+  } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
   useHydrationLayoutEffect(() => {
     const pending = pendingFocusRef.current;
@@ -1060,10 +1123,23 @@ function BoardGroupSection({
     const control = section?.querySelector(
       pending.target === 'strip' ? '.gn-board__column-strip' : '.gn-board__column-collapse',
     );
-    if (control instanceof HTMLElement) control.focus();
+    // `preventScroll`: a bare `focus()` scrolls the new control into view, and a strip
+    // stretches to the rail's height — so collapsing a column scrolled the page (owner, 2026-09-30).
+    if (control instanceof HTMLElement) control.focus({ preventScroll: true });
+    // Belt and braces: the swap itself can shift the layout under the page. Put back what moved
+    // (and only what moved — a page nothing touched is not scrolled at all).
+    if (window.scrollY !== pending.scrollY) window.scrollTo({ left: pending.scrollX, top: pending.scrollY, behavior: 'instant' });
+    const rail = railRef.current;
+    if (rail !== null && rail.scrollLeft !== pending.railLeft) rail.scrollLeft = pending.railLeft;
   });
   const setColumnExpanded = (stateId: string, expandedNow: boolean): void => {
-    pendingFocusRef.current = { stateId, target: expandedNow ? 'collapse' : 'strip' };
+    pendingFocusRef.current = {
+      stateId,
+      target: expandedNow ? 'collapse' : 'strip',
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+      railLeft: railRef.current?.scrollLeft ?? 0,
+    };
     onToggleColumn(group.workflowId, stateId, expandedNow);
   };
   /**
@@ -1151,12 +1227,42 @@ function BoardGroupSection({
         onDragEnd={() => {
           depthRef.current.clear();
           setDropTarget(null);
+          setDrag(null);
         }}
       >
         {group.columns.map((column) => {
           // No `column.category` test: every column collapses (plan D27, resolved).
           const collapsed = columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false;
           const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
+          const over = column.stateId === dropTarget;
+          const verdict = over ? verdictOf(column.stateId) : 'unknown';
+          // A placeholder only in a list that exists (a strip has none) and only for a legal move.
+          const slotAt = over && verdict === 'legal' && !collapsed && drag !== null ? landingIndex(column.cards, drag.ticketId) : null;
+          const cardSlots = column.cards.map((card) => (
+            <BoardCardSlot
+              key={card.ticketId}
+              card={card}
+              stateName={column.name}
+              onOpen={() => onOpenTicket(card.ticketId)}
+              onOpenTicket={onOpenTicket}
+              arrows={arrows === null ? null : arrows(card, column.stateId)}
+              onDragBegin={(height) => setDrag({ ticketId: card.ticketId, fromStateId: column.stateId, height })}
+              today={today}
+            />
+          ));
+          if (slotAt !== null && drag !== null) {
+            cardSlots.splice(
+              slotAt,
+              0,
+              <li
+                key="drop-placeholder"
+                className="gn-board__drop-placeholder"
+                data-testid={`board-drop-placeholder-${column.stateId}`}
+                aria-hidden="true"
+                style={{ height: `${drag.height}px` }}
+              />,
+            );
+          }
           return (
           <section
             key={column.stateId}
@@ -1166,7 +1272,7 @@ function BoardGroupSection({
             className={
               (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
               (collapsed ? ' gn-board__column--collapsed' : '') +
-              (column.stateId === dropTarget ? ' gn-board__column--drop-target' : '')
+              (over ? (verdict === 'refused' ? ' gn-board__column--drop-refused' : ' gn-board__column--drop-target') : '')
             }
             /*
              * Board-prototype-port Task 14. `preventDefault()` on
@@ -1176,7 +1282,16 @@ function BoardGroupSection({
              * wired when `onDropCard` is non-null, the same gate `onDrop`
              * itself uses immediately below.
              */
-            onDragOver={onDropCard === null ? undefined : (event) => event.preventDefault()}
+            onDragOver={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    event.preventDefault();
+                    // An illegal target: the cursor says no (a browser may then cancel the drop, so the
+                    // refusal is still reachable through the arrows — `handleDrop` refuses if one does fire).
+                    if (verdictOf(column.stateId) === 'refused') event.dataTransfer.dropEffect = 'none';
+                  }
+            }
             onDragEnter={
               onDropCard === null
                 ? undefined
@@ -1206,6 +1321,7 @@ function BoardGroupSection({
                 : (event) => {
                     depthRef.current.delete(column.stateId);
                     setDropTarget(null);
+                    setDrag(null);
                     onDropCard(event, column.stateId);
                   }
             }
@@ -1282,17 +1398,7 @@ function BoardGroupSection({
               </button>
             </header>
             <ul className="gn-board__cards" id={cardsId}>
-              {column.cards.map((card) => (
-                <BoardCardSlot
-                  key={card.ticketId}
-                  card={card}
-                  stateName={column.name}
-                  onOpen={() => onOpenTicket(card.ticketId)}
-                  onOpenTicket={onOpenTicket}
-                  arrows={arrows === null ? null : arrows(card, column.stateId)}
-                  today={today}
-                />
-              ))}
+              {cardSlots}
             </ul>
             {/*
              * The PER-COLUMN empty state (board-prototype-port Task 7,
@@ -1479,6 +1585,14 @@ function BoardGroupWithMoves({
       : (event: DragEvent<HTMLElement>, toStateId: string) => {
           event.preventDefault();
           const ticketId = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
+          // A drop on the card's OWN column is a no-op (owner, 2026-09-30): `moveOutcome` refuses a
+          // self-transition, and the refusal read "Can't move there" under a card that never moved.
+          // Read off THIS group's data, so a card of another workflow whose state merely shares the
+          // id is still a real (refused) attempt.
+          const currentStateId = group.columns.find((column) =>
+            column.cards.some((card) => card.ticketId === ticketId),
+          )?.stateId;
+          if (currentStateId === toStateId) return;
           const attempt = moveRegistry.current.get(ticketId);
           if (attempt !== undefined) attempt(toStateId);
         };
@@ -1507,6 +1621,13 @@ function BoardGroupWithMoves({
             )
       }
       onDropCard={handleDrop}
+      // `moveOutcome`'s own answer, so a column and an arrow can never disagree; `{}` fields
+      // because only `refused` is asked, and refusal never reads them (they split direct from dialog).
+      canDropOn={
+        workflowDef === null
+          ? null
+          : (fromStateId, toStateId) => moveOutcome(workflowDef, fromStateId, toStateId, {}).kind !== 'refused'
+      }
       bulkCloseFor={bulkCloseFor}
       today={today}
     />
@@ -1594,6 +1715,7 @@ function BoardCardSlot({
   onOpen,
   onOpenTicket,
   arrows,
+  onDragBegin,
   today,
 }: {
   card: BoardCardData;
@@ -1609,6 +1731,12 @@ function BoardCardSlot({
    */
   onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
+  /**
+   * Tells the workflow group a drag of THIS card began, with the card's measured
+   * height (board drag fixes D2) — the one thing a target column cannot read
+   * from a `dragover`. Called before the source turns into a placeholder.
+   */
+  onDragBegin: (height: number) => void;
   /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
   today?: string;
 }) {
@@ -1630,6 +1758,7 @@ function BoardCardSlot({
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData(DRAG_CARD_MARKER, '');
               const cardElement = event.currentTarget.firstElementChild;
+              onDragBegin((cardElement instanceof HTMLElement ? cardElement : event.currentTarget).getBoundingClientRect().height);
               if (cardElement instanceof HTMLElement) setCardDragImage(event, cardElement);
               // One frame later, NOT now: restyling the source synchronously would put the
               // hidden card into the browser's snapshot (Chromium can cancel the drag).

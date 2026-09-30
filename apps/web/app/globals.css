@@ -2965,6 +2965,39 @@ input, textarea, select { font-family: inherit; }
    Dressing it as an alarm trains people to click through alarms, which is the
    opposite of informed consent — the text carries the weight, not the colour. */
 
+/* `/mcp/connect` only (owner 2026-09-30: "centre it, as recommended"; the app nav
+   stays OFF — people arrive from an assistant for one decision). `/mcp/authorize`
+   shares `.gn-mcp-authorize` and is deliberately not touched.
+
+   The page is a full-height column and the STAGE (title + card, one block sharing a
+   left edge) centres itself with `margin: auto`. `justify-content: center` would
+   centre too, but when the stage is taller than the viewport it overflows equally
+   ABOVE and below, and the part above the top edge cannot be scrolled to — a
+   clipped card at 390px. Auto margins in a flex column collapse to zero when
+   there is no free space, so a tall stage is top-aligned under the page gutter and
+   scrolls normally. `min-width: 0` lets the stage shrink inside the flex column;
+   `overflow-wrap: anywhere` keeps a long self-reported app name from widening it.
+
+   The vertical padding is LONGHANDS and SYMMETRIC: `.gn-shell` pads 0 above and
+   3rem below, and centring inside that box would sit 1.5rem above the viewport's
+   middle. Longhands rather than a shorthand so the `@media (max-width: 60rem)`
+   `padding: 0 0.75rem 2rem` above keeps supplying the phone's side gutter (this
+   rule is declared later at equal specificity, so its top/bottom win). */
+.gn-mcp-connect {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+.gn-mcp-connect__stage {
+  width: 100%;
+  max-width: 34rem;
+  min-width: 0;
+  margin: auto;
+  overflow-wrap: anywhere;
+}
 .gn-mcp-authorize__card { max-width: 34rem; }
 
 .gn-mcp-authorize__lead { margin: 0 0 1rem; }
@@ -4179,6 +4212,18 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-control);
   padding: 0.75rem 1rem;
+  /* THE COPY BUTTON'S GUTTER (owner screenshot 2026-09-30: a wrapped line ran UNDER the
+     button). The button is `absolute` in this block's corner (editor.css: `right: 0.375rem`),
+     so the block must reserve its box itself. ONE width feeds both sides — the button's
+     `min-width` below and this gutter — and it is sized for the WIDER label, "Copied"
+     (~2.5rem of glyphs at 0.75rem + the button's 2 x 0.5rem padding), so the 1.5s "Copied"
+     flip neither grows the button nor reaches into text. Gutter = width + the 0.375rem
+     inset + 0.5rem of air. The padding is on THIS box, not on the scrolling `pre`: the
+     pre's scrollport therefore ends at the gutter's edge and scrolled text is clipped
+     before it reaches the button, which (absolute in this non-scrolling box) stays pinned.
+     It must follow the `padding` shorthand or the shorthand overwrites it. */
+  --gn-codeblock-copy-width: 4rem;
+  padding-inline-end: calc(var(--gn-codeblock-copy-width) + 0.375rem + 0.5rem);
   margin: 0.5rem 0;
 }
 .ticket-editor__content .editor-codeblock pre {
@@ -4199,7 +4244,15 @@ input, textarea, select { font-family: inherit; }
    :hover/:focus-within on the block. */
 .ticket-editor__content .editor-codeblock__copy {
   opacity: 0;
-  background: var(--gn-fill-tertiary);
+  /* A SOLID ground, never an alpha fill: `--gn-fill-tertiary` let the code show through the
+     button. `--gn-surface` is opaque in every style x theme and `text` on it is a declared 4.5:1
+     pair. `surface-sunken` was the first pick and is refused by case 20.302 (a recessed fill is
+     not a boundary), so the chip's edge is the house `--gn-border` line, as `.gn-field__input`'s. */
+  background: var(--gn-surface);
+  border: 1px solid var(--gn-border);
+  box-sizing: border-box;
+  min-width: var(--gn-codeblock-copy-width);
+  text-align: center;
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
