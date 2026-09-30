@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SessionsSection } from '../../src/account/sessions-section.js';
@@ -98,6 +98,30 @@ describe('SessionsSection', () => {
     const heading = screen.getAllByRole('heading', { level: 2 }).at(-1)!;
     expect(heading).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
     expect(within(heading.closest('section')!).getByText('Chrome on Mac · CCCC')).toBeInTheDocument();
+  });
+
+  it('6.339 a NON-current device that was never seen (lastSeenAt null, a pre-migration session the 5-minute stamp has not touched) is IDLE: under "Signed in, idle (1)", not in "M active"; control: the same device with a recent stamp is active', () => {
+    const never = device({ key: 'n', tag: 'NNNN', label: 'Edge on Linux', lastSeenAt: null });
+    mount([CURRENT, never]);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
+    expect(screen.getByRole('button', { name: 'Signed in, idle (1)' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Edge on Linux · NNNN')).toBeNull();
+    cleanup();
+    mount([CURRENT, { ...never, lastSeenAt: '2026-09-30T23:00:00Z' }]);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 2 active');
+    expect(screen.queryByText(/Signed in, idle/)).toBeNull();
+    expect(screen.getByText('Edge on Linux · NNNN')).toBeInTheDocument();
+  });
+
+  it('6.339 when NO device is active and none is current (a list with no isCurrent) the "Active in the last 24 hours" heading and list are absent and the heading reads "0 active"; control: one active device shows the group', () => {
+    mount([IDLE, LEGACY]);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 0 active');
+    expect(screen.queryByText('Active in the last 24 hours')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Signed in, idle (2)' })).toBeInTheDocument();
+    cleanup();
+    mount([IDLE, ACTIVE]);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
+    expect(screen.getByText('Active in the last 24 hours')).toBeInTheDocument();
   });
 
   it('6.333 "Sign out this device" is on every row except the current one and calls signOutDevice(key); "Sign out all other devices" shows once and calls signOutOthers()', async () => {
