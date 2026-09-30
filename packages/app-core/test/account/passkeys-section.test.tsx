@@ -196,3 +196,45 @@ describe('6.335/6.336 passkeys grouped by provider (devices plan Task 7)', () =>
     expect(onRemove).toHaveBeenCalledWith('p2');
   });
 });
+
+describe('6.346/6.347 rows inside a provider group (devices-3 survivors)', () => {
+  const mountList = (list: PasskeySummary[], onRemove = vi.fn()) =>
+    render(<PasskeysSection passkeys={list} onAdd={vi.fn()} onRemove={onRemove} now={NOW} />);
+
+  it('6.346 two passkeys under ONE provider keep the order the server sent (oldest first), whichever way that is; control: each group still counts both', () => {
+    mountList([
+      pk({ id: 'a', name: 'Alpha', createdAt: '2026-01-01T10:00:00Z' }),
+      pk({ id: 'b', name: 'Bravo', createdAt: '2026-02-01T10:00:00Z' }),
+      pk({ id: 'c', name: 'Charlie', createdAt: '2026-03-01T10:00:00Z' }),
+    ]);
+    expect(screen.getByRole('heading', { name: 'iCloud Keychain · 3' })).toBeInTheDocument();
+    const titles = () => screen.getAllByRole('listitem').map((li) => within(li).getByText(/^(Alpha|Bravo|Charlie|Zulu|Yankee)$/).textContent);
+    expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    cleanup();
+    // the order is the server's, not an alphabetical or date sort the view applies: a list sent newest-first stays newest-first
+    mountList([
+      pk({ id: 'z', name: 'Zulu', createdAt: '2026-03-01T10:00:00Z' }),
+      pk({ id: 'y', name: 'Yankee', createdAt: '2026-01-01T10:00:00Z' }),
+    ]);
+    expect(titles()).toEqual(['Zulu', 'Yankee']);
+  });
+
+  it('6.347 two UNNAMED passkeys added on different dates have different delete names, and the second is clicked by its own; control: a named passkey\'s delete name carries no date', async () => {
+    const onRemove = vi.fn();
+    const user = userEvent.setup();
+    mountList(
+      [
+        pk({ id: 'u1', name: null, createdAt: '2026-06-01T10:00:00Z' }),
+        pk({ id: 'u2', name: null, createdAt: '2026-09-18T10:00:00Z' }),
+        pk({ id: 'n1', name: 'Work laptop' }),
+      ],
+      onRemove,
+    );
+    const names = screen.getAllByRole('button', { name: /^Delete passkey Unnamed passkey/ }).map((b) => b.getAttribute('aria-label'));
+    expect(names).toEqual(['Delete passkey Unnamed passkey added 1 Jun 2026', 'Delete passkey Unnamed passkey added 18 Sep 2026']);
+    expect(new Set(names).size).toBe(2);
+    await user.click(screen.getByRole('button', { name: 'Delete passkey Unnamed passkey added 18 Sep 2026' }));
+    expect(onRemove).toHaveBeenCalledWith('u2');
+    expect(screen.getByRole('button', { name: 'Delete passkey Work laptop' })).toBeInTheDocument();
+  });
+});
