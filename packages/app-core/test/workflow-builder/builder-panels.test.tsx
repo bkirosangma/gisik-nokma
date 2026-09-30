@@ -203,6 +203,43 @@ describe('10.144 one row open at a time across both lists', () => {
   });
 });
 
+describe('10.144 a TRANSITION row collapses on a second click too', () => {
+  it('10.144 clicking the open transition row again closes it and selects nothing (the state-row test above cannot see this arm)', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    renderPanels(store);
+    const transitionRow = rowButtons()[store.getState().def.states.length]!;
+
+    // CONTROL — the first click opens it and selects it, so the second click below starts from a real open transition.
+    await user.click(transitionRow);
+    expect(transitionRow).toHaveAttribute('aria-expanded', 'true');
+    expect(store.getState().selection).toEqual({ kind: 'transition', index: 0 });
+
+    await user.click(transitionRow);
+    expect(transitionRow).toHaveAttribute('aria-expanded', 'false');
+    expect(store.getState().selection).toEqual({ kind: 'none' });
+    expect(document.querySelector('.transition-inspector')).toBeNull();
+  });
+});
+
+describe('10.154 the rows carry the hooks the stylesheet selects on', () => {
+  it('10.154 an open row is `li[data-open="true"] > .builder-row__head > .builder-row__chevron`, and a closed one says "false"', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    renderPanels(store);
+    const doingRow = stateRow('Doing');
+    const item = doingRow.closest('li')!;
+    const chevron = () => item.querySelector(':scope > .builder-row__head > .builder-row__chevron');
+
+    // CONTROL — closed: the chevron exists at the path the CSS names, and the row says "false".
+    expect(chevron()).not.toBeNull();
+    expect(item).toHaveAttribute('data-open', 'false');
+    await user.click(doingRow);
+    expect(item).toHaveAttribute('data-open', 'true');
+    expect(chevron()).not.toBeNull();
+  });
+});
+
 describe('10.145 the canvas and the lists share the one selection', () => {
   it('10.145 a selection made elsewhere (the canvas) opens its row and scrolls it into view, nearest, in the list', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
