@@ -1932,29 +1932,24 @@ describe('13.1144 the board\'s whole-board empty state is styled', () => {
  * declaration.
  */
 describe('13.1147 the timeline nav declares a border, so no UA bevel survives', () => {
-  it('13.1147 the rule declares border: none', () => {
-    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*none/);
+  it('13.1147 the rule declares border: 1px solid var(--gn-border)', () => {
+    // Amended 2026-09-30 by 20.271 (styling refresh Plan B, Task B8): the nav
+    // is P-QUIET now, so its declared border is the 1px `--gn-border` edge
+    // rather than `none` — what the finding needs is unchanged: a `border`
+    // IS declared, so no UA bevel survives.
+    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
+    expect(rule('.gn-timeline__nav')).not.toMatch(/outset/);
   });
 
   it('13.1147 and it takes the calendar nav\'s own values', () => {
     // Asserted as a PAIR with the sibling rule rather than as literals: the
     // finding's remedy is that the two views' navs agree, so a later edit that
     // re-diverges one of them is the regression to catch.
-    // Amended 2026-09-30 by 20.261 (styling refresh Plan B, Task B7): the
-    // calendar nav is now P-QUIET (an outlined 44px pill), so the pair is
-    // spelled per side until Task B8 restyles the timeline nav to the same
-    // values; what stays true of both is that a border IS declared.
+    // Amended 2026-09-30 by 20.271 (styling refresh Plan B, Task B8): the
+    // values are the P-QUIET ones both navs took in Tasks B7 and B8, so the
+    // pair reads the same list on BOTH sides again.
     const timeline = rule('.gn-timeline__nav');
     const calendar = rule('.gn-calendar__nav');
-    for (const property of [
-      /min-height:\s*2\.25rem/,
-      /border:\s*none/,
-      /border-radius:\s*var\(--gn-radius-control\)/,
-      /background:\s*var\(--gn-fill-tertiary\)/,
-      /color:\s*var\(--gn-text-accent\)/,
-    ]) {
-      expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
-    }
     for (const property of [
       /min-height:\s*2\.75rem/,
       /border:\s*1px solid var\(--gn-border\)/,
@@ -1962,10 +1957,9 @@ describe('13.1147 the timeline nav declares a border, so no UA bevel survives', 
       /background:\s*transparent/,
       /color:\s*var\(--gn-text-muted\)/,
     ]) {
+      expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
       expect(calendar, `calendar nav: ${String(property)}`).toMatch(property);
     }
-    expect(timeline).toMatch(/border:/);
-    expect(calendar).toMatch(/border:/);
   });
 
   it('13.1147 the family\'s other two members were already carrying it', () => {

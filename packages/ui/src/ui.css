@@ -4820,20 +4820,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    three-button control on the sibling view, so the two views' navs now agree
    rather than one of them wearing the browser's default bevel. `border: none`
    is the property that removes the bevel; the rest is the harmonisation the
-   calendar already settled. */
+   calendar already settled.
+   Styling refresh Plan B (Task B8): P-QUIET — the values above are superseded
+   in step with the calendar's nav (Task B7): a quiet outlined 44px pill in
+   text2, washed on hover. The border is now the 1px `--gn-border` edge, still
+   a declared `border`, so no UA bevel can survive. */
 .gn-timeline__nav {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.25rem; /* 36px */
+  min-height: 2.75rem; /* 44px */
   padding: 0 0.75rem; /* 12px */
-  border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
   font: inherit;
   cursor: pointer;
 }
+.gn-timeline__nav:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-timeline__glyph { color: var(--gn-text-muted); margin: 0 0.2rem; }
 .gn-timeline__nav:focus-visible,
 .gn-timeline__bar:focus-visible,
@@ -4882,10 +4887,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* Header grid: trayBg + trayShadow on the CONTAINER — `.gn-timeline__corner`
    and `.gn-timeline__week` are transparent grid items sitting on top of it,
    the same "background on the row, not the cell" shape the list's group
-   header bar (`.gn-list__section-title`, below) uses. */
+   header bar (`.gn-list__section-title`, below) uses.
+   Styling refresh Plan B (Task B8): the ground is now the recessed TRACK
+   (`surface-track` / `shadow-track`) instead of the sunken tray. */
 .gn-timeline__weeks {
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
 }
 /* Row: min-height 42px, zebra fill4. `:nth-of-type`, not `:nth-child` — each
    row's siblings inside `.gn-timeline__group` include the group's own `<h3
@@ -4974,11 +4981,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* Undrawn footer: padding 12px 14px, trayBg + trayShadow — the same pair
    `.gn-timeline__weeks` above uses for the identical prototype vocabulary.
    No radius: the spec's Timeline metrics give this row none, matching the
-   list's group-header bar below. */
+   list's group-header bar below.
+   Styling refresh Plan B (Task B8): the same recessed TRACK as the weeks band
+   above (`surface-track` / `shadow-track`), replacing the sunken tray. */
 .gn-timeline__side {
   padding: 0.75rem 0.875rem;
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
 }
 .gn-timeline__side-copy { margin: 0 0 0.35rem; color: var(--gn-text-muted); font-size: 0.75rem; line-height: 1rem; }
 .gn-timeline__side-list { list-style: none; margin: 0; padding: 0; }
