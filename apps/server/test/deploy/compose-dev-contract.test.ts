@@ -88,6 +88,22 @@ function buildArgsOf(service: string, doc = readCompose()): Record<string, strin
   return Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, String(value)]));
 }
 
+/**
+ * What compose does with `${NAME:-default}` before the container sees it: the
+ * shell's value when set and non-empty, else the default. The contract below feeds
+ * the parsed environment to the real loaders, and a declared-empty pass-through
+ * such as `MCP_PUBLIC_URL: "${MCP_PUBLIC_URL:-}"` must reach them as compose would
+ * deliver it (an empty string), not as the literal text of the placeholder.
+ */
+function substituted(env: Record<string, string>, shell: Record<string, string> = {}): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).map(([key, value]) => [
+      key,
+      value.replace(/\$\{(\w+):-([^}]*)\}/g, (_m, name: string, fallback: string) => (shell[name] ? shell[name]! : fallback)),
+    ]),
+  );
+}
+
 const EXPECTED_SERVICES = ['mailpit', 'minio', 'minio-init', 'postgres', 'server', 'web'];
 
 describe('docker-compose.dev.yml env contract', () => {
@@ -148,7 +164,7 @@ describe('docker-compose.dev.yml env contract', () => {
     it('satisfies loadConfig — every required key present AND well-formed', () => {
       const env = envOf('server');
       expect(Object.keys(env).length, 'parsed an empty server environment').toBeGreaterThan(5);
-      expect(() => loadConfig(env)).not.toThrow();
+      expect(() => loadConfig(substituted(env))).not.toThrow();
     });
 
     /**
@@ -413,5 +429,16 @@ describe('13.946 the dev stack serves the built image, and no source is bind-mou
       runbook,
       'the rebuild rule must name the MAIN folder exactly — a prefix also matches an executor worktree',
     ).toContain('cd /Users/kiro/my_projects/gisik-nokma && pnpm dev:stack:rebuild');
+  });
+});
+
+describe('14.294 the dev stack ships the hosted MCP door OFF and can switch it on', () => {
+  it('14.294 passes MCP_PUBLIC_URL through empty by default, and through unchanged when the shell sets it', () => {
+    const env = envOf('server');
+    expect(env.MCP_PUBLIC_URL, 'the server service does not declare MCP_PUBLIC_URL').toBe('${MCP_PUBLIC_URL:-}');
+    // Default: compose delivers an empty string and the door does not exist.
+    expect(loadConfig(substituted(env)).mcpPublicUrl).toBeNull();
+    // CONTROL, same `it`: the shell's value reaches the loader intact (the door is switchable).
+    expect(loadConfig(substituted(env, { MCP_PUBLIC_URL: 'http://localhost:3000' })).mcpPublicUrl).toBe('http://localhost:3000');
   });
 });
