@@ -702,7 +702,7 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 
 ## 14.5 Hosted MCP — the consent page
 
-*Remote-MCP plan Task 4 (14.230–14.236). Tests: `apps/web/test/mcp-connect-page.test.tsx`, `apps/web/test/next-config.test.ts`.*
+*Remote-MCP plan Task 4 (14.230–14.236); centring, owner 2026-09-30 (14.283–14.286). Tests: `apps/web/test/mcp-connect-page.test.tsx`, `apps/web/test/mcp-connect-centring.test.tsx`, `apps/web/test/next-config.test.ts`.*
 
 - ✅ **14.230 — signed out, `/mcp/connect?request=req_x` shows a Sign in link to `/sign-in?next=%2Fmcp%2Fconnect%3Frequest%3Dreq_x` and no Allow button;** control: signed in, Allow appears. Mutation: link to `/sign-in` without `next`.
 - ✅ **14.231 — signed in, the page shows the consent copy verbatim with the app name AND the redirect host from the API;** control: a different name/host pair renders its own values. Mutation: drop the host.
@@ -711,6 +711,10 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.234 — a 404 request shows "This connection request has expired. Go back to your assistant and connect again." and no buttons; a 409 shows the server's message verbatim;** control: a live request shows buttons. Mutation: render the buttons on 404.
 - ✅ **14.235 — Allow is the page's ONE primary button; Deny is the quiet (ghost) Button;** control: both are real `<button>`s with accessible names "Allow" and "Deny". Mutation: make Deny primary.
 - ✅ **14.236 — the page is not frameable: `next.config.ts` headers for `/:path*` (which covers `/mcp/connect`) include `x-frame-options: DENY` (FD4);** control: the pattern matches `/mcp/connect?request=x`. Mutation: scope the header to `/workspaces/:path*`.
+- ✅ **14.283 — `/mcp/connect` is a full-height column (`min-height: 100dvh`, flex) whose single child, the stage (title + card), centres itself with `margin: auto` at `max-width: 34rem` — auto margins, not `justify-content: center`, so a stage taller than the viewport is top-aligned and scrolls instead of being clipped above the top edge;** control: Allow is still the page's ONE primary button. Mutation: drop `margin: auto`; drop `min-height: 100dvh`; put `justify-content` on the stage; widen the stage's `max-width`; rename the stage class in `page.tsx`. *(`apps/web/test/mcp-connect-centring.test.tsx`; CSS-source scan, jsdom has no layout — the pixels are 14.285.)*
+- ✅ **14.284 — the page's vertical padding is symmetric longhands (`padding-top` = `padding-bottom`), so the stage centres on the VIEWPORT's middle rather than on `.gn-shell`'s 0/3rem box, and no `padding:` shorthand clobbers the phone's side gutter; the layout rules declare no colour (tokens only);** control: `.gn-shell`'s `@media (max-width: 60rem)` gutter rule is still there. Mutation: `padding-bottom: 3rem`; a `padding:` shorthand; a hex colour in either rule. *(same file)*
+- 🧪 **14.285 — in a browser, at 1512px the card's centre is within 2px of the viewport's centre, on both axes, in hig / minimal / neo; at 390px the page has no horizontal overflow and the card is not clipped; in a viewport shorter than the card the card is top-aligned under the gutter and the page scrolls;** control: Allow is still the one primary. Mutation: remove the centring rule (the card returns to x≈136–680 of 1512). *(measured by hand; no automated test)*
+- ✅ **14.286 — the page renders no app nav: no `<nav>`, `<header>` or navigation/banner landmark (people arrive from an assistant for one decision);** control: the same render does show the "Connect an assistant" heading and Allow. Mutation: mount a `<nav>` in the page. *(same file)*
 
 ## 14.9 Hosted MCP — Connected assistants
 

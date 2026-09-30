@@ -394,7 +394,7 @@ Case ids 18.460–18.479 belong to this batch (spec `docs/superpowers/specs/2026
 
 ## The notes tree and the document scroll separately (owner, 2026-09-30) — block `18.480`–`18.499`
 
-*Ids `18.487`–`18.489` and `18.495`–`18.499` are unused. Sits after the R7 block `18.460`–`18.479`. The page's scroll-following readers are `9.500`–`9.502`.*
+*Ids `18.487`–`18.489` and `18.495`–`18.499` are unused. Sits after the R7 block `18.460`–`18.479`. The page's scroll-following readers are `9.510`–`9.512`.*
 
 - ✅ **18.480 — above 60rem `.gn-notes__tree` is `overflow-y: auto` with `overscroll-behavior: contain`; control: its base rule scrolls nothing, so at and below 60rem the page scrolls as one.** Mutation: drop the tree's overflow. `apps/web/test/notes-css.test.tsx`.
 - ✅ **18.481 — above 60rem `.gn-notes__document` is `overflow-y: auto` with `overscroll-behavior: contain` and its own bottom padding; control: its base rule scrolls nothing.** Mutation: drop the document's overflow. `apps/web/test/notes-css.test.tsx`.

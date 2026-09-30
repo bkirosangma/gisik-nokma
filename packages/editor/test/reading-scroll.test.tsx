@@ -212,7 +212,7 @@ describe('9.408 ReadingTOC scrollspy root', () => {
 });
 
 /**
- * 9.500–9.502 — the scroller is re-resolved when the viewport crosses the
+ * 9.510–9.512 — the scroller is re-resolved when the viewport crosses the
  * breakpoint at which it changes (notes split-scroll, 2026-09-30).
  *
  * The note page scrolls the WINDOW at and below 60rem and the DOCUMENT COLUMN
@@ -236,8 +236,8 @@ function paneProgressFixture() {
   return { pane, ref: { current: surface }, setTop: (value: number) => (top = value) };
 }
 
-describe('9.500 ReadingProgress follows the scroller across a regime change', () => {
-  it('9.500 window → column on a resize that makes an ancestor scroll, and back; the regime it left is ignored', async () => {
+describe('9.510 ReadingProgress follows the scroller across a regime change', () => {
+  it('9.510 window → column on a resize that makes an ancestor scroll, and back; the regime it left is ignored', async () => {
     const { pane, ref, setTop } = paneProgressFixture();
     render(<ReadingProgress scrollContainerRef={ref} />);
     const bar = screen.getByRole('progressbar');
@@ -285,8 +285,8 @@ describe('9.500 ReadingProgress follows the scroller across a regime change', ()
   });
 });
 
-describe('9.501 ReadingTOC re-roots its scrollspy across a regime change', () => {
-  it('9.501 observes the column after a resize makes it scroll and the viewport after it stops; a resize that changes nothing does not rebuild', () => {
+describe('9.511 ReadingTOC re-roots its scrollspy across a regime change', () => {
+  it('9.511 observes the column after a resize makes it scroll and the viewport after it stops; a resize that changes nothing does not rebuild', () => {
     const roots: Array<Element | Document | null | undefined> = [];
     let disconnects = 0;
     class FakeObserver {
@@ -325,7 +325,7 @@ describe('9.501 ReadingTOC re-roots its scrollspy across a regime change', () =>
   });
 });
 
-describe('9.502 every popup that repositions on scroll listens in the CAPTURE phase', () => {
+describe('9.512 every popup that repositions on scroll listens in the CAPTURE phase', () => {
   /**
    * `scroll` does not bubble, so a listener on `window` hears an ELEMENT's scroll
    * only in the capture phase. Above 60rem the note scrolls inside
@@ -342,7 +342,7 @@ describe('9.502 every popup that repositions on scroll listens in the CAPTURE ph
     'src/components/TableFloatingToolbar.tsx',
   ];
 
-  it('9.502 the primitive holds, and each binder registers `window` scroll with capture: true', () => {
+  it('9.512 the primitive holds, and each binder registers `window` scroll with capture: true', () => {
     const pane = document.createElement('div');
     document.body.append(pane);
     const captured = vi.fn();
