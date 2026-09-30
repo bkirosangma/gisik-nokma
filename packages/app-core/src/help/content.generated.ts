@@ -1674,6 +1674,16 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " button on each row."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Inviting an address that already has a pending invitation does not add a second row."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " With the same role and projects, that invitation gets a fresh link and the email goes out again. With a different role or different projects, the pending invitation is replaced by one carrying the new role and projects, with a fresh link and a new email. Either way the older link stops working."
+                    }
                   ]
                 ]
               },
@@ -9690,7 +9700,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. There is currently no cap on how many pending invitations a workspace can have, or how many times you can invite the same address. That is disclosed as a known gap rather than a decision, so nothing will stop you sending the same person five invitations by accident."
+                    "text": "No. There is currently no cap on how many pending invitations a workspace can have. That is disclosed as a known gap rather than a decision. Inviting the SAME address again does not stack invitations, though: with the same role and projects it re-sends the pending invitation with a fresh link, and with a different role or projects it replaces the pending invitation with one carrying the new role and projects. Either way the older link stops working."
                   }
                 ]
               }

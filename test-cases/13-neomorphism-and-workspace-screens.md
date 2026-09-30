@@ -558,7 +558,7 @@ argument:**
    to TWO addresses, so the rows differ in exactly the field under test and in nothing else.
 3. *`status = 'pending'` alone is not "still live".* The claim is in the projection and the clock is in the
    credential store, and they disagree: 13.374 checks all four dead shapes — accepted, declined, revoked,
-   and **lapsed-but-still-pending** — each against a live invitation in the same response.
+   and **lapsed-but-still-pending** — each proven live first, and the lapsed one beside a live invitation in another workspace in the same response (a pending invitation for one address is replaced by a differing mint, case 6.230, so the dead shapes are minted one after another rather than together).
 4. *A table holding no row of the new shape diffs clean for the same reason an empty one does.* This is Task
    16's `proj_projects` trap in its own house. `proj_invites`' verify case held only `pending` and
    `accepted` rows, so it was extended with a DECLINED one: without it the rebuild's fold of
@@ -588,9 +588,11 @@ auth tables.*
   message names the address scope) but it is not isolated, and saying otherwise would misdescribe what a
   future reader will see.
   — (`apps/server/test/routes/my-invitations.test.ts`)
-- **13.374** ✅ An accepted, declined, revoked or lapsed invitation does not surface, while a fifth to the
-  same address still does. All five are asserted LIVE first, so the final `[live]` is a filter working
-  rather than a route that never served anything. The lapsed one is aged by moving
+- **13.374** ✅ An accepted, declined, revoked or lapsed invitation does not surface, while a live one still
+  does. Since 2026-09-30 (case 6.230) a mint that differs in role or projects REPLACES the pending invitation for
+  that address, so the dead shapes are minted one after another, each asserted LIVE first and then killed, and
+  the final `[live]` is a filter working rather than a route that never served anything; the lapsed one is
+  checked beside a live invitation in another workspace. The lapsed one is aged by moving
   `invite_tokens.expires_at` into the past — the only hand-written row in the file, written to the
   CREDENTIAL store because `expires_at` genuinely lives there (a projection reads no clock), and its
   projection row is asserted still `pending` so the case cannot be satisfied by the status check alone.
