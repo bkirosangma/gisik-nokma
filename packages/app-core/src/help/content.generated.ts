@@ -4090,6 +4090,19 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A card moves the moment you let go."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Drop it (or press an arrow) and the card slides into its new column straight away, while the change is saved in the background. If the change is refused or cannot be saved, the card slides back to where it was and says why underneath. A move that needs a comment shows the card in its new place, faded, until you confirm; cancel and it slides back. With your system set to reduce motion the card simply appears. While you drag, the page scrolls when you bring the card near its top or bottom edge, and the board scrolls sideways near its left or right edge. Hold a card over a collapsed column for a moment and it opens; move away and it closes again; drop the card there and it stays open."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "A card shows the title, who it is on, whether it is blocked, its progress, the "
                   },
