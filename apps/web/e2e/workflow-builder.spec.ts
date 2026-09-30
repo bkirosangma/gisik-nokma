@@ -133,7 +133,7 @@ test.describe('workflow builder smoke — admin', () => {
 
   test('author from blank: add a state, drag a connection, publish', async ({ page }) => {
     await page.goto(url(`/w/${workspaceId}/settings/workflows/new`));
-    await page.getByRole('button', { name: 'Start blank' }).click();
+    await page.getByRole('button', { name: 'Start from a blank workflow' }).click();
     // the blank draft seeds one open start state named "New"
     await page.getByRole('button', { name: 'Add state' }).click();
     // `Select` (packages/ui/src/select/select.tsx) is a react-aria button+listbox

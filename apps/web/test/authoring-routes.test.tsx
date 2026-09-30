@@ -90,7 +90,7 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     // Named in advance, both halves of the gallery: the template cards and the
     // blank-start button. Neither may be on screen.
     expect(screen.queryByRole('button', { name: /^Use the .+ template$/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start blank' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start from a blank workflow' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to the workflows' })).toBeInTheDocument();
   });
 
@@ -106,7 +106,7 @@ describe('the template gallery is a route-level authoring entry point, and a mem
       </Providers>,
     );
 
-    expect(await screen.findByRole('button', { name: 'Start blank' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Start from a blank workflow' })).toBeInTheDocument();
     // Printed, not counted: a failure names the templates that went missing.
     const templates = screen
       .getAllByRole('button', { name: /^Use the .+ template$/ })
@@ -331,8 +331,9 @@ describe('the second action reaches the history route, and that route renders th
 /**
  * Case `13.1150` — E4-10 — the template gallery's controls are styled, not bare
  * `<button>`s painting as raw user-agent chrome. **Amended 2026-09-30 (cases
- * 20.620–20.625): "Start blank" is still the shared `Button`; the three template
- * cards are now `template-gallery__door` controls (P-LIFT doors), not `Button`s.**
+ * 20.620–20.626): all four controls are now `template-gallery__door` controls
+ * (P-LIFT doors) — the three template cards and, since the owner's ruling that
+ * Start blank is a FOURTH door, "Start from a blank workflow" — not `Button`s.**
  *
  * The four carried **no `className` at all**, so nothing in the product's three
  * stylesheets matched them: measured **143×29** ×3 and **95×29**, flagged by
@@ -345,14 +346,11 @@ describe('the second action reaches the history route, and that route renders th
  * Asserted at the ROUTE rather than on the component, because the finding's
  * population is what the route renders; the case above already reads these four
  * by accessible name and this one reads their classes. **The single assertion
- * that can fail is the class**: for "Start blank" it is asserted as the exact
- * pair the shared component emits (`gn-button` + its variant) rather than as a
- * substring, so a hand-rolled `className="gn-button"` without the variant —
- * which would render unbordered and unfilled — reddens here; for the three
- * cards it is `template-gallery__door` and NOT `gn-button`.
+ * that can fail is the class**: every one of the four is `template-gallery__door`
+ * and NOT `gn-button`, and none is class-less.
  */
-describe('13.1150 the template gallery: Start blank is the shared Button, the templates are doors', () => {
-  it('13.1150 Start blank carries the shared component\'s classes and the three templates are doors', async () => {
+describe('13.1150 the template gallery: all four controls are doors, none a bare button', () => {
+  it('13.1150 the three templates and the blank door carry the door class and no gn-button', async () => {
     render(
       <Providers
         services={stubServices({}, { authoring: { listMembers: async () => rosterWhereIAm('admin') } })}
@@ -361,16 +359,16 @@ describe('13.1150 the template gallery: Start blank is the shared Button, the te
       </Providers>,
     );
 
-    const blank = await screen.findByRole('button', { name: 'Start blank' });
+    const blank = await screen.findByRole('button', { name: 'Start from a blank workflow' });
     const templates = screen.getAllByRole('button', { name: /^Use the .+ template$/ });
     expect(templates.length, 'the gallery rendered no template doors').toBeGreaterThan(0);
 
-    // Touch-doors (2026-09-30): the three template cards are DOORS, not shared Buttons —
-    // the whole card is the one control (`template-gallery__door`, P-LIFT). What this
-    // case guards is unchanged: no control is left CLASS-LESS (a bare `<button>` paints
-    // as UA chrome). Start blank is still the shared Button, with its variant.
-    expect(blank, 'Start blank is not the shared Button').toHaveClass('gn-button');
-    expect([...blank.classList].some((name) => name.startsWith('gn-button--')), 'Start blank carries gn-button with no variant').toBe(true);
+    // Touch-doors (2026-09-30): the three template cards AND the blank card are DOORS, not
+    // shared Buttons — the whole card is the one control (`template-gallery__door`, P-LIFT).
+    // What this case guards is unchanged: no control is left CLASS-LESS (a bare `<button>`
+    // paints as UA chrome).
+    expect(blank, 'the blank card is not a door').toHaveClass('template-gallery__door');
+    expect(blank, 'the blank card is a Button, not a door').not.toHaveClass('gn-button');
     for (const control of templates) {
       const label = control.getAttribute('aria-label');
       expect(control, `${String(label)} is not a door`).toHaveClass('template-gallery__door');

@@ -1,4 +1,3 @@
-import { Button } from '@gisik-nokma/ui';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../templates.js';
 
 /** Cloning is the caller's job (draftFromTemplate / newDraft) — the gallery only picks. */
@@ -27,8 +26,18 @@ export function TemplateGallery(props: { onPick(template: WorkflowTemplate | nul
             </button>
           </li>
         ))}
-        <li className="template-gallery__card template-gallery__card--blank">
-          <Button onClick={() => props.onPick(null)}>Start blank</Button>
+        {/* Start blank is the FOURTH door (owner, 2026-09-30) — the same door, not a ghost pill
+            beside three cards. The visible name is inside the accessible name (label-in-name). */}
+        <li className="template-gallery__card">
+          <button
+            type="button"
+            className="template-gallery__door"
+            aria-label="Start from a blank workflow"
+            onClick={() => props.onPick(null)}
+          >
+            <span className="template-gallery__name">Start from a blank workflow</span>
+            <span className="template-gallery__tagline">An empty canvas with one starting stage.</span>
+          </button>
         </li>
       </ul>
     </section>

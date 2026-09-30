@@ -416,9 +416,9 @@ describe('WorkflowListScreen', () => {
 
 describe('TemplateGallery', () => {
   /**
-   * 10.40 — the gallery offers the three templates plus Start blank.
+   * 10.40 — the gallery offers the three templates plus a blank door ("Start from a blank workflow").
    */
-  it('offers the three templates and Start blank', async () => {
+  it('offers the three templates and the blank door', async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     render(<TemplateGallery onPick={onPick} />);
@@ -429,7 +429,7 @@ describe('TemplateGallery', () => {
     }
     await user.click(screen.getByRole('button', { name: 'Use the Errand with waits template' }));
     expect(onPick).toHaveBeenCalledWith(WORKFLOW_TEMPLATES[1]);
-    await user.click(screen.getByRole('button', { name: 'Start blank' }));
+    await user.click(screen.getByRole('button', { name: 'Start from a blank workflow' }));
     expect(onPick).toHaveBeenCalledWith(null);
   });
 
@@ -440,8 +440,9 @@ describe('TemplateGallery', () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     const { container } = render(<TemplateGallery onPick={onPick} />);
-    const cards = [...container.querySelectorAll('.template-gallery__card:not(.template-gallery__card--blank)')];
-    expect(cards.length).toBe(WORKFLOW_TEMPLATES.length);
+    const cards = [...container.querySelectorAll('.template-gallery__card')];
+    // the three templates plus the blank door (owner 2026-09-30: Start blank is the FOURTH door)
+    expect(cards.length).toBe(WORKFLOW_TEMPLATES.length + 1);
     for (const [index, template] of WORKFLOW_TEMPLATES.entries()) {
       const card = cards[index]!;
       // ONE control per card, and it is the door — no second button or link inside it
@@ -462,12 +463,24 @@ describe('TemplateGallery', () => {
       await user.click(door);
       expect(onPick).toHaveBeenCalledWith(template);
     }
-    // CONTROL — Start blank is still its own ghost control and still picks null
+    // the FOURTH card is the blank door: one control, the same door, picks null
+    const blankCard = cards[WORKFLOW_TEMPLATES.length]!;
+    expect(blankCard.querySelectorAll('button, a[href], input, select, textarea, [tabindex]').length, 'controls in the blank card').toBe(1);
+    const blank = screen.getByRole('button', { name: 'Start from a blank workflow' });
+    expect(blank.className).toContain('template-gallery__door');
+    expect(blankCard.contains(blank)).toBe(true);
+    expect(blank).toHaveTextContent('Start from a blank workflow');
     onPick.mockClear();
-    const blank = screen.getByRole('button', { name: 'Start blank' });
-    expect(blank).toHaveClass('gn-button--ghost');
+    blank.focus();
+    await user.keyboard('{Enter}');
+    expect(onPick).toHaveBeenCalledWith(null);
+    onPick.mockClear();
     await user.click(blank);
     expect(onPick).toHaveBeenCalledWith(null);
+    // CONTROL — a template door still picks ITS template, not null (the blank door did not swallow the loop)
+    onPick.mockClear();
+    await user.click(screen.getByRole('button', { name: `Use the ${WORKFLOW_TEMPLATES[0]!.name} template` }));
+    expect(onPick).toHaveBeenCalledWith(WORKFLOW_TEMPLATES[0]);
   });
 
   /**
@@ -475,11 +488,28 @@ describe('TemplateGallery', () => {
    */
   it('20.622 the template chooser renders no .gn-button--primary', () => {
     const { container } = render(<TemplateGallery onPick={() => {}} />);
-    // CONTROL — the query reads real classes: the ghost Start blank is found by the same kind of query
-    expect(container.querySelectorAll('.gn-button--ghost').length).toBe(1);
+    // CONTROL — the query reads real classes: the four doors are found by the same kind of query, and no
+    // control on the page is a shared Button of any variant (the ghost pill Start blank used to be one)
+    expect(container.querySelectorAll('.template-gallery__door').length).toBe(WORKFLOW_TEMPLATES.length + 1);
+    expect(container.querySelectorAll('.gn-button--ghost').length).toBe(0);
     expect(container.querySelectorAll('.gn-button--primary').length).toBe(0);
     for (const door of container.querySelectorAll('.template-gallery__door')) {
       expect(door.className, 'a door is not a button').not.toMatch(/gn-button/);
     }
+  });
+
+  /**
+   * 20.626 — all four doors are the SAME door: the blank one is not a ghost pill beside three cards.
+   */
+  it('20.626 the three templates and Start blank share one door class; none is a shared Button', () => {
+    const { container } = render(<TemplateGallery onPick={() => {}} />);
+    const controls = [...container.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')];
+    expect(controls.length).toBe(WORKFLOW_TEMPLATES.length + 1);
+    for (const control of controls) {
+      expect(control.className, `${control.getAttribute('aria-label') ?? ''} carries exactly the door class`).toBe('template-gallery__door');
+      expect(control.className).not.toMatch(/gn-button/);
+    }
+    // CONTROL — the page still renders NO primary (rule 01)
+    expect(container.querySelectorAll('.gn-button--primary').length).toBe(0);
   });
 });

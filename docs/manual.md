@@ -1193,9 +1193,9 @@ You do not have to draw one from scratch. There are three templates plus a blank
 | **Simple kanban** | To do, doing, done. No rules — anything moves along the arrows. **Start here.** |
 | **Approval chain** | Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off. |
 | **Errand with waits** | Has a "Waiting" stage marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods. |
-| **Start blank** | An empty canvas with one starting stage called "New". |
+| **Start from a blank workflow** | An empty canvas with one starting stage called "New". |
 
-Press the template's card (each is one control, named **Use the [name] template**) and it copies it in. You then get your own independent copy — it
+Press the template's card (each is one control, named **Use the [name] template**) and it copies it in; the fourth card, **Start from a blank workflow**, starts empty. You then get your own independent copy — it
 does not stay linked to the template, and changing yours affects nobody else's. You can change it
 before publishing.
 

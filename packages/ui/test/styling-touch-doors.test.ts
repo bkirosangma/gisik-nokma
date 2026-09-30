@@ -42,10 +42,22 @@ describe('20.621 a template door is P-LIFT: raised, hover deepens, press settles
   });
 });
 
-describe('20.625 Start blank keeps its own 44px pill beside the doors', () => {
-  it('20.625 the blank cell centres its ghost button instead of stretching it to the door row height', () => {
-    // CONTROL — the door cells stretch (the door fills its card); only the blank cell centres.
-    expectRow({ sheet: 'ui', selectors: '.template-gallery__card', declarations: { display: 'flex' } });
-    expectRow({ sheet: 'ui', selectors: '.template-gallery__card--blank', declarations: { 'align-items': 'center' } });
+describe('20.625 the blank door has no rule of its own: it stretches to the door row like the other three', () => {
+  it('20.625 no `.template-gallery__card--blank` rule exists (the ghost pill it centred is gone)', () => {
+    // CONTROL — the door cells still stretch: the card is a flex container the door fills.
+    expectRow({ sheet: 'ui', selectors: '.template-gallery__card', declarations: { 'display': 'flex' } });
+    expectRow({ sheet: 'ui', selectors: DOOR, declarations: { flex: '1' } });
+    const blankRules = parseRules(cssOf('ui')).filter((rule) => rule.selectors.some((selector) => selector.includes('template-gallery__card--')));
+    expect(blankRules.map((rule) => rule.selectors.join()), 'a modifier rule on a door cell').toEqual([]);
+  });
+});
+
+describe('20.626 the four doors share ONE door rule', () => {
+  it('20.626 no door modifier class restyles a door; the door rule is the only source of its look', () => {
+    const css = cssOf('ui');
+    // CONTROL — the shared rule exists and is the P-LIFT one (a scan of nothing would pass)
+    expectRow({ sheet: 'ui', selectors: DOOR, declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } });
+    const modifiers = parseRules(css).filter((rule) => rule.selectors.some((selector) => /template-gallery__door--/.test(selector)));
+    expect(modifiers.map((rule) => rule.selectors.join()), 'a per-door override').toEqual([]);
   });
 });

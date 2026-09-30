@@ -6276,7 +6276,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "bold",
-                        "text": "Start blank"
+                        "text": "Start from a blank workflow"
                       }
                     ],
                     [
@@ -6301,7 +6301,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ") and it copies it in. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
+                    "text": ") and it copies it in; the fourth card, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start from a blank workflow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", starts empty. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
                   }
                 ]
               },

@@ -4321,8 +4321,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 1rem;
 }
 .template-gallery__card { display: flex; }
-/* The blank cell shares the doors' grid row: centre its ghost pill so it keeps its own 44px instead of stretching to the row (case 20.625). */
-.template-gallery__card--blank { align-items: center; }
 .template-gallery__door {
   flex: 1;
   display: flex;
