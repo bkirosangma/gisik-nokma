@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
@@ -248,7 +248,7 @@ describe('10.166 Escape closes the Add rule menu and returns focus to its trigge
 });
 
 describe('10.167 the Add rule menu moves focus with the arrow keys, Home and End', () => {
-  it('10.167 ArrowDown/ArrowUp step between items and wrap; Home and End jump', async () => {
+  it('10.167 ArrowDown/ArrowUp step between items and wrap, Home and End jump — each press is consumed (defaultPrevented), a key the menu does not handle is not', async () => {
     const user = userEvent.setup();
     const store = createDraftStore(draftFromTemplate(errand));
     renderPanels(store);
@@ -260,19 +260,76 @@ describe('10.167 the Add rule menu moves focus with the arrow keys, Home and End
     expect(items.length).toBeGreaterThanOrEqual(3);
     expect(document.activeElement).toBe(items[0]);
 
-    await user.keyboard('{ArrowDown}');
+    // `fireEvent` returns `false` when the event was cancelled: a handled key must not ALSO scroll the column or the page.
+    const press = (key: string) => fireEvent.keyDown(document.activeElement!, { key });
+    expect(press('ArrowDown')).toBe(false);
     expect(document.activeElement).toBe(items[1]);
-    await user.keyboard('{ArrowUp}');
+    expect(press('ArrowUp')).toBe(false);
     expect(document.activeElement).toBe(items[0]);
-    await user.keyboard('{ArrowUp}');
+    expect(press('ArrowUp')).toBe(false);
     expect(document.activeElement).toBe(items[items.length - 1]);
-    await user.keyboard('{ArrowDown}');
+    expect(press('ArrowDown')).toBe(false);
     expect(document.activeElement).toBe(items[0]);
-    await user.keyboard('{End}');
+    expect(press('End')).toBe(false);
     expect(document.activeElement).toBe(items[items.length - 1]);
-    await user.keyboard('{Home}');
+    expect(press('Home')).toBe(false);
     expect(document.activeElement).toBe(items[0]);
+
+    // CONTROL (same `it`) — keys the menu does not handle are left alone: not prevented, focus does not move.
+    for (const key of ['a', 'ArrowLeft', 'ArrowRight', 'PageDown']) {
+      expect(press(key), key).toBe(true);
+      expect(document.activeElement, key).toBe(items[0]);
+    }
     // The menu is still open (navigation does not close it) and nothing was added.
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+});
+
+describe('10.168 ArrowDown/ArrowUp from the trigger enter an OPEN menu — and nothing else from the trigger does', () => {
+  it('10.168 with the menu open, ArrowDown on the trigger focuses the first item and ArrowUp the last; Home, End and other keys leave it alone; a closed menu ignores them all', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderPanels(store);
+    act(() => store.actions.select({ kind: 'transition', index: 0 }));
+    const trigger = screen.getByRole('button', { name: 'Add rule' });
+
+    // CLOSED — the keys are not the menu's yet: not prevented, focus stays, nothing opens.
+    trigger.focus();
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+      expect(fireEvent.keyDown(trigger, { key }), `closed ${key}`).toBe(true);
+      expect(document.activeElement, `closed ${key}`).toBe(trigger);
+    }
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    // OPEN, focus still on the trigger (a click leaves it there): the two arrows ENTER the menu, consumed.
+    await user.click(trigger);
+    const items = screen.getAllByRole('menuitem');
+    expect(document.activeElement).toBe(trigger);
+    expect(fireEvent.keyDown(trigger, { key: 'ArrowDown' })).toBe(false);
+    expect(document.activeElement).toBe(items[0]);
+    trigger.focus();
+    expect(fireEvent.keyDown(trigger, { key: 'ArrowUp' })).toBe(false);
+    expect(document.activeElement).toBe(items[items.length - 1]);
+
+    // Anything else from the trigger is untouched — Home/End are the page's there, not the menu's.
+    trigger.focus();
+    for (const key of ['Home', 'End', 'a', 'ArrowLeft']) {
+      expect(fireEvent.keyDown(trigger, { key }), `open ${key}`).toBe(true);
+      expect(document.activeElement, `open ${key}`).toBe(trigger);
+    }
+    // A key that reaches the menu while focus is on NEITHER the trigger nor an item (an event on the list itself, focus
+    // elsewhere) is not the menu's to answer: not prevented, and focus is not pulled in.
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    try {
+      outside.focus();
+      for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End']) {
+        expect(fireEvent.keyDown(screen.getByRole('menu'), { key }), `outside ${key}`).toBe(true);
+        expect(document.activeElement, `outside ${key}`).toBe(outside);
+      }
+    } finally {
+      outside.remove();
+    }
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 });

@@ -41,7 +41,7 @@ export function AddRuleMenu(props: { transitionIndex: number }) {
    * open with focus on an item). Escape closes it and puts focus back on the trigger; the press is CONSUMED
    * (`preventDefault` is the contract `Dialog` and `Sheet` document, `stopPropagation` keeps anything above from also acting),
    * and only while the menu is open — a closed menu returns before touching the event, so the next Escape reaches whatever
-   * else is open. ArrowDown/ArrowUp step between the items (wrapping), Home and End jump to the ends.
+   * else is open. ArrowDown/ArrowUp step between the items (wrapping), Home and End jump to the ends; from the trigger the two arrows enter the open menu.
    */
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!open) return;
@@ -53,10 +53,18 @@ export function AddRuleMenu(props: { transitionIndex: number }) {
       return;
     }
     const items = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
     const at = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (items.length === 0 || at < 0) return;
-    const target =
-      event.key === 'ArrowDown' ? items[(at + 1) % items.length]
+    // Opening leaves focus on the trigger, so the two arrows ENTER the open menu from there (ArrowDown at the first item,
+    // ArrowUp at the last) — deliberately, not as a side effect of `at` being -1. Anything else from the trigger (Home and
+    // End are the page's there) and any key from outside the menu and its trigger is left alone.
+    const onTrigger = document.activeElement === triggerRef.current;
+    if (at < 0 && !onTrigger) return;
+    const target = onTrigger
+      ? event.key === 'ArrowDown' ? items[0]
+        : event.key === 'ArrowUp' ? items[items.length - 1]
+        : undefined
+      : event.key === 'ArrowDown' ? items[(at + 1) % items.length]
       : event.key === 'ArrowUp' ? items[(at - 1 + items.length) % items.length]
       : event.key === 'Home' ? items[0]
       : event.key === 'End' ? items[items.length - 1]
