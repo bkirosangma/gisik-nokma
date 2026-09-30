@@ -181,6 +181,10 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 - ✅ **20.342 — no settings rule paints a flat boundary or the retired constant;** control: the scan reads the settings and workspace-settings rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-settings__sidebar`.
 - ✅ **20.343 — Save is the Workspace settings screen's ONE loud element: exactly one primary `Button` is on the tab and it is Save;** control: the tab has rendered and Save is a named `button`. Mutation: drop `variant="primary"` from Save in `workspace-settings-form.tsx`.
 
+## 20.29 Plan B — empty states
+
+- ✅ **20.281 — an empty board is its own recessed track (`surface-track`, `shadow-track`, the track radius — the board's ground), its create action is a quiet outlined 44px control with a hover wash and no accent fill (New ticket in the header is already the screen's one loud element), and an empty column has no fill of its own so its track shows through;** control: the empty column's icon disc keeps its `fill-tertiary` fill. Mutation: restore the retired constant (`background: var(--gn-fill-tertiary)`) on `.gn-board__empty-create`.
+- ✅ **20.282 — no board-empty rule (`.gn-board--empty`, `.gn-board__empty`, `.gn-board__column-empty`) paints a flat boundary or the retired constant, and 13.1144's reset-before-rule order still holds;** control: the scan reads those rules, and the P1 grouped reset still precedes the styled rule. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-board__column-empty`.
 ## 20.31 Plan B — notes
 
 - ✅ **20.301 — the notes page's Deleted-notes separator is a decorative hairline and a comment's code block sits in a recessed well;** control: the notes fields keep their 1px `border` edge. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-comment__code`.

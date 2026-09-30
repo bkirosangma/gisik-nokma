@@ -1130,9 +1130,12 @@ a.gn-ticket-sheet__crumb--link {
    `--gn-radius-card`, never the prototype's literal 12px — a new card-like
    rule takes the token, the same rule `.gn-board-card`'s own radius history
    (case 13.464, Ruling 17) already established, so this rule cannot repeat
-   the defect that one fixed. */
+   the defect that one fixed.
+   Styling refresh Plan B (Task B9): the fill is gone — the empty column sits
+   inside its column TRACK, so the track shows through and the copy and the
+   icon disc carry the state. */
 .gn-board__column-empty {
-  background: var(--gn-fill-quaternary);
+  background: transparent;
   border-radius: var(--gn-radius-card);
   padding: 1.375rem 1rem;
   display: flex;
@@ -1208,10 +1211,15 @@ a.gn-ticket-sheet__crumb--link {
    third one: two empty states on one board should read as one family.
 
    ⚠ STILL NOT PAINTED — the same standing caveat as P1. What is asserted is
-   what the rules declare (case 13.1059). */
+   what the rules declare (case 13.1059).
+
+   Styling refresh Plan B (Task B9): the container is now its own recessed
+   TRACK (`surface-track` / `shadow-track` / `radius-track`) — the board's own
+   ground, as its columns are — instead of a `fill-quaternary` card. */
 .gn-board--empty {
-  background: var(--gn-fill-quaternary);
-  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-track);
   padding: 2rem 1rem;
   display: flex;
   flex-direction: column;
@@ -1230,22 +1238,27 @@ a.gn-ticket-sheet__crumb--link {
    radius, no border. This rule and the P1 bare-control reset above BOTH match
    this class and that is deliberate — P1 removed the UA chrome, this gives it
    the product's own. They overlap on `border`, `background`, `padding` and
-   `color`; source order decides, and this one is later. */
+   `color`; source order decides, and this one is later.
+   Styling refresh Plan B (Task B9): P-QUIET — the constant above is
+   superseded. The header's New ticket is the board's one loud element, so the
+   empty state's own create action is a quiet outlined 44px pill, washed on
+   hover; a second primary would break rule 01. */
 .gn-board__empty-create {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 2.75rem;
   padding: 0 1.125rem;
-  border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
   font: inherit;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
 }
+.gn-board__empty-create:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 .gn-board__empty-create:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
