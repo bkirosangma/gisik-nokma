@@ -88,3 +88,8 @@ the number you added.
 - ✅ **20.221 — every floating panel rests on `lift-near` with the card radius on the raised ground, and neo reaches its own floating shadow through the token with no `[data-style]` fork;** control: the info tip keeps its 1px `border` edge. Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-popover`.
 - ✅ **20.222 — a floating panel's ground (`surfaceRaised`) differs from the page (`surface`) in hig and minimal, both themes, so a menu stays distinguishable where minimal draws no shadow;** control: under neo the two are the same hex by design (depth is shadow-only). Mutation: none (a token fact, witnessed by a planted equal-ground palette in the test's control).
 
+## 20.25 Plan B — the project page's chrome
+
+- ✅ **20.241 — the project header's groups are 16px apart; the contested-claim banner is a recessed well keeping its contested edge; the saved-filter rename field is recessed like every field; the sync notice's Dismiss is a quiet outlined control;** control: the filter chip's remove control keeps its 24px in-list floor. Mutation: restore `border-radius: 6px` on `.gn-sync-notices__dismiss`.
+- ✅ **20.242 — no project-chrome rule (`gn-project`, `gn-filters`, `gn-saved-filters`, `gn-contest-banner`, `gn-sync-`) paints a flat boundary or the retired constant;** control: the scan reads more than 40 rules under those prefixes. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-contest-banner`.
+
