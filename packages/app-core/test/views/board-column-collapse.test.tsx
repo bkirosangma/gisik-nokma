@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import type { BoardCard, BoardColumn, BoardGroup, BoardView } from '../../src/view-types.js';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
@@ -359,5 +359,86 @@ describe('20.118 every column collapsed still leaves a usable board', () => {
     // Two independent memories: the group key was written apart from the column key.
     expect(window.localStorage.getItem(WORKFLOW_COLLAPSE_KEY)).not.toBeNull();
     expect(window.localStorage.getItem(COLUMN_COLLAPSE_KEY)).not.toBeNull();
+  });
+});
+
+/**
+ * Board drag fixes D3 (owner, 2026-09-30: "collapsing a column has the effect of
+ * scrolling down a page") — case 20.119. Focus follows the toggle WITHOUT the
+ * browser's scroll-into-view, and the page and the rail are put back if the
+ * layout shift moved them. jsdom scrolls nothing: `focus` is spied (a browser's
+ * scroll is simulated inside it) and `scrollY`/`scrollTo` and the rail's
+ * `scrollLeft` are planted. The real `scrollY` (±1px) is 20.120 (🧪).
+ */
+describe('20.119 collapsing or expanding a column does not scroll the page', () => {
+  let pageY = 0;
+  let scrollTo: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    pageY = 300;
+    scrollTo = vi.fn((...args: unknown[]) => {
+      const first = args[0];
+      pageY = typeof first === 'object' && first !== null ? Number((first as { top?: number }).top) : Number(args[1]);
+    });
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => pageY });
+    Object.defineProperty(window, 'scrollTo', { configurable: true, value: scrollTo });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(window, 'scrollY');
+  });
+
+  /**
+   * Two things move the page in a browser: the swap's own layout shift (the strip stretches to
+   * the rail's height — modelled as already happened by the time the effect focuses), and a bare
+   * `focus()` scrolling its target into view. `preventScroll` stops only the second.
+   */
+  function browserFocus(): ReturnType<typeof vi.spyOn> {
+    return vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+      pageY = 800;
+      if (options?.preventScroll !== true) pageY = 900;
+      Object.defineProperty(document, 'activeElement', { configurable: true, get: () => this });
+    });
+  }
+
+  it('20.119 focus is called with preventScroll and lands on the strip / the collapse button; scrollY is restored', async () => {
+    const focus = browserFocus();
+    setup(boardOf(errand()));
+    await settled();
+    const done = columnIn('Errand', 'done');
+    focus.mockClear();
+
+    fireEvent.click(collapseButton(done, 'Done'));
+    const strip = stripButton(columnIn('Errand', 'done'));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(focus.mock.contexts.at(-1)).toBe(strip);
+    expect(pageY).toBe(300);
+
+    // Expanding: the same, onto the collapse button.
+    pageY = 300;
+    focus.mockClear();
+    fireEvent.click(strip);
+    const collapse = collapseButton(columnIn('Errand', 'done'), 'Done');
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(focus.mock.contexts.at(-1)).toBe(collapse);
+    expect(pageY).toBe(300);
+  });
+
+  it('20.119 CONTROL: nothing moved the page — scrollTo is left alone; the rail’s scrollLeft is put back when the shift moved it', async () => {
+    const focus = browserFocus();
+    setup(boardOf(errand()));
+    await settled();
+    const rail = document.querySelector<HTMLElement>('.gn-board__rail')!;
+    let railLeft = 120;
+    Object.defineProperty(rail, 'scrollLeft', { configurable: true, get: () => railLeft, set: (v: number) => (railLeft = v) });
+    scrollTo.mockClear();
+
+    // The layout shift moves the rail while the strip mounts (not the page): it is restored, the page is not touched.
+    focus.mockImplementation(function (this: HTMLElement) {
+      railLeft = 0;
+    });
+    fireEvent.click(collapseButton(columnIn('Errand', 'done'), 'Done'));
+    expect(railLeft).toBe(120);
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
