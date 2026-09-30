@@ -25,6 +25,7 @@ import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
+import { registerMcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
@@ -135,6 +136,12 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * The API's own public origin (`MCP_PUBLIC_URL`) — the hosted MCP door's
+   * issuer. OPTIONAL and null/absent means the door is not registered at all:
+   * 404 on `/mcp`, `/oauth/*` and `/.well-known/oauth-*` (plan FD1).
+   */
+  mcpPublicUrl?: string | null;
   /**
    * Where invitation letters go (access plan W5). OPTIONAL, and absent means a
    * SILENT `LogInviteMailer`: that is the ~sixty test files' default, which mint
@@ -663,7 +670,10 @@ export function buildApp(
         method === 'POST' &&
         (routeUrl === '/v1/mcp/device/code' ||
           routeUrl === '/v1/mcp/device/approve' ||
-          routeUrl === '/v1/mcp/device/token')
+          routeUrl === '/v1/mcp/device/token' ||
+          // The hosted door's public registration endpoint: open to anyone, so it
+          // shares the device flow's bucket rather than having none.
+          routeUrl === '/oauth/register')
       ) {
         // The device flow's own bucket. Without this branch a route under
         // `/v1/mcp/...` matches NO bucket at all, which would leave the
@@ -1007,6 +1017,14 @@ export function buildApp(
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
 
   registerMcpTokenRoutes(app, { pool: deps.pool }, requireSession);
+  // The hosted MCP door — present only when the API knows its own public URL.
+  if (deps.mcpPublicUrl) {
+    registerMcpOAuthRoutes(
+      app,
+      { pool: deps.pool, webOrigin: deps.webOrigin, publicUrl: deps.mcpPublicUrl },
+      requireSession,
+    );
+  }
   // The realtime fan-out (Plan 5 Tasks 14–15) — the FIRST thing here that is
   // not a request/response at all, and the first that decides who ELSE hears
   // about a change. The hub is created HERE, beside the ingest service whose

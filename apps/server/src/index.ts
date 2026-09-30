@@ -143,6 +143,7 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
+      mcpPublicUrl: config.mcpPublicUrl,
       inviteMailer: selectInviteMailer(config, smtpLog),
       // The commit-feed listener `app.ts` registers when this is given. It
       // forwards to the worker created below; `EMBED_WORKER_ENABLED=false`

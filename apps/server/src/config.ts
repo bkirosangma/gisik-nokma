@@ -207,6 +207,14 @@ const configSchema = z.object({
   RATE_LIMIT_EVENTS_MAX: unsetWhenEmpty(z.coerce.number().int().positive().default(120)),
   RATE_LIMIT_WINDOW_SEC: unsetWhenEmpty(z.coerce.number().int().positive().default(60)),
 
+  /**
+   * The public origin of THIS API (`https://pm-api.artsourced.in`) — the OAuth
+   * issuer and the hosted MCP resource URL. NOT `BETTER_AUTH_URL`, which is the
+   * WEB origin in production. Optional, and unset means the hosted MCP door
+   * (`/mcp`, `/oauth/*`, `/.well-known/oauth-*`) is not built at all (plan FD1).
+   */
+  MCP_PUBLIC_URL: unsetWhenEmpty(httpUrl().optional()),
+
   /** Where error alerts POST. Optional — absent means no alerting, not a broken deploy. */
   ALERT_WEBHOOK_URL: unsetWhenEmpty(httpUrl().optional()),
 
@@ -270,6 +278,7 @@ export type AppConfig = {
   rateLimitEventsMax: number;
   rateLimitWindowSec: number;
   alertWebhookUrl: string | null;
+  mcpPublicUrl: string | null;
   smtpUrl: string | null;
   magicLinkFrom: string;
   inviteFrom: string;
@@ -309,6 +318,7 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
     // states, so a consumer that forgets to handle it fails a type check
     // rather than reading `undefined` and treating it as "not configured yet".
     alertWebhookUrl: parsed.data.ALERT_WEBHOOK_URL ?? null,
+    mcpPublicUrl: parsed.data.MCP_PUBLIC_URL ?? null,
     smtpUrl: parsed.data.SMTP_URL ?? null,
     magicLinkFrom: parsed.data.MAGIC_LINK_FROM,
     inviteFrom: parsed.data.INVITE_FROM ?? parsed.data.MAGIC_LINK_FROM,
