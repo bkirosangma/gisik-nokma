@@ -619,3 +619,68 @@ a second assistant they did not need.
 **The sentence carries the server's own words when it sent any** (`refusalText(cause.body)`, the same narrowing
 `revoke` and the rename path already use), and otherwise says what is true — that the read did not come back,
 that the list is unknown rather than empty, and the one recovery there is.
+
+## 14.2 Hosted MCP — storage
+
+*Remote-MCP plan (`docs/superpowers/plans/2026-09-30-remote-mcp-server.md`) Task 1, block 14.200–14.299. Tests: `apps/server/test/mcp/oauth-store.test.ts`.*
+
+- ✅ **14.200 — the migration adds five tables and three `mcp_tokens` columns, and every EXISTING token row reads `kind='local'`, `expires_at NULL`, `connection_id NULL`;** control: a device-flow token minted after the migration still authenticates `/v1/me/workspaces` with no expiry. Mutation: default `kind` to `'hosted'`.
+- ✅ **14.201 — a hosted access token past `expires_at` is refused by `requireSession` (401), a live one resolves to its owner;** control: a LOCAL token with `expires_at NULL` resolves at any `now`. Mutation: drop the `expires_at` clause from `resolveMcpToken`.
+- ✅ **14.202 — resolving a hosted token stamps its CONNECTION's `last_used`;** control: resolving a local token stamps only `mcp_tokens.last_used`. Mutation: remove the connection update.
+- ✅ **14.203 — a code is single-use and dies after 60 s:** `takeCode` returns the row once, `null` the second time, and `null` at `now + 61 s`;** control: at `now + 59 s` the first take succeeds. Mutation: `SELECT` instead of `DELETE … RETURNING`.
+- ✅ **14.204 — refresh rotation: `useRefreshToken` succeeds once; presenting the same token again returns `reused` AND deletes the connection with its access tokens;** control: a fresh refresh token issued by the first use still works. Mutation: skip the connection delete on reuse.
+- ✅ **14.205 — a connection past `idle_expires_at` refuses refresh (`expired`) and is deleted; a successful refresh slides `idle_expires_at` to `now + 90 d`;** control: at `now + 89 d` refresh succeeds. Mutation: do not slide the window.
+- ✅ **14.206 — `sweepStaleClients` deletes a 31-day-old client with no connection and no pending row, and keeps one with a live connection;** control: a 29-day-old unused client survives. Mutation: ignore connections in the sweep.
+- ✅ **14.207 — nothing raw is stored:** after `mintCode` + `issueTokens`, no column of `oauth_codes`, `mcp_tokens` or `oauth_refresh_tokens` contains the raw code, access or refresh token;** control: each table holds `hashCredential(raw)`. Mutation: store the raw refresh token.
+- ✅ **14.208 — `listMcpTokens` returns local tokens only; hosted access tokens never appear there;** control: a local token still lists with its name. Mutation: drop `WHERE kind = 'local'`.
+- ✅ **14.209 — every new table has a purge rule (`not-entity-bearing`)** — the existing guard `table-rules.test.ts` fails without them;** control: the guard's count of ruled tables rises by exactly five. Mutation: remove `oauth_connections` from `table-rules.ts`.
+
+## 14.7 Hosted MCP — one tool code path (hosted remote MCP plan, Task 6; block `14.200`–`14.299`)
+
+The hosted `/mcp` route runs the SAME nine tools as the stdio server, from the same package, over an in-process
+`fetch` that calls the API's own routes. This section is the seam that makes that true; the route itself is
+Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/plans/2026-09-30-remote-mcp-server.md`).
+
+- ✅ **14.250 — `@gisik-nokma/mcp-server` exports `registerTools`, `allTools` and `lazySession`, and `allTools` still yields the nine tools in their pinned order;** control: the same `it` reads the nine names in order. Mutation: drop `registerTools` from the index. — (`packages/mcp-server/test/exports.test.ts`)
+- ✅ **14.251 — `inProcessFetch` turns a `fetch('http://in-process/v1/me/workspaces', { headers: { authorization } })` into `app.inject` and returns a real `Response` with the route's status, JSON body and headers;** control: a 404 route comes back as a 404 `Response` (not a throw) and a call with no credential comes back 401. Mutation: always return status 200. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- ✅ **14.252 — the in-process request carries the OUTER caller's `remoteAddress` and `x-forwarded-for` (FD7): the rate-limit key seen by the events route is the outer key, not `127.0.0.1`;** control: two different outer callers land in two buckets and the same caller spends its own. Mutation: omit `remoteAddress` from `inject` (and, for the `trustProxy` case, omit the `x-forwarded-for` header). — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- ✅ **14.253 — a tool run through `hostedSession` writes an event with `origin: 'mcp'` and `actorId` = the token's owner;** control: a read tool returns the same JSON the REST route returns. Mutation: build the session with a different `userId`. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
+- 🧪 **14.254 — the server's build includes the package: `pnpm turbo run build --filter=@gisik-nokma/server...` builds `@gisik-nokma/mcp-server` first, and `apps/server/Dockerfile` needs no change (its manifest COPY already lists `packages/mcp-server/package.json`, line 44);** control: `pnpm deploy --prod --filter=@gisik-nokma/server <dir>` leaves `<dir>/node_modules/@gisik-nokma/mcp-server/dist/index.js`, and `import('@gisik-nokma/mcp-server')` from `<dir>` yields three functions. Mutation: remove the workspace dependency. — build check, run 2026-09-30 by executor lane B (command output in the Task 6 commit message; not a vitest case).
+
+## 14.3 Hosted MCP — metadata and registration
+
+*Remote-MCP plan Task 2 (14.210–14.219). Tests: `apps/server/test/mcp/oauth-metadata.test.ts`; the config half of 14.210 in `apps/server/test/config.test.ts`.*
+
+- ✅ **14.210 — with `MCP_PUBLIC_URL` unset, `/mcp`, `/oauth/register` and `/.well-known/oauth-authorization-server` are 404 (the hosted door does not exist);** control: set, the metadata answers 200. Mutation: register the plugin unconditionally.
+- ✅ **14.211 — `GET /.well-known/oauth-authorization-server` lists issuer = `MCP_PUBLIC_URL`, the authorize/token/register/revoke endpoints under it, `code_challenge_methods_supported: ["S256"]`, `grant_types_supported: ["authorization_code","refresh_token"]`, `token_endpoint_auth_methods_supported: ["none"]`, `response_types_supported: ["code"]`, `scopes_supported: ["gisik:act"]`;** control: no `plain` anywhere in the document. Mutation: add `"plain"` to the challenge methods.
+- ✅ **14.212 — protected-resource metadata is served at BOTH `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`, naming `resource: <public>/mcp` and `authorization_servers: [<public>]`;** control: the two documents are identical. Mutation: serve only the root one.
+- ✅ **14.213 — `POST /oauth/register` with `redirect_uris: ["https://claude.ai/api/mcp/auth_callback"]` and `client_name: "Claude"` answers 201 with a `client_id`, `token_endpoint_auth_method: "none"`, and NO `client_secret`;** control: the stored row carries the name and the exact URI. Mutation: return a client secret.
+- ✅ **14.214 — registration refuses a non-https, non-loopback redirect (`http://evil.example/cb`) with 400 `invalid_redirect_uri`;** control: `http://127.0.0.1:33418/callback` and `http://localhost:6274/cb` are accepted. Mutation: accept any `http:` URI.
+- ✅ **14.215 — registration refuses a redirect with a fragment or userinfo (`https://a.example/cb#x`, `https://u:p@a.example/cb`) and an empty `redirect_uris`;** control: a query string is allowed (`https://chatgpt.com/cb?x=1`). Mutation: drop the fragment check.
+- ✅ **14.216 — registration is charged to the MCP rate-limit bucket: the (mcpMax+1)-th registration from one client key in a window answers 429;** control: a different client key still registers. Mutation: remove `/oauth/register` from the bucket.
+- ✅ **14.217 — `client_name` is trimmed to 60 characters and a missing name stores the redirect host;** control: a 20-character name is stored as given. Mutation: store the raw 500-character name.
+- ✅ **14.218 — registering sweeps stale clients (Task 1's rule) — a 31-day-old unused client is gone after the next registration;** control: the new client exists. Mutation: never call the sweep.
+- ✅ **14.219 — a hosted-door request never reaches better-auth's catch-all: `/oauth/token` and `/.well-known/*` are their own routes, not `/api/auth/*`;** control: `/api/auth/get-session` still answers. Mutation: mount the routes under `/api/auth`.
+
+## 14.6 Hosted MCP — tokens and revocation
+
+*Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
+
+- ✅ **14.240 — `authorization_code` with the right verifier, client and redirect returns an access + refresh token (`expires_in: 3600`, `token_type: "Bearer"`, `scope: "gisik:act"`, `cache-control: no-store`), and the access token authenticates `GET /v1/me/workspaces` as the consenting person;** control: the response has no `id_token`. Mutation: return `expires_in: 86400`.
+- ✅ **14.241 — a wrong `code_verifier` is `invalid_grant` and the code is burnt (a retry with the right verifier also fails);** control: the right verifier on a fresh code succeeds. Mutation: skip `verifyPkceS256`.
+- ✅ **14.242 — the code is bound to its client and redirect: another client's id, or a different registered redirect, is `invalid_grant`;** control: the matching pair succeeds. Mutation: ignore `redirect_uri` at the token endpoint.
+- ✅ **14.243 — the code is single-use: a second exchange is `invalid_grant`;** control: the first exchange succeeded. Mutation: `getCode` instead of `takeCode`.
+- ✅ **14.244 — `refresh_token` returns a NEW access + refresh token, and the old refresh token is dead;** control: the new access token authenticates. Mutation: return the same refresh token.
+- ✅ **14.245 — presenting a used refresh token revokes the whole connection: its latest access token stops authenticating (401) and its latest refresh token is refused;** control: another connection of the same person is untouched. Mutation: skip the family revoke.
+- ✅ **14.246 — two concurrent refreshes with the same token: exactly one succeeds; the other is treated as reuse and the connection is gone;** control: a single refresh succeeds. Mutation: a read-then-write refresh (SELECT used_at, then UPDATE). *(Review Focus 2)*
+- ❌ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
+- ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
+- ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+
+## 14.10 Hosted MCP — member help (hosted remote MCP plan, Task 9; block `14.200`–`14.299`)
+
+*The manual's new "§16 — Connecting Claude or ChatGPT" (`docs/manual.md`). Tests: `packages/app-core/test/help/connecting-assistants.test.ts`; `pnpm check:help` guards its quoted strings and the freshness of the generated copy. The menu names for Claude and ChatGPT were checked on 2026-09-30 against the MCP project's "Connect to remote MCP servers" guide and OpenAI's ChatGPT developer-mode guide and are dated in the text.*
+
+- ✅ **14.280 — the manual has a §16 "Connecting Claude or ChatGPT" with, per app, three numbered steps (where to add a connector, paste the URL, press Allow), how to disconnect (Connected assistants → Disconnect), and what a "reconnect" prompt means;** control: `pnpm check:help` exits 0 and §15 has no second three-step list. Mutation: change **Allow** to **Approve** in the Claude steps — caught by the section test's `allow` assertions, NOT by `pnpm check:help`, which checks quoted strings only and does not see bold button names (controller-measured 2026-09-30: the check stays green), so a wrong bold label is guarded only by the words the test names. — (`packages/app-core/test/help/connecting-assistants.test.ts`, `pnpm check:help`)
+- ✅ **14.281 — the Help browser finds §16 by searching "ChatGPT" and "connector";** control: an existing §15 search still finds §15 and a term §16 does not contain does not find §16. Mutation: omit the generated file's regeneration. — (`packages/app-core/test/help/connecting-assistants.test.ts`)
+- 🟡 **14.282 — the "How to connect" link on Connected assistants lands on §16's anchor;** control: the anchor is unique across the manual. Mutation: link `/help` without the anchor. **Half covered:** the anchor exists and is pinned here — it is `manual-16-connecting-claude-or-chatgpt` (the generator's id for the section `16-connecting-claude-or-chatgpt`, NOT the plan's `connecting-claude-or-chatgpt`, which is not a section or entry id) — but the link itself is Task 8's panel, which had not landed when this was written; its test flips this to ✅. — (`packages/app-core/test/help/connecting-assistants.test.ts`)

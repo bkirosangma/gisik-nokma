@@ -130,6 +130,11 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
       title: 'Notes',
       sectionIds: ['15-notes'],
     },
+    {
+      id: 'manual-assistants',
+      title: 'Assistants',
+      sectionIds: ['16-connecting-claude-or-chatgpt'],
+    },
   ],
 };
 

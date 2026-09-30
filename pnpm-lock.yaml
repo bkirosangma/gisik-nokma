@@ -160,6 +160,9 @@ importers:
       '@gisik-nokma/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@gisik-nokma/mcp-server':
+        specifier: workspace:*
+        version: link:../../packages/mcp-server
       '@gisik-nokma/rule-engine':
         specifier: workspace:*
         version: link:../../packages/rule-engine
