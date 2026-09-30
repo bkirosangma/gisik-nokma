@@ -50,11 +50,17 @@ describe('13.360/13.361 — globals.css wires the retired accent hex through --g
    * have left this one page's recovery links on the retired, now text-unsafe
    * `--gn-accent`. This is the site the advisor's review caught: "flag it" was
    * the wrong call once specificity was actually traced.
+   *
+   * Amended 2026-09-29 by 20.391 (styling refresh Plan B): the link is a P-QUIET
+   * control now, so its ink is the declared `--gn-text-muted` role (`textMuted` on
+   * the page ground is a `CONTRAST_PAIRS` row) instead of `--gn-text-accent`; the
+   * arm's real claim — the rule must not fall back to the retired `--gn-accent` —
+   * is unchanged.
    */
-  it('.gn-notfound__link uses --gn-text-accent, not the retired --gn-accent', () => {
+  it('.gn-notfound__link uses a declared text role, not the retired --gn-accent', () => {
     const rule = ruleFor(css, /\.gn-notfound__link\s*\{/);
     expect(rule, `.gn-notfound__link rule: ${String(rule)}`).toBeDefined();
-    expect(rule).toContain('var(--gn-text-accent)');
+    expect(rule).toContain('var(--gn-text-muted)');
     expect(rule).not.toContain('var(--gn-accent)');
   });
 });

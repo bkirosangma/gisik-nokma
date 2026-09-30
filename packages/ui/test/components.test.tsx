@@ -662,15 +662,24 @@ describe('R1(c) at the component layer', () => {
    * Pinned the same shape 13.339 already pins for `.gn-field__input`, so a
    * future edit that drops either override reddens here rather than only
    * being visible by eye against the running app.
+   *
+   * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the BASE arm no longer
+   * pins `surface-sunken` on both. The type row is a raised item (`surface-raised`
+   * + `shadow-lift`, P-ROW) and the field row a recessed well (`surface-well`);
+   * the neo arm is unchanged — neo keeps its pressed rows (B-D3).
    */
   it('10.80 the ticket-type row and field row are pressed-in under neo, not merely coloured', () => {
+    const BASE_GROUND: Record<string, string> = {
+      '.ticket-type-list__row': 'surface-raised',
+      '.fields-editor__row': 'surface-well',
+    };
     for (const selector of ['.ticket-type-list__row', '.fields-editor__row']) {
       const base = rule(selector);
       const neo = rule(`[data-style="neo"] ${selector}`);
       expect(neo, `${selector}: the neo override must be a distinct rule, not a re-match of the base`).not.toBe(
         base,
       );
-      expect(base, selector).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+      expect(base, selector).toMatch(new RegExp(`background:\\s*var\\(--gn-${BASE_GROUND[selector]}\\)`));
       expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
     }
   });
@@ -726,15 +735,21 @@ describe('R1(c) at the component layer', () => {
    * deliberately so — that ruling's second half is a WIDER checker that does not
    * exist yet, so a case pinning 24 here would be pinning a floor nothing
    * enforces. The open question is named in `ui.css`'s own block.
+   *
+   * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the control is a P-GHOST
+   * icon now, so the shared-control-roles arm reads a transparent ground, the
+   * `text-subtle` ink and a full-round radius in place of the retired
+   * `fill-tertiary` + `text-accent` + control-radius constant. The 44px and
+   * no-style-fork arms are unchanged.
    */
   it('16.83 the reorder control has a rule at all, carries the shared control roles, and forks for no style', () => {
     const body = rule('.ticket-type-list__move');
 
     // The rule EXISTS — the whole defect. Every assertion below is about a class
     // that rendered as UA chrome precisely because this one was false.
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-subtle\)/);
+    expect(body).toMatch(/border-radius:\s*999px/);
     expect(body).toMatch(/border:\s*none/);
 
     // The recorded 44px divergence, on BOTH axes, so the prototype's 36px

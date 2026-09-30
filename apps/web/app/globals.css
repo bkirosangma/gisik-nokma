@@ -2705,7 +2705,7 @@ input, textarea, select { font-family: inherit; }
   margin: 0 auto 1.5rem;
   border-radius: 18px;
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   color: var(--gn-text-muted);
 }
 
@@ -2737,8 +2737,9 @@ input, textarea, select { font-family: inherit; }
   max-width: 68ch;
   margin: 0 0 1.75rem;
   padding: 0.9rem 1rem;
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
   color: var(--gn-text-muted);
 }
 
@@ -2772,17 +2773,16 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   min-height: 2.75rem;
   padding: 0 1rem;
-  border: 1px solid var(--gn-border-strong);
-  border-radius: 0.4rem;
-  background: var(--gn-surface-raised);
-  color: var(--gn-text-accent);
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
   text-decoration: none;
   transition: background-color 200ms ease, border-color 200ms ease;
 }
 
 .gn-notfound__link:hover {
-  background: var(--gn-surface-sunken);
-  border-color: var(--gn-accent);
+  background: var(--gn-fill-quaternary);
 }
 
 /* Focus is drawn with an outline and an offset rather than a background swap:
@@ -2873,8 +2873,8 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__flag {
   padding: 0.9rem 1rem;
   border-left: 3px solid var(--gn-warning);
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
 }
 
 .gn-legal__flag-label {
@@ -2891,8 +2891,9 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__draft {
   margin-top: 1rem;
   padding: 0.6rem 0.75rem;
-  border-radius: 0.4rem;
-  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-track);
   color: var(--gn-text-muted);
 }
 

@@ -417,7 +417,8 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
       ],
       ['.workflow-builder-screen__left', 'flex-direction: column'],
       ['.workflow-builder-screen__right', 'flex-direction: column'],
-      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-raised)'],
+      // Amended 2026-09-29 by 20.351 (styling refresh Plan B): the canvas is a P-RAISED panel now, lifted by `shadow-lift` (was `shadow-raised`).
+      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-lift)'],
       ['.state-inspector', 'border-radius: var(--gn-radius-card)'],
       ['.state-inspector__title', 'font-size: 0.9rem'],
       ['.state-inspector__actions', 'flex-wrap: wrap'],
