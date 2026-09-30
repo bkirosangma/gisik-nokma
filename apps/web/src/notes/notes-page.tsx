@@ -129,8 +129,9 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   /**
    * The document column scrolls on its own above 60rem (`.gn-notes__document`,
    * case 18.481), and Next resets the WINDOW's scroll on a navigation, not an
-   * element's: `/notes/a` → `/notes/b` keeps this section mounted, so the next
-   * note would open at the previous one's offset. A link that carries a hash
+   * element's: when the page stays mounted across `/notes/a` → `/notes/b` (a param
+   * change on one route file; a remount is the other possibility and resets this
+   * for free) the next note would open at the previous one's offset. A link that carries a hash
    * (`#heading`, `#comment-…`) is left alone — the scroll that owns it runs after
    * the content lands. Case 18.485.
    */

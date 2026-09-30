@@ -307,8 +307,10 @@ describe('18.11 The Notes page — the shell', () => {
   /**
    * 18.485 — above 60rem the document scrolls in its OWN column, and the window does not
    * (18.481). Next resets the WINDOW's scroll on a navigation; it does not reset an
-   * element's. `/notes/a` → `/notes/b` is the same route file with a new param, so this
-   * section persists and the next note would open at the previous note's offset.
+   * element's. `/notes/a` → `/notes/b` is the same route file with a new param; IF App
+   * Router keeps the page mounted the section persists and the next note would
+   * open at the previous note's offset (a rerender with a new `noteId` is what this
+   * drives; whether the real navigation remounts is the browser case 18.493).
    * CONTROL: an unrelated re-render (same note) leaves the offset alone, and a link
    * with a `#heading` or `#comment-…` hash is left to the scroll that owns it.
    * MUTATION TARGET: delete the effect, or drop the hash guard.
@@ -326,7 +328,7 @@ describe('18.11 The Notes page — the shell', () => {
     rerender(view('01J9NOTEAAAAAAAAAAAAAAAAAA')); // CONTROL: same note
     expect(region.scrollTop).toBe(400);
     rerender(view('01J9NOTEBBBBBBBBBBBBBBBBBB'));
-    expect(screen.getByTestId('note-document-region')).toBe(region); // the column persisted across the navigation
+    expect(screen.getByTestId('note-document-region')).toBe(region); // the rerender kept the same column element
     await waitFor(() => expect(region.scrollTop).toBe(0));
 
     window.location.hash = '#a-heading';

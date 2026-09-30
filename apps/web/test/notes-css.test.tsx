@@ -830,3 +830,26 @@ describe('18.484 a jump inside the column lands 1rem under ITS top, not under a 
     );
   });
 });
+
+describe('18.486 the wide block is declared AFTER every rule it overrides', () => {
+  /**
+   * A media query adds no specificity, so `@media (width > 60rem) { .x { … } }` beats an earlier
+   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide`. The heading
+   * `scroll-margin-top` base rule sits in the KB-parity section near the end of the file; a wide block
+   * filed earlier (where the first cut of it was) is silently ignored and every jump lands ~86px low,
+   * while the TEXT of the override is still present, so 18.484 alone cannot see it.
+   * MUTATION TARGET: move the wide block above the base heading rule (or above any base `.gn-notes*` rule).
+   */
+  it('18.486 every selector the wide block sets has all its other declarations BEFORE the block; CONTROL: the scan finds each base rule at least once', () => {
+    const stripped = stripComments(CSS);
+    const start = stripped.indexOf('@media (width > 60rem)');
+    expect(start).toBeGreaterThan(-1);
+    const selectors = ['.gn-shell--wide', '.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
+    for (const selector of selectors) {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const base = [...stripped.matchAll(new RegExp(`^${escaped}\\s*\\{`, 'gm'))].map((m) => m.index ?? -1);
+      expect(base.length, `a base rule for ${selector}`).toBeGreaterThan(0); // CONTROL: the scan is not vacuous
+      for (const index of base) expect(index, `${selector} base rule at ${index} is AFTER the wide block at ${start}`).toBeLessThan(start);
+    }
+  });
+});
