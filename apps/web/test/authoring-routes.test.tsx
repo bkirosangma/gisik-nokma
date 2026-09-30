@@ -89,7 +89,7 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     expect(await screen.findByText(READ_ONLY_COPY)).toBeInTheDocument();
     // Named in advance, both halves of the gallery: the template cards and the
     // blank-start button. Neither may be on screen.
-    expect(screen.queryByRole('button', { name: /^Use this template/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Use the .+ template$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start blank' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to the workflows' })).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe('the template gallery is a route-level authoring entry point, and a mem
     expect(await screen.findByRole('button', { name: 'Start blank' })).toBeInTheDocument();
     // Printed, not counted: a failure names the templates that went missing.
     const templates = screen
-      .getAllByRole('button', { name: /^Use this template/ })
+      .getAllByRole('button', { name: /^Use the .+ template$/ })
       .map((node) => node.getAttribute('aria-label'));
     expect(templates.length).toBeGreaterThan(0);
     expect(screen.queryByText(READ_ONLY_COPY)).not.toBeInTheDocument();
@@ -349,7 +349,7 @@ describe('the second action reaches the history route, and that route renders th
  * unbordered and unfilled — reddens here.
  */
 describe('13.1150 the template gallery uses the shared Button', () => {
-  it('13.1150 all four gallery controls carry the shared component\'s classes', async () => {
+  it('13.1150 Start blank carries the shared component\'s classes and the three templates are doors', async () => {
     render(
       <Providers
         services={stubServices({}, { authoring: { listMembers: async () => rosterWhereIAm('admin') } })}
@@ -359,20 +359,22 @@ describe('13.1150 the template gallery uses the shared Button', () => {
     );
 
     const blank = await screen.findByRole('button', { name: 'Start blank' });
-    const templates = screen.getAllByRole('button', { name: /^Use this template/ });
-    expect(templates.length, 'the gallery rendered no template buttons').toBeGreaterThan(0);
+    const templates = screen.getAllByRole('button', { name: /^Use the .+ template$/ });
+    expect(templates.length, 'the gallery rendered no template doors').toBeGreaterThan(0);
 
+    // Touch-doors (2026-09-30): the three template cards are DOORS, not shared Buttons —
+    // the whole card is the one control (`template-gallery__door`, P-LIFT). What this
+    // case guards is unchanged: no control is left CLASS-LESS (a bare `<button>` paints
+    // as UA chrome). Start blank is still the shared Button, with its variant.
+    expect(blank, 'Start blank is not the shared Button').toHaveClass('gn-button');
+    expect([...blank.classList].some((name) => name.startsWith('gn-button--')), 'Start blank carries gn-button with no variant').toBe(true);
+    for (const control of templates) {
+      const label = control.getAttribute('aria-label');
+      expect(control, `${String(label)} is not a door`).toHaveClass('template-gallery__door');
+      expect(control, `${String(label)} is a Button, not a door`).not.toHaveClass('gn-button');
+    }
     for (const control of [blank, ...templates]) {
       const label = control.getAttribute('aria-label') ?? control.textContent;
-      expect(control, `${String(label)} is not the shared Button`).toHaveClass('gn-button');
-      // The variant class is what carries the fill and the border reset; a
-      // `gn-button` with no variant would satisfy a substring check and paint
-      // as nothing.
-      expect(
-        [...control.classList].some((name) => name.startsWith('gn-button--')),
-        `${String(label)} carries gn-button with no variant`,
-      ).toBe(true);
-      // And the negative the finding is about: no control is left class-less.
       expect(control.className, `${String(label)} is back to a bare <button>`).not.toBe('');
     }
   });
@@ -399,7 +401,7 @@ describe('13.1150 the template gallery uses the shared Button', () => {
 describe('13.1152 the type editor and the builder use the shared Button', () => {
   it('13.1152 the rendered Save is the shared primary variant', async () => {
     // THE SAVE HALF ONLY, and the first version of this case is why: it looped
-    // over `[/^Publish$/, /^Use this template/]` on THIS route, and the
+    // over `[/^Publish$/, /^Use the .+ template$/]` on THIS route, and the
     // population assertion added to stop the loop passing vacuously immediately
     // failed — this route renders no Publish at all. The loop had been passing
     // for the wrong reason. Publish renders on the builder route and is asserted
