@@ -9372,7 +9372,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " twice, or reload the page after answering, the second answer is refused with a plain message that the request has already been answered — nothing extra is connected. Start again from the assistant."
+                    "text": " twice, the second answer is refused with a plain message that the request has already been answered. If you reload the page after answering, it says the connection request has expired. Either way nothing extra is connected. Start again from the assistant."
                   }
                 ]
               }

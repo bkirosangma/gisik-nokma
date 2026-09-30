@@ -1810,9 +1810,9 @@ whatever it calls itself, so the address is the part to trust: if you were not j
 the address is not one you recognise, press **Deny**. **Deny** sends you back with a refusal and nothing is
 connected.
 
-If you press **Allow** twice, or reload the page after answering, the second answer is refused with a plain
-message that the request has already been answered — nothing extra is connected. Start again from the
-assistant.
+If you press **Allow** twice, the second answer is refused with a plain message that the request has already
+been answered. If you reload the page after answering, it says the connection request has expired. Either way
+nothing extra is connected. Start again from the assistant.
 
 ### Seeing what is connected, and disconnecting
 
