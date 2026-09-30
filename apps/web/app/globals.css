@@ -4628,4 +4628,61 @@ input, textarea, select { font-family: inherit; }
   margin: 0;
   color: var(--gn-text-muted);
 }
+/* The Pending invitations list (owner 2026-09-30, P1: "spacing of the withdraw
+   button from the text needs to be adjusted"). Before this the family had no
+   layout rule at all, so the address, role and lapse date ran together, the
+   button touched them and the `<ul>` showed a bullet.
+
+   The vocabulary is the members table's (B12): a raised panel with the lit-edge
+   `lift` shadow, zebra on the EVEN rows (`.gn-members__row:nth-child(even)`).
+   `overflow: hidden` lets the panel's radius clip the zebra at the corners.
+
+   A row is a WRAPPING flex row, `gap: 1rem`. The address is the row's text and
+   takes the slack (`flex: 1 1 auto; min-width: 0` so a long address shrinks
+   rather than pushing the row wider, `overflow-wrap: anywhere` because an
+   address has no spaces to break at). The role and the lapse are third-tier
+   meta, the `·` between them `aria-hidden` and unselectable. Withdraw keeps its
+   quiet `ghost` variant and is pushed to the far edge with `margin-left: auto`;
+   at 40rem and below the address takes a full line, the meta sits under it, and
+   Withdraw wraps under that, LEFT-aligned (`margin-left: 0`, since an auto
+   margin on a wrapped line would push it right). 2.75rem is the 44px target. */
+.gn-invite-pending {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  border-radius: var(--gn-radius-card);
+  overflow: hidden;
+}
+.gn-invite-pending__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0.6875rem 1.125rem;
+}
+.gn-invite-pending__row:nth-child(even) { background: var(--gn-fill-quaternary); }
+.gn-invite-pending__address {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9375rem;
+  color: var(--gn-text);
+  overflow-wrap: anywhere;
+}
+.gn-invite-pending__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--gn-text-subtle);
+}
+.gn-invite-pending__sep { user-select: none; }
+.gn-invite-pending__withdraw { margin-left: auto; }
+@media (max-width: 40rem) {
+  .gn-invite-pending__address { flex-basis: 100%; }
+  .gn-invite-pending__withdraw { margin-left: 0; }
+}
 /* ══ access-and-invites: end ══ */

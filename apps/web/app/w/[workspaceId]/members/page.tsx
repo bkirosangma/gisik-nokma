@@ -1110,12 +1110,16 @@ function MintForm({
  * `<h2 className="gn-invite-mint__heading">` (`:781`). Following the sibling is
  * the port; the authority's `<p>` is the drawing.
  *
- * ⚠ **`gn-invite-pending*` has NO CSS RULE, and this heading inherits that.**
- * `Features.md` **§3** — the people-page bullet, *"The people page, gated by the
- * server's own 403"* — records the missing family as a scope call with a named
- * owner. This heading joins the family rather than opening a second one, so the
- * two headings on this screen stay consistent — styling one of them and not the
- * other would be a divergence this change invented.
+ * ⚠ **The heading (`gn-invite-pending__heading`) still has NO CSS RULE; the LIST
+ * and its rows do (owner 2026-09-30, cases 20.650–20.655).** The rows were
+ * running together — `…localmemberLapses 14 Oct 2026, 01:28 IST[Withdraw]`, a
+ * bullet, the button touching the text — so `globals.css` now gives
+ * `.gn-invite-pending` the members table's raised-panel and zebra vocabulary and
+ * each row a wrapping flex row: the address, then a meta group (role · lapse,
+ * the dot `aria-hidden`), then Withdraw pushed to the far edge and, at 40rem and
+ * below, wrapped under the address. The heading and `__empty` were left as they
+ * were: the owner's report named the row, and the mint half's family is still the
+ * scope call `Features.md` **§3** records against a named owner.
  */
 function PendingList({
   rows,
@@ -1134,13 +1138,20 @@ function PendingList({
           {rows.map((row) => (
             <li key={row.inviteId} className="gn-invite-pending__row">
               <span className="gn-invite-pending__address">{row.address}</span>
-              <span className="gn-invite-pending__role">{row.role}</span>
-              <span className="gn-invite-pending__expiry">
-                {row.expiresAt === null
-                  ? 'No link behind this one — withdraw it and invite again.'
-                  : `Lapses ${formatDateTime(row.expiresAt)}`}
+              <span className="gn-invite-pending__meta">
+                <span className="gn-invite-pending__role">{row.role}</span>
+                <span className="gn-invite-pending__sep" aria-hidden="true">
+                  ·
+                </span>
+                <span className="gn-invite-pending__expiry">
+                  {row.expiresAt === null
+                    ? 'No link behind this one — withdraw it and invite again.'
+                    : `Lapses ${formatDateTime(row.expiresAt)}`}
+                </span>
               </span>
-              <Button onClick={() => onRevoke(row.inviteId)}>Withdraw</Button>
+              <Button className="gn-invite-pending__withdraw" onClick={() => onRevoke(row.inviteId)}>
+                Withdraw
+              </Button>
             </li>
           ))}
         </ul>

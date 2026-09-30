@@ -1,5 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -15,6 +18,7 @@ import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
+import { ruleFor } from './helpers/css-rule-scan.js';
 import { shellRefusalCopy } from '../src/shell-refusal.js';
 import {
   CREATE_INVITE_LINK,
@@ -1894,5 +1898,144 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
     mountRemove(ROWS, { remove: async () => REMOVED }, { workspaceName: null });
     await user.click(within(await rowOf('Bora Sangma')).getByRole('button', { name: REMOVE }));
     expect(await screen.findByRole('dialog', { name: 'Remove Bora Sangma from this workspace?' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Case block 20.650–20.655 — the Pending invitations row no longer runs together
+ * (owner screenshot 2026-09-30: `…localmemberLapses 14 Oct 2026, 01:28 IST[Withdraw]`, a
+ * bullet, the button touching the text). `gn-invite-pending*` had no layout rule.
+ *
+ * jsdom has no layout, so the CONTRACT is asserted in the CSS source and the DOM order on the
+ * rendered row; the geometry (boxes ≥8px apart, button ≥16px from the text, 390px) is 20.654.
+ */
+const GLOBALS_CSS = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../app/globals.css'),
+  'utf8',
+);
+const SECOND: PendingInvite = { ...PENDING, inviteId: '01J9INVITE00000000000000AC', address: 'bora@example.test' };
+
+/** The rule for one selector, escaped so `:nth-child(even)` and `__` are literal. */
+const pendingRule = (selector: string): string | undefined =>
+  ruleFor(GLOBALS_CSS, new RegExp(`^${selector.replace(/[.()]/g, '\\$&')}\\s*\\{`));
+
+/** The body of the `@media (max-width: 40rem)` block that mentions `needle`. */
+function narrowBlockWith(needle: string): string | undefined {
+  return [...GLOBALS_CSS.matchAll(/@media \(max-width: 40rem\) \{([\s\S]*?)\n\}/g)]
+    .map((m) => m[1] ?? '')
+    .find((body) => body.includes(needle));
+}
+
+/** Click Withdraw on the only row: the revoke is submitted ONCE and the row leaves the list. */
+async function withdrawLeavesTheList(): Promise<void> {
+  cleanup();
+  const submitted: SubmittedEvent[] = [];
+  let reads = 0;
+  mount(
+    { listPending: async () => (++reads === 1 ? [PENDING] : []) },
+    (events) => submitted.push(...events),
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: 'Withdraw' }));
+  await waitFor(() => expect(screen.queryByText('anselma@example.test')).toBeNull());
+  expect(submitted.filter((e) => e.type === 'invite.revoked')).toHaveLength(1);
+}
+
+describe('20.65x the Pending invitations row (owner 2026-09-30, P1)', () => {
+  it('20.650 the list has no bullet and is a raised panel with the members table’s zebra', async () => {
+    mount({ listPending: async () => [PENDING, SECOND] });
+    const list = (await screen.findByText('anselma@example.test')).closest('ul');
+    expect(list).not.toBeNull();
+    expect(list!.className).toBe('gn-invite-pending');
+    const list_ = pendingRule('.gn-invite-pending');
+    expect(list_, 'a `.gn-invite-pending { }` rule').toBeDefined();
+    expect(list_).toMatch(/list-style:\s*none/);
+    expect(list_).toMatch(/padding:\s*0\s*;/);
+    expect(list_).toMatch(/margin:\s*0\s*;/);
+    expect(list_).toContain('background: var(--gn-surface-raised)');
+    expect(list_).toContain('box-shadow: var(--gn-shadow-lift)');
+    expect(list_).toContain('border-radius: var(--gn-radius-card)');
+    expect(pendingRule('.gn-invite-pending__row:nth-child(even)')).toContain('background: var(--gn-fill-quaternary)');
+    // CONTROL (same `it`): both invitations are real rows of that one list.
+    expect(within(list!).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('20.651 each row is a wrapping flex row, gap 1rem, centred, at least 44px tall', async () => {
+    const row = pendingRule('.gn-invite-pending__row');
+    expect(row, 'a `.gn-invite-pending__row { }` rule').toBeDefined();
+    expect(row).toMatch(/display:\s*flex/);
+    expect(row).toMatch(/flex-wrap:\s*wrap/);
+    expect(row).toMatch(/align-items:\s*center/);
+    expect(row).toMatch(/gap:\s*1rem/);
+    expect(row).toMatch(/min-height:\s*2\.75rem/);
+    // CONTROL (same `it`): Withdraw still revokes — once — and the row leaves the list.
+    await withdrawLeavesTheList();
+  });
+
+  it('20.652 the address is the row’s text, role and lapse are subtle meta around an aria-hidden dot, Withdraw is pushed to the far edge', async () => {
+    mount({ listPending: async () => [PENDING] });
+    const li = (await screen.findByText('anselma@example.test')).closest('li')!;
+    const kids = Array.from(li.children);
+    expect(kids.map((k) => k.className.split(' ')[0])).toEqual([
+      'gn-invite-pending__address',
+      'gn-invite-pending__meta',
+      'gn-button',
+    ]);
+    const meta = kids[1]!;
+    expect(Array.from(meta.children).map((k) => k.className)).toEqual([
+      'gn-invite-pending__role',
+      'gn-invite-pending__sep',
+      'gn-invite-pending__expiry',
+    ]);
+    const sep = meta.children[1]!;
+    expect(sep.getAttribute('aria-hidden')).toBe('true');
+    expect(sep.textContent).toBe('·');
+    expect(meta.children[0]!.textContent).toBe('member');
+    expect(meta.children[2]!.textContent).toMatch(/^Lapses /);
+    expect(kids[2]!.textContent).toBe('Withdraw');
+    expect(kids[2]!.className).toContain('gn-invite-pending__withdraw');
+
+    const address = pendingRule('.gn-invite-pending__address');
+    expect(address).toMatch(/font-size:\s*0\.9375rem/);
+    expect(address).toContain('color: var(--gn-text)');
+    expect(address).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(address).toMatch(/flex:\s*1 1 auto/);
+    expect(address).toMatch(/min-width:\s*0/);
+    const metaRule = pendingRule('.gn-invite-pending__meta');
+    expect(metaRule).toMatch(/font-size:\s*0\.8125rem/);
+    expect(metaRule).toContain('color: var(--gn-text-subtle)');
+    expect(metaRule).toMatch(/display:\s*flex/);
+    expect(metaRule).toMatch(/gap:\s*0\.5rem/);
+    expect(pendingRule('.gn-invite-pending__withdraw')).toMatch(/margin-left:\s*auto/);
+    // CONTROL (same `it`): the expiry sentence for a row with no link is still the whole sentence.
+    cleanup();
+    mount({ listPending: async () => [{ ...PENDING, expiresAt: null }] });
+    expect(await screen.findByText('No link behind this one — withdraw it and invite again.')).toBeInTheDocument();
+  });
+
+  it('20.653 at 40rem and below the address takes a full line and Withdraw wraps under it, left-aligned', async () => {
+    const narrow = narrowBlockWith('.gn-invite-pending');
+    expect(narrow, 'a `@media (max-width: 40rem)` block naming the pending row').toBeDefined();
+    expect(narrow).toMatch(/\.gn-invite-pending__address\s*\{[^}]*flex-basis:\s*100%/);
+    expect(narrow).toMatch(/\.gn-invite-pending__withdraw\s*\{[^}]*margin-left:\s*0/);
+    // CONTROL (same `it`): the WIDE rule still pushes it right and the row still wraps at all.
+    expect(pendingRule('.gn-invite-pending__withdraw')).toMatch(/margin-left:\s*auto/);
+    expect(pendingRule('.gn-invite-pending__row')).toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it('20.655 the pending rules use tokens only: no colour literal, no flat boundary', () => {
+    const selectors = [
+      '.gn-invite-pending',
+      '.gn-invite-pending__row',
+      '.gn-invite-pending__address',
+      '.gn-invite-pending__meta',
+      '.gn-invite-pending__sep',
+      '.gn-invite-pending__withdraw',
+    ];
+    const bodies = selectors.map((s) => pendingRule(s));
+    // CONTROL: every rule exists, so the scan below has a subject.
+    expect(bodies.every((b) => b !== undefined)).toBe(true);
+    const all = bodies.join('\n');
+    expect(all).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
+    expect(all).not.toContain('--gn-surface-sunken');
   });
 });
