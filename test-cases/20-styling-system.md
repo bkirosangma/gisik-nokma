@@ -173,3 +173,8 @@ Run on the dev stack built from the release branch (`ctl rebuild` is the control
 
 - ✅ **20.271 — the timeline's Earlier / Today / Later navigation is a quiet outlined 44px control with its hover wash and agrees with the calendar's navigation on every value (the pair 13.1147 compares), and its weeks band and side panel are recessed tracks;** control: the clipped-bar dashed edges and the side-entry marker edge are still declared. Mutation: restore `min-height: 2.25rem` on `.gn-timeline__nav`.
 - ✅ **20.272 — no timeline rule paints a flat boundary or the retired constant;** control: the scan reads more than 25 timeline rules. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-timeline__side`.
+## 20.35 Plan B — settings and the workspace settings form
+
+- ✅ **20.341 — the settings sidebar is a raised panel and the workspace settings form's action row is separated by a decorative hairline;** control: the form's fields keep their accessible edge (B2). Mutation: restore `border-top: 1px solid var(--gn-border)` on the actions row.
+- ✅ **20.342 — no settings rule paints a flat boundary or the retired constant;** control: the scan reads the settings and workspace-settings rules. Mutation: plant `background: var(--gn-surface-sunken)` into `.gn-settings__sidebar`.
+- ✅ **20.343 — Save is the Workspace settings screen's ONE loud element: exactly one primary `Button` is on the tab and it is Save;** control: the tab has rendered and Save is a named `button`. Mutation: drop `variant="primary"` from Save in `workspace-settings-form.tsx`.
