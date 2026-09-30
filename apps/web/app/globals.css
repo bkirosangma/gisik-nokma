@@ -4501,6 +4501,24 @@ input, textarea, select { font-family: inherit; }
    lands 1rem under the TOP OF THE COLUMN: the bar is not over this column, so the
    `calc(var(--app-nav-offset) + 1rem)` the window-scrolled page needs is reset.
 
+   EACH COLUMN IS THE CONTAINING BLOCK OF THE ABSOLUTE NODES INSIDE IT
+   (`position: relative`, case 18.487; N1b, measured in a real browser). The
+   editor's visually-hidden `disabledReason` span
+   (`packages/editor/src/components/TicketEditorSlot.tsx`, inline
+   `position: absolute`, rendered on every note) had no positioned ancestor, so
+   it escaped the column's `overflow` — an absolute box is clipped only by
+   ancestors that are its containing block — and sat at its static position at
+   the bottom of the note: the PAGE became scrollable (`scrollHeight` 6271 at a
+   725px window) and a TOC `scrollIntoView` moved the window as well as the
+   column. On the scrollers themselves, not on `.gn-notes`: `.gn-notes` does not
+   clip, so the node would still overflow it and still stretch the page. No
+   `overflow: clip` on `.gn-notes`, which would also hide the next stray
+   element. `position: relative` makes no containing block for `position: fixed`
+   (only transform, filter and contain do), so the suggestion popups, the link
+   editor, the TOC launcher and the progress bar keep anchoring to the
+   viewport; the table toolbar and the tooltips anchor to `.ticket-editor` and
+   `.ticket-editor__tool-wrap`, both already positioned.
+
    DECLARED HERE, AFTER THE BASE RULES IT OVERRIDES, AND NOT NEXT TO THE
    `max-width: 60rem` BLOCK: a media query adds no specificity, so this block
    beats an EARLIER equal-specificity rule and loses to a later one. The heading
@@ -4522,11 +4540,13 @@ input, textarea, select { font-family: inherit; }
     grid-template-rows: minmax(0, 1fr);
   }
   .gn-notes__tree {
+    position: relative;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-bottom: 1rem;
   }
   .gn-notes__document {
+    position: relative;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-bottom: 3rem;

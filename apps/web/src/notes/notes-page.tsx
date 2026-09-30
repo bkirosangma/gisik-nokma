@@ -14,6 +14,7 @@ import { CreateNoteDialog } from './create-note-dialog.js';
 import { NoteDocument } from './note-document.js';
 import { NotesSearchHeader } from './notes-search-header.js';
 import { TocLauncher } from './toc-launcher.js';
+import { carryTreeScroll } from './tree-scroll.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -129,11 +130,11 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   /**
    * The document column scrolls on its own above 60rem (`.gn-notes__document`,
    * case 18.481), and Next resets the WINDOW's scroll on a navigation, not an
-   * element's: when the page stays mounted across `/notes/a` → `/notes/b` (a param
-   * change on one route file; a remount is the other possibility and resets this
-   * for free) the next note would open at the previous one's offset. A link that carries a hash
-   * (`#heading`, `#comment-…`) is left alone — the scroll that owns it runs after
-   * the content lands. Case 18.485.
+   * element's. In production a note change REMOUNTS this page (see `tree-scroll.ts`),
+   * so the new column starts at the top for free; this effect covers the page
+   * being reused across a param change (a re-render with a new `noteId`). A link that
+   * carries a hash (`#heading`, `#comment-…`) is left alone — the scroll that owns it
+   * runs after the content lands. Case 18.485.
    */
   const documentRegionRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -142,6 +143,12 @@ export function NotesPage({ noteId }: { noteId?: string }) {
       if (region !== null) region.scrollTop = 0;
     }
   }, [noteId]);
+  /**
+   * Put the tree back where it was after the remount a note change is (18.488; why the tree is
+   * not lifted into a layout, and how the offset is carried, is `tree-scroll.ts`'s).
+   */
+  const treeRef = useRef<HTMLElement | null>(null);
+  useEffect(() => (treeRef.current === null ? undefined : carryTreeScroll(treeRef.current)), []);
   const [headings, setHeadings] = useState<ReadingMeta['headings']>([]);
 
   /** The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css). */
@@ -228,6 +235,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             Notes list
           </button>
           <nav
+            ref={treeRef}
             aria-label="Notes"
             id="gn-notes-tree"
             className="gn-notes__tree gn-notes__tree--drawer"

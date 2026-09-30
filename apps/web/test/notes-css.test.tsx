@@ -853,3 +853,40 @@ describe('18.486 the wide block is declared AFTER every rule it overrides', () =
     }
   });
 });
+
+describe('18.487 each scroller is the containing block of the absolute nodes inside it', () => {
+  /**
+   * N1b (measured in a real browser, 2026-09-30): the page still scrolled at 1280px
+   * (`scrollHeight` 6271 vs `innerHeight` 725) and a TOC click moved the WINDOW 155.5px. The node
+   * doing it is `TicketEditorSlot`'s visually-hidden `disabledReason` span
+   * (`packages/editor/src/components/TicketEditorSlot.tsx`, `id={useId()}`, an INLINE
+   * `position: absolute`): the notes editor mounts the slot with no `submit`, so the span renders on
+   * every note, and nothing above it was positioned (`.editor-slot` clips but is not a containing
+   * block). An absolute box escapes the overflow of every ancestor that is not its containing block,
+   * so it sat at its static position at the bottom of the note and stretched the PAGE.
+   * `.editor-slot__attach-input` is a second instance of the same shape.
+   * THIS SCANS THE STYLESHEET, so it cannot see an inline-styled culprit — it pins the cure instead:
+   * a scroller that is `position: relative` is the containing block for, and clips, every absolute
+   * descendant whatever styled it. On `.gn-notes` alone it would not work (it does not clip, so the
+   * node still overflows it and still extends the page). `position: relative` creates no containing
+   * block for `position: fixed`, so the popups, the TOC launcher and the progress bar keep anchoring
+   * to the viewport. Whether the window is now unscrollable is the 🧪 case 18.490.
+   * MUTATION TARGET: delete `position: relative` from either rule in the `width > 60rem` block.
+   */
+  it('18.487 .gn-notes__document and .gn-notes__tree are position: relative in the wide block and nowhere else; CONTROL: both are also the scrollers, and .gn-notes is not the fix', () => {
+    const wide = wideBody();
+    for (const selector of ['.gn-notes__document', '.gn-notes__tree']) {
+      expect(ruleIn(wide, selector), `${selector} in the wide block`).toMatch(/position:\s*relative;/);
+      // Nothing changes at or below 60rem: the base rule is not positioned either.
+      expect(declarationsFor(CSS, selector) ?? '', `${selector} base rule`).not.toMatch(/position:/);
+    }
+    const narrow = mediaBlocksTouching(CSS, 'gn-notes').find((b) => b.condition === 'max-width: 60rem');
+    expect(narrow, 'the max-width: 60rem block').toBeDefined();
+    expect(narrow!.body).not.toMatch(/\.gn-notes__(?:tree|document)[^{]*\{[^}]*position:/);
+    // CONTROL (same `it`): the containing blocks are the very rules that scroll, and `.gn-notes` is not
+    // made `position: relative` instead — it does not clip, so that would not stop the page scrolling.
+    expect(ruleIn(wide, '.gn-notes__document')).toMatch(/overflow-y:\s*auto;/);
+    expect(ruleIn(wide, '.gn-notes__tree')).toMatch(/overflow-y:\s*auto;/);
+    expect(ruleIn(wide, '.gn-notes')).not.toMatch(/position:/);
+  });
+});
