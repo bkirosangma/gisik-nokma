@@ -26,6 +26,8 @@ describe('6.330 relativeTime', () => {
 
   it('6.330 control: a timestamp in the future (clock skew) reads "Active now", and junk is returned verbatim', () => {
     expect(relativeTime(new Date(now.getTime() + 60_000).toISOString(), now)).toBe('Active now');
+    // Far enough ahead that a sign-blind age (Math.abs) would read "2 hours ago".
+    expect(relativeTime(new Date(now.getTime() + 2 * HOUR).toISOString(), now)).toBe('Active now');
     expect(relativeTime('not-a-date', now)).toBe('not-a-date');
   });
 });
