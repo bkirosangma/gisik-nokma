@@ -222,6 +222,22 @@ describe('20.105 the column under the drag is highlighted, not given a placehold
     expect(list().children.length).toBe(before);
   });
 
+  it('20.105 one shared dataTransfer: what dragstart writes is what dragenter reads', async () => {
+    await mount();
+    const columnB = columnOf('doing');
+    // A recording fake: `setData` appends to the live `types`, as a browser's does.
+    const dataTransfer = liftingDataTransfer([]);
+    // CONTROL — before dragstart the same (still empty) object highlights nothing.
+    fireEvent.dragEnter(columnB, { dataTransfer });
+    expect(columnB.classList.contains(DROP_TARGET)).toBe(false);
+    // The two handlers are connected ONLY through this object: the marker is written
+    // in the slot's onDragStart and read in the column's onDragEnter.
+    fireEvent.dragStart(slotOf(TICKET), { dataTransfer });
+    expect(dataTransfer.types).toContain(DRAG_CARD_MARKER);
+    fireEvent.dragEnter(columnB, { dataTransfer });
+    expect(columnB.classList.contains(DROP_TARGET)).toBe(true);
+  });
+
   it('20.105 a drag carrying only text/plain (a text selection) never highlights', async () => {
     await mount();
     const columnB = columnOf('doing');
