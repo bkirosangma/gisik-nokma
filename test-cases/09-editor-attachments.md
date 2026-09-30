@@ -556,7 +556,7 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.408 — the scrollspy observer is rooted at the viewport when the window scrolls and at the pane when a pane does.** (`packages/editor/test/reading-scroll.test.tsx`)
 - ✅ **9.409 — the note page mounts a labelled progressbar for an editor and for a read-only viewer.** (`apps/web/test/note-document.test.tsx`)
 - ✅ **9.410 — the skin: bar top from `--app-nav-offset`, `--gn-border` track and `--gn-accent` fill, transition dropped under `prefers-reduced-motion`, headings `scroll-margin-top` clear of the nav, no literal colour in the section.** (`apps/web/test/note-document.test.tsx`)
-- 🧪 **9.411 — browser: on a long note the bar sits directly under the sticky nav, fills as the page scrolls, and a table-of-contents click lands the heading below the nav (light and dark).**
+- 🧪 **9.411 — browser: on a long note the bar sits directly under the sticky nav, fills as the page scrolls, and a table-of-contents click lands the heading below the nav (light and dark).** *At and below 60rem; above it the document column scrolls instead — see 18.491.*
 - ✅ **9.412 — heading anchors are opt-in: without `headingLink` a heading has no id, no button and no live region (and the extension registers no plugin); with it all three, and the region goes with the editor.** (`packages/editor/test/heading-anchors.test.ts`)
 - ✅ **9.413 — H1–H6 are all stamped in document order with `-2`/`-3` for repeats, an empty heading gets nothing, a punctuation-only one gets `heading-N` (N over non-empty headings), and the ids follow an edit.** (`packages/editor/test/heading-anchors.test.ts`)
 - ✅ **9.414 — one id function: `extractReadingMeta` lists H1–H3 with exactly the ids the extension stamped (H4+ stamped, not listed), and a `data-heading-id` wins over a reading of the rendered text.** (`packages/editor/test/heading-anchors.test.ts`)
@@ -614,3 +614,11 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 *Ids `9.491`–`9.499` are unused. Sits after the peer block `9.480`–`9.489`.*
 
 - ✅ **9.490 — a keyboard or assistive-technology activation of the fold button (`click` with `detail === 0`) keeps focus on the button; control: a pointer click (`detail: 1`) leaves focus in the editor.** Mutation: drop the `detail !== 0` guard so the hand-back also runs for a pointer click, or delete the `click` arm → red. Behaviour was wrong for a keyboard or screen-reader user (their focus jumped into the editor body); a mouse user's caret in the editor is intended. (`packages/editor/test/collapsible.test.ts`)
+
+## The reading readers follow the scroller across the notes breakpoint (notes split-scroll, 2026-09-30) — block `9.500`–`9.509`
+
+*Ids `9.503`–`9.509` are unused. Sits after the fold-focus block `9.490`–`9.499`.*
+
+- ✅ **9.500 — `ReadingProgress` follows the scroller across a regime change: at mount only the window is read (a scroll on an ancestor that does not yet scroll is ignored — control); after a resize that makes an ancestor scroll it reads the column and ignores the window; after a resize that stops it, the window again and the column ignored.** Mutation: the resize handler does not re-resolve (the bar stays on the window). `packages/editor/test/reading-scroll.test.tsx`.
+- ✅ **9.501 — `ReadingTOC` re-roots its scrollspy observer across a regime change: viewport → column → viewport, disconnecting the old observer each time; a resize that changes nothing does not rebuild (control).** Mutation: the resize handler does not re-root. `packages/editor/test/reading-scroll.test.tsx`.
+- ✅ **9.502 — every popup that repositions on scroll registers `window` scroll in the CAPTURE phase (`suggestion-popup-position.ts`, `wiki-link.ts`, `LinkEditorPopover.tsx`, `TableFloatingToolbar.tsx`), so a nested scroller's scroll reaches it; the primitive is proved live (a capture listener on `window` hears an element's scroll, a bubble one does not — control).** Mutation: `true` → `false` on one registration. `packages/editor/test/reading-scroll.test.tsx`.
