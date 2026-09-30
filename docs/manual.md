@@ -1226,6 +1226,9 @@ to show its settings: for a stage, its name, **Set as start** and **Delete state
 rules, **Add rule** and **Delete transition**. Only one row is open at a time — opening another closes
 the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
 canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
+An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide
+screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so
+the canvas and the page do not move while you read down it.
 Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
 them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
 

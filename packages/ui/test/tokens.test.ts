@@ -1555,6 +1555,27 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
   });
+
+  /**
+   * 10.160 (W1c, 2026-10-01) — `danger` as TEXT on **`surfaceWell`**, the ground of the quiet danger buttons
+   * (`.gn-button.builder-quiet-danger`: "Remove rule", "Delete transition", "Delete state") inside the builder's
+   * recessed row body. Same two controls as 16.84 bind the reading to THIS token table.
+   */
+  it('10.160 danger-as-ink on surfaceWell clears AA in all six combinations, on the ground the builder\'s danger buttons really have', () => {
+    // CONTROL 1 — the pinned primitives.
+    expect(colorOf('light', 'danger', 'neo')).toBe('#9e2a20');
+    expect(colorOf('light', 'danger', 'hig')).toBe('#d70015');
+    // CONTROL 2 — the same computation still reproduces the recorded `surface` shortfall (4.4013 < 4.5), so it reads the table the rest of the file reads.
+    expect(contrastRatio(colorOf('light', 'danger'), colorOf('light', 'surface'))).toBeLessThan(4.5);
+    for (const style of ['hig', 'minimal', 'neo'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        expect(
+          contrastRatio(colorOf(theme, 'danger', style), colorOf(theme, 'surfaceWell', style)),
+          `${style}/${theme}: danger as ink on surfaceWell — the quiet danger buttons' ground`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
 });
 
 /**

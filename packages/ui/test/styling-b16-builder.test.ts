@@ -96,15 +96,17 @@ describe('10.154 the States / Transitions layout and row declarations', () => {
   it('10.154 the left column is sticky and scrolls ONLY side by side; the base rule carries none of it; the two queries never overlap', () => {
     const sideBySide = ruleExactly(css, '.workflow-builder-screen__left', SIDE_BY_SIDE);
     expect(valueOf(sideBySide, 'position')).toBe('sticky');
-    expect(valueOf(sideBySide, 'top')).toBe('1rem');
-    expect(valueOf(sideBySide, 'max-height')).toBe('calc(100vh - 2rem)');
+    // W1d (2026-10-01, case 10.161): clears the sticky app bar (`--app-nav-offset`), which `top: 1rem` sat UNDER.
+    expect(valueOf(sideBySide, 'top')).toBe('calc(var(--app-nav-offset, 0px) + 1rem)');
+    expect(valueOf(sideBySide, 'max-height')).toBe('calc(100vh - var(--app-nav-offset, 0px) - 2rem)');
     expect(valueOf(sideBySide, 'overflow-y')).toBe('auto');
+    expect(valueOf(sideBySide, 'overscroll-behavior')).toBe('contain');
 
     // Stacked, the column is plain flow: the BASE rule (no at-rule) must not carry any of the four.
     const base = ruleExactly(css, '.workflow-builder-screen__left');
     // CONTROL — the base rule was found and does carry its own layout, so "absent" below is a reading and not an empty string.
     expect(valueOf(base, 'flex-direction')).toBe('column');
-    for (const property of ['position', 'top', 'max-height', 'overflow-y']) expect(valueOf(base, property), property).toBeNull();
+    for (const property of ['position', 'top', 'max-height', 'overflow-y', 'overscroll-behavior']) expect(valueOf(base, property), property).toBeNull();
 
     // No viewport width matches both queries: min strictly above max, and contiguous (under one px, 1/16 rem).
     const min = Number(/min-width: ([\d.]+)rem/.exec(SIDE_BY_SIDE)?.[1]);
@@ -141,5 +143,109 @@ describe('10.154 the States / Transitions layout and row declarations', () => {
     expect(naming.some((rule) => valueOf(rule.body, 'background') === 'var(--gn-surface-well)')).toBe(true);
     const displayed = naming.filter((rule) => valueOf(rule.body, 'display') !== null);
     if (displayed.length > 0) expect(valueOf(ruleExactly(css, '.builder-row__body[hidden]'), 'display')).toBe('none');
+  });
+});
+
+/**
+ * W1 polish (2026-10-01, cases 10.157–10.161) — the stylesheet half of four owner-approved fixes. Browser-only claims are
+ * 10.162/10.163 (🧪); everything here is a contract on declarations, each asserted by exact value with a control in the same `it`.
+ */
+describe('10.157 the Add rule trigger has a 44px hit box and the drawn box is unchanged', () => {
+  const css = cssOf('ui');
+  const floor = 44;
+  const px = (rem: string | null): number => Number(/^(-?[\d.]+)rem$/.exec(rem ?? '')?.[1]) * 16;
+
+  it('10.157 a transparent ::before, centred, 2.75rem tall, on a positioned trigger', () => {
+    // CONTROL — the trigger's own reset rule is intact (bare: no border, no fill), so the slop is what adds the 44.
+    const reset = ruleExactly(css, ['.gn-board__empty-create', '.add-rule-menu__trigger']);
+    expect(valueOf(reset, 'border')).toBe('none');
+    expect(valueOf(reset, 'padding')).toBe('0');
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__trigger'), 'position')).toBe('relative');
+    const slop = ruleExactly(css, '.add-rule-menu__trigger::before');
+    expect(valueOf(slop, 'content')).toBe("''");
+    expect(valueOf(slop, 'position')).toBe('absolute');
+    expect(px(valueOf(slop, 'height'))).toBeGreaterThanOrEqual(floor);
+    // Centred on the control, so the extra height is split above and below.
+    expect(valueOf(slop, 'top')).toBe('50%');
+    expect(px(valueOf(slop, 'margin-top'))).toBe(-px(valueOf(slop, 'height')) / 2);
+    // It paints nothing.
+    for (const property of ['background', 'border', 'box-shadow']) expect(valueOf(slop, property), property).toBeNull();
+  });
+
+  it('10.157 the list is positioned, so the first item (painted after the trigger) wins the overlap under the trigger\'s slop', () => {
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__list'), 'position')).toBe('relative');
+  });
+});
+
+describe('10.158 the Add rule menu items have a 44px hit box', () => {
+  const css = cssOf('ui');
+  it('10.158 an item is at least 2.75rem tall, a quiet row that washes on hover', () => {
+    const item = ruleExactly(css, '.add-rule-menu__item');
+    // CONTROL — the rule reads as the reset it is (no UA chrome), so the height check reads the real rule.
+    expect(valueOf(item, 'border')).toBe('none');
+    expect(valueOf(item, 'background')).toBe('transparent');
+    expect(valueOf(item, 'min-height')).toBe('2.75rem');
+    expect(valueOf(item, 'width')).toBe('100%');
+    expect(valueOf(ruleExactly(css, '.add-rule-menu__item:hover'), 'background')).toBe('var(--gn-fill-quaternary)');
+  });
+});
+
+describe('10.159 the destructive buttons inside the well are quiet danger buttons', () => {
+  const css = cssOf('ui');
+  const QUIET = '.gn-button.builder-quiet-danger';
+
+  it('10.159 transparent at rest, danger ink, no shadow; the hover is a wash, not a fill; 44px kept', () => {
+    // CONTROL — the filled variant this overrides still exists and still fills, so "transparent" below is an override, not an absence.
+    expect(valueOf(ruleExactly(css, '.gn-button--danger'), 'background')).toBe('var(--gn-danger)');
+    const rest = ruleExactly(css, QUIET);
+    expect(valueOf(rest, 'background')).toBe('transparent');
+    expect(valueOf(rest, 'color')).toBe('var(--gn-danger)');
+    expect(valueOf(rest, 'box-shadow')).toBe('none');
+    expect(valueOf(rest, 'min-height')).toBe('2.75rem');
+    const hover = ruleExactly(css, `${QUIET}:hover:not(:disabled)`);
+    expect(valueOf(hover, 'background')).toBe('var(--gn-fill-quaternary)');
+    // The filled variant's lift and scale do not come back on hover or press.
+    expect(valueOf(hover, 'box-shadow')).toBe('none');
+    expect(valueOf(hover, 'transform')).toBe('none');
+    const press = ruleExactly(css, `${QUIET}:active:not(:disabled)`);
+    expect(valueOf(press, 'box-shadow')).toBe('none');
+    expect(valueOf(press, 'transform')).toBe('none');
+  });
+
+  it('10.159 no rule in the family fills with danger (the overriding rule is the only thing that names the quiet class)', () => {
+    const naming = parseRules(css).filter((rule) => rule.selectors.some((selector) => selector.includes('builder-quiet-danger')));
+    expect(naming.length).toBeGreaterThanOrEqual(3);
+    for (const rule of naming) expect(valueOf(rule.body, 'background'), rule.selectors.join(', ')).not.toBe('var(--gn-danger)');
+  });
+});
+
+describe('10.161 the left column is its own scroll region above the wide breakpoint', () => {
+  const css = cssOf('ui');
+  const SIDE_BY_SIDE = '@media (min-width: 64.0625rem)';
+  const STACKED = '@media (max-width: 64rem)';
+
+  it('10.161 sticky under the app bar, height bounded to the viewport below it, own overflow, scroll does not chain to the page', () => {
+    const wide = ruleExactly(css, '.workflow-builder-screen__left', SIDE_BY_SIDE);
+    // CONTROL — the rule was found and is the positioned one (so the four assertions below read the real block).
+    expect(valueOf(wide, 'position')).toBe('sticky');
+    expect(valueOf(wide, 'top')).toBe('calc(var(--app-nav-offset, 0px) + 1rem)');
+    expect(valueOf(wide, 'max-height')).toBe('calc(100vh - var(--app-nav-offset, 0px) - 2rem)');
+    expect(valueOf(wide, 'overflow-y')).toBe('auto');
+    expect(valueOf(wide, 'overscroll-behavior')).toBe('contain');
+  });
+
+  it('10.161 the wide block is declared AFTER the base rule, and the stacked block gives the column nothing', () => {
+    const rules = parseRules(css);
+    const at = (atRule: string | null) => rules.findIndex((rule) => rule.atRule === atRule && rule.selectors.join(',') === '.workflow-builder-screen__left');
+    const base = at(null);
+    const wide = at(SIDE_BY_SIDE);
+    // CONTROL — both were found.
+    expect(base).toBeGreaterThanOrEqual(0);
+    expect(wide).toBeGreaterThanOrEqual(0);
+    expect(wide).toBeGreaterThan(base);
+    // Stacked: no rule in the stacked block names the column at all — nothing scrolls on its own there.
+    expect(at(STACKED)).toBe(-1);
+    // The stacked layout rule is still the one-track arm (untouched by this change).
+    expect(valueOf(ruleExactly(css, '.workflow-builder-screen__layout', STACKED), 'grid-template-columns')).toBe('minmax(0, 1fr)');
   });
 });
