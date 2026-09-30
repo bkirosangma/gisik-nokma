@@ -155,6 +155,19 @@ describe('6.335/6.336 passkeys grouped by provider (devices plan Task 7)', () =>
     expect(within(group).getByText('Unnamed passkey')).toBeInTheDocument();
     expect(within(group).queryByText('YubiKey')).toBeNull();
     cleanup();
+    // "Security key or other" must be last because it is the catch-all, not because 'S' happens to sort late: a provider
+    // sorting AFTER it alphabetically ("Windows Hello") must still come before it, whatever order the server sent.
+    mount([
+      pk({ id: 'u', provider: 'Security key or other' }),
+      pk({ id: 'w', provider: 'Windows Hello' }),
+      pk({ id: 'g', provider: 'Google Password Manager' }),
+    ]);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Google Password Manager · 1',
+      'Windows Hello · 1',
+      'Security key or other · 1',
+    ]);
+    cleanup();
     mount([pk({ id: 'only', provider: 'Windows Hello' })]);
     expect(screen.getByRole('heading', { name: 'Windows Hello · 1' })).toBeInTheDocument();
   });

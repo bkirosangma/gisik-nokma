@@ -272,7 +272,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   no longer does: `prefs` stays unset on a failed read, the section renders every row **disabled** with
   a stated refusal ("Your preferences could not be loaded"), and `toggleKind`'s own guard (it already
   refused to act while `prefs` is unset) now means a click on this path cannot save. **RULING E2-24(a) (closed):** a refused SAVE (as opposed to a failed read) reverted the optimistic flip with no rendered outcome at all — the only trace was the switch silently snapping back, and if the REVERT read itself also failed there was no trace whatsoever, since that `.load()` call carried no rejection handler either. Both closed: the revert's `.load()` now falls back to the same `prefsError` state a failed initial read uses (the component genuinely does not know the true value any more, so it earns the same disabled treatment), and the section takes a new `saveError` prop — distinct from `error`, rendered as its own refusal WITHOUT disabling anything, since the data is still current once a successful revert settles. **Sign-in and devices, devices half (devices plan Task 6, 2026-10-01):** ONE row per device, not per session — the list comes from `GET /v1/me/devices` (see "Your devices"), read with a plain `fetch('/v1/me/devices', { credentials: 'include' })` in `apps/web/src/account/account-clients.ts` (no `authClient.listSessions`: that route is charged to the shared `auth:` rate-limit bucket and could not carry the one-way `key`/`tag`). The heading reads "Sign-in and devices · N signed in · M active" (N devices, M the size of the active group — the current device always counts as active; a device with no `lastSeenAt` is idle). **Owner ruling FD3=A:** the list splits into "Active in the last 24 hours" (strictly under 24 h, or the current device) and a collapsed "Signed in, idle (N)" toggle (`aria-expanded`; its rows are not rendered until opened). Each row reads "<browser> on <OS> · TAG" ("Older sign-in · …" for a pre-cookie legacy row), with "This device", the last-active wording (`relativeTime` in `packages/app-core/src/account/relative-time.ts`: "Active now" under 5 minutes, then minutes/hours/days, from 7 days the IST date via `formatDate`), "First signed in <date>" and, above one, "N sign-ins". Every device but the current one has a quiet "Sign out this device" (`POST /v1/me/devices/:key/sign-out`; accessible name carries the row title), and "Sign out all other devices" (better-auth `revokeOtherSessions`) shows once when there is more than one device. A refused sign-out renders verbatim in a `role="alert"` and the list is re-read only after a success (ruling E2-24(b), closed); no optimistic removal. **Named absence, on the same silent-omission footing as Your workspaces and Notifications above:** a failed list read collapses to the same hedged empty note an honestly-empty answer produces ("No signed-in devices to show."). Files: `packages/app-core/src/account/sessions-section.tsx`, `sessions-client.ts`, `relative-time.ts`. **Sign-in and devices, Passkeys half (Task 8):** the credentials
-  `authClient.passkey.listUserPasskeys()` answers, each row carrying a delete control whose ACCESSIBLE
+  `GET /v1/me/passkeys` answers (devices plan Tasks 5 and 7, 2026-10-01 — not the plugin's `listUserPasskeys`, whose schema does not know `lastUsedAt`): **grouped under a heading per authenticator** ("iCloud Keychain · 2", providers alphabetical, "Security key or other" always last), each row reading its name ("Unnamed passkey" when it has none), "Added <date>", and "Last used <relative>" or "Never used", with a quiet **Not used recently** flag when the server says it has been unused for 90 days (or never) — and each row carrying a delete control whose ACCESSIBLE
   name is its own passkey's (`Delete passkey {name}`, so three credentials are three distinguishable
   controls rather than three announcements of "Delete"), a named empty state ("You have no passkeys
   yet."), and a name field plus "Add a passkey" that runs the real WebAuthn registration ceremony
@@ -282,7 +282,7 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   the stored label is the server's answer, so a locally-invented row could show a name the account
   does not carry. **The three client member names were settled by the COMPILER, not by documentation
   or by a grep:** only `signIn.passkey` and `passkey.addPasskey` are hand-declared by
-  `@better-auth/passkey@1.7.2`'s client plugin; `listUserPasskeys` and `deletePasskey` are generated
+  `@better-auth/passkey@1.7.2`'s client plugin; `deletePasskey` (and, no longer used for the list, `listUserPasskeys`) are generated
   from the server endpoint paths (`/passkey/list-user-passkeys`, `/passkey/delete-passkey`) by the
   same `PathToObject`/`CamelCase` machinery the Sessions half documents, and a typecheck probe WITH a
   negative control (an invented member, which failed `TS2339`) is what rules out the vacuous reading
@@ -297,20 +297,20 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   that carries NO message still surfaces, because `error?.message ?? null` would read a message-less
   refusal as success and a silent no-op after somebody touched a fingerprint sensor is
   indistinguishable from the passkey having been saved. **RULING E2-23 (closed):** the passive list read no longer keeps the silent-omission treatment its three siblings have, either. A failed list read used to collapse to `[]`, and the named empty state above ("You have no passkeys yet.") then asserted a fact about the account nobody had confirmed — the same shape `sessions-section.tsx`'s sibling read still carries, hedged only by wording ("…to show"), never by a distinct state. `PasskeysSection` now takes a `listFailed` flag, independent of the add/remove `error` above: it states "Your passkeys could not be loaded." instead of the empty claim, but ONLY when there is nothing else to show — a caller still holding a real, previously-read list keeps rendering it even if a later poll fails. **The passkey list is also the one mount-time
-  read on this page that is GATED** (on `user !== null`): it lands under `/api/auth/*`, charged to the
-  shared `auth:` bucket, and sits behind better-auth's session middleware — measured as a real 401 in
-  `apps/server/test/auth/sign-in-flows.test.ts`, not asserted in prose — so an anonymous `/account`
-  load would spend a unit of everyone's sign-in budget on a request that cannot succeed. **Named cost,
+  read on this page that is GATED** (on `user !== null`): `GET /v1/me/passkeys` answers 401 to an anonymous visitor, so an
+  anonymous `/account` load would make a request that cannot succeed (until 2026-10-01 it was the plugin's
+  `/passkey/list-user-passkeys` under `/api/auth/*`, where that request also spent a unit of everyone's sign-in budget — measured as a real 401 in
+  `apps/server/test/auth/sign-in-flows.test.ts`). **Named cost,
   disclosed rather than slipped in:** for a SIGNED-IN visitor this adds `auth:` charges per
-  `/account` load (`/get-session`, `/passkey/list-user-passkeys`; the device list moved to `/v1/me/devices` on 2026-10-01 and is not charged) against a
+  `/account` load (`/get-session` only — the device list moved to `/v1/me/devices` and the passkey list to `/v1/me/passkeys` on 2026-10-01, `/v1/*` routes the limiter never charges) against a
   `RATE_LIMIT_AUTH_MAX` of 10; `/passkey/*` is absent from `SIGN_IN_PREFIXES`, so none of it touches
   the tighter `signin:` bucket. **And the CEREMONIES cost more than the page load, which is the half of
   this disclosure an operator actually has to act on:** counted from `@better-auth/passkey`'s own
-  `dist/client.mjs`, a successful Add is **3** units (`generate-register-options`,
-  `verify-registration`, then the re-list), an Add aborted at the prompt is **1**, a Delete is **2**,
+  `dist/client.mjs`, a successful Add is **2** units (`generate-register-options`,
+  `verify-registration`; the re-list is a `/v1/*` read and is not charged), an Add aborted at the prompt is **1**, a Delete is **1**,
   and a passkey sign-in click on `/sign-in` is **2** (`generate-authenticate-options`,
   `verify-authentication` — so a completed click costs two, not one). Arriving on `/account` and
-  registering once is six units of ten, and a person who fumbles the prompt a few times and retries can
+  registering once is three units of ten, and a person who fumbles the prompt a few times and retries can
   exhaust the window on a key shared across every browser behind the web container. **This does NOT
   weaken the rate-limit-neutral constraint and the two must not be run together:** that constraint is
   specifically about an ANONYMOUS `/sign-in` PAGE LOAD, which still charges ZERO — measured in a real

@@ -620,6 +620,39 @@ export const HELP_CONTENT: HelpContent = [
                     "text": " ends every one except the one you are using. The device you are using cannot be signed out from here — use the account menu."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Your "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Passkeys"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " are listed in the same place, grouped under the kind of authenticator that holds each one — for example \"iCloud Keychain\" or \"Windows Hello\", with a security key or anything unrecognised last. Each shows when you added it and when you last used it to sign in, or \"Never used\". A passkey that has not been used for about three months is marked "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Not used recently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; if you no longer have that device, choose "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside it."
+                  }
+                ]
               }
             ]
           }

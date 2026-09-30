@@ -120,6 +120,12 @@ there. The ones used in the last 24 hours are listed first; the rest wait under 
 you can open. **Sign out this device** ends that one; **Sign out all other devices** ends every one except
 the one you are using. The device you are using cannot be signed out from here — use the account menu.
 
+Your **Passkeys** are listed in the same place, grouped under the kind of authenticator that holds each
+one — for example "iCloud Keychain" or "Windows Hello", with a security key or anything unrecognised last.
+Each shows when you added it and when you last used it to sign in, or "Never used". A passkey that has not
+been used for about three months is marked **Not used recently**; if you no longer have that device,
+choose **Delete** beside it.
+
 ---
 
 ## §2 — Finding your way around
