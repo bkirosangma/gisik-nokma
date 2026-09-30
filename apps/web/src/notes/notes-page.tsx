@@ -31,6 +31,21 @@ import { WorkspaceNotesSection } from './workspace-notes-section.js';
 let pendingLostAccessToast = false;
 
 /**
+ * The tree's scroll offset, carried across the remount the same way — and for the
+ * same reason. App Router keys a dynamic segment by its param VALUE, so
+ * `/notes/a` → `/notes/b` does not re-render this page, it mounts a new one
+ * (measured in a real browser, N1b: the tree's `scrollTop` went 800 → 0), and
+ * `/notes` ↔ `/notes/<id>` are two route files. The alternative — lifting the tree
+ * into `app/notes/layout.tsx` so it never unmounts — was not taken: the tree's
+ * state (`workspaces`, the filters, the search) lives beside the document that
+ * also reads it, `getMyWorkspaces` would stop re-running per note, and
+ * `pendingLostAccessToast` above (read once by a fresh mount) and the drawer
+ * state (`treeOpen`, which a pick should close) depend on the remount.
+ * Case 18.488.
+ */
+let treeScrollTop = 0;
+
+/**
  * The `/notes` page (notes series Plan 5, spec §9.1–9.2).
  *
  * ## Why this page FANS OUT over workspaces when the inbox does not
@@ -129,11 +144,11 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   /**
    * The document column scrolls on its own above 60rem (`.gn-notes__document`,
    * case 18.481), and Next resets the WINDOW's scroll on a navigation, not an
-   * element's: when the page stays mounted across `/notes/a` → `/notes/b` (a param
-   * change on one route file; a remount is the other possibility and resets this
-   * for free) the next note would open at the previous one's offset. A link that carries a hash
-   * (`#heading`, `#comment-…`) is left alone — the scroll that owns it runs after
-   * the content lands. Case 18.485.
+   * element's. In production a note change REMOUNTS this page (see `treeScrollTop`),
+   * so the new column starts at the top for free; this effect covers the page
+   * being reused across a param change (a re-render with a new `noteId`). A link that
+   * carries a hash (`#heading`, `#comment-…`) is left alone — the scroll that owns it
+   * runs after the content lands. Case 18.485.
    */
   const documentRegionRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -142,6 +157,44 @@ export function NotesPage({ noteId }: { noteId?: string }) {
       if (region !== null) region.scrollTop = 0;
     }
   }, [noteId]);
+  /**
+   * Put the tree back where it was (18.488). The new tree is "Loading…" and short, and a
+   * browser CLAMPS `scrollTop` to what is scrollable, so setting it on mount lands on 0: the
+   * offset is re-applied each time the tree's rows change, until it sticks. The reader taking
+   * over (wheel, touch, key, pointer) cancels it, and so does a five-second cap (the rows
+   * that held the offset may be gone). While it is pending a `scroll` event is the clamp's,
+   * not the reader's, and is not recorded.
+   */
+  const treeRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const tree = treeRef.current;
+    if (tree === null) return;
+    let restoring = treeScrollTop > 0;
+    const restore = () => {
+      if (!restoring) return;
+      tree.scrollTop = treeScrollTop;
+      if (Math.abs(tree.scrollTop - treeScrollTop) < 2) restoring = false;
+    };
+    const stop = () => {
+      restoring = false;
+    };
+    const record = () => {
+      if (!restoring) treeScrollTop = tree.scrollTop;
+    };
+    const observer = new MutationObserver(restore);
+    observer.observe(tree, { childList: true, subtree: true });
+    restore();
+    const takeover = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    tree.addEventListener('scroll', record, { passive: true });
+    for (const type of takeover) tree.addEventListener(type, stop, { passive: true });
+    const giveUp = window.setTimeout(stop, 5000);
+    return () => {
+      window.clearTimeout(giveUp);
+      observer.disconnect();
+      tree.removeEventListener('scroll', record);
+      for (const type of takeover) tree.removeEventListener(type, stop);
+    };
+  }, []);
   const [headings, setHeadings] = useState<ReadingMeta['headings']>([]);
 
   /** The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css). */
@@ -228,6 +281,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             Notes list
           </button>
           <nav
+            ref={treeRef}
             aria-label="Notes"
             id="gn-notes-tree"
             className="gn-notes__tree gn-notes__tree--drawer"
