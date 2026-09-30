@@ -4212,10 +4212,11 @@ input, textarea, select { font-family: inherit; }
 .ticket-editor__content .editor-codeblock__copy {
   opacity: 0;
   /* A SOLID ground, never an alpha fill: `--gn-fill-tertiary` let the code show through the
-     button. `--gn-surface-sunken` is the house recessed well (the same ground a posted
-     comment's code block wears), `text` on it is a declared 4.5:1 pair, and it reads as a
-     chip against the block's own tint. */
-  background: var(--gn-surface-sunken);
+     button. `--gn-surface` is opaque in every style x theme and `text` on it is a declared 4.5:1
+     pair. `surface-sunken` was the first pick and is refused by case 20.302 (a recessed fill is
+     not a boundary), so the chip's edge is the house `--gn-border` line, as `.gn-field__input`'s. */
+  background: var(--gn-surface);
+  border: 1px solid var(--gn-border);
   box-sizing: border-box;
   min-width: var(--gn-codeblock-copy-width);
   text-align: center;

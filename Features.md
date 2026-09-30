@@ -1645,7 +1645,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     `packages/app-core/src/views/comment-body.tsx`, `packages/ui/src/ui.css`
   - ✅ **The code block's Copy button no longer sits on the code** — the web skin reserves its box on the block's
     inline end (`padding-inline-end` derived from one `--gn-codeblock-copy-width`, sized for "Copied") so a wrapped line
-    stops short of it and the label flip cannot grow it, and paints it on the solid `--gn-surface-sunken` (it was the
+    stops short of it and the label flip cannot grow it, and paints it on the solid `--gn-surface` with a `--gn-border` edge (it was the
     alpha `--gn-fill-tertiary`, which let text show through); the gutter is on the outer block, so a scrolling `pre` ends
     at it and the button stays pinned. Reaches every web `TicketEditorSlot` mount; the mobile WebView (editor.css only)
     is not reached (cases 9.500–9.505; owner screenshot 2026-09-30); `apps/web/app/globals.css`

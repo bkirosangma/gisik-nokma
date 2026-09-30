@@ -93,7 +93,7 @@ describe('9.500 the code block reserves the Copy button on its inline end', () =
   });
 });
 
-/** `var(--gn-surface-sunken)` -> `surfaceSunken`. */
+/** `var(--gn-surface)` -> `surface`; `var(--gn-fill-tertiary)` -> `fillTertiary`. */
 function roleOf(value: string | null): TokenRole {
   const name = /^var\(--gn-([a-z-]+)\)$/.exec(value ?? '')?.[1];
   expect(name, `background is one solid \`var(--gn-*)\` token, got ${value}`).toBeDefined();
@@ -120,6 +120,9 @@ describe('9.502 the Copy button has an opaque ground and keeps 4.5:1 ink in ever
         ).toBeGreaterThanOrEqual(4.5);
       }
     }
+
+    // The chip's edge is the house border line (a solid ground alone would vanish into the block).
+    expect(declaration(copy, 'border')).toBe('1px solid var(--gn-border)');
 
     // CONTROL (stays green when the fill is restored): the ink is still the existing `--gn-text`.
     expect(declaration(copy, 'color')).toBe('var(--gn-text)');
