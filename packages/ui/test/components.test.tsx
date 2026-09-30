@@ -1152,10 +1152,11 @@ describe('13.1344 the raised appearance declares the raised coat', () => {
  * `border-radius` of its own, so the board card falls through to `.gn-card`'s
  * token and moves with the style axis like every other card.
  */
+// Amended 2026-09-29 (styling refresh Plan A, 20.042): the rule is multi-line with 1rem padding; the property — no radius of its own — is unchanged.
 describe('13.464 — the board card declares no border-radius of its own (Ruling 17)', () => {
   it('.gn-board-card keeps its own padding rule but sets no border-radius', () => {
     const body = rule('.gn-board-card');
-    expect(body, `.gn-board-card rule: ${body}`).toMatch(/padding:\s*0\.875rem/);
+    expect(body, `.gn-board-card rule: ${body}`).toMatch(/padding:\s*1rem/);
     expect(
       body.includes('border-radius'),
       `.gn-board-card reintroduced a literal radius that would out-specify nothing and tie .gn-card's by source order — ${body}`,
@@ -1169,8 +1170,8 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
    */
   it('a planted literal border-radius on .gn-board-card is caught', () => {
     const mutated = UI_CSS.replace(
-      '.gn-board-card { padding: 0.875rem; }',
-      '.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }',
+      '.gn-board-card {\n  padding: 1rem;',
+      '.gn-board-card {\n  padding: 1rem;\n  border-radius: 0.75rem;',
     );
     expect(
       mutated,

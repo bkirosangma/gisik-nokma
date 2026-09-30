@@ -372,7 +372,7 @@ not silently.
   source-scan shape, `neo-card-radius.test.ts`) — the rule still exists and still carries its 14px
   padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
   token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
-  `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)
+  `border-radius` on the rule is caught by the same test. Amended 2026-09-29 by 20.042 (styling refresh Plan A): the rule is now multi-line with 16px padding; it still declares no radius, and the witness plants one into the new text. — (`packages/ui/test/components.test.tsx`)
 - **13.1177** ✅ A board card draws a CLAIMED due date in its meta line, and draws a date that has
   PASSED in the danger tone (`.gn-board-card__due--late`) — ruling **E5-2** (release 2026-09-22, batch
   B13), from `docs/lanes/review-ux-exec5.md:242`. **The id comes from B13's ALLOCATED §13 BLOCK,
