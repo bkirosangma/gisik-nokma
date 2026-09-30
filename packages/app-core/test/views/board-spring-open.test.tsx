@@ -127,7 +127,7 @@ describe('20.140 leaving puts it back; leaving early cancels the wait', () => {
     await mount();
     const dataTransfer = dragOnto('tk_doing', 'done');
     await wait(SPRING_DELAY_MS - 100);
-    fireEvent.dragLeave(columnOf('done'), { dataTransfer, relatedTarget: columnOf('doing') });
+    leave(columnOf('done'), dataTransfer, columnOf('doing'));
     await wait(SPRING_DELAY_MS * 2);
     expect(isCollapsed('done')).toBe(true);
 
@@ -143,7 +143,7 @@ describe('20.140 leaving puts it back; leaving early cancels the wait', () => {
     await wait(SPRING_DELAY_MS);
     expect(isCollapsed('done')).toBe(false);
     // The pointer goes to a column OUTSIDE it: a real leave, whatever the enter/leave count holds.
-    fireEvent.dragLeave(columnOf('done'), { dataTransfer, relatedTarget: columnOf('doing') });
+    leave(columnOf('done'), dataTransfer, columnOf('doing'));
     expect(isCollapsed('done')).toBe(true);
     expect(stored()).toEqual(before);
   });
@@ -229,7 +229,7 @@ function enterTwice(dataTransfer: DataTransfer, stateId: string): void {
   fireEvent.dragEnter(columnOf(stateId).firstElementChild!, { dataTransfer });
 }
 const WAITING_KEY = columnCollapseKey('wf-errand', 'waiting');
-const DONE_OUTLINE = 'gn-board__column--drop-target';
+const DROP_OUTLINE = 'gn-board__column--drop-target';
 
 describe('20.155 only a column collapsed by choice springs', () => {
   it('20.155 a card held over an OPEN legal column and dropped writes nothing to the memory (CONTROL: Done, collapsed, springs in the same drag)', async () => {
@@ -257,9 +257,9 @@ describe('20.156 a dragend that reaches only the document clears the drop outlin
     // Mutation `drag-end cleanup does not clear drop target`: drop `setDropTarget(null);` from the document-level `clear`.
     await mount();
     dragOnto('tk_doing', 'waiting');
-    expect(columnOf('waiting').classList.contains(DONE_OUTLINE)).toBe(true); // CONTROL
+    expect(columnOf('waiting').classList.contains(DROP_OUTLINE)).toBe(true); // CONTROL
     act(() => void document.dispatchEvent(new Event('dragend', { bubbles: true })));
-    expect(columnOf('waiting').classList.contains(DONE_OUTLINE)).toBe(false);
+    expect(columnOf('waiting').classList.contains(DROP_OUTLINE)).toBe(false);
   });
 });
 
@@ -277,7 +277,7 @@ describe('20.157 a dragleave to a target outside the column is a real leave even
     expect(isCollapsed('done')).toBe(false);
     leave(inner, dataTransfer, columnOf('doing')); // depth 2 -> 1, but the pointer is gone for good
     expect(isCollapsed('done')).toBe(true);
-    expect(columnOf('done').classList.contains(DONE_OUTLINE)).toBe(false);
+    expect(columnOf('done').classList.contains(DROP_OUTLINE)).toBe(false);
   });
 });
 
@@ -293,7 +293,7 @@ describe('20.158 a dragleave between two children of the same column is not a le
     const inner = columnOf('done').firstElementChild!;
     leave(inner, dataTransfer, columnOf('done').querySelector('ul') ?? columnOf('done'));
     expect(isCollapsed('done')).toBe(false);
-    expect(columnOf('done').classList.contains(DONE_OUTLINE)).toBe(true);
+    expect(columnOf('done').classList.contains(DROP_OUTLINE)).toBe(true);
 
     leave(inner, dataTransfer, columnOf('doing')); // CONTROL — a leave to a column outside does close it
     leave(columnOf('done'), dataTransfer, columnOf('doing'));

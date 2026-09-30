@@ -44,7 +44,9 @@ describe('20.134 the flight rides the move token and switches off under reduced 
     const wash = ruleExactly(CSS, '.gn-board__card-slot--waiting::after');
     const opacity = Number(valueOf(wash, 'opacity'));
     expect(opacity).toBeGreaterThan(0);
-    expect(opacity).toBeLessThan(1); // CONTROL — a wash that is fully opaque would hide the card it is meant to fade
+    expect(opacity).toBeLessThan(1); // a wash that is fully opaque would hide the card it is meant to fade
+    // CONTROL — the same probe on a rule with no wash says "absent": the flight rule sets no opacity, so it reads as 0
+    expect(Number(valueOf(ruleExactly(CSS, '.gn-board__card-slot--flight'), 'opacity') ?? 0)).toBe(0);
     expect(valueOf(wash, 'background')).toContain('var(--gn-');
     expect(valueOf(wash, 'inset')).toBe('0');
     expect(valueOf(wash, 'content')).toBe('""');
