@@ -118,6 +118,12 @@ the number you added.
 - ✅ **20.241 — the project header's groups are 16px apart; the contested-claim banner is a recessed well keeping its contested edge; the saved-filter rename field is recessed like every field; the sync notice's Dismiss is a quiet outlined control;** control: the filter chip's remove control keeps its 24px in-list floor. Mutation: restore `border-radius: 6px` on `.gn-sync-notices__dismiss`.
 - ✅ **20.242 — no project-chrome rule (`gn-project`, `gn-filters`, `gn-saved-filters`, `gn-contest-banner`, `gn-sync-`) paints a flat boundary or the retired constant;** control: the scan reads more than 40 rules under those prefixes. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-contest-banner`.
 
+
+## 20.26 Plan B — the List and Backlog tabs
+
+- ✅ **20.251 — the List's rows answer hover with a soft `fill-quaternary` wash, its row actions are ghost controls, its bulk close and column toggle are quiet outlined 44px controls (each with its hover wash), its column options are raised 44px pills, its section titles are recessed track bands, and its table is a raised panel with a recessed `surface-well` header band;** control: the collapse caret keeps its 24px in-list floor. Mutation: restore `min-height: 2.25rem` on `.gn-list__columns-toggle`.
+- ✅ **20.252 — no List/Backlog rule (`gn-list`, `gn-table`, `gn-row-action`) paints a flat boundary or the retired constant;** control: the tail-drop indicator keeps its `border-top` state edge, and the scan reads more than 50 rules under those prefixes (so an empty result is not an empty haystack). Mutation: restore `background: var(--gn-surface-sunken)` on the clickable-row hover.
+- ✅ **20.253 — the bulk close is QUIET (edged) and a row action is GHOST (edgeless): a standalone toolbar control carries an edge, a control inside a row does not;** control: both keep 44px. Mutation: give `.gn-row-action` `border: 1px solid var(--gn-border)`.
 ## 20.32 Plan B — members and invitations
 
 - ✅ **20.311 — the members table is a raised panel with a recessed header band; Send invitation is the screen's one loud element (the shared primary);** control: the zebra rows keep their `fill-quaternary`. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-members__th`.
