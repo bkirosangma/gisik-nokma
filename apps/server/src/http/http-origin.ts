@@ -186,6 +186,9 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // `SameSite=Lax` does not close it, because the product and the API are
   // same-site siblings of one registrable domain (see this file's own notes).
   '/v1/me/mcp-tokens/:id',
+  // Disconnecting a hosted assistant (remote-MCP plan Task 8) — the same denial-of-
+  // service-by-ambient-cookie as the token revoke above.
+  '/v1/me/mcp-connections/:id',
   // A cookie-authenticated POST that MINTS A CREDENTIAL — the same category as
   // the invite route three lines up, and the reason that one is here.
   '/v1/mcp/device/approve',

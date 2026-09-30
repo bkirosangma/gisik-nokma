@@ -43,6 +43,21 @@ const OTHER = 'b'.repeat(64);
 type Call = { url: string; method: string; body?: unknown };
 let calls: Call[] = [];
 
+/**
+ * The hosted-door reads Task 8 added to this screen (`/v1/me/mcp-connections`,
+ * `/v1/mcp/public-url`). They are answered BEFORE the script and recorded apart
+ * from `calls`, so every case written about the tokens door keeps asserting
+ * exactly what it did: which requests THAT door made, in what order. A case about
+ * the hosted door overrides `hosted`; the default is "no connections, door off".
+ */
+type Answer = { status: number; body?: unknown };
+const HOSTED_DEFAULTS: Record<string, Answer> = {
+  '/v1/me/mcp-connections': { status: 200, body: { connections: [] } },
+  '/v1/mcp/public-url': { status: 200, body: { url: null } },
+};
+let hosted: Record<string, Answer | ((call: Call) => Answer | Promise<Answer>)> = { ...HOSTED_DEFAULTS };
+let hostedCalls: Call[] = [];
+
 /** A `fetch` that answers from a script, recording every call it was asked to make. */
 function fetchStub(script: (call: Call, n: number) => { status: number; body?: unknown }): void {
   let n = 0;
@@ -51,8 +66,14 @@ function fetchStub(script: (call: Call, n: number) => { status: number; body?: u
     // write that only asserted "a PUT happened" would pass on a client that sent
     // the wrong name, or none. It stays the raw string the transport was handed.
     const call = { url: String(input), method: init?.method ?? 'GET', body: init?.body };
-    calls.push(call);
-    const answer = script(call, n);
+    const isHosted = call.url.startsWith('/v1/me/mcp-connections') || call.url === '/v1/mcp/public-url';
+    if (isHosted) hostedCalls.push(call);
+    else calls.push(call);
+    const hostedAnswer = isHosted ? hosted[call.url.split('?')[0]!] ?? hosted['/v1/me/mcp-connections'] : undefined;
+    const answer = isHosted
+      ? typeof hostedAnswer === 'function' ? await hostedAnswer(call) : hostedAnswer!
+      : script(call, n);
+    if (isHosted) return { ok: answer.status >= 200 && answer.status < 300, status: answer.status, json: async () => answer.body } as Response;
     n += 1;
     return {
       ok: answer.status >= 200 && answer.status < 300,
@@ -72,6 +93,8 @@ function mount(): void {
 
 beforeEach(() => {
   calls = [];
+  hostedCalls = [];
+  hosted = { ...HOSTED_DEFAULTS };
   session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
 });
 
@@ -372,3 +395,122 @@ describe('D — naming a connection from the row', () => {
     expect(calls.filter((c) => c.method !== 'GET')).toEqual([]);
   });
 });
+
+/**
+ * Case block 14.274–14.277 — the hosted MCP door's half of this screen (remote-MCP
+ * plan Task 8): the assistant APPS a person connected by URL, Disconnect, and the
+ * Connect panel. The tokens door's own cases above are untouched.
+ */
+const CONN = { id: 'conn_1', clientName: 'Claude', redirectHost: 'claude.ai', createdAt: '2026-09-30T00:00:00Z', lastUsedAt: '2026-09-30T10:00:00Z' };
+const LOCAL = { id: ID, name: 'laptop', createdAt: '2026-09-01T00:00:00Z', lastUsedAt: null };
+const tokensOnly = (tokens: unknown[]) => (call: Call) =>
+  call.method === 'GET' ? { status: 200, body: { tokens } } : { status: 204 };
+
+describe('14.274 hosted connections beside the local tokens', () => {
+  it('shows app · host, Connected, Last used and Disconnect; local rows keep Revoke', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN, { ...CONN, id: 'conn_2', clientName: 'ChatGPT', redirectHost: 'chatgpt.com', lastUsedAt: null }] } };
+    fetchStub(tokensOnly([LOCAL]));
+    mount();
+    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(screen.getByText('ChatGPT · chatgpt.com')).toBeInTheDocument();
+    const list = screen.getByTestId('mcp-connections-list');
+    expect(list).toHaveTextContent(/Connected .*2026/);
+    expect(list).toHaveTextContent(/Last used .*2026/);
+    expect(list).toHaveTextContent('Never used');
+    const disconnect = screen.getByTestId('mcp-connections-disconnect-conn_1');
+    expect(disconnect).toHaveTextContent('Disconnect'); // the visible label, not only the accessible name
+    expect(screen.getByRole('button', { name: 'Disconnect Claude (claude.ai)' })).toBeInTheDocument();
+    expect(screen.getByTestId(`mcp-tokens-revoke-${ID}`)).toHaveTextContent('Revoke'); // CONTROL — the local row is unchanged
+    expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
+  });
+
+  it('control: a person with neither sees the existing empty state', async () => {
+    fetchStub(tokensOnly([]));
+    mount();
+    expect(await screen.findByTestId('mcp-tokens-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-connections-list')).toBeNull();
+  });
+});
+
+describe('14.275 Disconnect', () => {
+  it('keeps the row while the DELETE is in flight and drops it after it resolves', async () => {
+    let release!: (a: Answer) => void;
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    hosted['/v1/me/mcp-connections/conn_1'] = () => new Promise<Answer>((resolve) => { release = resolve; });
+    fetchStub(tokensOnly([]));
+    mount();
+    const button = await screen.findByTestId('mcp-connections-disconnect-conn_1');
+    await userEvent.setup().click(button);
+    await waitFor(() => expect(hostedCalls.some((c) => c.method === 'DELETE' && c.url === '/v1/me/mcp-connections/conn_1')).toBe(true));
+    expect(screen.getByText('Claude · claude.ai')).toBeInTheDocument(); // CONTROL — still there mid-request
+    expect(screen.getByTestId('mcp-connections-disconnect-conn_1')).toHaveTextContent('Disconnecting…');
+    release({ status: 204 });
+    await waitFor(() => expect(screen.queryByText('Claude · claude.ai')).toBeNull());
+  });
+
+  it('shows the server\'s reason when the DELETE fails, and keeps the row', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    hosted['/v1/me/mcp-connections/conn_1'] = { status: 500, body: { error: 'boom', message: 'The server could not disconnect that right now.' } };
+    fetchStub(tokensOnly([]));
+    mount();
+    await userEvent.setup().click(await screen.findByTestId('mcp-connections-disconnect-conn_1'));
+    expect(await screen.findByTestId('mcp-tokens-refused')).toHaveTextContent('The server could not disconnect that right now.');
+    expect(screen.getByText('Claude · claude.ai')).toBeInTheDocument();
+  });
+});
+
+describe('14.276 the Connect an assistant panel', () => {
+  it('shows the server\'s URL with a Copy that writes it to the clipboard, and a How to connect link', async () => {
+    hosted['/v1/mcp/public-url'] = { status: 200, body: { url: 'https://pm-api.artsourced.in/mcp' } };
+    fetchStub(tokensOnly([]));
+    mount();
+    expect(await screen.findByTestId('mcp-public-url')).toHaveTextContent('https://pm-api.artsourced.in/mcp');
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    await user.click(screen.getByTestId('mcp-public-url-copy'));
+    expect(writeText).toHaveBeenCalledWith('https://pm-api.artsourced.in/mcp');
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'How to connect' })).toHaveAttribute('href', '/help#connecting-claude-or-chatgpt');
+    expect(screen.getByRole('heading', { name: 'Connect an assistant' })).toBeInTheDocument();
+  });
+
+  it('control: with the door off the panel is absent', async () => {
+    fetchStub(tokensOnly([]));
+    mount();
+    await screen.findByTestId('mcp-tokens-empty');
+    await waitFor(() => expect(hostedCalls.some((c) => c.url === '/v1/mcp/public-url')).toBe(true));
+    expect(screen.queryByTestId('mcp-public-url')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Connect an assistant' })).toBeNull();
+  });
+});
+
+describe('14.277 the two lists are read independently', () => {
+  it('a failed connections read still shows the tokens, with its own sentence', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 500, body: {} };
+    fetchStub(tokensOnly([LOCAL]));
+    mount();
+    expect(await screen.findByTestId('mcp-connections-failed')).toHaveTextContent('could not be loaded');
+    expect(screen.getByTestId('mcp-tokens-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-tokens-failed')).toBeNull();
+    expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull(); // unknown is not empty
+  });
+
+  it('a failed tokens read still shows the connections, with its own sentence', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    fetchStub((call) => (call.method === 'GET' ? { status: 500, body: {} } : { status: 204 }));
+    mount();
+    expect(await screen.findByTestId('mcp-tokens-failed')).toBeInTheDocument();
+    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-connections-failed')).toBeNull();
+  });
+
+  it('control: both succeed, both lists render', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    fetchStub(tokensOnly([LOCAL]));
+    mount();
+    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(screen.getByTestId('mcp-tokens-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-connections-failed')).toBeNull();
+  });
+});
+

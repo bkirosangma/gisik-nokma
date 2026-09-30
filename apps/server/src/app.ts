@@ -25,6 +25,7 @@ import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
 import { registerMcpTokenRoutes } from './routes/mcp-tokens.js';
+import { registerMcpConnectionRoutes } from './routes/mcp-connections.js';
 import { registerMcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
@@ -1019,6 +1020,7 @@ export function buildApp(
   registerMcpDeviceRoutes(app, { pool: deps.pool, webOrigin: deps.webOrigin }, requireSession);
 
   registerMcpTokenRoutes(app, { pool: deps.pool }, requireSession);
+  registerMcpConnectionRoutes(app, { pool: deps.pool, publicUrl: deps.mcpPublicUrl ?? null }, requireSession);
   // The hosted MCP door — present only when the API knows its own public URL.
   if (deps.mcpPublicUrl) {
     registerMcpOAuthRoutes(

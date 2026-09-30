@@ -238,6 +238,9 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     // Remote-MCP plan Task 3 (case 14.227): the hosted door's consent DECISION — a
     // cookie POST that mints an authorization code. Needs the hosted door ON in
     // `build()` (`mcpPublicUrl`), otherwise the route does not exist to be tested.
+    // Remote-MCP plan Task 8 (14.272): the DELETE that disconnects a hosted assistant
+    // — the mirror of the mcp-tokens revoke above it, and just as forgeable.
+    ['the MCP connection DISCONNECT', '/v1/me/mcp-connections/conn_x', '/v1/me/mcp-connections/:id', 'DELETE'],
     ['the MCP OAuth consent DECISION', '/v1/mcp/oauth/requests/req_x/decision', '/v1/mcp/oauth/requests/:requestId/decision', 'POST'],
     // Added 2026-09-19 with the DENIAL route. It needs its OWN row rather than a
     // share of approve's, because the drift guard below compares the table and

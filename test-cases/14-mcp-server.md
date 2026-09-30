@@ -710,3 +710,17 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.234 — a 404 request shows "This connection request has expired. Go back to your assistant and connect again." and no buttons; a 409 shows the server's message verbatim;** control: a live request shows buttons. Mutation: render the buttons on 404.
 - ✅ **14.235 — Allow is the page's ONE primary button; Deny is the quiet (ghost) Button;** control: both are real `<button>`s with accessible names "Allow" and "Deny". Mutation: make Deny primary.
 - ✅ **14.236 — the page is not frameable: `next.config.ts` headers for `/:path*` (which covers `/mcp/connect`) include `x-frame-options: DENY` (FD4);** control: the pattern matches `/mcp/connect?request=x`. Mutation: scope the header to `/workspaces/:path*`.
+
+## 14.9 Hosted MCP — Connected assistants
+
+*Remote-MCP plan Task 8 (14.270–14.277). Tests: `apps/server/test/mcp/mcp-connections.test.ts`, `test/http/security-middleware.test.ts` (row for the DELETE), `apps/web/test/mcp-tokens-page.test.tsx`.*
+
+- ✅ **14.270 — `GET /v1/me/mcp-connections` lists the caller's LIVE hosted connections (name, redirect host, connected, last used) and none of another person's; a connection past its idle expiry is absent (the row is still in the table);** control: local tokens still list under `/v1/me/mcp-tokens`, hosted ones never do. Mutations: drop the `user_id` filter; drop the `idle_expires_at > now` filter (a review survivor).
+- ✅ **14.271 — Disconnect (`DELETE /v1/me/mcp-connections/:id`) deletes the connection: its access token stops authenticating and its refresh token is `invalid_grant`;** control: another person's id answers 404 and their connection, access token and refresh token all survive. Mutation: revoke by id without the owner (`revokeConnection(…, null)`; a review survivor).
+- ✅ **14.272 — the DELETE refuses a cookie request with a foreign Origin (403 `forbidden_origin`);** control: `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+- ✅ **14.273 — `GET /v1/mcp/public-url` answers `{ url: "<MCP_PUBLIC_URL>/mcp" }` when the door is on and `{ url: null }` when off;** control: unauthenticated callers get the same answer. Mutation: return the web origin.
+- ✅ **14.274 — the Connected assistants screen shows each hosted connection as "{app name} · {host}", "Connected {date}", "Last used {date}" or "Never used" and a **Disconnect** button; local tokens keep **Revoke**;** control: a person with neither sees the existing empty state. Mutation: label the hosted button Revoke.
+- ✅ **14.275 — Disconnect removes the row only after the DELETE resolves and shows the server's reason on failure;** control: while in flight the row stays and its button reads "Disconnecting…". Mutation: remove the row before the DELETE resolves.
+- ✅ **14.276 — the "Connect an assistant" panel shows the URL from `/v1/mcp/public-url` with a **Copy** button (writes it to the clipboard, then reads "Copied") and a "How to connect" link to the Help article;** control: with `url: null` the panel is absent. Mutation: hard-code the URL.
+- ✅ **14.277 — the screen reads `/v1/me/mcp-connections` and `/v1/me/mcp-tokens` independently: a failure of one shows its own failure sentence and still renders the other;** control: both succeed → both lists. Mutation: make one failure fail both.
+
