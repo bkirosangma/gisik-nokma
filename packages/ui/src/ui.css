@@ -1282,28 +1282,6 @@ a.gn-ticket-sheet__crumb--link {
      pressed card moves, so the transition names box-shadow alone. */
   transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
 }
-/* The priority card tint (owner request, 2026-09-23: "the entire card
-   surface is tinted by priority"). TWO layers, not one: a `linear-gradient`
-   of the alpha wash repeated as both stops, painted OVER the opaque
-   `--gn-surface-raised` `.gn-card` already sets — never the wash alone as
-   `background`, which would composite against whatever sits BEHIND this
-   card in the DOM (`.gn-board__column`'s `--gn-surface-sunken`, a colour
-   this feature was never measured against). The measured ground is the
-   CARD's own surface, exactly as `tokens.ts`'s
-   `priorityTintP1Light`/etc. docblock states and `tokens.test.ts`'s
-   "the priority tint composites legibly…" suite proves. Equal specificity to
-   `.gn-card`'s own rule (both single-class), so source order is what makes
-   this win — declared after it, like every other `.gn-board-card` rule in
-   this file. */
-.gn-board-card--p1 {
-  background: linear-gradient(var(--gn-priority-p1-tint), var(--gn-priority-p1-tint)), var(--gn-surface-raised);
-}
-.gn-board-card--p2 {
-  background: linear-gradient(var(--gn-priority-p2-tint), var(--gn-priority-p2-tint)), var(--gn-surface-raised);
-}
-.gn-board-card--p3 {
-  background: linear-gradient(var(--gn-priority-p3-tint), var(--gn-priority-p3-tint)), var(--gn-surface-raised);
-}
 /* The epic chip (owner ruling, 2026-09-23: the card's TOP LINE, above the
    title — a flag icon + the epic's title, truncated). A real button, not a
    label: it opens the epic's sheet. `min-height` is the SAME dense-in-list
@@ -1318,7 +1296,10 @@ a.gn-ticket-sheet__crumb--link {
    line with the next sibling — `.gn-board-card__title`, a `<button>`,
    inline-level by default — whenever both fit. `width: fit-content` keeps
    the now-block-level chip's own hit area (and its focus ring) sized to
-   its content instead of stretching to the card's full width. */
+   its content instead of stretching to the card's full width.
+   Styling refresh (Plan A Task 6): a small filled chip — padding 4/8, radius 8,
+   the house chip fill (plan D19) — and no margin, because the epic and the
+   title are ONE group (8px apart via the card's gap). */
 .gn-board-card__epic {
   display: flex;
   width: fit-content;
@@ -1326,12 +1307,14 @@ a.gn-ticket-sheet__crumb--link {
   gap: 0.25rem;
   max-width: 100%;
   min-height: 1.5rem;
-  margin: 0 0 0.3rem;
-  padding: 0;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
   border: none;
-  background: none;
+  border-radius: 0.5rem;
+  background: var(--gn-fill-tertiary);
   font: inherit;
   font-size: 0.75rem;
+  line-height: 1rem;
   font-weight: 600;
   color: var(--gn-text-muted);
   cursor: pointer;
@@ -1344,10 +1327,9 @@ a.gn-ticket-sheet__crumb--link {
 }
 /* The parent-key badge (owner request, 2026-09-23), LEFT of the card's own
    key in the keys row below — a real button, clickable, that opens the
-   parent's sheet. `--gn-text-accent` (a link colour, not the row's own muted
-   ink) is what tells it apart from the plain `key`/`due` text beside it at a
-   glance, the same role `.gn-board-card__move`'s own label already draws in
-   this ink. */
+   parent's sheet. Styling refresh (Plan A Task 6): underlined text2, not the
+   accent — the accent is saved for the action (rule 03), and the underline is
+   what tells it apart from the plain `key`/`due` text beside it. */
 .gn-board-card__parent-key {
   display: inline-flex;
   align-items: center;
@@ -1356,9 +1338,9 @@ a.gn-ticket-sheet__crumb--link {
   border: none;
   background: none;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--gn-text-accent);
+  color: var(--gn-text-muted);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -1481,7 +1463,9 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board__column--drop-target { outline: 2px solid var(--gn-accent); outline-offset: -2px; }
 .gn-board-card__title {
   font: inherit;
-  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.5rem;
+  font-weight: 500;
   border: none;
   background: none;
   color: var(--gn-text);
@@ -1489,8 +1473,28 @@ a.gn-ticket-sheet__crumb--link {
   padding: 0;
   text-align: left;
 }
-.gn-board-card__meta { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap; }
-.gn-board-card__progress { color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-board-card__meta { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.gn-board-card__progress { color: var(--gn-text-muted); font-size: 0.75rem; font-weight: 600; }
+/* Three groups, 16 apart (rule 02): the card's own gap is 8, so the people row
+   and the footer each add 8 of margin. A card with no assignee, chips or
+   rollup renders the people row EMPTY (React emits no children), and it must
+   not leave an 8px hole — it collapses and hands its 8 to the keys row. */
+.gn-board-card__meta:empty { display: none; }
+.gn-board-card__meta:empty + .gn-board-card__meta-line { margin-top: 0.5rem; }
+/* A status chip on a card is plain third-tier text (the mockup,
+   `Main.dc.html:91`) — no fill, no inset — but it KEEPS its tone dot: the dot
+   is the chip's only non-text carrier of its tone (plan D15). Same specificity
+   as `[data-style="neo"] .gn-chip` and `[data-style="minimal"] .gn-chip`
+   above, declared later, so it wins on source order (20.056 asserts the
+   order, not only the declarations). */
+.gn-board-card__meta .gn-chip {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-subtle);
+}
 /* Ruling E5-2 (2026-09-21) — the card's DUE LABEL: the export's meta line
    (`EXPORT:2493-2504`, `bits.push(di.label)` coloured
    `di.late ? "var(--danger)" : "var(--label2)"`), which the product's card
@@ -1509,7 +1513,7 @@ a.gn-ticket-sheet__crumb--link {
    this file: `.gn-ticket-sheet__delete` cites `--gn-danger` on that same
    ground clearing 4.5 in all six style×theme combinations, worst 5.0392. A
    small label needs 4.5, and the pair is the same one.  */
-.gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
+.gn-board-card__due { color: var(--gn-text-subtle); font-size: 0.75rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
 /* THE KEYS ROW (owner request, 2026-09-23; formerly "the prototype's meta
    line under the chips", `desktop.dc.html:2496-2504`, key first, owner
@@ -1531,49 +1535,68 @@ a.gn-ticket-sheet__crumb--link {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.375rem;
-  margin: 0.25rem 0 0;
-  font-size: 0.8rem;
-  line-height: 1.125rem;
-  color: var(--gn-text-muted);
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--gn-text-subtle);
 }
-.gn-board-card__key { color: var(--gn-text-muted); }
-.gn-board-card__meta-sep { color: var(--gn-text-muted); }
-/* THE PRIORITY BADGE (owner request, 2026-09-23, superseding spec
-   2026-09-22's "only P1 takes the tone" — see case 13.1451/13.1452's own
-   citation of the superseded cases). Every level now carries its own icon
-   AND its own ink — P1 red fire, P2 green leaf, P3 frozen-blue snowflake —
-   because the tinted card SURFACE is now the thing that would make a
-   uniformly-muted badge invisible on its own ground; the badge's job moved
-   from "the only priority signal" to "the LEGIBLE one on a coloured card",
-   which every level needs equally. `display: inline-flex` lays the icon
-   beside the text with a small `gap`; the icon inherits this element's own
-   `color` via `currentColor` (`packages/ui/src/icons/priority-icons.tsx`),
-   so one declaration per modifier sets both. P1/P2 reuse the EXISTING
-   `danger`/`success` roles — "reuses the … family" in the literal sense,
-   not merely a similar hue — already measured against this card's tinted
-   ground by `tokens.test.ts`'s "the priority tint composites legibly…"
-   suite; P3 is the one new ink role, `--gn-priority-p3`, measured there too. */
+.gn-board-card__key { color: var(--gn-text-subtle); font-weight: 500; font-variant-numeric: tabular-nums; }
+.gn-board-card__meta-sep { color: var(--gn-text-subtle); }
+/* The owner's `›` between parent and key; pulled in by 4px on each side so the
+   8px row gap does not leave it floating (`Main.dc.html:97`). */
+.gn-board-card__parent-sep { margin: 0 -0.25rem; color: var(--gn-text-subtle); }
+/* THE PRIORITY BADGE — styling refresh Plan A Task 6 (2026-09-29). The icon
+   is the SHAPE that tells the levels apart on every card (fire, leaf,
+   snowflake — `packages/ui/src/icons/priority-icons.tsx`); the INK is neutral
+   except Urgent (the planner's rules-application decision, owner-seen in the
+   mockup): one accent saved for the action, one loud element per card (layout
+   rules 01, 03). P1 `danger`, P2 text2, P3 text3 — each ≥ 4.5 on the card's
+   ground in every style×theme (case 20.057). This SUPERSEDES the owner's
+   2026-09-23 request (red fire / green leaf / blue snowflake on a card tinted
+   by its priority): the tint rules and their four roles are retired (plan D11,
+   confirmed by the owner 2026-09-29). The icon inherits this element's `color`
+   through `currentColor`, so one declaration per level sets both. */
 .gn-board-card__priority {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  color: var(--gn-text-muted);
-  font-size: 0.8rem;
+  gap: 0.25rem;
+  color: var(--gn-text-subtle);
+  font-size: 0.75rem;
   font-weight: 600;
 }
 .gn-board-card__priority--p1 { color: var(--gn-danger); }
-.gn-board-card__priority--p2 { color: var(--gn-success); }
-.gn-board-card__priority--p3 { color: var(--gn-priority-p3); }
+.gn-board-card__priority--p2 { color: var(--gn-text-muted); }
+.gn-board-card__priority--p3 { color: var(--gn-text-subtle); }
+/* The card's FOOTER: "who · when" left, the arrows (and Close) right, one row.
+   `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the card's 8px gap
+   makes the 16 between groups; the negative sides and bottom let the 44px
+   targets reach 8px into the card's 16px padding, so the card does not grow
+   (the mockup, `Main.dc.html:109`). Wraps when "who · when" unfolds into a
+   long sentence, so the arrows drop to their own line rather than shrink. */
+.gn-board-card__footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0.5rem -0.5rem -0.5rem;
+}
 .gn-board-card__provenance {
-  font: inherit;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem;
+  margin-right: auto;
+  padding: 0 0.5rem;
   border: none;
-  background: none;
-  color: var(--gn-text-muted);
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--gn-text-subtle);
   cursor: pointer;
-  padding: 0.2rem 0 0;
   text-align: left;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
   /* 24px, the WCAG 2.5.8 in-list floor, and NOT 44 (E4-3). This is the same
      call `.gn-attention__title` above makes and for the same reason: it is a
      bare text disclosure sitting on the card's meta line beside the progress
@@ -1596,8 +1619,12 @@ a.gn-ticket-sheet__crumb--link {
      below is declared but not yet EXERCISED — the same position
      `.gn-my-work__title` is recorded in. Closing it means a second
      `measureTapTargets` call on the board route plus its baseline key, which
-     needs a live stack on :3001 that this lane does not own. */
-  min-height: 1.5rem;
+     needs a live stack on :3001 that this lane does not own.
+
+     Styling refresh (Plan A Task 6): now a 44px ghost control in the footer — the
+     24px dense-in-list floor this comment argued for is superseded by the
+     owner-approved card (`Main.dc.html:110`), and `DENSE_IN_LIST` keeps its
+     entry (a 44px target passes a 24px floor). */
 }
 /* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
    button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
@@ -1625,8 +1652,12 @@ a.gn-ticket-sheet__crumb--link {
    The metric's own VISUAL treatment — `ctlBg`, accent text, 15px/600 — is
    kept exactly as specified; only the tap target is raised, matching the
    tab rail's own precedent rather than inventing a new rule for this one
-   control. */
-.gn-board-card__moves { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+   control.
+   Styling refresh (Plan A Task 6): the fill, accent ink and 15px above are
+   SUPERSEDED — the arrows are borderless ghost controls in the card's footer
+   (transparent at rest, `textSubtle` ink, an 18px glyph, the P-GHOST lit state
+   below); only the 44px target survives. */
+.gn-board-card__moves { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin: 0; }
 .gn-board-card__move {
   display: inline-flex;
   align-items: center;
@@ -1634,17 +1665,14 @@ a.gn-ticket-sheet__crumb--link {
   min-height: 2.75rem; /* 44px, not the prototype's 32px — see the rule block's own comment */
   min-width: 2.75rem; /* 44px, not the prototype's 36px — see the rule block's own comment */
   border: none;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-subtle);
   font: inherit;
-  font-size: 0.9375rem; /* 15px */
+  font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
-}
-.gn-board-card__move:focus-visible {
-  outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
 }
 /* Spec row "Move button, unavailable": `opacity:0.4; cursor:not-allowed` —
    this component's OWN metric, not `.gn-button`'s generic `:disabled` rule
@@ -1683,10 +1711,12 @@ a.gn-ticket-sheet__crumb--link {
    the SAME class under both of its labels — `Bulk close` unarmed and
    `Confirm close (N)` armed (owner request, 2026-09-22) — because it is one
    control whose text changes, and a second class would be a second set of
-   metrics to keep in step. */
-.gn-board-card__close,
+   metrics to keep in step.
+   Styling refresh (Plan A Task 6): the board's two members, `.gn-board-card__close`
+   and `.gn-board__column-action`, moved OUT of this group into their own ghost
+   rule below; this body is now the List's alone (`.gn-row-action`,
+   `.gn-list__bulk-close`) until Plan B restyles it. */
 .gn-row-action,
-.gn-board__column-action,
 .gn-list__bulk-close {
   display: inline-flex;
   align-items: center;
@@ -1702,17 +1732,60 @@ a.gn-ticket-sheet__crumb--link {
   font-weight: 600;
   cursor: pointer;
 }
-.gn-board-card__close:focus-visible,
 .gn-row-action:focus-visible,
-.gn-board__column-action:focus-visible,
 .gn-list__bulk-close:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-.gn-board-card__close:disabled,
 .gn-row-action:disabled,
-.gn-board__column-action:disabled,
 .gn-list__bulk-close:disabled { opacity: 0.4; cursor: not-allowed; }
+/* The board's text actions — Close on a terminal card, `Close all (N)` in a
+   terminal column's header — are GHOST controls like the card's other footer
+   controls (the mockup, `Main.dc.html:115`): borderless, transparent, a 44px
+   pill, text2 13px/600. Split out of the List's shared group 2026-09-29
+   (styling refresh Plan A Task 6); the List keeps the old constant until
+   Plan B restyles it. */
+.gn-board-card__close,
+.gn-board__column-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--gn-motion-feedback) ease-out;
+}
+/* Pattern P-GHOST's lit state for every footer control: a soft neutral fill
+   within the feedback time, and the ink steps UP a tier — `textSubtle` over
+   this fill measures 4.03:1 in hig dark (case 20.059), `textMuted` clears
+   4.5 in every style×theme. */
+.gn-board-card__provenance:hover,
+.gn-board-card__provenance:focus-visible,
+.gn-board-card__move:hover:not(:disabled),
+.gn-board-card__move:focus-visible,
+.gn-board-card__close:hover:not(:disabled),
+.gn-board-card__close:focus-visible,
+.gn-board__column-action:hover:not(:disabled),
+.gn-board__column-action:focus-visible {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+}
+.gn-board-card__provenance:focus-visible,
+.gn-board-card__move:focus-visible,
+.gn-board-card__close:focus-visible,
+.gn-board__column-action:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 0;
+}
+.gn-board-card__close:disabled,
+.gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
@@ -1723,6 +1796,8 @@ a.gn-ticket-sheet__crumb--link {
    as the three conditional siblings did before this wrapper existed, so
    nothing about the visible layout of the arrows or the notice changes. */
 .gn-board-card__notice { display: contents; }
+/* A move refusal takes its own line under the arrows rather than squeezing beside them in the footer row. */
+.gn-board-card__notice > .gn-refusal { flex-basis: 100%; }
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 /* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
    align-items:center;flex-wrap:wrap`. */
@@ -3000,8 +3075,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    STYLING TASK's authority, so the pill takes a neutral fill and the TONE is
    carried by the dot alone. **UPDATED 2026-09-23**: `tintWarning` is no
    longer the only wash — the board card's priority tint
-   (`priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint`, `tokens.ts`) exists
-   now, scoped to that ONE owner-authorised feature. It is not a general
+   (`priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint`, `tokens.ts`) existed
+   then, scoped to that ONE owner-authorised feature (RETIRED 2026-09-29, Plan A Task 6). It is not a general
    `tintDanger`/`tintSuccess` this pill could reach for: the refusal above
    still holds for anything reached on a styling task's own authority. */
 .gn-visibility__standing-mode {

@@ -1825,14 +1825,23 @@ function BoardCardView({
           `null` card key still draws no separator and no placeholder.  */}
       <p className="gn-board-card__meta-line">
         {showParentBadge ? (
-          <button
-            type="button"
-            className="gn-board-card__parent-key"
-            aria-label={`Open parent ${card.parent?.key}`}
-            onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
-          >
-            {card.parent?.key}
-          </button>
+          <>
+            <button
+              type="button"
+              className="gn-board-card__parent-key"
+              aria-label={`Open parent ${card.parent?.key}`}
+              onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
+            >
+              {card.parent?.key}
+            </button>
+            {/* Owner ruling (2026-09-29, styling refresh): "if parent is
+                present, separate with >" — the `›` the sheet's breadcrumb
+                already uses. `aria-hidden`: the badge's own name ("Open parent
+                GN-17") already says what it is, and a spoken "›" is noise. */}
+            <span className="gn-board-card__parent-sep" aria-hidden="true">
+              ›
+            </span>
+          </>
         ) : null}
         {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
         <span
@@ -1854,15 +1863,21 @@ function BoardCardView({
           </>
         ) : null}
       </p>
-      <button
-        type="button"
-        className="gn-board-card__provenance"
-        aria-expanded={unfolded}
-        onClick={() => setUnfolded((value) => !value)}
-      >
-        {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
-      </button>
-      {arrows}
+      {/* The card's FOOTER (styling refresh Plan A Task 6): "who · when" and
+          the move arrows share one row that reaches into the card's padding,
+          so 44px targets do not grow the card. Layout only — both children
+          are exactly what they were. */}
+      <div className="gn-board-card__footer">
+        <button
+          type="button"
+          className="gn-board-card__provenance"
+          aria-expanded={unfolded}
+          onClick={() => setUnfolded((value) => !value)}
+        >
+          {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
+        </button>
+        {arrows}
+      </div>
     </Card>
   );
 }

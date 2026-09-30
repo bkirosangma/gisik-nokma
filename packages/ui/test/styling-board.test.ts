@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { CONTRAST_PAIRS, colorOf, type StyleName, type ThemeName } from '../src/tokens.js';
+import { contrastRatio, over } from './helpers/contrast.js';
 import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from './helpers/css-rules.js';
 
 /**
@@ -180,5 +182,209 @@ describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
     expect(valueOf(ruleExactly(CSS, '.gn-board__column-action + .gn-board__column-collapse'), 'margin-left')).toBe('0');
     // CONTROL — an expanded column is still the 18rem lane.
     expect(valueOf(ruleExactly(CSS, '.gn-board__column'), 'flex')).toBe('0 0 18rem');
+  });
+});
+
+const STYLES: StyleName[] = ['hig', 'minimal', 'neo'];
+const THEMES: ThemeName[] = ['light', 'dark'];
+const rem = (value: string | null): number => Number.parseFloat(value ?? 'NaN');
+
+describe('20.053 the title is the one loud element', () => {
+  it('20.053 15/24 at 500 in text; everything else on the card is at most 13px', () => {
+    const title = ruleExactly(CSS, '.gn-board-card__title');
+    expect(valueOf(title, 'font-size')).toBe('0.9375rem');
+    expect(valueOf(title, 'line-height')).toBe('1.5rem');
+    expect(valueOf(title, 'font-weight')).toBe('500');
+    expect(valueOf(title, 'color')).toBe('var(--gn-text)');
+    const others = [
+      '.gn-board-card__epic',
+      '.gn-board-card__meta-line',
+      '.gn-board-card__progress',
+      '.gn-board-card__provenance',
+      ['.gn-board-card__close', '.gn-board__column-action'],
+    ] as const;
+    for (const selector of others) {
+      const size = rem(valueOf(ruleExactly(CSS, selector), 'font-size'));
+      expect(size, String(selector)).toBeLessThanOrEqual(0.8125);
+      // CONTROL — strictly smaller than the title.
+      expect(size).toBeLessThan(rem(valueOf(title, 'font-size')));
+    }
+  });
+});
+
+describe('20.054 three groups 16 apart, lines 8 apart, the footer inside the padding', () => {
+  it('20.054 margins that add to the 8px gap, the empty people row collapses', () => {
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__meta'), 'margin-top')).toBe('0.5rem');
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__meta:empty'), 'display')).toBe('none');
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__meta:empty + .gn-board-card__meta-line'), 'margin-top')).toBe('0.5rem');
+    // The keys row adds nothing of its own otherwise: the card's 8px gap is its only separation.
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__meta-line'), 'margin')).toBe('0');
+    const footer = ruleExactly(CSS, '.gn-board-card__footer');
+    expect(valueOf(footer, 'margin')).toBe('0.5rem -0.5rem -0.5rem');
+    expect(valueOf(footer, 'display')).toBe('flex');
+    expect(valueOf(footer, 'flex-wrap')).toBe('wrap');
+    // CONTROL — the epic and title are one group: the chip adds no margin.
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__epic'), 'margin')).toBe('0');
+  });
+});
+
+describe('20.055 the epic chip', () => {
+  it('20.055 padding 4/8, radius 8, chip fill, text2 12px, 24px tall', () => {
+    const epic = ruleExactly(CSS, '.gn-board-card__epic');
+    expect(valueOf(epic, 'padding')).toBe('0.25rem 0.5rem');
+    expect(valueOf(epic, 'border-radius')).toBe('0.5rem');
+    expect(valueOf(epic, 'background')).toBe('var(--gn-fill-tertiary)');
+    expect(valueOf(epic, 'color')).toBe('var(--gn-text-muted)');
+    expect(valueOf(epic, 'font-size')).toBe('0.75rem');
+    expect(valueOf(epic, 'min-height')).toBe('1.5rem');
+    // CONTROL — 13.1467's block-level shape is kept.
+    expect(valueOf(epic, 'display')).toBe('flex');
+    expect(valueOf(epic, 'width')).toBe('fit-content');
+  });
+});
+
+describe('20.056 a status chip on a card is plain third-tier text', () => {
+  it('20.056 no fill, no inset, 12px textSubtle; the shared chip keeps its fill', () => {
+    const chip = ruleExactly(CSS, '.gn-board-card__meta .gn-chip');
+    expect(valueOf(chip, 'background')).toBe('transparent');
+    expect(valueOf(chip, 'box-shadow')).toBe('none');
+    expect(valueOf(chip, 'padding')).toBe('0');
+    expect(valueOf(chip, 'font-size')).toBe('0.75rem');
+    expect(valueOf(chip, 'color')).toBe('var(--gn-text-subtle)');
+    // CONTROL — everywhere else a chip is still a filled pill.
+    expect(valueOf(ruleExactly(CSS, '.gn-chip'), 'background')).toBe('var(--gn-fill-tertiary)');
+  });
+
+  it('20.056 it WINS: it ties the minimal and neo chip rules at (0,2,0), so it must come after them and restate what they set', () => {
+    const rules = parseRules(CSS).filter((rule) => rule.atRule === null);
+    const at = (selector: string): number => {
+      const index = rules.findIndex((rule) => rule.selectors.length === 1 && rule.selectors[0] === selector);
+      expect(index, selector).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    const card = at('.gn-board-card__meta .gn-chip');
+    const cardBody = rules[card]!.body;
+    for (const styled of ['[data-style="minimal"] .gn-chip', '[data-style="neo"] .gn-chip']) {
+      expect(card, `${styled} is declared after the card's chip rule, so it would win the tie`).toBeGreaterThan(at(styled));
+      // Every property the tied rule sets is set again by the card's rule, so nothing of theirs shows through.
+      const set = [...rules[at(styled)]!.body.matchAll(/(?:^|;|\s)([a-z-]+)\s*:/g)].map((match) => match[1]!);
+      expect(set.length, styled).toBeGreaterThan(0);
+      for (const property of set) expect(valueOf(cardBody, property), `${styled} sets ${property}`).not.toBeNull();
+    }
+  });
+});
+
+describe('20.057 priority ink is neutral except Urgent', () => {
+  it('20.057 P1 danger, P2 text2, P3 text3 — each ≥ 4.5 on the card ground — and no card tint remains', () => {
+    const ink = { p1: 'danger', p2: 'textMuted', p3: 'textSubtle' } as const;
+    for (const [level, role] of Object.entries(ink)) {
+      const cssVar = `var(--gn-${role.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`;
+      expect(valueOf(ruleExactly(CSS, `.gn-board-card__priority--${level}`), 'color'), level).toBe(cssVar);
+      for (const style of STYLES) {
+        for (const theme of THEMES) {
+          expect(
+            contrastRatio(colorOf(theme, role, style), colorOf(theme, 'surfaceRaised', style)),
+            `${level} ${style}/${theme}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      // No rule of any shape (a pseudo-class, a compound) is keyed on the card's tint modifier.
+      const tinted = parseRules(CSS).filter((rule) => rule.selectors.some((s) => s.includes(`.gn-board-card--${level}`)));
+      expect(tinted, `card tint for ${level}`).toEqual([]);
+    }
+    // ...and nothing reads a priority tint or P3 ink variable.
+    expect(CSS).not.toMatch(/--gn-priority-p\d/);
+    // CONTROL — the badge base rule still exists (the icon inherits currentColor from it).
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__priority'), 'display')).toBe('inline-flex');
+  });
+});
+
+describe('20.058 the keys row', () => {
+  it('20.058 12/16 text3 with 8px gaps; key 500 tabular; parent text2 underlined; late danger 600', () => {
+    const line = ruleExactly(CSS, '.gn-board-card__meta-line');
+    expect(valueOf(line, 'font-size')).toBe('0.75rem');
+    expect(valueOf(line, 'line-height')).toBe('1rem');
+    expect(valueOf(line, 'color')).toBe('var(--gn-text-subtle)');
+    expect(valueOf(line, 'gap')).toBe('0.5rem');
+    const key = ruleExactly(CSS, '.gn-board-card__key');
+    expect(valueOf(key, 'font-weight')).toBe('500');
+    expect(valueOf(key, 'font-variant-numeric')).toBe('tabular-nums');
+    const parent = ruleExactly(CSS, '.gn-board-card__parent-key');
+    expect(valueOf(parent, 'color')).toBe('var(--gn-text-muted)');
+    expect(valueOf(parent, 'text-decoration')).toBe('underline');
+    expect(valueOf(parent, 'border')).toBe('none');
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__parent-sep'), 'margin')).toBe('0 -0.25rem');
+    const late = ruleExactly(CSS, '.gn-board-card__due--late');
+    expect(valueOf(late, 'color')).toBe('var(--gn-danger)');
+    expect(valueOf(late, 'font-weight')).toBe('600');
+    // CONTROL — on time is third tier, regular weight.
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__due'), 'color')).toBe('var(--gn-text-subtle)');
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card__due'), 'font-weight')).toBeNull();
+  });
+});
+
+describe('20.059 the footer controls are ghost controls with real targets', () => {
+  it('20.059 44px targets, pills, transparent, fill + ink step + ring on hover/focus', () => {
+    const provenance = ruleExactly(CSS, '.gn-board-card__provenance');
+    expect(valueOf(provenance, 'min-height')).toBe('2.75rem');
+    const move = ruleExactly(CSS, '.gn-board-card__move');
+    expect(valueOf(move, 'min-height')).toBe('2.75rem');
+    expect(valueOf(move, 'min-width')).toBe('2.75rem');
+    const close = ruleExactly(CSS, ['.gn-board-card__close', '.gn-board__column-action']);
+    expect(valueOf(close, 'min-height')).toBe('2.75rem');
+    for (const body of [provenance, move, close]) {
+      expect(valueOf(body, 'border')).toBe('none');
+      expect(valueOf(body, 'border-radius')).toBe('999px');
+      expect(valueOf(body, 'background')).toBe('transparent');
+    }
+    const lit = ruleExactly(CSS, [
+      '.gn-board-card__provenance:hover',
+      '.gn-board-card__provenance:focus-visible',
+      '.gn-board-card__move:hover:not(:disabled)',
+      '.gn-board-card__move:focus-visible',
+      '.gn-board-card__close:hover:not(:disabled)',
+      '.gn-board-card__close:focus-visible',
+      '.gn-board__column-action:hover:not(:disabled)',
+      '.gn-board__column-action:focus-visible',
+    ]);
+    expect(valueOf(lit, 'background')).toBe('var(--gn-fill-tertiary)');
+    expect(valueOf(lit, 'color')).toBe('var(--gn-text-muted)');
+    const ring = ruleExactly(CSS, [
+      '.gn-board-card__provenance:focus-visible',
+      '.gn-board-card__move:focus-visible',
+      '.gn-board-card__close:focus-visible',
+      '.gn-board__column-action:focus-visible',
+    ]);
+    expect(valueOf(ring, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    for (const style of STYLES) {
+      for (const theme of THEMES) {
+        const lifted = over(colorOf(theme, 'fillTertiary', style), colorOf(theme, 'surfaceRaised', style));
+        expect(contrastRatio(colorOf(theme, 'textMuted', style), lifted), `${style}/${theme}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // CONTROL — why the ink steps up: textSubtle over the same fill fails 4.5 in hig dark.
+    const higDark = over(colorOf('dark', 'fillTertiary', 'hig'), colorOf('dark', 'surfaceRaised', 'hig'));
+    expect(contrastRatio(colorOf('dark', 'textSubtle', 'hig'), higDark)).toBeLessThan(4.5);
+    // The pairs the refresh added are still declared (Task 1 owns their count).
+    expect(CONTRAST_PAIRS.length).toBeGreaterThanOrEqual(44);
+  });
+
+  it('20.059 no [data-style] rule restyles a footer control, so the fill and the ink read the same tokens in every style', () => {
+    const footer = [
+      '.gn-board-card__provenance',
+      '.gn-board-card__move',
+      '.gn-board-card__close',
+      '.gn-board__column-action',
+    ];
+    const styled = parseRules(CSS).filter(
+      (rule) =>
+        rule.selectors.some((selector) => selector.includes('[data-style')) &&
+        rule.selectors.some((selector) => footer.some((name) => selector.includes(name))),
+    );
+    expect(styled.map((rule) => rule.selectors.join(', '))).toEqual([]);
+    // CONTROL — the scan can see style-scoped rules at all: the chip has them.
+    expect(
+      parseRules(CSS).some((rule) => rule.selectors.some((selector) => selector === '[data-style="neo"] .gn-chip')),
+    ).toBe(true);
   });
 });
