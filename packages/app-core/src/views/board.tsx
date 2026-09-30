@@ -990,10 +990,13 @@ type BoardDrag = { ticketId: string; fromStateId: string; height: number };
  * pushed into columns in that order at `replica-data-source.ts:1526`) and the
  * client mapper (`online/mappers.ts:713`, `.map` — order kept) all agree, and the
  * board renders `column.cards` as given, so a live-query repaint after the move
- * puts the card exactly here. Ticket ids are ULIDs — uppercase Crockford base32,
- * one fixed width — so JS `<` is the same order as the database's. NOT arrival
- * order and NOT age: a card created earlier lands ABOVE a later one because its
- * id sorts first.
+ * puts the card exactly here (nothing patches the board optimistically — the
+ * online source refetches). A ticket's entity id must match `ULID_REGEX`
+ * (`packages/domain/src/envelope.ts:120`, pattern at `ids.ts:9`) — 26 characters
+ * of `[0-9A-Z]` — so JS `<` gives the same order as Postgres's default collation
+ * (`ticket_id text`, `proj-tickets.sql:74`, no `COLLATE`) and SQLite's binary
+ * one. NOT arrival order and NOT age: a card created earlier lands ABOVE a
+ * later one because its id sorts first.
  */
 function landingIndex(cards: readonly BoardCardData[], ticketId: string): number {
   const ahead = cards.findIndex((card) => card.ticketId > ticketId);
@@ -1125,7 +1128,7 @@ function BoardGroupSection({
     if (control instanceof HTMLElement) control.focus({ preventScroll: true });
     // Belt and braces: the swap itself can shift the layout under the page. Put back what moved
     // (and only what moved — a page nothing touched is not scrolled at all).
-    if (window.scrollY !== pending.scrollY) window.scrollTo(pending.scrollX, pending.scrollY);
+    if (window.scrollY !== pending.scrollY) window.scrollTo({ left: pending.scrollX, top: pending.scrollY, behavior: 'instant' });
     const rail = railRef.current;
     if (rail !== null && rail.scrollLeft !== pending.railLeft) rail.scrollLeft = pending.railLeft;
   });

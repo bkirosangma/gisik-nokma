@@ -235,7 +235,7 @@ describe('20.110 the placeholder goes on the last leave, a drop, a dragend or Es
     fireEvent.dragEnter(slotOf('tk_b'), { dataTransfer });
     fireEvent.dragLeave(target, { dataTransfer });
     expect(placeholderIn('doing')).toHaveLength(1);
-    // Onto the placeholder itself (it is a child too), then out of the child.
+    // Onto the placeholder itself (jsdom-only: it is `pointer-events: none`, so a browser never enters it), then out of the child.
     fireEvent.dragEnter(placeholderIn('doing')[0]!, { dataTransfer });
     fireEvent.dragLeave(slotOf('tk_b'), { dataTransfer });
     expect(placeholderIn('doing')).toHaveLength(1);
