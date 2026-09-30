@@ -10,6 +10,8 @@ import {
   cssVariableName,
   fontStackOf,
   fontVariableName,
+  motionVariableName,
+  spaceVariableName,
   primitives,
   radiusVariableName,
   shadowValueOf,
@@ -136,8 +138,11 @@ describe('CSS variable emission', () => {
       ...TOKEN_ROLES.map(cssVariableName),
       radiusVariableName('card'),
       radiusVariableName('control'),
+      radiusVariableName('track'),
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
       ...FONT_ROLE_NAMES.map(fontVariableName),
+      ...([1, 2, 3] as const).map(spaceVariableName),
+      ...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
@@ -361,7 +366,8 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // literal does NOT track `SHADOW_ROLES` automatically (that is the whole
     // point, see the docblock above), so a role added to `SHADOWS`/`ShadowRole`
     // without a matching addition HERE stays uncovered by this case, silently.
-    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'] as const;
+    // The nine styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012; lift-drag for Task 5A) — added HERE by hand, which is the point of this literal.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;
     const stylesheet = themeStylesheet();
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
