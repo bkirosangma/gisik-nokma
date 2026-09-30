@@ -89,6 +89,42 @@ describe('20.111 the column memory is per user and per project, choices only', (
     expect(() => rememberColumnCollapse(USER, PROJECT, { [KEY]: false })).not.toThrow();
   });
 
+  it('20.111 a record with ANY non-boolean value is refused WHOLE, not filtered down to its good entries', () => {
+    const plant = (value: unknown): void =>
+      window.localStorage.setItem(
+        COLUMN_COLLAPSE_KEY,
+        JSON.stringify({ userId: USER, projects: { p: { 'wf:a': false, 'wf:b': value } } }),
+      );
+    // CONTROL — the same record with a boolean second value is honoured whole.
+    plant(true);
+    expect(readColumnCollapse(USER, 'p')).toEqual({ 'wf:a': false, 'wf:b': true });
+    // MIXED — one good entry beside one bad: the good `false` must NOT survive.
+    plant('yes');
+    expect(readColumnCollapse(USER, 'p')).toBe(NO_COLUMN_CHOICES);
+  });
+
+  it('20.111 a stored document whose userId is the empty string is not the no-session reader\'s to honour', () => {
+    // CONTROL — a real user reads their own document.
+    window.localStorage.setItem(COLUMN_COLLAPSE_KEY, JSON.stringify({ userId: 'u1', projects: { p: { 'wf:a': false } } }));
+    expect(readColumnCollapse('u1', 'p')).toEqual({ 'wf:a': false });
+    // The doc a `''` writer could have left: `'' === ''` would match it, so only
+    // the explicit no-session guard stops the read from honouring it.
+    window.localStorage.setItem(COLUMN_COLLAPSE_KEY, JSON.stringify({ userId: '', projects: { p: { 'wf:a': false } } }));
+    expect(readColumnCollapse('', 'p')).toBe(NO_COLUMN_CHOICES);
+  });
+
+  it("20.111 an empty record deletes the project's entry from the STORED bytes, and another project's entry stays", () => {
+    rememberColumnCollapse(USER, 'p', { [KEY]: false });
+    rememberColumnCollapse(USER, 'q', { [KEY]: true });
+    // CONTROL — both projects are in the stored document before the empty write.
+    expect(Object.keys((stored() as { projects: object }).projects).sort()).toEqual(['p', 'q']);
+    rememberColumnCollapse(USER, 'p', {});
+    const { projects } = stored() as { projects: Record<string, unknown> };
+    expect(Object.keys(projects)).toEqual(['q']);
+    expect(projects).not.toHaveProperty('p');
+    expect(projects.q).toEqual({ [KEY]: true });
+  });
+
   it("20.111 CONTROL: a column write leaves the workflow group's key untouched", () => {
     window.localStorage.setItem(WORKFLOW_COLLAPSE_KEY, '{"userId":"user_kiro","projects":{}}');
     rememberColumnCollapse(USER, PROJECT, { [KEY]: false });
