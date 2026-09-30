@@ -47,6 +47,7 @@ describe('loadConfig', () => {
       inviteFrom: 'sign-in@gisik-nokma.local',
       databaseCaCert: null,
       deploySha: 'dev',
+      mcpPublicUrl: null,
     });
   });
 
@@ -669,3 +670,12 @@ function parseEnvExample(text: string): Record<string, string> {
   }
   return env;
 }
+
+describe('MCP_PUBLIC_URL — the hosted MCP door\'s switch (14.210)', () => {
+  it('14.210 is optional (unset or empty = null) and must be an http(s) URL when set', () => {
+    expect(loadConfig({ ...VALID_ENV }).mcpPublicUrl).toBeNull();
+    expect(loadConfig({ ...VALID_ENV, MCP_PUBLIC_URL: '' }).mcpPublicUrl).toBeNull();
+    expect(loadConfig({ ...VALID_ENV, MCP_PUBLIC_URL: 'https://pm-api.artsourced.in' }).mcpPublicUrl).toBe('https://pm-api.artsourced.in');
+    expect(() => loadConfig({ ...VALID_ENV, MCP_PUBLIC_URL: 'not a url' })).toThrow(/MCP_PUBLIC_URL/);
+  });
+});

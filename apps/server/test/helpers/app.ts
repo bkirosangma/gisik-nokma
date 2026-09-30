@@ -50,6 +50,8 @@ export type TestApp = {
  * the real `buildApp`, the real auth, the real gated ingest.
  */
 export type BuildTestAppOverrides = {
+  /** `AppDeps.mcpPublicUrl` — the hosted MCP door's switch. Unset = the door is not built. */
+  mcpPublicUrl?: string;
   /**
    * Turns the app's logger ON and captures what it writes. Off by default, as
    * every other test file expects; `invites.test.ts` uses it to OBSERVE that
@@ -181,6 +183,7 @@ export function buildTestApp(
       // is the only route into `ingestBatch` any handler has.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: TEST_WEB_ORIGIN,
+      mcpPublicUrl: overrides.mcpPublicUrl,
       inviteMailer: overrides.inviteMailer,
       // Undefaulted: `registerAttentionRoutes` owns the real-clock default, and
       // passing `undefined` here is what lets it.
