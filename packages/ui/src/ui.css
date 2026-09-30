@@ -237,11 +237,12 @@
 .gn-chip--restricted .gn-chip__dot { background: var(--gn-restricted); }
 .gn-chip--contested .gn-chip__dot { background: var(--gn-contested); }
 
+/* Rule 04 (styling refresh Plan A Task 4): every static panel rests on the lit-edge, falling `lift` shadow. neo's lift IS its raised pair; minimal draws none. A Card is never itself interactive (card.tsx), so hover lift is keyed on the interactive element's own class, never here (pattern P-LIFT). */
 .gn-card {
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
   padding: 0.75rem;
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
 }
 
 /* The fill is `fill-tertiary`, NOT the `surface-sunken` this shipped with, and
@@ -407,7 +408,9 @@
    here against its `min(560px,100%)`), which is not a difference a 14px lift
    can be wrong for. */
 .gn-dialog {
-  border-radius: var(--gn-radius-card);
+  border-radius: var(--gn-radius-track);
+  /* Styling refresh Plan A Task 4: a dialog sits above a scrim, so it floats on the near lift (24px; neo 28px). Beats the `.gn-dialog, .gn-sheet` group's `overlay` by source order at equal specificity; the sheet is untouched (Task 7). */
+  box-shadow: var(--gn-shadow-lift-near);
   width: min(34rem, 92vw);
   animation: gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
