@@ -914,7 +914,8 @@ a.gn-ticket-sheet__crumb--link {
   vertical-align: top;
 }
 .gn-table__row--clickable { cursor: pointer; }
-.gn-table__row--clickable:hover { background: var(--gn-surface-sunken); }
+/* Styling refresh Plan B (Task B6): P-HOVER — a row answers hover with the soft fill, not a flat sunken panel. */
+.gn-table__row--clickable:hover { background: var(--gn-fill-quaternary); }
 
 .gn-board { display: flex; flex-direction: column; gap: 1.5rem; }
 .gn-board__workflow { color: var(--gn-text-muted); margin: 0 0 0.5rem; }
@@ -1683,11 +1684,17 @@ a.gn-ticket-sheet__crumb--link {
    the SAME class under both of its labels — `Bulk close` unarmed and
    `Confirm close (N)` armed (owner request, 2026-09-22) — because it is one
    control whose text changes, and a second class would be a second set of
-   metrics to keep in step. */
+   metrics to keep in step.
+   Styling refresh Plan B (Task B6): the alias set is split for the List's two
+   names — `.gn-row-action` (ghost, inside a row) and `.gn-list__bulk-close`
+   (quiet, a standalone toolbar control) now each own a rule below the body,
+   because a control inside a row and one beside the summary do not wear the
+   same edge. The board's two names keep this body until Plan A Task 6 gives
+   them their own rules. The `:focus-visible` / `:disabled` groups still name
+   every member, except that `.gn-row-action` takes its focus ring from its
+   ghost rule. */
 .gn-board-card__close,
-.gn-row-action,
-.gn-board__column-action,
-.gn-list__bulk-close {
+.gn-board__column-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1703,7 +1710,6 @@ a.gn-ticket-sheet__crumb--link {
   cursor: pointer;
 }
 .gn-board-card__close:focus-visible,
-.gn-row-action:focus-visible,
 .gn-board__column-action:focus-visible,
 .gn-list__bulk-close:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -1713,6 +1719,45 @@ a.gn-ticket-sheet__crumb--link {
 .gn-row-action:disabled,
 .gn-board__column-action:disabled,
 .gn-list__bulk-close:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Styling refresh Plan B (Task B6): P-GHOST — a control inside a table row is a text control with no edge; hover or focus washes it. */
+.gn-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px tap-target floor */
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-subtle);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-row-action:hover:not(:disabled),
+.gn-row-action:focus-visible {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+}
+.gn-row-action:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+/* Styling refresh Plan B (Task B6): P-QUIET — the bulk close is a standalone toolbar control: an outlined pill, a soft wash on hover. */
+.gn-list__bulk-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px tap-target floor */
+  padding: 0 0.875rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-list__bulk-close:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
@@ -1878,20 +1923,22 @@ a.gn-ticket-sheet__crumb--link {
    restyle and is at 36px after is not a tap-target regression this task
    introduced. (`/my-work`'s recorded offender count is what the tap ratchet
    watches; this control is on the board.) */
+/* Styling refresh Plan B (Task B6): P-QUIET — the column chooser is a quiet outlined 44px pill; the 36px floor recorded above is retired. */
 .gn-list__columns-toggle {
   display: inline-flex;
   align-items: center;
   gap: 0.4375rem;
-  min-height: 2.25rem;
+  min-height: 2.75rem;
   padding: 0 0.75rem;
-  border: none;
-  border-radius: var(--gn-radius-control);
+  border: 1px solid var(--gn-border);
+  border-radius: 999px;
   background: transparent;
-  color: var(--gn-text);
+  color: var(--gn-text-muted);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
 }
+.gn-list__columns-toggle:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 /* The caret is DRAWN, never typed. It is a `::after` pseudo-element, so it
    contributes no text node — which keeps the toggle's accessible name exactly
    "Columns" for a screen reader, and keeps it out of the type-scale sweep
@@ -1951,11 +1998,11 @@ a.gn-ticket-sheet__crumb--link {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 2.25rem;
+  min-height: 2.75rem; /* Styling refresh Plan B (Task B6): a 44px raised pill on `lift`. */
   padding: 0 0.75rem;
   border-radius: 999px;
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   color: var(--gn-text);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -2045,8 +2092,10 @@ a.gn-ticket-sheet__crumb--link {
   flex-wrap: wrap;
   margin: 0 0 0.4rem;
   padding: 0.6875rem 1rem;
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  /* Styling refresh Plan B (Task B6): a recessed track band with the card radius. */
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-card);
   font-size: 0.9375rem;
   line-height: 1.25rem;
   font-weight: 600;
@@ -2175,9 +2224,10 @@ a.gn-ticket-sheet__crumb--link {
    three together, identically, on the shared `.gn-card` rule itself
    (`:160-165` above, unedited by this task) that every card in the product,
    `.gn-board-card` included, renders through. */
+/* Styling refresh Plan B (Task B6): P-RAISED — the table is a raised panel on `lift`. */
 .gn-list__table-wrap {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-raised);
+  box-shadow: var(--gn-shadow-lift);
   border-radius: var(--gn-radius-card);
   overflow: auto;
 }
@@ -2209,7 +2259,7 @@ a.gn-ticket-sheet__crumb--link {
   line-height: 1.125rem;
   font-weight: 600;
   color: var(--gn-text-muted);
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-well); /* Styling refresh Plan B (Task B6): a recessed header band inside the raised table. */
   padding: 0.6875rem 1rem;
   white-space: nowrap;
 }
