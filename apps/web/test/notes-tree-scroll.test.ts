@@ -8,17 +8,25 @@ import { describe, expect, it, vi } from 'vitest';
  * two shapes the page test cannot: a tree ALREADY populated when it attaches, and the `scroll`
  * event the browser fires when its own clamp moves the offset. A `scrollTop` that clamps to the rows
  * present (60px each, a 300px window) stands in for the browser, as in 18.488.
- * CONTROL (same `it`): a module that has saved nothing writes nothing.
+ * CONTROL (same `it`): a module that has saved nothing writes NOTHING — asserted on the setter (a spy), since a write of 0 is invisible
+ * to a value read; so a `restoring = true` start is red, not equivalent.
  * MUTATION TARGETS: (a) drop the `restore()` call that follows `observer.observe` (only a populated
  * tree sees it); (b) record while restoring; (c) drop the takeover listeners; (d) drop the give-up
- * timer; (e) stop recording on `scroll`.
+ * timer; (e) stop recording on `scroll`; (f) drop `observer.disconnect()` from the detach; (g) drop the `scroll`
+ * `removeEventListener` from the detach; (h) start in the restoring state with nothing saved.
  */
+/** Every value written to an element's `scrollTop`, in order — jsdom's own setter is unobservable, so a write of 0 is otherwise invisible. */
+const writes = new WeakMap<Element, number[]>();
+const writesOf = (element: Element): number[] => writes.get(element) ?? [];
+
 function tree(rows: number): HTMLElement {
   const element = document.createElement('div');
   let offset = 0;
+  writes.set(element, []);
   Object.defineProperty(element, 'scrollTop', {
     get: () => offset,
     set: (value: number) => {
+      writes.get(element)?.push(value);
       offset = Math.min(value, Math.max(0, element.children.length * 60 - 300));
     },
   });
@@ -48,6 +56,7 @@ describe('18.489 carryTreeScroll', () => {
     const untouched = tree(30);
     const detachControl = carryTreeScroll(untouched);
     expect(untouched.scrollTop).toBe(0);
+    expect(writesOf(untouched)).toEqual([]); // not even a write of 0: a first mount does not enter the restoring state
     untouched.scrollTop = 800;
     untouched.dispatchEvent(new Event('scroll')); // the reader's scroll — recorded
     detachControl();
@@ -101,5 +110,30 @@ describe('18.489 carryTreeScroll', () => {
     const detachNext = carryTreeScroll(next);
     expect(next.scrollTop).toBe(200);
     detachNext();
+
+    // (f) detach stops the observer: a row added to a still-short tree after detach restores nothing.
+    const gone = tree(0);
+    const detachGone = carryTreeScroll(gone);
+    addRows(gone, 1);
+    await flush();
+    const before = writesOf(gone).length;
+    expect(before).toBeGreaterThan(1); // CONTROL: the same mutation BEFORE detach does write (attach + the row)
+    detachGone();
+    addRows(gone, 1);
+    await flush();
+    expect(writesOf(gone)).toHaveLength(before);
+
+    // (g) detach stops recording: a scroll event after detach does not move the saved offset.
+    const leaver = tree(30);
+    const detachLeaver = carryTreeScroll(leaver);
+    leaver.scrollTop = 500;
+    leaver.dispatchEvent(new Event('scroll')); // CONTROL: before detach it IS recorded
+    detachLeaver();
+    leaver.scrollTop = 900;
+    leaver.dispatchEvent(new Event('scroll'));
+    const successor = tree(30);
+    const detachSuccessor = carryTreeScroll(successor);
+    expect(successor.scrollTop).toBe(500);
+    detachSuccessor();
   });
 });
