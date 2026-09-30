@@ -427,9 +427,59 @@ describe('TemplateGallery', () => {
       expect(screen.getByText(template.name)).toBeInTheDocument();
       expect(screen.getByText(template.tagline)).toBeInTheDocument();
     }
-    await user.click(screen.getByRole('button', { name: 'Use this template — Errand with waits' }));
+    await user.click(screen.getByRole('button', { name: 'Use the Errand with waits template' }));
     expect(onPick).toHaveBeenCalledWith(WORKFLOW_TEMPLATES[1]);
     await user.click(screen.getByRole('button', { name: 'Start blank' }));
     expect(onPick).toHaveBeenCalledWith(null);
+  });
+
+  /**
+   * 20.620 — touch-doors: every template card IS the one control that starts from that template.
+   */
+  it('20.620 each template card is one focusable control named "Use the <name> template"', async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    const { container } = render(<TemplateGallery onPick={onPick} />);
+    const cards = [...container.querySelectorAll('.template-gallery__card:not(.template-gallery__card--blank)')];
+    expect(cards.length).toBe(WORKFLOW_TEMPLATES.length);
+    for (const [index, template] of WORKFLOW_TEMPLATES.entries()) {
+      const card = cards[index]!;
+      // ONE control per card, and it is the door — no second button or link inside it
+      const controls = card.querySelectorAll('button, a[href], input, select, textarea, [tabindex]');
+      expect(controls.length, `${template.name}: controls in the card`).toBe(1);
+      const door = screen.getByRole('button', { name: `Use the ${template.name} template` });
+      expect(door.className).toContain('template-gallery__door');
+      expect(card.contains(door)).toBe(true);
+      // the card's own copy is inside the door, so the whole card is the hit area
+      expect(door).toHaveTextContent(template.name);
+      expect(door).toHaveTextContent(template.tagline);
+      // Enter starts from THIS template (the same action the button had)
+      onPick.mockClear();
+      door.focus();
+      await user.keyboard('{Enter}');
+      expect(onPick).toHaveBeenCalledWith(template);
+      onPick.mockClear();
+      await user.click(door);
+      expect(onPick).toHaveBeenCalledWith(template);
+    }
+    // CONTROL — Start blank is still its own ghost control and still picks null
+    onPick.mockClear();
+    const blank = screen.getByRole('button', { name: 'Start blank' });
+    expect(blank).toHaveClass('gn-button--ghost');
+    await user.click(blank);
+    expect(onPick).toHaveBeenCalledWith(null);
+  });
+
+  /**
+   * 20.622 — the chooser has no primary button: N loud buttons would break rule 01, the doors are the affordance.
+   */
+  it('20.622 the template chooser renders no .gn-button--primary', () => {
+    const { container } = render(<TemplateGallery onPick={() => {}} />);
+    // CONTROL — the query reads real classes: the ghost Start blank is found by the same kind of query
+    expect(container.querySelectorAll('.gn-button--ghost').length).toBe(1);
+    expect(container.querySelectorAll('.gn-button--primary').length).toBe(0);
+    for (const door of container.querySelectorAll('.template-gallery__door')) {
+      expect(door.className, 'a door is not a button').not.toMatch(/gn-button/);
+    }
   });
 });

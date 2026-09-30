@@ -1195,7 +1195,7 @@ You do not have to draw one from scratch. There are three templates plus a blank
 | **Errand with waits** | Has a "Waiting" stage marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods. |
 | **Start blank** | An empty canvas with one starting stage called "New". |
 
-Press **Use this template — [name]** and it copies it in. You then get your own independent copy — it
+Press the template's card (each is one control, named **Use the [name] template**) and it copies it in. You then get your own independent copy — it
 does not stay linked to the template, and changing yours affects nobody else's. You can change it
 before publishing.
 
@@ -1739,3 +1739,98 @@ Honestly, not everything:
 - Notes have no screen yet on the phone or desktop apps — only the website has one.
 - Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built.
 - There is no list on a note or a job showing what else links to it.
+
+## §16 — Connecting Claude or ChatGPT
+
+### What connecting does
+
+You can let Claude or ChatGPT work in Gisik Nokma **as you**. Once it is connected you can ask it, in
+ordinary words — *what is waiting on me?*, *add a job to the Shop floor project*, *move the chiller job to
+Done*, *put a comment on that one* — and it does it, in the same workspaces, with the same permissions,
+as if you had done it yourself.
+
+There is nothing to install and nothing to copy between windows: you paste one web address into the
+assistant, sign in the way you always do, and press **Allow**.
+
+Three things are worth knowing before you press it:
+
+- **It can do what you can do — all of it.** It can see and change everything you can, in every workspace
+  you belong to: read jobs, create them, move them through their stages, comment and assign. There is no
+  read-only choice and no picking one workspace.
+- **It can never do more than you can.** A job you cannot see, it cannot see. A move your role does not
+  allow is refused for the assistant in the same words it would be refused for you.
+- **Every change it makes is recorded under your name**, like any other change in the job's history.
+
+### The address to paste
+
+The address is `https://pm-api.artsourced.in/mcp`.
+
+The easy way to get it is on the website: open **Account**, find "Connected assistants", and press
+**Connect an assistant**. The panel shows the address with a **Copy** button, and a **How to connect** link
+back to this chapter.
+
+### In Claude
+
+The steps below are for Claude on the web or in the desktop app, as of 30 September 2026. Menus in other
+people's apps move; if a name has changed, look for **Connectors** in Claude's settings.
+
+1. Open Claude's **Settings**, choose **Connectors**, press **Add**, then **Add custom connector**.
+2. Paste the address above, give it a name you will recognise (for example Gisik Nokma) and press **Add**.
+3. A Gisik Nokma page opens in your browser. Sign in if it asks you to, check the name and the website
+   address shown on the page, and press **Allow**.
+
+You are returned to Claude, and the connector is ready to use in any conversation.
+
+On a Team or Enterprise plan, an owner of your Claude organisation adds the connector for the organisation
+first (in the organisation's connector settings); after that each person opens **Connectors**, finds it in
+the list and presses **Connect** — and then does step 3 themselves.
+
+### In ChatGPT
+
+The steps below are for ChatGPT on the web, as of 30 September 2026. ChatGPT calls this **Developer
+mode**, and it may only be offered on some plans; a Business or Enterprise workspace may need an
+administrator to switch it on for you. ChatGPT moves these menus more often than most — if a name below is
+not on your screen, look for **Developer mode** and for the button that creates a new connector or app.
+
+1. In **Settings**, turn on **Developer mode** (it has been under **Security and login**, and before that
+   under **Connectors** → **Advanced**).
+2. In the connectors (or apps) settings, press the button that creates a new one — **Create** or the plus
+   button — paste the address above, give it a name, and choose sign-in by **OAuth** if you are asked.
+3. A Gisik Nokma page opens. Sign in if it asks you to, check the name and the website address shown, and
+   press **Allow**.
+
+The new connector appears among ChatGPT's developer-mode tools; turn it on for a conversation from the
+message box.
+
+### What the Allow page shows
+
+The page says which assistant is asking, and always shows the **website address** it will send you back to
+beside that name — for Claude that is `claude.ai`, for ChatGPT it is `chatgpt.com`. An assistant's name is
+whatever it calls itself, so the address is the part to trust: if you were not just adding a connector and
+the address is not one you recognise, press **Deny**. **Deny** sends you back with a refusal and nothing is
+connected.
+
+If you press **Allow** twice, or reload the page after answering, the second answer is refused with a plain
+message that the request has already been answered — nothing extra is connected. Start again from the
+assistant.
+
+### Seeing what is connected, and disconnecting
+
+**Account** → "Connected assistants" lists everything connected as you: the assistant's name and the
+website address it came from, when it was connected and when it was last used. Press **Disconnect** on a
+row and that assistant loses access at once — its next request is refused.
+
+The same list also shows anything you approved from a computer with the older, installed way of connecting
+an assistant. Each has its own **Revoke** or **Disconnect** button.
+
+Removing the connector inside Claude or ChatGPT stops that app asking; **Disconnect** here is the one that
+cuts the access off from our side, so use it if you are not sure.
+
+### If the assistant asks you to reconnect
+
+Sometimes Claude or ChatGPT says the connector needs to be reconnected, or shows a **Connect** or **Sign
+in** button beside it. That means its permission has ended — because you pressed **Disconnect**, or because
+it has gone about three months without being used. Nothing is lost. Press the button and go through the
+**Allow** page again; it is the same as the first time.
+
+Day to day you never see any of this: the permission renews itself every time the assistant is used.

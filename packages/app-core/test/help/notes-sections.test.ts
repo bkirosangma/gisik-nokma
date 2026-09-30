@@ -35,14 +35,17 @@ const MANUAL_NOTES_SUBSECTIONS = [
 ];
 
 describe('15.36 the generated corpus carries the notes release sections', () => {
-  it('15.36 the manual has a "§15 — Notes" section, last in document order, with its ten subsections', () => {
+  it('15.36 the manual has a "§15 — Notes" section, between §14 and §16, with its ten subsections', () => {
     const manual = document('manual');
     const notes = manual.sections.find((section) => section.id === '15-notes');
     expect(notes).toBeDefined();
     expect(notes?.title).toBe('§15 — Notes');
-    // Last, not merely present — §15 follows §14, and a section spliced in
-    // ahead of it would be a different defect than a missing one.
-    expect(manual.sections[manual.sections.length - 1]?.id).toBe('15-notes');
+    // Immediately after §14 and immediately before §16 (added 2026-09-30, hosted
+    // MCP Task 9 — it was the LAST section until then) — not merely present. A
+    // section spliced in ahead of it would be a different defect than a missing one.
+    const at = manual.sections.findIndex((section) => section.id === '15-notes');
+    expect(manual.sections[at - 1]?.id).toBe('14-the-time-zone-and-other-things-worth-knowing');
+    expect(manual.sections[at + 1]?.id).toBe('16-connecting-claude-or-chatgpt');
     expect(notes?.entries.map((entry) => entry.title)).toEqual(MANUAL_NOTES_SUBSECTIONS);
   });
 
@@ -76,10 +79,11 @@ describe('15.36 the generated corpus carries the notes release sections', () => 
    * mistake, or duplicated. Both leave `notes` defined and would pass a
    * weaker existence check.
    */
-  it('15.36 control: the manual’s last section is genuinely the notes section, not merely present', () => {
+  it('15.36 control: the notes section is genuinely §15 — present exactly once, and not the last chapter', () => {
     const manual = document('manual');
     const last = manual.sections[manual.sections.length - 1];
     expect(last?.id).not.toBe('14-the-time-zone-and-other-things-worth-knowing');
+    expect(last?.id).not.toBe('15-notes');
     expect(manual.sections.filter((section) => section.id === '15-notes')).toHaveLength(1);
   });
 });

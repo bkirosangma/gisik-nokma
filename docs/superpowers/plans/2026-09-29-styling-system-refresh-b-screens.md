@@ -91,7 +91,7 @@ The audit tables mark those rows **kept**, with the reason.
 | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` (project chrome + 5 tabs) | `gn-project`, `gn-filters`, `gn-segmented`, `gn-list`, `gn-calendar`, `gn-timeline`, `gn-saved-filters`, `gn-contest-banner`, `gn-sync-*` | **New ticket** (`create-ticket-flow.tsx:488`) on every tab | B5 chrome; B6 Backlog+List; Board = Plan A; B7 Calendar; B8 Timeline |
 | `apps/web/app/w/[workspaceId]/my-work/page.tsx` | `gn-my-work`, `gn-attention` | the page title (no primary action) | B10 |
 | `apps/web/app/w/[workspaceId]/members/page.tsx` | `gn-members`, `gn-invite-mint`, `gn-invite-pending`, `gn-table` | **Send invitation** (`:956`) | B12 |
-| `apps/web/app/w/[workspaceId]/settings/workflows/**` (4 routes), `…/settings/ticket-types/**` (3 routes) | `workflow-*`, `ticket-type-*`, `state-*`, `transition-*`, `inspector-panel`, `advisories-panel`, `publish-controls`, `fields-editor`, `icon-picker`, `read-only-banner` | **New workflow** / **New type** on the lists; **Publish** / **Save ticket type** in the editors | B16 |
+| `apps/web/app/w/[workspaceId]/settings/workflows/**` (4 routes), `…/settings/ticket-types/**` (3 routes) | `workflow-*`, `ticket-type-*`, `state-*`, `transition-*`, `inspector-panel`, `advisories-panel`, `publish-controls`, `fields-editor`, `icon-picker`, `read-only-banner` | **New workflow** / **New type** on the lists; **Publish** / **Save ticket type** in the editors; the template chooser (`/workflows/new`): **doors, no primary (as B13 home)** — each template card is a P-LIFT door (cases 20.620–20.622) | B16 |
 | `apps/web/app/settings/page.tsx` | `gn-settings`, `gn-workspace-list`, `gn-workspace-settings` | **Save** (`workspace-settings-form.tsx:439`) | B15 |
 | `apps/web/app/account/page.tsx` (incl. Deleted items, passkeys, sessions, notifications) | `gn-account`, `gn-deleted-items` | **Save name** (`profile-section.tsx:79`) | B17 |
 | `apps/web/app/inbox/page.tsx` | `gn-inbox` | the page title (no primary action) | B18 |
@@ -101,6 +101,8 @@ The audit tables mark those rows **kept**, with the reason.
 | Shared: fields and the segmented control | `gn-field`, `gn-segmented`, `gn-switch` | — | B2 |
 | Shared: the app shell and navigation | `gn-shell`, `gn-nav`, `gn-page-title`, `gn-theme-toggle`, `gn-skip` | — (supports every page's own loud element) | B4 |
 | Shared: empty states (board, column, and every other screen's empty copy) | `gn-board--empty`, `gn-board__column-empty*`, `*-empty` | the empty state's one action, which is quiet whenever a primary exists elsewhere on the screen | B9 |
+
+**Touch-target KEPT list (2026-09-30, cases 20.611–20.619, 20.624).** After browser check B every control under 44px was fixed (hit-slop, grow or stretch — `Features.md` §17) except: the native `<select>` (20px) on notes and members — the shared Select's visually hidden `HiddenSelect`, not a target, the 44px trigger is; and inline links inside running text (footer, sign-in, legal: 19px) — WCAG 2.5.8 excludes inline links in a sentence. The 24px in-list floor (`DENSE_IN_LIST`, the per-task `KEPT` lists) is unchanged.
 
 **The desktop and mobile shells:**
 - **`apps/desktop`** imports `@gisik-nokma/ui/ui.css` (`apps/desktop/src/main.tsx:6`) and installs `themeStylesheet()` (`apps/desktop/src/theme.ts`, via `installTheme`). It renders app-core's `HelpBrowser` and `SyncNotices` (`apps/desktop/src/app.tsx:9-16`).

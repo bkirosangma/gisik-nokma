@@ -204,6 +204,19 @@ input, textarea, select { font-family: inherit; }
    `.gn-page-title`'s margin, so it can carry a smaller size without shrinking
    the page title it sits above. */
 .gn-breadcrumb { margin: 1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+.gn-breadcrumb a { position: relative; }
+/* Touch target (browser check B, 2026-09-30; case 20.616): HIT-SLOP. A `::before` centred on the
+   control, 2.75rem tall and painting nothing, so the hit box reaches 44px while the drawn box —
+   the 16px crumb text — stays exactly as it was. */
+.gn-breadcrumb a::before {
+  content: '';
+  position: absolute;
+  left: -0.25rem;
+  right: -0.25rem;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
+}
 
 /* The title-plus-Cancel row a detail/editor page puts above its form. `wrap`
    for the same measured reason every other title-and-action row in this file
@@ -651,6 +664,19 @@ input, textarea, select { font-family: inherit; }
   text-align: left;
   cursor: pointer;
   border-radius: var(--gn-radius-control);
+  position: relative;
+}
+/* Touch target (browser check B, 2026-09-30; case 20.612): HIT-SLOP. A `::before` centred on the
+   control, 2.75rem tall and painting nothing, so the hit box reaches 44px while the drawn box —
+   the padding-less heading text — stays exactly as it was. */
+.gn-workspace-home__rename-trigger::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
 }
 .gn-workspace-home__rename-trigger:hover:not(:disabled) { color: var(--gn-text-accent); }
 .gn-workspace-home__rename-trigger:focus-visible {
@@ -3121,6 +3147,15 @@ input, textarea, select { font-family: inherit; }
 
 .gn-mcp-tokens__signed-out { margin: 0; }
 
+/* The hosted-connections list and the Connect panel (remote-MCP plan Task 8).
+   Sections of the same card, separated by space rather than a second card — a
+   card holding a card is the shape `.gn-mcp-tokens__card--account` exists to
+   avoid. No font-size: the subtitle inherits the weight-only emphasis `__name` uses. */
+.gn-mcp-tokens__hosted { margin-top: 1.5rem; }
+.gn-mcp-tokens__subtitle { margin: 0 0 0.75rem; font-weight: 600; }
+.gn-mcp-tokens__connect { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.gn-mcp-tokens__url { overflow-wrap: anywhere; }
+
 .gn-mcp-tokens__refusal {
   margin: 1rem 0 0;
   padding: 0.75rem 1rem;
@@ -3461,6 +3496,8 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__filter {
   flex: 1 1 auto;
   min-width: 0;
+  /* Touch target (case 20.613): GROW — the bordered field's box IS its look. */
+  min-height: 2.75rem;
   padding: 0.375rem 0.5rem;
   font: inherit;
   font-size: 0.8125rem;
@@ -3497,7 +3534,10 @@ input, textarea, select { font-family: inherit; }
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  align-items: baseline;
+  /* Touch target (case 20.614): GROW — the row's hover and open fills ARE its box, and rows
+     sit 2px apart, so a hit-slop would overlap the next row. */
+  min-height: 2.75rem;
+  align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.375rem;
   color: var(--gn-text);

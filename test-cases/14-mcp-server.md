@@ -662,6 +662,10 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.218 — registering sweeps stale clients (Task 1's rule) — a 31-day-old unused client is gone after the next registration;** control: the new client exists. Mutation: never call the sweep.
 - ✅ **14.219 — a hosted-door request never reaches better-auth's catch-all: `/oauth/token` and `/.well-known/*` are their own routes, not `/api/auth/*`;** control: `/api/auth/get-session` still answers. Mutation: mount the routes under `/api/auth`.
 
+- ✅ **14.237 — registration refuses a `redirect_uris` list with a non-string entry (`["https://claude.ai/api/mcp/auth_callback", 5]`) with 400 `invalid_redirect_uri` — the good entry is NOT registered on its own;** control: the same list without the `5` registers. Mutation: drop the `uris.length !== given.length` clause (a review survivor of Task 2).
+- ✅ **14.238 — registration allows at most 10 redirect URIs (11 → 400 `invalid_redirect_uri`, no client stored);** control: exactly 10 registers. Mutation: remove the count bound.
+- ✅ **14.239 — each redirect URI may be at most 2048 characters (2049 → 400 `invalid_redirect_uri`);** control: exactly 2048 registers. Mutation: remove the length bound.
+
 ## 14.6 Hosted MCP — tokens and revocation
 
 *Remote-MCP plan Task 5 (14.240–14.249). Tests: `apps/server/test/mcp/oauth-token.test.ts`, `pkce.test.ts`. Landed BEFORE Task 3 on the controller's ordering, so its `consent()` helper (now shared, in `apps/server/test/helpers/oauth.ts`) mints the code through the store (`mintCode`) rather than through `/oauth/authorize` + the decision route; **14.247's pending-consent half needs Task 3 and its case flips there** (the code half is already asserted in `oauth-token.test.ts`).*
@@ -673,9 +677,62 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.244 — `refresh_token` returns a NEW access + refresh token, and the old refresh token is dead;** control: the new access token authenticates. Mutation: return the same refresh token.
 - ✅ **14.245 — presenting a used refresh token revokes the whole connection: its latest access token stops authenticating (401) and its latest refresh token is refused;** control: another connection of the same person is untouched. Mutation: skip the family revoke.
 - ✅ **14.246 — two concurrent refreshes with the same token: exactly one succeeds; the other is treated as reuse and the connection is gone;** control: a single refresh succeeds. Mutation: a read-then-write refresh (SELECT used_at, then UPDATE). *(Review Focus 2)*
-- ❌ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
+- ✅ **14.247 — a pending consent and a minted code survive an app restart (a second `buildOAuthApp` on the same database completes the exchange);** control: the same exchange on the first app also works. Mutation: keep pending rows in a `Map`. *(Review Focus 5)*
 - ✅ **14.248 — `/oauth/revoke` with an access OR refresh token deletes the connection (both stop working) and answers 200; an unknown token also answers 200;** control: a different connection keeps working. Mutation: revoke only the presented access token.
 - ✅ **14.249 — the token endpoint accepts `application/x-www-form-urlencoded` (what OAuth clients send) and JSON; an unknown `grant_type` is `unsupported_grant_type`;** control: the same exchange in both encodings yields a token. Mutation: accept JSON only.
+- ✅ **14.255 — `verifyPkceS256` refuses a verifier shorter than 43 or longer than 128 characters, or with a character outside the RFC 7636 unreserved set, even when that verifier's OWN S256 challenge is presented;** control: 43 and 128 characters are accepted. Mutation: delete the `/^[A-Za-z0-9._~-]{43,128}$/` test line. *(A survivor of Task 5's review.)*
+- ✅ **14.256 — `/oauth/token` and `/oauth/revoke` are each charged to the MCP rate-limit bucket (`mcpMax: 2` → the third call from one client is 429);** control: another client key is not limited. Mutations: drop `/oauth/token` from the bucket condition in `app.ts`; drop `/oauth/revoke` from it. *(A survivor of Task 5's review.)*
+- ✅ **14.257 — a refresh whose new token pair cannot be issued (a trigger rejects the insert) answers 500 and leaves the old refresh token UNUSED — the transaction rolled back;** control: with the fault removed the same token refreshes (200) and authenticates. Mutation: delete the `BEGIN`/`COMMIT` around the refresh in `routes/mcp-oauth.ts`. *(A survivor of Task 5's review.)*
+- ✅ **14.258 — `GET /oauth/authorize` is charged to the MCP rate-limit bucket (`mcpMax: 2` → the third call from one client is 429 and writes no pending row);** control: another client key is not limited. Mutation: drop `/oauth/authorize` from the bucket condition in `app.ts`.
+
+## 14.4 Hosted MCP — authorize and consent API
+
+*Remote-MCP plan Task 3 (14.220–14.229; 14.237–14.239 sit in §14.3). Tests: `apps/server/test/mcp/oauth-authorize.test.ts`, `test/http/security-middleware.test.ts` (row for the decision route).*
+
+- ✅ **14.220 — a valid authorize request 302s to `${WEB_ORIGIN}/mcp/connect?request=req_…` and stores a pending row with the challenge, redirect and state;** control: the pending row expires 10 minutes after `now`. Mutation: redirect to the API's own host.
+- ✅ **14.221 — PKCE is required: `code_challenge_method=plain` and a missing `code_challenge` are refused (302 to the client with `error=invalid_request`), no pending row;** control: `S256` with a 43-char challenge is accepted. Mutation: accept `plain`.
+- ✅ **14.222 — the redirect must equal a registered one EXACTLY: a trailing slash, a different case in the path, or an extra query parameter is refused with a 400 JSON error and NO redirect;** control: the exact string is accepted. Mutation: compare after `new URL().href` normalisation.
+- ✅ **14.223 — an unknown `client_id` is a 400 JSON error, never a redirect;** control: a known client proceeds. Mutation: redirect to the supplied `redirect_uri` on an unknown client.
+- ✅ **14.224 — `GET /v1/mcp/oauth/requests/:id` returns the client's name AND the redirect host (`claude.ai`) to the signed-in person, 401 signed out, 404 for an expired request (the pending row is still in the table, only past `expires_at`);** control: a live request answers 200. Mutations: omit `redirectHost`; make `getPending` ignore `expires_at` (a review survivor).
+- ✅ **14.225 — Allow mints a code for the SIGNED-IN person and answers `redirectTo = <redirect_uri>?code=…&state=<state>`; Deny answers `redirectTo = <redirect_uri>?error=access_denied&state=<state>` and mints nothing;** control: a redirect that already has a query keeps it (`…cb?x=1&code=…`). Mutation: drop `state`.
+- ✅ **14.226 — a request is answered once: a second decision (either way) is 409 `already_answered`, and no second code exists;** control: the first decision was 200. Mutation: read the pending row with `getPending` instead of `takePending`.
+- ✅ **14.227 — the decision refuses a cookie POST whose `Origin` is not `WEB_ORIGIN` (403 via the HTTP-Origin hook);** control: the same POST with `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+- ✅ **14.228 — an MCP token (local) cannot decide a consent (403 `mcp_token_may_not_decide`), and the request stays answerable;** control: a better-auth session can. Mutation: drop the `authKind` fence.
+- ✅ **14.229 — `response_type` other than `code` and a `scope` other than `gisik:act` are handled: `token` → `error=unsupported_response_type`; `admin` → `error=invalid_scope`;** control: an absent scope is accepted as `gisik:act`. Mutation: accept any scope.
+
+## 14.5 Hosted MCP — the consent page
+
+*Remote-MCP plan Task 4 (14.230–14.236). Tests: `apps/web/test/mcp-connect-page.test.tsx`, `apps/web/test/next-config.test.ts`.*
+
+- ✅ **14.230 — signed out, `/mcp/connect?request=req_x` shows a Sign in link to `/sign-in?next=%2Fmcp%2Fconnect%3Frequest%3Dreq_x` and no Allow button;** control: signed in, Allow appears. Mutation: link to `/sign-in` without `next`.
+- ✅ **14.231 — signed in, the page shows the consent copy verbatim with the app name AND the redirect host from the API;** control: a different name/host pair renders its own values. Mutation: drop the host.
+- ✅ **14.232 — Allow POSTs `{ allow: true }` to the decision route and navigates to the returned `redirectTo` (`window.location.assign`);** control: the button is disabled while the POST is in flight (no double submit) and nothing navigates before it resolves. Mutation: navigate before the POST resolves.
+- ✅ **14.233 — Deny POSTs `{ allow: false }` and navigates to the returned `redirectTo`;** control: Allow is not called. Mutation: Deny posts `allow: true`.
+- ✅ **14.234 — a 404 request shows "This connection request has expired. Go back to your assistant and connect again." and no buttons; a 409 shows the server's message verbatim;** control: a live request shows buttons. Mutation: render the buttons on 404.
+- ✅ **14.235 — Allow is the page's ONE primary button; Deny is the quiet (ghost) Button;** control: both are real `<button>`s with accessible names "Allow" and "Deny". Mutation: make Deny primary.
+- ✅ **14.236 — the page is not frameable: `next.config.ts` headers for `/:path*` (which covers `/mcp/connect`) include `x-frame-options: DENY` (FD4);** control: the pattern matches `/mcp/connect?request=x`. Mutation: scope the header to `/workspaces/:path*`.
+
+## 14.9 Hosted MCP — Connected assistants
+
+*Remote-MCP plan Task 8 (14.270–14.277). Tests: `apps/server/test/mcp/mcp-connections.test.ts`, `test/http/security-middleware.test.ts` (row for the DELETE), `apps/web/test/mcp-tokens-page.test.tsx`.*
+
+- ✅ **14.270 — `GET /v1/me/mcp-connections` lists the caller's LIVE hosted connections (name, redirect host, connected, last used) and none of another person's; a connection past its idle expiry is absent (the row is still in the table);** control: local tokens still list under `/v1/me/mcp-tokens`, hosted ones never do. Mutations: drop the `user_id` filter; drop the `idle_expires_at > now` filter (a review survivor).
+- ✅ **14.271 — Disconnect (`DELETE /v1/me/mcp-connections/:id`) deletes the connection: its access token stops authenticating and its refresh token is `invalid_grant`;** control: another person's id answers 404 and their connection, access token and refresh token all survive. Mutation: revoke by id without the owner (`revokeConnection(…, null)`; a review survivor).
+- ✅ **14.272 — the DELETE refuses a cookie request with a foreign Origin (403 `forbidden_origin`);** control: `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+- ✅ **14.273 — `GET /v1/mcp/public-url` answers `{ url: "<MCP_PUBLIC_URL>/mcp" }` when the door is on and `{ url: null }` when off;** control: unauthenticated callers get the same answer. Mutation: return the web origin.
+- ✅ **14.274 — the Connected assistants screen shows each hosted connection as "{app name} · {host}", "Connected {date}", "Last used {date}" or "Never used" and a **Disconnect** button; local tokens keep **Revoke**;** control: a person with neither sees the existing empty state. Mutation: label the hosted button Revoke.
+- ✅ **14.275 — Disconnect removes the row only after the DELETE resolves and shows the server's reason on failure;** control: while in flight the row stays and its button reads "Disconnecting…". Mutation: remove the row before the DELETE resolves.
+- ✅ **14.276 — the "Connect an assistant" panel shows the URL from `/v1/mcp/public-url` with a **Copy** button (writes it to the clipboard, then reads "Copied") and a "How to connect" link to the Help article;** control: with `url: null` the panel is absent. Mutation: hard-code the URL.
+- ✅ **14.277 — the screen reads `/v1/me/mcp-connections` and `/v1/me/mcp-tokens` independently: a failure of one shows its own failure sentence and still renders the other;** control: both succeed → both lists. Mutation: make one failure fail both.
+
+
+## 14.10 Hosted MCP — member help (hosted remote MCP plan, Task 9; block `14.200`–`14.299`)
+
+*The manual's new "§16 — Connecting Claude or ChatGPT" (`docs/manual.md`). Tests: `packages/app-core/test/help/connecting-assistants.test.ts`; `pnpm check:help` guards its quoted strings and the freshness of the generated copy. The menu names for Claude and ChatGPT were checked on 2026-09-30 against the MCP project's "Connect to remote MCP servers" guide and OpenAI's ChatGPT developer-mode guide and are dated in the text.*
+
+- ✅ **14.280 — the manual has a §16 "Connecting Claude or ChatGPT" with, per app, three numbered steps (where to add a connector, paste the URL, press Allow), how to disconnect (Connected assistants → Disconnect), and what a "reconnect" prompt means;** control: `pnpm check:help` exits 0 and §15 has no second three-step list. Mutation: change **Allow** to **Approve** in the Claude steps — caught by the section test's `allow` assertions, NOT by `pnpm check:help`, which checks quoted strings only and does not see bold button names (controller-measured 2026-09-30: the check stays green), so a wrong bold label is guarded only by the words the test names. — (`packages/app-core/test/help/connecting-assistants.test.ts`, `pnpm check:help`)
+- ✅ **14.281 — the Help browser finds §16 by searching "ChatGPT" and "connector";** control: an existing §15 search still finds §15 and a term §16 does not contain does not find §16. Mutation: omit the generated file's regeneration. — (`packages/app-core/test/help/connecting-assistants.test.ts`)
+- ✅ **14.282 — the "How to connect" link on Connected assistants lands on §16's anchor: its `href` is EXACTLY `/help#manual-16-connecting-claude-or-chatgpt`, derived in the web test from the generated manual's section id (`manual-${section.id}`, as the Help browser renders it);** control: the anchor is unique across the manual (`packages/app-core/test/help/connecting-assistants.test.ts`) and the section exists in `HELP_CONTENT`. Mutation: link `/help` without the anchor; link the old wrong anchor `/help#connecting-claude-or-chatgpt`. — (`apps/web/test/mcp-tokens-page.test.tsx` 14.276 for the link, `packages/app-core/test/help/connecting-assistants.test.ts` for the anchor)
 
 ## 14.8 Hosted MCP — the /mcp endpoint
 

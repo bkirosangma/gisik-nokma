@@ -992,6 +992,19 @@ a.gn-ticket-sheet__crumb--link {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  position: relative;
+}
+/* Touch target (browser check B, 2026-09-30; case 20.611): HIT-SLOP. A `::before` centred on the
+   control, 2.75rem tall and painting nothing, so the hit box reaches 44px while the drawn box —
+   the 36px transparent toggle — stays exactly as it was. */
+.gn-board__workflow-toggle::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
 }
 /* Drawn, never typed — the SAME idiom and the SAME reason as
    `.gn-list__columns-caret` above: a `::after` contributes no text node, so
@@ -3790,6 +3803,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   flex: 1;
   font: inherit;
   color: inherit;
+  /* Touch target (browser check B, 2026-09-30; case 20.624): the field wrapper is 44px but the
+     bare input inside it was 27px, so the wrapper's top and bottom bands focused nothing. Stretch
+     it to the wrapper's height and pull it over the wrapper's 1px edge; the input paints nothing,
+     so its drawn box (the text) is what it was. */
+  align-self: stretch;
+  margin-block: -1px;
 }
 .gn-select__trigger--searchable input:focus { outline: none; }
 /* E4-21 — the removal above is the product's OWN declaration, so no user-agent
@@ -4277,14 +4296,63 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    rather than with a typography-and-surface port. (2) The `.transition-inspector`
    card renders four MORE families that are still at zero CSS — `add-rule-menu*`,
    `restrict-to-editor*`, `require-field-editor*`, `require-different-user-editor*`
-   — and `template-gallery*` is the same shape on the sibling `/workflows/new`
-   route. **Named as a gap with an owner, not fixed here:** the prototype draws
+   — (`template-gallery*` WAS the same shape until 2026-09-30, now styled as
+   doors just below). **Named as a gap with an owner, not fixed here:** the prototype draws
    no rule-authoring UI at all (0 hits for `Add rule`/`Remove rule`/`Restrict`),
    so there is no drawn design to fit them to, and the audit's own `isBuilder`
    row named three families rather than seven. **Owner: whoever next touches the
    rule editors, and the audit's "keep and restyle" (`:694`) is the warrant.** */
 
 .workflow-builder-screen { display: flex; flex-direction: column; gap: 1rem; }
+/* Touch-doors (owner, 2026-09-30): the template chooser's cards are DOORS. Each whole card is the
+   one control that starts from that template — raised on `lift`, hover deepens to `lift-near`,
+   press settles on `lift-press` in the feedback time; shadow only, no transform, no filter — the
+   vocabulary of the workspace home's door cards (`globals.css` `.gn-workspace-home__link`, Plan B
+   B13). The page carries no primary button, exactly like the workspace home: the doors are the
+   affordance, and N loud buttons would break rule 01. `z-index` needs a positioned element, hence
+   `position: relative` on the hover. The grid gap leaves room below a row for the falling
+   `lift-near` shadow. */
+.template-gallery__cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.template-gallery__card { display: flex; }
+/* The blank cell shares the doors' grid row: centre its ghost pill so it keeps its own 44px instead of stretching to the row (case 20.625). */
+.template-gallery__card--blank { align-items: center; }
+.template-gallery__door {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-height: 2.75rem;
+  padding: 1rem 1.1rem;
+  border: none;
+  font: inherit;
+  text-align: left;
+  color: var(--gn-text);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  border-radius: var(--gn-radius-card);
+  transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
+  cursor: pointer;
+}
+.template-gallery__door:hover {
+  box-shadow: var(--gn-shadow-lift-near);
+  position: relative;
+  z-index: 1;
+}
+.template-gallery__door:active {
+  box-shadow: var(--gn-shadow-lift-press);
+  transition-duration: var(--gn-motion-feedback);
+}
+.template-gallery__door:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.template-gallery__name { font-size: 1.05rem; font-weight: 600; }
+.template-gallery__tagline { font-size: 0.8rem; color: var(--gn-text-muted); }
 .workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
 /* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
    preference. `danger` used as TEXT on `surface` measures **4.40** under
@@ -7237,6 +7305,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-fill-secondary);
   cursor: pointer;
   transition: background 0.15s ease;
+}
+/* Touch target (browser check B, 2026-09-30; case 20.615): HIT-SLOP. A `::before` centred on the
+   control, 2.75rem tall and painting nothing, so the hit box reaches 44px while the drawn box —
+   the 51x31 track and its knob — stays exactly as it was. */
+.gn-switch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
 }
 .gn-switch::after {
   content: '';

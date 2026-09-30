@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { buildOAuthApp, consent as consentFor, type Consent, pkcePair } from '../helpers/oauth.js';
+import type { SecurityOptions } from '../../src/app.js';
 
 let db: TestDatabase;
 beforeAll(async () => { db = await createTestDatabase(); });
@@ -112,6 +113,49 @@ describe('token endpoint and revocation', () => {
     expect([a.statusCode, b.statusCode].sort()).toEqual([200, 400]);
     const winner = (a.statusCode === 200 ? a : b).json();
     expect((await me(u.app, winner.access_token)).statusCode).toBe(401); // the loser's reuse revoked the family
+  });
+
+  it('14.256 /oauth/token and /oauth/revoke are charged to the MCP rate-limit bucket', async () => {
+    const security: SecurityOptions = {
+      webOrigin: null,
+      trustProxy: true,
+      rateLimit: { authMax: 100, eventsMax: 100, inviteMax: 100, mcpMax: 2, signInMax: 100, windowSec: 60 },
+    };
+    const { app } = buildOAuthApp(db, { security });
+    const call = (url: string, xff: string) =>
+      app.inject({ method: 'POST', url, headers: { 'x-forwarded-for': xff, ...form({ grant_type: 'refresh_token', refresh_token: 'nope', token: 'nope' }).headers }, payload: form({ grant_type: 'refresh_token', refresh_token: 'nope', token: 'nope' }).payload });
+    for (const [url, ip, ok] of [['/oauth/token', '198.51.100.11', 400], ['/oauth/revoke', '198.51.100.12', 200]] as const) {
+      expect((await call(url, ip)).statusCode, url).toBe(ok);
+      expect((await call(url, ip)).statusCode, url).toBe(ok);
+      expect((await call(url, ip)).statusCode, url).toBe(429);
+      expect((await call(url, `${ip}0`)).statusCode, url).toBe(ok); // CONTROL — another client key is not limited
+    }
+  });
+
+  it('14.257 a refresh whose new pair cannot be issued leaves the old refresh token usable (the transaction rolls back)', async () => {
+    const u = await person('+911100002257');
+    const c = await consent(u.app, u.userId);
+    const t = (await exchange(u.app, c)).json();
+    // The failure is deterministic: a trigger that rejects the NEW refresh-token row
+    // for this connection, installed after the exchange that created the first pair.
+    const mine = (await db.pool.query<{ connection_id: string }>(
+      `SELECT connection_id FROM mcp_tokens WHERE user_id = $1 AND connection_id IS NOT NULL`, [u.userId])).rows[0]!.connection_id;
+    await db.pool.query(`CREATE FUNCTION fail_refresh_issue() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW.connection_id = '${mine}' THEN RAISE EXCEPTION 'injected issuance failure'; END IF; RETURN NEW; END $$`);
+    await db.pool.query(`CREATE TRIGGER fail_refresh_issue BEFORE INSERT ON oauth_refresh_tokens FOR EACH ROW EXECUTE FUNCTION fail_refresh_issue()`);
+    try {
+      const failed = await refresh(u.app, t.refresh_token, c.clientId);
+      expect(failed.statusCode).toBe(500);
+      const row = await db.pool.query(`SELECT used_at FROM oauth_refresh_tokens WHERE connection_id = $1`, [mine]);
+      expect(row.rows).toHaveLength(1);
+      expect(row.rows[0].used_at).toBeNull(); // the burn was rolled back
+    } finally {
+      await db.pool.query(`DROP TRIGGER fail_refresh_issue ON oauth_refresh_tokens`);
+      await db.pool.query(`DROP FUNCTION fail_refresh_issue()`);
+    }
+    const retry = await refresh(u.app, t.refresh_token, c.clientId); // CONTROL — with the fault gone the SAME token still works
+    expect(retry.statusCode).toBe(200);
+    expect((await me(u.app, retry.json().access_token)).statusCode).toBe(200);
   });
 
   it('14.247 a minted code survives an app restart', async () => {

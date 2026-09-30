@@ -6293,15 +6293,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Press "
+                    "text": "Press the template's card (each is one control, named "
                   },
                   {
                     "kind": "bold",
-                    "text": "Use this template — [name]"
+                    "text": "Use the [name] template"
                   },
                   {
                     "kind": "text",
-                    "text": " and it copies it in. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
+                    "text": ") and it copies it in. You then get your own independent copy — it does not stay linked to the template, and changing yours affects nobody else's. You can change it before publishing."
                   }
                 ]
               },
@@ -8849,6 +8849,648 @@ export const HELP_CONTENT: HelpContent = [
                       "text": "There is no list on a note or a job showing what else links to it."
                     }
                   ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "16-connecting-claude-or-chatgpt",
+        "title": "§16 — Connecting Claude or ChatGPT",
+        "intro": [],
+        "entries": [
+          {
+            "id": "what-connecting-does",
+            "title": "What connecting does",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "You can let Claude or ChatGPT work in Gisik Nokma "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "as you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Once it is connected you can ask it, in ordinary words — "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "what is waiting on me?"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "add a job to the Shop floor project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "move the chiller job to Done"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "put a comment on that one"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — and it does it, in the same workspaces, with the same permissions, as if you had done it yourself."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "There is nothing to install and nothing to copy between windows: you paste one web address into the assistant, sign in the way you always do, and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Allow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Three things are worth knowing before you press it:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "It can do what you can do — all of it."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign. There is no read-only choice and no picking one workspace."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "It can never do more than you can."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " A job you cannot see, it cannot see. A move your role does not allow is refused for the assistant in the same words it would be refused for you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Every change it makes is recorded under your name"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", like any other change in the job's history."
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-address-to-paste",
+            "title": "The address to paste",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The address is "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "https://pm-api.artsourced.in/mcp"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The easy way to get it is on the website: open "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", find \"Connected assistants\", and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Connect an assistant"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". The panel shows the address with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Copy"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button, and a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "How to connect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " link back to this chapter."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "in-claude",
+            "title": "In Claude",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The steps below are for Claude on the web or in the desktop app, as of 30 September 2026. Menus in other people's apps move; if a name has changed, look for "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Connectors"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Claude's settings."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": true,
+                "items": [
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Open Claude's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Settings"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", choose "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Connectors"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Add"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", then "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Add custom connector"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Paste the address above, give it a name you will recognise (for example Gisik Nokma) and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Add"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "A Gisik Nokma page opens in your browser. Sign in if it asks you to, check the name and the website address shown on the page, and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Allow"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "You are returned to Claude, and the connector is ready to use in any conversation."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a Team or Enterprise plan, an owner of your Claude organisation adds the connector for the organisation first (in the organisation's connector settings); after that each person opens "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Connectors"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", finds it in the list and presses "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Connect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — and then does step 3 themselves."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "in-chatgpt",
+            "title": "In ChatGPT",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The steps below are for ChatGPT on the web, as of 30 September 2026. ChatGPT calls this "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Developer mode"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and it may only be offered on some plans; a Business or Enterprise workspace may need an administrator to switch it on for you. ChatGPT moves these menus more often than most — if a name below is not on your screen, look for "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Developer mode"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and for the button that creates a new connector or app."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": true,
+                "items": [
+                  [
+                    {
+                      "kind": "text",
+                      "text": "In "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Settings"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", turn on "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Developer mode"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (it has been under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Security and login"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and before that under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Connectors"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " → "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Advanced"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ")."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "In the connectors (or apps) settings, press the button that creates a new one — "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or the plus button — paste the address above, give it a name, and choose sign-in by "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "OAuth"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " if you are asked."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "A Gisik Nokma page opens. Sign in if it asks you to, check the name and the website address shown, and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Allow"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The new connector appears among ChatGPT's developer-mode tools; turn it on for a conversation from the message box."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-the-allow-page-shows",
+            "title": "What the Allow page shows",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The page says which assistant is asking, and always shows the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "website address"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " it will send you back to beside that name — for Claude that is "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "claude.ai"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", for ChatGPT it is "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "chatgpt.com"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". An assistant's name is whatever it calls itself, so the address is the part to trust: if you were not just adding a connector and the address is not one you recognise, press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deny"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deny"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " sends you back with a refusal and nothing is connected."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If you press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Allow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " twice, or reload the page after answering, the second answer is refused with a plain message that the request has already been answered — nothing extra is connected. Start again from the assistant."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "seeing-what-is-connected-and-disconnecting",
+            "title": "Seeing what is connected, and disconnecting",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " → \"Connected assistants\" lists everything connected as you: the assistant's name and the website address it came from, when it was connected and when it was last used. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Disconnect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on a row and that assistant loses access at once — its next request is refused."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The same list also shows anything you approved from a computer with the older, installed way of connecting an assistant. Each has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Revoke"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Disconnect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Removing the connector inside Claude or ChatGPT stops that app asking; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Disconnect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " here is the one that cuts the access off from our side, so use it if you are not sure."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "if-the-assistant-asks-you-to-reconnect",
+            "title": "If the assistant asks you to reconnect",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Sometimes Claude or ChatGPT says the connector needs to be reconnected, or shows a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Connect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Sign in"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beside it. That means its permission has ended — because you pressed "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Disconnect"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", or because it has gone about three months without being used. Nothing is lost. Press the button and go through the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Allow"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " page again; it is the same as the first time."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Day to day you never see any of this: the permission renews itself every time the assistant is used."
+                  }
                 ]
               }
             ]

@@ -169,6 +169,7 @@ export const SCREEN_OWNERS: Record<string, string> = {
   'apps/web/app/invite/[token]/page.tsx': 'B19',
   'apps/web/app/mcp/authorize/page.tsx': 'B19',
   'apps/web/app/mcp/tokens/page.tsx': 'B19',
+  'apps/web/app/mcp/connect/page.tsx': 'B19', // the hosted-MCP consent page (remote-MCP plan Task 4): an auth-flow screen like /mcp/authorize
   'apps/web/app/workspaces/page.tsx': 'B14',
   'apps/web/app/w/[workspaceId]/page.tsx': 'B13',
   'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 'A5-A7, B5-B8',
