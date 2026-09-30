@@ -260,18 +260,19 @@ describe('POST /v1/workspaces/:workspaceId/invites — issuance (case 6.32)', ()
     expect(stored[0]?.token_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('two invitations to the same address get different tokens — a token is not derived from anything', async () => {
+  it('each mint to the same address gets a different token — a token is not derived from anything', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
-    // Different roles, so they are two invitations (case 6.226); the SAME shape
-    // twice is one invitation whose token rotates (case 6.222).
+    // A different role UPDATES the pending invitation (a new invitation, the old
+    // one revoked — case 6.230); the SAME shape twice is one invitation whose
+    // token rotates (case 6.222). Each mint's token differs from the last.
     const first = await mintOk(owner, workspaceId, { address: 'same@example.com', role: 'member' });
     const second = await mintOk(owner, workspaceId, { address: 'same@example.com', role: 'admin' });
     expect(first.token).not.toBe(second.token);
     expect(first.inviteId).not.toBe(second.inviteId);
-    const repeat = await mintOk(owner, workspaceId, { address: 'same@example.com', role: 'member' });
-    expect(repeat.token).not.toBe(first.token);
-    expect(repeat.inviteId).toBe(first.inviteId);
+    const repeat = await mintOk(owner, workspaceId, { address: 'same@example.com', role: 'admin' });
+    expect(repeat.token).not.toBe(second.token);
+    expect(repeat.inviteId).toBe(second.inviteId);
   });
 
   it('planted defect: a plain member issuing an invitation is refused permission.role (case 6.33)', async () => {

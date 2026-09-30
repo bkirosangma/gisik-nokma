@@ -297,6 +297,10 @@ already signed in, there is a **Join [workspace]** button.
 - **One link, one person.** If three people click the same link at the same moment, one gets in and
   the other two see the dead-link message.
 - To take an invitation back: the pending list has a **Withdraw** button on each row.
+- **Inviting an address that already has a pending invitation does not add a second row.** With the
+  same role and projects, that invitation gets a fresh link and the email goes out again. With a
+  different role or different projects, the pending invitation is replaced by one carrying the new role
+  and projects, with a fresh link and a new email. Either way the older link stops working.
 
 If somebody tells you their link does not work, the message they see is: *"This invitation link does
 not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
