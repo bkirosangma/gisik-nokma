@@ -2375,8 +2375,14 @@ input, textarea, select { font-family: inherit; }
    wires it in rather than inventing a new shadow. `hig`/`minimal` render
    `--gn-shadow-sunken` as `none` (their `SHADOWS` entries are empty), so this
    rule is inert there without needing its own guard beyond the attribute
-   selector already scoping it to `neo`. */
-[data-style="neo"] .gn-nav a[aria-current='page'] {
+   selector already scoping it to `neo`.
+
+   Styling refresh Plan B (Task B4 follow-up): the `button` twin is listed too.
+   The base current-item rule above raises `a` AND `button`, so a neo rule for
+   `a` alone left a current `<button>` (the account menu's items) raised while
+   its `<a>` peers were pressed in. */
+[data-style="neo"] .gn-nav a[aria-current='page'],
+[data-style="neo"] .gn-nav button[aria-current='page'] {
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }

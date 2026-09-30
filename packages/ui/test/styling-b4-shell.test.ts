@@ -40,7 +40,11 @@ const ROWS: RosterRow[] = [
     declarations: { 'border-top': '1px solid var(--gn-fill-secondary)' },
   },
 ];
-const KEPT = ["[data-style=\"neo\"] .gn-nav a[aria-current='page']"];
+const NEO_CURRENT = [
+  "[data-style=\"neo\"] .gn-nav a[aria-current='page']",
+  "[data-style=\"neo\"] .gn-nav button[aria-current='page']",
+];
+const KEPT = [NEO_CURRENT.join(', ')];
 
 describe('20.231 the shell follows the rules', () => {
   it('20.231 every row; the non-current links keep text-muted', () => {
@@ -55,5 +59,52 @@ describe('20.232 no flat boundary in the shell', () => {
     // CONTROL — neo's pressed-in current item is still declared.
     for (const kept of KEPT) expect(stillDeclared(kept), kept).toBe(true);
     expect(flatBoundaryOffenders(cssOf('globals'), ['.gn-nav', '.gn-theme-toggle', '.gn-skip'], KEPT)).toEqual([]);
+  });
+});
+
+/** [ids, classes + attributes + pseudo-classes, elements] of one selector (no :not/:is in these rules). */
+function specificity(selector: string): [number, number, number] {
+  const bare = selector.replace(/"[^"]*"|'[^']*'/g, '');
+  const ids = (bare.match(/#[\w-]+/g) ?? []).length;
+  const classes = (bare.match(/\.[\w-]+|\[[^\]]*\]|:(?!:)[\w-]+/g) ?? []).length;
+  const elements = (bare.replace(/\[[^\]]*\]/g, '').match(/(?:^|[\s>+~])[a-z][\w-]*/gi) ?? []).length;
+  return [ids, classes, elements];
+}
+function outranks(a: [number, number, number], b: [number, number, number]): boolean {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return (a[i] as number) > (b[i] as number);
+  return true; // equal: the later rule wins, and rules are walked in source order
+}
+/** The value the cascade picks for `property` among rules with a selector `applies` accepts. */
+function winningValue(css: string, applies: (selector: string) => boolean, property: string): string | null {
+  let best: { spec: [number, number, number]; value: string } | null = null;
+  for (const rule of parseRules(css)) {
+    const value = valueOf(rule.body, property);
+    if (value === null) continue;
+    for (const selector of rule.selectors.filter(applies)) {
+      const spec = specificity(selector);
+      if (best === null || outranks(spec, best.spec)) best = { spec, value };
+    }
+  }
+  return best === null ? null : best.value;
+}
+const CURRENT_TAIL = { a: "a[aria-current='page']", button: "button[aria-current='page']" } as const;
+const winnerFor = (css: string, element: keyof typeof CURRENT_TAIL, neo: boolean, property: string): string | null =>
+  winningValue(
+    css,
+    (selector) =>
+      selector.includes(`.gn-nav ${CURRENT_TAIL[element]}`) && (selector.startsWith('[data-style="neo"]') ? neo : true),
+    property,
+  );
+
+describe('20.233 under neo a current button is pressed in like a current link', () => {
+  it('20.233 the winning declarations for a neo current <button> are sunken', () => {
+    const css = cssOf('globals');
+    // CONTROL — the same probe reads the raised look where neo is not in play, and a neo <a> is pressed in.
+    expect(winnerFor(css, 'button', false, 'background')).toBe('var(--gn-surface-raised)');
+    expect(winnerFor(css, 'button', false, 'box-shadow')).toBe('var(--gn-shadow-lift)');
+    expect(winnerFor(css, 'a', true, 'background')).toBe('var(--gn-surface-sunken)');
+    // the cascade winner for a current <button> under neo
+    expect(winnerFor(css, 'button', true, 'background')).toBe('var(--gn-surface-sunken)');
+    expect(winnerFor(css, 'button', true, 'box-shadow')).toBe('var(--gn-shadow-sunken)');
   });
 });
