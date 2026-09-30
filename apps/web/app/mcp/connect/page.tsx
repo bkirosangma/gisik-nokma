@@ -31,6 +31,13 @@ import { useSessionStatus } from '../../../src/providers.js';
  * alone: the redirect host (`claude.ai`, `chatgpt.com`) always sits beside it.
  * Allow is the page's one primary button; Deny is the quiet one. Neither is
  * dressed as an alarm — connecting your own assistant is a normal act.
+ *
+ * ## The card sits in the middle, and there is no app nav (owner 2026-09-30)
+ *
+ * People arrive from Claude or ChatGPT for one decision, so the page carries no
+ * navigation and the stage (title + card) is centred in the viewport — see
+ * `.gn-mcp-connect` in `globals.css` for why `margin: auto` and not
+ * `justify-content: center`.
  */
 type Details = { requestId: string; clientName: string; redirectHost: string };
 
@@ -114,53 +121,55 @@ function ConnectScreen(): React.JSX.Element {
   const returnPath = `/mcp/connect?request=${request}`;
 
   return (
-    <main id="gn-main" className="gn-shell gn-mcp-authorize">
-      <h1 className="gn-page-title">Connect an assistant</h1>
+    <main id="gn-main" className="gn-shell gn-mcp-authorize gn-mcp-connect">
+      <div className="gn-mcp-connect__stage">
+        <h1 className="gn-page-title">Connect an assistant</h1>
 
-      <Card className="gn-mcp-authorize__card">
-        {session.kind === 'loading' ? (
-          <p>Checking your session…</p>
-        ) : session.kind === 'signed-out' ? (
-          <p className="gn-mcp-authorize__signed-out">
-            <Link href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> to connect an
-            assistant — you land back here.
-          </p>
-        ) : request === '' || view.kind === 'expired' ? (
-          <p role="status">{EXPIRED}</p>
-        ) : view.kind === 'refused' ? (
-          <p role="status">{view.message}</p>
-        ) : view.kind === 'loading' ? (
-          <p>Loading the request…</p>
-        ) : (
-          <>
-            <p className="gn-mcp-authorize__lead">
-              <strong>{view.details.clientName}</strong> ({view.details.redirectHost}) wants to use Gisik Nokma as{' '}
-              <strong>you</strong>.
+        <Card className="gn-mcp-authorize__card">
+          {session.kind === 'loading' ? (
+            <p>Checking your session…</p>
+          ) : session.kind === 'signed-out' ? (
+            <p className="gn-mcp-authorize__signed-out">
+              <Link href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> to connect an
+              assistant — you land back here.
             </p>
-            <p className="gn-mcp-authorize__consent">
-              It will be able to see and change everything you can — read tickets, create them, move them, comment
-              and assign — in all your workspaces.
-            </p>
-            <p className="gn-mcp-authorize__revoke">
-              You can disconnect it any time from Account → Connected assistants.
-            </p>
-            <div className="gn-mcp-authorize__actions">
-              <Button variant="primary" onClick={() => decide(true)} disabled={busy}>
-                Allow
-              </Button>
-              <Button variant="ghost" onClick={() => decide(false)} disabled={busy}>
-                Deny
-              </Button>
-            </div>
-          </>
-        )}
+          ) : request === '' || view.kind === 'expired' ? (
+            <p role="status">{EXPIRED}</p>
+          ) : view.kind === 'refused' ? (
+            <p role="status">{view.message}</p>
+          ) : view.kind === 'loading' ? (
+            <p>Loading the request…</p>
+          ) : (
+            <>
+              <p className="gn-mcp-authorize__lead">
+                <strong>{view.details.clientName}</strong> ({view.details.redirectHost}) wants to use Gisik Nokma as{' '}
+                <strong>you</strong>.
+              </p>
+              <p className="gn-mcp-authorize__consent">
+                It will be able to see and change everything you can — read tickets, create them, move them, comment
+                and assign — in all your workspaces.
+              </p>
+              <p className="gn-mcp-authorize__revoke">
+                You can disconnect it any time from Account → Connected assistants.
+              </p>
+              <div className="gn-mcp-authorize__actions">
+                <Button variant="primary" onClick={() => decide(true)} disabled={busy}>
+                  Allow
+                </Button>
+                <Button variant="ghost" onClick={() => decide(false)} disabled={busy}>
+                  Deny
+                </Button>
+              </div>
+            </>
+          )}
 
-        {refusal !== null ? (
-          <p className="gn-mcp-authorize__refusal" role="alert">
-            {refusal}
-          </p>
-        ) : null}
-      </Card>
+          {refusal !== null ? (
+            <p className="gn-mcp-authorize__refusal" role="alert">
+              {refusal}
+            </p>
+          ) : null}
+        </Card>
+      </div>
     </main>
   );
 }
