@@ -164,6 +164,7 @@ compute against one specific background — which is exactly why they are cases 
   omitted: this product colours links with the same accent, so accent-plus-semibold is not UNIQUELY a
   button.** What is left to separate them is fill, radius and a 44px target — each individually
   sub-3:1. A reader who thinks that insufficient should reopen R1, which is the owner's call.*
+  Amended 2026-09-29 by 20.024: the token measurement this case pins (the fill is < 3:1, the accent label ≥ 4.5) is unchanged and still true, and it is exactly why the ghost button now carries an edge instead of relying on its fill.
 
 > **THREE FIELDS ARE DELIBERATELY NOT SWEPT, and this is requirement 4's "say so" half.**
 > `.gn-sign-in__method label input`, `.gn-mcp-authorize__input` and `.gn-notfound__link` keep their
@@ -594,6 +595,7 @@ grows is a count nobody maintains.
   *And the guard the plan shipped could not have caught what it names: `not.toMatch(/border:\s*1px/)` sees only the shorthand, so **`border: 2px solid` beside a `border-color: transparent` passed green**, demonstrated. Widened to any border longhand that PAINTS — `-color` and `-radius` excluded because neither draws one, and `none`/`0` excluded because they are how a rule says there is no border, which the first draft of the regex forbade and went red against a correct file.*
   affordance), is fill `--gn-fill-tertiary` + accent 600 label with `border-color: transparent`.
   Mutation-witnessed: restoring a border reddens it by name. — (`packages/ui/test/components.test.tsx`)
+  Amended 2026-09-29 by 20.024 (styling refresh Plan A): rule 03 supersedes R1(c) for buttons — the ghost is now transparent with a 1px `--gn-border` edge (≥ 3:1) and a `textMuted` label; the case holds the new property, and still that the BASE rule paints no border. Its `PAINTING_BORDER` regex was also corrected (a `(?!\s|…)` arm: the greedy `\s*` had been backtracking so that `border: none` matched), which the old base rule's `}`-bearing comment had hidden.
 - **13.290** ✅ `.gn-refusal--preview` / `--server` carry tone as `inset 4px 0 0` box-shadow fills, and
   *Same widening as 13.289, and it was needed here too: the shipped `/\bborder:/` let **`border-left: 4px solid` beside the inset shadow** pass green — a visible rule on the one panel whose whole job is to look like content rather than decoration.*
   declare no `border`. The honesty panels are the last thing that should look decorative. —

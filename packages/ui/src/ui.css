@@ -49,79 +49,112 @@
   to   { transform: none; opacity: 1; }
 }
 
-/* `min-height: 2.75rem` = 44px, WCAG 2.5.5's enhanced target size and the floor
-   this product already used for its 404 recovery links and the MCP code input.
-   Measured at 390px before this: `340x38` — the shared button was SIX PIXELS
-   short, everywhere it is used, which made it the single largest source of
-   tap-target offenders across the product.
+/* ── THE SHARED BUTTON — styling refresh Plan A Task 3 (2026-09-29) ─────────
+   The owner's button rules (plan: `docs/superpowers/plans/2026-09-29-styling-
+   system-refresh.md`, "Design source"): 01 Size 48/24 (primary), 02 Label 17px
+   semibold, 03 label ≥ 4.5 and EDGE ≥ 3:1, 04 lit edge + falling shadow,
+   05 radius = height ÷ 2 and one icon 10px from the label, 06 feedback in
+   100ms, done in 300.
 
-   `inline-flex` + centring is what makes the min-height do anything on a button
-   whose height was previously its padding plus one line of text. The padding
-   stays for the horizontal rhythm; the vertical is now the floor's job. */
+   This base rule is the QUIET control every variant starts from: 44px
+   (`min-height: 2.75rem`, WCAG 2.5.5 — the floor this rule has carried since
+   it was measured SIX pixels short at 390px), a pill (radius = height ÷ 2 at
+   any height), a 10px gap so an icon child sits 10px from its label, and no
+   border — the ghost modifier adds the accessible edge, the primary its accent
+   edge, so neither inherits the other's.
+
+   ⚠ R1(c) (2026-09-08) removed every control border and identified a control
+   by its fill plus an accent label. Rule 03 supersedes it for BUTTONS: the fill
+   measured 1.09–1.15:1 against every surface (this block recorded that number
+   itself), i.e. it vanished. The ghost now carries a 1px `--gn-border` edge
+   (4.27–6.01:1) and a `--gn-text-muted` label — the accent is "saved for the
+   action" (layout rule 03). Cases 20.021–20.026; 13.289/13.284 amended.
+
+   No `[data-style]` block may touch this family (13.340): per-style depth
+   reaches a button only through `--gn-shadow-action*`/`--gn-shadow-lift*`. */
 .gn-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.625rem;
   min-height: 2.75rem;
   font: inherit;
-  border-radius: var(--gn-radius-control);
-  padding: 0 1.125rem;
-  /* OPEN DECISION (whole-branch review, Important 4): the prototype's `.btn`
-     also carries the raised neumorphic `--ctlShadow` under `neo`
-     (`desktop.dc.html:62`, `:214-215`, `:227`). The spec named it for this
-     rule; the plan dropped it with no recorded reason, and this fix wave
-     deliberately does NOT add it — applying a raised control shadow to every
-     button in the product and in `apps/desktop` is a product-wide visual
-     decision for the repo owner to make, not something a fix wave should
-     decide on the review's behalf. Either implement it or record the
-     refusal; nothing has done either yet. */
-  /* R1(c): no boundary. The affordance is fill + an accent-coloured semibold
-     label — three signals replacing one hairline, and it is what the design
-     specifies (`.btn { border:none; background: fill3; color: accent;
-     font-weight: 600 }`, 18 `border:none` across 23 prototypes and not one
-     border on any control).
-
-     MEASURED, because this is the one thing the ruling declined to assert:
-     the FILL is 1.09-1.15 against every surface and does NOT carry
-     identification. The LABEL does, at 4.54-5.87 - comfortably past the 4.5
-     it owes as text. See `13.284` for what that does and does not settle.
-
-     `color: var(--gn-text-accent)`, NOT `--gn-accent` — Round 2d (2026-09-09).
-     `accent` stopped being a text-safe colour when the owner's neo-round
-     accent hexes shipped (4.19-4.30 as text on a bare surface, let alone this
-     rule's darker fillTertiary-composited one); `textAccent` is the role that
-     carries the 4.5 guarantee this comment describes, and it is what
-     `.gn-button--ghost` below duplicates deliberately (13.289). This base
-     rule's own `color` LIKELY never wins the cascade today: `button.tsx`'s
-     `variant` defaults to `'ghost'` and its class list is unconditionally
-     `['gn-button', 'gn-button--${variant}', className]`, so every element
-     THIS COMPONENT renders also carries `--primary`/`--danger`/`--ghost`,
-     each of which sets its own `color` at equal specificity and wins by
-     source order. That argument covers every call site THROUGH `Button`; it
-     does not rule out something elsewhere hand-authoring a bare
-     `className="gn-button"` outside the component (a repo-wide grep for
-     `gn-button` in every `*.ts`/`*.tsx` file found none, but a grep is
-     evidence, not a proof). Updated here regardless, so a future bare
-     `.gn-button` — through the component or otherwise — sees the same
-     guarantee the measured numbers describe rather than the retired role. */
-  border: none;
-  background: var(--gn-fill-tertiary);
-  color: var(--gn-text-accent);
   font-weight: 600;
+  border-radius: 999px;
+  padding: 0 1rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-text-muted);
   text-decoration: none;
   cursor: pointer;
+  transform-origin: 50% 60%;
+  transition:
+    background-color var(--gn-motion-feedback) ease-out,
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out),
+    transform var(--gn-motion-move) var(--gn-motion-ease-out);
 }
 .gn-button:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
+/* The ONE loud element on a screen (layout rule 01). 48px / 24px / 17px
+   (rules 01–02); the accent fill with an `accentEdge` edge ≥ 3:1 (rule 03);
+   the `action` shadow — lit top edge, shadow falling down, tinted by the
+   accent in hig light (rule 04, `Buttons.dc.html:52`). Hover comes TOWARD the
+   user (owner: "make it seem more 3d … like the lifting is towards the
+   user" — "yes, apply the same lift to the buttons"): grows 4% and its shadow
+   spreads and falls further; press pushes it back past rest into its track,
+   within the 100ms feedback time. */
 .gn-button--primary {
+  min-height: 3rem;
+  padding: 0 1.5rem;
+  border: 1px solid var(--gn-accent-edge);
   background: var(--gn-accent);
   color: var(--gn-accent-text);
+  font-size: 1.0625rem;
+  box-shadow: var(--gn-shadow-action);
 }
+.gn-button--primary:hover:not(:disabled) {
+  background: var(--gn-accent-edge);
+  box-shadow: var(--gn-shadow-action-near);
+  transform: scale(1.04);
+}
+.gn-button--primary:active:not(:disabled) {
+  box-shadow: var(--gn-shadow-action-press);
+  transform: scale(0.98);
+  transition-duration: var(--gn-motion-feedback);
+}
+/* A destructive confirm is its dialog's loud element, so it takes the
+   primary's geometry and lift — on the NEUTRAL `lift` shadows, because the
+   `action` shadow is tinted by the accent. */
 .gn-button--danger {
+  min-height: 3rem;
+  padding: 0 1.5rem;
   background: var(--gn-danger);
   color: var(--gn-danger-text);
+  font-size: 1.0625rem;
+  box-shadow: var(--gn-shadow-lift);
+}
+.gn-button--danger:hover:not(:disabled) {
+  box-shadow: var(--gn-shadow-lift-near);
+  transform: scale(1.04);
+}
+.gn-button--danger:active:not(:disabled) {
+  box-shadow: var(--gn-shadow-lift-press);
+  transform: scale(0.98);
+  transition-duration: var(--gn-motion-feedback);
+}
+/* Rule 06 and WCAG 2.3.3: no scale for a reduced-motion user. The four
+   selectors are the SAME as the rules they cancel — `:not(:disabled)` adds a
+   class's worth of specificity, so a bare `.gn-button--primary:hover` here
+   would LOSE to them. Equal specificity, later source order, and the shadow
+   change (which is not motion) still happens. */
+@media (prefers-reduced-motion: reduce) {
+  .gn-button { transition: none; }
+  .gn-button--primary:hover:not(:disabled),
+  .gn-button--primary:active:not(:disabled),
+  .gn-button--danger:hover:not(:disabled),
+  .gn-button--danger:active:not(:disabled) { transform: none; }
 }
 .gn-button:disabled {
   opacity: 0.55;
@@ -6043,25 +6076,19 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-color: transparent;
 }
 
-/* ── The ghost button gets its own rule at last. It had none, and the plan's
-   reason for adding it — "the 2.49:1 border was its only affordance" — was
-   TRUE OF THE PRE-#354 TREE AND IS NOT TRUE NOW, which review caught before
-   this shipped. That border came off in the border sweep, and the base
-   `.gn-button` above already carries `border: none`, the tertiary fill, the
-   accent colour and weight 600, so a ghost button has rendered correctly since
-   #354 — `button.tsx` always emits `gn-button gn-button--ghost` together and
-   never the modifier alone.
-
-   So every declaration here duplicates the base and this rule changes NOTHING
-   today. It is kept, explicitly, for one reason: `.gn-button--ghost` is what
-   the variant MEANS, and pinning it here is what makes 13.289 able to say so.
-   It is not repairing anything. ─────────────────────────────────────────── */
+/* ── The ghost button: every QUIET control (styling refresh Plan A Task 3).
+   Transparent, a 1px edge in the accessible grey (`--gn-border`, ≥ 3:1 on
+   every ground it sits on — `CONTRAST_PAIRS`), and the text2 label. The
+   mockup's own quiet controls (`Main.dc.html:54` Filter, `Sheet.dc.html:97`
+   Comment) are exactly this. Hover shows a soft neutral fill within the
+   feedback time. Pattern P-QUIET in the plan. */
 .gn-button--ghost {
-  background: var(--gn-fill-tertiary);
-  border-color: transparent;
-  color: var(--gn-text-accent);
+  background: transparent;
+  border: 1px solid var(--gn-border);
+  color: var(--gn-text-muted);
   font-weight: 600;
 }
+.gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 
 /* ── Page header: icon tile, title, tagline. Opt-in per screen. ─────────── */
 .gn-page-header {

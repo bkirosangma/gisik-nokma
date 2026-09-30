@@ -582,15 +582,18 @@ describe('R1(c) at the component layer', () => {
    * border**, so a guard that forbids them forbids the correct answer.
    */
   const PAINTING_BORDER =
-    /border(-(top|right|bottom|left))?(-(width|style))?\s*:\s*(?!(none|0)\b)/;
+    /border(-(top|right|bottom|left))?(-(width|style))?\s*:\s*(?!\s|(none|0)\b)/;
+  // Amended 2026-09-29 (styling refresh Task 3): `(?!\s|…)` — without the `\s` arm the greedy `\s*` backtracks to zero
+  // spaces and the lookahead sees ` none`, so `border: none` MATCHED. It never showed because the old base rule's
+  // comment held a `}` that cut `rule()`'s body short before the `border: none;` line.
 
-  it('13.289 a ghost button renders as fill and label, with no painting border on either rule', () => {
-    // BOTH rules, because what renders is the cascade: `button.tsx` always
-    // emits `gn-button gn-button--ghost` together, so a boundary reintroduced
-    // on the base would reach the screen while a modifier-only assertion stayed
-    // green.
-    expect(rule('.gn-button--ghost')).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(rule('.gn-button--ghost')).not.toMatch(PAINTING_BORDER);
+  it('13.289 a ghost button is transparent with the ACCESSIBLE edge, and the base rule paints none', () => {
+    // Amended 2026-09-29 (styling refresh Plan A, 20.024): rule 03 ("edge ≥
+    // 3:1 — a flat grey fill at 1.6:1 vanishes") supersedes R1(c) for buttons.
+    // The property this case now holds: the edge is the accessible `border`
+    // role and lives on the MODIFIER, so a primary/danger never inherits it.
+    expect(rule('.gn-button--ghost')).toMatch(/background:\s*transparent/);
+    expect(rule('.gn-button--ghost')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
     expect(rule('.gn-button')).not.toMatch(PAINTING_BORDER);
   });
   it('13.290 refusal panels carry tone as an inset fill, never a border', () => {
