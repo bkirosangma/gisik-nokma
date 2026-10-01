@@ -12,10 +12,10 @@ in the table below. Take from your block, never from the tip.
 
 | Plan | Block |
 |---|---|
-| A Foundation, board, sheet | `20.001`–`20.174` |
+| A Foundation, board, sheet | `20.001`–`20.175` |
 | B Every other screen | `20.201`–`20.600` |
 
-Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12) and the survivors of their mutation review take `20.149`–`20.159` (§20.12, same day; the block was widened from `20.150` into the unallocated `20.151`–`20.200`). the browser-pass follow-up (2026-10-01) takes `20.160`–`20.161` (§20.12). the source-column sibling glide (2026-10-01) takes `20.162`–`20.168` (§20.12). the arrow-move target glide (2026-10-01) takes `20.169`–`20.174` (§20.12; the block was widened from `20.170` into the unallocated `20.171`–`20.200`).
+Plan A follow-up blocks (Plan A's gaps, taken in place): the 2026-09-30 board drag fixes take `20.106`–`20.110` (§20.10), `20.119`–`20.120` (§20.11) and `20.123`–`20.124` (browser); the 2026-10-01 optimistic board moves take `20.125`–`20.148` (§20.12) and the survivors of their mutation review take `20.149`–`20.159` (§20.12, same day; the block was widened from `20.150` into the unallocated `20.151`–`20.200`). the browser-pass follow-up (2026-10-01) takes `20.160`–`20.161` (§20.12). the source-column sibling glide (2026-10-01) takes `20.162`–`20.168` (§20.12). the arrow-move target glide (2026-10-01) takes `20.169`–`20.175` (§20.12; the block was widened from `20.170` into the unallocated `20.171`–`20.200`).
 
 **Write cases as `- ✅ **20.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -194,6 +194,7 @@ Owner, 2026-10-01: *"the dropped card briefly jumps back to the original column 
 - ✅ **20.172 — the edges of the target glide:** a card landing LAST in Doing flies no target sibling and nothing throws (control: the landing card flies); a target flight is consumed once (the commit's overlay change does not fly tk_d again; control: it flew once); a target flight older than `FLIGHT_MAX_AGE_MS` is ignored (control: a fresh one glided). Mutations: never consumed; no age check.
 - ✅ **20.173 — an arrow move reached through the PICKER (several declared targets one way) glides the target the same way:** with `todo → doing` and `todo → done` both declared, › offers Doing or Done and confirming Doing lays its entry with the arrow flag, so tk_d slides down (`-130px`; control: tk_z closes up in the source, tk_b above stays). Mutation: the picker confirm without the arrow flag.
 - 🧪 **20.174 — real browser (dev stack; hig, minimal and neo): a target column of at least four cards — arrow-move a card into the second slot and watch the lower cards glide down over ~200ms with no snap; on a refusal they slide back up; with `prefers-reduced-motion` they just move; a drag still shows only the drop placeholder's opening (no second animation):** Reason: jsdom lays nothing out and runs no CSS animation; the offsets, the flight class, the controls and the drag/arrow split are pinned (20.169–20.173), the look and the 200ms feel are not.
+- ✅ **20.175 — an ARROW move that opens the transition dialog (a comment-required target) opens the target slot at once and closes it smoothly on Cancel:** the card waits faded in the landing slot and tk_d, which has no dialog of its own, glides down (`--gn-flip-y: -130px`; only a card with ITS OWN dialog open stays still — the dialog's card is the mover); tk_b above stays. Cancel releases the card and tk_d glides back up (`130px`). Control in the same `it`: a DRAG into the same dialog, cancelled, records no target flight at begin or on Cancel (tk_z closes up in the source, so the harness glides). Mutation: the dialog-awaiting `attemptMove` call does not pass the arrow flag (red on both halves). `board-optimistic-moves.test.tsx`.
 
 ## 20.23 Plan B — floating surfaces
 
