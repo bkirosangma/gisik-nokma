@@ -311,13 +311,26 @@ describe('20.413 a refusal glides every card back by the same MEASURED amounts, 
     expect(flipY('tk_a')).toBe(px(stackTop(['tk_a', 'tk_b', 'tk_d'], 0) - stackTop(TODO, 0)));
   });
 
-  it('20.413 a DROP refusal of tk_c: source cards back DOWN 188 and the mover home by its own offset, no target card glides (CONTROL: the placeholder had already opened the slot)', async () => {
-    await refusedMove('tk_c', 'drop');
-    for (const below of ['tk_m', 'tk_z']) expect(flipY(below), below).toBe(px(-stride('tk_c')));
-    expect(flies('tk_a')).toBe(false);
-    expect(flies('tk_b') || flies('tk_d'), 'a drop recorded no target siblings').toBe(false);
-    expect(flipX('tk_c')).toBe(px(COLUMN_LEFT.doing! - COLUMN_LEFT.todo!));
-    expect(flipY('tk_c')).toBe(px(stackTop(['tk_b', 'tk_c', 'tk_d'], 1) - stackTop(TODO, 1)));
+  it('20.413 a DROP refusal: source cards back DOWN, target cards back UP and the mover home, each by its own mover’s stride (CONTROL: the DROP itself flew no target card; the 96px tk_a reverses 104)', async () => {
+    // #845 (refused-drag glide) made a release close the target slot for a DROP too; before it only an arrow move noted the target cards.
+    // Mutations: the target side not reversed on a drop's refusal; the release using a fixed amount; the source side not reversed.
+    for (const [mover, index] of [['tk_c', 1], ['tk_a', 0]] as const) {
+      const write = deferred<IngestResult[]>();
+      await scenario(() => write.promise);
+      drop(mover, 'doing');
+      // CONTROL — the placeholder had already opened the slot: the drop itself moves no target card.
+      expect(flies('tk_b') || flies('tk_d'), `${mover}: the drop recorded no target siblings`).toBe(false);
+      settleAll();
+      await act(async () => write.resolve(refused([{ id: 'x' }])));
+      expect(idsIn('doing')).toEqual(DOING);
+      for (const below of TODO.slice(TODO.indexOf(mover) + 1)) expect(flipY(below), `${mover}: ${below}`).toBe(px(-stride(mover)));
+      // The target cards BELOW the landing index close the slot again: they start one stride BELOW their slots; the one above stays.
+      for (const target of DOING.slice(index)) expect(flipY(target), `${mover}: ${target}`).toBe(px(stride(mover)));
+      for (const above of DOING.slice(0, index)) expect(flies(above), `${mover}: ${above} above the slot`).toBe(false);
+      expect(flipX(mover)).toBe(px(COLUMN_LEFT.doing! - COLUMN_LEFT.todo!));
+      const landed = [...DOING.slice(0, index), mover, ...DOING.slice(index)];
+      expect(flipY(mover)).toBe(px(stackTop(landed, index) - stackTop(TODO, TODO.indexOf(mover))));
+    }
   });
 });
 
