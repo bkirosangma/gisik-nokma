@@ -1132,3 +1132,55 @@ describe('20.173 an arrow move reached through the picker (several targets one w
     expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
   });
 });
+
+describe('20.175 an ARROW move that opens the transition dialog: the target slot opens at once and closes smoothly on Cancel', () => {
+  function plant() {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+      const left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+      const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+  }
+  const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
+
+  it('20.175 › into a gated target: tk_d opens the slot at once (only a card with its OWN dialog stays still) and Cancel glides it back up (CONTROL: a DRAG into the same dialog, cancelled, records no target flight)', async () => {
+    // Mutation: the dialog-awaiting arrow path does not pass the arrow flag to `beginPending` (`attemptMove`, the `'awaiting'` call).
+    const never = () => new Promise<IngestResult[]>(() => {});
+    const user = userEvent.setup();
+    await mount(never, GATED);
+    plant();
+    // The drag: the drop placeholder opened the slot, so no target sibling is noted at begin or on Cancel (the same layout would show one).
+    drag('tk_c', 'doing');
+    let dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(flies('tk_z')).toBe(true); // CONTROL — the source column closed up, so the harness glides
+    expect(flies('tk_d')).toBe(false);
+    for (const id of ['tk_z', 'tk_c']) fireEvent.animationEnd(slotOf(id));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
+    expect(flies('tk_d')).toBe(false);
+    cleanup();
+    vi.restoreAllMocks();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    await mount(never, GATED);
+    plant();
+    await user.click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to Doing' }));
+    dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']); // the card waits, faded, in the landing slot
+    // tk_d has no dialog of its own: it glides down from (300, 230) to (300, 360), as in 20.162's open-dialog case (the dialog's card is the mover).
+    expect(flies('tk_d')).toBe(true);
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('-130px');
+    expect(flies('tk_b')).toBe(false);
+    for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+    expect(flies('tk_d')).toBe(false);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+    // The slot closes smoothly: tk_d was drawn at 360 and is back at 230, so it starts 130px BELOW its slot.
+    expect(flies('tk_d')).toBe(true);
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
+    expect(flies('tk_b')).toBe(false);
+  });
+});
