@@ -948,6 +948,44 @@ a.gn-ticket-sheet__crumb--link {
 .gn-dialog__body,
 .gn-sheet__body { padding: 0 1.5rem 1.5rem; overflow-y: auto; }
 
+/* The ticket sheet's header "Move" shortcut (case 21.071): a phone-only second door to the State row's
+   Move…, so it is not painted at all above 40rem. It follows `.gn-button` (same specificity), so this
+   `display: none` wins over `.gn-button`'s `inline-flex`. */
+.gn-sheet__move { display: none; }
+
+/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
+   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
+   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
+   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). */
+@media (max-width: 40rem) {
+  /* The ticket sheet fills the screen: the `.gn-sheet--full` form, forced (21.070). */
+  .gn-sheet {
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--gn-surface);
+  }
+  /* The header stays put while the body scrolls under it, and carries the Move shortcut (21.071). */
+  .gn-sheet__header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--gn-surface);
+  }
+  .gn-sheet__move { display: inline-flex; }
+  /* Dialogs become bottom sheets (21.072): pinned to the bottom edge, full width, rounded on top only. */
+  .gn-dialog__scrim { align-items: flex-end; }
+  .gn-dialog {
+    width: 100%;
+    max-width: none;
+    border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
 /* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
    wraps a `Chip` (tone `terminal`) rather than restyling it, so its colour
    comes from `.gn-chip--terminal` alone — this rule is layout only, nothing
