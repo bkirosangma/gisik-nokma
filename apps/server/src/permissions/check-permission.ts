@@ -1069,7 +1069,9 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
  * ## Prefixes/groups Task 3: `project.updated` too, and RESERVED prefixes
  *
  * The same question is now asked of a `project.updated` that carries a
- * `prefix`, and the answer has two refusals, in this order:
+ * `prefix`, and the answer has two refusals (the sets are disjoint — a prefix
+ * one project holds is never another's former one — so their order only fixes
+ * which text a damaged history would get):
  *
  *  1. `project.prefix-taken` — another project's CURRENT prefix (above).
  *  2. `project.prefix-reserved` — a prefix another project has moved OFF, from
