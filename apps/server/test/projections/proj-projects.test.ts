@@ -70,6 +70,91 @@ async function rowsFor(projectId: string) {
   return rows;
 }
 
+function projectUpdated(projectId: string, payload: Record<string, unknown>) {
+  return testEnvelope({
+    workspaceId: WS,
+    entity: { kind: 'project', id: projectId },
+    type: 'project.updated',
+    payload,
+    actorId: newUlid(),
+  });
+}
+
+async function nameAndDescription(projectId: string) {
+  const { rows } = await db.pool.query(
+    'SELECT name, description, prefix FROM proj_projects WHERE project_id = $1',
+    [projectId],
+  );
+  return rows[0];
+}
+
+describe('13.1601–13.1602, 13.1605–13.1606 project.updated in proj_projects', () => {
+  it('13.1601 renames and redescribes; another project untouched', async () => {
+    const a = newUlid();
+    const b = newUlid();
+    await apply(
+      projectCreated(a, WS, 'Old', 'old text'),
+      projectCreated(b, WS, 'Other', 'other text'),
+      projectUpdated(a, { name: 'New', description: 'new text' }),
+    );
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'New', description: 'new text' });
+    // control: the other project's row is exactly as founded
+    expect(await nameAndDescription(b)).toMatchObject({ name: 'Other', description: 'other text' });
+  });
+
+  it('13.1602 null clears the description and leaves the name; absent keeps it', async () => {
+    const a = newUlid();
+    await apply(projectCreated(a, WS, 'P', 'keep me'));
+    await apply(projectUpdated(a, { name: 'P2' }));
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'P2', description: 'keep me' }); // absent keeps
+    await apply(projectUpdated(a, { description: null }));
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'P2', description: null });
+    await apply(projectUpdated(a, { description: 'x' })); // control: a string sets it
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'P2', description: 'x' });
+  });
+
+  it('13.1605 the prefix is unchanged by a rename', async () => {
+    const a = newUlid();
+    await apply(
+      testEnvelope({
+        workspaceId: WS,
+        entity: { kind: 'project', id: a },
+        type: 'project.created',
+        payload: { name: 'Shop', prefix: 'SO' },
+        actorId: newUlid(),
+      }),
+      projectUpdated(a, { name: 'Shop floor' }),
+    );
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'Shop floor', prefix: 'SO' });
+  });
+
+  it('13.1606 a rebuild from the ledger equals the live table after created → updated → updated', async () => {
+    const a = newUlid();
+    const events = [
+      projectCreated(a, WS, 'One', 'first'),
+      projectUpdated(a, { name: 'Two' }),
+      projectUpdated(a, { description: 'Three' }),
+    ];
+    const client = await db.pool.connect();
+    try {
+      for (const event of events) {
+        await insertEvent(client, event);
+        await projProjects.apply(event, client);
+      }
+    } finally {
+      client.release();
+    }
+    const projections = buildProjectionRegistry();
+    for (const projection of projections.all()) {
+      await rebuildProjection(projection.name, { pool: db.pool, projections });
+    }
+    // the rebuilt live table carries the folded updates (not the founding values)
+    expect(await nameAndDescription(a)).toMatchObject({ name: 'Two', description: 'Three' });
+    // control: verifyProjections finds no drift between live and a fresh shadow rebuild
+    expect(await verifyProjections({ pool: db.pool, projections })).toEqual({ clean: true, diffs: [] });
+  });
+});
+
 describe('projProjects — what a founding records', () => {
   /**
    * 6.27 — a `project.created` lands ONE `proj_projects` row scoped to its workspace, carrying its creator and the RECEIVED instant (`event.serverTime`) rather than a client-supplied one.

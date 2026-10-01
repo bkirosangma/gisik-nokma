@@ -113,10 +113,10 @@ export const projectCreatedPayload = z.object({
    * project rather than a consequence of it, and would refuse the whole
    * pre-existing ledger in the same breath.
    *
-   * **IMMUTABLE after creation**, and there is no `project.renamed` to carry
-   * one even if it were not: `proj_projects` has no rename handler at all
-   * (`projections/proj-projects.ts`), so this rides with `name` and is
-   * permanent in exactly the same way.
+   * **IMMUTABLE after creation**: `project.updated` (2026-10-01) renames a
+   * project but deliberately carries no prefix, so the key's half rides with
+   * the founding event and is permanent — a rename moves the name and never
+   * the ticket keys.
    *
    * **UNIQUE WITHIN THE WORKSPACE** (owner ruling 2026-09-20). That is a
    * constraint on the value, not a shape this schema can express — a payload
@@ -238,3 +238,20 @@ export type ProjectArchivedPayload = z.infer<typeof projectArchivedPayload>;
 
 export const projectRestoredPayload = z.object({}).strict();
 export type ProjectRestoredPayload = z.infer<typeof projectRestoredPayload>;
+
+/**
+ * Rename / redescribe a project (MCP CRUD plan Task 1, owner ruling M1, 2026-10-01).
+ * Filed against the PROJECT entity. `description: null` CLEARS the description —
+ * the column has been nullable since door A precisely so a later edit could clear
+ * it (see `projectCreatedPayload.description`); an absent key leaves it alone.
+ * The PREFIX is not here and never will be: it is immutable after creation
+ * (owner spec 2026-09-20), so a rename moves the name and never the ticket keys.
+ */
+export const projectUpdatedPayload = z
+  .object({ name: displayName.optional(), description: descriptionText.nullable().optional() })
+  .strict()
+  .refine(
+    (p) => p.name !== undefined || p.description !== undefined,
+    'a project update names a new name, a description, or both',
+  );
+export type ProjectUpdatedPayload = z.infer<typeof projectUpdatedPayload>;
