@@ -244,3 +244,20 @@ describe('21.113 Timeline: the weeks band scrolls inside its track; the page doe
     expect(valueOf(desktopBands, 'min-width')).toBeNull();
   });
 });
+
+describe('21.115 the Calendar grid contains its own absolutely placed descendants, so the page does not scroll sideways at 360', () => {
+  /**
+   * Found by the T13 browser pass (2026-10-01): at 360 the Calendar tab made the DOCUMENT 5px wider than the window
+   * (`scrollWidth` 365). The grid is the deliberate scroller (21.112) and clips its overflow — but an absolutely
+   * placed descendant (the `.gn-visually-hidden` text inside each day chip) whose containing block is OUTSIDE the
+   * scroller is not clipped by it, so its right edge (365) reached the page. `position: relative` on the grid makes
+   * the scroller their containing block. Measured with the rule injected on the `d22d4ffa` build: 5 → 0.
+   */
+  it('21.115 the phone grid is `position: relative` (the scroller is the containing block), after nothing that would undo it', () => {
+    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'position')).toBe('relative');
+    // The arm still scrolls sideways, as 21.112 says.
+    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overflow-x')).toBe('auto');
+    // CONTROL — above 40rem the grid is not positioned (the plain 7x1fr it was): nothing about the desktop calendar changes.
+    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid'), 'position')).toBeNull();
+  });
+});
