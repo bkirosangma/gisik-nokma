@@ -38,7 +38,7 @@
 - **FD8: no Plus icon exists.** Icons are hand-written SVG components in `packages/ui` (`select-icons.tsx`, exported one by one from `packages/ui/src/index.ts`). Task 8 adds `PlusIcon` in that style. There's no icon dependency.
 - **FD9: "New ticket" is pinned** by tests that press it by name, by the dialog title (`packages/app-core/src/views/new-ticket-dialog.tsx:911`, `title="New ticket"`) and by the help corpus. That's why D10 kept it. Task 8 renames all three, and amends `pnpm check:help`'s quoted strings and the manual.
 - **FD10: the Settings shell is `apps/web/app/settings/page.tsx`** (tabs `ticket-types | workflows | workspace`, l.14-18, sidebar l.182). Groups is a fourth tab there, not a new `/w/[id]/settings/groups` route.
-- **FD11: `Select` has no "create new" path** (`packages/ui/src/select/select.tsx`). The group picker (Task 10) is a new `GroupPicker` built on the same `@react-aria/combobox` hooks.
+- **FD11: `Select` has no "create new" path** (`packages/ui/src/select/select.tsx`). The group picker (Task 9) is a new `GroupPicker` built on the same `@react-aria/combobox` hooks.
 
 
 ## Audit items absorbed (owner, 2026-10-02: "your recommendation for the rest")
