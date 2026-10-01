@@ -9,7 +9,7 @@ import { createDraftStore, type DraftStore } from '../../src/workflow-builder/dr
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
-import { InspectorPanel } from '../../src/workflow-builder/ui/inspector-panel.js';
+import { BuilderPanels } from '../../src/workflow-builder/ui/builder-panels.js';
 import { WorkflowBuilderScreen } from '../../src/workflow-builder/ui/workflow-builder-screen.js';
 
 /**
@@ -50,7 +50,8 @@ const WEB_CSS_PATH = join(REPO_ROOT, 'apps/web/app/globals.css');
 const PREFIXES = [
   'workflow-builder-screen',
   'state-inspector',
-  'inspector-panel',
+  'builder-panel',
+  'builder-row',
   'transition-inspector',
 ];
 
@@ -175,7 +176,7 @@ function environmentFor(): BuilderEnvironment {
 function renderPanel(store: DraftStore) {
   return render(
     <BuilderProvider store={store} env={environmentFor()}>
-      <InspectorPanel />
+      <BuilderPanels />
     </BuilderProvider>,
   );
 }
@@ -251,8 +252,13 @@ async function collectClasses(): Promise<{ rendered: string[]; exempt: string[];
     () => screen.findByText('Could not load workspace people and types — reload to try again.'),
   );
 
-  // 4, 5, 6 — the inspector's three selections.
+  // 4, 5, 6 — the panels' three selections.
   absorb(renderPanel(createDraftStore(draftFromTemplate(kanban))).container);
+  cleanup();
+
+  // 6b (W1, 2026-09-30) — the empty arm: no states and no transitions, so `builder-panel__empty` renders.
+  const emptyDraft = draftFromTemplate(kanban);
+  absorb(renderPanel(createDraftStore({ ...emptyDraft, def: { ...emptyDraft.def, states: [], transitions: [] } })).container);
   cleanup();
 
   const stateStore = createDraftStore(draftFromTemplate(kanban));
@@ -413,11 +419,12 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
       ['.workflow-builder-screen__name:disabled', 'var(--gn-surface-sunken)'],
       [
         '.workflow-builder-screen__layout',
-        'grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) minmax(0, 20rem)',
+        // Amended 2026-09-30 (W1): two columns — the right rail is gone; its inspectors expand in the left lists.
+        'grid-template-columns: minmax(0, 22rem) minmax(0, 1fr)',
       ],
       ['.workflow-builder-screen__left', 'flex-direction: column'],
-      ['.workflow-builder-screen__right', 'flex-direction: column'],
-      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-raised)'],
+      // Amended 2026-09-29 by 20.351 (styling refresh Plan B): the canvas is a P-RAISED panel now, lifted by `shadow-lift` (was `shadow-raised`).
+      ['.workflow-builder-screen__canvas', 'box-shadow: var(--gn-shadow-lift)'],
       ['.state-inspector', 'border-radius: var(--gn-radius-card)'],
       ['.state-inspector__title', 'font-size: 0.9rem'],
       ['.state-inspector__actions', 'flex-wrap: wrap'],
@@ -427,7 +434,13 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
       ['.transition-inspector__rule', 'border-left: 2px solid var(--gn-border)'],
       ['.transition-inspector__rule-summary', 'font-size: 0.85rem'],
       ['.transition-inspector__actions', 'flex-wrap: wrap'],
-      ['.inspector-panel__hint', 'background: var(--gn-surface-raised)'],
+      // W1 (2026-09-30, case 10.154): the States / Transitions panels (replace the retired `.inspector-panel__hint`).
+      ['.builder-panel', 'background: var(--gn-surface-raised)'],
+      ['.builder-panel__list', 'flex-direction: column'],
+      ['.builder-row__head', 'min-height: 2.75rem'],
+      ['.builder-row__head:hover', 'var(--gn-fill-quaternary)'],
+      ['.builder-row__head:focus-visible', 'var(--gn-focus-ring)'],
+      ['.builder-row__body', 'background: var(--gn-surface-well)'],
     ];
     for (const [selector, declaration] of expected) {
       expect(

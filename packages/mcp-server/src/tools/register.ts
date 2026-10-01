@@ -14,6 +14,10 @@ export function allTools(session: Session): ToolDefinition[] {
   return [...readTools(session), ...writeTools(session)];
 }
 
+/** What the hosted door may observe about a call: which tool, how it ended, how long. Nothing else. */
+export type ToolCallEvent = { tool: string; outcome: 'ok' | 'error'; durationMs: number };
+export type RegisterHooks = { onCall?(event: ToolCallEvent): void };
+
 /**
  * The ONE place that knows the MCP SDK's registration API. Everything else in
  * this package speaks `ToolDefinition`, so an SDK upgrade that moves this
@@ -35,18 +39,30 @@ export function allTools(session: Session): ToolDefinition[] {
  * unchanged — a refusal from the rule engine reaches the assistant saying what
  * the rule was and why, which is the whole point. Rewording it here would make
  * the product explain itself in words it did not choose.
+ *
+ * `hooks.onCall` is the hosted door's one observation point (remote-MCP plan
+ * Task 7, case 14.268): it fires after every handler with the tool's NAME, its
+ * outcome and how long it took — and deliberately nothing else. The arguments
+ * and the result are what a person typed and what their workspace holds; a log
+ * line that could carry them would be a second copy of the ledger with none of
+ * its access rules. The stdio entry point passes no hooks and is unchanged.
  */
-export function registerTools(server: McpServer, session: LazySession): void {
+export function registerTools(server: McpServer, session: LazySession, hooks: RegisterHooks = {}): void {
   for (const tool of allTools(session)) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.inputSchema },
       async (args: Record<string, unknown>) => {
+        const started = Date.now();
+        const observe = (outcome: ToolCallEvent['outcome']): void =>
+          hooks.onCall?.({ tool: tool.name, outcome, durationMs: Date.now() - started });
         try {
           await session.ready();
           const result = await tool.handler(args);
+          observe('ok');
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
+          observe('error');
           return {
             isError: true,
             content: [

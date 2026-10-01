@@ -15,6 +15,7 @@ import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
 import { optionalDatabaseCaCert } from './backup-env.js';
+import { runExpiredSessionSweep, sessionSweepIntervalMs as readSessionSweepIntervalMs } from './expired-sessions.js';
 import { exportLedger } from './export-ledger.js';
 import { s3SinkFromEnv, s3TargetFromEnv } from './object-sink.js';
 import { dumpDatabaseToSink } from './pg-dump.js';
@@ -188,6 +189,10 @@ async function main(): Promise<void> {
     rawPurgeInterval === undefined || rawPurgeInterval.trim() === '' ? '3600000' : rawPurgeInterval,
   );
 
+  // The expired-session delete (devices plan Task 4): the same read-once, validate-on-every-call shape
+  // and empty-means-unset handling as the sweeps above, default one day.
+  const sessionSweepIntervalMs = readSessionSweepIntervalMs(process.env);
+
   // The auto-close sweep closes tickets, so it needs a door to close them
   // THROUGH — the same composition `seed/cli-seed-dev-workspace.ts` uses, built
   // here rather than there because this is the process that runs it on a timer.
@@ -295,6 +300,13 @@ async function main(): Promise<void> {
         console.log(JSON.stringify({ msg: 'purge sweep complete', ...report }));
       },
       delayMs: () => requirePositiveIntervalMs(purgeSweepIntervalMs, 'PURGE_SWEEP_INTERVAL_MS'),
+    },
+    {
+      name: 'expired-sessions',
+      run: async (): Promise<void> => {
+        await runExpiredSessionSweep(pool, new Date(), (entry) => console.log(JSON.stringify(entry)));
+      },
+      delayMs: () => requirePositiveIntervalMs(sessionSweepIntervalMs, 'SESSION_SWEEP_INTERVAL_MS'),
     },
   ];
 

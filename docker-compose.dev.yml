@@ -208,6 +208,13 @@ services:
       APPLE_CLIENT_ID: "${APPLE_CLIENT_ID:-}"
       APPLE_CLIENT_SECRET: "${APPLE_CLIENT_SECRET:-}"
       APPLE_APP_BUNDLE_IDENTIFIER: "${APPLE_APP_BUNDLE_IDENTIFIER:-}"
+      # The hosted MCP door (remote-MCP plan Task 11). DECLARED AND EMPTY: unset
+      # means `/mcp`, `/oauth/*` and the OAuth metadata are 404, exactly as in a
+      # deploy that has not set it. To try the door on this stack, export
+      # `MCP_PUBLIC_URL=http://localhost:3000` (the API's port, which is where the
+      # issuer and the endpoints live) before `ctl rebuild`, or put it in the
+      # untracked `.env` beside this file.
+      MCP_PUBLIC_URL: "${MCP_PUBLIC_URL:-}"
       # Deviation 2: OBJECT_STORE_S3_* — the names store-config.ts actually
       # reads — not the plan's bare S3_* names.
       OBJECT_STORE: s3

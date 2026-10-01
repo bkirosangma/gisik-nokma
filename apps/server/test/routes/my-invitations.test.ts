@@ -220,23 +220,17 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
     const workspaceId = await found(admin, 'Dead Shapes');
     const me = await signedIn();
 
-    // Five invitations to ONE address that must stay five: a repeat of the same
-    // role and project set would rotate the pending one instead of adding a row
-    // (case 6.222), so each differs in role or in project set (case 6.226).
-    const [projectA, projectB] = [await foundProject(admin, workspaceId), await foundProject(admin, workspaceId)];
-    const live = await invite(admin, workspaceId, me.email, 'member');
+    // A PENDING invitation for an address is replaced by a mint that differs in
+    // role or projects (case 6.230), so the four dead invitations cannot all sit
+    // beside a live one: each is minted, PROVEN LIVE by the served list, and
+    // then killed before the next mint. The control is per step — the list
+    // served it a moment before the kill — and the final `[live]` is a filter
+    // working, not a route that never served anything.
+    const servedNow = async (): Promise<string[]> => (await myInvitations(me)).map((row) => row.inviteId).sort();
+    const projectA = await foundProject(admin, workspaceId);
+
     const accepted = await invite(admin, workspaceId, me.email, 'admin');
-    const declined = await invite(admin, workspaceId, me.email, 'guest');
-    const revoked = await invite(admin, workspaceId, me.email, 'member', [projectA as string]);
-    const lapsed = await invite(admin, workspaceId, me.email, 'member', [projectB as string]);
-
-    // All five are live before anything kills four of them — the control that
-    // says this case's `[live]` at the end is a filter working and not a route
-    // that never served anything.
-    expect((await myInvitations(me)).map((row) => row.inviteId).sort()).toEqual(
-      [live.inviteId, accepted.inviteId, declined.inviteId, revoked.inviteId, lapsed.inviteId].sort(),
-    );
-
+    expect(await servedNow()).toEqual([accepted.inviteId]);
     const acceptRes = await app.inject({
       method: 'POST',
       url: `/v1/invites/${accepted.token}/accept`,
@@ -244,6 +238,8 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
     });
     expect(acceptRes.statusCode).toBe(200);
 
+    const declined = await invite(admin, workspaceId, me.email, 'guest');
+    expect(await servedNow()).toEqual([declined.inviteId]);
     const declineRes = await app.inject({
       method: 'POST',
       url: `/v1/me/invitations/${declined.inviteId}/decline`,
@@ -251,6 +247,8 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
     });
     expect(declineRes.statusCode).toBe(204);
 
+    const revoked = await invite(admin, workspaceId, me.email, 'member', [projectA as string]);
+    expect(await servedNow()).toEqual([revoked.inviteId]);
     const revokeRes = await app.inject({
       method: 'POST',
       url: '/v1/events',
@@ -276,13 +274,23 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
       'committed',
     );
 
+    // Accepted, declined and revoked are all withheld while a live one shows.
+    const live = await invite(admin, workspaceId, me.email, 'member');
+    expect(await servedNow()).toEqual([live.inviteId]);
+
+    // Lapsed: the same invitation, its token past its expiry, is withheld too —
+    // and still `pending`, so it is the token's expiry doing the work. A live
+    // invitation in ANOTHER workspace (the match is per workspace) sits beside it
+    // in the same response.
+    const otherWorkspaceId = await found(admin, 'Live Elsewhere');
+    const elsewhere = await invite(admin, otherWorkspaceId, me.email, 'member');
+    expect(await servedNow()).toEqual([live.inviteId, elsewhere.inviteId].sort());
     await db.pool.query(
       "UPDATE invite_tokens SET expires_at = now() - interval '1 day' WHERE invite_id = $1",
-      [lapsed.inviteId],
+      [live.inviteId],
     );
-    expect(await statusOf(lapsed.inviteId)).toBe('pending');
-
-    expect((await myInvitations(me)).map((row) => row.inviteId)).toEqual([live.inviteId]);
+    expect(await statusOf(live.inviteId)).toBe('pending');
+    expect(await servedNow()).toEqual([elsewhere.inviteId]);
   });
 
   /**

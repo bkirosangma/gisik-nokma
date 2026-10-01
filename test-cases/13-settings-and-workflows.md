@@ -215,6 +215,8 @@ knowing before concluding one of them is stale.
   proves the COMPONENT renders the ported strings and the DOM the parity depends on, and
   `packages/ui/test/tokens.test.ts` measures the `ui.css` rule.
 
+  **Amended 2026-09-29 by 20.351 (styling refresh Plan B):** the row is now a raised item (`surface-raised` + `shadow-lift`, P-ROW), not a sunken one. The ground is still the CARD — an even row's stripe replaces the row's own background, so it composites over `.gn-card`'s `surface-raised` exactly as before and every measured reading is unchanged; an even row keeps the row's `shadow-lift`.
+
   **The zebra, and why the parity is the whole case.** The prototype stripes
   `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i` (`:3159`), so the tint falls on the
   **1-indexed EVEN** rows. That single bit is silently invertible and **two families in this repo already
@@ -1634,6 +1636,8 @@ background**, so nothing measured the pair at all.
   could not meet. `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared
   backup. Package suites: ui 426, web 652. **The three ratios are computed, not painted** — the 3.71 is
   the finding's own.
+
+**Amended 2026-09-29 by 20.351 (styling refresh Plan B):** the advisories panel's ground is now `surface-well`, so the inherited-ink arm reads the declared `textMuted`/`surfaceWell` pair (Plan A 20.002) instead of `textMuted`/`surfaceSunken`; the no-own-ink and warning-edge arms are unchanged.
 
 **No `Features.md` bullet.** This corrects an existing heading's ink; it adds no affordance.
 

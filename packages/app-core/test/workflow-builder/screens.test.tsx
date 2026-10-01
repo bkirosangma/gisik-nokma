@@ -28,8 +28,11 @@ describe('WorkflowBuilderScreen', () => {
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
     expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
-    expect(await screen.findByText('To do')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
-    expect(screen.getByText('Select a state or a transition to edit it.')).toBeInTheDocument();
+    expect(await screen.findByTestId('state-node-todo')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
+    // W1 (2026-09-30): the right inspector and its "Select a state…" hint are gone; the lists took its place.
+    expect(screen.queryByText('Select a state or a transition to edit it.')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'States (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Transitions (4)' })).toBeInTheDocument();
   });
 
   it('edits the workflow name into the def', async () => {
@@ -64,7 +67,9 @@ describe('WorkflowBuilderScreen', () => {
     );
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await user.click(screen.getByRole('button', { name: 'Add state' }));
-    expect(await screen.findByText('New state')).toBeInTheDocument();
+    // W1: the new state is a canvas node AND a row in the States list.
+    expect(await screen.findAllByText('New state')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'States (4)' })).toBeInTheDocument();
   });
 
   it('says so when workspace data cannot load', async () => {
@@ -416,9 +421,9 @@ describe('WorkflowListScreen', () => {
 
 describe('TemplateGallery', () => {
   /**
-   * 10.40 — the gallery offers the three templates plus Start blank.
+   * 10.40 — the gallery offers the three templates plus a blank door ("Start from a blank workflow").
    */
-  it('offers the three templates and Start blank', async () => {
+  it('offers the three templates and the blank door', async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
     render(<TemplateGallery onPick={onPick} />);
@@ -427,9 +432,89 @@ describe('TemplateGallery', () => {
       expect(screen.getByText(template.name)).toBeInTheDocument();
       expect(screen.getByText(template.tagline)).toBeInTheDocument();
     }
-    await user.click(screen.getByRole('button', { name: 'Use this template — Errand with waits' }));
+    await user.click(screen.getByRole('button', { name: 'Use the Errand with waits template' }));
     expect(onPick).toHaveBeenCalledWith(WORKFLOW_TEMPLATES[1]);
-    await user.click(screen.getByRole('button', { name: 'Start blank' }));
+    await user.click(screen.getByRole('button', { name: 'Start from a blank workflow' }));
     expect(onPick).toHaveBeenCalledWith(null);
+  });
+
+  /**
+   * 20.620 — touch-doors: every template card IS the one control that starts from that template.
+   */
+  it('20.620 each template card is one focusable control named "Use the <name> template"', async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    const { container } = render(<TemplateGallery onPick={onPick} />);
+    const cards = [...container.querySelectorAll('.template-gallery__card')];
+    // the three templates plus the blank door (owner 2026-09-30: Start blank is the FOURTH door)
+    expect(cards.length).toBe(WORKFLOW_TEMPLATES.length + 1);
+    for (const [index, template] of WORKFLOW_TEMPLATES.entries()) {
+      const card = cards[index]!;
+      // ONE control per card, and it is the door — no second button or link inside it
+      const controls = card.querySelectorAll('button, a[href], input, select, textarea, [tabindex]');
+      expect(controls.length, `${template.name}: controls in the card`).toBe(1);
+      const door = screen.getByRole('button', { name: `Use the ${template.name} template` });
+      expect(door.className).toContain('template-gallery__door');
+      expect(card.contains(door)).toBe(true);
+      // the card's own copy is inside the door, so the whole card is the hit area
+      expect(door).toHaveTextContent(template.name);
+      expect(door).toHaveTextContent(template.tagline);
+      // Enter starts from THIS template (the same action the button had)
+      onPick.mockClear();
+      door.focus();
+      await user.keyboard('{Enter}');
+      expect(onPick).toHaveBeenCalledWith(template);
+      onPick.mockClear();
+      await user.click(door);
+      expect(onPick).toHaveBeenCalledWith(template);
+    }
+    // the FOURTH card is the blank door: one control, the same door, picks null
+    const blankCard = cards[WORKFLOW_TEMPLATES.length]!;
+    expect(blankCard.querySelectorAll('button, a[href], input, select, textarea, [tabindex]').length, 'controls in the blank card').toBe(1);
+    const blank = screen.getByRole('button', { name: 'Start from a blank workflow' });
+    expect(blank.className).toContain('template-gallery__door');
+    expect(blankCard.contains(blank)).toBe(true);
+    expect(blank).toHaveTextContent('Start from a blank workflow');
+    onPick.mockClear();
+    blank.focus();
+    await user.keyboard('{Enter}');
+    expect(onPick).toHaveBeenCalledWith(null);
+    onPick.mockClear();
+    await user.click(blank);
+    expect(onPick).toHaveBeenCalledWith(null);
+    // CONTROL — a template door still picks ITS template, not null (the blank door did not swallow the loop)
+    onPick.mockClear();
+    await user.click(screen.getByRole('button', { name: `Use the ${WORKFLOW_TEMPLATES[0]!.name} template` }));
+    expect(onPick).toHaveBeenCalledWith(WORKFLOW_TEMPLATES[0]);
+  });
+
+  /**
+   * 20.622 — the chooser has no primary button: N loud buttons would break rule 01, the doors are the affordance.
+   */
+  it('20.622 the template chooser renders no .gn-button--primary', () => {
+    const { container } = render(<TemplateGallery onPick={() => {}} />);
+    // CONTROL — the query reads real classes: the four doors are found by the same kind of query, and no
+    // control on the page is a shared Button of any variant (the ghost pill Start blank used to be one)
+    expect(container.querySelectorAll('.template-gallery__door').length).toBe(WORKFLOW_TEMPLATES.length + 1);
+    expect(container.querySelectorAll('.gn-button--ghost').length).toBe(0);
+    expect(container.querySelectorAll('.gn-button--primary').length).toBe(0);
+    for (const door of container.querySelectorAll('.template-gallery__door')) {
+      expect(door.className, 'a door is not a button').not.toMatch(/gn-button/);
+    }
+  });
+
+  /**
+   * 20.626 — all four doors are the SAME door: the blank one is not a ghost pill beside three cards.
+   */
+  it('20.626 the three templates and Start blank share one door class; none is a shared Button', () => {
+    const { container } = render(<TemplateGallery onPick={() => {}} />);
+    const controls = [...container.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')];
+    expect(controls.length).toBe(WORKFLOW_TEMPLATES.length + 1);
+    for (const control of controls) {
+      expect(control.className, `${control.getAttribute('aria-label') ?? ''} carries exactly the door class`).toBe('template-gallery__door');
+      expect(control.className).not.toMatch(/gn-button/);
+    }
+    // CONTROL — the page still renders NO primary (rule 01)
+    expect(container.querySelectorAll('.gn-button--primary').length).toBe(0);
   });
 });

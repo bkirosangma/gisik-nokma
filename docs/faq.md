@@ -153,9 +153,11 @@ month (thirty days, described as a placeholder) in case they come back; re-add t
 and their settings come back with them.
 
 **Is there a limit on invitations?**
-No. There is currently no cap on how many pending invitations a workspace can have, or how many times
-you can invite the same address. That is disclosed as a known gap rather than a decision, so nothing
-will stop you sending the same person five invitations by accident.
+No. There is currently no cap on how many pending invitations a workspace can have. That is disclosed as
+a known gap rather than a decision. Inviting the SAME address again does not stack invitations, though:
+with the same role and projects it re-sends the pending invitation with a fresh link, and with a different
+role or projects it replaces the pending invitation with one carrying the new role and projects. Either way
+the older link stops working.
 
 **Somebody says the invitation link doesn't work.**
 They will see: *"This invitation link does not open anything. It may have been used, withdrawn, or

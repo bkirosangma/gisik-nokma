@@ -389,8 +389,8 @@ for `task/help-notes`: the manual's new "§15 — Notes" section, the FAQ's new 
 correction of the FAQ's now-false "Finding things" claims, and (addendum, owner "yes pls") documenting
 starting-status and board-card-badges in the existing sections. Cases file: this one.
 
-- **15.36** ✅ The generated corpus carries the manual's "§15 — Notes" section (last in document order,
-  its ten subsections) and the FAQ's "Notes" section (8–15 real questions) — against the real generated
+- **15.36** ✅ The generated corpus carries the manual's "§15 — Notes" section (between §14 and §16 —
+  it was the last chapter until §16 landed, 2026-09-30 — with its ten subsections) and the FAQ's "Notes" section (8–15 real questions) — against the real generated
   content, not a fixture — (`packages/app-core/test/help/notes-sections.test.ts`)
 - **15.37** ✅ Every quoted UI string the help-notes task wrote — the notes sections (Units 1–2) AND, from
   Unit 4, the starting-status/board-badge passages it touched in §5, §8, §11 and two FAQ sections — is

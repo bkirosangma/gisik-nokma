@@ -402,7 +402,7 @@ and each case records what its own run printed.
 
 - 13.1347 🧪 `ctl rebuild` builds the stack from the branch the primary checkout stands on, not from `main`.
   On a clean checkout on `release/2026-09-99` the dry-run prints `DRY: git pull --ff-only origin
-  release/2026-09-99` then `OK rebuild dry-run on release/2026-09-99`, exit 0 — the pulled ref and the OK
+  release/2026-09-99`, the two `DRY: docker … prune` lines (13.1592), then `OK rebuild dry-run on release/2026-09-99`, exit 0 — the pulled ref and the OK
   line BOTH name the release branch, which is what makes the built tree the release branch's tree.
   `scripts/ctl/verbs/rebuild.sh`
 - 13.1348 🧪 CONTROL for 13.1347 — a task branch is refused, so 13.1347 cannot be green merely because the
@@ -418,9 +418,63 @@ and each case records what its own run printed.
   `main` arm — a setup failure that reads exactly like a result if only the exit code is read.
   `scripts/ctl/verbs/rebuild.sh`
 - 13.1350 🧪 REGRESSION arm — `main` is still accepted after the change: `DRY: git pull --ff-only origin
-  main` then `OK rebuild dry-run on main`, exit 0. Without this arm a guard that had been narrowed to
+  main`, the two prune lines (13.1592), then `OK rebuild dry-run on main`, exit 0. Without this arm a guard that had been narrowed to
   `release/*` alone would look identical to the intended one across every other case in this section.
   `scripts/ctl/verbs/rebuild.sh`
+
+## `ctl rebuild` prunes the build cache and old unused images, never a volume (`task/ctl-rebuild-prune`, owner standing rule 2026-10-01)
+Why: on 2026-10-01 the Docker VM disk filled with superseded images and build cache, the test Postgres began
+refusing connections, and a whole gate failed (`ECONNREFUSED`, "Cannot read properties of undefined (reading
+'drop')"). A stub `docker` first on PATH records argv, so the cases assert what ctl RUNS, not what Docker did.
+Block `13.1590`–`13.1595`. All six are **🧪, not ✅, on purpose** — same reason as `13.1501`–`13.1512`: 13.1590–13.1594 run automatically as `scripts/ctl/test/lib.test.sh` arms under `pnpm check:ctl`, each named for its case id, but `check-case-citations.mjs` scans only `apps/` and `packages/`, so a ✅ here would read as uncited.
+Mutations measured 2026-10-01 (controller, LOCAL, the prune assertions alone, control 14/14 green first):
+nine, **9 red** — drop `--filter until=24h` (3 red), `--volumes` on the image prune (5), `--volumes` on the
+build-cache prune (5), the OK line without the prune result (1), the second prune skipped after the first
+fails (1), the dry-run without the prune (1), the `n/a` fallback removed (1), a `docker volume prune` line
+planted in `rebuild.sh` (2), a `docker system prune` planted in the dry-run (3).
+
+- 13.1590 🧪 After the stack is verified, `ctl_prune` runs exactly `docker builder prune -f` then `docker
+  image prune -a -f --filter until=24h`, in that order, and nothing else; the image prune is bounded by
+  `until=24h` (an unbounded `-a` would delete the image the rebuild just built). `scripts/ctl/lib.sh`,
+  `scripts/ctl/test/lib.test.sh`. Mutation: drop `--filter until=24h` → red.
+- 13.1591 🧪 A prune NEVER names a volume. The stub's recorded argv carries no `volume`, `system prune` or
+  `--volumes`, and no non-comment line of any ctl script runs `docker volume …`, `docker system prune` or
+  `compose down -v`. CONTROLS in the same file: the detector flags each of seven volume-touching commands it
+  exists to catch, and the static scan flags a planted `docker volume prune` fixture — so neither can be
+  green merely because it matches nothing. Mutation: add `--volumes` to either prune → red.
+- 13.1592 🧪 `ctl rebuild --dry-run` prints `DRY: git pull --ff-only origin <branch>; …`, then `DRY: docker
+  builder prune -f`, then `DRY: docker image prune -a -f --filter until=24h`, then `OK rebuild dry-run on
+  <branch>`, exit 0; it only prints (the stub records no docker call) and the output names no volume. Cases
+  13.1347 and 13.1350 stay true: the pull line and the OK line are unchanged.
+- 13.1593 🧪 `ctl_disk_line` prints `disk: images <size> (reclaimable <n>), build cache <size> (reclaimable
+  <n>), Docker VM disk <pct> used`, the VM figure read through the test Postgres container whose data dir
+  sits on that disk. CONTROL: when Docker cannot answer, each field reads `n/a`, never empty.
+- 13.1594 🧪 A prune failure does not stop the rebuild or hide the other prune: with the build-cache prune
+  failing the image prune still runs and `ctl_prune` returns non-zero (CONTROL: zero when nothing fails). In
+  `rebuild.sh` the prune comes AFTER the last verification gate (`GOOGLE_CLIENT_ID`) and BEFORE the final
+  `ctl_ok`, and the OK line carries the prune result and the disk line — so a failed prune is visible and a
+  good build is never reported failed over it, nor a bad build pruned over.
+- 13.1595 🧪 REAL RUN on the dev stack — one `ctl rebuild` from the release tip prints an OK line ending
+  `…, pruned build cache + unused images >24h, disk: images …, build cache …, Docker VM disk NN% used (log
+  …)`, the dev stack stays Up and healthy, the three named volumes (`gisik-nokma-dev_pg-dev-data`,
+  `gisik-nokma-dev_minio-data`, the test Postgres's) are still listed by `docker volume ls`, and the Docker
+  VM disk figure falls.
+  **Run 2026-10-01 (controller, LOCAL, Docker Desktop) — PARTLY:** (1) the first `ctl rebuild` after this merged
+  printed the OLD OK line (no prune, no disk line) — expected, not a bug: the running `rebuild.sh` is the file
+  that was on disk when it started, and its own `git pull` brought the new one. (2) A second `ctl rebuild` on the
+  unchanged tree **FAILed** `gisik-nokma-dev-server-1 image created … is not newer than start` — with every layer
+  CACHED the image keeps its old `.Created`, so a no-op rebuild trips the freshness check; this predates the
+  change and is a separate finding (open), and it means the new final step is not reached on a no-op rebuild.
+  (3) So the functions were run for real, as the final step would: `ctl_prune` rc=0, build cache **3.743 GB → 0 B**,
+  Docker VM disk **25% → 18% used**, the disk line read `disk: images 6.004GB (reclaimable 1.578GB (26%)), build
+  cache 0B (reclaimable 0B), Docker VM disk 18% used`; `docker volume ls` identical before and after (13 volumes);
+  both dev containers Up, server healthy. The unused-image prune removed nothing (no unused image older than 24 h).
+  **Completed 2026-10-01 (controller, LOCAL):** the next landing's `ctl rebuild` (release tip `5685643f`, new code)
+  built, verified and ended `OK rebuild release/2026-09-30 5685643f67a1 images fresh, server healthy, /healthz 200 on
+  :3000, web :3001 307, sign-in configured, pruned build cache + unused images >24h, disk: images 6.696GB
+  (reclaimable 2.276GB (33%)), build cache 0B (reclaimable 0B), Docker VM disk 19% used (log …)`; `docker volume
+  ls` identical before and after (13 volumes); server healthy. The case is left 🧪 only because it is a hand-run
+  against the real Docker (the arms above are automatic).
 
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 

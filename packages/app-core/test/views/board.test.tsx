@@ -1382,6 +1382,29 @@ describe('13.1452 the card carries a priority tint modifier class of its own, di
   });
 });
 
+describe('20.602 the keys row binds the separator to the due label', () => {
+  const DUE = '2026-10-19';
+  it('20.602 the `·` sits inside the due unit, aria-hidden, and the row text is unchanged', () => {
+    render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1101', dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
+    const line = screen.getByText('GN-1101').closest<HTMLElement>('.gn-board-card__meta-line')!;
+    const unit = line.querySelector<HTMLElement>('.gn-board-card__due-unit')!;
+    const sep = line.querySelector<HTMLElement>('.gn-board-card__meta-sep')!;
+    expect(unit.contains(sep)).toBe(true);
+    expect(unit.contains(within(line).getByText(formatDate(DUE)))).toBe(true);
+    expect(sep.getAttribute('aria-hidden')).toBe('true');
+    // The unwrapped row still reads `key priority · due`.
+    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
+    // CONTROL — every `·` in the row is inside a unit, and a card with no due date draws neither.
+    expect([...line.querySelectorAll('.gn-board-card__meta-sep')].every((el) => el.closest('.gn-board-card__due-unit') !== null)).toBe(true);
+  });
+  it('20.602 CONTROL — no due date draws no unit and no separator', () => {
+    render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
+    const line = screen.getByText('GN-1102').closest<HTMLElement>('.gn-board-card__meta-line')!;
+    expect(line.querySelector('.gn-board-card__due-unit')).toBeNull();
+    expect(line.querySelector('.gn-board-card__meta-sep')).toBeNull();
+  });
+});
+
 /**
  * 13.1281 — the prototype's meta line (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
  * dueLabel].join(" · ")`), with the KEY first (owner, 2026-09-22). The due half keeps

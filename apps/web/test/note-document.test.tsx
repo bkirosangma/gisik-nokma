@@ -839,7 +839,10 @@ describe('9.409 the note page carries a reading-progress bar', () => {
     expect(rule('.reading-progress__bar')).toMatch(/background:\s*var\(--gn-accent\)/);
     expect(rule('.reading-progress__bar')).toMatch(/transition:\s*transform/);
     expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.reading-progress__bar\s*\{\s*transition:\s*none/);
-    expect(rule('.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)')).toMatch(/scroll-margin-top:\s*calc\(var\(--app-nav-offset/);
+    // TWO rules now (notes split-scroll, 18.484): the base one clears the bar on the window-scrolled page, and a
+    // `width > 60rem` one resets it to 1rem inside the document column. This case pins the BASE one by content.
+    const headingRules = [...css.matchAll(/\.gn-notes__editor :is\(h1, h2, h3, h4, h5, h6\)\s*\{([^}]*)\}/g)].map((m) => m[1] ?? '');
+    expect(headingRules.some((body) => /scroll-margin-top:\s*calc\(var\(--app-nav-offset/.test(body))).toBe(true);
     // No literal colour in the section this piece added.
     const section = css.slice(css.indexOf('.reading-progress {'));
     expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);

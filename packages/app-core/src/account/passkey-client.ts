@@ -8,16 +8,21 @@
  * (see that file's own docblock for what the verification found, and for the
  * one thing it could NOT establish).
  *
- * `PasskeySummary` carries `name` as a plain `string`, never `string |
- * undefined` — better-auth's own `Passkey` row types it optional
- * (`name?: string | undefined`), and resolving that absence to a displayable
- * label is the ADAPTER's job, not this view-model's, for the same reason
- * `SessionSummary.deviceLabel` is a resolved string here rather than a raw
- * `userAgent`. A component handed `undefined` would have to invent a label
- * mid-render, which is the fabrication `deviceLabelOf`'s "Unknown device"
- * fallback already refuses one seam earlier.
+ * `PasskeySummary` is one row of `GET /v1/me/passkeys` (devices plan Task 5): the list is read from that route and
+ * not from the plugin's `listUserPasskeys`, because the plugin's schema does not know `lastUsedAt` (FD5). `provider`
+ * is the authenticator's NAME, resolved on the server from the AAGUID ("iCloud Keychain", or "Security key or other"
+ * - never a UUID). `name` is `null` when the person gave none and the plugin left it empty; the SECTION shows "Unnamed
+ * passkey" then, because that is a wording of the view and not a fact about the credential. `notUsedRecently` (never
+ * used, or 90 days or more ago) is computed server-side so the threshold has one home.
  */
-export type PasskeySummary = { id: string; name: string };
+export type PasskeySummary = {
+  id: string;
+  name: string | null;
+  provider: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  notUsedRecently: boolean;
+};
 
 export interface PasskeyClient {
   list(): Promise<PasskeySummary[]>;

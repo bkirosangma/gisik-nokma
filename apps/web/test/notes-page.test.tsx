@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -302,6 +302,121 @@ describe('18.11 The Notes page — the shell', () => {
       </Providers>,
     );
     await waitFor(() => expect(screen.getByText(LOST)).toBeInTheDocument());
+  });
+
+  /**
+   * 18.485 — above 60rem the document scrolls in its OWN column, and the window does not
+   * (18.481). Next resets the WINDOW's scroll on a navigation; it does not reset an
+   * element's. `/notes/a` → `/notes/b` is the same route file with a new param; IF App
+   * Router keeps the page mounted the section persists and the next note would
+   * open at the previous note's offset (a rerender with a new `noteId` is what this
+   * drives; whether the real navigation remounts is the browser case 18.493).
+   * CONTROL: an unrelated re-render (same note) leaves the offset alone, and a link
+   * with a `#heading` or `#comment-…` hash is left to the scroll that owns it.
+   * MUTATION TARGET: delete the effect, or drop the hash guard.
+   */
+  it('18.485 opening a different note returns the document column to the top; CONTROL: the same note keeps its place, and a hash link is not reset', async () => {
+    const view = (id: string) => (
+      <Providers services={world({ getNote: async () => null })}>
+        <NotesPage noteId={id} />
+      </Providers>
+    );
+    window.location.hash = '';
+    const { rerender } = render(view('01J9NOTEAAAAAAAAAAAAAAAAAA'));
+    const region = await screen.findByTestId('note-document-region');
+    region.scrollTop = 400;
+    rerender(view('01J9NOTEAAAAAAAAAAAAAAAAAA')); // CONTROL: same note
+    expect(region.scrollTop).toBe(400);
+    rerender(view('01J9NOTEBBBBBBBBBBBBBBBBBB'));
+    expect(screen.getByTestId('note-document-region')).toBe(region); // the rerender kept the same column element
+    await waitFor(() => expect(region.scrollTop).toBe(0));
+
+    window.location.hash = '#a-heading';
+    try {
+      region.scrollTop = 400;
+      rerender(view('01J9NOTECCCCCCCCCCCCCCCCCC'));
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(region.scrollTop).toBe(400);
+    } finally {
+      window.location.hash = '';
+    }
+  });
+
+  /**
+   * 18.488 — the tree keeps its place when the next note opens (owner, 2026-09-30; measured in a
+   * real browser at `e4e92f77`: the tree's `scrollTop` went 800 → 0).
+   *
+   * App Router keys a dynamic segment by its param VALUE, so `/notes/a` → `/notes/b` does not re-render
+   * `NotesPage`, it MOUNTS A NEW ONE: the `<nav id="gn-notes-tree">` is a new node by design and the
+   * workspaces and every section's notes are read again. This test models that with a `key` (a bare
+   * re-render with a new `noteId` keeps the node and would pass today — the trap 18.485 fell into).
+   * The restore has to outlast the reads: the new tree is "Loading…" and short, and a browser CLAMPS
+   * `scrollTop` to what is scrollable, so a restore on mount lands on 0. jsdom does not clamp, so the
+   * setter below does — by the number of note links present — and the test reads 0 straight after the
+   * remount to prove it is live. The restore is cancelled by the reader taking over (wheel, touch, key,
+   * pointer), and what they scroll to next is what the next note restores.
+   * CONTROL (same `it`): a first mount starts at 0 and the clamp is real; the geometry in a browser is 🧪 18.493.
+   * MUTATION TARGET: drop the restore (the observer, or the saved value), or stop recording on `scroll`.
+   */
+  it('18.488 a remount puts the tree back at the offset it had once its rows are back; CONTROL: a first mount starts at 0, and the new tree is 0 while its rows are still loading', async () => {
+    const rows = Array.from({ length: 30 }, (_, i) => ({
+      noteId: `01J9NOTE${String(i).padStart(18, '0')}`,
+      workspaceId: WS_A,
+      homeProjectId: '',
+      authorId: 'u_kiro',
+      title: `Note ${i}`,
+      scope: { mode: 'workspace' as const },
+      attachedTickets: [],
+      deleted: false,
+      createdAt: '2026-09-19T09:00:00.000Z',
+      updatedAt: '2026-09-19T09:00:00.000Z',
+    }));
+    const original = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')!;
+    const offsets = new WeakMap<Element, number>();
+    const room = (el: Element) => Math.max(0, el.querySelectorAll('a[href^="/notes/"]').length * 60 - 300);
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      configurable: true,
+      get(this: Element) {
+        return this.id === 'gn-notes-tree' ? (offsets.get(this) ?? 0) : (original.get as () => number).call(this);
+      },
+      set(this: Element, value: number) {
+        if (this.id === 'gn-notes-tree') offsets.set(this, Math.min(value, room(this)));
+        else (original.set as (v: number) => void).call(this, value);
+      },
+    });
+    try {
+      const services = world({ getNote: async () => null, getNotes: async () => rows });
+      const view = (id: string) => (
+        <Providers services={services}>
+          <NotesPage key={id} noteId={id} />
+        </Providers>
+      );
+      const treeOf = () => screen.getByRole('navigation', { name: 'Notes' });
+      const loaded = (tree: HTMLElement) =>
+        waitFor(() => expect(tree.querySelectorAll('a[href^="/notes/"]').length).toBeGreaterThan(10));
+
+      const { rerender } = render(view('01J9NOTEAAAAAAAAAAAAAAAAAA'));
+      const first = treeOf();
+      expect(first.scrollTop).toBe(0); // CONTROL: a first mount starts at the top
+      await loaded(first);
+      first.scrollTop = 800;
+      fireEvent.scroll(first);
+      expect(first.scrollTop).toBe(800);
+
+      rerender(view('01J9NOTEBBBBBBBBBBBBBBBBBB')); // what Next does: a new page, a new tree
+      const second = treeOf();
+      expect(second).not.toBe(first); // a remount IS a new node; the offset has to be carried
+      expect(second.scrollTop).toBe(0); // CONTROL: still loading, and the clamp says 0
+      await waitFor(() => expect(second.scrollTop).toBe(800));
+
+      // The reader scrolls somewhere else: THAT is what the next note restores.
+      second.scrollTop = 200;
+      fireEvent.scroll(second);
+      rerender(view('01J9NOTECCCCCCCCCCCCCCCCCC'));
+      await waitFor(() => expect(treeOf().scrollTop).toBe(200));
+    } finally {
+      Object.defineProperty(Element.prototype, 'scrollTop', original);
+    }
   });
 
   /**

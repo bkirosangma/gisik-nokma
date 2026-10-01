@@ -134,7 +134,8 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
    * from a stale branch or pasted back by a future edit reddens here.
    *
    * Mutation: `60rem` → `59rem` on the `@media (max-width: 60rem)` line —
-   * this test's own pinned condition string goes red.
+   * this test's own pinned condition string goes red; likewise `width > 60rem`
+   * → `width > 61rem` on the split-scroll block.
    */
   it('pins the base grid and its ONE breakpoint, and no rule anywhere declares a third track', () => {
     const base = declarationsFor(CSS, '.gn-notes__body');
@@ -144,7 +145,11 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
     const blocks = mediaBlocksTouching(CSS, 'gn-notes');
     // EXACT set, in file order: a reintroduced `min-width: 64rem` breakpoint
     // on a `.gn-notes` selector anywhere in the file would add it back here.
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem']);
+    // AMENDED 2026-09-30 (notes split-scroll, 18.480–18.484): the second entry is
+    // the EXACT COMPLEMENT of the first (`width > 60rem` is every width the
+    // `max-width: 60rem` block does not cover), so there is still ONE breakpoint —
+    // 60rem — with a rule set on each side of it; no third point was added.
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'width > 60rem']);
 
     const narrow = blocks[0]!.body;
     expect(narrow).toMatch(/\.gn-notes__body\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/);
@@ -709,5 +714,179 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       el.getAttributeNames().filter((name) => name.startsWith('data-')),
     );
     for (const attribute of styled) expect(rendered).toContain(attribute);
+  });
+});
+
+/**
+ * 18.480–18.484 — the notes page scrolls its TREE and its DOCUMENT separately
+ * above 60rem (owner, 2026-09-30: "the gn-notes-tree and the gn-notes__document
+ * should have separate scrolls").
+ *
+ * jsdom lays nothing out, so this is the CSS CONTRACT: which rules exist above the
+ * breakpoint, and that none of them exist at or below it. What scrolling then
+ * DOES (the tree's `scrollTop` and `window.scrollY` stay 0 while the document
+ * scrolls, and vice versa) is the 🧪 browser cases 18.490–18.493.
+ */
+function wideBody(): string {
+  const blocks = mediaBlocksTouching(CSS, 'gn-notes');
+  const wide = blocks.find((b) => b.condition === 'width > 60rem');
+  expect(wide, 'a `@media (width > 60rem)` block touching .gn-notes').toBeDefined();
+  return wide!.body;
+}
+
+/** The declarations of `selector` INSIDE a media block's body (rules there are indented, so `declarationsFor` cannot read them). */
+function ruleIn(body: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rule = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(body);
+  expect(rule, `${selector} inside the block`).not.toBeNull();
+  return rule?.[1] ?? '';
+}
+
+describe('18.480 the tree scrolls on its own above 60rem', () => {
+  /** MUTATION TARGET: delete `overflow-y: auto` from `.gn-notes__tree` in the `width > 60rem` block. */
+  it('18.480 .gn-notes__tree is overflow-y: auto and contains its overscroll there; CONTROL: its base rule scrolls nothing, so at and below 60rem the page scrolls as one', () => {
+    const tree = ruleIn(wideBody(), '.gn-notes__tree');
+    expect(tree).toMatch(/overflow-y:\s*auto;/);
+    expect(tree).toMatch(/overscroll-behavior:\s*contain;/);
+    // CONTROL (same `it`): the same scan reads the document's rule too, and the tree's base rule is scroll-free.
+    expect(ruleIn(wideBody(), '.gn-notes__document')).toMatch(/overflow-y:\s*auto;/);
+    expect(declarationsFor(CSS, '.gn-notes__tree') ?? '').not.toMatch(/overflow/);
+  });
+});
+
+describe('18.481 the document scrolls on its own above 60rem', () => {
+  /** MUTATION TARGET: delete `overflow-y: auto` from `.gn-notes__document` in the `width > 60rem` block. */
+  it('18.481 .gn-notes__document is overflow-y: auto and contains its overscroll there, with room under the last line; CONTROL: its base rule scrolls nothing', () => {
+    const document_ = ruleIn(wideBody(), '.gn-notes__document');
+    expect(document_).toMatch(/overflow-y:\s*auto;/);
+    expect(document_).toMatch(/overscroll-behavior:\s*contain;/);
+    expect(document_).toMatch(/padding-bottom:/); // the shell's own bottom padding is zeroed below, so the last line needs its own
+    expect(ruleIn(wideBody(), '.gn-notes__tree')).toMatch(/overflow-y:\s*auto;/); // CONTROL: the sibling is found by the same scan
+    const base = declarationsFor(CSS, '.gn-notes__document') ?? '';
+    expect(base).toMatch(/padding:\s*0\s+clamp\(/); // the existing rule is what the control reads
+    expect(base).not.toMatch(/overflow/);
+  });
+});
+
+describe('18.482 the page fills the viewport below the bar, so the PAGE does not scroll', () => {
+  /**
+   * The bar's height is `--app-nav-offset` (`:root`, hand-set 4.35rem and already what
+   * `.gn-notes__editor`'s `min-height` and the heading `scroll-margin-top` use) — the
+   * token, never a second number. The shell's own `padding-bottom: 3rem` would leave
+   * exactly that much page scroll, so it is zeroed on the notes `<main>`.
+   * MUTATION TARGET: `var(--app-nav-offset)` → `4.35rem`, or drop the shell padding reset.
+   */
+  it('18.482 .gn-notes is a flex column of 100dvh minus the bar, the body takes the rest on a zero-floor row, and the shell padding is 0', () => {
+    const body = wideBody();
+    const notes = ruleIn(body, '.gn-notes');
+    expect(notes).toMatch(/display:\s*flex;/);
+    expect(notes).toMatch(/flex-direction:\s*column;/);
+    expect(notes).toMatch(/height:\s*calc\(100dvh - var\(--app-nav-offset\)\);/);
+    const rows = ruleIn(body, '.gn-notes__body');
+    expect(rows).toMatch(/flex:\s*1;/);
+    expect(rows).toMatch(/min-height:\s*0;/);
+    // A bare auto row is sized by its content and would push the columns past the viewport instead of scrolling.
+    expect(rows).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\);/);
+    expect(ruleIn(body, '.gn-shell--wide')).toMatch(/padding-bottom:\s*0;/);
+    // CONTROL (same `it`): the token this leans on is the one the bar's other readers use, and it is defined.
+    expect(stripComments(CSS)).toMatch(/:root\s*\{\s*--app-nav-offset:\s*4\.35rem;\s*\}/);
+    expect(body).not.toMatch(/4\.35rem/);
+  });
+});
+
+describe('18.483 at and below 60rem NOTHING changes', () => {
+  /**
+   * MUTATION TARGET: add `overflow-y: auto` to the BASE `.gn-notes__document` rule (or to
+   * the `max-width: 60rem` block) — the page would then scroll in two places on a phone.
+   */
+  it('18.483 no region scrolls, fills the viewport or is pinned outside the wide block; the two conditions are exact complements; CONTROL: the narrow block still holds the drawer rules', () => {
+    const blocks = mediaBlocksTouching(CSS, 'gn-notes');
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'width > 60rem']);
+    const narrow = blocks[0]!.body;
+    expect(narrow).toMatch(/\.gn-notes__tree--drawer\s*\{[^}]*display:\s*none;/); // CONTROL: this is the block that matters
+    expect(narrow).not.toMatch(/overflow|overscroll|100dvh|min-height|grid-template-rows|flex:|scroll-margin/);
+
+    // The base rules the two regimes share carry nothing that would scroll or pin the page.
+    for (const selector of ['.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document']) {
+      const base = declarationsFor(CSS, selector);
+      expect(base, selector).not.toBeNull();
+      expect(base ?? '', selector).not.toMatch(/overflow|overscroll|100dvh|grid-template-rows|display:\s*flex|flex:/);
+    }
+  });
+});
+
+describe('18.484 a jump inside the column lands 1rem under ITS top, not under a bar that is not over it', () => {
+  /**
+   * `.gn-notes__editor` headings carry `scroll-margin-top: calc(var(--app-nav-offset) + 1rem)`
+   * because the sticky bar sits OVER a window-scrolled page. Above 60rem the column starts
+   * below the bar, so keeping the bar's offset would land every table-of-contents jump and
+   * `#heading` link about 70px low. MUTATION TARGET: delete the override from the wide block.
+   */
+  it('18.484 the wide block resets the heading scroll-margin to 1rem; CONTROL: the base rule (narrow, window-scrolled) still clears the bar', () => {
+    const heading = /\.gn-notes__editor :is\(h1, h2, h3, h4, h5, h6\)/;
+    expect(ruleIn(wideBody(), '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)')).toMatch(/scroll-margin-top:\s*1rem;/);
+    expect(stripComments(CSS)).toMatch(
+      new RegExp(`${heading.source}\\s*\\{\\s*scroll-margin-top:\\s*calc\\(var\\(--app-nav-offset,\\s*0px\\)\\s*\\+\\s*1rem\\);`),
+    );
+  });
+});
+
+describe('18.486 the wide block is declared AFTER every rule it overrides', () => {
+  /**
+   * A media query adds no specificity, so `@media (width > 60rem) { .x { … } }` beats an earlier
+   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide`. The heading
+   * `scroll-margin-top` base rule sits in the KB-parity section near the end of the file; a wide block
+   * filed earlier (where the first cut of it was) is silently ignored and every jump lands ~86px low,
+   * while the TEXT of the override is still present, so 18.484 alone cannot see it.
+   * MUTATION TARGET: move the wide block above the base heading rule (or above any base `.gn-notes*` rule).
+   */
+  it('18.486 every selector the wide block sets has all its other declarations BEFORE the block; CONTROL: the scan finds each base rule at least once', () => {
+    const stripped = stripComments(CSS);
+    const start = stripped.indexOf('@media (width > 60rem)');
+    expect(start).toBeGreaterThan(-1);
+    const selectors = ['.gn-shell--wide', '.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
+    for (const selector of selectors) {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const base = [...stripped.matchAll(new RegExp(`^${escaped}\\s*\\{`, 'gm'))].map((m) => m.index ?? -1);
+      expect(base.length, `a base rule for ${selector}`).toBeGreaterThan(0); // CONTROL: the scan is not vacuous
+      for (const index of base) expect(index, `${selector} base rule at ${index} is AFTER the wide block at ${start}`).toBeLessThan(start);
+    }
+  });
+});
+
+describe('18.487 each scroller is the containing block of the absolute nodes inside it', () => {
+  /**
+   * N1b (measured in a real browser, 2026-09-30): the page still scrolled at 1280px
+   * (`scrollHeight` 6271 vs `innerHeight` 725) and a TOC click moved the WINDOW 155.5px. The node
+   * doing it is `TicketEditorSlot`'s visually-hidden `disabledReason` span
+   * (`packages/editor/src/components/TicketEditorSlot.tsx`, `id={useId()}`, an INLINE
+   * `position: absolute`): the notes editor mounts the slot with no `submit`, so the span renders on
+   * every note, and nothing above it was positioned (`.editor-slot` clips but is not a containing
+   * block). An absolute box escapes the overflow of every ancestor that is not its containing block,
+   * so it sat at its static position at the bottom of the note and stretched the PAGE.
+   * `.editor-slot__attach-input` is a second instance of the same shape.
+   * THIS SCANS THE STYLESHEET, so it cannot see an inline-styled culprit — it pins the cure instead:
+   * a scroller that is `position: relative` is the containing block for, and clips, every absolute
+   * descendant whatever styled it. On `.gn-notes` alone it would not work (it does not clip, so the
+   * node still overflows it and still extends the page). `position: relative` creates no containing
+   * block for `position: fixed`, so the popups, the TOC launcher and the progress bar keep anchoring
+   * to the viewport. Whether the window is now unscrollable is the 🧪 case 18.490.
+   * MUTATION TARGET: delete `position: relative` from either rule in the `width > 60rem` block.
+   */
+  it('18.487 .gn-notes__document and .gn-notes__tree are position: relative in the wide block and nowhere else; CONTROL: both are also the scrollers, and .gn-notes is not the fix', () => {
+    const wide = wideBody();
+    for (const selector of ['.gn-notes__document', '.gn-notes__tree']) {
+      expect(ruleIn(wide, selector), `${selector} in the wide block`).toMatch(/position:\s*relative;/);
+      // Nothing changes at or below 60rem: the base rule is not positioned either.
+      expect(declarationsFor(CSS, selector) ?? '', `${selector} base rule`).not.toMatch(/position:/);
+    }
+    const narrow = mediaBlocksTouching(CSS, 'gn-notes').find((b) => b.condition === 'max-width: 60rem');
+    expect(narrow, 'the max-width: 60rem block').toBeDefined();
+    expect(narrow!.body).not.toMatch(/\.gn-notes__(?:tree|document)[^{]*\{[^}]*position:/);
+    // CONTROL (same `it`): the containing blocks are the very rules that scroll, and `.gn-notes` is not
+    // made `position: relative` instead — it does not clip, so that would not stop the page scrolling.
+    expect(ruleIn(wide, '.gn-notes__document')).toMatch(/overflow-y:\s*auto;/);
+    expect(ruleIn(wide, '.gn-notes__tree')).toMatch(/overflow-y:\s*auto;/);
+    expect(ruleIn(wide, '.gn-notes')).not.toMatch(/position:/);
   });
 });

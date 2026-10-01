@@ -2,10 +2,13 @@ import { newUlid } from '@gisik-nokma/domain';
 import { betterAuth } from 'better-auth';
 import { bearer, magicLink, phoneNumber } from 'better-auth/plugins';
 import { passkey } from '@better-auth/passkey';
+import { createAuthMiddleware } from 'better-auth/api';
 import type { Pool } from 'pg';
 import type { MagicLinkSender } from './magic-link-sender.js';
 import type { OtpSender } from './otp-sender.js';
 import { normalizeOrigin } from '../http/http-origin.js';
+import { deviceSessionHook } from './device-cookie.js';
+import { passkeyLastUsedHook } from './passkey-last-used.js';
 import {
   readSocialProviderEnv,
   socialProvidersFromEnv,
@@ -321,6 +324,22 @@ export function createAuth(deps: AuthDeps) {
      * differently to each, and a config read off the instance cannot.
      */
     socialProviders: deps.socialProviders ?? socialProvidersFromEnv(readSocialProviderEnv()),
+    session: {
+      // Devices plan (Task 1). `returned: false` keeps the raw id out of every better-auth response
+      // (listSessions included) - FD4; `input: false` means no client can set it.
+      additionalFields: {
+        deviceId: { type: 'string', required: false, returned: false, input: false },
+      },
+    },
+    // Devices plan Task 5: a passkey sign-in stamps that passkey's `lastUsedAt` (the plugin's schema does not know it).
+    hooks: {
+      after: createAuthMiddleware(async (ctx) => passkeyLastUsedHook(deps.pool)(ctx)),
+    },
+    databaseHooks: {
+      session: {
+        create: { before: deviceSessionHook({ secure: new URL(deps.baseUrl).protocol === 'https:' }) },
+      },
+    },
     plugins: [
       phoneNumber({
         sendOTP: async ({ phoneNumber: phone, code }) => {

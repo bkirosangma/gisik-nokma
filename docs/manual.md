@@ -113,6 +113,19 @@ initial — and choose **Sign out**. Signing out really does end it — the next
 device is refused immediately, not "at some point later". That matters if you have signed in on somebody
 else's laptop.
 
+To see where else you are signed in, open **Account** and look under **Sign-in and devices**. Each
+browser you have signed in on is one row — for example "Chrome on Mac" with a short four-letter code, so
+two identical browsers can be told apart — with when it was last active and when you first signed in
+there. The ones used in the last 24 hours are listed first; the rest wait under **Signed in, idle**, which
+you can open. **Sign out this device** ends that one; **Sign out all other devices** ends every one except
+the one you are using. The device you are using cannot be signed out from here — use the account menu.
+
+Your **Passkeys** are listed in the same place, grouped under the kind of authenticator that holds each
+one — for example "iCloud Keychain" or "Windows Hello", with a security key or anything unrecognised last.
+Each shows when you added it and when you last used it to sign in, or "Never used". A passkey that has not
+been used for about three months is marked **Not used recently**; if you no longer have that device,
+choose **Delete** beside it.
+
 ---
 
 ## §2 — Finding your way around
@@ -297,6 +310,10 @@ already signed in, there is a **Join [workspace]** button.
 - **One link, one person.** If three people click the same link at the same moment, one gets in and
   the other two see the dead-link message.
 - To take an invitation back: the pending list has a **Withdraw** button on each row.
+- **Inviting an address that already has a pending invitation does not add a second row.** With the
+  same role and projects, that invitation gets a fresh link and the email goes out again. With a
+  different role or different projects, the pending invitation is replaced by one carrying the new role
+  and projects, with a fresh link and a new email. Either way the older link stops working.
 
 If somebody tells you their link does not work, the message they see is: *"This invitation link does
 not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
@@ -763,6 +780,15 @@ was an epic, *"Nothing in the backlog — epics appear in the List."*
 Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a
 column, press the **‹** or **›** arrow on the card, or open it and press **Move…** (§7).
 
+**A card moves the moment you let go.** Drop it (or press an arrow) and the card slides into its new
+column straight away, while the change is saved in the background. If the change is refused or cannot be
+saved, the card slides back to where it was and says why underneath. A move that needs a comment shows
+the card in its new place, faded, until you confirm; cancel and it slides back. With your system set to
+reduce motion the card simply appears. While you drag, the page scrolls when you bring the card near its
+top or bottom edge, and the board scrolls sideways near its left or right edge. Hold a card over a
+collapsed column for a moment and it opens; move away and it closes again; drop the card there and it
+stays open.
+
 A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
 that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
 tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
@@ -1189,9 +1215,9 @@ You do not have to draw one from scratch. There are three templates plus a blank
 | **Simple kanban** | To do, doing, done. No rules — anything moves along the arrows. **Start here.** |
 | **Approval chain** | Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off. |
 | **Errand with waits** | Has a "Waiting" stage marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods. |
-| **Start blank** | An empty canvas with one starting stage called "New". |
+| **Start from a blank workflow** | An empty canvas with one starting stage called "New". |
 
-Press **Use this template — [name]** and it copies it in. You then get your own independent copy — it
+Press the template's card (each is one control, named **Use the [name] template**) and it copies it in; the fourth card, **Start from a blank workflow**, starts empty. You then get your own independent copy — it
 does not stay linked to the template, and changing yours affects nobody else's. You can change it
 before publishing.
 
@@ -1215,6 +1241,18 @@ It is a drawing canvas. Each stage is a box. **Add state** makes a new one. Each
 
 **To connect two stages, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a job can go this way".
+
+**The left-hand column lists everything, and each row opens in place.** Above the system rules you will
+find a **States** list and a **Transitions** list, each with a count. Press a row and it opens right there
+to show its settings: for a stage, its name, **Set as start** and **Delete state**; for an arrow, its
+rules, **Add rule** and **Delete transition**. Only one row is open at a time — opening another closes
+the first — and pressing the open row closes it. It is the same thing as clicking a box or an arrow on the
+canvas: click one and its row opens in the list, open a row and its box or arrow lights up on the canvas.
+An arrow can be clicked anywhere along its line, whether or not it carries any conditions. On a wide
+screen the column stays beside the canvas and scrolls by itself when it is longer than the window, so
+the canvas and the page do not move while you read down it.
+Two moves are listed at the bottom of **Transitions** but cannot be opened, because every workflow has
+them and nobody can change them: **Start** (out of the Backlog) and **Send to Backlog**.
 
 Boxes and arrows are not hard. It is the vocabulary around them that trips people, not the drawing.
 
@@ -1735,3 +1773,98 @@ Honestly, not everything:
 - Notes have no screen yet on the phone or desktop apps — only the website has one.
 - Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built.
 - There is no list on a note or a job showing what else links to it.
+
+## §16 — Connecting Claude or ChatGPT
+
+### What connecting does
+
+You can let Claude or ChatGPT work in Gisik Nokma **as you**. Once it is connected you can ask it, in
+ordinary words — *what is waiting on me?*, *add a job to the Shop floor project*, *move the chiller job to
+Done*, *put a comment on that one* — and it does it, in the same workspaces, with the same permissions,
+as if you had done it yourself.
+
+There is nothing to install and nothing to copy between windows: you paste one web address into the
+assistant, sign in the way you always do, and press **Allow**.
+
+Three things are worth knowing before you press it:
+
+- **It can do what you can do — all of it.** It can see and change everything you can, in every workspace
+  you belong to: read jobs, create them, move them through their stages, comment and assign. There is no
+  read-only choice and no picking one workspace.
+- **It can never do more than you can.** A job you cannot see, it cannot see. A move your role does not
+  allow is refused for the assistant in the same words it would be refused for you.
+- **Every change it makes is recorded under your name**, like any other change in the job's history.
+
+### The address to paste
+
+The address is `https://pm-api.artsourced.in/mcp`.
+
+The easy way to get it is on the website: open **Account**, find "Connected assistants", and press
+**Connect an assistant**. The panel shows the address with a **Copy** button, and a **How to connect** link
+back to this chapter.
+
+### In Claude
+
+The steps below are for Claude on the web or in the desktop app, as of 30 September 2026. Menus in other
+people's apps move; if a name has changed, look for **Connectors** in Claude's settings.
+
+1. Open Claude's **Settings**, choose **Connectors**, press **Add**, then **Add custom connector**.
+2. Paste the address above, give it a name you will recognise (for example Gisik Nokma) and press **Add**.
+3. A Gisik Nokma page opens in your browser. Sign in if it asks you to, check the name and the website
+   address shown on the page, and press **Allow**.
+
+You are returned to Claude, and the connector is ready to use in any conversation.
+
+On a Team or Enterprise plan, an owner of your Claude organisation adds the connector for the organisation
+first (in the organisation's connector settings); after that each person opens **Connectors**, finds it in
+the list and presses **Connect** — and then does step 3 themselves.
+
+### In ChatGPT
+
+The steps below are for ChatGPT on the web, as of 30 September 2026. ChatGPT calls this **Developer
+mode**, and it may only be offered on some plans; a Business or Enterprise workspace may need an
+administrator to switch it on for you. ChatGPT moves these menus more often than most — if a name below is
+not on your screen, look for **Developer mode** and for the button that creates a new connector or app.
+
+1. In **Settings**, turn on **Developer mode** (it has been under **Security and login**, and before that
+   under **Connectors** → **Advanced**).
+2. In the connectors (or apps) settings, press the button that creates a new one — **Create** or the plus
+   button — paste the address above, give it a name, and choose sign-in by **OAuth** if you are asked.
+3. A Gisik Nokma page opens. Sign in if it asks you to, check the name and the website address shown, and
+   press **Allow**.
+
+The new connector appears among ChatGPT's developer-mode tools; turn it on for a conversation from the
+message box.
+
+### What the Allow page shows
+
+The page says which assistant is asking, and always shows the **website address** it will send you back to
+beside that name — for Claude that is `claude.ai`, for ChatGPT it is `chatgpt.com`. An assistant's name is
+whatever it calls itself, so the address is the part to trust: if you were not just adding a connector and
+the address is not one you recognise, press **Deny**. **Deny** sends you back with a refusal and nothing is
+connected.
+
+If you press **Allow** twice, the second answer is refused with a plain message that the request has already
+been answered. If you reload the page after answering, it says the connection request has expired. Either way
+nothing extra is connected. Start again from the assistant.
+
+### Seeing what is connected, and disconnecting
+
+**Account** → "Connected assistants" lists everything connected as you: the assistant's name and the
+website address it came from, when it was connected and when it was last used. Press **Disconnect** on a
+row and that assistant loses access at once — its next request is refused.
+
+The same list also shows anything you approved from a computer with the older, installed way of connecting
+an assistant. Each has its own **Revoke** or **Disconnect** button.
+
+Removing the connector inside Claude or ChatGPT stops that app asking; **Disconnect** here is the one that
+cuts the access off from our side, so use it if you are not sure.
+
+### If the assistant asks you to reconnect
+
+Sometimes Claude or ChatGPT says the connector needs to be reconnected, or shows a **Connect** or **Sign
+in** button beside it. That means its permission has ended — because you pressed **Disconnect**, or because
+it has gone about three months without being used. Nothing is lost. Press the button and go through the
+**Allow** page again; it is the same as the first time.
+
+Day to day you never see any of this: the permission renews itself every time the assistant is used.

@@ -1,4 +1,3 @@
-import { Button } from '@gisik-nokma/ui';
 import { WORKFLOW_TEMPLATES, type WorkflowTemplate } from '../templates.js';
 
 /** Cloning is the caller's job (draftFromTemplate / newDraft) — the gallery only picks. */
@@ -9,30 +8,36 @@ export function TemplateGallery(props: { onPick(template: WorkflowTemplate | nul
       <ul className="template-gallery__cards">
         {WORKFLOW_TEMPLATES.map((template) => (
           <li className="template-gallery__card" key={template.id}>
-            <h3 className="template-gallery__name">{template.name}</h3>
-            <p className="template-gallery__tagline">{template.tagline}</p>
-            {/* E4-10 — the shared `Button`, not a bare `<button>`. These four
-                carried NO `className` at all, so nothing in the product's three
-                stylesheets matched them and they painted as raw user-agent
-                chrome: measured 143x29 x3 and 95x29, flagged by the UA-chrome
-                detector (`borderTopStyle === 'outset'` or the UA's
-                `rgb(239,239,239)` fill) on the route. Round 1's P1 population
-                was "each static `className` literal on a `<button|input|…>`",
-                so a CLASS-LESS button was outside it by construction — which
-                is why this is its own finding rather than a P1 member. The
-                sibling comment at `workflow-builder-screen.tsx:42` states the
-                rule this file now follows: *"The shared `Button`, not a bare
-                `<button>`"* (`fill-tertiary` + `text-accent` + 600, no border). */}
-            <Button
-              aria-label={`Use this template — ${template.name}`}
+            {/* Touch-doors (owner, 2026-09-30): the WHOLE card is the one control that starts from
+                this template — a P-LIFT door like the workspace home's cards, not a ghost button
+                inside a card. N primary buttons would break rule 01 (one loud element), and four
+                ghosts left the page with no affordance but a small text button; the raised card is
+                the affordance. Phrasing-only content inside the `<button>` (spans, not the `<h3>`
+                and `<p>` this card used to have), so the markup stays valid; the visible name is
+                inside the accessible name (label-in-name). */}
+            <button
+              type="button"
+              className="template-gallery__door"
+              aria-label={`Use the ${template.name} template`}
               onClick={() => props.onPick(template)}
             >
-              Use this template
-            </Button>
+              <span className="template-gallery__name">{template.name}</span>
+              <span className="template-gallery__tagline">{template.tagline}</span>
+            </button>
           </li>
         ))}
-        <li className="template-gallery__card template-gallery__card--blank">
-          <Button onClick={() => props.onPick(null)}>Start blank</Button>
+        {/* Start blank is the FOURTH door (owner, 2026-09-30) — the same door, not a ghost pill
+            beside three cards. The visible name is inside the accessible name (label-in-name). */}
+        <li className="template-gallery__card">
+          <button
+            type="button"
+            className="template-gallery__door"
+            aria-label="Start from a blank workflow"
+            onClick={() => props.onPick(null)}
+          >
+            <span className="template-gallery__name">Start from a blank workflow</span>
+            <span className="template-gallery__tagline">An empty canvas with one starting stage.</span>
+          </button>
         </li>
       </ul>
     </section>

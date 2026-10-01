@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ctl rebuild — pull --ff-only in the primary checkout, rebuild server+web, verify the running artifact.
+# ctl rebuild — pull --ff-only in the primary checkout, rebuild server+web, verify the running artifact, then prune the build cache and unused images >24h.
 set -u
 . "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 ctl_parse_common "$@" || true
@@ -25,7 +25,7 @@ esac
 [ -z "$(/usr/bin/git status --porcelain)" ] || ctl_fail rebuild "primary checkout is dirty"
 [ -f .env ] || ctl_fail rebuild "no .env in the primary checkout (sign-in would silently switch off)"
 ctl_node22 || exit 1
-if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: git pull --ff-only origin $branch; pnpm dev:stack:rebuild; verify"; ctl_ok rebuild "dry-run on $branch"; fi
+if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: git pull --ff-only origin $branch; pnpm dev:stack:rebuild; verify"; ctl_prune; ctl_ok rebuild "dry-run on $branch"; fi
 /usr/bin/git pull -q --ff-only origin "$branch" || ctl_fail rebuild "pull --ff-only origin $branch failed"
 sha="$(/usr/bin/git rev-parse --short=12 HEAD)"; start="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; log="$(ctl_log rebuild)"
 pnpm dev:stack:rebuild > "$log" 2>&1 || ctl_fail rebuild "dev:stack:rebuild rc=$? (log $log)"
@@ -44,4 +44,8 @@ gid="$(docker exec gisik-nokma-dev-server-1 sh -c 'printf %s "$GOOGLE_CLIENT_ID"
 # is (a) HEAD was $branch $sha when the build started and (b) each image's .Created is newer than that start
 # -- together enough to exclude the stale-serving case, not enough to identify the tree from the outside.
 # Baking the sha as a build arg would close that, and is not done here.
-ctl_ok rebuild "$branch $sha images fresh, server healthy, /healthz 200 on :$sp, web :$wp $wc, sign-in configured (log $log)"
+# FINAL STEP, after the stack is proven good (a failed prune must not mask a good build, nor a bad build be
+# pruned over): prune the build cache and unused images older than 24 h -- ctl_prune in lib.sh, which never
+# names a volume. Its output goes to the log; a failure is reported in the OK line, not turned into FAIL.
+if ctl_prune >> "$log" 2>&1; then pr="pruned build cache + unused images >24h"; else pr="PRUNE FAILED (see log)"; fi
+ctl_ok rebuild "$branch $sha images fresh, server healthy, /healthz 200 on :$sp, web :$wp $wc, sign-in configured, $pr, $(ctl_disk_line) (log $log)"

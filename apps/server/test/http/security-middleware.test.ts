@@ -69,6 +69,8 @@ function build(security?: SecurityOptions): { app: FastifyInstance; recorder: Re
       serverAppend: async () => [],
       webOrigin: WEB_ORIGIN,
       store: createObjectStoreFromEnv({}),
+      // The hosted MCP door ON, so its routes exist to be measured (14.227).
+      mcpPublicUrl: 'https://api.test',
     },
     security === undefined ? {} : { security },
   );
@@ -233,6 +235,15 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     // precisely what that guard is for. A cookie-authenticated POST that mints
     // a credential, so it belongs to the same category as the invite MINT.
     ['the MCP device APPROVAL', '/v1/mcp/device/approve', '/v1/mcp/device/approve', 'POST'],
+    // Remote-MCP plan Task 3 (case 14.227): the hosted door's consent DECISION — a
+    // cookie POST that mints an authorization code. Needs the hosted door ON in
+    // `build()` (`mcpPublicUrl`), otherwise the route does not exist to be tested.
+    // Remote-MCP plan Task 8 (14.272): the DELETE that disconnects a hosted assistant
+    // — the mirror of the mcp-tokens revoke above it, and just as forgeable.
+    ['the MCP connection DISCONNECT', '/v1/me/mcp-connections/conn_x', '/v1/me/mcp-connections/:id', 'DELETE'],
+    // Devices plan Task 3 (6.311-6.320): signing another of the caller's devices out, a cookie POST that destroys sessions.
+    ['the DEVICE sign-out', '/v1/me/devices/key_x/sign-out', '/v1/me/devices/:key/sign-out', 'POST'],
+    ['the MCP OAuth consent DECISION', '/v1/mcp/oauth/requests/req_x/decision', '/v1/mcp/oauth/requests/:requestId/decision', 'POST'],
     // Added 2026-09-19 with the DENIAL route. It needs its OWN row rather than a
     // share of approve's, because the drift guard below compares the table and
     // `HTTP_ORIGIN_PROTECTED_ROUTES` for SET EQUALITY in both directions — so
@@ -347,6 +358,7 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
         serverAppend: async () => [],
         webOrigin: WEB_ORIGIN,
         store: createObjectStoreFromEnv({}),
+        mcpPublicUrl: 'https://api.test',
       },
       {
         security: HTTP_ORIGIN_ON,
@@ -398,6 +410,20 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       // there is no ambient credential to forge (`routes/mcp-device.ts`).
       '/v1/mcp/device/code',
       '/v1/mcp/device/token',
+      // The hosted MCP door's OAuth endpoints (remote-MCP plan Tasks 2 and 5): none
+      // reads a cookie session, so there is no ambient credential to forge. They
+      // take a client's own body — a public-client registration, a code + PKCE
+      // verifier, a refresh token, a token to revoke — and are charged to the MCP
+      // rate-limit bucket instead.
+      '/oauth/register',
+      '/oauth/token',
+      '/oauth/revoke',
+      // The hosted MCP endpoint (remote-MCP plan Task 7): bearer-authenticated ONLY —
+      // it never reads a cookie session, so there is no ambient credential to forge.
+      // It carries its OWN Origin allow-list (claude.ai, chatgpt.com, the web origin;
+      // case 14.265), because a foreign Origin there is a DNS-rebinding risk rather
+      // than a CSRF one and an ABSENT Origin must be admitted.
+      '/mcp',
       // better-auth's OWN CSRF middleware, not this file's: `auth.ts` wires
       // `disableOriginCheck: false` and `trustedOrigins: [WEB_ORIGIN]`, which
       // is a DIFFERENT check (better-auth's `api/middlewares/origin-check.mjs`)

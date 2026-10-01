@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@gisik-nokma/ui';
+import { formatDate } from '../provenance.js';
 import type { PasskeySummary } from './passkey-client.js';
+import { relativeTime } from './relative-time.js';
 
 export type PasskeysSectionProps = {
   passkeys: PasskeySummary[];
@@ -16,7 +18,33 @@ export type PasskeysSectionProps = {
    * `passkeys` list keeps rendering it regardless of this flag.
    */
   listFailed?: boolean;
+  /** The clock for "Last used ..."; injected so a test can fix it. Defaults to now. */
+  now?: Date;
 };
+
+/** The server's label for an authenticator it cannot name; always listed last. */
+const UNKNOWN_PROVIDER = 'Security key or other';
+
+/**
+ * Providers alphabetically, the unknown bucket last; rows inside a provider keep the server's order (oldest first). A
+ * stable, total order: the list must not reshuffle when one passkey is added or used.
+ */
+function groupByProvider(passkeys: PasskeySummary[]): Array<{ provider: string; rows: PasskeySummary[] }> {
+  const groups = new Map<string, PasskeySummary[]>();
+  for (const p of passkeys) groups.set(p.provider, [...(groups.get(p.provider) ?? []), p]);
+  return [...groups.entries()]
+    .sort(([a], [b]) =>
+      a === b ? 0 : a === UNKNOWN_PROVIDER ? 1 : b === UNKNOWN_PROVIDER ? -1 : a.localeCompare(b),
+    )
+    .map(([provider, rows]) => ({ provider, rows }));
+}
+
+/** "Last used just now" reads better than "Last used Active now": `relativeTime`'s sentence is about a device. */
+function lastUsedText(iso: string | null, now: Date): string {
+  if (iso === null) return 'Never used';
+  const when = relativeTime(iso, now);
+  return `Last used ${when === 'Active now' ? 'just now' : when}`;
+}
 
 /**
  * The `/account` "Sign-in and devices" section, Passkeys half — the sibling
@@ -97,8 +125,10 @@ export function PasskeysSection({
   onRemove,
   error = null,
   listFailed = false,
+  now,
 }: PasskeysSectionProps) {
   const [name, setName] = useState('');
+  const clock = now ?? new Date();
 
   return (
     <section className="gn-account__section gn-account__passkeys">
@@ -119,20 +149,41 @@ export function PasskeysSection({
       ) : passkeys.length === 0 ? (
         <p>You have no passkeys yet.</p>
       ) : (
-        <ul className="gn-account__passkey-list">
-          {passkeys.map((passkey) => (
-            <li key={passkey.id} className="gn-account__passkey-row">
-              <span className="gn-account__row-text">{passkey.name}</span>
-              <Button
-                variant="danger"
-                aria-label={`Delete passkey ${passkey.name}`}
-                onClick={() => onRemove(passkey.id)}
-              >
-                Delete
-              </Button>
-            </li>
-          ))}
-        </ul>
+        groupByProvider(passkeys).map(({ provider, rows }) => (
+          <div key={provider} className="gn-account__device-group">
+            <h3 className="gn-account__group-title">{`${provider} · ${rows.length}`}</h3>
+            <ul className="gn-account__passkey-list">
+              {rows.map((passkey) => {
+                const label = passkey.name ?? 'Unnamed passkey';
+                const added = formatDate(passkey.createdAt);
+                return (
+                  <li key={passkey.id} className="gn-account__passkey-row">
+                    <span className="gn-account__row-text">
+                      <span className="gn-account__device-title">{label}</span>
+                      <span className="gn-account__device-meta">
+                        <span>{`Added ${added}`}</span>
+                        <span>{lastUsedText(passkey.lastUsedAt, clock)}</span>
+                      </span>
+                    </span>
+                    {passkey.notUsedRecently ? (
+                      <span className="gn-account__passkey-stale">Not used recently</span>
+                    ) : null}
+                    <Button
+                      variant="danger"
+                      // An unnamed passkey carries its added date so two of them are still told apart by name.
+                      aria-label={
+                        passkey.name === null ? `Delete passkey ${label} added ${added}` : `Delete passkey ${label}`
+                      }
+                      onClick={() => onRemove(passkey.id)}
+                    >
+                      Delete
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))
       )}
       <label className="gn-field">
         <span className="gn-field__label">Passkey name</span>
@@ -143,8 +194,8 @@ export function PasskeysSection({
           className="gn-field__input"
         />
       </label>
+      {/* Quiet, not primary: Save name is the Account page's one loud element (styling refresh Plan B, B17). */}
       <Button
-        variant="primary"
         onClick={() => {
           onAdd(name);
           // Cleared BEFORE the ceremony resolves, on purpose: `onAdd` is a

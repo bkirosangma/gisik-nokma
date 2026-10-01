@@ -12,6 +12,14 @@
  * So the ref names the READING SURFACE (the element whose text is being read)
  * and this module answers the two questions the ports ask of it, for either
  * kind of host.
+ *
+ * The answer can CHANGE while a page is open: the note page scrolls the window
+ * at and below 60rem and its document column above it, so resizing across the
+ * breakpoint (or rotating a tablet) moves the scroller. Both readers therefore
+ * re-ask on every window `resize` and rebind only when the answer differs
+ * (`sameScroller`). It is `findScroller`, not a `matchMedia` literal, because
+ * this package is shared with the ticket sheet and the desktop app and the
+ * 60rem is the web app's own breakpoint.
  */
 
 export type Scroller = { kind: 'element'; element: HTMLElement } | { kind: 'window' };
@@ -32,6 +40,11 @@ export function findScroller(surface: HTMLElement): Scroller {
     }
   }
   return { kind: 'window' };
+}
+
+/** Whether two answers of `findScroller` name the same scroller. */
+export function sameScroller(a: Scroller, b: Scroller): boolean {
+  return a.kind === 'window' ? b.kind === 'window' : b.kind === 'element' && a.element === b.element;
 }
 
 /** The node whose `scroll` event fires for `scroller`. */

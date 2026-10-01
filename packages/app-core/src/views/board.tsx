@@ -1,8 +1,11 @@
 import {
+  useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type MutableRefObject,
   type ReactNode,
@@ -27,13 +30,37 @@ import type {
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { arrowTargets } from './board-arrows.js';
+import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
+import {
+  EMPTY_SESSION,
+  MoveStateContext,
+  applyPendingMoves,
+  landingIndex,
+  useMoveState,
+  type FlightRect,
+  type MoveState,
+} from './board-move-state.js';
+import {
+  FLIGHT_MAX_AGE_MS,
+  SPRING_DELAY_MS,
+  createEdgeScroller,
+  isOffscreen,
+  prefersReducedMotion,
+} from './board-motion.js';
 import {
   NO_COLLAPSE_CHOICES,
   readWorkflowCollapse,
   rememberWorkflowCollapse,
   type WorkflowCollapseChoices,
 } from '../preferences/workflow-collapse.js';
+import {
+  NO_COLUMN_CHOICES,
+  columnCollapseKey,
+  readColumnCollapse,
+  rememberColumnCollapse,
+  type ColumnCollapseChoices,
+} from '../preferences/column-collapse.js';
 import { BulkCloseDialog, type BulkCloseTicket } from './bulk-close-dialog.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
@@ -361,6 +388,17 @@ export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column — epics appe
 export const DRAG_TICKET_FORMAT = 'text/plain';
 
 /**
+ * A second, card-only `dataTransfer` type (styling refresh Plan A Task 5A).
+ * `DRAG_TICKET_FORMAT` is `'text/plain'`, and any text selection dragged across
+ * the page carries `text/plain` too. During `dragenter` a page can read a
+ * drag's `types` but not its data, so the column highlight cannot ask "is this
+ * a ticket id?" — it keys on this marker instead, which `dragstart` sets with
+ * an empty value. The drop still reads the ticket id from
+ * `DRAG_TICKET_FORMAT`, exactly as before.
+ */
+export const DRAG_CARD_MARKER = 'application/x-gisik-card';
+
+/**
  * Ticket id → the exact `attemptMove` closure that card's own `MoveArrows`
  * instance built for its `‹ ›` buttons (board-prototype-port Task 14).
  *
@@ -394,7 +432,7 @@ export const DRAG_TICKET_FORMAT = 'text/plain';
  * to in that case, so this is the one outcome this feature does not
  * narrate; it is inert rather than wrong.
  */
-type MoveRegistry = Map<string, (toStateId: string) => void>;
+type MoveRegistry = Map<string, (toStateId: string, from?: FlightRect) => void>;
 
 /**
  * Does this workflow group hold a ticket anywhere?
@@ -446,7 +484,7 @@ const useHydrationLayoutEffect = typeof document === 'undefined' ? useEffect : u
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today, currentUserId }: BoardProps) {
+export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today, currentUserId }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -458,6 +496,24 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    * reaches — the same shape `moves` itself is on that path.
    */
   const moveRegistryRef = useRef<MoveRegistry>(new Map());
+
+  /**
+   * THE OPTIMISTIC LAYER (owner, 2026-10-01: *"assume it is already a success and show the card to move to
+   * the new column, if it fails for some reason, move it back"*). `realBoard` is what the read says;
+   * `board` is what is drawn: the same view with every in-flight move already laid over it
+   * (`applyPendingMoves`, pure). The overlay is view state only — nothing is written to the live query — and
+   * `useMoveState` retires an entry only when `realBoard` shows the card in its target (or the write failed),
+   * so a refetch that is merely stale can never flash a card back to its source. The move lifecycle (dialog,
+   * refusal, latch) is held there too, because the card that started it is unmounted and remounted in the
+   * target column. `board` shadows the read everywhere below; `realBoard` is named only where the DATA is
+   * meant (the auto-expand rule).
+   */
+  const move = useMoveState(realBoard);
+  const board = useMemo(() => applyPendingMoves(realBoard, move.pending), [realBoard, move.pending]);
+  /** Edge auto-scroll for a live drag (`board-motion.ts`): begun on a card's `dragstart`, ended by the drop, the dragend or unmount. */
+  const scrollerRef = useRef<ReturnType<typeof createEdgeScroller> | null>(null);
+  scrollerRef.current ??= createEdgeScroller();
+  useEffect(() => () => scrollerRef.current?.end(), []);
 
   /**
    * What the LAST run of the auto-expand effect saw, per group: `true` where the
@@ -519,6 +575,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    * for the Rule of Hooks reason `moveRegistryRef`'s own docblock gives.
    */
   const [groupChoices, setGroupChoices] = useState<WorkflowCollapseChoices>(NO_COLLAPSE_CHOICES);
+  /**
+   * The COLUMNS a person collapsed to a strip (styling refresh Plan A Task 5B;
+   * owner ruling 2026-09-29, "all columns are collapsible"), keyed by
+   * `columnCollapseKey(workflowId, stateId)`. Choices only, like `groupChoices`
+   * and for the same reason, and a separate memory: collapsing every column
+   * never collapses the group, and collapsing the group never touches these.
+   * There is no default rule here — an absent key is an expanded column.
+   */
+  const [columnChoices, setColumnChoices] = useState<ColumnCollapseChoices>(NO_COLUMN_CHOICES);
 
   /**
    * Reads the memory ONCE per project, and the two choices here are both about
@@ -545,7 +610,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    */
   useHydrationLayoutEffect(() => {
     setGroupChoices(readWorkflowCollapse(currentUserId ?? '', board.projectId));
+    setColumnChoices(readColumnCollapse(currentUserId ?? '', board.projectId));
   }, [currentUserId, board.projectId]);
+
+  /** Records the person's choice for ONE column (`expanded` is the state they asked for) and writes it through. */
+  const toggleColumn = (workflowId: string, stateId: string, expanded: boolean): void => {
+    const next = { ...columnChoices, [columnCollapseKey(workflowId, stateId)]: expanded };
+    setColumnChoices(next);
+    rememberColumnCollapse(currentUserId ?? '', board.projectId, next);
+  };
 
   /**
    * Is this group collapsed BY ITS DEFAULT — i.e. by the owner's rule and not by
@@ -628,7 +701,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
     const next = new Map<string, boolean>();
     let adopted: WorkflowCollapseChoices | null = null;
 
-    for (const group of board.groups) {
+    for (const group of realBoard.groups) {
       const key = groupKey(group);
       const wasCollapsedByDefault = previous.get(key) === true;
       next.set(key, defaultCollapsed(group));
@@ -648,7 +721,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
     // `groupChoices` is a dependency and not a stale capture: the adopt branch
     // reads it, and the effect must see the version the render it ran under saw.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board, groupChoices, currentUserId]);
+  }, [realBoard, groupChoices, currentUserId]);
 
   /**
    * Opens the dialog on ONE column's cards, in the column's own render order —
@@ -847,7 +920,13 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
     return <div className="gn-board gn-board--empty">{emptyBanner}</div>;
   }
   return (
-    <div className="gn-board">
+    <MoveStateContext.Provider value={move}>
+    <div
+      className="gn-board"
+      onDragStart={(event) => {
+        if (isCardDrag(event)) scrollerRef.current?.begin();
+      }}
+    >
       {emptyBanner}
       {board.groups.map((group) => {
         const key = groupKey(group);
@@ -870,6 +949,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             group={group}
             expanded={expanded}
             onToggleWorkflow={() => toggleGroup(group)}
+            columnChoices={columnChoices}
+            onToggleColumn={toggleColumn}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             moves={moves}
@@ -883,10 +964,13 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             group={group}
             expanded={expanded}
             onToggleWorkflow={() => toggleGroup(group)}
+            columnChoices={columnChoices}
+            onToggleColumn={toggleColumn}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             arrows={null}
             onDropCard={null}
+            canDropOn={null}
             bulkCloseFor={null}
             today={today}
           />
@@ -916,6 +1000,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
         />
       ) : null}
     </div>
+    </MoveStateContext.Provider>
   );
 }
 
@@ -925,31 +1010,57 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
  * the plain read-only board and `BoardGroupWithMoves` below. `arrows` is the
  * ONLY axis of difference between the two paths: precomputed by the caller
  * as `(card, fromStateId) => ReactNode`, or `null` when no move capability
- * is wired, so this component itself stays hook-free and renders identically
- * either way except for what `arrows` hands back per card.
+ * is wired, so it renders identically either way except for what `arrows` hands
+ * back per card. (It holds one piece of view state, the column being dragged
+ * over — Task 5A — which is inert without `onDropCard`.)
  */
+/** True when a drag carries a board card (the marker `dragstart` sets), not merely `text/plain`. */
+/**
+ * The card being dragged, as its OWN workflow group knows it (board drag fixes
+ * D2, owner 2026-09-30). During `dragover`/`dragenter` a browser hides a drag's
+ * DATA and shows only its `types`, so a target column cannot ask which card is
+ * over it, or how tall — the source slot tells the group at `dragstart`, and the
+ * group clears it on `drop` and `dragend`. `height` is measured BEFORE the source
+ * turns into a placeholder, so the target's placeholder is the card's own size.
+ */
+type BoardDrag = { ticketId: string; fromStateId: string; height: number };
+
+function isCardDrag(event: DragEvent<HTMLElement>): boolean {
+  return Array.from(event.dataTransfer.types ?? []).includes(DRAG_CARD_MARKER);
+}
+
 function BoardGroupSection({
   group,
   expanded,
   onToggleWorkflow,
+  columnChoices,
+  onToggleColumn,
   onOpenTicket,
   onCreateTicket,
   arrows,
   onDropCard,
+  canDropOn,
   bulkCloseFor,
   today,
 }: {
   group: BoardGroup;
   /**
    * Whether this group's columns are on screen. OWNED BY `Board` and threaded
-   * through unchanged — this component stays hook-free (`BoardGroupSection`
-   * vs. `BoardGroupWithMoves`'s own docblock), so the state cannot live here,
-   * and it must not: the default depends on emptiness, and the two paths below
-   * would then each have to derive it.
+   * through unchanged — the state does not live here, and must not: the
+   * default depends on emptiness, and the two paths below would then each have
+   * to derive it.
    */
   expanded: boolean;
   /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
   onToggleWorkflow: () => void;
+  /**
+   * The person's COLUMN choices (Task 5B), owned by `Board` for the reason
+   * `expanded` is: one memory, and both render paths must agree. `false` under
+   * `columnCollapseKey(workflowId, stateId)` is a column collapsed to a strip.
+   */
+  columnChoices: ColumnCollapseChoices;
+  /** `expanded` is the state the person asked for. `Board`'s `toggleColumn` records and remembers it. */
+  onToggleColumn: (workflowId: string, stateId: string, expanded: boolean) => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
@@ -957,12 +1068,20 @@ function BoardGroupSection({
    * Board-prototype-port Task 14. `null` on the plain, `moves`-less path —
    * the SAME "capability absent, not a dead stub" precedent `arrows` itself
    * already sets immediately above. Non-null, a column becomes a real drop
-   * target: `BoardGroupSection` itself stays hook-free (`BoardGroupSection`
-   * vs. `BoardGroupWithMoves`'s own docblock) and knows nothing about
+   * target: `BoardGroupSection` knows nothing about
    * `moveOutcome` or the registry — it only has somewhere to hand the event
    * and a `toStateId`, mirroring exactly how it already treats `arrows`.
    */
   onDropCard: ((event: DragEvent<HTMLElement>, toStateId: string) => void) | null;
+  /**
+   * Whether a card in `fromStateId` may move to `toStateId` at all (board drag
+   * fixes D2) — `moveOutcome`'s own availability, the decision the arrows use,
+   * handed over as a question so this component still knows nothing about
+   * workflows. `null` where `onDropCard` is (no workflow definition yet, or no
+   * move capability): a column then cannot tell a legal target from an illegal
+   * one and draws neither a placeholder nor a refusal.
+   */
+  canDropOn: ((fromStateId: string, toStateId: string) => boolean) | null;
   /**
    * The column-level bulk close (spec §8.3's Board bullet, second wave Task
    * 10). `null` on the plain, `moves`-less path — the SAME "capability absent,
@@ -979,6 +1098,117 @@ function BoardGroupSection({
   /** `Board`'s own `today`, threaded through unchanged — see its prop docblock. */
   today?: string;
 }) {
+  /**
+   * The column being dragged over (Task 5A) — OUTLINED, and (board drag fixes
+   * D2, owner 2026-09-30, superseding plan D25's "outline only": the landing slot
+   * is knowable, see `landingIndex`) a LEGAL target also holds a same-size
+   * placeholder at that slot, while an illegal one draws the "can't drop here"
+   * state instead. `dragleave` fires whenever the pointer moves onto a child, so
+   * entering is counted per column and all of it clears only when the count
+   * returns to zero.
+   */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const depthRef = useRef(new Map<string, number>());
+  /** The card being dragged from THIS group, or `null` (another group's drag shows nothing here). */
+  const [drag, setDrag] = useState<BoardDrag | null>(null);
+  /** What a column is to the drag over it: its own column, a legal target, an illegal one, or unknown. */
+  const verdictOf = (stateId: string): 'own' | 'legal' | 'refused' | 'unknown' =>
+    drag === null || canDropOn === null
+      ? 'unknown'
+      : drag.fromStateId === stateId
+        ? 'own'
+        : canDropOn(drag.fromStateId, stateId)
+          ? 'legal'
+          : 'refused';
+  /**
+   * Focus follows a column toggle (Task 5B): the control that was pressed
+   * unmounts with its branch, so focus would fall to `<body>`. The handler
+   * records where it should land; the layout effect below moves it after the
+   * branch has swapped.
+   */
+  const pendingFocusRef = useRef<{
+    stateId: string;
+    target: 'strip' | 'collapse';
+    /** Where the page and the rail were BEFORE the toggle (board drag fixes D3). */
+    scrollX: number;
+    scrollY: number;
+    railLeft: number;
+  } | null>(null);
+  const railRef = useRef<HTMLDivElement | null>(null);
+  useHydrationLayoutEffect(() => {
+    const pending = pendingFocusRef.current;
+    if (pending === null) return;
+    pendingFocusRef.current = null;
+    const section = [...(railRef.current?.querySelectorAll('section') ?? [])].find(
+      (candidate) => candidate.getAttribute('data-testid') === `board-column-${pending.stateId}`,
+    );
+    const control = section?.querySelector(
+      pending.target === 'strip' ? '.gn-board__column-strip' : '.gn-board__column-collapse',
+    );
+    // `preventScroll`: a bare `focus()` scrolls the new control into view, and a strip
+    // stretches to the rail's height — so collapsing a column scrolled the page (owner, 2026-09-30).
+    if (control instanceof HTMLElement) control.focus({ preventScroll: true });
+    // Belt and braces: the swap itself can shift the layout under the page. Put back what moved
+    // (and only what moved — a page nothing touched is not scrolled at all).
+    if (window.scrollY !== pending.scrollY) window.scrollTo({ left: pending.scrollX, top: pending.scrollY, behavior: 'instant' });
+    const rail = railRef.current;
+    if (rail !== null && rail.scrollLeft !== pending.railLeft) rail.scrollLeft = pending.railLeft;
+  });
+  const setColumnExpanded = (stateId: string, expandedNow: boolean): void => {
+    pendingFocusRef.current = {
+      stateId,
+      target: expandedNow ? 'collapse' : 'strip',
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+      railLeft: railRef.current?.scrollLeft ?? 0,
+    };
+    onToggleColumn(group.workflowId, stateId, expandedNow);
+  };
+  /**
+   * SPRING-LOADED COLUMNS (owner, 2026-10-01: *"if dragged over a collapsed column and remained for a bit,
+   * the column should temporarily open up. if the drag is moved out of the column it may be collapsed
+   * again. if it is dropped there, keep column open"*). The one column a drag has held open, or `null`.
+   * It is NOT the collapse memory: nothing is written until a card is dropped there.
+   *
+   * `armed` is the column the drag is over when that column is collapsed BY CHOICE and a drop there is
+   * legal — an illegal column shows "can't drop" as it always did and never springs. The effect re-runs only
+   * when `armed` changes, which is exactly "moved into / out of a collapsed column": it re-collapses
+   * whatever was open (`setSpringOpen(null)`), and starts a fresh `SPRING_DELAY_MS` wait for the new one. A
+   * leave before the wait is over clears the timer in the cleanup, so nothing opens.
+   */
+  const armed =
+    dropTarget !== null &&
+    columnChoices[columnCollapseKey(group.workflowId, dropTarget)] === false &&
+    verdictOf(dropTarget) === 'legal'
+      ? dropTarget
+      : null;
+  // Clearing `dropTarget` (leave, drop, Esc, dragend) is what puts a sprung column back: `armed` goes null and this
+  // effect's first line closes whatever was open. Nothing else needs to reach `setSpringOpen`.
+  const [springOpen, setSpringOpen] = useState<string | null>(null);
+  useEffect(() => {
+    setSpringOpen(null);
+    if (armed === null) return;
+    const timer = setTimeout(() => setSpringOpen(armed), SPRING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [armed]);
+  // A drag that ends without reaching this rail's own `onDragEnd` — Esc in ANOTHER workflow group, or a
+  // drop whose source card unmounted optimistically (so its `dragend` fires on a detached node) — still
+  // has to put the springs and the outline away.
+  useEffect(() => {
+    if (dropTarget === null && springOpen === null && drag === null) return;
+    const clear = (): void => {
+      depthRef.current.clear();
+      setDropTarget(null);
+      setDrag(null);
+    };
+    document.addEventListener('dragend', clear);
+    document.addEventListener('drop', clear);
+    return () => {
+      document.removeEventListener('dragend', clear);
+      document.removeEventListener('drop', clear);
+    };
+  }, [dropTarget, springOpen, drag]);
+
   /**
    * The rail's id, which the heading's button points at with `aria-controls`.
    * Built from the group's own identity rather than from an index, so a
@@ -1054,15 +1284,63 @@ function BoardGroupSection({
         the columns, their per-column empty copy and their `Add a ticket` with
         it (`13.1409`).
       */}
-      <div className="gn-board__rail" id={railId} hidden={!expanded}>
-        {group.columns.map((column) => (
+      <div
+        className="gn-board__rail"
+        id={railId}
+        ref={railRef}
+        hidden={!expanded}
+        // A card's `dragend` bubbles here from its slot: that covers Esc and a
+        // drop outside every column, neither of which fires `drop`.
+        onDragEnd={() => {
+          depthRef.current.clear();
+          setDropTarget(null);
+          setDrag(null);
+        }}
+      >
+        {group.columns.map((column) => {
+          // No `column.category` test: every column collapses (plan D27, resolved).
+          const collapsed =
+            columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false && springOpen !== column.stateId;
+          const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
+          const over = column.stateId === dropTarget;
+          const verdict = over ? verdictOf(column.stateId) : 'unknown';
+          // A placeholder only in a list that exists (a strip has none) and only for a legal move.
+          const slotAt = over && verdict === 'legal' && !collapsed && drag !== null ? landingIndex(column.cards, drag.ticketId) : null;
+          const cardSlots = column.cards.map((card) => (
+            <BoardCardSlot
+              key={card.ticketId}
+              card={card}
+              stateName={column.name}
+              onOpen={() => onOpenTicket(card.ticketId)}
+              onOpenTicket={onOpenTicket}
+              arrows={arrows === null ? null : arrows(card, column.stateId)}
+              onDragBegin={(height) => setDrag({ ticketId: card.ticketId, fromStateId: column.stateId, height })}
+              today={today}
+            />
+          ));
+          if (slotAt !== null && drag !== null) {
+            cardSlots.splice(
+              slotAt,
+              0,
+              <li
+                key="drop-placeholder"
+                className="gn-board__drop-placeholder"
+                data-testid={`board-drop-placeholder-${column.stateId}`}
+                aria-hidden="true"
+                style={{ height: `${drag.height}px` }}
+              />,
+            );
+          }
+          return (
           <section
             key={column.stateId}
             role="region"
             aria-label={column.name}
             data-testid={`board-column-${column.stateId}`}
             className={
-              column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column'
+              (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
+              (collapsed ? ' gn-board__column--collapsed' : '') +
+              (over ? (verdict === 'refused' ? ' gn-board__column--drop-refused' : ' gn-board__column--drop-target') : '')
             }
             /*
              * Board-prototype-port Task 14. `preventDefault()` on
@@ -1072,9 +1350,80 @@ function BoardGroupSection({
              * wired when `onDropCard` is non-null, the same gate `onDrop`
              * itself uses immediately below.
              */
-            onDragOver={onDropCard === null ? undefined : (event) => event.preventDefault()}
-            onDrop={onDropCard === null ? undefined : (event) => onDropCard(event, column.stateId)}
+            onDragOver={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    event.preventDefault();
+                    // An illegal target: the cursor says no (a browser may then cancel the drop, so the
+                    // refusal is still reachable through the arrows — `handleDrop` refuses if one does fire).
+                    if (verdictOf(column.stateId) === 'refused') event.dataTransfer.dropEffect = 'none';
+                  }
+            }
+            onDragEnter={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    if (!isCardDrag(event)) return;
+                    depthRef.current.set(column.stateId, (depthRef.current.get(column.stateId) ?? 0) + 1);
+                    setDropTarget(column.stateId);
+                  }
+            }
+            onDragLeave={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    if (!isCardDrag(event)) return;
+                    const depth = (depthRef.current.get(column.stateId) ?? 0) - 1;
+                    // Where the pointer went, when the browser says: a target OUTSIDE this column is a real
+                    // leave whatever the count holds. The count drifts when a column opens under the pointer
+                    // (the strip button it was over is removed without a `dragleave`), and this is what
+                    // stops such a column staying "over" — and open — after the drag has gone.
+                    const next = event.relatedTarget;
+                    const leftForGood = next instanceof Node && !event.currentTarget.contains(next);
+                    if (depth > 0 && !leftForGood) {
+                      depthRef.current.set(column.stateId, depth);
+                      return;
+                    }
+                    depthRef.current.delete(column.stateId);
+                    setDropTarget((current) => (current === column.stateId ? null : current));
+                  }
+            }
+            onDrop={
+              onDropCard === null
+                ? undefined
+                : (event) => {
+                    depthRef.current.delete(column.stateId);
+                    setDropTarget(null);
+                    setDrag(null);
+                    // Dropped on a column the drag itself held open: keep it open, and remember that (Task 5B's
+                    // store, through `onToggleColumn` and not `setColumnExpanded` — the latter queues a focus and a
+                    // scroll restore that would fight the landing slot's own scroll into view).
+                    if (springOpen === column.stateId) onToggleColumn(group.workflowId, column.stateId, true);
+                    setSpringOpen(null);
+                    onDropCard(event, column.stateId);
+                  }
+            }
           >
+            {collapsed ? (
+              /* THE STRIP (Task 5B): the same section, still a drop target, holding one
+                 control. The name is `aria-hidden` because the button's own name already
+                 says it; there is no `aria-controls`, since the list it would control is
+                 not rendered. */
+              <button
+                type="button"
+                className="gn-board__column-strip"
+                aria-expanded="false"
+                aria-label={`Expand ${column.name}, ${column.cards.length} ${column.cards.length === 1 ? 'ticket' : 'tickets'}`}
+                onClick={() => setColumnExpanded(column.stateId, true)}
+              >
+                <span className="gn-board__count">{column.cards.length}</span>
+                <span className="gn-board__column-strip-name" aria-hidden="true">
+                  {column.name}
+                </span>
+              </button>
+            ) : (
+              <>
             <header className="gn-board__column-header">
               <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
@@ -1114,19 +1463,21 @@ function BoardGroupSection({
                   Close all ({column.cards.length})
                 </button>
               ) : null}
+              <button
+                type="button"
+                className="gn-board__column-collapse"
+                aria-expanded="true"
+                aria-controls={cardsId}
+                aria-label={`Collapse ${column.name}`}
+                onClick={() => setColumnExpanded(column.stateId, false)}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M14.5 6.5 9 12l5.5 5.5" />
+                </svg>
+              </button>
             </header>
-            <ul className="gn-board__cards">
-              {column.cards.map((card) => (
-                <BoardCardSlot
-                  key={card.ticketId}
-                  card={card}
-                  stateName={column.name}
-                  onOpen={() => onOpenTicket(card.ticketId)}
-                  onOpenTicket={onOpenTicket}
-                  arrows={arrows === null ? null : arrows(card, column.stateId)}
-                  today={today}
-                />
-              ))}
+            <ul className="gn-board__cards" id={cardsId}>
+              {cardSlots}
             </ul>
             {/*
              * The PER-COLUMN empty state (board-prototype-port Task 7,
@@ -1200,8 +1551,11 @@ function BoardGroupSection({
                 ) : null}
               </div>
             ) : null}
+              </>
+            )}
           </section>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -1228,6 +1582,8 @@ function BoardGroupWithMoves({
   group,
   expanded,
   onToggleWorkflow,
+  columnChoices,
+  onToggleColumn,
   onOpenTicket,
   onCreateTicket,
   moves,
@@ -1249,6 +1605,9 @@ function BoardGroupWithMoves({
   expanded: boolean;
   /** See the prop of the same name on `BoardGroupSection`. */
   onToggleWorkflow: () => void;
+  /** See the props of the same names on `BoardGroupSection` — forwarded for the reason `expanded` is. */
+  columnChoices: ColumnCollapseChoices;
+  onToggleColumn: (workflowId: string, stateId: string, expanded: boolean) => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   moves: BoardMoveCapability;
@@ -1259,6 +1618,7 @@ function BoardGroupWithMoves({
   /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
   today?: string;
 }) {
+  const moveState = useContext(MoveStateContext);
   const workflowKey = `${group.workflowId}@${group.workflowVersion}`;
   const workflow = useLiveQuery(moves.dataSource, moves.workspaceId, workflowKey, () =>
     moves.dataSource.query.getWorkflowDef(moves.workspaceId, group.workflowId, group.workflowVersion),
@@ -1279,7 +1639,7 @@ function BoardGroupWithMoves({
    * effect's cleanup after a newer effect's setup for the same ticket id —
    * StrictMode's synthetic double-invoke is exactly this shape.
    */
-  const registerAttempt = (ticketId: string, attempt: (toStateId: string) => void): (() => void) => {
+  const registerAttempt = (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void): (() => void) => {
     moveRegistry.current.set(ticketId, attempt);
     return () => {
       if (moveRegistry.current.get(ticketId) === attempt) {
@@ -1305,8 +1665,23 @@ function BoardGroupWithMoves({
       : (event: DragEvent<HTMLElement>, toStateId: string) => {
           event.preventDefault();
           const ticketId = event.dataTransfer.getData(DRAG_TICKET_FORMAT);
+          // A drop on the card's OWN column is a no-op (owner, 2026-09-30): `moveOutcome` refuses a
+          // self-transition, and the refusal read "Can't move there" under a card that never moved.
+          // Read off THIS group's data, so a card of another workflow whose state merely shares the
+          // id is still a real (refused) attempt.
+          const currentStateId = group.columns.find((column) =>
+            column.cards.some((card) => card.ticketId === ticketId),
+          )?.stateId;
+          if (currentStateId === toStateId) return;
           const attempt = moveRegistry.current.get(ticketId);
-          if (attempt !== undefined) attempt(toStateId);
+          // Where the card's corner was when it was let go — the pointer at the drop, less where it grabbed
+          // the card — so the optimistic card can fly from THERE to its landing slot.
+          const grab = moveState?.grab.current;
+          const from =
+            grab?.ticketId === ticketId && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
+              ? { left: event.clientX - grab.offsetX, top: event.clientY - grab.offsetY, at: Date.now() }
+              : undefined;
+          if (attempt !== undefined) attempt(toStateId, from);
         };
 
   return (
@@ -1314,6 +1689,8 @@ function BoardGroupWithMoves({
       group={group}
       expanded={expanded}
       onToggleWorkflow={onToggleWorkflow}
+      columnChoices={columnChoices}
+      onToggleColumn={onToggleColumn}
       onOpenTicket={onOpenTicket}
       onCreateTicket={onCreateTicket}
       arrows={
@@ -1331,6 +1708,13 @@ function BoardGroupWithMoves({
             )
       }
       onDropCard={handleDrop}
+      // `moveOutcome`'s own answer, so a column and an arrow can never disagree; `{}` fields
+      // because only `refused` is asked, and refusal never reads them (they split direct from dialog).
+      canDropOn={
+        workflowDef === null
+          ? null
+          : (fromStateId, toStateId) => moveOutcome(workflowDef, fromStateId, toStateId, {}).kind !== 'refused'
+      }
       bulkCloseFor={bulkCloseFor}
       today={today}
     />
@@ -1418,6 +1802,7 @@ function BoardCardSlot({
   onOpen,
   onOpenTicket,
   arrows,
+  onDragBegin,
   today,
 }: {
   card: BoardCardData;
@@ -1433,13 +1818,115 @@ function BoardCardSlot({
    */
   onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
+  /**
+   * Tells the workflow group a drag of THIS card began, with the card's measured
+   * height (board drag fixes D2) — the one thing a target column cannot read
+   * from a `dragover`. Called before the source turns into a placeholder.
+   */
+  onDragBegin: (height: number) => void;
   /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
   today?: string;
 }) {
   const draggedRef = useRef(false);
+  // The placeholder (Task 5A): the source slot, one frame after `dragstart`.
+  const [placeholder, setPlaceholder] = useState(false);
+  const frameRef = useRef<number | null>(null);
+  const moveState = useContext(MoveStateContext);
+  const slotRef = useRef<HTMLLIElement | null>(null);
+  // Where this card flies from, when it has just been drawn in a new place (see the layout effect below).
+  const [flight, setFlight] = useState<{ dx: number; dy: number } | null>(null);
+  const phase = moveState?.pending[card.ticketId]?.phase;
+
+  // Let the board find this slot by ticket id, to measure where the card is drawn right now.
+  const slots = moveState?.slots;
+  useLayoutEffect(() => {
+    const element = slotRef.current;
+    if (slots === undefined || element === null) return;
+    slots.current.set(card.ticketId, element);
+    return () => {
+      if (slots.current.get(card.ticketId) === element) slots.current.delete(card.ticketId);
+    };
+  }, [slots, card.ticketId]);
+
+  /**
+   * A card that mounts while a FLIGHT is waiting for it has just been moved — optimistically into its target
+   * column, or back to its source after a failure. Two things, both before the browser paints: scroll it into
+   * view if it landed outside the window or the rail, and start the glide from where it was (the drop point,
+   * its old slot, or the slot it was drawn in) to where it is. The glide is a CSS animation on the motion
+   * tokens (`.gn-board__card-slot--flight`), so `prefers-reduced-motion` switches it off in the stylesheet; it
+   * is also not started here under reduced motion, and not while this card has a dialog open (a transform
+   * on an ancestor would drag the dialog's fixed scrim along with it).
+   */
+  useLayoutEffect(() => {
+    const element = slotRef.current;
+    const flights = moveState?.flights;
+    if (element === null || flights === undefined) return;
+    const from = flights.current.get(card.ticketId);
+    if (from === undefined || from.sibling === true) return;
+    flights.current.delete(card.ticketId);
+    if (Date.now() - from.at > FLIGHT_MAX_AGE_MS) return;
+    const rect = element.getBoundingClientRect();
+    const reduced = prefersReducedMotion();
+    const rail = element.closest('.gn-board__rail');
+    if (
+      typeof element.scrollIntoView === 'function' &&
+      isOffscreen(rect, { width: window.innerWidth, height: window.innerHeight }, rail?.getBoundingClientRect())
+    ) {
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+    }
+    if (reduced || moveState?.sessions[card.ticketId]?.dialog != null) return;
+    const dx = from.left - rect.left;
+    const dy = from.top - rect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    setFlight({ dx, dy });
+    // Once per mount: the flight is consumed by the card that mounts for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * A card the move SHIFTED (below the mover in its source column, or in the target column on an arrow move or a release) is already mounted: after the render that moved
+   * it, it glides from where it was drawn to where it is — the same FLIP, the same `flights` map and the same
+   * `.gn-board__card-slot--flight` class as the landing card, never a scroll. Consumed once; a stale entry, reduced
+   * motion and an open dialog (a transform would drag its fixed scrim) each mean it simply snaps.
+   */
+  const pendingMoves = moveState?.pending;
+  useLayoutEffect(() => {
+    const element = slotRef.current;
+    const flights = moveState?.flights;
+    if (element === null || flights === undefined) return;
+    const from = flights.current.get(card.ticketId);
+    if (from === undefined || from.sibling !== true) return;
+    flights.current.delete(card.ticketId);
+    if (Date.now() - from.at > FLIGHT_MAX_AGE_MS) return;
+    if (prefersReducedMotion() || moveState?.sessions[card.ticketId]?.dialog != null) return;
+    const rect = element.getBoundingClientRect();
+    const dx = from.left - rect.left;
+    const dy = from.top - rect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    setFlight({ dx, dy });
+    // Keyed on the overlay: the render that moves a sibling is always one that changed it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMoves]);
+
+  const slotClass = [
+    'gn-board__card-slot',
+    placeholder ? 'gn-board__card-slot--placeholder' : '',
+    phase === 'awaiting' ? 'gn-board__card-slot--waiting' : '',
+    flight !== null ? 'gn-board__card-slot--flight' : '',
+  ]
+    .filter((name) => name !== '')
+    .join(' ');
   return (
     <li
-      className="gn-board__card-slot"
+      ref={slotRef}
+      className={slotClass}
+      style={
+        flight === null
+          ? undefined
+          : ({ '--gn-flip-x': `${flight.dx}px`, '--gn-flip-y': `${flight.dy}px` } as CSSProperties)
+      }
+      data-move-phase={phase}
+      onAnimationEnd={flight === null ? undefined : () => setFlight(null)}
       data-testid={`ticket-card-${card.ticketId}`}
       draggable={arrows !== null}
       onDragStart={
@@ -1449,6 +1936,36 @@ function BoardCardSlot({
               draggedRef.current = true;
               event.dataTransfer.setData(DRAG_TICKET_FORMAT, card.ticketId);
               event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData(DRAG_CARD_MARKER, '');
+              const cardElement = event.currentTarget.firstElementChild;
+              const cardRect = (cardElement instanceof HTMLElement ? cardElement : event.currentTarget).getBoundingClientRect();
+              onDragBegin(cardRect.height);
+              // Where the pointer took hold of the card, so a drop can be turned back into the card's corner.
+              if (moveState !== null) {
+                moveState.grab.current = {
+                  ticketId: card.ticketId,
+                  offsetX: (event.clientX || 0) - cardRect.left,
+                  offsetY: (event.clientY || 0) - cardRect.top,
+                };
+              }
+              if (cardElement instanceof HTMLElement) setCardDragImage(event, cardElement);
+              // One frame later, NOT now: restyling the source synchronously would put the
+              // hidden card into the browser's snapshot (Chromium can cancel the drag).
+              frameRef.current = requestAnimationFrame(() => {
+                frameRef.current = null;
+                setPlaceholder(true);
+              });
+            }
+      }
+      // Fires on a drop, on Esc and on a refused drop. `draggedRef` is NOT touched
+      // here: it is cleared on the next `mousedown`, never on `dragend` (docblock above).
+      onDragEnd={
+        arrows === null
+          ? undefined
+          : () => {
+              if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+              frameRef.current = null;
+              setPlaceholder(false);
             }
       }
       onMouseDown={() => {
@@ -1626,14 +2143,23 @@ function BoardCardView({
           `null` card key still draws no separator and no placeholder.  */}
       <p className="gn-board-card__meta-line">
         {showParentBadge ? (
-          <button
-            type="button"
-            className="gn-board-card__parent-key"
-            aria-label={`Open parent ${card.parent?.key}`}
-            onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
-          >
-            {card.parent?.key}
-          </button>
+          <>
+            <button
+              type="button"
+              className="gn-board-card__parent-key"
+              aria-label={`Open parent ${card.parent?.key}`}
+              onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
+            >
+              {card.parent?.key}
+            </button>
+            {/* Owner ruling (2026-09-29, styling refresh): "if parent is
+                present, separate with >" — the `›` the sheet's breadcrumb
+                already uses. `aria-hidden`: the badge's own name ("Open parent
+                GN-17") already says what it is, and a spoken "›" is noise. */}
+            <span className="gn-board-card__parent-sep" aria-hidden="true">
+              ›
+            </span>
+          </>
         ) : null}
         {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
         <span
@@ -1644,7 +2170,11 @@ function BoardCardView({
           {card.priority.value}
         </span>
         {card.dueDate !== null ? (
-          <>
+          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `·` and the
+             due label wrap TOGETHER, so a separator is never left alone at the
+             end of one line with its date at the start of the next. The
+             markup's text is unchanged and the `·` stays `aria-hidden`. */
+          <span className="gn-board-card__due-unit">
             <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
@@ -1652,18 +2182,24 @@ function BoardCardView({
             >
               {formatDate(card.dueDate.date)}
             </span>
-          </>
+          </span>
         ) : null}
       </p>
-      <button
-        type="button"
-        className="gn-board-card__provenance"
-        aria-expanded={unfolded}
-        onClick={() => setUnfolded((value) => !value)}
-      >
-        {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
-      </button>
-      {arrows}
+      {/* The card's FOOTER (styling refresh Plan A Task 6): "who · when" and
+          the move arrows share one row that reaches into the card's padding,
+          so 44px targets do not grow the card. Layout only — both children
+          are exactly what they were. */}
+      <div className="gn-board-card__footer">
+        <button
+          type="button"
+          className="gn-board-card__provenance"
+          aria-expanded={unfolded}
+          onClick={() => setUnfolded((value) => !value)}
+        >
+          {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
+        </button>
+        {arrows}
+      </div>
     </Card>
   );
 }
@@ -1823,7 +2359,7 @@ export function MoveRefusalNotice({
 function MoveArrows({
   card,
   workflow,
-  fromStateId,
+  fromStateId: displayedStateId,
   columnOrder,
   moves,
   registerAttempt,
@@ -1834,7 +2370,7 @@ function MoveArrows({
   columnOrder: string[];
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock above `Board`. */
-  registerAttempt: (ticketId: string, attempt: (toStateId: string) => void) => () => void;
+  registerAttempt: (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void) => () => void;
 }) {
   /**
    * THE EVIDENCE UPLOADER, BOUND TO THIS CARD.
@@ -1856,82 +2392,55 @@ function MoveArrows({
       ? undefined
       : (file: File): Promise<{ attachmentId: string }> => uploadEvidence(file, card.ticketId);
 
-  const [refusal, setRefusal] = useState<{ available: string[] } | null>(null);
-  const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
-  /**
-   * Ruling 27 (board-prototype-port, 2026-09-16) — kept SEPARATE from
-   * `serverRefusal` on purpose, not merged into it with an extra `kind` tag.
-   * `serverRefusal` carries only what the engine actually said (a real
-   * `{rule, reason}` pair, `refuse()`'s own shape, never minted by this
-   * component); this carries a PLAIN SENTENCE for the two cases where nobody
-   * adjudicated at all — `ingest` rejected (a transport failure) or answered
-   * with no result for this event (`results[0] === undefined`). Before this
-   * ruling both were dressed as a `{rule: 'transport'|'no-response', reason}`
-   * pair and fed into `serverRefusal`, rendering through the identical
-   * "Refused by the server — …" sentence a real refusal uses — a dropped
-   * connection reading as though the server adjudicated the move and declined
-   * it. `TransitionDialog` gained the identical `transportError` prop for its
-   * own submit path, for the same reason.
-   */
-  const [transportError, setTransportError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ offer: string[]; preselect: string | null } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  // The whole attempt — refusal, dialog, latch — lives on the BOARD, keyed by ticket (`board-move-state.ts`):
+  // this component is unmounted and remounted in another column the moment the move is shown optimistically.
+  const moveState = useContext(MoveStateContext);
+  if (moveState === null) throw new Error('MoveArrows renders inside a Board, which provides the move state.');
+  const { pending } = moveState;
+  const session = moveState.sessions[card.ticketId] ?? EMPTY_SESSION;
+  // `transportError` is kept SEPARATE from `serverRefusal` on purpose (Ruling 27, 2026-09-16): `serverRefusal`
+  // carries only what the engine actually said — a real `{rule, reason}` pair — while this carries a PLAIN
+  // SENTENCE for the two cases where nobody adjudicated at all: `ingest` rejected, or answered with no result
+  // for this event. Dressed as a rule/reason pair, a dropped connection would read as the server declining.
+  // `TransitionDialog` has the identical `transportError` prop for its own submit path.
+  const { refusal, serverRefusal, transportError, dialog, submitting } = session;
+  const patchSession = (patch: Partial<typeof session>): void => moveState.patchSession(card.ticketId, patch);
+  const setRefusal = (value: typeof refusal): void => patchSession({ refusal: value });
+  const setServerRefusal = (value: typeof serverRefusal): void => patchSession({ serverRefusal: value });
+  const setTransportError = (value: typeof transportError): void => patchSession({ transportError: value });
+  const setDialog = (value: typeof dialog): void => patchSession({ dialog: value });
+  const setSubmitting = (value: boolean): void => patchSession({ submitting: value });
+
+  // Where the DATA says the card is while its move is unanswered — the card is DRAWN in the target column by
+  // then, but the transition dialog and `moveOutcome` are asked about the move it is making, from its source.
+  const entry = pending[card.ticketId];
+  const fromStateId = entry !== undefined && entry.phase !== 'committed' ? entry.fromStateId : displayedStateId;
+  const beginPending = (toStateId: string, phase: 'awaiting' | 'writing', from?: FlightRect, byArrow = false): void =>
+    moveState.beginPending(
+      { ticketId: card.ticketId, workflowId: workflow.id, fromStateId, toStateId, phase },
+      from,
+      byArrow,
+    );
 
   /**
-   * Same idiom as `useLiveQuery`'s `isCurrent()` (`use-live-query.ts:77`) and
-   * `TransitionDialog`'s own precheck effect's `cancelled` flag: an `await`
-   * inside this component can resolve after THIS card has unmounted.
+   * Ruling 28 (board-prototype-port coordinator, 2026-09-16) — scrolls a notice that renders following a
+   * DROP into view, never following an arrow click. `.gn-board__rail` (`ui.css`) is `overflow-x: auto`, and
+   * the notice always renders where `MoveArrows` already renders it — under the card in its SOURCE column (a
+   * second rendering site nearer the drop point would be the "two products" fork this task exists to avoid).
+   * After a rightward drag that column can scroll out of view before the person reads why their card went
+   * back — the "silent snap-back" the design spec forbids (`:270-271`) for SIGHTED users; `role="alert"`
+   * already announces it regardless of scroll position, so this scroll COMPLETES the disclosure.
    *
-   * It is not a rare race. `moves.onMoved()` is `board.reload()` — a
-   * SUCCESSFUL move on ANY card in the board (this one or a sibling) can
-   * refetch the board and restructure which `<li>` this ticket sits under,
-   * unmounting this exact `MoveArrows` instance while ITS OWN `ingest` is
-   * still in flight (a slow network, or simply losing a race with a
-   * sibling's faster move). React 18 drops the console warning for a
-   * setState on an unmounted component, so nothing short of this guard would
-   * ever surface the bug — confirmed absent from every one of this file's
-   * tests, which run a single card in isolation.
-   *
-   * `moves.onMoved()` itself is NOT guarded here — it calls into the PARENT
-   * (`board.reload()`), which is safe to invoke regardless of whether this
-   * card is still mounted. Only the setters that touch THIS component's own
-   * state are gated.
-   */
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  /**
-   * Ruling 28 (board-prototype-port coordinator, 2026-09-16) — scrolls a
-   * notice that renders following a DROP into view, never following an
-   * arrow click. `.gn-board__rail` (`ui.css`) is `overflow-x: auto`, and the
-   * notice always renders where `MoveArrows` already renders it — under the
-   * SOURCE card, in its origin column (the coordinator's own ruling: a
-   * second rendering site nearer the drop point would be the exact
-   * "two products" fork this task exists to avoid). After a rightward drag
-   * that origin column can scroll out of view before the person reads why
-   * their card snapped back — functionally the "silent snap-back" the
-   * design spec forbids (`:270-271`) for SIGHTED users specifically:
-   * `role="alert"` already announces the notice to assistive technology
-   * regardless of scroll position, so this scroll COMPLETES the disclosure
-   * rather than being the whole of it.
-   *
-   * `lastAttemptSourceRef` is set at the very top of `attemptMove`, below,
-   * to whichever caller invoked it — the arrow `onClick` handlers pass
-   * nothing (defaulting to `'arrow'`); the registry wrapper the drop path
-   * registers passes `'drop'` explicitly. `noticeRef` is attached to the
-   * single wrapper `<div>` around all three (mutually exclusive) notice
-   * renders below, so one ref and one effect cover `refusal`,
-   * `serverRefusal` AND `transportError` alike — never a second, parallel
-   * scroll call per notice kind.
+   * `session.source` is set at the very top of `attemptMove`, below, to whichever caller invoked it — the
+   * arrow handlers pass nothing (`'arrow'`); the registry wrapper the drop path registers passes `'drop'`.
+   * It lives in the board-level session now (not a ref here) because the notice is drawn by the card that
+   * mounts AFTER the glide back, and that is a different instance from the one the drop reached.
+   * `noticeRef` is attached to the single wrapper `<div>` around all three (mutually exclusive) notices, so
+   * one ref and one effect cover `refusal`, `serverRefusal` AND `transportError` alike.
    */
   const noticeRef = useRef<HTMLDivElement | null>(null);
-  const lastAttemptSourceRef = useRef<'arrow' | 'drop'>('arrow');
   useEffect(() => {
-    if (lastAttemptSourceRef.current !== 'drop') return;
+    if (session.source !== 'drop') return;
     if (refusal === null && serverRefusal === null && transportError === null) return;
     noticeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [refusal, serverRefusal, transportError]);
@@ -2003,42 +2512,38 @@ function MoveArrows({
         // arrows today either way. Kept for agreement with `closeCard` (which
         // has no such wrapper and DOES rely on this line) and as a second
         // line of defence if `attemptMove` ever stops clearing on its own.
-        if (mountedRef.current) {
-          setServerRefusal(null);
-          setTransportError('The server did not answer this move.');
-        }
+        setServerRefusal(null);
+        setTransportError('The server did not answer this move.');
+        moveState.dropPending(card.ticketId);
         return;
       }
       if (result.status === 'committed') {
-        // `onMoved()` reaches the PARENT and is safe regardless of whether
-        // this card is still mounted; only the local setter is gated.
-        if (mountedRef.current) {
-          setServerRefusal(null);
-          setTransportError(null);
-        }
+        // The entry stays (phase `committed`) until a read shows the card in its target: the refetch
+        // `onMoved()` starts may still be in flight, and a stale one must not flash the card back.
+        setServerRefusal(null);
+        setTransportError(null);
+        moveState.setPhase(card.ticketId, 'committed');
         moves.onMoved();
         return;
       }
-      if (mountedRef.current) {
-        setTransportError(null);
-        setServerRefusal(
-          result.status === 'refused'
-            ? { rule: result.rule, reason: result.reason }
-            : { rule: result.code, reason: result.message },
-        );
-      }
+      setTransportError(null);
+      setServerRefusal(
+        result.status === 'refused'
+          ? { rule: result.rule, reason: result.reason }
+          : { rule: result.code, reason: result.message },
+      );
+      moveState.dropPending(card.ticketId);
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel, own sentence, never `serverRefusal`. E5-25:
       // a 401 is neither, and `writeFailureCopy` is the one place that is
       // decided.
-      if (mountedRef.current) {
-        setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
-        );
-      }
+      setTransportError(
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+      );
+      moveState.dropPending(card.ticketId);
     } finally {
-      if (mountedRef.current) setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -2109,39 +2614,31 @@ function MoveArrows({
         // case `13.588c`): a REFUSED click followed by a SILENT one must not
         // leave the earlier "Refused by the server — …" notice standing
         // beside the new one, describing an answer that no longer holds.
-        if (mountedRef.current) {
-          setServerRefusal(null);
-          setTransportError('The server did not answer this close.');
-        }
+        setServerRefusal(null);
+        setTransportError('The server did not answer this close.');
         return;
       }
       if (result.status === 'committed') {
-        if (mountedRef.current) {
-          setServerRefusal(null);
-          setTransportError(null);
-        }
+        setServerRefusal(null);
+        setTransportError(null);
         moves.onMoved();
         return;
       }
-      if (mountedRef.current) {
-        setTransportError(null);
-        setServerRefusal(
-          result.status === 'refused'
-            ? { rule: result.rule, reason: result.reason }
-            : { rule: result.code, reason: result.message },
-        );
-      }
+      setTransportError(null);
+      setServerRefusal(
+        result.status === 'refused'
+          ? { rule: result.rule, reason: result.reason }
+          : { rule: result.code, reason: result.message },
+      );
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel `submitDirect` uses, own sentence, never
       // `serverRefusal`. E5-25: the 401 arm joins it, one author.
-      if (mountedRef.current) {
-        setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
-        );
-      }
+      setTransportError(
+        writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+      );
     } finally {
-      if (mountedRef.current) setSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -2160,27 +2657,29 @@ function MoveArrows({
    * origin column out of view; `'drop'` (passed only by the registry
    * wrapper `registerAttempt` below registers) can.
    */
-  const attemptMove = (toStateId: string, source: 'arrow' | 'drop' = 'arrow'): void => {
+  const attemptMove = (toStateId: string, source: 'arrow' | 'drop' = 'arrow', from?: FlightRect): void => {
     // Set AFTER the latch check — a call the latch blocks produces no new
     // refusal/serverRefusal/transportError, so the notice effect above
     // never re-runs for it regardless; but recording its source anyway
     // would still clobber the CORRECT source of an earlier, still in-flight
     // attempt whose async result has not resolved yet.
     if (submitting) return;
-    lastAttemptSourceRef.current = source;
-    setRefusal(null);
-    setServerRefusal(null);
-    setTransportError(null);
+    patchSession({ source, refusal: null, serverRefusal: null, transportError: null });
     const outcome = moveOutcome(workflow, fromStateId, toStateId, {});
     if (outcome.kind === 'refused') {
       setRefusal({ available: outcome.available });
       return;
     }
     if (outcome.kind === 'direct') {
+      // Assume it succeeds (owner, 2026-10-01): the card is drawn in its target NOW, at the slot the drop
+      // placeholder showed; a refusal or a failure releases it and it glides back.
+      beginPending(outcome.toStateId, 'writing', from, source === 'arrow');
       void submitDirect(outcome.toStateId);
       return;
     }
-    // The gesture meant exactly this one state: offer it alone, already aimed.
+    // The gesture meant exactly this one state: offer it alone, already aimed. The card waits in the
+    // landing slot, faded, until the dialog is confirmed or cancelled.
+    beginPending(outcome.toStateId, 'awaiting', from, source === 'arrow');
     setDialog({ offer: [outcome.toStateId], preselect: outcome.toStateId });
   };
 
@@ -2197,11 +2696,7 @@ function MoveArrows({
       return;
     }
     if (targets.length > 1) {
-      lastAttemptSourceRef.current = 'arrow';
-      setRefusal(null);
-      setServerRefusal(null);
-      setTransportError(null);
-      setDialog({ offer: targets, preselect: null });
+      patchSession({ source: 'arrow', refusal: null, serverRefusal: null, transportError: null, dialog: { offer: targets, preselect: null } });
     }
   };
 
@@ -2228,7 +2723,7 @@ function MoveArrows({
    * The registered function is a one-line wrapper, `(toStateId) =>
    * attemptMove(toStateId, 'drop')`, NOT `attemptMove` passed bare (Ruling
    * 28) — the ONLY difference from Task 14's original wiring, and it changes
-   * no dispatch: it exists solely so `attemptMove`'s own `lastAttemptSourceRef`
+   * no dispatch: it exists solely so `attemptMove`'s own `session.source`
    * write, above, can tell a drop-triggered notice from an arrow-triggered
    * one, for the scroll-into-view effect. Every arrow `onClick` below
    * reaches `attemptMove(target)` through `arrowClick` with no second
@@ -2250,7 +2745,7 @@ function MoveArrows({
    * same deps, same guarded cleanup.
    */
   useLayoutEffect(() => {
-    const attemptFromDrop = (toStateId: string): void => attemptMove(toStateId, 'drop');
+    const attemptFromDrop = (toStateId: string, from?: FlightRect): void => attemptMove(toStateId, 'drop', from);
     return registerAttempt(card.ticketId, attemptFromDrop);
   }, [registerAttempt, card.ticketId, attemptMove]);
 
@@ -2276,6 +2771,17 @@ function MoveArrows({
     return precheckEvent(candidate, moves.cache);
   };
 
+  /**
+   * A dialog write has failed. If the dialog is still open the card goes back to WAITING in its landing slot,
+   * for a retry or a Cancel. If it was closed while the write was open (the board passes the dialog no
+   * `submitting`, so Cancel and Esc stay live) nobody is left to retry or cancel, and a card washed and
+   * waiting forever would be stuck: release it, and it glides back with the reason under it. The session is
+   * read through `sessionOf` — this closure is from the render that began the write.
+   */
+  const settleFailedDialogWrite = (): void => {
+    if (moveState.sessionOf(card.ticketId).dialog === null) moveState.dropPending(card.ticketId);
+    else moveState.setPhase(card.ticketId, 'awaiting');
+  };
   /**
    * Mirrors `TicketSheet.submitTransition`'s ORDERING exactly — field claims
    * first, the transition last, one ordered batch, the shipped payload
@@ -2316,36 +2822,35 @@ function MoveArrows({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
+    // Confirming is the moment the card's target is certain (a picker offered several): lay the entry now
+    // (a no-op upsert when the gesture already aimed it), so the card settles into the slot while it writes.
+    // (a picker is reached by the arrows only: a drop aims a dialog at one state and has laid its entry already)
+    beginPending(submission.toStateId, 'writing', undefined, true);
     try {
       const results = await moves.dataSource.ingest([...fieldEvents, transition]);
       const failed = results.find((result) => result.status !== 'committed');
       if (failed === undefined) {
-        // Same unmount guard as `submitDirect` above — `onMoved()` reaches the
-        // parent and runs regardless; the two local setters are gated.
-        if (mountedRef.current) {
-          setServerRefusal(null);
-          setTransportError(null);
-          setDialog(null);
-        }
+        setServerRefusal(null);
+        setTransportError(null);
+        setDialog(null);
+        moveState.setPhase(card.ticketId, 'committed');
         moves.onMoved();
         return;
       }
-      if (mountedRef.current) {
-        setTransportError(null);
-        setServerRefusal(
-          failed.status === 'refused'
-            ? { rule: failed.rule, reason: failed.reason }
-            : { rule: failed.code, reason: failed.message },
-        );
-      }
+      setTransportError(null);
+      setServerRefusal(
+        failed.status === 'refused'
+          ? { rule: failed.rule, reason: failed.reason }
+          : { rule: failed.code, reason: failed.message },
+      );
+      settleFailedDialogWrite();
     } catch (cause) {
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
       // E5-25: a 401 goes to the session sentence through the same author.
-      if (mountedRef.current) {
-        setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
-        );
-      }
+      setTransportError(
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+      );
+      settleFailedDialogWrite();
     }
   };
 
@@ -2427,9 +2932,9 @@ function MoveArrows({
           offerStateIds={dialog.offer}
           initialToStateId={dialog.preselect}
           onClose={() => {
-            setDialog(null);
-            setServerRefusal(null);
-            setTransportError(null);
+            patchSession({ dialog: null, serverRefusal: null, transportError: null });
+            // Cancel: the card glides back out of the landing slot. (A committed entry is left to its read.)
+            if (entry?.phase === 'awaiting') moveState.dropPending(card.ticketId);
           }}
           onSubmit={(submission) => void submitFromDialog(submission)}
           precheck={precheck}

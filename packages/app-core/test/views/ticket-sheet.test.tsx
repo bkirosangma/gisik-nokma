@@ -4003,6 +4003,59 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
   });
 });
 
+describe('TicketSheet — the title wraps (20.604)', () => {
+  it('20.604 the title is a one-row textarea, and line breaks are folded into one space', async () => {
+    const user = userEvent.setup();
+    renderSheet(ticketRead());
+    await settled();
+    const field = screen.getByRole('textbox', { name: 'Ticket title' });
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field.getAttribute('rows')).toBe('1');
+    fireEvent.change(field, { target: { value: 'Line one\r\nLine two\n\nLine three' } });
+    expect((field as HTMLTextAreaElement).value).toBe('Line one Line two Line three');
+    // CONTROL — a title with no line break is left exactly as typed.
+    await user.clear(field);
+    await user.type(field, 'One plain title');
+    expect((field as HTMLTextAreaElement).value).toBe('One plain title');
+  });
+
+  it('20.604 Enter commits the title and never inserts a newline', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+    const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLTextAreaElement;
+    await user.clear(field);
+    await user.type(field, 'Filed for August{Enter}');
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]?.[0]?.payload).toEqual({ fieldId: 'title', value: 'Filed for August' });
+    expect(field.value).not.toContain('\n');
+  });
+
+  it('20.604 the height is fitted to the content, and re-fitted as the content changes', async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'scrollHeight');
+    // jsdom lays nothing out: stand in a content height of 2px per character.
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return this.value.length * 2;
+      },
+    });
+    try {
+      renderSheet(ticketRead());
+      await settled();
+      const field = screen.getByRole('textbox', { name: 'Ticket title' }) as HTMLTextAreaElement;
+      fireEvent.change(field, { target: { value: 'x'.repeat(60) } });
+      await waitFor(() => expect(field.style.height).toBe('120px'));
+      // CONTROL — a shorter title shrinks it again.
+      fireEvent.change(field, { target: { value: 'x'.repeat(10) } });
+      await waitFor(() => expect(field.style.height).toBe('20px'));
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', descriptor);
+      else delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+    }
+  });
+});
+
 /**
  * 16.86 — the INLINE TITLE EDITOR.
  *
@@ -5604,5 +5657,267 @@ describe('19.228–19.232 the ticket sheet asks through DeleteDialog', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog', { name: TITLE })).toBeNull());
     expect(onClose).not.toHaveBeenCalled();
     expect(source.ingested).toHaveLength(0);
+  });
+});
+
+/**
+ * 16.130–16.132 — Add subtask under a TERMINAL parent takes the same guarded
+ * path New ticket › Parent does (owner, 2026-09-30: "fix the subtask bug too").
+ *
+ * The defect: the sheet's `addSubtask` sent the `ticket.created` through
+ * `dataSource.ingest` and printed ANY refusal as "That subtask was not
+ * created: …". For a Done parent the server's answer is
+ * `hierarchy.parent-terminal` — "Adding live work reopens it — choose a state
+ * to reopen it to, then add this ticket." — a sentence that promises a chooser
+ * the sheet never drew. The create flow draws it (`ReopenDialog`, via
+ * `submitChildEvent` / `reopenAndProceed`); the sheet must too.
+ *
+ * The fake door below enforces the rule the way the engine does: a
+ * `ticket.created` under a parent whose state is terminal is refused
+ * `hierarchy.parent-terminal`; a `ticket.transitioned` on the parent moves it.
+ * Mutations, named (run AFTER the fix): M-a "skip the dialog branch" (the
+ * refusal is printed as before) kills 16.130 and 16.131; M-b "Cancel still adds"
+ * (onCancel sends the child) kills 16.131; M-c "add without the reopen batch"
+ * (accept sends only the child) kills 16.130.
+ *
+ * Fix round 1 (controller, 2026-09-30): two mutations survived because the
+ * fixture had no `closed` flag, so the production path (`[ticket.reopened,
+ * ticket.transitioned]`) never ran. 16.133 and 16.134 use a door that models
+ * the flag. Mutations: M-d `parentClosed: false` at accept kills 16.133 and
+ * 16.134; M-e dropping the `parentNoLongerClosed` re-arm kills 16.134; M-f
+ * dropping the reopened half from the batch kills 16.133 and 16.134.
+ */
+describe('16.130–16.132 Add subtask under a terminal parent offers the reopen', () => {
+  const PARENT_TERMINAL_REASON =
+    '"File the GST return" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
+
+  /** `closed` is the flag a real Done parent carries (16.133/16.134); 16.130–16.132 keep the bare terminal fixture. */
+  function doneRead(closed: { actorId: string; at: string } | null = null): TicketRead {
+    return ticketRead({
+      ticket: ticketStateSeed({
+        stateId: 'done',
+        stateCategory: 'terminal',
+        closed,
+        fields: {
+          title: {
+            value: 'File the GST return',
+            actorId: 'user_kiro',
+            clientTime: '2026-08-18T07:59:00.000Z',
+            serverTime: '2026-08-18T08:00:00.000Z',
+          },
+        },
+      }),
+      rollup: null,
+    });
+  }
+
+  /**
+   * A door that enforces `hierarchy.parent-terminal` against the parent's CURRENT
+   * state, and — when the read carries `closed` — the closed flag the way the
+   * engine does: a CLOSED ticket has no legal transition (`closed-ticket`), so
+   * only a `ticket.reopened` ahead of the transition clears it, and a
+   * `ticket.reopened` on a ticket that is NOT closed is refused `not-closed`.
+   * `refuseTransitionTo` names targets the parent's own rules refuse (a rule
+   * refusal of the transition, AFTER the reopen half has committed).
+   */
+  function guardedSource(read: TicketRead, startsTerminal: boolean, refuseTransitionTo: string[] = []) {
+    const parent = { terminal: startsTerminal, closed: (read.ticket.closed ?? null) !== null, stateId: read.ticket.stateId };
+    const answer = (event: SubmittedEvent): IngestResult => {
+      if (event.type === 'ticket.reopened' && event.entity.id === TICKET) {
+        if (!parent.closed) {
+          return { status: 'refused', eventId: event.id, rule: 'not-closed', reason: 'This ticket is not closed.' };
+        }
+        parent.closed = false;
+      } else if (event.type === 'ticket.transitioned' && event.entity.id === TICKET) {
+        const to = (event.payload as { to: string }).to;
+        if (parent.closed) {
+          return { status: 'refused', eventId: event.id, rule: 'closed-ticket', reason: 'A closed ticket cannot be moved.' };
+        }
+        if (refuseTransitionTo.includes(to)) {
+          return { status: 'refused', eventId: event.id, rule: 'transition.guard', reason: `${to} is not open today.` };
+        }
+        parent.stateId = to;
+        parent.terminal = false;
+      } else if (event.type === 'ticket.created' && parent.terminal) {
+        return { status: 'refused', eventId: event.id, rule: 'hierarchy.parent-terminal', reason: PARENT_TERMINAL_REASON };
+      }
+      return { status: 'committed', eventId: event.id, seq: 10, serverTime: '2026-09-30T09:00:00.000Z' };
+    };
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'owner' }],
+        getTicketHistory: async () => [],
+        getTickets: async (projectId) => ({ projectId, rows: [] }),
+        getTicketTypes: async () => [
+          { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-errand', fields: [] },
+          { id: 'sub-task', name: 'Sub-task', icon: 'list', rank: 4, workflowId: 'wf-errand', fields: [] },
+        ],
+      },
+      (events) => events.map(answer),
+    );
+    return { source, parent };
+  }
+
+  async function pressAddSubtask(title: string): Promise<void> {
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), title);
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+  }
+
+  it('16.130 a Done parent: the dialog offers the parent’s reopen states, choosing one reopens and adds; a live parent adds with no dialog (control)', async () => {
+    // CONTROL — under a LIVE parent no dialog appears and the subtask is added directly.
+    const live = guardedSource(ticketRead({ rollup: null }), false);
+    renderSheet(ticketRead({ rollup: null }), live.source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await waitFor(() => expect(live.source.ingested).toHaveLength(1));
+    expect(live.source.ingested[0]![0]!.type).toBe('ticket.created');
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull();
+    cleanup();
+
+    // THE CASE — a Done parent.
+    const read = doneRead();
+    const { source, parent } = guardedSource(read, true);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull();
+    await pressAddSubtask('Book the venue');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    expect(dialog).toHaveTextContent('File the GST return is Done.');
+    expect(dialog).toHaveTextContent(`Refused by the server — hierarchy.parent-terminal: ${PARENT_TERMINAL_REASON}`);
+    const picker = within(dialog).getByTestId('hidden-select-container');
+    const offered = [...picker.querySelectorAll('option')]
+      .map((option) => option.getAttribute('value'))
+      .filter((value) => value !== '');
+    expect(offered.sort()).toEqual(['doing', 'todo']);
+
+    await userEvent.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+
+    // refused create, then the parent's transition, then the SAME create retried.
+    await waitFor(() => expect(source.ingested).toHaveLength(3));
+    const [refusedCreate, parentBatch, childBatch] = source.ingested;
+    expect(refusedCreate![0]!.type).toBe('ticket.created');
+    expect(parentBatch!.map((e) => e.type)).toEqual(['ticket.transitioned']);
+    expect(parentBatch![0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(parentBatch![0]!.payload).toMatchObject({ to: 'doing' });
+    expect(childBatch![0]).toBe(refusedCreate![0]);
+    expect(parent.stateId).toBe('doing');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    expect(screen.queryByTestId('sheet-subtask-refusal')).toBeNull();
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
+  });
+
+  it('16.131 Cancel adds nothing and leaves the parent Done', async () => {
+    const read = doneRead();
+    const { source, parent } = guardedSource(read, true);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    // Only the refused create ever went out: no transition, no retried child.
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]![0]!.type).toBe('ticket.created');
+    expect(parent.stateId).toBe('done');
+    // The title stays so the person can act on it, exactly as after any refusal.
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('Book the venue');
+  });
+
+  it('16.132 a parent-terminal refusal is never printed as a dead-end "not created" line', async () => {
+    const read = doneRead();
+    const { source } = guardedSource(read, true);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    expect(screen.queryByTestId('sheet-subtask-refusal')).toBeNull();
+  });
+
+  const CLOSED = { actorId: 'user_kiro', at: '2026-08-20T19:00:00.000Z' };
+
+  async function chooseAndAccept(label: string): Promise<void> {
+    await userEvent.click(screen.getByRole('button', { name: /Reopen to/ }));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: label }));
+    await userEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+  }
+
+  it('16.133 a CLOSED Done parent: the accept batch is [ticket.reopened, ticket.transitioned] then the same child; the unflagged parent still sends [transitioned] alone (control)', async () => {
+    // CONTROL — the unflagged fixture of 16.130: NOT closed, so the batch is the transition alone
+    // (a `ticket.reopened` here would be refused `not-closed` by this door and the child never added).
+    const bare = doneRead();
+    const control = guardedSource(bare, true);
+    renderSheet(bare, control.source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+    await waitFor(() => expect(control.source.ingested).toHaveLength(3));
+    expect(control.source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.transitioned']);
+    cleanup();
+
+    // THE CASE — the flag a real Done parent carries.
+    const read = doneRead(CLOSED);
+    const { source, parent } = guardedSource(read, true);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+
+    await waitFor(() => expect(source.ingested).toHaveLength(3));
+    const [refusedCreate, parentBatch, childBatch] = source.ingested;
+    expect(refusedCreate![0]!.type).toBe('ticket.created');
+    // The reopen half first, then the transition — ONE batch, in that order.
+    expect(parentBatch!.map((e) => e.type)).toEqual(['ticket.reopened', 'ticket.transitioned']);
+    expect(parentBatch![0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(parentBatch![0]!.payload).toEqual({});
+    expect(parentBatch![1]!.entity).toEqual({ kind: 'ticket', id: TICKET });
+    expect(parentBatch![1]!.payload).toEqual({
+      to: 'doing',
+      cause: { kind: 'reopened-for-child', childTicketId: refusedCreate![0]!.entity.id },
+    });
+    expect(childBatch![0]).toBe(refusedCreate![0]);
+    expect(parent).toMatchObject({ stateId: 'doing', closed: false, terminal: false });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    expect(screen.queryByTestId('sheet-subtask-refusal')).toBeNull();
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
+  });
+
+  it('16.134 a refused reopen keeps the dialog open with the refusal and adds nothing; the retry to another target sends the transition alone', async () => {
+    const read = doneRead(CLOSED);
+    // The parent's own rules refuse Doing — after the batch's `ticket.reopened` has committed.
+    const { source, parent } = guardedSource(read, true, ['doing']);
+    renderSheet(read, source);
+    await screen.findByTestId('sheet-subtask-title');
+    await pressAddSubtask('Book the venue');
+    await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    await chooseAndAccept('Doing');
+
+    // Refused create, then the two-event parent batch — and NO child retry.
+    await waitFor(() => expect(source.ingested).toHaveLength(2));
+    expect(source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.reopened', 'ticket.transitioned']);
+    const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Refused by the server — transition.guard: doing is not open today.');
+    expect(parent).toMatchObject({ closed: false, stateId: 'done' });
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('Book the venue');
+
+    // CONTROL — a second target on the same list succeeds and adds the child. The reopen already
+    // committed, so the retry must NOT resend `ticket.reopened` (this door refuses it `not-closed`).
+    await chooseAndAccept('To do');
+    await waitFor(() => expect(source.ingested).toHaveLength(4));
+    const [, , retry, child] = source.ingested;
+    expect(retry!.map((e) => e.type)).toEqual(['ticket.transitioned']);
+    expect(retry![0]!.payload).toMatchObject({ to: 'todo' });
+    expect(child![0]).toBe(source.ingested[0]![0]);
+    expect(parent.stateId).toBe('todo');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Reopen parent?' })).toBeNull());
+    expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('');
   });
 });

@@ -372,7 +372,7 @@ not silently.
   source-scan shape, `neo-card-radius.test.ts`) — the rule still exists and still carries its 14px
   padding, only the radius literal is asserted absent, so the board card falls through to `.gn-card`'s
   token-driven radius rather than pinning 12px under every style. Mutation-witnessed: a planted literal
-  `border-radius` on the rule is caught by the same test. — (`packages/ui/test/components.test.tsx`)
+  `border-radius` on the rule is caught by the same test. Amended 2026-09-29 by 20.042 (styling refresh Plan A): the rule is now multi-line with 16px padding; it still declares no radius, and the witness plants one into the new text. — (`packages/ui/test/components.test.tsx`)
 - **13.1177** ✅ A board card draws a CLAIMED due date in its meta line, and draws a date that has
   PASSED in the danger tone (`.gn-board-card__due--late`) — ruling **E5-2** (release 2026-09-22, batch
   B13), from `docs/lanes/review-ux-exec5.md:242`. **The id comes from B13's ALLOCATED §13 BLOCK,
@@ -1244,7 +1244,7 @@ The `try/catch/finally` `13.504` added made every local `setState` call in both 
 meantime, which is not rare: a successful move on ANY card (this one or a sibling) calls `moves.onMoved()`
 → `board.reload()`, which can restructure the board and unmount a DIFFERENT card whose own slower `ingest`
 is still in flight. Found in a second-opinion review (the same one that led to `13.505`), fixed with a
-`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s
+`mountedRef` gating every local setter in both submit paths — the identical idiom `use-live-query.ts`'s [2026-10-01: the `mountedRef` is gone — the per-card session moved to `Board`'s move-state (cases 20.125–20.148), which removes the race by construction.]
 `isCurrent()` and `TransitionDialog`'s own precheck `cancelled` flag already use — while leaving
 `moves.onMoved()` itself unguarded (it reaches the parent and is safe regardless of this component's mount
 state). **React 18 drops the console warning for a setState on an unmounted component, so no assertion in
@@ -1287,7 +1287,7 @@ exact shape this repo has already removed once (`481ad12c`).
 
 **A THIRD review round, requested before declaring the `13.504` follow-up done, found two more real
 issues** — `13.505` above (the `submitFromDialog` transport-failure fix, code changed and
-mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see
+mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT mutation-witnessed, see [2026-10-01: the `mountedRef` guard was removed with the session's move to `Board`.]
 above for why). Two further points from that same round were left as documented judgment calls rather
 than code changes: `submitFromDialog` still carries no `try/catch` of its OWN distinct from the transport
 fix already applied (moot — the fix IS the catch); and the client-invented `rule: 'transport'`/
@@ -1492,7 +1492,7 @@ specifically: `role="alert"` already announces the notice to assistive technolog
 position.
 
 **Fix: keep the single rendering site, scroll it into view on the drop path only.** `MoveArrows` gained a
-`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter
+`lastAttemptSourceRef` (`'arrow' | 'drop'`), set by `attemptMove`'s own new optional second parameter [2026-10-01: the ref is now the `source` field of `Board`'s move session.]
 (defaulting to `'arrow'` — every arrow `onClick` is unchanged); the registry wrapper `registerAttempt`
 registers now passes `'drop'` explicitly. The three notices are wrapped in one `<div
 className="gn-board-card__notice" ref={noticeRef}>` (`display: contents` in `ui.css`, so the wrapper is
@@ -1515,7 +1515,7 @@ about to render AND the triggering attempt's source was `'drop'`.
 
 **Both mutation-witnessed.** (1) The `scrollIntoView` call itself removed: reddened exactly `13.515`
 (`AssertionError: expected "spy" to be called 1 times, but got 0 times`), `13.516` untouched (still nothing
-to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires
+to assert against). (2) The `lastAttemptSourceRef.current !== 'drop'` guard removed (scroll fires [2026-10-01: the guard now reads `session.source !== 'drop'`.]
 regardless of source): reddened exactly `13.516` (`Number of calls: 1`, expected `0`), `13.515` untouched
 (still correctly called once on its own drop). Both reverted; the 9-case file re-confirmed green
 afterward.
@@ -1793,6 +1793,7 @@ judge corrected the finding's "only sweep" absolute — `e2e-viewport/responsive
   `inline-block` (its rule sets no `display`), so a min size applies to it, unlike the `padding: 0` bare
   buttons elsewhere in the file whose height is their line box. `ui.css` and `e2e-viewport/tap-targets.ts`
   were each reverted to `HEAD` for the RED run and restored from sha256-compared backups.
+  **Amended 2026-09-29 by 20.059:** the floor is now 44px (a ghost control in the card's footer); the `DENSE_IN_LIST` classification is kept, and a 44px target satisfies it.
 
 ### ⚠ Clause (b) of the membership rule is UNMET, recorded rather than implied
 
@@ -1916,6 +1917,7 @@ screen back toward a prototype that never had it — the second half of the find
   pinned by index rather than assumed. **Not painted**: what is asserted is what the rules declare, and
   `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
   run and restored from a sha256-compared backup.
+  Amended 2026-09-30 by 20.281 (styling refresh Plan B Task B9): the container is now the board's recessed track (`surface-track`, `shadow-track`, `radius-track`) rather than the sibling's `fill-quaternary` card shape, and the action is a quiet outlined pill (transparent, `text-muted`, `border: 1px solid var(--gn-border)`, 999px radius) rather than the shared constant; the reset-before-rule order and the 44px floor are unchanged.
 
 ## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1147`
 
@@ -1933,6 +1935,7 @@ different questions. `P35`'s own corroboration: the family's other two members, 
 ### The case
 
 - ✅ **13.1147 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
+  Amended 2026-09-30 by 20.261 (styling refresh Plan B): the calendar nav is now a quiet outlined 44px pill (`border: 1px solid var(--gn-border)`), so the pair is asserted per side until Plan B Task B8 restyles the timeline nav to the same values; both sides still declare a `border`. Amended again 2026-09-30 by 20.271 (styling refresh Plan B Task B8): the timeline nav took the same quiet outlined values, so the pair is asserted on BOTH sides again (`min-height: 2.75rem`, `border: 1px solid var(--gn-border)`, `border-radius: 999px`, transparent, text-muted) and the timeline's own rule declares that 1px border instead of `none`.
   **The assertion is the PRESENCE of the declaration, not the absence of `outset`**, and the difference
   matters: `outset` is what the UA applies *because* the declaration is missing, so a test searching a
   stylesheet for the string `outset` would pass on every tree, broken or fixed. The five values are
@@ -1976,6 +1979,9 @@ says so rather than letting the assertion imply a stricter claim.
   and compared to the sheet head's — the same evidence by a different route. **Not painted**: the
   measurement above is the finding's own. `ui.css` was reverted to `HEAD` for the RED run and restored
   from a sha256-compared backup. Package suites: ui 420, web 639.
+  **Amended 2026-09-29 by 20.073 (styling refresh Plan A):** the dismiss control is now a ghost icon —
+  transparent at rest, the `fillTertiary` fill on hover/focus with the focus ring; its 44px floor and shared
+  rule are unchanged.
 
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
 

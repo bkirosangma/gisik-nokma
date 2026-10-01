@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import {
   PRIORITIES,
   newUlid,
@@ -12,6 +12,15 @@ import { Button, Chip, SegmentedControl, Select, Sheet, Toast } from '@gisik-nok
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
+import {
+  UnansweredClaimError,
+  parentNoLongerClosed,
+  reopenAndProceed,
+  reopenOfferFor,
+  submitChildEvent,
+  type ReopenOffer,
+  type Refusal,
+} from '../flows/guarded-child-event.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { actorLabelFrom, memberLabel } from '../member-label.js';
@@ -37,6 +46,7 @@ import {
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
 import { TicketNotesSection } from './ticket-notes-section.js';
+import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
@@ -599,6 +609,72 @@ function fieldRowClass(index: number): string {
     : 'gn-ticket-sheet__field';
 }
 
+/**
+ * The title control: a `<textarea>` that starts one row tall and GROWS with its
+ * content, styled as a heading (`.gn-ticket-sheet__title-input`).
+ *
+ * WHY NOT AN `<input>` (visual-fixes V2, 2026-09-30). The title is 26px/700 and
+ * the header's free width is about 400px beside the Full screen pill and the
+ * close button — a 60-character title needs roughly 870px. An `<input>` never
+ * wraps, so no flex arrangement can show every character of it; only a wrapping
+ * control can.
+ *
+ * WHAT A TEXTAREA CHANGES, AND IS HELD BACK HERE: a text input strips line breaks
+ * from what is pasted into it and a textarea keeps them, so `onChange` folds
+ * every run of `\r`/`\n` into one space; Enter is the caller's commit key and
+ * its `preventDefault` means it never inserts a newline. The height is set from
+ * `scrollHeight` (rather than `field-sizing: content`) so it works in every
+ * browser the web and desktop shells run in, and it is re-fitted when the width
+ * changes (full screen, a resized window), which re-wraps the text.
+ */
+function TitleField({
+  value,
+  disabled,
+  onChange,
+  onBlur,
+  onKeyDown,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+  onBlur: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+}): ReactElement {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = (): void => {
+    const el = ref.current;
+    if (el === null) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(fit, [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      className="gn-ticket-sheet__title-input"
+      rows={1}
+      aria-label="Ticket title"
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value.replace(/[\r\n]+/g, ' '))}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+    />
+  );
+}
+
 export function TicketSheet({
   dataSource,
   cache,
@@ -844,6 +920,18 @@ export function TicketSheet({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskRefusal, setSubtaskRefusal] = useState<string | null>(null);
+  /**
+   * The reopen offer for Add subtask under a TERMINAL parent (2026-09-30) — set
+   * when the server answers the child's `ticket.created` with
+   * `hierarchy.parent-terminal`, cleared on Cancel or a settled attempt. The
+   * refused claim rides along so an accepted reopen resubmits the SAME envelope
+   * (an interactive refusal records nothing, so its event id is still unused),
+   * exactly as the create flow does.
+   */
+  const [subtaskReopen, setSubtaskReopen] = useState<
+    (ReopenOffer & { childEvent: SubmittedEvent; refusal: Refusal }) | null
+  >(null);
+  const [subtaskParentRefusal, setSubtaskParentRefusal] = useState<Refusal | null>(null);
 
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
     dataSource.query.getTicket(workspaceId, ticketId),
@@ -2316,28 +2404,85 @@ export function TicketSheet({
           start: 'focus',
         },
       });
-      const results = await dataSource.ingest([event]);
-      const answer = results[0];
-      if (answer === undefined || answer.status !== 'committed') {
-        // A PRESENTATION of the refusal the server sent, never a paraphrase of
-        // one it did not — this file's own rule for the same slot elsewhere.
-        // **And BOTH non-committed arms are named, because they are different
-        // sentences**: a blank title is `invalid` (`IngestResult` carries
-        // `message` there, from the payload schema) while the rule engine's
-        // answer is `refused` (which carries `reason`). Reading `.reason` off
-        // an `invalid` answer would present `undefined` as the server's words.
-        const said =
-          answer === undefined
-            ? 'The server did not answer, so what happened is not known.'
-            : answer.status === 'invalid'
-              ? answer.message
-              : answer.reason;
-        setSubtaskRefusal(`That subtask was not created: ${said}`);
+      // The create flow's guarded door (`submitChildEvent`), not a bare
+      // `ingest`: a `hierarchy.parent-terminal` refusal is not an error but the
+      // moment the reopen is offered (2026-09-30 — the sentence promised a
+      // chooser this sheet never drew).
+      let outcome;
+      try {
+        outcome = await submitChildEvent(dataSource, event);
+      } catch (error) {
+        if (!(error instanceof UnansweredClaimError)) throw error;
+        setSubtaskRefusal('That subtask was not created: The server did not answer, so what happened is not known.');
         return;
       }
-      // Cleared only on a committed answer: a refusal keeps the title so it can
-      // be fixed rather than retyped.
-      setNewSubtaskTitle('');
+      if (outcome.kind === 'committed') {
+        // Cleared only on a committed answer: a refusal keeps the title so it can
+        // be fixed rather than retyped.
+        setNewSubtaskTitle('');
+        return;
+      }
+      // The sheet already holds the parent's definition and state (it IS the
+      // parent), so the offer is derived from them; without the definition the
+      // refusal stands as it is rather than opening a chooser with nothing in it.
+      if (outcome.kind === 'needs-reopen' && workflow.data != null) {
+        setSubtaskParentRefusal(null);
+        setSubtaskReopen({ childEvent: event, refusal: outcome.refusal, ...reopenOfferFor(workflow.data, state) });
+        return;
+      }
+      // A PRESENTATION of the refusal the server sent, never a paraphrase of
+      // one it did not — this file's own rule for the same slot elsewhere.
+      // **And BOTH non-committed arms are named, because they are different
+      // sentences**: a blank title is `invalid` (`message`, from the payload
+      // schema) while the rule engine's answer is a refusal (`reason`).
+      const said = outcome.kind === 'invalid' ? outcome.result.message : outcome.refusal.reason;
+      setSubtaskRefusal(`That subtask was not created: ${said}`);
+    } finally {
+      setAddingSubtask(false);
+    }
+  };
+  /**
+   * The person chose a state to reopen the parent to: reopen it, then add the
+   * SAME child claim (`reopenAndProceed` — the parent's remedy first, the child
+   * only once the parent is live, sequentially). Every outcome is the create
+   * flow's, spoken on this sheet's own slots.
+   */
+  const acceptSubtaskReopen = async (toStateId: string): Promise<void> => {
+    if (subtaskReopen === null) return;
+    setSubtaskParentRefusal(null);
+    setAddingSubtask(true);
+    try {
+      const outcome = await reopenAndProceed(
+        dataSource,
+        {
+          parent: { ticketId, workspaceId },
+          toStateId,
+          childTicketId: subtaskReopen.childEvent.entity.id,
+          childEvent: subtaskReopen.childEvent,
+          parentClosed: subtaskReopen.parentClosed,
+        },
+        make,
+      );
+      if (outcome.kind === 'committed') {
+        setSubtaskReopen(null);
+        setNewSubtaskTitle('');
+        return;
+      }
+      if (outcome.kind === 'parent-refused') {
+        // Stays open, in the dialog, verbatim: the parent's own rules refused the
+        // reopen and another target on the list may still be allowed.
+        if (parentNoLongerClosed(outcome)) {
+          setSubtaskReopen((prev) => (prev === null ? prev : { ...prev, parentClosed: false }));
+        }
+        setSubtaskParentRefusal(outcome.refusal);
+        return;
+      }
+      setSubtaskReopen(null);
+      setSubtaskRefusal(
+        outcome.kind === 'child-refused-after-reopen'
+          ? `${ticketRead.title} was reopened — that is now recorded history. That subtask was not created: ${outcome.refusal.reason}`
+          : `That subtask was not created: ${outcome.result.message}`,
+      );
     } finally {
       setAddingSubtask(false);
     }
@@ -2855,7 +3000,7 @@ export function TicketSheet({
         THE HEADER'S OWN COLUMN: the location breadcrumb, then the title as a
         CONTROL. Both are the prototype's (`desktop.dc.html:1101-1116` — a
         `<nav>` of crumbs, then a borderless `<input>` carrying the title in
-        22px/600), and they are one `titleSlot` rather than two props because
+        22px/600; ours is `TitleField`, a wrapping one-row `<textarea>`), and they are one `titleSlot` rather than two props because
         the prototype draws them as one flex column with a 6px gap, and two
         independent slots could not express that.
 
@@ -2950,15 +3095,14 @@ export function TicketSheet({
             text a reader may not have touched invents a step.
 
             `aria-label` rather than a visible label: the field sits where a
-            heading sat, and the visible text is the title itself.
+            heading sat, and the visible text is the title itself. `TitleField`
+            is a one-row textarea that grows with its content, so a long title
+            wraps instead of being clipped beside the header's actions.
           */}
-          <input
-            className="gn-ticket-sheet__title-input"
-            type="text"
-            aria-label="Ticket title"
+          <TitleField
             value={titleDraft ?? ticketRead.title}
             disabled={titleSaving}
-            onChange={(event) => setTitleDraft(event.target.value)}
+            onChange={setTitleDraft}
             onBlur={() => {
               if (titleDraft !== null) void submitTitle(titleDraft);
             }}
@@ -4175,6 +4319,24 @@ export function TicketSheet({
         `Delete` stays the only button of that name. It unmounts on commit via
         `onDeleteCommitted`, and on Cancel/Escape via `setConfirmingDelete`.
       */}
+      {subtaskReopen !== null ? (
+        <ReopenDialog
+          open
+          parentTitle={ticketRead.title}
+          parentStateName={subtaskReopen.parentStateName}
+          refusal={subtaskReopen.refusal}
+          refusalOrigin="server"
+          reopenStates={subtaskReopen.reopenStates}
+          parentRefusal={subtaskParentRefusal}
+          onAccept={(toStateId) => {
+            void acceptSubtaskReopen(toStateId);
+          }}
+          onCancel={() => {
+            setSubtaskReopen(null);
+            setSubtaskParentRefusal(null);
+          }}
+        />
+      ) : null}
       <DeleteDialog
         open={confirmingDelete}
         kind="ticket"

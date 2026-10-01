@@ -7,7 +7,7 @@ import {
   PasskeysSection,
   SessionsSection,
   type PasskeySummary,
-  type SessionSummary,
+  type DeviceSummary,
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import type { NotificationKind, NotificationPreferences } from '@gisik-nokma/domain';
@@ -36,26 +36,15 @@ export default function AccountPage() {
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [prefsSaveError, setPrefsSaveError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [devices, setDevices] = useState<DeviceSummary[] | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeysListFailed, setPasskeysListFailed] = useState(false);
   const passkeyClient = useMemo(() => createPasskeyClient(), []);
-  const sessionsClient = useMemo(
-    // `?.session?.token`, not `?.session.token` — `session.data`'s own type
-    // (`getSession`'s declared return, `{ session, user } | null`) always
-    // carries `.session` when `.data` is non-null, but `app-nav.test.tsx`'s
-    // OWN `auth-client.js` mock (a second, independent mock of this module,
-    // separate from `account-page.test.tsx`'s) mounts this same page with
-    // `data: { user }` and no `session` key at all — a shape only a test
-    // double can produce, and one this page must not crash its ENTIRE render
-    // over just to build the Sessions section's client. The extra `?.` costs
-    // nothing against the real client and keeps a missing `session` on the
-    // same silent-omission footing every other section's failed read gets.
-    () => createSessionsClient(session.data?.session?.token ?? null),
-    [session.data?.session?.token],
-  );
+  // Stateless now: the list is `GET /v1/me/devices` and the server knows which device is the caller's
+  // (devices plan Task 6), so the adapter no longer needs the current session's token.
+  const sessionsClient = useMemo(() => createSessionsClient(), []);
 
   useEffect(() => {
     // A failed read collapses to the SAME `[]` an honestly-empty answer would
@@ -94,41 +83,42 @@ export default function AccountPage() {
     // recreated whenever the current session's own token changes (sign-in,
     // sign-out, a refreshed session), so this effect re-lists against the
     // right adapter rather than a stale one closing over an old token.
-    sessionsClient.list().then(setSessions, () => setSessions([]));
+    sessionsClient.list().then(setDevices, () => setDevices([]));
   }, [sessionsClient]);
 
-  const revokeSession = useCallback(
-    async (token: string) => {
-      // No optimistic removal: unlike `toggleKind`'s flip above, there is no
-      // local edit to make that would be honest to show before the server
-      // confirms it — re-listing is what proves a session is actually gone,
-      // the same distrust `toggleKind`'s own `.catch()` has for a state this
-      // component did not itself confirm.
-      //
-      // RULING E2-24(b): the result used to be read and discarded — a
-      // refusal left the list simply failing to shrink, with nothing on
-      // screen to say why. Same `{ error }`-then-conditionally-reload shape
-      // `addPasskey`/`removePasskey` below already use.
-      const result = await sessionsClient.revoke(token);
+  // Both sign-outs share the list re-read and the refusal slot. No optimistic removal: re-listing is what
+  // proves a device is actually gone. RULING E2-24(b): a refusal shows on screen and the list is NOT re-read.
+  const afterSignOut = useCallback(
+    (result: { error: string | null }) => {
       setSessionError(result.error);
-      if (result.error === null) sessionsClient.list().then(setSessions);
+      if (result.error === null) sessionsClient.list().then(setDevices);
     },
     [sessionsClient],
   );
+  const signOutDevice = useCallback(
+    async (key: string) => afterSignOut(await sessionsClient.signOutDevice(key)),
+    [sessionsClient, afterSignOut],
+  );
+  const signOutOthers = useCallback(
+    async () => afterSignOut(await sessionsClient.signOutOthers()),
+    [sessionsClient, afterSignOut],
+  );
 
   /**
-   * THE PASSKEY LIST IS THE ONLY MOUNT-TIME READ ON THIS PAGE THAT IS GATED,
-   * and the gate is a rate-limit decision, not a tidy-up.
+   * THE PASSKEY LIST IS THE ONLY MOUNT-TIME READ ON THIS PAGE THAT IS GATED.
    *
-   * `GET /passkey/list-user-passkeys` lands under `/api/auth/*`, which
-   * `apps/server/src/app.ts` charges against the shared `auth:` bucket —
-   * `RATE_LIMIT_AUTH_MAX` is 10 per 60s in `deploy/do/app.yaml`, and
+   * `GET /v1/me/passkeys` (devices plan Tasks 5 and 7, 2026-10-01) answers 401
+   * to a signed-out visitor, so for one it is a request that CANNOT succeed.
+   * It used to be the plugin's `GET /passkey/list-user-passkeys`, which lands
+   * under `/api/auth/*` and so spent a unit of the shared `auth:` bucket
+   * (`RATE_LIMIT_AUTH_MAX` is 10 per 60s in `deploy/do/app.yaml`, and
    * `http/rate-limit.ts` records as MEASURED that a web container proxies
    * every browser into ONE client key, so that budget is shared across
-   * people. An `/account` load already spends two units of it (`/get-session`
-   * behind `useSession`, and `/list-sessions` behind the effect above); this
-   * task adds a third, which is named here and in the task report rather than
-   * slipped in under a change whose whole headline is auth-bucket hygiene.
+   * people). Devices plan Task 6 moved the devices list to `GET /v1/me/devices`
+   * and Task 7 moved this one to `/v1/me/passkeys`: `/v1/*` routes the
+   * limiter never charges, so an `/account` load is now ONE unit, `/get-session`
+   * behind `useSession`. The gate stays because the request still cannot succeed
+   * anonymously.
    *
    * ## AND THE CEREMONIES COST MORE THAN THE PAGE LOAD — the half of the
    * ## disclosure an owner actually has to act on
@@ -139,13 +129,13 @@ export default function AccountPage() {
    *
    * | action | requests under `/api/auth/*` | units |
    * |---|---|---|
-   * | `/account` load (signed in) | `get-session`, `list-sessions`, `list-user-passkeys` | **3** |
-   * | Add a passkey, succeeding | `generate-register-options`, `verify-registration`, then the re-list | **3** |
+   * | `/account` load (signed in) | `get-session` (the passkey list is `/v1/me/passkeys`, uncharged) | **1** |
+   * | Add a passkey, succeeding | `generate-register-options`, `verify-registration` (the re-list is `/v1/me/passkeys`, uncharged) | **2** |
    * | Add a passkey, ABORTED at the prompt | `generate-register-options` only — `startRegistration` throws before the verify | **1** |
-   * | Delete a passkey | `delete-passkey`, then the re-list | **2** |
+   * | Delete a passkey | `delete-passkey` (the re-list is uncharged) | **1** |
    * | Sign in with a passkey (`/sign-in`) | `generate-authenticate-options`, `verify-authentication` | **2** |
    *
-   * So arriving on this page and registering once is **six units of ten**, and a
+   * So arriving on this page and registering once is **three units of ten**, and a
    * person who fumbles the prompt two or three times and retries can exhaust the
    * window — on a key shared with everyone behind the same web container, whose
    * sign-in is then refused. **That is a real operational cost and it is stated
@@ -161,20 +151,18 @@ export default function AccountPage() {
    * remedy if it ever bites is an operator raising `RATE_LIMIT_AUTH_MAX`, not a
    * change here.
    *
-   * Gating on `user !== null` is what keeps the third charge from being spent
-   * on a request that CANNOT succeed: the endpoint sits behind better-auth's
-   * `sessionMiddleware`, so an anonymous `/account` load would buy a 401 with
-   * a unit of everyone's sign-in budget. That is the same "a control that can
-   * never succeed" defect `app/sign-in/page.tsx`'s own docblock removes, one
-   * layer down — and it is why this effect is gated while the three above,
-   * which read product routes on their own budgets, are not.
+   * Gating on `user !== null` is what keeps a request that CANNOT succeed from
+   * being sent: the route sits behind the session, so an anonymous `/account`
+   * load would buy a 401. That is the same "a control that can never succeed"
+   * defect `app/sign-in/page.tsx`'s own docblock removes, one layer down — and
+   * it is why this effect is gated while the ones above, which are read on
+   * their own routes, are not.
    *
    * `signedIn` (a boolean) rather than `user` is the dependency on purpose:
    * `useSession()` hands back a fresh object every render, so depending on
    * `user` would re-fire this read on every re-render of the page.
    *
-   * None of this weakens `/sign-in`'s own guarantee, which is the property
-   * this task exists to protect: `/passkey/*` is absent from
+   * None of this weakens `/sign-in`'s own guarantee: `/passkey/*` is absent from
    * `SIGN_IN_PREFIXES`, so nothing here touches the tighter `signin:` bucket,
    * and an ANONYMOUS visitor now reaches neither this effect nor any passkey
    * request at all.
@@ -212,7 +200,7 @@ export default function AccountPage() {
       // Re-list rather than push the new row locally: the credential's stored
       // label is the SERVER's answer (an empty name is resolved from the
       // authenticator's AAGUID), so a locally-invented row would show a name
-      // the account does not actually carry. Same distrust `revokeSession`
+      // the account does not actually carry. Same distrust `afterSignOut`
       // above has for a state this component did not itself confirm.
       if (result.error === null) reloadPasskeys();
     },
@@ -323,10 +311,11 @@ export default function AccountPage() {
             (`GET /v1/me/deleted-items`), and a signed-out read would buy a
             401 for nothing. */}
         {user !== null ? <DeletedItemsSection dataSource={dataSource} currentUserId={user.id} /> : null}
-        {sessions !== null ? (
+        {devices !== null ? (
           <SessionsSection
-            sessions={sessions}
-            onRevoke={(token) => void revokeSession(token)}
+            devices={devices}
+            onSignOutDevice={(key) => void signOutDevice(key)}
+            onSignOutOthers={() => void signOutOthers()}
             error={sessionError}
           />
         ) : null}

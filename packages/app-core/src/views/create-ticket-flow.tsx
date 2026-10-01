@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { newUlid, statesWithBacklog, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
-import { REFUSAL_RULES } from '@gisik-nokma/rule-engine';
+import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import {
+  parentNoLongerClosed,
   reopenAndProceed,
-  reopenStateOptions,
+  reopenOfferFor,
   submitChildEvent,
   type Refusal,
 } from '../flows/guarded-child-event.js';
@@ -93,10 +93,10 @@ type ReopenPrompt = {
    *
    * `parentRead.ticket.closed` is `{actorId; at} | null | undefined` —
    * optional on the domain `TicketState` because 441 fixtures predate the
-   * flag (dispatch-context's binding ruling) — so this reads it through the
-   * SAME `?? null` normalisation every other reader of the flag uses, rather
-   * than `!== null` alone, which would treat an undefined (pre-flag) ticket
-   * as closed.
+   * flag (dispatch-context's binding ruling) — so `reopenOfferFor`
+   * (`flows/guarded-child-event.ts`) reads it through the SAME `?? null`
+   * normalisation every other reader of the flag uses, rather than `!== null`
+   * alone, which would treat an undefined (pre-flag) ticket as closed.
    */
   parentClosed: boolean;
 };
@@ -257,23 +257,15 @@ export function CreateTicketFlow({
       });
       return;
     }
-    // `statesWithBacklog`, not `def.states` (backlog/closed spec §1.4,
-    // 2026-09-17): a parent parked in the universal Backlog state has no row
-    // in its own published definition, and the reopen prompt must still name
-    // it "Backlog" rather than the bare id.
-    const parentStateName =
-      statesWithBacklog(def).find((state) => state.id === parentRead.ticket.stateId)?.name ??
-      parentRead.ticket.stateId;
+    const offer = reopenOfferFor(def, parentRead.ticket);
     setReopenPrompt({
       childEvent,
       childTicketId: childEvent.entity.id,
       parentId,
       parentTitle: parentRead.title,
-      parentStateName,
-      reopenStates: reopenStateOptions(def, parentRead.ticket.stateId),
+      ...offer,
       refusal,
       refusalOrigin,
-      parentClosed: (parentRead.ticket.closed ?? null) !== null,
     });
   };
 
@@ -440,7 +432,7 @@ export function CreateTicketFlow({
     if (outcome.kind === 'parent-refused') {
       // Stays open, in the dialog, verbatim: the parent's own rules refused the
       // reopen, and another target on the same list may still be allowed.
-      if (outcome.parentReopened || outcome.refusal.rule === REFUSAL_RULES.notClosed) {
+      if (parentNoLongerClosed(outcome)) {
         // Ruling 39 (fix round 1, 2026-09-17): the batch's `ticket.reopened`
         // half already COMMITTED before its transition half was refused — the
         // server processes a batch per-event, never atomically

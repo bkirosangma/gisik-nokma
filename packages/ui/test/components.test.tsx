@@ -582,15 +582,18 @@ describe('R1(c) at the component layer', () => {
    * border**, so a guard that forbids them forbids the correct answer.
    */
   const PAINTING_BORDER =
-    /border(-(top|right|bottom|left))?(-(width|style))?\s*:\s*(?!(none|0)\b)/;
+    /border(-(top|right|bottom|left))?(-(width|style))?\s*:\s*(?!\s|(none|0)\b)/;
+  // Amended 2026-09-29 (styling refresh Task 3): `(?!\s|…)` — without the `\s` arm the greedy `\s*` backtracks to zero
+  // spaces and the lookahead sees ` none`, so `border: none` MATCHED. It never showed because the old base rule's
+  // comment held a `}` that cut `rule()`'s body short before the `border: none;` line.
 
-  it('13.289 a ghost button renders as fill and label, with no painting border on either rule', () => {
-    // BOTH rules, because what renders is the cascade: `button.tsx` always
-    // emits `gn-button gn-button--ghost` together, so a boundary reintroduced
-    // on the base would reach the screen while a modifier-only assertion stayed
-    // green.
-    expect(rule('.gn-button--ghost')).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(rule('.gn-button--ghost')).not.toMatch(PAINTING_BORDER);
+  it('13.289 a ghost button is transparent with the ACCESSIBLE edge, and the base rule paints none', () => {
+    // Amended 2026-09-29 (styling refresh Plan A, 20.024): rule 03 ("edge ≥
+    // 3:1 — a flat grey fill at 1.6:1 vanishes") supersedes R1(c) for buttons.
+    // The property this case now holds: the edge is the accessible `border`
+    // role and lives on the MODIFIER, so a primary/danger never inherits it.
+    expect(rule('.gn-button--ghost')).toMatch(/background:\s*transparent/);
+    expect(rule('.gn-button--ghost')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
     expect(rule('.gn-button')).not.toMatch(PAINTING_BORDER);
   });
   it('13.290 refusal panels carry tone as an inset fill, never a border', () => {
@@ -659,15 +662,24 @@ describe('R1(c) at the component layer', () => {
    * Pinned the same shape 13.339 already pins for `.gn-field__input`, so a
    * future edit that drops either override reddens here rather than only
    * being visible by eye against the running app.
+   *
+   * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the BASE arm no longer
+   * pins `surface-sunken` on both. The type row is a raised item (`surface-raised`
+   * + `shadow-lift`, P-ROW) and the field row a recessed well (`surface-well`);
+   * the neo arm is unchanged — neo keeps its pressed rows (B-D3).
    */
   it('10.80 the ticket-type row and field row are pressed-in under neo, not merely coloured', () => {
+    const BASE_GROUND: Record<string, string> = {
+      '.ticket-type-list__row': 'surface-raised',
+      '.fields-editor__row': 'surface-well',
+    };
     for (const selector of ['.ticket-type-list__row', '.fields-editor__row']) {
       const base = rule(selector);
       const neo = rule(`[data-style="neo"] ${selector}`);
       expect(neo, `${selector}: the neo override must be a distinct rule, not a re-match of the base`).not.toBe(
         base,
       );
-      expect(base, selector).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+      expect(base, selector).toMatch(new RegExp(`background:\\s*var\\(--gn-${BASE_GROUND[selector]}\\)`));
       expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
     }
   });
@@ -723,15 +735,21 @@ describe('R1(c) at the component layer', () => {
    * deliberately so — that ruling's second half is a WIDER checker that does not
    * exist yet, so a case pinning 24 here would be pinning a floor nothing
    * enforces. The open question is named in `ui.css`'s own block.
+   *
+   * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the control is a P-GHOST
+   * icon now, so the shared-control-roles arm reads a transparent ground, the
+   * `text-subtle` ink and a full-round radius in place of the retired
+   * `fill-tertiary` + `text-accent` + control-radius constant. The 44px and
+   * no-style-fork arms are unchanged.
    */
   it('16.83 the reorder control has a rule at all, carries the shared control roles, and forks for no style', () => {
     const body = rule('.ticket-type-list__move');
 
     // The rule EXISTS — the whole defect. Every assertion below is about a class
     // that rendered as UA chrome precisely because this one was false.
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-subtle\)/);
+    expect(body).toMatch(/border-radius:\s*999px/);
     expect(body).toMatch(/border:\s*none/);
 
     // The recorded 44px divergence, on BOTH axes, so the prototype's 36px
@@ -839,7 +857,8 @@ describe('R1(c) at the component layer', () => {
     expect(body).not.toMatch(/background:\s*var\(--gn-danger\)/);
 
     expect(body).toMatch(/border:\s*none/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    // Amended 2026-09-29 (styling refresh, 20.077): a pill, rule 05.
+    expect(body).toMatch(/border-radius:\s*999px/);
 
     // The prototype's `min-height:44px` (`:1372`), kept in rem so it scales with
     // the reader's text size, and pinned so a re-transcription is a red rather
@@ -926,8 +945,12 @@ describe('Select panel/option styling', () => {
   // that requires a literal backslash in the stylesheet text and can never
   // match real CSS — verified empirically (a raw string matches, a
   // pre-escaped one does not) before writing these.
-  it('the neo panel gets shadow-only elevation, matching the row-shadow precedent', () => {
-    expect(rule('[data-style="neo"] .gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-raised\)/);
+  // Amended 2026-09-30 by 20.221 (styling refresh Plan B): the neo fork is gone. The BASE rule
+  // reads `--gn-shadow-lift-near`, which resolves to neo's own larger raised pair through the
+  // token, so the panel is still shadow-only under neo without a `[data-style]` restatement.
+  it('the neo panel gets shadow-only elevation, through the base rule and the token', () => {
+    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-lift-near\)/);
+    expect(UI_CSS).not.toMatch(/\[data-style="neo"\]\s+\.gn-select__panel\s*\{/);
   });
 
   it('the active/focused option row uses a focus-ring outline, not a background-fill misuse of focusRing', () => {
@@ -1149,10 +1172,11 @@ describe('13.1344 the raised appearance declares the raised coat', () => {
  * `border-radius` of its own, so the board card falls through to `.gn-card`'s
  * token and moves with the style axis like every other card.
  */
+// Amended 2026-09-29 (styling refresh Plan A, 20.042): the rule is multi-line with 1rem padding; the property — no radius of its own — is unchanged.
 describe('13.464 — the board card declares no border-radius of its own (Ruling 17)', () => {
   it('.gn-board-card keeps its own padding rule but sets no border-radius', () => {
     const body = rule('.gn-board-card');
-    expect(body, `.gn-board-card rule: ${body}`).toMatch(/padding:\s*0\.875rem/);
+    expect(body, `.gn-board-card rule: ${body}`).toMatch(/padding:\s*1rem/);
     expect(
       body.includes('border-radius'),
       `.gn-board-card reintroduced a literal radius that would out-specify nothing and tie .gn-card's by source order — ${body}`,
@@ -1166,8 +1190,8 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
    */
   it('a planted literal border-radius on .gn-board-card is caught', () => {
     const mutated = UI_CSS.replace(
-      '.gn-board-card { padding: 0.875rem; }',
-      '.gn-board-card { padding: 0.875rem; border-radius: 0.75rem; }',
+      '.gn-board-card {\n  padding: 1rem;',
+      '.gn-board-card {\n  padding: 1rem;\n  border-radius: 0.75rem;',
     );
     expect(
       mutated,
@@ -1207,13 +1231,18 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
  * `.gn-board-card--p1 .gn-board-card__priority` would have.
  */
 describe('13.1451-13.1452 the priority tint and the epic chip truncation are real CSS rules', () => {
-  it('each priority modifier paints the tint OVER the opaque surface, never the wash alone', () => {
+  // AMENDED 2026-09-29 by 20.057 (styling refresh Plan A Task 6): the tint is
+  // retired. This arm used to prove each modifier painted the wash OVER the
+  // opaque surface; it now proves the opposite — the modifier classes stay on
+  // the card as hooks (board.test.tsx, 13.1452) and NO rule paints them.
+  it('no priority modifier paints a background any more: the tint is retired', () => {
+    const stripped = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
     for (const level of ['p1', 'p2', 'p3'] as const) {
-      const body = rule(`.gn-board-card--${level}`);
-      expect(body, `.gn-board-card--${level}: ${body}`).toMatch(
-        new RegExp(`linear-gradient\\(var\\(--gn-priority-${level}-tint\\), var\\(--gn-priority-${level}-tint\\)\\), var\\(--gn-surface-raised\\)`),
-      );
+      expect(stripped, `.gn-board-card--${level}`).not.toMatch(new RegExp(`\\.gn-board-card--${level}(?![\\w-])`));
+      expect(stripped, `--gn-priority-${level}-tint`).not.toContain(`--gn-priority-${level}-tint`);
     }
+    // CONTROL — the pending modifier, which IS still painted, is still found by the same scan.
+    expect(stripped).toMatch(/\.gn-board-card--pending(?![\w-])/);
   });
 
   it('the epic title truncates with an ellipsis rather than wrapping or overflowing the card', () => {
@@ -1264,9 +1293,11 @@ describe('13.1467 the epic chip is block-level, sized to its own content, not in
     expect(body, body).toMatch(/display:\s*flex\s*;/);
     expect(body).not.toMatch(/display:\s*inline/);
     expect(body).toMatch(/width:\s*fit-content\s*;/);
-    // The one declaration unique to this rule in the whole file — proof
-    // `rule()`'s first-match regex landed on THIS rule, not a namesake.
-    expect(body).toMatch(/margin:\s*0 0 0\.3rem\s*;/);
+    // The declarations unique to this rule — proof `rule()`'s first-match regex
+    // landed on THIS rule. Amended 2026-09-29 (styling refresh, 20.055): the
+    // chip is now padded 4/8 with radius 8 and no margin of its own.
+    expect(body).toMatch(/padding:\s*0\.25rem 0\.5rem\s*;/);
+    expect(body).toMatch(/border-radius:\s*0\.5rem\s*;/);
   });
 });
 
@@ -1855,8 +1886,11 @@ describe('13.1142 the ticket sheet collapses its label column at phone width', (
 describe('13.1144 the board\'s whole-board empty state is styled', () => {
   it('13.1144 the container carries the column sibling\'s shape', () => {
     const body = rule('.gn-board--empty');
-    expect(body).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-card\)/);
+    // Amended 2026-09-30 by 20.281 (styling refresh Plan B, Task B9): the
+    // container is the board's own recessed TRACK now, not a fill4 card.
+    expect(body).toMatch(/background:\s*var\(--gn-surface-track\)/);
+    expect(body).toMatch(/box-shadow:\s*var\(--gn-shadow-track\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-track\)/);
     // The sibling's own three, asserted as a family rather than one property:
     // a container that centred differently would read as a different state.
     expect(body).toMatch(/display:\s*flex/);
@@ -1873,10 +1907,13 @@ describe('13.1144 the board\'s whole-board empty state is styled', () => {
 
   it('13.1144 the action takes the shared control constant', () => {
     const body = rule('.gn-board__empty-create');
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
-    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
-    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
-    expect(body).toMatch(/border:\s*none/);
+    // Amended 2026-09-30 by 20.281 (styling refresh Plan B, Task B9): the
+    // action is QUIET now — New ticket in the header is the screen's one loud
+    // element — so the constant is replaced by the outlined transparent pill.
+    expect(body).toMatch(/background:\s*transparent/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-muted\)/);
+    expect(body).toMatch(/border-radius:\s*999px/);
+    expect(body).toMatch(/border:\s*1px solid var\(--gn-border\)/);
     // The 44px standalone floor, the same one `.ticket-type-list__move` carries.
     expect(body).toMatch(/min-height:\s*2\.75rem/);
     // And the NEGATIVE half: a control still carrying the UA's edge is exactly
@@ -1916,22 +1953,30 @@ describe('13.1144 the board\'s whole-board empty state is styled', () => {
  * declaration.
  */
 describe('13.1147 the timeline nav declares a border, so no UA bevel survives', () => {
-  it('13.1147 the rule declares border: none', () => {
-    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*none/);
+  it('13.1147 the rule declares border: 1px solid var(--gn-border)', () => {
+    // Amended 2026-09-30 by 20.271 (styling refresh Plan B, Task B8): the nav
+    // is P-QUIET now, so its declared border is the 1px `--gn-border` edge
+    // rather than `none` — what the finding needs is unchanged: a `border`
+    // IS declared, so no UA bevel survives.
+    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*1px solid var\(--gn-border\)/);
+    expect(rule('.gn-timeline__nav')).not.toMatch(/outset/);
   });
 
   it('13.1147 and it takes the calendar nav\'s own values', () => {
     // Asserted as a PAIR with the sibling rule rather than as literals: the
     // finding's remedy is that the two views' navs agree, so a later edit that
     // re-diverges one of them is the regression to catch.
+    // Amended 2026-09-30 by 20.271 (styling refresh Plan B, Task B8): the
+    // values are the P-QUIET ones both navs took in Tasks B7 and B8, so the
+    // pair reads the same list on BOTH sides again.
     const timeline = rule('.gn-timeline__nav');
     const calendar = rule('.gn-calendar__nav');
     for (const property of [
-      /min-height:\s*2\.25rem/,
-      /border:\s*none/,
-      /border-radius:\s*var\(--gn-radius-control\)/,
-      /background:\s*var\(--gn-fill-tertiary\)/,
-      /color:\s*var\(--gn-text-accent\)/,
+      /min-height:\s*2\.75rem/,
+      /border:\s*1px solid var\(--gn-border\)/,
+      /border-radius:\s*999px/,
+      /background:\s*transparent/,
+      /color:\s*var\(--gn-text-muted\)/,
     ]) {
       expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
       expect(calendar, `calendar nav: ${String(property)}`).toMatch(property);
@@ -1988,10 +2033,10 @@ describe('13.1148 the overlay dismiss control meets the 44px standalone floor', 
     expect(body).toMatch(/justify-content:\s*center/);
   });
 
-  it('13.1148 it takes the prototype\'s circle and fill', () => {
+  it('13.1148 it takes the circle, transparent at rest (the fill moved to hover — styling refresh 20.073)', () => {
     const body = rule(CLOSE);
     expect(body).toMatch(/border-radius:\s*999px/);
-    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/background:\s*transparent/);
   });
 
   it('13.1148 the header\'s two controls answer the size question the same way', () => {

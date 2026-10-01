@@ -111,7 +111,7 @@ test.describe('workflow builder smoke — admin', () => {
 
   test('clone errand-with-waits, publish, and find it in the list', async ({ page }) => {
     await page.goto(url(`/w/${workspaceId}/settings/workflows/new`));
-    await page.getByRole('button', { name: 'Use this template — Errand with waits' }).click();
+    await page.getByRole('button', { name: 'Use the Errand with waits template' }).click();
     await expect(page.getByText('No issues — this workflow can be published.')).toBeVisible();
     // PLAN TEXT WAS WRONG HERE: the plan's snippet asserts 'Waiting on
     // counterparty', a string that appears nowhere in this template.
@@ -133,7 +133,7 @@ test.describe('workflow builder smoke — admin', () => {
 
   test('author from blank: add a state, drag a connection, publish', async ({ page }) => {
     await page.goto(url(`/w/${workspaceId}/settings/workflows/new`));
-    await page.getByRole('button', { name: 'Start blank' }).click();
+    await page.getByRole('button', { name: 'Start from a blank workflow' }).click();
     // the blank draft seeds one open start state named "New"
     await page.getByRole('button', { name: 'Add state' }).click();
     // `Select` (packages/ui/src/select/select.tsx) is a react-aria button+listbox

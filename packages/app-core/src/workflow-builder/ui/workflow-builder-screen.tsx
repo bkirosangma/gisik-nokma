@@ -12,7 +12,7 @@ import {
   type BuilderEnvironment,
   type BuilderSession,
 } from './builder-context.js';
-import { InspectorPanel } from './inspector-panel.js';
+import { BuilderPanels } from './builder-panels.js';
 import { IssuesPanel } from './issues-panel.js';
 import { PublishControls } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
@@ -198,6 +198,7 @@ export function WorkflowBuilderScreen(props: {
         </header>
         <div className="workflow-builder-screen__layout">
           <aside className="workflow-builder-screen__left">
+            <BuilderPanels />
             <SystemRulesPanel />
             <IssuesPanel />
           </aside>
@@ -212,9 +213,6 @@ export function WorkflowBuilderScreen(props: {
           <section className="workflow-builder-screen__canvas" aria-label="Canvas">
             <WorkflowCanvas />
           </section>
-          <aside className="workflow-builder-screen__right">
-            <InspectorPanel />
-          </aside>
         </div>
       </div>
     </BuilderProvider>

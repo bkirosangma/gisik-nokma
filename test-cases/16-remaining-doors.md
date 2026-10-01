@@ -569,7 +569,7 @@ plus a partial index → a filter at every view-serving SELECT.
 
 ### What is BUILT, and the two cases that carry it
 
-- **16.84** ✅ — **`Delete` is a history-retaining removal with an undo.**
+- **16.84** ✅ — **`Delete` is a history-retaining removal with an undo.** *Amended 2026-09-29 by 20.077: Delete is a pill (radius = height ÷ 2) with a soft hover fill; still danger ink on transparent, borderless, 44px.*
   `packages/app-core/test/views/ticket-sheet.test.tsx` (the sheet's half) and
   `apps/web/test/sheet-delete.test.tsx` (the CALL SITE's half — the sentence, and the Undo posting
   `ticket.restored` for the id it was offered for). **The sheet emits, closes ITSELF, and hands the
@@ -634,7 +634,13 @@ plus a partial index → a filter at every view-serving SELECT.
   passed`). The strip's Undo carries a **distinct accessible name** (`Undo the deletion of <title>`)
   because the toast's control is called "Undo" too; the visible word is unchanged and the accessible name
   contains it, so WCAG 2.5.3 holds, and a page-wide `getByRole('button', {name: 'Undo'})` stays
-  unambiguous. — (`apps/web/test/sheet-delete.test.tsx`)
+  unambiguous. **Flake fix (2026-10-01):** this case's fake clock was never uninstalled, and the timer it
+  then owned is a LIBRARY one — Tiptap's deferred `useEditor` destroy (`@tiptap/react` `useEditor.ts`,
+  `scheduleDestroy`, a 1 ms `setTimeout`), not one of the repo's own editor timers (`code-block-copy.ts`,
+  `heading-anchors.ts`, `wiki-link.ts`) — so under load it fired after jsdom was torn down (`window is not
+  defined` at `PasteRule.ts:282`, vitest exit 1 with every test green). The file's `afterEach` now
+  unmounts, flushes that destroy inside `act()` while `window` exists, and restores real timers; a GUARD
+  case straight after this one asserts `vi.isFakeTimers()` is `false`. — (`apps/web/test/sheet-delete.test.tsx`)
 
 - **13.1183** ✅ **`Delete` ASKS FIRST (ruling E2-35, 2026-09-21).** The footer's control performed the
   delete on ONE press, while the product reaches **the same soft delete** on many tickets through a whole
@@ -923,7 +929,7 @@ migration or a disclosure the table does not name is a **STOP AND ASK**.
 
 - **16.82** ✅ **`Full screen`** — the authority's pill (`desktop.dc.html:1119-1120`: 32px minimum height, fully round, an icon and a label that BOTH change), toggling **the scrim, the panel and the body TOGETHER** (the prototype's own three-part treatment, `:3396-3400`: the scrim goes opaque, the panel fills the viewport, the body becomes a centred 860px column). **All three parts are one property**: any one alone is a panel that grew while the page behind it stayed visible, which is what each part looks like on its own. Mutation-witnessed both ways — the scrim alone left behind reddens it, and a label that never turns around reddens it.
 - **16.81** ✅ The sheet's sections are **ONE segmented control** — the authority's shape (`:1134-1140`) — rendered by the SHARED `SegmentedControl`, carrying the same `tablist` / `tab` / `aria-selected` roles the two bordered buttons had, **plus a `aria-label` the tablist never carried** (see the correction below). **⚠ THREE tabs since 2026-09-22, and this line read "Two tabs exactly" with the `Attachments` tab's ABSENCE pinned.** That absence was correct while the question of drawing a third surface was open; **the owner ruled it in** (sheet-parity spec decision 5 — *"add the Attachments tab"*), so the case now asserts the ruled shape. **The mutation witness turns around with it:** adding a third tab reddened this case when two were right, and the way to redden it now is REMOVING one — the assertion is `toEqual(['Details', 'History', 'Attachments'])` plus a length, so neither direction of drift passes. **⚠ The added `aria-label` is NOT seen by the accessible-name ratchet, and an earlier version of this line claimed a "ratchet RISE": no suite renders the sheet** (the sweeps navigate `/p/:projectId` without `?ticket=`, and the sheet mounts only when it is present), so the number cannot move either way today — the witness is the unit assertion, and the rise would be exactly one `ariaLabel` the day something renders it.
-- **16.83** ✅ **The ticket-type list's ↑/↓ reorder had NO CSS RULE AT ALL**, and now has one — which is the whole case, because the class rendered as raw user-agent chrome for as long as it existed. **Measured in Chromium against the real screen:** `button.ticket-type-list__move` appeared in `ui.css` and `globals.css` **zero times**, against a positive control of `.ticket-type-list__row` in the same sweep; it painted `border: 2px outset`, `background: rgba(239,239,239,0.3)`, `border-radius: 0px`, `font-weight: 400`, `28.2 × 29.2`. **⚠ AND THE FIRST REPORT OF IT WAS MISDIAGNOSED** — the controller told the owner it was a *contrast* regression at 1.41:1; a class with no rule has no ratio of its own to be below, and the 1.41 was the stripped UA border colour the roster had been recording all along. **So this case does not pin a colour and must not be read as fixing one.** It pins that the rule EXISTS, that it carries the repo's ruled borderless-control roles (`--gn-fill-tertiary` + `--gn-text-accent` + `--gn-radius-control`, the same pairing `.gn-button` and `.gn-board-card__move` resolve this identical prototype constant to), that **no `[data-style]` block forks it** (13.340's positive scan, repeated for this class), and that the **44px tap target is taken over the prototype's own `32px`/`36px`** — the recorded divergence `.gn-board-card__move` already made, pinned so a re-transcription cannot land quietly. Mutation-witnessed **six ways, and each mutation dies on ITS OWN assertion**: the rule deleted (`rule()` throws), the fill swapped, `2.75rem` → `32px`, a `[data-style="neo"]` override added, `:disabled` `0.4` → `0.55`, and the `<li>` taken back off `display: flex`. **The three styles resolve from ONE unconditional rule** — measured in Chromium: `hig`/`minimal` at `rgba(39,58,99,0.11)` + 8px, `neo` at `rgba(176,152,132,0.16)` + 14px. **The glyph clears 4.5 in all six style×theme combinations on its real painted composite** — worst **`hig`/`minimal` DARK at `4.75`** (the full set: 4.75 · 4.75 · 4.98 · 5.18 · 5.18 · 5.85; an earlier draft of this line named `neo` light's `4.98` as the worst, which is **not the minimum in the author's own table**) — measured rather than assumed because the button's ground is the card, not the `surface` the existing `fillTertiary` case pins, and **no case in `tokens.test.ts` asserts this pairing** (its composited check at `:588` uses the default style only, over `surface`). **The layout half is part of it:** `<li>` is now the flex row the component's own comment claims ("the controls sit beside the door") and nothing honoured while `<li>` was `display: list-item` and the row door is `width: 100%` — measured before: pair top `205.7` against row top `234.8`, i.e. the pair sat on its own line ABOVE the row it reorders. **What it does NOT settle, named rather than assumed:** the owner's 2026-09-20 ruling that *dense in-list* controls take 24px has a checker that does not exist yet, so 44 is taken here — matching the repo's only other instance of this exact control — and **24 would LOWER a floor a live gate currently enforces.** That question and the rule to change are named in `ui.css`'s own block. `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
+- **16.83** ✅ **The ticket-type list's ↑/↓ reorder had NO CSS RULE AT ALL**, and now has one — which is the whole case, because the class rendered as raw user-agent chrome for as long as it existed. **Measured in Chromium against the real screen:** `button.ticket-type-list__move` appeared in `ui.css` and `globals.css` **zero times**, against a positive control of `.ticket-type-list__row` in the same sweep; it painted `border: 2px outset`, `background: rgba(239,239,239,0.3)`, `border-radius: 0px`, `font-weight: 400`, `28.2 × 29.2`. **⚠ AND THE FIRST REPORT OF IT WAS MISDIAGNOSED** — the controller told the owner it was a *contrast* regression at 1.41:1; a class with no rule has no ratio of its own to be below, and the 1.41 was the stripped UA border colour the roster had been recording all along. **So this case does not pin a colour and must not be read as fixing one.** It pins that the rule EXISTS, that it carries the repo's ruled borderless-control roles (`--gn-fill-tertiary` + `--gn-text-accent` + `--gn-radius-control`, the same pairing `.gn-button` and `.gn-board-card__move` resolve this identical prototype constant to), that **no `[data-style]` block forks it** (13.340's positive scan, repeated for this class), and that the **44px tap target is taken over the prototype's own `32px`/`36px`** — the recorded divergence `.gn-board-card__move` already made, pinned so a re-transcription cannot land quietly. Mutation-witnessed **six ways, and each mutation dies on ITS OWN assertion**: the rule deleted (`rule()` throws), the fill swapped, `2.75rem` → `32px`, a `[data-style="neo"]` override added, `:disabled` `0.4` → `0.55`, and the `<li>` taken back off `display: flex`. **The three styles resolve from ONE unconditional rule** — measured in Chromium: `hig`/`minimal` at `rgba(39,58,99,0.11)` + 8px, `neo` at `rgba(176,152,132,0.16)` + 14px. **The glyph clears 4.5 in all six style×theme combinations on its real painted composite** — worst **`hig`/`minimal` DARK at `4.75`** (the full set: 4.75 · 4.75 · 4.98 · 5.18 · 5.18 · 5.85; an earlier draft of this line named `neo` light's `4.98` as the worst, which is **not the minimum in the author's own table**) — measured rather than assumed because the button's ground is the card, not the `surface` the existing `fillTertiary` case pins, and **no case in `tokens.test.ts` asserts this pairing** (its composited check at `:588` uses the default style only, over `surface`). **The layout half is part of it:** `<li>` is now the flex row the component's own comment claims ("the controls sit beside the door") and nothing honoured while `<li>` was `display: list-item` and the row door is `width: 100%` — measured before: pair top `205.7` against row top `234.8`, i.e. the pair sat on its own line ABOVE the row it reorders. **What it does NOT settle, named rather than assumed:** the owner's 2026-09-20 ruling that *dense in-list* controls take 24px has a checker that does not exist yet, so 44 is taken here — matching the repo's only other instance of this exact control — and **24 would LOWER a floor a live gate currently enforces.** That question and the rule to change are named in `ui.css`'s own block. `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx` *Amended 2026-09-29 by 20.351 (styling refresh Plan B): the control is a P-GHOST icon — transparent ground, `text-subtle` ink, full-round radius, a `fill-tertiary` hover/focus wash — in place of the `fill-tertiary` + `text-accent` + control-radius constant; the 44px and no-style-fork arms are unchanged.*
 
 ## The attachments read — a route over the table that has been waiting for a caller (executor 2, 2026-09-20) — cases `16.47`–`16.58`
 
@@ -1700,3 +1706,44 @@ reports the failure at `row 7` — the seam — rather than at a count.
 correct once the index bug was fixed, so the case was written green and its value is established by MUTATION, not by
 a failing test. The RED it did produce was against the DEFECT — which is the stronger evidence of the two, and the
 one that would have been lost had the case been written to match what the code happened to do.
+
+## Add subtask under a TERMINAL parent offers the reopen (executor lane 4, 2026-09-30) — cases `16.130`–`16.132`
+
+The sheet's Add subtask refused under a Done parent with *"…Adding live work reopens it — choose a state to
+reopen it to…"* and drew no chooser; the create flow opened `ReopenDialog`. The sheet now takes the SAME guarded
+path (`submitChildEvent` → `reopenAndProceed`, `flows/guarded-child-event.ts`), with the offer derived from the
+parent's own definition (`reopenOfferFor`). Block `16.130`–`16.139`; `16.135`–`16.139` unspent.
+
+- **16.130** ✅ Done parent → Add subtask → the "Reopen parent?" dialog names the parent and its state, carries the
+  server's refusal, and offers exactly the parent's reopen states (Doing, To do; not Waiting, not Done). Choosing
+  Doing → "Reopen and proceed" sends the parent `ticket.transitioned` (`reopened-for-child`) and THEN the same
+  create event; the parent is Doing, the dialog closes, no refusal line, the title input is cleared. CONTROL in
+  the same `it`: under a live parent no dialog appears and the subtask is added with one ingest.
+- **16.131** ✅ Cancel adds nothing — one ingest only (the refused create), the parent stays Done, the dialog
+  closes, the typed title is kept.
+- **16.132** ✅ The refusal sentence is not the only surface: the dialog appears AND `sheet-subtask-refusal` is
+  absent (the dialog replaces the dead-end line rather than sitting beside it).
+
+**Mutations, run after the commit:** M-a skip the dialog branch (the `needs-reopen` arm falls to the refusal
+line) → kills `16.130`, `16.131`, `16.132`; M-b dialog Cancel still adds → kills `16.131`; M-c accept without the
+reopen batch (child event only) → kills `16.130`.
+
+**Fix round 1 (controller, 2026-09-30) — the production path, `16.133`–`16.134`.** Two controller mutations survived
+`16.130`–`16.132`: `parentClosed: false` at accept and dropping the `parentNoLongerClosed` re-arm. Cause: the Done
+fixture carried no `closed` flag, so the accept batch never held the parent's `ticket.reopened` half. These two cases
+use a door that models the flag (`closed-ticket` refuses a transition on a closed ticket; `ticket.reopened` on an
+unclosed one is `not-closed`).
+
+- **16.133** ✅ A CLOSED Done parent: choosing Doing sends, in order, the refused create, then ONE batch
+  `[ticket.reopened (payload {}), ticket.transitioned (to Doing, cause reopened-for-child)]` on the parent, then the SAME
+  child envelope; the parent ends live and unclosed, the dialog closes, the title clears. CONTROL in the same `it`: the
+  unflagged fixture of `16.130` still sends `[ticket.transitioned]` alone.
+- **16.134** ✅ A refused reopen (the parent's rules refuse Doing after the `ticket.reopened` committed) keeps the dialog
+  open showing the refusal verbatim, adds nothing and keeps the title; the retry to To do sends
+  `[ticket.transitioned]` ALONE (never a second `ticket.reopened` — `not-closed`) and then the child. CONTROL: the
+  second target succeeds and adds the child.
+
+**Mutations, run after the commit:** `parentClosed: false` at accept → kills `16.133` and `16.134`; the
+`parentNoLongerClosed` re-arm dropped → kills `16.134`; the reopened half dropped from the batch → kills `16.133` and
+`16.134`.
+

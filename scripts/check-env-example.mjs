@@ -72,8 +72,9 @@ const ROOTS = ['apps/server/src', 'apps/web', 'apps/mobile', 'apps/desktop', 'pa
 // database password never appears in argv where `ps` can read it. Its value
 // comes from DATABASE_URL, which IS documented; an operator must never set
 // PGPASSWORD themselves, so documenting it in .env.example would invite
-// exactly the wrong thing.
-const IGNORE = new Set(['NODE_ENV', 'CI', 'PATH', 'HOME', 'TEST_DATABASE_ADMIN_URL', 'PGPASSWORD']);
+// exactly the wrong thing. GISIK_E2E_RUN_STARTED_AT is the same kind: the e2e-stack `global-setup.ts` WRITES it and
+// `global-teardown.ts` reads it back in the same Playwright process (devices plan Task 8) -- never an operator setting.
+const IGNORE = new Set(['NODE_ENV', 'CI', 'PATH', 'HOME', 'TEST_DATABASE_ADMIN_URL', 'PGPASSWORD', 'GISIK_E2E_RUN_STARTED_AT']);
 // Where the server's configuration contract is declared. A tripwire, not a
 // detector: if this file stops contributing variables, the gate is no longer
 // covering the thing it exists to cover.

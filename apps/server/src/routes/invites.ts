@@ -252,29 +252,35 @@ async function withMintLock<T>(pool: Pool, key: string | null, work: (db: Querya
   }
 }
 
+type PendingInvite = { invite_id: string; role: string; project_ids: string[] };
+
 /**
- * The PENDING invitation this request repeats: same workspace, channel and
- * address, the same role and the SAME project set (order-insensitive — `@>` and
- * `<@` together are set equality). A revoked, accepted or declined invitation is
- * never matched. A pending one that differs in role or projects is NOT matched
- * either: that case mints a new invitation as it always did (an open question
- * for the owner). Newest first, because rows minted before this dedupe existed
- * may already be duplicated.
+ * Every PENDING invitation for this workspace, channel and address (email
+ * compared case-insensitively), newest first. Matched on the ADDRESS ONLY: a
+ * pending invitation of another role or project set is exactly what an update
+ * replaces (case 6.230). A revoked, accepted or declined invitation is never
+ * returned. More than one row is possible: rows minted before the dedupe
+ * existed may already be duplicated (case 6.232).
  */
-async function findPendingMatch(
+async function findPendingInvites(
   db: Queryable,
-  args: { workspaceId: string; channel: string; role: string; address: string; projectIds: string[] },
-): Promise<string | null> {
-  const { rows } = await db.query<{ invite_id: string }>(
-    `SELECT invite_id FROM proj_invites
-      WHERE workspace_id = $1 AND channel = $2 AND role = $3 AND status = 'pending'
-        AND (CASE WHEN channel = 'email' THEN lower(address) = lower($4) ELSE address = $4 END)
-        AND project_ids @> $5::text[] AND project_ids <@ $5::text[]
-      ORDER BY invited_at DESC
-      LIMIT 1`,
-    [args.workspaceId, args.channel, args.role, args.address, args.projectIds],
+  args: { workspaceId: string; channel: string; address: string },
+): Promise<PendingInvite[]> {
+  const { rows } = await db.query<PendingInvite>(
+    `SELECT invite_id, role, project_ids FROM proj_invites
+      WHERE workspace_id = $1 AND channel = $2 AND status = 'pending'
+        AND (CASE WHEN channel = 'email' THEN lower(address) = lower($3) ELSE address = $3 END)
+      ORDER BY invited_at DESC, invite_id DESC`,
+    [args.workspaceId, args.channel, args.address],
   );
-  return rows[0]?.invite_id ?? null;
+  return rows;
+}
+
+/** The same role and the SAME project set (order-insensitive, duplicates ignored). */
+function isRepeat(row: PendingInvite, role: string, projectIds: string[]): boolean {
+  const have = new Set(row.project_ids);
+  const want = new Set(projectIds);
+  return row.role === role && have.size === want.size && [...want].every((id) => have.has(id));
 }
 
 type TokenRow = { invite_id: string; expires_at: Date };
@@ -504,17 +510,71 @@ export function registerInviteRoutes(
       // transaction-scoped advisory lock on a dedicated connection and is
       // released BEFORE the letter is sent: holding a pooled connection across
       // an SMTP send would starve the pool.
+      //
+      // WHAT THE LOCK GUARDS, three ways (owner ruling 2026-09-30, "update the
+      // pending invite"):
+      //  - the NEWEST pending invitation has this very role and project set → a
+      //    REPEAT: rotate its token, same invitation id, no new event (S4);
+      //  - a pending invitation exists but differs in role or projects → an
+      //    UPDATE: revoke it (and any older pending duplicates) and send a fresh
+      //    invitation for the new role and projects, so the pending list shows
+      //    ONE invitation. There is no `invite.updated` event; the update is
+      //    `invite.revoked` then `invite.sent`, both through the gated door as
+      //    the caller. Two commits, NOT one transaction — see the note below;
+      //  - none pending → a fresh mint.
       const outcome = await withMintLock(
         deps.pool,
         mayDedupe ? mintLockKey(workspaceId, channel, address) : null,
         async (db) => {
           // Connect, BEGIN and the lock wait: everything since the gate.
           timing.mark('lock');
-          const existing = mayDedupe
-            ? await findPendingMatch(db, { workspaceId, channel, role, address, projectIds: projectIds ?? [] })
-            : null;
+          const pending = mayDedupe ? await findPendingInvites(db, { workspaceId, channel, address }) : [];
+          const newest = pending[0];
+          const repeat = newest !== undefined && isRepeat(newest, role, projectIds ?? []);
+          const existing = repeat ? newest.invite_id : null;
+          const updating = pending.length > 0 && !repeat;
 
           timing.mark('match');
+          if (updating) {
+            // AUTHORISATION BEFORE ANYTHING CHANGES. The new `invite.sent` was
+            // dry-run above (`mayDedupe`); every revoke is dry-run HERE, before
+            // the first one commits, so a refusal leaves the pending invitation
+            // exactly as it was. Same question as ingest asks, so the answer is
+            // the ingest layer's own shape.
+            const revokes = pending.map(
+              (row): SubmittedEvent => ({
+                id: newUlid(),
+                workspaceId,
+                entity: { kind: 'invite', id: row.invite_id },
+                type: 'invite.revoked',
+                version: 1,
+                payload: { inviteId: row.invite_id },
+                actorId: request.currentUserId,
+                origin: 'web',
+                clientTime: new Date().toISOString(),
+              }),
+            );
+            for (const revoke of revokes) {
+              const revokeParsed = parseEvent(revoke);
+              if (!revokeParsed.ok) throw new Error('the invite.revoked claim did not parse');
+              const refusal = await checkPermission(
+                { ...revokeParsed.event, serverTime: new Date().toISOString(), seq: 0 } satisfies EventEnvelope,
+                { db: deps.pool, sessionUserId: request.currentUserId },
+              );
+              if (refusal !== null) {
+                return { kind: 'refused' as const, result: { status: 'refused' as const, eventId: revoke.id, rule: refusal.rule, reason: refusal.reason } };
+              }
+            }
+            // Revoke the old, THEN send the new: never two pending invitations for
+            // one address. If the send is refused after the revokes committed (a
+            // race the dry-runs cannot see) the address is left with NO pending
+            // invitation and the admin invites again — nothing here compensates.
+            for (const revoke of revokes) {
+              const [revoked] = await deps.ingest.ingestClientBatch([revoke], request.currentUserId);
+              if (revoked === undefined) throw new Error('ingest returned no result for the invite.revoked event');
+              if (revoked.status !== 'committed') return { kind: 'refused' as const, result: revoked };
+            }
+          }
           if (existing === null) {
             const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
             if (result === undefined) {
@@ -539,7 +599,9 @@ export function registerInviteRoutes(
           // changes: tokens are stored hashed, so the original link cannot be
           // re-sent, and a fresh token REPLACES the old one — the old link stops
           // opening anything. An upsert, because the old row may be expired or
-          // may have been swept.
+          // may have been swept. On an UPDATE the invitation is a NEW one, so this
+          // inserts its first token; the revoked invitation's token is dead with
+          // its revoke (`openableInvite` refuses a non-pending invitation).
           const token = randomBytes(32).toString('base64url');
           const createdAt = new Date();
           const expiresAt = new Date(createdAt.getTime() + INVITE_TOKEN_TTL_MS);
@@ -553,14 +615,14 @@ export function registerInviteRoutes(
             [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
           );
           timing.mark('token');
-          return { kind: 'minted' as const, inviteId, token, expiresAt, deduped: existing !== null };
+          return { kind: 'minted' as const, inviteId, token, expiresAt, deduped: pending.length > 0, updated: updating };
         },
       );
       timing.mark('commit');
       if (outcome.kind === 'refused') {
         return reply.code(422).send(outcome.result);
       }
-      const { inviteId, token, expiresAt, deduped } = outcome;
+      const { inviteId, token, expiresAt, deduped, updated } = outcome;
 
       // The one and only copy of the raw token leaves here. `expiresAt` rides
       // with it so the admin can be told when the link lapses rather than
@@ -597,7 +659,7 @@ export function registerInviteRoutes(
       timing.mark('send');
       // The measurement the owner asked for (S1): where an invite's seconds go.
       // Durations and ids only.
-      request.log.info({ inviteId, channel, deduped, emailSent, timingMs: timing.ms }, 'invite mint timing');
+      request.log.info({ inviteId, channel, deduped, updated, emailSent, timingMs: timing.ms }, 'invite mint timing');
       return reply.code(201).send({ inviteId, url, expiresAt: expiresAt.toISOString(), emailSent });
     },
   );

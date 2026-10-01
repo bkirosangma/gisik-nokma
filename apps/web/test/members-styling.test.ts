@@ -129,7 +129,8 @@ describe('13.888 the roster table wears the prototype’s four card-and-table tr
     // `--cardBg`/`--cardShadow`/`--cardR` → the three roles below, per the
     // mapping table quoted at the head of this block in globals.css.
     expect(rule).toContain('background: var(--gn-surface-raised)');
-    expect(rule).toContain('box-shadow: var(--gn-shadow-raised)');
+    // Amended 2026-09-29 by 20.311 (styling refresh Plan B): the resting shadow is the lit-edge `lift`.
+    expect(rule).toContain('box-shadow: var(--gn-shadow-lift)');
     expect(rule).toContain('border-radius: var(--gn-radius-card)');
     // `overflow:auto` is the prototype's own and it is load-bearing rather than
     // decorative: the table is 820px wide and this is what carries it on a
@@ -137,14 +138,15 @@ describe('13.888 the roster table wears the prototype’s four card-and-table tr
     expect(rule).toContain('overflow: auto');
   });
 
-  it('the header row is the prototype’s tray: surface-sunken, 13px/18px/600, 11px 18px (desktop.dc.html:662)', () => {
+  it('the header row is the prototype’s tray: surface-well, 13px/18px/600, 11px 18px (desktop.dc.html:662)', () => {
     const rule = ruleFor(css, /^\.gn-members__th\s*\{/);
     expect(rule, `.gn-members__th rule: ${String(rule)}`).toBeDefined();
     expect(rule).toContain('font-size: 0.8125rem'); // 13px
     expect(rule).toContain('line-height: 1.125rem'); // 18px
     expect(rule).toContain('font-weight: 600');
     expect(rule).toContain('color: var(--gn-text-muted)'); // --label2
-    expect(rule).toContain('background: var(--gn-surface-sunken)'); // --trayBg
+    // Amended 2026-09-29 by 20.311 (styling refresh Plan B): the tray is the recessed `well`, not the 1.14:1 `surface-sunken`.
+    expect(rule).toContain('background: var(--gn-surface-well)'); // --trayBg
     expect(rule).toContain('padding: 0.6875rem 1.125rem'); // 11px 18px
   });
 

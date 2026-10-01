@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
+import { over } from './helpers/contrast.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
@@ -10,6 +11,8 @@ import {
   cssVariableName,
   fontStackOf,
   fontVariableName,
+  motionVariableName,
+  spaceVariableName,
   primitives,
   radiusVariableName,
   shadowValueOf,
@@ -136,8 +139,11 @@ describe('CSS variable emission', () => {
       ...TOKEN_ROLES.map(cssVariableName),
       radiusVariableName('card'),
       radiusVariableName('control'),
+      radiusVariableName('track'),
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
       ...FONT_ROLE_NAMES.map(fontVariableName),
+      ...([1, 2, 3] as const).map(spaceVariableName),
+      ...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
@@ -361,7 +367,8 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // literal does NOT track `SHADOW_ROLES` automatically (that is the whole
     // point, see the docblock above), so a role added to `SHADOWS`/`ShadowRole`
     // without a matching addition HERE stays uncovered by this case, silently.
-    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'] as const;
+    // The nine styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012; lift-drag for Task 5A) — added HERE by hand, which is the point of this literal.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;
     const stylesheet = themeStylesheet();
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
@@ -678,73 +685,36 @@ describe('tintWarning composites legibly on every surface it can reach', () => {
 });
 
 /**
- * 13.1453 — the board card's priority tint (owner request, 2026-09-23,
- * board-card badges). `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint` are
- * ALPHA — `primitives.priorityTintP1Light`'s own docblock has the full
- * derivation and the twelve worst-case numbers this block re-derives — so
- * no `CONTRAST_PAIRS` row may name them (the same rule `tintWarning`'s
- * block states), and the obligation is against the COMPOSITE.
- *
- * `.gn-board-card` sits on `.gn-card`'s own ground, `surfaceRaised`
- * (`ui.css:207`) — NOT `surface`, which is `tintWarning`'s page-level ground
- * and the wrong one here. Checked against every foreground a tinted card
- * actually draws: the priority's own ink/icon colour, the title/body text
- * (`text`/`textMuted`), and the THIRD-LEVEL composite the move-arrows' ghost
- * buttons make — `textAccent` on `fillTertiary`, itself composited over the
- * SAME wash (`.gn-board-card__move`, `ui.css`) — the tightest of the four in
- * every combination this block measures.
+ * 13.1453 — AMENDED 2026-09-29 by the styling refresh (Plan A Task 6, case
+ * 20.057). The per-priority card tint (owner request 2026-09-23) is retired:
+ * the owner-approved mockup draws no tint, and the ink is neutral except
+ * Urgent. The property this case now holds is the one a reader needs: every
+ * ink the priority badge draws clears 4.5 on the card's own ground, in every
+ * style × theme — and the four tint/ink roles are gone, so nothing can paint
+ * them by accident.
  */
-describe('the priority tint composites legibly on every surface it can reach, for every foreground the card draws', () => {
-  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
-  const over = (src: string, dst: string): string => {
-    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
-    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
-    const channel = (i: number): number =>
-      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
-    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
-  };
-
-  const PRIORITIES: { tint: TokenRole; ink: TokenRole; label: string }[] = [
-    { tint: 'priorityP1Tint', ink: 'danger', label: 'P1' },
-    { tint: 'priorityP2Tint', ink: 'success', label: 'P2' },
-    { tint: 'priorityP3Tint', ink: 'priorityP3', label: 'P3' },
+describe('13.1453 the priority ink clears 4.5 on the card ground; the tint roles are retired', () => {
+  const INKS: { label: string; ink: TokenRole }[] = [
+    { label: 'P1', ink: 'danger' },
+    { label: 'P2', ink: 'textMuted' },
+    { label: 'P3', ink: 'textSubtle' },
   ];
-
-  for (const { tint, ink, label } of PRIORITIES) {
+  for (const { label, ink } of INKS) {
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
-        it(`${label} ${style}/${theme}: the badge ink, the card text, and the move-arrow ghost all clear 4.5 on the wash`, () => {
-          const ground = colorOf(theme, 'surfaceRaised', style);
-          const washed = over(colorOf(theme, tint, style), ground);
-
-          // THE ANTI-VACUOUS CONTROL — `tintWarning`'s own block's precedent:
-          // a fully transparent tint composites to `ground` itself, which
-          // would make every assertion below pass by measuring text on a
-          // bare surface that already passes.
-          expect(washed, `${label} ${style}/${theme}: the tint composites to nothing`).not.toBe(ground);
-
+        it(`13.1453 ${label} ${style}/${theme}: ${ink} on surfaceRaised ≥ 4.5`, () => {
           expect(
-            contrastRatio(colorOf(theme, ink, style), washed),
-            `${label} ${style}/${theme}: the priority ink no longer clears 4.5 on its own tint`,
-          ).toBeGreaterThanOrEqual(4.5);
-          expect(
-            contrastRatio(colorOf(theme, 'text', style), washed),
-            `${label} ${style}/${theme}: the card title no longer clears 4.5 on the wash`,
-          ).toBeGreaterThanOrEqual(4.5);
-          expect(
-            contrastRatio(colorOf(theme, 'textMuted', style), washed),
-            `${label} ${style}/${theme}: the card body no longer clears 4.5 on the wash`,
-          ).toBeGreaterThanOrEqual(4.5);
-
-          const fillOverWash = over(colorOf(theme, 'fillTertiary', style), washed);
-          expect(
-            contrastRatio(colorOf(theme, 'textAccent', style), fillOverWash),
-            `${label} ${style}/${theme}: the move-arrow ghost button no longer clears 4.5 on the tinted card`,
+            contrastRatio(colorOf(theme, ink, style), colorOf(theme, 'surfaceRaised', style)),
           ).toBeGreaterThanOrEqual(4.5);
         });
       }
     }
   }
+  it('13.1453 the four priority tint/ink roles no longer exist', () => {
+    for (const role of ['priorityP1Tint', 'priorityP2Tint', 'priorityP3Tint', 'priorityP3']) {
+      expect((TOKEN_ROLES as readonly string[]).includes(role), role).toBe(false);
+    }
+  });
 });
 
 /**
@@ -1478,10 +1448,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
-    // The roster is unchanged in SIZE by this change — a floor removed is a
-    // guarantee removed, and it would show up here first. (Features.md states
-    // the same 33.)
-    expect(CONTRAST_PAIRS.length).toBe(33);
+    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows. A floor removed is a guarantee removed, and it would show here first.
+    expect(CONTRAST_PAIRS.length).toBe(44);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
@@ -1587,6 +1555,33 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
         ).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+
+  /**
+   * 10.160 (W1c, 2026-10-01) — `danger` as TEXT on **`surfaceWell`**, the ground of the quiet danger buttons
+   * (`.gn-button.builder-quiet-danger`: "Remove rule", "Delete transition", "Delete state") inside the builder's
+   * recessed row body. Same two controls as 16.84 bind the reading to THIS token table.
+   */
+  it('10.160 danger-as-ink on surfaceWell clears AA in all six combinations, on the ground the builder\'s danger buttons really have', () => {
+    // CONTROL 1 — the pinned primitives.
+    expect(colorOf('light', 'danger', 'neo')).toBe('#9e2a20');
+    expect(colorOf('light', 'danger', 'hig')).toBe('#d70015');
+    // CONTROL 2 — the same computation still reproduces the recorded `surface` shortfall (4.4013 < 4.5), so it reads the table the rest of the file reads.
+    expect(contrastRatio(colorOf('light', 'danger'), colorOf('light', 'surface'))).toBeLessThan(4.5);
+    for (const style of ['hig', 'minimal', 'neo'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        const well = colorOf(theme, 'surfaceWell', style);
+        expect(
+          contrastRatio(colorOf(theme, 'danger', style), well),
+          `${style}/${theme}: danger as ink on surfaceWell — the quiet danger buttons' ground`,
+        ).toBeGreaterThanOrEqual(4.5);
+        // The HOVER state keeps this same ground (a danger ring, no wash — see the control below), so the ratio above IS the hover ratio.
+      }
+    }
+    // CONTROL — why the hover is a ring and not `.gn-button--ghost`'s `fillQuaternary` wash: danger ink on that wash over the
+    // well is 4.18 in hig/minimal light (4.47 dark), below 4.5. If a token edit lifts it, this fails and says the wash is back on the table.
+    const lightWell = colorOf('light', 'surfaceWell', 'hig');
+    expect(contrastRatio(colorOf('light', 'danger', 'hig'), over(colorOf('light', 'fillQuaternary', 'hig'), lightWell))).toBeLessThan(4.5);
   });
 });
 
@@ -1751,6 +1746,13 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * the two roles are the same hex (`neoPaper`), which is why the error hid there
  * and only showed under `hig`. 13.920 composites its chip over `surfaceRaised`
  * for the same reason.
+ *
+ * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the row is now a raised
+ * item (`surface-raised` + `shadow-lift`, P-ROW) rather than a sunken one. The
+ * ground stays the CARD — an even row's stripe still REPLACES the row's own
+ * background (one element paints one background), so it composites over
+ * `.gn-card`'s `surface-raised` exactly as before and every measured reading
+ * below is unchanged; what an even row keeps of P-ROW is its `shadow-lift`.
  */
 describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible', () => {
   const ZEBRA = '.ticket-type-list__rows li:nth-child(even) .ticket-type-list__row';
@@ -2310,6 +2312,11 @@ describe('13.1146 token colours on surfaceSunken are declared pairs', () => {
  * own assertion rather than being folded into a sweep that would pass over it.
  * The tone is not lost by the fix — the panel's own `border-left: 3px dashed
  * var(--gn-warning)` carries it, at 3:1 as a non-text boundary.
+ *
+ * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the panel's ground is
+ * now `surface-well`, not `surface-sunken`, so the inherited-ink arm reads the
+ * `textMuted`/`surfaceWell` pair (declared by Plan A 20.002) instead of
+ * `textMuted`/`surfaceSunken`. The warning-edge and no-own-ink arms are unchanged.
  */
 describe('13.1146 (second arm) the advisories title inherits a declared ink', () => {
   // Read HERE, not reused from the describe above: `UI_CSS_TEXT` is scoped to
@@ -2330,16 +2337,16 @@ describe('13.1146 (second arm) the advisories title inherits a declared ink', ()
     expect(bodyOf('.advisories-panel__title')).not.toMatch(/color:/);
   });
 
-  it('13.1146 the panel it inherits from is a DECLARED pair on sunken', () => {
+  it('13.1146 the panel it inherits from is a DECLARED pair on the well', () => {
     const panel = bodyOf('.advisories-panel');
-    expect(panel).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+    expect(panel).toMatch(/background:\s*var\(--gn-surface-well\)/);
     // The ink the title now inherits, and it must be one the roster holds on
     // this surface — otherwise the fix moves the failure rather than removing
     // it.
     expect(panel).toMatch(/color:\s*var\(--gn-text-muted\)/);
     expect(
-      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceSunken'),
-      'textMuted/surfaceSunken is not a declared pair — the inherited ink is unchecked',
+      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceWell'),
+      'textMuted/surfaceWell is not a declared pair — the inherited ink is unchecked',
     ).toBe(true);
   });
 

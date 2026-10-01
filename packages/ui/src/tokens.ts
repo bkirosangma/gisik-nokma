@@ -665,91 +665,68 @@ export const primitives = {
   onColorWarmDark: '#141a2e',
 
   /**
-   * ## The priority card tint (owner request, 2026-09-23: "the entire card
-   * surface is tinted by priority")
+   * ## The styling refresh's grounds (Plan A Task 1, 2026-09-29)
    *
-   * Eight primitives: an ALPHA wash per priority per theme, plus two new
-   * SOLID inks for P3 (P1/P2 reuse the existing `danger`/`success` roles for
-   * ink — see `TOKEN_ROLES`'s `priorityP1Tint`/`priorityP2Tint`/`priorityP3`
-   * docblock for the role-level picture).
-   *
-   * **This reopens a refusal on record, and the reopening is authorised,
-   * not accidental.** `ui.css` (the `.gn-visibility__standing-mode` block)
-   * says outright: "this product has no tint role for [a danger/success
-   * wash]... inventing one would be adding a token on a STYLING TASK's
-   * authority." That refusal was about a styling task reaching for a colour
-   * nobody asked for; this one is the owner's own explicit request, named
-   * and dated, so the reason the refusal gave does not apply. The tokens
-   * below are named `priorityTintP1`/`priorityTintP2` rather than a general
-   * `tintDanger`/`tintSuccess` for exactly that reason: scoped to what was
-   * asked, not a general-purpose wash a later styling task could reach for
-   * on ITS OWN authority.
-   *
-   * ## Alpha, hue and the method
-   *
-   * ALPHA 0.05 (byte `0x0d`) for all three, all four theme×priority
-   * combinations — one weight, so the three read as one system rather than
-   * three independent decisions. The HUE is the corresponding ink's own
-   * primitive: `red600`/`red300` for P1 (danger family), `green700`/`green300`
-   * for P2 (success family) — literally "reuses the … family", not merely a
-   * similar colour — and the two NEW `priorityInkP3*` hexes below for P3, a
-   * cyan-leaning blue chosen to read as "frozen" and to stay visually distinct
-   * from `accent`/`textAccent` (`blue600`/`blue300`), which already carries
-   * the product's link/button meaning.
-   *
-   * Measured exactly as `packages/ui/test/tokens.test.ts`'s own
-   * `relativeLuminance`/`contrastRatio`/`over` helpers compute it (a
-   * throwaway script mirroring them line for line, `over(tint, groundBySt‑
-   * yle)`), against BOTH grounds a tinted card can sit on — `warmRaised`
-   * (hig/minimal light) and `neoPaper` (neo light); `navyRaised`
-   * (hig/minimal dark) and `neoNavyRaised` (neo dark) — for every foreground
-   * a tinted card actually draws: the priority ink itself, `text`,
-   * `textMuted`, and the THIRD-LEVEL composite `textAccent` on `fillTertiary`
-   * (the move-arrows' ghost buttons, `.gn-board-card__move`) over the SAME
-   * wash. All twelve combinations (3 priorities × 2 themes × 2 style
-   * grounds) clear 4.5; the worst of each is cited below, at 0.05:
-   *
-   * - **P1** (hue `red600`/`red300`): light hig/minimal ink **4.605**
-   *   (text 11.950, muted 9.358, ghost 5.468), light neo ink 5.754; dark
-   *   hig/minimal ink **4.759** (text 11.197, muted 11.335, ghost 5.110),
-   *   dark neo ink 5.116.
-   * - **P2** (hue `green700`/`green300`): light hig/minimal ink **4.748**
-   *   (text 12.283, muted 9.619, ghost 5.607), light neo ink 5.399; dark
-   *   hig/minimal ink 7.032 (ghost **4.949**, the tightest P2 number), dark
-   *   neo ink 7.678.
-   * - **P3** (new hue, below): light hig/minimal ink 5.248, light neo ink
-   *   **4.719** (the tightest P3 number; text 10.988, muted 8.605, ghost
-   *   5.414); dark hig/minimal ink 7.813 (ghost **4.854**), dark neo ink
-   *   8.544.
-   *
-   * No `STYLE_COLOR_OVERRIDES` entry: the tint's HUE does not vary by style
-   * (unlike `danger`/`success` themselves, which already do) — only the
-   * ground it composites against does, which is exactly what the twelve
-   * combinations above measure. A future reader who wants `neo`'s own
-   * tinted-card hue to match `neoLightDanger`/`neoLightSuccess` exactly is
-   * free to add one; nothing here forecloses it, and today's margins (worst
-   * 4.605) are not so tight that hig/minimal's shared value is fragile.
+   * Transcribed from the owner-approved mockup (`Main.dc.html:130`, `:143`;
+   * `Sheet.dc.html:111`, `:120`). The TRACK is the recessed ground that HOLDS
+   * raised items on the page (a board column); the WELL is the recessed ground
+   * INSIDE a raised panel (the sheet's field group). Both measure below 1.5:1
+   * against the ground around them (1.08 / 1.10), on purpose: they are
+   * identified by the `track` shadow (Task 2), not by fill — rule 04, "light
+   * from above". Under neo both roles resolve to the neo surface, as every neo
+   * ground does (depth is shadow-only there, `STYLE_COLOR_OVERRIDES` below).
    */
-  priorityTintP1Light: '#d700150d',
-  priorityTintP1Dark: '#ff69610d',
-  priorityTintP2Light: '#1e7a340d',
-  priorityTintP2Dark: '#30db5b0d',
+  trackWarm: '#e8ded4',
+  trackNavy: '#10152a',
+  wellWarm: '#f3ece5',
+  wellNavy: '#1a213b',
   /**
-   * P3's ink — DERIVED, not exported from anywhere, the same standing
-   * `textAccentLight`/`textAccentDark` and `textSubtleLight`/`textSubtleDark`
-   * already have in this file: a colour this product needs that no prototype
-   * export supplies. Chosen for hue distance from `accent`
-   * (`blue600`/`blue300`, roughly 211° in HSL) — this sits nearer 190-195°,
-   * cyan-leaning rather than violet-leaning, which is what reads as "icy"
-   * beside the product's own blue rather than as a duller copy of it.
-   * Measured worst-case ratios are cited on `priorityTintP1Light`'s own
-   * docblock above (the P3 bullet); both clear 4.5 with the SAME margin
-   * discipline the other two priorities are held to.
+   * The primary button's DARK edge (`Main.dc.html:132`, `accentEdge`). The
+   * light edge is `textAccentLight` (`#2d5488`, above) byte-for-byte, so it is
+   * reused rather than duplicated. 11.42:1 on `navyBase`, 9.41:1 on `navyRaised`.
    */
-  priorityInkP3Light: '#146b8a',
-  priorityInkP3Dark: '#7ad8f5',
-  priorityTintP3Light: '#146b8a0d',
-  priorityTintP3Dark: '#7ad8f50d',
+  accentEdgeDark: '#bcd4f7',
+  /**
+   * ## The styling refresh's depth (Plan A Task 2, 2026-09-29) — hig only
+   *
+   * Every value is the owner-approved mockup's own rgba, converted to 8-digit
+   * hex (alpha × 255, rounded): `Main.dc.html:133-140` (dark) and `:146-153`
+   * (light), `Sheet.dc.html:118`/`:127` (the sheet). Names start `shadow`, so
+   * case 13.338's sweep (`tokens.test.ts:229`) sees every one. neo reuses its
+   * OWN primitives above (`shadowNeo*`) and minimal draws none.
+   */
+  shadowLitLight: '#ffffffe6',
+  shadowLitNearLight: '#ffffffff',
+  shadowFallLight1: '#273a631f',
+  shadowFallLight2: '#273a6338',
+  shadowFallNearLight1: '#273a6314',
+  shadowFallNearLight2: '#273a632e',
+  shadowFallNearLight3: '#273a6347',
+  shadowFallPressLight1: '#273a6324',
+  shadowFallPressLight2: '#273a6333',
+  shadowTrackLight: '#b0988459',
+  shadowTrackLitLight: '#ffffff99',
+  shadowActionLitLight: '#ffffff47',
+  shadowActionFallLight: '#273a6340',
+  shadowActionGlowLight: '#33629f73',
+  shadowActionLitNearLight: '#ffffff66',
+  shadowActionGlowNearLight: '#33629f80',
+  shadowActionPressLight: '#1016254d',
+  shadowSheetLight: '#273a6359',
+  shadowLitDark: '#f2e9e112',
+  shadowLitNearDark: '#f2e9e11f',
+  shadowFallDark1: '#00000080',
+  shadowFallDark2: '#00000099',
+  shadowFallNearDark1: '#00000059',
+  shadowFallNearDark2: '#0000008c',
+  shadowTrackDark: '#00000073',
+  shadowTrackLitDark: '#ffffff0a',
+  shadowActionLitDark: '#ffffff73',
+  shadowActionLitNearDark: '#ffffff8c',
+  shadowActionFallNearDark: '#000000a6',
+  shadowActionPressDark: '#141a2e73',
+  shadowActionPressFallDark: '#00000066',
+  shadowSheetLitDark: '#f2e9e114',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -759,6 +736,14 @@ export const TOKEN_ROLES = [
   'surfaceRaised',
   'surfaceSunken',
   'surfaceOverlay',
+  /**
+   * The recessed TRACK and WELL grounds — styling refresh Plan A Task 1. A
+   * track holds raised items on the page ground (board columns); a well is a
+   * recessed group inside a raised panel (the sheet's fields). Text on both is
+   * a declared pair at 4.5 (see `CONTRAST_PAIRS`).
+   */
+  'surfaceTrack',
+  'surfaceWell',
   'text',
   'textMuted',
   /**
@@ -875,6 +860,12 @@ export const TOKEN_ROLES = [
   'brand',
   'accent',
   'accentText',
+  /**
+   * The primary button's EDGE (rule 03: "edge ≥ 3:1") and its hover fill.
+   * Declared ≥ 3 on `surface`/`surfaceRaised`, and `accentText` on it ≥ 4.5,
+   * because the hovered primary paints its fill with this role.
+   */
+  'accentEdge',
   'danger',
   'dangerText',
   'warning',
@@ -908,36 +899,6 @@ export const TOKEN_ROLES = [
    * that wants them apart moves this line, not every call site.
    */
   'customMarker',
-  /**
-   * ## The priority card tint + P3's ink (owner request, 2026-09-23)
-   *
-   * Four roles, not three: `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint`
-   * are the alpha washes `ui.css`'s `.gn-board-card--p1`/`--p2`/`--p3`
-   * composite over `surfaceRaised`; `priorityP3` is a SOLID ink role, the P3
-   * badge/icon colour, sitting in the SAME family as `danger`/`success` —
-   * which is why P1 and P2 need no ink role of their own here: their badges
-   * already draw `danger`/`success` directly, "reuses the … family" in the
-   * literal sense.
-   *
-   * `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint` are ALPHA, so — the
-   * same rule `tintWarning` above is held to — **no `CONTRAST_PAIRS` row may
-   * name one of them**: `relativeLuminance` ignores alpha, and a declared
-   * pair would measure the wash's own colour against a background it is
-   * actually blended INTO. The obligation is against the COMPOSITE, proven in
-   * `tokens.test.ts`'s own describe block for these three roles, mirroring
-   * the shape its `tintWarning composites legibly…` block already uses.
-   *
-   * `priorityP3` (solid) COULD be named in `CONTRAST_PAIRS` against a plain
-   * surface, but is deliberately NOT: a P3 badge only ever renders on a
-   * P3-tinted card (every card is tinted by ITS OWN priority), so the
-   * obligation that matters is the same composite check the tint roles
-   * already need — a plain-surface pairing would assert a guarantee nothing
-   * on screen relies on.
-   */
-  'priorityP1Tint',
-  'priorityP2Tint',
-  'priorityP3Tint',
-  'priorityP3',
 ] as const;
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
@@ -954,6 +915,8 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'warmRaised',
     surfaceSunken: 'warmSunken',
     surfaceOverlay: 'overlayWarmHig',
+    surfaceTrack: 'trackWarm',
+    surfaceWell: 'wellWarm',
     text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
@@ -971,6 +934,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     brand: 'brandOrange',
     accent: 'blue600',
     accentText: 'onColorWarmLight',
+    accentEdge: 'textAccentLight',
     danger: 'red600',
     dangerText: 'onColorWarmLight',
     warning: 'amber700',
@@ -985,16 +949,14 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet600',
     contested: 'magenta600',
     customMarker: 'violet600',
-    priorityP1Tint: 'priorityTintP1Light',
-    priorityP2Tint: 'priorityTintP2Light',
-    priorityP3Tint: 'priorityTintP3Light',
-    priorityP3: 'priorityInkP3Light',
   },
   dark: {
     surface: 'navyBase',
     surfaceRaised: 'navyRaised',
     surfaceSunken: 'navySunken',
     surfaceOverlay: 'overlayNavyHig',
+    surfaceTrack: 'trackNavy',
+    surfaceWell: 'wellNavy',
     text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
@@ -1012,6 +974,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     brand: 'brandOrange',
     accent: 'blue300',
     accentText: 'onColorWarmDark',
+    accentEdge: 'accentEdgeDark',
     danger: 'red300',
     dangerText: 'redInk',
     warning: 'amber300',
@@ -1026,10 +989,6 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet300',
     contested: 'magenta300',
     customMarker: 'violet300',
-    priorityP1Tint: 'priorityTintP1Dark',
-    priorityP2Tint: 'priorityTintP2Dark',
-    priorityP3Tint: 'priorityTintP3Dark',
-    priorityP3: 'priorityInkP3Dark',
   },
 };
 
@@ -1068,6 +1027,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoPaper',
       surfaceSunken: 'neoPaper',
       surfaceOverlay: 'overlayWarmNeo',
+      surfaceTrack: 'neoPaper',
+      surfaceWell: 'neoPaper',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
       danger: 'neoLightDanger',
@@ -1082,6 +1043,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoNavyRaised',
       surfaceSunken: 'neoNavySunken',
       surfaceOverlay: 'overlayNavyNeo',
+      surfaceTrack: 'neoNavy',
+      surfaceWell: 'neoNavy',
       fillTertiary: 'fillNavyNeo3',
       fillQuaternary: 'fillNavyNeo4',
     },
@@ -1089,13 +1052,14 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
 };
 
 /** `radius.card` / `radius.control` → `--gn-radius-card` / `--gn-radius-control`. Not a colour, so plain CSS length strings, no primitive/discipline concerns. */
-export type RadiusRole = 'card' | 'control';
+export type RadiusRole = 'card' | 'control' | 'track';
 
+/** `track` (styling refresh, 2026-09-29) = card + 8: a track pads its cards by 8px, and rule 05 says inner radius = outer − padding (16 = 24 − 8; neo 20 = 28 − 8). */
 /** `hig` and `minimal` share the shipped radii; `neo`'s are the export's own, larger values. */
 export const radii: Record<StyleName, Record<RadiusRole, string>> = {
-  hig: { card: '16px', control: '8px' },
-  minimal: { card: '16px', control: '8px' },
-  neo: { card: '20px', control: '14px' },
+  hig: { card: '16px', control: '8px', track: '24px' },
+  minimal: { card: '16px', control: '8px', track: '24px' },
+  neo: { card: '20px', control: '14px', track: '28px' },
 };
 
 export function radiusOf(style: StyleName, role: RadiusRole): string {
@@ -1146,6 +1110,31 @@ export function fontStackOf(role: FontRole): string {
 /** `sans` → `--gn-font-sans`. */
 export function fontVariableName(role: FontRole): string {
   return `--gn-font-${role}`;
+}
+
+/**
+ * The 8-pt grid and the motion constants (styling refresh Plan A Task 2,
+ * rules "02 Spacing — 24 around, 16 between groups, 8 between lines" and
+ * "06 Motion — feedback in 100ms, done in 300; 150–300ms, ease-out"). Neither
+ * varies by style or theme, so — like the fonts — they are emitted ONCE under
+ * the bare `:root` (`themeStylesheet`'s first block), never per style×theme.
+ */
+export const spacing = { 1: '0.5rem', 2: '1rem', 3: '1.5rem' } as const;
+export type SpaceStep = keyof typeof spacing;
+export function spaceVariableName(step: SpaceStep): string {
+  return `--gn-space-${step}`;
+}
+
+export const motion = {
+  feedback: '100ms',
+  move: '200ms',
+  lift: '220ms',
+  done: '300ms',
+  'ease-out': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+} as const;
+export type MotionKey = keyof typeof motion;
+export function motionVariableName(key: MotionKey): string {
+  return `--gn-motion-${key}`;
 }
 
 /**
@@ -1230,13 +1219,29 @@ export function fontVariableName(role: FontRole): string {
  * names `fillQuaternary`, so 13.338's actual guarantee is unaffected), but
  * the sweep no longer covers every shadow layer by construction.
  */
-export type ShadowRole = 'raised' | 'sunken' | 'overlay' | 'sunken-compact' | 'selected';
+export type ShadowRole =
+  | 'raised'
+  | 'sunken'
+  | 'overlay'
+  | 'sunken-compact'
+  | 'selected'
+  | 'lift'
+  | 'lift-near'
+  | 'lift-press'
+  | 'lift-drag'
+  | 'track'
+  | 'action'
+  | 'action-near'
+  | 'action-press'
+  | 'sheet';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
   x: number;
   y: number;
   blur: number;
+  /** Optional fourth length (styling refresh Task 2): a negative spread keeps a long, soft fall from widening past the card. */
+  spread?: number;
   colour: PrimitiveName;
   inset?: boolean;
 };
@@ -1274,6 +1279,65 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 0, y: 3, blur: 8, colour: 'shadowHigLight' },
         { x: 0, y: 3, blur: 1, colour: 'fillWarmHig4' },
       ],
+      /** Styling refresh (Plan A Task 2) — `Main.dc.html:146` `lift`. */
+      lift: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallLight1' },
+        { x: 0, y: 8, blur: 16, spread: -8, colour: 'shadowFallLight2' },
+      ],
+      /** `:148` `near` — the lift TOWARD the user: brighter lit edge, 3-layer spreading fall. */
+      'lift-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearLight', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallNearLight1' },
+        { x: 0, y: 12, blur: 24, spread: -6, colour: 'shadowFallNearLight2' },
+        { x: 0, y: 28, blur: 48, spread: -16, colour: 'shadowFallNearLight3' },
+      ],
+      /** `:149` `press`. */
+      'lift-press': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallPressLight1' },
+        { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallPressLight2' },
+      ],
+      /**
+       * Added 2026-09-29 (owner kanban rulings; Task 5A). The DRAGGED card is
+       * lifted furthest toward the user: `lift-near`'s lit edge, with a fall that
+       * reaches further and softer (40px down, 64px blur). The mockup draws no
+       * drag state, so this reuses the mockup's own primitives and adds none.
+       */
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearLight', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallLight1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallLight2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallNearLight3' },
+      ],
+      /** `:150` `recess` — the track, lit from above (dark top inset, light bottom lip). */
+      track: [
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackLight', inset: true },
+        { x: 0, y: -1, blur: 0, colour: 'shadowTrackLitLight', inset: true },
+      ],
+      /** `:153` `btnShadow`. */
+      action: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitLight', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowActionFallLight' },
+        { x: 0, y: 8, blur: 16, spread: -6, colour: 'shadowActionGlowLight' },
+      ],
+      /** `:151` `btnNear`. */
+      'action-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitNearLight', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallPressLight2' },
+        { x: 0, y: 10, blur: 20, spread: -6, colour: 'shadowActionGlowLight' },
+        { x: 0, y: 20, blur: 36, spread: -14, colour: 'shadowActionGlowNearLight' },
+      ],
+      /** `:152` `btnPress` — pushed back into its track. */
+      'action-press': [
+        { x: 0, y: 2, blur: 4, colour: 'shadowActionPressLight', inset: true },
+        { x: 0, y: 1, blur: 1, colour: 'shadowFallPressLight2' },
+      ],
+      /** `Sheet.dc.html:127` `sheetShadow` — lit inner left edge, shadow falls to the left. */
+      sheet: [
+        { x: 1, y: 0, blur: 0, colour: 'shadowLitLight', inset: true },
+        { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowSheetLight' },
+      ],
     },
     dark: {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
@@ -1282,11 +1346,56 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       'sunken-compact': [],
       /** `--segOnShadow` hig dark (`desktop.dc.html:43`) — ONE layer only, not two; see the docblock above. */
       selected: [{ x: 0, y: 3, blur: 8, colour: 'shadowHigDark' }],
+      lift: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallDark1' },
+        { x: 0, y: 8, blur: 16, spread: -8, colour: 'shadowFallDark2' },
+      ],
+      'lift-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearDark', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowFallNearDark1' },
+        { x: 0, y: 12, blur: 24, spread: -6, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 28, blur: 48, spread: -16, colour: 'shadowFallDark2' },
+      ],
+      'lift-press': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallDark1' },
+      ],
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearDark', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallNearDark1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallDark2' },
+      ],
+      track: [
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackDark', inset: true },
+        { x: 0, y: -1, blur: 0, colour: 'shadowTrackLitDark', inset: true },
+      ],
+      action: [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitDark', inset: true },
+        { x: 0, y: 1, blur: 2, colour: 'shadowFallDark1' },
+        { x: 0, y: 8, blur: 16, spread: -6, colour: 'shadowFallNearDark2' },
+      ],
+      'action-near': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowActionLitNearDark', inset: true },
+        { x: 0, y: 2, blur: 4, colour: 'shadowTrackDark' },
+        { x: 0, y: 10, blur: 20, spread: -6, colour: 'shadowFallDark2' },
+        { x: 0, y: 20, blur: 36, spread: -14, colour: 'shadowActionFallNearDark' },
+      ],
+      'action-press': [
+        { x: 0, y: 2, blur: 4, colour: 'shadowActionPressDark', inset: true },
+        { x: 0, y: 1, blur: 1, colour: 'shadowActionPressFallDark' },
+      ],
+      sheet: [
+        { x: 1, y: 0, blur: 0, colour: 'shadowSheetLitDark', inset: true },
+        { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowFallDark2' },
+      ],
     },
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
-    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [] },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
   },
   neo: {
     light: {
@@ -1317,6 +1426,47 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
       selected: [
         { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
         { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
+      lift: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Toward the user: the same pair, thrown further. */
+      'lift-near': [
+        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -10, y: -10, blur: 24, colour: 'shadowNeoHighlightLight' },
+      ],
+      'lift-press': [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
+      'lift-drag': [
+        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -14, y: -14, blur: 32, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** The track IS neo's `sunken` tray. */
+      track: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkLight', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      action: [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
+      ],
+      'action-near': [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Pushed in: neo's own `selected` inset. */
+      'action-press': [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
+      ],
+      sheet: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
       ],
     },
     dark: {
@@ -1353,12 +1503,54 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
         { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
       ],
+      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
+      lift: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Toward the user: the same pair, thrown further. */
+      'lift-near': [
+        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -10, y: -10, blur: 24, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      'lift-press': [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
+      'lift-drag': [
+        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -14, y: -14, blur: 32, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** The track IS neo's `sunken` tray. */
+      track: [
+        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkDark', inset: true },
+        { x: -4, y: -4, blur: 9, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      action: [
+        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      'action-near': [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
+      /** Pushed in: neo's own `selected` inset. */
+      'action-press': [
+        { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
+        { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
+      ],
+      sheet: [
+        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
+        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
+      ],
     },
   },
 };
 
 function shadowLayerCss(layer: ShadowLayer): string {
-  return `${layer.inset ? 'inset ' : ''}${layer.x}px ${layer.y}px ${layer.blur}px ${primitives[layer.colour]}`;
+  const spread = layer.spread === undefined ? '' : ` ${layer.spread}px`;
+  return `${layer.inset ? 'inset ' : ''}${layer.x}px ${layer.y}px ${layer.blur}px${spread} ${primitives[layer.colour]}`;
 }
 
 /** The CSS `box-shadow` value for one style×theme×role — `'none'` when that combination has no layers. */
@@ -1515,6 +1707,25 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'border', bg: 'surface', minimum: 3 },
   { fg: 'borderStrong', bg: 'surface', minimum: 3 },
   { fg: 'focusRing', bg: 'surface', minimum: 3 },
+  /**
+   * Styling refresh Plan A Task 1 (2026-09-29). The two recessed grounds carry
+   * the three text tiers (rule 03), the primary's edge clears the non-text 3:1
+   * on the grounds a button sits on (rule 03, "edge ≥ 3:1"), the hovered
+   * primary's label clears 4.5 on its hover fill, and the quiet controls'
+   * accessible edge (`border`) is declared on the raised and well grounds it
+   * now also sits on — it was only ever declared on `surface`.
+   */
+  { fg: 'text', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'textMuted', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'text', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'textMuted', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'textSubtle', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'accentEdge', bg: 'surface', minimum: 3 },
+  { fg: 'accentEdge', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'accentText', bg: 'accentEdge', minimum: 4.5 },
+  { fg: 'border', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'border', bg: 'surfaceWell', minimum: 3 },
 ];
 
 /**
@@ -1534,7 +1745,7 @@ export function cssVariableName(role: TokenRole): string {
   return `--gn-${role.replace(/[A-Z]/g, (upper) => `-${upper.toLowerCase()}`)}`;
 }
 
-const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
+const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control', 'track'];
 /**
  * EXPORTED (round 3 fix round 1, 2026-09-16) so `tokens.test.ts` can build its
  * own "every var(--gn-…) names a declared role" check directly from THIS
@@ -1565,7 +1776,22 @@ const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control'];
  * updated to add `'selected'` in the same change that added it here, which
  * is what makes 13.411's coverage of this role real rather than assumed.
  */
-export const SHADOW_ROLES: readonly ShadowRole[] = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected'];
+export const SHADOW_ROLES: readonly ShadowRole[] = [
+  'raised',
+  'sunken',
+  'overlay',
+  'sunken-compact',
+  'selected',
+  'lift',
+  'lift-near',
+  'lift-press',
+  'lift-drag',
+  'track',
+  'action',
+  'action-near',
+  'action-press',
+  'sheet',
+];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {
@@ -1637,7 +1863,13 @@ export function themeStylesheet(): string {
        `declarationsFor`, where it would belong — lands later in source order
        and wins the tie against this base at equal specificity, which is the
        direction an override has to resolve. */
-    `:root { ${FONT_ROLES.map((role) => `${fontVariableName(role)}: ${fontStackOf(role)};`).join(' ')} }`,
+    `:root { ${FONT_ROLES.map((role) => `${fontVariableName(role)}: ${fontStackOf(role)};`).join(' ')} ${(
+      Object.keys(spacing) as unknown as SpaceStep[]
+    )
+      .map((step) => `${spaceVariableName(step)}: ${spacing[step]};`)
+      .join(' ')} ${(Object.keys(motion) as MotionKey[])
+      .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
+      .join(' ')} }`,
     `:root { ${declarationsFor('hig', 'light')} }`,
     `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('hig', 'dark')} } }`,

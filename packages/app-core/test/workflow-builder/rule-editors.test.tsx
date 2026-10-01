@@ -8,7 +8,7 @@ import { createDraftStore, type DraftStore } from '../../src/workflow-builder/dr
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
-import { InspectorPanel } from '../../src/workflow-builder/ui/inspector-panel.js';
+import { BuilderPanels } from '../../src/workflow-builder/ui/builder-panels.js';
 
 // Every conditional affordance below is asserted BOTH ways: present when the
 // condition holds, and absent when it does not. The absent half is not
@@ -50,7 +50,7 @@ function renderInspector(store: DraftStore, envOverrides: Partial<BuilderEnviron
   };
   return render(
     <BuilderProvider store={store} env={environment}>
-      <InspectorPanel />
+      <BuilderPanels />
     </BuilderProvider>,
   );
 }

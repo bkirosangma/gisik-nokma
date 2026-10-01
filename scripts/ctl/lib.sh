@@ -26,6 +26,29 @@ ctl_fail() { echo "FAIL $1 $2"; exit 1; }
 # Run a command, or only print it under CTL_DRY_RUN=1.
 ctl_run() { if [ "${CTL_DRY_RUN:-0}" = 1 ]; then echo "DRY: $*"; else "$@"; fi; }
 
+# Disk hygiene after a dev-stack rebuild (owner standing rule, 2026-10-01). A rebuild leaves the previous image
+# and the build cache behind; the Docker VM disk filled (2026-10-01) and the test Postgres began refusing
+# connections, failing a whole gate. So every rebuild ends by pruning the BUILD CACHE and UNUSED images older
+# than 24 h -- `-a` widens "unused" from dangling to every image no container uses, `until=24h` spares anything
+# built today. These two commands are the ONLY prunes ctl may run: never `docker volume prune`, never
+# `docker system prune`, never `--volumes` -- the dev Postgres, MinIO and the test Postgres live in volumes
+# (test-cases 13.1590-13.1595 police this).
+ctl_prune_build_cache() { ctl_run docker builder prune -f; }
+ctl_prune_old_images()  { ctl_run docker image prune -a -f --filter until=24h; }
+# Both run even when the first fails; non-zero if either did.
+ctl_prune() { local rc=0; ctl_prune_build_cache || rc=1; ctl_prune_old_images || rc=1; return $rc; }
+
+# One line: image and build-cache size (reclaimable) plus how full the Docker VM disk is (read through the
+# test Postgres container, whose data dir sits on it -- the disk that filled). Each part degrades to "n/a".
+ctl_disk_line() {
+  local df img cache use
+  df="$(docker system df --format '{{.Type}}|{{.Size}}|{{.Reclaimable}}' 2>/dev/null)"
+  img="$(printf '%s\n' "$df" | awk -F'|' '$1=="Images"{printf "%s (reclaimable %s)", $2, $3}')"
+  cache="$(printf '%s\n' "$df" | awk -F'|' '$1=="Build Cache"{printf "%s (reclaimable %s)", $2, $3}')"
+  use="$(docker exec gisik-nokma-postgres-1 df -P /var/lib/postgresql/data 2>/dev/null | awk 'NR==2{print $5}')"
+  echo "disk: images ${img:-n/a}, build cache ${cache:-n/a}, Docker VM disk ${use:-n/a} used"
+}
+
 ctl_marker_dir() { local root="$1" gitdir; gitdir="$(cd "$root" && /usr/bin/git rev-parse --git-dir)"; case "$gitdir" in /*) ;; *) gitdir="$root/$gitdir";; esac; mkdir -p "$gitdir/ctl"; echo "$gitdir/ctl"; }
 ctl_marker_write() { local root="$1" kind="$2" sha="$3" log="$4"; echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $log" > "$(ctl_marker_dir "$root")/$kind-$sha"; }
 ctl_marker_has()   { [ -f "$(ctl_marker_dir "$1")/$2-$3" ]; }
