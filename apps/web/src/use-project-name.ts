@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
 
 /**
@@ -32,6 +33,10 @@ import { useAppServices, useSessionStatus } from './providers.js';
  * there is no remount for a cache to survive and nothing it would buy here —
  * only a second stale-entry-eviction story to keep in sync with the first.
  * Stated as a decision, not an oversight.
+ *
+ * **It re-asks when `projects-version.ts` is bumped** (MCP CRUD plan Task 2): a
+ * committed project write — an Edit's rename above all — would otherwise leave
+ * this page's title on the old name until the next page load.
  */
 export function useProjectName(
   workspaceId: string | undefined,
@@ -41,6 +46,8 @@ export function useProjectName(
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
   const [name, setName] = useState<string | null>(null);
+  // Re-asks after a committed project write (an Edit's new name), see `projects-version.ts`.
+  const version = useProjectsVersion();
 
   useEffect(() => {
     if (workspaceId === undefined || projectId === undefined || !signedIn) {
@@ -64,7 +71,7 @@ export function useProjectName(
     return () => {
       cancelled = true;
     };
-  }, [dataSource, workspaceId, projectId, signedIn]);
+  }, [dataSource, workspaceId, projectId, signedIn, version]);
 
   return name;
 }

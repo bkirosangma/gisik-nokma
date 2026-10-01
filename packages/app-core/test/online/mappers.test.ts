@@ -1028,6 +1028,32 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
     });
   });
 
+  /** 7.706 — the plural SERVER keys (MCP CRUD plan Task 3) are not the web client's: it keeps sending the singular wire keys. */
+  it('7.706 emits only the singular wire keys for every UI axis — never a plural server key', () => {
+    const wire = toServerFilterSpec({
+      assigneeIds: [ANSELMA],
+      collaboratorIds: [ANSELMA],
+      typeIds: ['bug'],
+      stateIds: ['todo'],
+      stateCategories: ['active'],
+      priorities: ['P1'],
+    });
+    // control: every axis IS present, as its singular key
+    expect(wire).toEqual({
+      assigneeId: ANSELMA,
+      collaboratorId: ANSELMA,
+      typeId: 'bug',
+      stateId: 'todo',
+      stateCategory: 'active',
+      priority: 'P1',
+    });
+    for (const plural of ['assigneeIds', 'collaboratorIds', 'typeIds', 'stateIds', 'stateCategories', 'priorities']) {
+      expect(Object.keys(wire)).not.toContain(plural);
+    }
+    // and a two-value axis is still refused loudly, not sent as a list
+    expect(() => toServerFilterSpec({ priorities: ['P1', 'P2'] })).toThrow(UnexpressibleFilterError);
+  });
+
   it('THROWS on a multi-assignee filter, naming the key and the count', () => {
     expect(() => toServerFilterSpec({ assigneeIds: [ANSELMA, BIREN] })).toThrow(
       UnexpressibleFilterError,

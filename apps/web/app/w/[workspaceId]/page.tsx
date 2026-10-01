@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { newUlid, type IngestResult } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import {
@@ -20,6 +20,14 @@ import { useAppServices, useCurrentUser } from '../../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../../src/expired-session.js';
 import { mayAdminister, restrictedLine, viewerOf } from '../../../src/workspace-viewer.js';
 import { DocumentTitle } from '../../../src/document-title.js';
+import { ProjectEditForm, type ProjectEditValues } from '../../../src/project-edit-form.js';
+import { bumpProjectsVersion } from '../../../src/projects-version.js';
+import { updateSeeds } from '../../../src/project-update-seeds.js';
+
+// Exported from here beside `archiveSeeds` (the two project acts this page
+// submits); the builder lives in `src/` because the project page's header
+// submits the same claim.
+export { updateSeeds };
 
 /**
  * Archiving and restoring are ONE control and one symmetric event pair, chosen
@@ -258,6 +266,13 @@ export default function WorkspaceHomePage() {
         return;
       }
       const seeds = build(user.id);
+      // A builder that answers `[]` (an Edit form saved with nothing changed)
+      // is not a claim to send: the act is done as soon as it is asked, and the
+      // `setRefusal(null)` above has already cleared any earlier refusal.
+      if (seeds.length === 0) {
+        whenDone();
+        return;
+      }
       const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
       setBusy(true);
       void dataSource.ingest(seeds.map(make)).then(
@@ -276,6 +291,10 @@ export default function WorkspaceHomePage() {
           const bad = results.find((result) => result.status !== 'committed');
           if (bad === undefined) {
             whenDone();
+            // A committed batch may have renamed, redescribed, archived or
+            // founded a project; tell the hooks that cache the served list
+            // (the nav's project link, the project page's title) to re-ask.
+            bumpProjectsVersion();
             // The outcome is OBSERVED by re-reading, never by editing this
             // page's own copy of the list — a client that moved the row itself
             // would be asserting an outcome instead of reading one.
@@ -429,6 +448,7 @@ function ProjectCard({
   isAdmin,
   busy,
   onArchive,
+  onEdit,
   onDelete,
 }: {
   workspaceId: string;
@@ -437,8 +457,17 @@ function ProjectCard({
   isAdmin: boolean;
   busy: boolean;
   onArchive: (project: ProjectRef) => void;
+  onEdit: (project: ProjectRef, values: ProjectEditValues, whenDone: () => void) => void;
   onDelete: (project: ProjectRef) => void;
 }) {
+  // MCP CRUD plan Task 2 (owner ruling M1): an owner/admin can rename and
+  // redescribe a project from its card. The form replaces the actions strip
+  // while it is open (the door above keeps showing the served name), and it is
+  // gated by the SAME `isAdmin` as Archive — the server's `project.updated` bar
+  // is the same as `project.archived`'s, and this control only tells a person
+  // that before they type.
+  const [editing, setEditing] = useState(false);
+  const editTrigger = useRef<HTMLButtonElement>(null);
   return (
     <li data-testid={`project-row-${project.id}`}>
       <Card
@@ -489,8 +518,26 @@ function ProjectCard({
             )}
           </span>
         </Link>
-        {isAdmin ? (
+        {isAdmin && editing ? (
+          <ProjectEditForm
+            idPrefix={`gn-project-${project.id}`}
+            initial={{ name: project.name, description: project.description ?? null }}
+            busy={busy}
+            onSave={(values) => onEdit(project, values, () => setEditing(false))}
+            onCancel={() => setEditing(false)}
+            returnFocusRef={editTrigger}
+          />
+        ) : isAdmin ? (
           <div className="gn-project-card__actions">
+            <Button
+              ref={editTrigger}
+              type="button"
+              disabled={busy}
+              aria-label={`Edit ${project.name}`}
+              onClick={() => setEditing(true)}
+            >
+              Edit
+            </Button>
             <Button
               type="button"
               disabled={busy}
@@ -771,6 +818,17 @@ function WorkspaceHome({
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
+  const edit = (project: ProjectRef, values: ProjectEditValues, whenDone: () => void): void =>
+    onSubmit(
+      () =>
+        updateSeeds(
+          workspace.id,
+          project.id,
+          { name: project.name, description: project.description ?? null },
+          values,
+        ),
+      whenDone,
+    );
   // "N members · M active projects · you're an owner" — every number SERVED,
   // never derived a second way. The member-count gate is `viewer.
   // countsWithheld`, NOT `workspace.memberCount === null` — a review caught
@@ -1035,6 +1093,7 @@ function WorkspaceHome({
               isAdmin={isAdmin}
               busy={busy}
               onArchive={archive}
+              onEdit={edit}
               onDelete={onDelete}
             />
           ))}
