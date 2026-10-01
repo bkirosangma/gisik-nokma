@@ -554,7 +554,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByTestId('note-document');
-    snap(container); // header, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
+    snap(container); // header, bar, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
     // group/group-title, deleted/restore button, session-absent, editor,
     // title, byline, author, edited, scope/scope-wrap, badges, reading-time,
     // byline-actions, toc(wrapper), search/search-input/filters.

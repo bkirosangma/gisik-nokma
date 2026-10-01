@@ -32,18 +32,21 @@ describe('23.163 My Work attention: five rows, one per ticket, strongest reason'
           itemOf('overdue', 'A', 'All five'),
           itemOf('stale', 'B', 'Stale and soon'),
           itemOf('due-soon', 'B', 'Stale and soon'),
-          itemOf('due-soon', 'C', 'Blocked and contested'),
-          itemOf('contested', 'C', 'Blocked and contested'),
+          itemOf('due-soon', 'C', 'Soon and contested'),
+          itemOf('contested', 'C', 'Soon and contested'),
           itemOf('blocked', 'D', 'Only blocked'),
+          itemOf('stale', 'E', 'Stale and blocked'), // stale listed FIRST: input order cannot pass the blocked > stale pair
+          itemOf('blocked', 'E', 'Stale and blocked'),
         ]}
         onOpenTicket={() => {}}
       />,
     );
-    expect(titles(container)).toHaveLength(4); // 4 tickets, so no cap yet
+    expect(titles(container)).toHaveLength(5); // 5 tickets (the cap), so nothing is hidden yet
     expect(screen.getAllByText('All five')).toHaveLength(1);
     expect(chipsOf(screen.getByText('All five').closest('li') as HTMLElement)).toEqual(['Overdue']);
     expect(chipsOf(screen.getByText('Stale and soon').closest('li') as HTMLElement)).toEqual(['Stale']);
-    expect(chipsOf(screen.getByText('Blocked and contested').closest('li') as HTMLElement)).toEqual(['Due soon']);
+    expect(chipsOf(screen.getByText('Soon and contested').closest('li') as HTMLElement)).toEqual(['Due soon']);
+    expect(chipsOf(screen.getByText('Stale and blocked').closest('li') as HTMLElement)).toEqual(['Blocked']);
     // control: the one-reason ticket
     expect(chipsOf(screen.getByText('Only blocked').closest('li') as HTMLElement)).toEqual(['Blocked']);
     expect(screen.queryByRole('button', { name: /^Show all/ })).toBeNull(); // nothing hidden, nothing to show

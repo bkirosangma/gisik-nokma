@@ -79,8 +79,8 @@ describe('23.160 the Notes drawer toggle is a styled ghost Button named "Notes" 
   });
 });
 
-describe('23.161 the Notes landing opens on the list, with "Create note" showing (audit NP-02)', () => {
-  it('23.161 with no note open the tree is expanded (data-open and aria-expanded true) and "Create note" is in it; CONTROL: with a note open the tree starts collapsed, and above 60rem the grid is unchanged', async () => {
+describe('23.161 the Notes landing opens on the list, with "Create note" outside the drawer (audit NP-02)', () => {
+  it('23.161 with no note open the tree is expanded and "Create note" shows; CONTROL: with a note open the drawer is closed yet the ONE "Create note" is outside `#gn-notes-tree`, painted at every width, and the desktop grid is unchanged', async () => {
     const landing = mount();
     const tree = await screen.findByRole('navigation', { name: 'Notes' });
     expect(tree).toHaveAttribute('data-open', 'true');
@@ -89,13 +89,27 @@ describe('23.161 the Notes landing opens on the list, with "Create note" showing
     expect(screen.queryByRole('button', { name: 'New note' })).toBeNull(); // the old label is gone
     landing.unmount();
 
-    // CONTROL: a note open → the drawer starts closed (the document is the page)
+    // CONTROL: a note open → the drawer starts closed (the document is the page) …
     mount('01J9NOTE00000000000000000A');
     const closed = await screen.findByRole('navigation', { name: 'Notes' });
     expect(closed).toHaveAttribute('data-open', 'false');
     expect(screen.getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-expanded', 'false');
-    // CONTROL: above 60rem the split is exactly as it was
+    // … and "Create note" is STILL reachable: ONE button, not a descendant of the drawer (NP-02's "note at 360…" half)
+    const create = await screen.findByRole('button', { name: 'Create note' });
+    expect(document.getElementById('gn-notes-tree')!.contains(create)).toBe(false);
+    expect(screen.getAllByRole('button', { name: 'Create note' })).toHaveLength(1);
+    // the container that holds it is never hidden below 60rem (jsdom cannot paint a @media, so the rule text is the proxy)
+    expect(create.closest('.gn-notes__bar')).not.toBeNull();
+    const tablet = parseRules(globals).filter((rule) => rule.atRule === TABLET);
+    for (const rule of tablet.filter((r) => r.selectors.some((sel) => sel.startsWith('.gn-notes__bar')))) {
+      expect(valueOf(rule.body, 'display')).not.toBe('none');
+    }
+    expect(valueOf(ruleExactly(globals, '.gn-notes__bar'), 'display')).toBe('flex');
+    // CONTROL: above 60rem the split is exactly as it was — the bar is OUTSIDE `.gn-notes__body`, so the grid is
+    // still the tree and the document in columns 1 and 2, and the toggle is still hidden
     expect(valueOf(ruleExactly(globals, '.gn-notes__body'), 'grid-template-columns')).toBe('18rem minmax(0, 1fr)');
+    expect(create.closest('.gn-notes__body')).toBeNull();
+    expect(valueOf(ruleExactly(globals, '.gn-notes__tree-toggle'), 'display')).toBe('none');
   });
 });
 

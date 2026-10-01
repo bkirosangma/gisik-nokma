@@ -3866,6 +3866,18 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
 }
 
+/* The BAR — the drawer toggle and the page's ONE "Create note" (UX fixes T9, 23.161, audit NP-02). It sits OUTSIDE
+   `.gn-notes__body`, so the two-column grid above is untouched, and OUTSIDE `.gn-notes__tree--drawer`, so the
+   ≤60rem arm that hides the drawer cannot hide the Create button. No rule in that arm sets `display: none` on it.
+   Above 60rem the toggle is `display: none` and the bar is a row of its own holding only Create. */
+.gn-notes__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 /* Confluence-style inner padding (owner, 2026-09-23), generous and
    viewport-proportional so it neither pins to the edge at 1600px nor crowds
    the text at 768px. */
@@ -3964,7 +3976,8 @@ input, textarea, select { font-family: inherit; }
   margin-top: 0.5rem;
 }
 
-/* The tree head — the title filter now, and Task 3's Create button beside it. */
+/* The tree head — the title filter. The Create button is NOT here: it sits in `.gn-notes__bar`, outside the
+   drawer, so it is painted while the drawer is closed (UX fixes T9, 23.161, audit NP-02). */
 .gn-notes__tree-head {
   display: flex;
   align-items: center;
@@ -4190,7 +4203,6 @@ input, textarea, select { font-family: inherit; }
   .gn-notes__tree-toggle {
     display: inline-flex;
     align-items: center;
-    margin-bottom: 0.75rem;
   }
   .gn-notes__tree--drawer {
     display: none;
