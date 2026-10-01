@@ -19,12 +19,12 @@ import type { Session } from '../src/session.js';
  */
 
 /**
- * Every tool, in the order `allTools` composes them: the four reads that remain in
- * `read-tools.ts`, the four ticket writes, then the workspace tools (MCP CRUD plan
- * Task 6 — `list_workspaces` moved there and gained `include`).
+ * Every tool, in the order `allTools` composes them: the three reads that remain in
+ * `read-tools.ts`, the four ticket writes, the workspace tools (MCP CRUD plan Task 6 —
+ * `list_workspaces` moved there and gained `include`), then the project tools (Task 7 —
+ * `list_projects` moved there and gained `include`).
  */
 const TOOL_NAMES = [
-  'list_projects',
   'search_tickets',
   'list_tickets',
   'get_ticket',
@@ -40,6 +40,14 @@ const TOOL_NAMES = [
   'restore_workspace',
   'delete_workspace',
   'undelete_workspace',
+  'list_projects',
+  'get_project',
+  'create_project',
+  'update_project',
+  'archive_project',
+  'restore_project',
+  'delete_project',
+  'undelete_project',
 ];
 
 const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-09-08T00:00:00.000Z' }] };
@@ -49,14 +57,15 @@ function fakeSession(over: Partial<Session> = {}): Session {
     userId: () => '01J0A5ER0000000000000000AA',
     // One workspace `w` named `W` (and an empty Deleted items list) rather than a
     // bare stub: `list_projects` and the workspace tools read the directory, and
-    // the sweep in 14.88 drives `archive_workspace` with `confirm_name: 'W'` — a
+    // the sweep in 14.88 drives `archive_workspace` with `confirm_name: 'W'` and `archive_project` with `'P'` — a
     // shapeless answer would fail it for a reason that has nothing to do with stdout.
     get: async () => ({
-      workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }],
+      workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [{ projectId: 'p', name: 'P', description: null, prefix: 'P', archived: false }] }],
       items: [],
     }),
     post: async () => ({}),
-    postEvents: async () => COMMITTED,
+    // One committed result per event sent: `create_project` sends a pair, and a short answer is refused.
+    postEvents: async (events) => ({ results: events.map(() => COMMITTED.results[0]) }),
     ...over,
   };
 }
@@ -79,6 +88,13 @@ const ARGS: Record<string, Record<string, unknown>> = {
   restore_workspace: { workspaceId: 'w' },
   delete_workspace: { workspaceId: 'w', confirm_name: 'W' },
   undelete_workspace: { workspaceId: 'w' },
+  get_project: { projectId: 'p' },
+  create_project: { workspaceId: 'w', name: 'X' },
+  update_project: { projectId: 'p', name: 'Y' },
+  archive_project: { projectId: 'p', confirm_name: 'P' },
+  restore_project: { projectId: 'p' },
+  delete_project: { projectId: 'p', confirm_name: 'P' },
+  undelete_project: { projectId: 'p' },
 };
 
 async function connected(session: LazySession): Promise<Client> {

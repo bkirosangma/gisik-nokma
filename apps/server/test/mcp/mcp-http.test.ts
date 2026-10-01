@@ -162,7 +162,6 @@ describe('POST /mcp — the tools', () => {
     expect(list.headers['mcp-session-id']).toBeUndefined();
     const tools = list.json().result.tools as { name: string; description: string }[];
     expect(tools.map((t) => t.name)).toEqual([
-      'list_projects',
       'search_tickets',
       'list_tickets',
       'get_ticket',
@@ -178,6 +177,14 @@ describe('POST /mcp — the tools', () => {
       'restore_workspace',
       'delete_workspace',
       'undelete_workspace',
+      'list_projects',
+      'get_project',
+      'create_project',
+      'update_project',
+      'archive_project',
+      'restore_project',
+      'delete_project',
+      'undelete_project',
     ]);
     expect(tools.every((t) => t.description.length > 0)).toBe(true); // CONTROL: described, not bare names
     await app.close();

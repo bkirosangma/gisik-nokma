@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { projectTools } from '../src/tools/project-tools.js';
 import { readTools } from '../src/tools/read-tools.js';
 import { workspaceTools } from '../src/tools/workspace-tools.js';
 import type { Session } from '../src/session.js';
@@ -23,6 +24,13 @@ function tool(name: string, session: Session) {
   return found;
 }
 
+/** `list_projects` moved to `project-tools.ts` in MCP CRUD plan Task 7 (it gained `include`); 14.61/14.62 still pin its reads. */
+function listProjects(session: Session) {
+  const found = projectTools(session).find((t) => t.name === 'list_projects');
+  if (found === undefined) throw new Error('no tool named list_projects');
+  return found;
+}
+
 describe('the read tools', () => {
   // `list_workspaces` moved to `workspace-tools.ts` in MCP CRUD plan Task 6 (it gained `include`);
   // this case stays here because its claim — a live workspace's directory row is passed through
@@ -41,7 +49,7 @@ describe('the read tools', () => {
       { workspaceId: 'w2', name: 'Other', role: 'guest', projects: [{ projectId: 'p2', name: 'Else' }] },
     ] };
     const { session, paths } = sessionRecording(body);
-    expect(await tool('list_projects', session).handler({ workspaceId: 'w1' })).toEqual({
+    expect(await listProjects(session).handler({ workspaceId: 'w1' })).toEqual({
       workspaceId: 'w1',
       projects: [{ projectId: 'p1', name: 'Ops' }],
     });
@@ -50,7 +58,7 @@ describe('the read tools', () => {
 
   it('14.62 list_projects answers an empty list for a workspace the person cannot see', async () => {
     const { session } = sessionRecording({ workspaces: [] });
-    expect(await tool('list_projects', session).handler({ workspaceId: 'nope' })).toEqual({
+    expect(await listProjects(session).handler({ workspaceId: 'nope' })).toEqual({
       workspaceId: 'nope', projects: [],
     });
   });

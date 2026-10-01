@@ -17,22 +17,6 @@ const filterArg = filterSpecSchema.optional();
 export function readTools(session: Session): ToolDefinition[] {
   return [
     {
-      name: 'list_projects',
-      description:
-        'List the projects you can see inside one workspace. Reads the same workspace directory as ' +
-        'list_workspaces — the server has no separate projects route — and returns an empty list for ' +
-        'a workspace you cannot see.',
-      inputSchema: { workspaceId: z.string().min(1) },
-      handler: async (args) => {
-        const workspaceId = z.string().min(1).parse(args['workspaceId']);
-        const body = (await session.get('/v1/me/workspaces')) as {
-          workspaces: { workspaceId: string; projects: { projectId: string; name: string }[] }[];
-        };
-        const match = body.workspaces.find((w) => w.workspaceId === workspaceId);
-        return { workspaceId, projects: match?.projects ?? [] };
-      },
-    },
-    {
       name: 'search_tickets',
       description:
         'Full-text search across the tickets you can see in one workspace. Returns at most 50 hits ' +
