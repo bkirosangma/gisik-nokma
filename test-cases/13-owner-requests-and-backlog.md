@@ -2133,7 +2133,7 @@ SHA-256 with the value taken before the mutation** — never by a shell `diff`, 
 "identical" in this repo. The two survivors are listed with their reasons, and neither is a mutation that
 failed to run: one of them refused to run at first and the refusal is recorded below.
 
-- **M1 — the door check reads the stored column instead of the derived set.** `checkProjectPrefixUnique`'s
+- **M1 — the door check reads the stored column instead of the derived set.** `checkProjectPrefixUnique` (since renamed `checkPrefixReservation`)'s
   input replaced with `new Set(rows.map(r => r.prefix).filter(p => p !== null))`.
   **REDDENS 13.1015. 13.1014 passes.** The runner's own counts: `1 failed | 4 passed (5)` — the one
   failure is 13.1015, so the control case is genuinely green. This is the mutation that separates the
