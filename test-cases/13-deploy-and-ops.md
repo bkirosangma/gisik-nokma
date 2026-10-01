@@ -469,8 +469,12 @@ planted in `rebuild.sh` (2), a `docker system prune` planted in the dry-run (3).
   Docker VM disk **25% → 18% used**, the disk line read `disk: images 6.004GB (reclaimable 1.578GB (26%)), build
   cache 0B (reclaimable 0B), Docker VM disk 18% used`; `docker volume ls` identical before and after (13 volumes);
   both dev containers Up, server healthy. The unused-image prune removed nothing (no unused image older than 24 h).
-  **Still 🧪:** the full path — a `ctl rebuild` that BUILDS new code and ends with the new OK line — is first
-  exercised by the next landing's rebuild.
+  **Completed 2026-10-01 (controller, LOCAL):** the next landing's `ctl rebuild` (release tip `5685643f`, new code)
+  built, verified and ended `OK rebuild release/2026-09-30 5685643f67a1 images fresh, server healthy, /healthz 200 on
+  :3000, web :3001 307, sign-in configured, pruned build cache + unused images >24h, disk: images 6.696GB
+  (reclaimable 2.276GB (33%)), build cache 0B (reclaimable 0B), Docker VM disk 19% used (log …)`; `docker volume
+  ls` identical before and after (13 volumes); server healthy. The case is left 🧪 only because it is a hand-run
+  against the real Docker (the arms above are automatic).
 
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 
