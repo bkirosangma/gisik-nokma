@@ -330,3 +330,81 @@ describe('22.166 every level is a 44px target with a visible label, and the keyb
     ]);
   });
 });
+
+describe('22.167 the Create option sits last when nothing matches exactly', () => {
+  it('22.167 — under Shops, "Fran" ends the options with Create “Fran”, and the pointer or ArrowDown+Enter on it makes a pending group; control: "retail" (exact) offers no Create option', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const first = render(<Harness groups={GROUPS} initial={{ groupId: SHOPS.id, pendingNames: [] }} onChange={onChange} />);
+    await user.type(level(2), 'Fran');
+    expect(optionTexts().at(-1)).toBe('Create “Fran”');
+    await user.click(screen.getByRole('option', { name: 'Create “Fran”' }));
+    expect(last(onChange)).toEqual({ groupId: SHOPS.id, pendingNames: ['Fran'] });
+    first.unmount();
+
+    const second = render(<Harness groups={GROUPS} initial={{ groupId: SHOPS.id, pendingNames: [] }} onChange={onChange} />);
+    await user.type(level(2), 'ale');
+    expect(optionTexts(), 'the real match first, Create LAST').toEqual(['Wholesale', 'Create “ale”']);
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(last(onChange)).toEqual({ groupId: SHOPS.id, pendingNames: ['ale'] });
+    second.unmount();
+
+    render(<Harness groups={GROUPS} initial={{ groupId: SHOPS.id, pendingNames: [] }} />);
+    await user.type(level(2), 'retail');
+    expect(optionTexts(), 'control: an exact match has no Create option').toEqual(['Retail']);
+  });
+});
+
+describe('22.168 the picker keeps Enter and Escape to itself', () => {
+  it('22.168 — inside a form, Enter in a level does not submit it and Escape with the list OPEN does not reach the outer keydown; control: Escape with the list CLOSED does reach it', async () => {
+    const user = userEvent.setup();
+    const submit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    const outerKeyDown = vi.fn();
+    render(
+      <div onKeyDown={(event) => outerKeyDown(event.key)}>
+        <form onSubmit={submit}>
+          <Harness groups={GROUPS} initial={{ groupId: SHOPS.id, pendingNames: [] }} />
+          <button type="submit">Save</button>
+        </form>
+      </div>,
+    );
+
+    await user.click(level(2));
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(submit, 'Enter picked an option; it did not submit the form').not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(submit, 'Enter with nothing highlighted resolves the box; still no submit').not.toHaveBeenCalled();
+
+    await user.keyboard('{ArrowDown}');
+    expect(level(2), 'the list is open before Escape').toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Escape}');
+    expect(outerKeyDown, 'Escape with the list open closes it and stays inside').not.toHaveBeenCalledWith('Escape');
+
+    await user.keyboard('{Escape}');
+    expect(outerKeyDown, 'control: Escape with the list closed reaches the dialog behind it').toHaveBeenCalledWith('Escape');
+  });
+});
+
+describe('22.169 aria-activedescendant follows the highlighted option', () => {
+  it('22.169 — ArrowDown twice sets aria-activedescendant to the second option and aria-expanded true; control: before any arrow it is absent', async () => {
+    const user = userEvent.setup();
+    render(<Harness groups={GROUPS} initial={{ groupId: SHOPS.id, pendingNames: [] }} />);
+    await user.click(level(2));
+    expect(level(2), 'control: nothing highlighted yet').not.toHaveAttribute('aria-activedescendant');
+
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    const second = screen.getByRole('option', { name: 'Wholesale' });
+    expect(level(2)).toHaveAttribute('aria-activedescendant', second.id);
+    expect(second).toHaveAttribute('aria-selected', 'true');
+    expect(level(2)).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('22.170 groupSeeds refuses a chain deeper than level 4', () => {
+  it('22.170 — two pending names under a level-3 pick throw; control: ONE gives a level-4 group.created', () => {
+    expect(() => groupSeeds(WS, GROUPS, { groupId: ONLINE.id, pendingNames: ['A', 'B'] }, () => 'x')).toThrow(/pass level 4/);
+    const { seeds } = groupSeeds(WS, GROUPS, { groupId: ONLINE.id, pendingNames: ['A'] }, () => 'x');
+    expect(seeds).toHaveLength(1);
+    expect(seeds[0]!.payload).toMatchObject({ parentId: ONLINE.id, level: 4, name: 'A' });
+  });
+});
