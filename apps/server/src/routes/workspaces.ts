@@ -222,7 +222,8 @@ export function registerWorkspaceRoutes(
       // inline in the object below so the two cannot be read from different
       // ends of the workspace's naming history by accident. The name is the
       // LAST thing anyone said the workspace is called; the prefix is the
-      // FIRST claim that carried one, because it is immutable.
+      // LAST `workspace.prefix_changed`, or the FIRST claim that carried one
+      // when it never changed (`workspace-name.ts`).
       const identity = await workspaceIdentityFromLedger(deps.pool, row.workspace_id);
       workspaces.push({
         workspaceId: row.workspace_id,
