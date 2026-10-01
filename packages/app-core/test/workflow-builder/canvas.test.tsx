@@ -15,6 +15,7 @@ import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { WorkflowCanvas } from '../../src/workflow-builder/ui/workflow-canvas.js';
+import { ruleExactly, valueOf, readUiCss } from '../../../ui/test/helpers/css-rules.js';
 
 const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
 
@@ -487,6 +488,10 @@ describe('23.175 the canvas opens fitted to the whole graph, and has a Fit to sc
     renderCanvas(createDraftStore(draftFromTemplate(errand)));
     const fit = screen.getByRole('button', { name: 'Fit to screen' });
     expect(fit).toHaveClass('gn-workflow-canvas__fit');
+    // …and a 44px target: the stylesheet declares both floors on that one rule (the jsdom render measures nothing).
+    const fitRule = ruleExactly(readUiCss(), '.gn-workflow-canvas__fit');
+    expect(valueOf(fitRule, 'min-height')).toBe('2.75rem');
+    expect(valueOf(fitRule, 'min-width')).toBe('2.75rem');
     // CONTROL — the user's zoom is KEPT after an edit: the one `fitView(` CALL is the button's own handler. No
     // effect refits on a draft change, so nothing re-fits on every change.
     expect(src.match(/\bfitView\(/g)).toHaveLength(1);

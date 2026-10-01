@@ -63,7 +63,9 @@ const VISUALLY_HIDDEN = {
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
  *   and no event carries one. The prototype's other badge value (`"Built-in"`) IS
  *   drawn, beside the rank in the meta line.
- * - **the ↑/↓ reorder controls — BUILT 2026-09-19, when the owner lifted the hold.**
+ * - **the ↑/↓ reorder controls — BUILT 2026-09-19, when the owner lifted the hold.** (AMENDED 2026-10-02, 23.171: they
+ *   are now a "Reorder" menu — Move up / Move down / Move to top — on CUSTOM rows only; the text below keeps the history
+ *   and says "arrow" where it means the menu item.)
  *   `docs/lanes/owner-holds.md` §1 had put *"`isTypes` | reorder and per-type
  *   counts"* on the owner's hold list, and that register's own rule is that a hold
  *   lifts only when the owner names it — **the owner named it on 2026-09-19**. The
@@ -85,7 +87,8 @@ const VISUALLY_HIDDEN = {
  *   neighbour, and the server's own `ORDER BY rank, type_id` resolves a tie by an
  *   id — by nothing a person can see. Both types are re-ranked in one `submit`.
  *
- *   **The arrow that would move a built-in is DISABLED, not refused after the
+ *   **(AMENDED 2026-10-02, 23.171: a built-in now carries NO control at all, and a custom type's move that would
+ *   cross one is the DISABLED menu item.) The arrow that would move a built-in is DISABLED, not refused after the
  *   fact.** For the same per-event reason: the four built-ins are rank-locked
  *   server-side (`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds
  *   `type.builtin-rank`), so a swap across one would HALF commit — the neighbour's
@@ -186,7 +189,7 @@ export function TicketTypeListScreen(props: {
    */
   const [ticketCounts, setTicketCounts] = useState<Record<string, number> | 'unavailable' | null>(null);
   // A refusal the CLIENT did not predict. The client predicts the one refusal it
-  // knows about (`type.builtin-rank`, below, by disabling the arrow that would
+  // knows about (`type.builtin-rank`, below, by disabling the menu item that would
   // provoke it), but the server is the authority and may refuse for a reason
   // this screen does not model. Swallowing it would render a control that does
   // nothing, which a reader cannot tell from a click that worked.
@@ -194,8 +197,8 @@ export function TicketTypeListScreen(props: {
   // One swap at a time. Without this, a second click landing inside the first
   // `submit`'s round-trip computes from the PRE-swap array and overwrites it —
   // probed by review: two clicks in one tick folded to two types sharing a rank,
-  // the exact tie the two-event swap exists to prevent. Every arrow is disabled
-  // while a swap is in flight.
+  // the exact tie the two-event swap exists to prevent. Every Reorder menu item is
+  // disabled while a swap is in flight.
   const [reorderPending, setReorderPending] = useState(false);
   /** Per-mount prefix for the reorder reasons' ids — see the buttons' note. */
   const reorderReasonId = useId();
@@ -253,7 +256,7 @@ export function TicketTypeListScreen(props: {
   const count = types.length;
 
   /**
-   * Why the arrow at `index` pointing `delta` cannot move anything — or `null`
+   * Why the Reorder menu item at `index` pointing `delta` cannot move anything — or `null`
    * when it can. Two blockers are structural:
    *
    *  - the END of the list has nothing to swap with;
@@ -263,7 +266,7 @@ export function TicketTypeListScreen(props: {
    *    therefore HALF commit: the other type's re-rank lands, the built-in's is
    *    refused, and the two then share a rank, which the server's own
    *    `ORDER BY rank, type_id` resolves by an id — that is, by nothing a person
-   *    can see. So the arrow is disabled rather than the refusal discovered.
+   *    can see. So the menu item is disabled rather than the refusal discovered.
    */
   function moveBlocker(index: number, delta: -1 | 1): string | null {
     const target = index + delta;
@@ -449,7 +452,8 @@ export function TicketTypeListScreen(props: {
           ))}
         </ul>
         {/*
-          E5-14 — WHY THE ARROWS DO NOTHING. All ten ↑/↓ controls render disabled,
+          E5-14 — WHY THE ARROWS DO NOTHING. (Since 23.171 the built-ins carry no control, so no dead control is
+          drawn for them; the note below is still true of the rank rule.) All ten ↑/↓ controls render disabled,
           and the reason lived only in each button's `title` attribute
           (`moveBlocker`, "Built-in types keep their rank.") — a hover tooltip,
           with no touch or keyboard equivalent. A reader on a phone met ten dead

@@ -577,10 +577,10 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * exists to prevent — while the screen rendered `rank 5` for a type it had
    * submitted as 6. Against the real door the window is a whole round-trip.
    *
-   * The guard is asserted AS the guard: while a swap is in flight, every arrow
-   * is disabled and a second click submits nothing.
+   * The guard is asserted AS the guard: while a swap is in flight, every Reorder
+   * menu item is disabled and a second click submits nothing.
    */
-  it('13.935 every arrow is disabled while a swap is in flight, and a second click submits nothing', async () => {
+  it('13.935 every Reorder menu item is disabled while a swap is in flight, and a second click submits nothing', async () => {
     const user = userEvent.setup();
     const base = createFakeGateway({
       workflows: [kanbanPublished],
@@ -613,19 +613,19 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     // CONTROL: before the swap, Invoice's Move down is enabled — so the disabled state below is the guard.
     expect(menuItem('Move down')).toBeEnabled();
     const click = user.click(menuItem('Move down'));
-    // In flight: nothing else may be started. `waitFor` rather than a bare
-    // assertion because the click is deliberately NOT awaited — awaiting it would
-    // wait for the door to close, which is the window under test.
-    //
+    // In flight: nothing else may be started. The Reorder menu is opened ONCE, outside `waitFor`: a click on the
+    // trigger inside a retry loop would toggle the popover shut on every second attempt. Only the assertion waits,
+    // because the Move down click is deliberately NOT awaited — awaiting it would wait for the door to close,
+    // which is the window under test.
+    await openReorder(user, 'Errand');
     // The condition waited on is Errand's `Move up`: ON PURPOSE it is enabled before the click (Invoice, a
     // custom type, sits above it) and disabled only while a swap is in flight, so it discriminates. Invoice's
     // own `Move up` is disabled in EVERY state (a built-in sits above it) and would return instantly.
-    await waitFor(async () => {
-      await user.click(screen.getByRole('button', { name: 'Reorder Errand' }));
-      expect(menuItem('Move up')).toBeDisabled();
-    });
+    await waitFor(() => expect(menuItem('Move up')).toBeDisabled());
     expect(menuItem('Move to top')).toBeDisabled();
     expect(document.body).toHaveTextContent('A reorder is already in flight.');
+    // The SECOND click, while the first is still in flight: it lands on a disabled item and starts nothing.
+    await user.click(menuItem('Move up'));
 
     release!();
     await click;

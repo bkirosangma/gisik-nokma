@@ -8323,7 +8323,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    So the `<li>` becomes the flex row the comment describes, and `__reorder` a
    flex pair so the two arrows read as one unit at `.gn-board-card__moves`'s own
-   `0.5rem` gap. **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
+   `0.5rem` gap. (AMENDED 2026-10-02, 23.171: there is ONE Reorder button now, so the pair is a single item and the gap
+   separates nothing visible; the wrapper keeps the declaration.) **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
    its base is the full line and it shrinks against the pair** — asserted by
    measurement below rather than by reading the spec, and deliberately NOT
    rewritten, because `.ticket-type-list__row`'s body is pinned by 10.80
@@ -8366,7 +8367,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-weight: 600;
   cursor: pointer;
 }
-/* Styling refresh Plan B (Task B16): P-GHOST icon — the reorder arrows are text controls with no edge; hover or focus washes them. */
+/* Styling refresh Plan B (Task B16): P-GHOST — the reorder trigger (the "Reorder" word since 23.171; the arrows before) is a text control with no edge; hover or focus washes it. */
 .ticket-type-list__move:hover:not(:disabled),
 .ticket-type-list__move:focus-visible {
   background: var(--gn-fill-tertiary);
