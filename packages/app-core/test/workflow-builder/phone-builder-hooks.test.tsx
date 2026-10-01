@@ -54,6 +54,11 @@ describe('21.170 the Panels sheet: the column is `data-open`, a Panels button op
     expect(panels).toHaveClass('workflow-builder-screen__panels');
     expect(panels).toHaveAttribute('aria-expanded', 'false');
     expect(panels).toHaveAttribute('aria-controls', aside.id);
+    // AMENDED 2026-10-01 (T11 fix 1): the aside is the desktop column, not a dialog (no role, no aria-modal, no focus
+    // containment), so the button is an `aria-expanded` disclosure and promises no popup.
+    expect(panels).not.toHaveAttribute('aria-haspopup');
+    expect(aside).not.toHaveAttribute('role');
+    expect(aside).not.toHaveAttribute('aria-modal');
     expect(aside).toHaveAttribute('data-open', 'false');
     expect(container.querySelector('.workflow-builder-screen__scrim')).toBeNull();
     // CONTROL — the column is the same aside the wide layout uses and still holds all four panels.
@@ -104,6 +109,11 @@ describe('21.170 the Panels sheet: the column is `data-open`, a Panels button op
     // CONTROL — closing the sheet and then CLEARING the selection (collapsing the open row) is not a new selection, so it
     // does not reopen the sheet.
     await user.click(within(aside).getByRole('button', { name: 'Done' }));
+    expect(aside).toHaveAttribute('data-open', 'false');
+    // CONTROL — a draft change that is NOT a selection change (typing the workflow name) leaves the state selected, and
+    // the sheet closed: only a NEW selection opens it. (Drop `last = next` or `next !== last` and this reopens it.)
+    await user.type(screen.getByRole('textbox', { name: 'Workflow name' }), 'x');
+    expect(screen.getByRole('textbox', { name: 'Workflow name' })).toHaveValue(`${kanban.name}x`);
     expect(aside).toHaveAttribute('data-open', 'false');
     const openRow = within(aside).getAllByRole('button').find((button) => button.getAttribute('aria-expanded') === 'true')!;
     await user.click(openRow);

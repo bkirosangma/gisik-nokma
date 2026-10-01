@@ -208,7 +208,6 @@ export function WorkflowBuilderScreen(props: {
               <Button
                 ref={panelsButtonRef}
                 className="workflow-builder-screen__panels"
-                aria-haspopup="dialog"
                 aria-expanded={panelsOpen}
                 aria-controls="workflow-builder-panels"
                 onClick={() => setPanelsOpen(true)}

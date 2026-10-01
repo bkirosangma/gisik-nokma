@@ -7455,8 +7455,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
 /* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
-   20rem floor is what makes this a grid of cards at desktop width and a single
-   column on a phone, with no media query. */
+   20rem floor is what makes this a grid of cards at desktop width. It is NOT
+   what makes a phone single-column: 20rem overflows a 320px screen, so the
+   phone arm below (`@media (max-width: 40rem)`, `minmax(0, 1fr)`) does that. */
 .workflow-list__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));

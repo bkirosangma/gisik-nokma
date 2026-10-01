@@ -30,13 +30,58 @@ function position(css: string, selectors: string[], atRule: string | null): numb
   return index;
 }
 
-/** The phone rule comes after EVERY base rule it overrides (`bases`: top-level selector lists; default its own). */
+/**
+ * Index of the LAST top-level rule whose selector list names every one of `selectors` (a base rule may be split
+ * across the file; the FIRST one is not the check — a later top-level rule that undoes the arm must be seen).
+ */
+function lastBaseIndex(css: string, selectors: string[]): number {
+  let found = -1;
+  parseRules(css).forEach((rule, i) => {
+    if (rule.atRule === null && selectors.every((selector) => rule.selectors.includes(selector))) found = i;
+  });
+  if (found === -1) throw new Error(`no top-level rule names ${selectors.join(', ')}`);
+  return found;
+}
+
+/** An at-rule that applies at a 40rem-wide window: no at-rule at all, or a `(max-width: N)` arm with N ≥ 40rem. */
+function appliesAtPhone(atRule: string | null): boolean {
+  if (atRule === null) return true;
+  const hit = /^@media \(max-width: ([0-9.]+)rem\)$/.exec(atRule);
+  return hit !== null && Number(hit[1]) >= 40;
+}
+
+/** The property names a rule body declares. */
+function declaredProperties(body: string): string[] {
+  return [...body.matchAll(/(?:^|[;{\s])([a-z-]+)\s*:/g)].map((hit) => hit[1] ?? '');
+}
+
+/**
+ * The phone rule for `selectors` comes after BOTH:
+ *  (a) the explicit `bases` (default: its own selector list) — each compared against the LAST top-level rule naming it,
+ *      and a base that does not exist is an error (a typo'd base must not pass); and
+ *  (b) the LAST other rule that names ANY of its own selectors and applies at ≤40rem — top level, or a
+ *      `(max-width: N)` arm with N ≥ 40rem. This needs no base to exist (`.workflow-list__new` has no top-level
+ *      rule), and it is what sees a later `@media (max-width: 64rem)` arm or a later top-level rule undoing the arm.
+ *      A later rule in the phone arm itself counts only when it writes a property the phone rule writes.
+ */
 function after(css: string, selectors: string[], bases: string[][] = [selectors]): void {
+  const own = position(css, selectors, PHONE);
   for (const base of bases) {
-    expect(position(css, selectors, PHONE), `${selectors.join(', ')}: the phone arm must follow ${base.join(', ')}`).toBeGreaterThan(
-      position(css, base, null),
+    expect(own, `${selectors.join(', ')}: the phone arm must follow the LAST top-level rule naming ${base.join(', ')}`).toBeGreaterThan(
+      lastBaseIndex(css, base),
     );
   }
+  const rules = parseRules(css);
+  const ownProperties = declaredProperties(rules[own]?.body ?? '');
+  let latest = -1;
+  rules.forEach((rule, i) => {
+    if (i === own || !appliesAtPhone(rule.atRule) || !selectors.some((selector) => rule.selectors.includes(selector))) return;
+    // Another rule in the SAME phone arm after this one is a companion (e.g. `__panels { display }` after the shared
+    // `__add-state, __panels` sizing) unless it writes a property this rule writes; every outer rule counts as it stands.
+    if (rule.atRule === PHONE && !declaredProperties(rule.body).some((property) => ownProperties.includes(property))) return;
+    latest = i;
+  });
+  expect(own, `${selectors.join(', ')}: the phone arm must follow the LAST rule naming it that applies at ≤40rem`).toBeGreaterThan(latest);
 }
 
 /** No top-level rule names `selector` with a paint — the phone arm is the only place it is drawn. */
