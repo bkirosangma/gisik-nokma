@@ -1161,3 +1161,18 @@ describe('13.1037 hideEpicRows also takes a HALF-dated epic out of the side list
     expect(bare.groups).toEqual([]);
   });
 });
+
+describe('23.142 todayDay is an index into THIS window, and null outside it', () => {
+  it('23.142 todayDay is null for a today before the anchor or after the window end, and the right index inside (explicit anchor)', () => {
+    // The window is 17 Aug – 11 Oct (ANCHOR's Monday, eight weeks): day indices 0–55.
+    expect(model([], { today: '2026-08-19' }).todayDay).toBe(2);
+    // The edges are INSIDE: the first day and the last day.
+    expect(model([], { today: WINDOW_START }).todayDay).toBe(0);
+    expect(model([], { today: WINDOW_END }).todayDay).toBe(55);
+    // One day either side is outside — each bound is its own claim (`>= windowStart`, `<= windowEnd`).
+    expect(model([], { today: '2026-08-16' }).todayDay).toBeNull();
+    expect(model([], { today: '2026-10-12' }).todayDay).toBeNull();
+    // No `today` at all: no line.
+    expect(model([]).todayDay).toBeNull();
+  });
+});

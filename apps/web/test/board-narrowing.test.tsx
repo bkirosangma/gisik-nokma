@@ -1007,9 +1007,12 @@ describe('13.601 Calendar and Timeline hide closed tickets by default, disclosed
 
     await userEvent.click(screen.getByRole('button', { name: /Remove filter.*Closed: hidden/i }));
 
-    // `CalendarView` renders a due-only marker's LABEL, never the ticket's
-    // title (13.558's own discriminator), so there is no title text to query
-    // for on this tab. The strip vanishing ENTIRELY — the same proof
+    // Since 23.140 `CalendarView` names a due-only marker by its ticket
+    // (`<key> <title>`), so Calendar could prove this at ticket level too; the
+    // Timeline's side-list title (13.558's discriminator) is kept because it
+    // needs no change and a due-only ticket can only be there as an undrawn
+    // entry. This note's tab is the Calendar, whose assertion stays at the
+    // count level. The strip vanishing ENTIRELY — the same proof
     // `13.437`/`13.471` use for "everything reset" — is what it means for
     // `shown` to have become `total` again: nothing left active (no explicit
     // chip, the default no longer in force) and nothing left hidden.

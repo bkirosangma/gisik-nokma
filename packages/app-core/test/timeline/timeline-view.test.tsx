@@ -1081,12 +1081,29 @@ describe('23.142 timeline bars end on their real day, and today has a line (audi
     }
     unmount();
 
-    // CONTROL — the line follows the PROP, not a device clock: a day inside the window moves it, and a day outside removes it.
+    // CONTROL — the line follows the PROP, not a device clock: a day inside the window moves it.
     const moved = renderTimeline([bar('One', '2026-08-24', '2026-08-26')], { today: '2026-08-17' });
     expect(moved.container.querySelector('.gn-timeline__today')?.getAttribute('style')).toContain('--timeline-today-lead: 0');
     moved.unmount();
-    const outside = renderTimeline([bar('One', '2026-08-24', '2026-08-26')], { today: '2027-01-01' });
-    expect(outside.container.querySelector('.gn-timeline__today')).toBeNull();
+  });
+
+  it('23.142 paging away from today removes the line, while the bar that spans both windows keeps its row; Today brings it back', () => {
+    // The window opens on the Monday of the `today` prop, so a different `today` would MOVE the window and no row
+    // would render for a line to sit in. The real case is the person paging away: `today` stays, the window moves.
+    const { container } = renderTimeline([bar('Spans both', '2026-08-24', '2026-10-02')], { today: '2026-08-26', weeksCount: 2 });
+    const line = () => container.querySelector('.gn-timeline__today');
+    expect(barOf('Spans both')).toBeInTheDocument();
+    expect(line()).not.toBeNull();
+
+    // Later is 28 days: the window is now 21 Sep – 4 Oct and today (26 Aug) is behind it.
+    fireEvent.click(screen.getByRole('button', { name: 'Later' }));
+    // The row is STILL there (the bar runs to 2 Oct), so a missing line is the model's answer, not an empty chart.
+    expect(barOf('Spans both')).toBeInTheDocument();
+    expect(container.querySelectorAll('.gn-timeline__row').length).toBeGreaterThan(0);
+    expect(line()).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+    expect(line()).not.toBeNull();
   });
 });
 

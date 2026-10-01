@@ -179,8 +179,8 @@ export const TIMELINE_SIDE_LIST_NO_DATES_COPY = 'These tickets have no dates yet
  * It states a LEAVING condition — add both and the ticket is drawn — so it is true exactly of entries that will
  * leave the moment the missing claim arrives: `no-dates`, `start-only`, `due-only`. It is FALSE over the other
  * two: a `start-after-due` entry already carries both and is still here, and so is one whose claimed day is not a
- * day on the calendar. That is why the model chooses between this sentence and the one below rather than
- * printing this one unconditionally as the plan's Task 10 does.
+ * day on the calendar. That is why the model chooses among this sentence, the "no dates yet" one above and the one below (three,
+ * since 23.143) rather than printing this one unconditionally as the plan's Task 10 does.
  */
 export const TIMELINE_SIDE_LIST_COPY = 'Add a start and a due date to place a ticket on the timeline.';
 

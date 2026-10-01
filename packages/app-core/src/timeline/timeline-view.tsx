@@ -371,8 +371,10 @@ export function TimelineView(props: TimelineViewProps) {
       */}
       {model.sideList.length > 0 && (
         <aside className="gn-timeline__side" aria-label="Undated or partially dated">
-          {/* The model chose between two headings — one true only of entries
-              waiting on a missing claim, one true of a mixed list. Verbatim. */}
+          {/* The heading is a counted one, and the sentence under it is the model's
+              choice among THREE (23.143): "no dates yet" (only undated work), the
+              leaving-condition sentence (only work missing a claim, one of which
+              has a date) and the mixed-list sentence. Verbatim. */}
           <h3 className="gn-timeline__side-heading">Not on the timeline yet ({model.sideList.length})</h3>
           <p className="gn-timeline__side-copy">{model.sideListCopy}</p>
           <ul className="gn-timeline__side-list">
