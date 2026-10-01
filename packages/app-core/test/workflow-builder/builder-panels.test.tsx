@@ -41,7 +41,10 @@ function renderPanels(store: DraftStore, environment = env()) {
 }
 
 function rowButtons(): HTMLButtonElement[] {
-  return screen.queryAllByRole('button').filter((button) => button.hasAttribute('aria-expanded')) as HTMLButtonElement[];
+  // The phone Panels button (21.170) carries `aria-expanded` too, but it opens the sheet, not a row.
+  return screen
+    .queryAllByRole('button')
+    .filter((button) => button.hasAttribute('aria-expanded') && !button.classList.contains('workflow-builder-screen__panels')) as HTMLButtonElement[];
 }
 
 /** A state's row — scoped to the States list, because "Doing → To do" (a transition row) also starts "Doing". */

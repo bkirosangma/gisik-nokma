@@ -3896,6 +3896,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    checked. */
 .fields-editor__required { flex: none; }
 
+/* The web app on phones — the field rows (Plan Task 11, case 21.173): the name and type fields take a full row each
+   (their 8rem / 9rem floors would leave a ragged half row), and Add field fills the width. Inside the one 40rem arm,
+   AFTER the base rules. */
+@media (max-width: 40rem) {
+  .fields-editor__name,
+  .fields-editor__type { flex: 1 1 100%; min-width: 0; }
+  .fields-editor__add { align-self: stretch; }
+}
+
 /* The `appearance="raised"` coat for this trigger is NOT declared here, and a
    reader looking for it will not find it by scrolling this block. It sits
    immediately after `[data-style="neo"] .gn-field__input` at the foot of the
@@ -4097,6 +4106,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    leading and sat visibly lighter and smaller than the drawing. */
 .ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+/* The web app on phones — New ticket type is the list's one primary on its own full row (Plan Task 11, case 21.173).
+   Inside the one 40rem arm, AFTER `.ticket-type-list__header`. */
+@media (max-width: 40rem) {
+  .ticket-type-list__new { flex: 1 1 100%; }
+}
 /* E5-14 — the on-screen reason the ↑/↓ controls are disabled, and the tie-break
    under it. Muted and small like the summary above it, because it is an aside
    about the controls rather than a message: it renders whether or not any arrow
@@ -4277,6 +4291,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    radius, beside a shared `Button` that is 44px, border-less and
    control-radiused, against a prototype that draws 44. */
 .ticket-type-editor__save { align-self: flex-start; }
+/* The web app on phones — the ticket type editor's Save takes its own full row (Plan Task 11, case 21.173). */
+@media (max-width: 40rem) {
+  .ticket-type-editor__save { flex: 1 1 100%; }
+}
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
@@ -4491,6 +4509,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .template-gallery__door:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .template-gallery__name { font-size: 1.05rem; font-weight: 600; }
 .template-gallery__tagline { font-size: 0.8rem; color: var(--gn-text-muted); }
+
+/* The web app on phones — the template doors (Plan Task 11, case 21.172). One column: the doors stack (the base
+   track's `auto-fit` 15rem floor is a grid; a phone's list is a column). Inside the one 40rem arm, AFTER the
+   base rule. */
+@media (max-width: 40rem) {
+  .template-gallery__cards { grid-template-columns: minmax(0, 1fr); }
+}
 .workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
 /* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
    preference. `danger` used as TEXT on `surface` measures **4.40** under
@@ -4647,6 +4672,54 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (max-width: 64rem) {
   .workflow-builder-screen__layout { grid-template-columns: minmax(0, 1fr); }
   .workflow-builder-screen__canvas { order: -1; }
+}
+
+/* The web app on phones — the workflow editor (Plan Task 11, cases 21.170, 21.171). Above 40rem the "Panels"
+   button, the sheet's Done button and the scrim are not painted at all (`display: none`, declared BEFORE the
+   arm so the arm's `display` wins on source order). */
+.workflow-builder-screen__panels,
+.workflow-builder-screen__panels-done,
+.workflow-builder-screen__scrim { display: none; }
+/* At <=40rem the canvas fills the screen and pans (it is the `overflow: auto` card; React Flow pans inside it),
+   and the States / Transitions / System rules / Issues column becomes a bottom sheet the "Panels" button opens
+   (`data-open="true"` on the aside, set by the component), above the scrim and the bottom bar. The screen is
+   bounded to the window minus the chrome around it, INCLUDING the phone bottom bar: the shell's bottom padding
+   is `calc(bar + inset) + 2rem` here, not `--gn-shell-pad-bottom` (case 10.164's allowance, which the bar
+   outgrows). The header stacks: the name on its own row, then Add state · Panels · Publish, Publish — the one
+   primary — full width. Inside the one 40rem arm and AFTER every base rule it overrides. */
+@media (max-width: 40rem) {
+  .workflow-builder-screen {
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--gn-builder-crumb-gap, 0px) - var(--gn-builder-crumb-line, 0px) - (var(--gn-phone-bar-height) + env(safe-area-inset-bottom)) - 2rem);
+    min-height: 28rem;
+  }
+  .workflow-builder-screen__title-row { flex-direction: column; align-items: stretch; }
+  .workflow-builder-screen__name { min-height: 2.75rem; font-size: 1.5rem; line-height: 2rem; }
+  .workflow-builder-screen__actions { width: 100%; }
+  .workflow-builder-screen__add-state,
+  .workflow-builder-screen__panels { flex: 1 1 0; min-height: 2.75rem; }
+  .workflow-builder-screen__panels { display: inline-flex; }
+  .publish-controls { flex: 1 1 100%; }
+  .publish-controls__publish { align-self: stretch; }
+  .workflow-builder-screen__layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .workflow-builder-screen__canvas { max-height: 100%; }
+  .workflow-builder-screen__left { display: none; }
+  .workflow-builder-screen__left[data-open='true'] {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 41;
+    max-height: 85dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem 1rem max(1rem, env(safe-area-inset-bottom));
+    background: var(--gn-surface);
+    border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
+    box-shadow: var(--gn-shadow-overlay);
+  }
+  .workflow-builder-screen__scrim { display: block; position: fixed; inset: 0; z-index: 40; background: var(--gn-surface-overlay); }
+  .workflow-builder-screen__panels-done { display: inline-flex; align-self: flex-end; min-height: 2.75rem; }
 }
 
 /* The inspector card, shared by both inspectors (`:1080`: cardBg + cardShadow +
@@ -7425,6 +7498,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__state-bar--terminal { background: var(--gn-category-terminal); }
 .workflow-list__meta { margin: 0; font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
 .workflow-list__actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* The web app on phones — the workflow list (Plan Task 11, case 21.172). One column of cards (the base track's
+   20rem floor would overflow a 320px screen), the New workflow primary on its own full row, and the Open /
+   History pair sharing the card's width. Inside the one 40rem arm and AFTER the base rules it overrides. */
+@media (max-width: 40rem) {
+  .workflow-list__cards { grid-template-columns: minmax(0, 1fr); }
+  .workflow-list__new { flex: 1 1 100%; }
+  .workflow-list__open,
+  .workflow-list__history { flex: 1 1 0; }
+}
 
 /* ── The version history (Task 3, owner-lifted 2026-09-19) ──────────────────
    The first screen in this product the prototype does not draw, so these rules
