@@ -168,7 +168,7 @@ describe('21.132 My work on a phone', () => {
     expect(after(ui, ['.gn-my-work__item', '.gn-my-work__contested'], null)).toBe(true);
     expect(after(ui, '.gn-my-work__title', null)).toBe(true);
     // The strip's rows and My work's rows wrap their chip / project / due / reason — and no phone rule turns that off.
-    // (The strip's own rows stay as the base draws them: 13.893 forbids a second `.gn-attention*` rule, so there is none here.)
+    // (The strip's own row is lifted by its ONE phone rule, case 21.134 below.)
     expect(valueOf(ruleExactly(ui, '.gn-attention__item'), 'flex-wrap')).toBe('wrap');
     expect(valueOf(ruleExactly(ui, ['.gn-my-work__item', '.gn-my-work__contested']), 'flex-wrap')).toBe('wrap');
     for (const selector of ['.gn-attention__item', '.gn-my-work__item', '.gn-my-work__contested', '.gn-my-work']) {
@@ -179,5 +179,30 @@ describe('21.132 My work on a phone', () => {
     expect(valueOf(ruleExactly(ui, '.gn-attention__item'), 'min-height')).toBe('1.5rem');
     expect(valueOf(ruleExactly(ui, '.gn-my-work__title'), 'min-height')).toBe('1.5rem');
     expect(valueOf(ruleExactly(ui, '.gn-my-work'), 'flex-direction')).toBe('column');
+  });
+});
+
+describe('21.134 the attention strip on a phone', () => {
+  it('21.134 every clickable attention-strip row is at least 2.75rem (44px) tall at ≤40rem — measured as the DECLARED min-height — in ONE phone rule after the last base; desktop keeps its current row', () => {
+    // MEASURE: the declared `min-height` of the row. The row is `box-sizing: border-box`, so its 0.4375rem
+    // padding sits INSIDE the floor and the row is exactly 44px when its content is shorter — min-height alone
+    // is the figure, not min-height + padding.
+    const row = ruleExactly(ui, '.gn-attention__item', PHONE);
+    const floor = valueOf(row, 'min-height') ?? '';
+    expect(floor).toMatch(/^[\d.]+rem$/);
+    expect(Number.parseFloat(floor)).toBeGreaterThanOrEqual(2.75);
+    expect(valueOf(row, 'align-items')).toBe('center'); // content centred in the taller row, as My work's rows
+    expect(propertiesOf(row)).toEqual(['min-height', 'align-items']); // no other declaration: the ::after click surface and the 8pt gap stay as the base draws them
+    expect(after(ui, '.gn-attention__item', null)).toBe(true);
+
+    // CONTROL — desktop keeps today's row: 24px floor, baseline alignment, wrapping, 7px of padding, the 4px rhythm
+    // between rows, and the title's stretched click surface.
+    const base = ruleExactly(ui, '.gn-attention__item');
+    expect(valueOf(base, 'min-height')).toBe('1.5rem');
+    expect(valueOf(base, 'align-items')).toBe('baseline');
+    expect(valueOf(base, 'flex-wrap')).toBe('wrap');
+    expect(valueOf(base, 'padding')).toBe('0.4375rem 0');
+    expect(valueOf(ruleExactly(ui, '.gn-attention__items'), 'gap')).toBe('0.25rem');
+    expect(valueOf(ruleExactly(ui, '.gn-attention__title::after'), 'inset')).toBe('0');
   });
 });
