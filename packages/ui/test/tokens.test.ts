@@ -9,6 +9,7 @@ import {
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
+  disabledOpacity,
   disabledOpacityVariableName,
   fontStackOf,
   fontVariableName,
@@ -163,6 +164,22 @@ describe('CSS variable emission', () => {
     // merely declared in TypeScript.
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
+  });
+
+  /**
+   * 23.094 — the token's VALUE. Every other 23.094 check reads only `var(--gn-disabled-opacity)`, so `0.55` would pass them
+   * all; this is the one place the number is pinned, and where it is emitted.
+   */
+  it('23.094 --gn-disabled-opacity is 0.5, emitted exactly once, in the bare :root block', () => {
+    expect(disabledOpacity).toBe('0.5');
+    const stylesheet = themeStylesheet();
+    const declaration = `${disabledOpacityVariableName}: 0.5;`;
+    expect(stylesheet.split(declaration)).toHaveLength(2); // exactly once
+    const at = stylesheet.indexOf(declaration);
+    const block = stylesheet.slice(stylesheet.lastIndexOf('}', at) + 1, stylesheet.indexOf('}', at) + 1).trim();
+    expect(block.startsWith(':root {')).toBe(true); // the bare :root, not a themed or media-wrapped one
+    // CONTROL — the bare :root is the block that also carries the phone heights, not a different :root.
+    expect(block).toContain('--gn-phone-bar-height');
   });
 
   /**
