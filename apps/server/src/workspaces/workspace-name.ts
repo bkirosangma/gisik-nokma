@@ -67,11 +67,13 @@ export async function workspaceNameFromLedger(
  *
  * - the NAME is the LAST naming event — a rename is a later claim about what
  *   the workspace is called;
- * - the PREFIX is the FIRST naming event that carries one — because a prefix is
- *   IMMUTABLE. `workspace.renamed` does not carry one and deliberately cannot
- *   (`events/membership.ts`): moving the prefix on a rename would change every
- *   ticket key in the workspace under readers who had already quoted one, and a
- *   key's whole job is to name one thing durably.
+ * - the PREFIX is the FIRST naming event that carries one — because a rename
+ *   never moves it. `workspace.renamed` does not carry one and deliberately
+ *   cannot (`events/membership.ts`): moving the prefix on a rename would change
+ *   every ticket key in the workspace under readers who had already quoted one.
+ *   **`workspace.prefix_changed` (2026-10-02) now exists and this query does
+ *   not read it yet**; the prefixes and groups plan Task 2 makes the prefix the
+ *   LAST such event and returns the former prefixes.
  *
  * A single `ORDER BY workspace_seq DESC LIMIT 1`, which the name's own fold used
  * before this function existed, cannot answer the prefix at all once a rename
@@ -127,9 +129,10 @@ export async function workspaceIdentityFromLedger(
   // was supposed to catch it (13.1012) passed because its fixture stores a
   // prefix and therefore never took the derived path at all.
   //
-  // The founding name is immutable in the same way the prefix is: no event
+  // The founding name is immutable: no event
   // rewrites a `workspace.created` payload (`events` refuses UPDATE). So
-  // reading it makes the derived half exactly as stable as the stored one.
+  // reading it makes the derived half exactly as stable as the stored one (until
+  // a `workspace.prefix_changed`, which names the prefix outright).
   const foundingName = rows[0]?.payload.name;
   const derived = derivePrefix(typeof foundingName === 'string' ? foundingName : named);
   return { name: named, prefix: typeof stored === 'string' ? stored : derived };

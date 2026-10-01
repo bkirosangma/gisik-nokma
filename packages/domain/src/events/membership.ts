@@ -52,11 +52,13 @@ import { prefixSchema } from '../prefix.js';
  * still needs a key, and refusing them would make the key a precondition of
  * founding a workspace rather than a consequence of it.
  *
- * **IMMUTABLE after creation.** `workspace.renamed` carries a name and NOT a
- * prefix, deliberately: a rename is a claim about what the workspace is
- * CALLED, and a key is not a name. If a rename could move the prefix, every
- * ticket key in the workspace would change under readers who had already
- * quoted one — which is the one thing a key may not do.
+ * **A rename never moves it; `workspace.prefix_changed` does** (owner spec
+ * 2026-10-01, R1/R2, `docs/superpowers/specs/2026-10-01-prefixes-groups-create-buttons-design.md`).
+ * `workspace.renamed` carries a name and NOT a prefix, deliberately: a rename
+ * is a claim about what the workspace is CALLED, and a key is not a name. The
+ * prefix changes only through the explicit `workspace.prefix_changed` event, so
+ * a person always chose it. When it changes every key re-reads, and the former
+ * prefixes stay reserved and resolvable (a former key still finds its ticket).
  */
 export const workspaceCreatedPayload = z
   .object({ name: displayName, prefix: prefixSchema.optional() })
@@ -65,6 +67,16 @@ export type WorkspaceCreatedPayload = z.infer<typeof workspaceCreatedPayload>;
 
 export const workspaceRenamedPayload = z.object({ name: displayName }).strict();
 export type WorkspaceRenamedPayload = z.infer<typeof workspaceRenamedPayload>;
+
+/**
+ * The workspace's prefix changed (owner spec 2026-10-01, R1/R2). Filed against
+ * the WORKSPACE entity. One field, the new prefix, in the same format as
+ * `workspaceCreatedPayload.prefix` (`prefixSchema`). Whether the new prefix is
+ * free (not held by another project, nor reserved as another's former prefix)
+ * is a rule across the ledger, so it is enforced at the door, not here.
+ */
+export const workspacePrefixChangedPayload = z.object({ prefix: prefixSchema }).strict();
+export type WorkspacePrefixChangedPayload = z.infer<typeof workspacePrefixChangedPayload>;
 
 /**
  * A project description: prose a person reads on the project card (door A,
@@ -113,10 +125,11 @@ export const projectCreatedPayload = z.object({
    * project rather than a consequence of it, and would refuse the whole
    * pre-existing ledger in the same breath.
    *
-   * **IMMUTABLE after creation**: `project.updated` (2026-10-01) renames a
-   * project but deliberately carries no prefix, so the key's half rides with
-   * the founding event and is permanent — a rename moves the name and never
-   * the ticket keys, **entered or derived**. An un-entered prefix is derived
+   * **The FOUNDING prefix; a rename never moves it.** `project.updated`
+   * renames a project and does not touch the key's half — a rename moves the
+   * name and never the ticket keys, **entered or derived**. Only an explicit
+   * `project.updated.prefix` (owner spec 2026-10-01, R1/R2) changes it, and then
+   * every key re-reads and the former prefix stays reserved and resolvable. An un-entered prefix is derived
    * from THIS event's `name` (`proj_projects.founding_name`), never from the
    * project's current name, so a later `project.updated` cannot re-key it or
    * shift a neighbour's derived prefix.
@@ -243,21 +256,30 @@ export const projectRestoredPayload = z.object({}).strict();
 export type ProjectRestoredPayload = z.infer<typeof projectRestoredPayload>;
 
 /**
- * Rename / redescribe a project (MCP CRUD plan Task 1, owner ruling M1, 2026-10-01).
+ * Rename / redescribe / re-prefix / re-file a project (MCP CRUD plan Task 1,
+ * owner ruling M1, 2026-10-01; `prefix` and `groupId` added by the prefixes and
+ * groups plan Task 1, owner spec 2026-10-01, R1/R2).
  * Filed against the PROJECT entity. `description: null` CLEARS the description —
  * the column has been nullable since door A precisely so a later edit could clear
  * it (see `projectCreatedPayload.description`); an absent key leaves it alone.
- * The PREFIX is not here and never will be: it is immutable after creation
- * (owner spec 2026-09-20), so a rename moves the name and never the ticket keys
- * — entered or DERIVED: a project with no entered prefix derives it from its
- * FOUNDING name (`project.created`'s `name`), which this event cannot touch
- * (owner, 2026-10-01).
+ * `groupId: null` takes the project OUT of its group (ungrouped); an absent key
+ * leaves the group alone. A RENAME alone moves the name and never the ticket
+ * keys — entered or DERIVED: a project with no entered prefix derives it from
+ * its FOUNDING name (`project.created`'s `name`), which this event cannot touch
+ * (owner, 2026-10-01). Only the `prefix` key changes the key's half. Whether
+ * that prefix is free, and whether `groupId` names a real group, are rules
+ * across the ledger and are enforced at the door, not here.
  */
 export const projectUpdatedPayload = z
-  .object({ name: displayName.optional(), description: descriptionText.nullable().optional() })
+  .object({
+    name: displayName.optional(),
+    description: descriptionText.nullable().optional(),
+    prefix: prefixSchema.optional(),
+    groupId: z.string().min(1).nullable().optional(),
+  })
   .strict()
   .refine(
-    (p) => p.name !== undefined || p.description !== undefined,
-    'a project update names a new name, a description, or both',
+    (p) => p.name !== undefined || p.description !== undefined || p.prefix !== undefined || p.groupId !== undefined,
+    'a project update names a new name, description, prefix or group',
   );
 export type ProjectUpdatedPayload = z.infer<typeof projectUpdatedPayload>;

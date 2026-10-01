@@ -213,8 +213,8 @@ describe('13.1004-13.1013 the ticket key', () => {
       prefix: 'XY',
     });
 
-    // A rename. The name is a LATER claim and moves; the prefix is immutable and
-    // does not — otherwise every ticket key in the workspace would change under
+    // A rename. The name is a LATER claim and moves; a rename never moves the
+    // prefix (only `workspace.prefix_changed` does) — otherwise every ticket key in the workspace would change under
     // a reader who had already quoted one. `workspace.renamed` carries no
     // `prefix` key at all (its schema is `.strict()`), so this is also the case
     // that would break a fold reading the prefix off the LATEST event.

@@ -15,8 +15,9 @@ import type { EnvelopeSeed } from '@gisik-nokma/app-core';
  * - **Nothing changed → `[]`**, so the caller can close the form without a
  *   round trip that would only add an empty-looking entry to the ledger.
  *
- * The prefix is not a parameter and never will be: it is immutable after
- * creation, and the schema refuses the key.
+ * The prefix and group are not parameters of THIS seed: a rename never moves a
+ * key. `projectUpdatedPayload` now carries `prefix` and `groupId` (prefixes and
+ * groups plan Task 1); the edit form gains them in Task 10.
  *
  * Pure, and exported (re-exported from the workspace home page beside
  * `archiveSeeds`), so a test reads the SHAPE without mounting anything.
