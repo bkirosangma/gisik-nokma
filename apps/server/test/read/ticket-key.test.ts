@@ -192,6 +192,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, legacy)).toEqual({
       name: 'Convenience Corner',
       prefix: 'CC',
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
   });
 
@@ -211,6 +212,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, modern)).toEqual({
       name: 'Corner Shop',
       prefix: 'XY',
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
 
     // A rename. The name is a LATER claim and moves; a rename never moves the
@@ -231,6 +233,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, modern)).toEqual({
       name: 'Corner Emporium',
       prefix: 'XY',
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
   });
 
@@ -258,6 +261,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, derived)).toEqual({
       name: 'Convenience Corner',
       prefix: 'CC',
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
 
     await appendTestEvent(
@@ -276,6 +280,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, derived)).toEqual({
       name: 'Corner Emporium',
       prefix: 'CC',
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
   });
 
@@ -283,6 +288,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(await workspaceIdentityFromLedger(db.pool, newUlid())).toEqual({
       name: null,
       prefix: null,
+      formerPrefixes: [], // 22.023: the former prefixes ride with the identity; none here
     });
   });
 });

@@ -89,6 +89,7 @@ export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> 
     ['DELETE FROM proj_note_search WHERE note_id = ANY($1::text[])', [N]],
     ['DELETE FROM search_note_chunks WHERE note_id = ANY($1::text[])', [N]],
     ['DELETE FROM proj_memberships WHERE project_id = ANY($1::text[])', [P]],
+    ['DELETE FROM proj_project_prefixes WHERE project_id = ANY($1::text[])', [P]],
     ['DELETE FROM proj_projects WHERE project_id = ANY($1::text[])', [P]],
   ];
   for (const [sql, params] of statements) {
