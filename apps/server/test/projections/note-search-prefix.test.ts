@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, type EntityKind, type LedgerEvent } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { lexicalNoteSearch } from '../../src/read/note-search.js';
@@ -55,7 +55,7 @@ async function searchNotes(q: string): Promise<string[]> {
 }
 
 const ev = (
-  entity: { kind: string; id: string },
+  entity: { kind: EntityKind; id: string },
   actorId: string,
   type: string,
   payload: unknown,

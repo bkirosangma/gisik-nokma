@@ -91,6 +91,10 @@ import type { Projection } from './registry.js';
  * misspelling OF. Leaving them is also what keeps the table deterministic: a
  * rebuild replays the same events, so it produces the same set, and `reset`
  * truncates both tables so the replay starts from nothing.
+ *
+ * Two events narrow "never deleted": a purge (`rederiveWorkspaceLexemes`, trash
+ * series Plan 2) and a prefix change (above), which re-derive the workspace's
+ * vocabulary from its current rows.
  */
 
 type NoteSourceRow = {
