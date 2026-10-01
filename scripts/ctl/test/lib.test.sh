@@ -238,5 +238,39 @@ check "delivered: a new spinner with an OLD echo (needle count unchanged) is not
 p_boxfull=$(pane boxfull '\033[38;5;16m  old response line\033[39m\n  idle filler 59 — no action needed\n\xe2\x9c\xb3 Imagining… (6s · ↓ 107 tokens)\n\033[38;5;241m\xe2\x9d\xaf \033[39m[still typed here]\n  status line\n')
 check "delivered: real text still in the box is never proof, whatever the transcript shows" '! delivered "$p_idle" "$p_boxfull" >/dev/null'
 rm -rf "$fk"
+# Post-rebuild prune (13.1590-13.1595, test-cases/13-deploy-and-ops.md). A stub `docker` first on PATH records every
+# argv, so the assertions read what ctl would have run, never what Docker did.
+pk="$(mktemp -d)"; mkdir -p "$pk/bin"
+cat > "$pk/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >> "$DLOG"
+case "$1 $2" in
+  "system df") [ -n "${STUB_NO_DF:-}" ] && exit 1; printf 'Images|12.3GB|4.1GB (33%%)\nContainers|1MB|0B (0%%)\nLocal Volumes|2GB|0B (0%%)\nBuild Cache|5.5GB|5.5GB\n';;
+  "exec gisik-nokma-postgres-1") [ -n "${STUB_NO_DF:-}" ] && exit 1; printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\noverlay 100 62 38 62%% /var/lib/postgresql/data\n';;
+  "builder prune") [ -n "${STUB_FAIL_PRUNE:-}" ] && exit 1;;
+esac
+exit 0
+STUB
+chmod +x "$pk/bin/docker"
+prune_run() { : > "$pk/dlog"; ( PATH="$pk/bin:$PATH" DLOG="$pk/dlog" CTL_DRY_RUN=0 "$@" ) >/dev/null 2>&1; }
+# the detector the "never names a volume" checks use, with its own controls below
+names_volume() { /usr/bin/grep -Eiq 'volume|system prune|down +(-[a-z]*v|.*--volumes)' ; }
+check "13.1590 prune: runs exactly the build-cache prune and the >24h unused-image prune, in that order" 'prune_run ctl_prune; [ "$(cat "$pk/dlog")" = "$(printf "%s\n%s" "builder prune -f" "image prune -a -f --filter until=24h")" ]'
+check "13.1590 prune: the image prune is bounded by until=24h (an unbounded -a would eat the image just built)" 'prune_run ctl_prune_old_images; /usr/bin/grep -q -- "--filter until=24h" "$pk/dlog"'
+check "13.1591 volumes: nothing ctl_prune runs names a volume, a system prune or --volumes" 'prune_run ctl_prune; [ -s "$pk/dlog" ] && ! names_volume < "$pk/dlog"'
+check "13.1591 volumes: CONTROL — the detector flags every volume-touching prune it exists to catch" 'for l in "volume prune -f" "system prune -af" "system prune --volumes" "image prune -a -f --volumes" "builder prune -f --volumes" "compose down -v" "compose down --volumes"; do echo "$l" | names_volume || { echo "missed: $l"; false; break; }; done'
+check "13.1591 volumes: no non-comment line of any ctl script names a volume or a system prune" '! /usr/bin/grep -rEh "^[^#]*(volume|system prune|down +-[a-z]*v)" --include="*.sh" --include=ctl "$HERE/lib.sh" "$HERE/ctl" "$HERE/verbs" | /usr/bin/grep -Evi "^[[:space:]]*#" | /usr/bin/grep -Eiq "docker.*(volume|system prune)|down +-[a-z]*v"'
+check "13.1591 volumes: CONTROL — the static scan sees a planted volume prune in a fixture verb (no backticks in a check name: a double-quoted one EXECUTES)" 'echo "  docker volume prune -f" > "$pk/planted.sh"; /usr/bin/grep -Eih "^[^#]*(volume|system prune|down +-[a-z]*v)" "$pk/planted.sh" | /usr/bin/grep -Eiq "docker.*(volume|system prune)"'
+prim="$pk/primary"; mkdir -p "$prim"; ( cd "$prim" && git init -q -b release/2026-09-99 . && git commit -q --allow-empty -m x && echo X=1 > .env && echo .env > .gitignore && git add .gitignore && git commit -q -m ign )
+prune_dry() { : > "$pk/dlog"; PATH="$pk/bin:$PATH" DLOG="$pk/dlog" GISIK_PRIMARY="$prim" "$HERE/ctl" rebuild --dry-run 2>&1; }
+check "13.1592 dry-run: rebuild --dry-run prints both prune commands between the pull line and the OK line, exit 0" 'out=$(prune_dry); rc=$?; [ $rc -eq 0 ] && [ "$(echo "$out" | sed -n 1p)" = "DRY: git pull --ff-only origin release/2026-09-99; pnpm dev:stack:rebuild; verify" ] && [ "$(echo "$out" | sed -n 2p)" = "DRY: docker builder prune -f" ] && [ "$(echo "$out" | sed -n 3p)" = "DRY: docker image prune -a -f --filter until=24h" ] && [ "$(echo "$out" | sed -n 4p)" = "OK rebuild dry-run on release/2026-09-99" ]'
+check "13.1592 dry-run: it only PRINTS — the stub recorded no docker call" 'prune_dry >/dev/null; [ ! -s "$pk/dlog" ]'
+check "13.1592 dry-run: the dry-run output names no volume" '! prune_dry | names_volume'
+check "13.1593 disk line: images, build cache and the Docker VM disk percentage, from the stub's df" '[ "$(PATH="$pk/bin:$PATH" DLOG="$pk/dlog" ctl_disk_line)" = "disk: images 12.3GB (reclaimable 4.1GB (33%)), build cache 5.5GB (reclaimable 5.5GB), Docker VM disk 62% used" ]'
+check "13.1593 disk line: CONTROL — with docker unable to answer it degrades to n/a, never an empty field" '[ "$(STUB_NO_DF=1 PATH="$pk/bin:$PATH" DLOG="$pk/dlog" ctl_disk_line)" = "disk: images n/a, build cache n/a, Docker VM disk n/a used" ]'
+check "13.1594 failure: a failing build-cache prune still runs the image prune, and ctl_prune reports non-zero" ': > "$pk/dlog"; ( PATH="$pk/bin:$PATH" DLOG="$pk/dlog" STUB_FAIL_PRUNE=1 CTL_DRY_RUN=0 ctl_prune ) >/dev/null 2>&1; rc=$?; [ $rc -ne 0 ] && /usr/bin/grep -q "^image prune" "$pk/dlog"'
+check "13.1594 failure: CONTROL — with nothing failing ctl_prune reports zero" 'prune_run ctl_prune'
+check "13.1594 order: rebuild.sh prunes only AFTER the last verification gate and BEFORE the final ctl_ok, and the OK line carries the prune result and the disk line" 'v="$HERE/verbs/rebuild.sh"; g=$(/usr/bin/grep -an "GOOGLE_CLIENT_ID empty" "$v" | cut -d: -f1); p=$(/usr/bin/grep -an "^if ctl_prune >>" "$v" | cut -d: -f1); o=$(/usr/bin/grep -an "^ctl_ok rebuild \"\$branch" "$v" | cut -d: -f1); [ -n "$g" ] && [ -n "$p" ] && [ -n "$o" ] && [ "$g" -lt "$p" ] && [ "$p" -lt "$o" ] && sed -n "${o}p" "$v" | /usr/bin/grep -q "\$pr, \$(ctl_disk_line)"'
+rm -rf "$pk"
 rm -rf "$tmp" "$wt"
 [ "$fails" -eq 0 ] && echo "lib.test.sh: ok" || { echo "lib.test.sh: $fails FAILED"; exit 1; }

@@ -3174,6 +3174,14 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   sign-in OFF — **not the `main` BRANCH.** The folder is still fixed; only the branch it stands on moved.
   The evidence limit: no sha is baked into the image, so the branch and sha in `ctl rebuild`'s OK line are
   read from git HEAD at build time — nothing inside a running container can be asked which tree it came from.
+  **`ctl rebuild` ends by pruning the build cache and unused images older than 24 h** (owner standing rule,
+  2026-10-01): `docker builder prune -f` and `docker image prune -a -f --filter until=24h`, run only after the
+  stack has been proven good, output to the log, a failed prune reported in the OK line rather than turned into
+  a FAIL. **Never a volume** — no `docker volume prune`, `docker system prune` or `--volumes`: the dev Postgres,
+  MinIO and the test Postgres live in volumes. The OK line carries a disk line (image and build-cache size with
+  what is reclaimable, plus how full the Docker VM disk is) and `--dry-run` prints both prune commands. Why: a
+  full Docker VM disk made the test Postgres refuse connections and failed a whole gate. `scripts/ctl/lib.sh`
+  (`ctl_prune`, `ctl_disk_line`), `scripts/ctl/verbs/rebuild.sh`, `scripts/ctl/test/lib.test.sh`.
   **The rebuild rule is the load-bearing part, and its failure shape is this repo's recorded
   stale-serving class.** Merge to `main` and skip `pnpm dev:stack:rebuild`, and the app keeps serving the
   PREVIOUS build while `/healthz` answers 200, both containers are `Up`, and `:3001` returns its usual
