@@ -20,7 +20,7 @@ import { seedGuest, seedMember, seedProject } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
- * Prefixes and groups plan Task 6, cases 22.091–22.101: the group tree's events, its
+ * Prefixes and groups plan Task 6, cases 22.091–22.101 and 22.103–22.107: the group tree's events, its
  * projection, its door and its read route, all driven through the REAL `POST /v1/events`
  * door and `GET /v1/workspaces/:id/groups` — what COMMITS and what is SERVED, not a
  * unit over `checkGroupRules`.
@@ -216,6 +216,79 @@ describe('22.096 a group a project is filed under cannot be deleted', () => {
       reason: 'Shop operations is in this group. Move it out first.',
     });
     // CONTROL: ungroup (groupId: null) and the same delete is accepted.
+    expect(await submit(owner, assign(workspaceId, projectId, null))).toMatchObject({ status: 'committed' });
+    expect(await submit(owner, deleteGroup(workspaceId, retail))).toMatchObject({ status: 'committed' });
+  });
+});
+
+describe('22.103 siblings are served in rank order, a reorder moves the group, and projectCount is that group’s own', () => {
+  it('22.103 A, B, C list in rank order, a reorder of C to the front lists C, A, B; one project in A counts 1 for A and 0 for B and C', async () => {
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const [a, b, c] = [newUlid(), newUlid(), newUlid()];
+    await submit(owner, createGroup(workspaceId, a, 'Alpha', null, 'm'));
+    await submit(owner, createGroup(workspaceId, b, 'Beta', null, 'n'));
+    await submit(owner, createGroup(workspaceId, c, 'Gamma', null, 'p'));
+    // CONTROL: before the reorder the order is the creation (= rank) order.
+    expect((await readGroups(owner, workspaceId)).groups.map((g) => g.name)).toEqual(['Alpha', 'Beta', 'Gamma']);
+
+    expect(await submit(owner, reorderGroup(workspaceId, c, 'a'))).toMatchObject({ status: 'committed' });
+    const after = (await readGroups(owner, workspaceId)).groups;
+    expect(after.map((g) => g.name)).toEqual(['Gamma', 'Alpha', 'Beta']);
+    expect(after[0]).toMatchObject({ id: c, rank: 'a' });
+
+    const projectId = newUlid();
+    await seedProject(db.pool, workspaceId, projectId, 'Shop');
+    expect(await submit(owner, assign(workspaceId, projectId, a))).toMatchObject({ status: 'committed' });
+    const counted = (await readGroups(owner, workspaceId)).groups;
+    expect(counted.map((g) => [g.name, g.projectCount])).toEqual([['Gamma', 0], ['Alpha', 1], ['Beta', 0]]);
+  });
+});
+
+describe('22.104 the directory serves each project’s groupId', () => {
+  it('22.104 GET /v1/me/workspaces carries the group a project is filed under; control: a never-filed project reads null throughout', async () => {
+    const { owner, workspaceId, retail } = await world();
+    const filed = newUlid();
+    const loose = newUlid();
+    await seedProject(db.pool, workspaceId, filed, 'Filed');
+    await seedProject(db.pool, workspaceId, loose, 'Loose');
+    const read = async (): Promise<Record<string, string | null>> => {
+      const res = await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: owner.headers });
+      expect(res.statusCode).toBe(200);
+      const ws = (res.json() as { workspaces: Array<{ workspaceId: string; projects: Array<{ projectId: string; groupId: string | null }> }> })
+        .workspaces.find((w) => w.workspaceId === workspaceId)!;
+      return Object.fromEntries(ws.projects.map((p) => [p.projectId, p.groupId]));
+    };
+    expect(await read()).toEqual({ [filed]: null, [loose]: null });
+    expect(await submit(owner, assign(workspaceId, filed, retail))).toMatchObject({ status: 'committed' });
+    expect(await read()).toEqual({ [filed]: retail, [loose]: null });
+    expect(await submit(owner, assign(workspaceId, filed, null))).toMatchObject({ status: 'committed' });
+    expect(await read()).toEqual({ [filed]: null, [loose]: null });
+  });
+});
+
+describe('22.106 reorder and delete of a group that does not exist are refused', () => {
+  it('22.106 a re-delivered delete and a reorder of a fabricated id are refused group.unknown; control: the live group’s reorder commits', async () => {
+    const { owner, workspaceId, retail } = await world();
+    const gone = newUlid();
+    await submit(owner, createGroup(workspaceId, gone, 'Gone', null, 'n'));
+    expect(await submit(owner, deleteGroup(workspaceId, gone))).toMatchObject({ status: 'committed' });
+    expect(await submit(owner, deleteGroup(workspaceId, gone))).toMatchObject({ status: 'refused', rule: GROUP_UNKNOWN_RULE });
+    expect(await submit(owner, reorderGroup(workspaceId, newUlid(), 'z'))).toMatchObject({ status: 'refused', rule: GROUP_UNKNOWN_RULE });
+    expect(await submit(owner, reorderGroup(workspaceId, retail, 'z'))).toMatchObject({ status: 'committed' });
+  });
+});
+
+describe('22.107 a trashed project still blocks its group’s delete', () => {
+  it('22.107 delete is refused group.in-use while the filed project is in the trash; control: restored and ungrouped, the delete commits', async () => {
+    const { owner, workspaceId, retail } = await world();
+    const projectId = newUlid();
+    await seedProject(db.pool, workspaceId, projectId, 'Shop operations');
+    expect(await submit(owner, assign(workspaceId, projectId, retail))).toMatchObject({ status: 'committed' });
+    const trash = (type: string): Seed => ({ workspaceId, entity: { kind: 'project', id: projectId }, type, payload: {} });
+    expect(await submit(owner, trash('project.deleted'))).toMatchObject({ status: 'committed' });
+    expect(await submit(owner, deleteGroup(workspaceId, retail))).toMatchObject({ status: 'refused', rule: GROUP_IN_USE_RULE });
+    expect(await submit(owner, trash('project.undeleted'))).toMatchObject({ status: 'committed' });
     expect(await submit(owner, assign(workspaceId, projectId, null))).toMatchObject({ status: 'committed' });
     expect(await submit(owner, deleteGroup(workspaceId, retail))).toMatchObject({ status: 'committed' });
   });
