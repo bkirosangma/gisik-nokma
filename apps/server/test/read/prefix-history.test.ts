@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, ticketKey, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, ticketKey, type LedgerEvent, type Ulid } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import { createIngestService } from '../../src/ingest/ingest-service.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
@@ -197,7 +197,7 @@ describe('22.027 the former prefixes are listed oldest first', () => {
 describe('22.026 a derived prefix flees a reserved one, in every reader', () => {
   it('22.026 — after A (derived SO) moves to SH, a later derived Shop-ops project reads SO2 in both readers; control: before the move the first one held SO', async () => {
     const { ws, actor } = await freshWorkspace();
-    const [a, b] = [newUlid(), newUlid()].sort() as [string, string];
+    const [a, b] = [newUlid(), newUlid()].sort() as [Ulid, Ulid];
     await seedProject(db.pool, ws, a, 'Shop operations');
     expect((await projectPrefixesInWorkspace(db.pool, ws)).get(a)).toBe('SO'); // control
     await setPrefix(ws, actor, a, 'SH');
