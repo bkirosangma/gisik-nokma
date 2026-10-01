@@ -1884,7 +1884,7 @@ function BoardCardSlot({
   }, []);
 
   /**
-   * A card the move SHIFTED (below the mover in its source column) is already mounted: after the render that moved
+   * A card the move SHIFTED (below the mover in its source column, or in the target column on an arrow move or a release) is already mounted: after the render that moved
    * it, it glides from where it was drawn to where it is — the same FLIP, the same `flights` map and the same
    * `.gn-board__card-slot--flight` class as the landing card, never a scroll. Consumed once; a stale entry, reduced
    * motion and an open dialog (a transform would drag its fixed scrim) each mean it simply snaps.

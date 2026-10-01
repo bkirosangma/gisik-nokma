@@ -158,7 +158,7 @@ export type FlightRect = {
    * Set on a card that does NOT change column but is shifted by one that does (a card below a mover in its source
    * column, closing the gap — or reopening it on a refusal). Such a card is already mounted, so it claims its
    * flight after the render that moved it (not at mount) and never scrolls itself into view. The cards of the TARGET
-   * column below the landing slot are siblings too, but only on an arrow move (a drag's drop placeholder opened the slot).
+   * column below the landing slot are siblings too: noted at the start of an arrow move, and at the release of either gesture.
    */
   sibling?: true;
 };
