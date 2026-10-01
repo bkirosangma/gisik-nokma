@@ -1017,3 +1017,56 @@ describe('invite events in sync-down (case 6.38)', () => {
     expect(memberIds).not.toContain(revoked.id);
   });
 });
+
+/**
+ * Case 22.105 — group events are withheld from every replica stream.
+ *
+ * No replica table folds `group.*`, so a streamed one would reach a client that cannot fold it
+ * (`audienceClassOf('group')`). The control is the `project.updated {groupId}` committed in the
+ * same run: it IS served, so "the owner and the member receive nothing" cannot be an empty reader.
+ */
+describe('group events in sync-down (case 22.105)', () => {
+  it('the owner and a member receive no group.* event, and do receive the project.updated that files a project', async () => {
+    const ws = newUlid();
+    const owner = newUlid();
+    const member = newUlid();
+    await seedMember(db.pool, ws, owner, 'owner');
+    await seedMember(db.pool, ws, member, 'member');
+    const projectId = newUlid();
+    await seedProject(db.pool, ws, projectId);
+    const groupId = newUlid();
+    const created = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'group', id: groupId },
+        type: 'group.created',
+        payload: { parentId: null, level: 1, name: 'Retail', rank: 'm' },
+        actorId: owner,
+      }),
+    );
+    const renamed = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'group', id: groupId },
+        type: 'group.renamed',
+        payload: { name: 'Retail 2' },
+        actorId: owner,
+      }),
+    );
+    const filed = await record(
+      testEnvelope({
+        workspaceId: ws,
+        entity: { kind: 'project', id: projectId },
+        type: 'project.updated',
+        payload: { groupId },
+        actorId: owner,
+      }),
+    );
+    for (const [label, reader] of [['owner', owner], ['member', member]] as const) {
+      const ids = idsOf(await collect(reader, ws));
+      expect(ids, label).toContain(filed.id);
+      expect(ids, label).not.toContain(created.id);
+      expect(ids, label).not.toContain(renamed.id);
+    }
+  });
+});
