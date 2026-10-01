@@ -5327,7 +5327,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (max-width: 40rem) {
   .gn-calendar { min-width: 0; max-width: 100%; }
   .gn-calendar__header { flex-wrap: wrap; }
-  .gn-calendar__grid { overflow-x: auto; overscroll-behavior-x: contain; }
+  /* `position: relative` (21.115): the scroller must be the containing block of the day chips' absolutely placed
+     visually-hidden text, or that text escapes the scroller's clip and the page scrolls sideways by the chip's overhang. */
+  .gn-calendar__grid { position: relative; overflow-x: auto; overscroll-behavior-x: contain; }
   .gn-calendar__weekday-head,
   .gn-calendar__days,
   .gn-calendar__items { grid-template-columns: repeat(7, minmax(3rem, 1fr)); }
