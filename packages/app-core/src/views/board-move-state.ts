@@ -134,7 +134,7 @@ export type MoveSession = {
   refusal: { available: string[] } | null;
   serverRefusal: { rule: string; reason: string } | null;
   transportError: string | null;
-  dialog: { offer: string[]; preselect: string | null } | null;
+  dialog: { offer: string[]; preselect: string | null; markRules?: boolean } | null;
   submitting: boolean;
   /** How the attempt began; a DROP's refusal scrolls itself into view, an arrow's does not. */
   source: 'arrow' | 'drop';
