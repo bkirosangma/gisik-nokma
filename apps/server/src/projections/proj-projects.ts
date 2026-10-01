@@ -78,8 +78,13 @@ import type { Projection } from './registry.js';
  * docblock used to promise. It folds onto the row `project.created` made, keyed
  * on `(project_id, workspace_id)`, and touches only the columns its payload
  * names: an absent `name`/`description` leaves the column alone and
- * `description: null` clears it. The `prefix` is deliberately not a column it can
- * move — the payload schema refuses the key — so ticket keys never change.
+ * `description: null` clears it. **A rename never moves a ticket key, entered
+ * or derived.** The `prefix` is not a column it can move — the payload schema
+ * refuses the key — and `founding_name`, the name an UN-entered prefix is
+ * derived from, is written by `project.created` and never by this branch. Until
+ * 2026-10-01 the reader derived from `name`, so a rename re-keyed every ticket
+ * of a project with no entered prefix (and could shift a neighbour's); the
+ * reader now derives from `founding_name` (`read/visible-projects.ts`).
  */
 export const projProjects: Projection = {
   name: 'proj_projects',
@@ -125,12 +130,16 @@ export const projProjects: Projection = {
     }
     const payload = projectCreatedPayload.parse(event.payload);
     await tx.query(
-      `INSERT INTO proj_projects (project_id, workspace_id, name, description, prefix, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO proj_projects (project_id, workspace_id, name, founding_name, description, prefix, created_by, created_at)
+       VALUES ($1, $2, $3, $3, $4, $5, $6, $7)
        ON CONFLICT (project_id) DO NOTHING`,
       [
         event.entity.id,
         event.workspaceId,
+        // `$3` is BOTH `name` and `founding_name`: at founding they are the
+        // same claim. Only `name` moves afterwards (`project.updated`); the
+        // reader derives an un-entered prefix from `founding_name`, so a rename
+        // never moves a key.
         payload.name,
         // `?? null`, and NULL is the right value rather than a convenience: an
         // event that never carried a description describes nothing, which is
