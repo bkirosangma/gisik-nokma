@@ -42,6 +42,7 @@ export { Sheet, type SheetProps } from './components/sheet.js';
 export { Switch, type SwitchProps } from './components/switch.js';
 export { Table, type TableColumn, type TableProps } from './components/table.js';
 export { Select, type SelectOption, type SelectProps } from './select/select.js';
+export { useScrollEdges } from './use-scroll-edges.js';
 // ONE glyph, exported on its own terms. `RemoveIcon` is the 12px ✕ the Select's
 // own clear control draws, and `apps/web`'s bulk-close cancel needs the same
 // one beside the button it cancels (owner request, 2026-09-22). The alternative

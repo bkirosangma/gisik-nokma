@@ -9,13 +9,16 @@ const ROWS: RosterRow[] = [
 ];
 
 describe('20.311 Members follow the rules', () => {
-  it('20.311 every row; the zebra is kept', () => {
-    // CONTROL — the zebra rows keep their `fill-quaternary` (a stripe, not a boundary).
+  it('20.311 every row; the zebra became a hairline (amended by 23.095)', () => {
+    // AMENDED by 23.095 (UX fixes T6, audit SET-13): the every-second-row `fill-quaternary` tint read as a selected row, so each
+    // row carries a `--gn-border` hairline instead.
     expectRow({
       sheet: 'globals',
-      selectors: '.gn-members__row:nth-child(even)',
-      declarations: { background: 'var(--gn-fill-quaternary)' },
+      selectors: '.gn-members__row',
+      declarations: { 'border-bottom': '1px solid var(--gn-border)' },
     });
+    // CONTROL — the zebra is really gone, and the scan reads a sheet that still has the row family.
+    expect(parseRules(cssOf('globals')).filter((rule) => rule.selectors.some((s) => s.startsWith('.gn-members__row:nth-child')))).toEqual([]);
     for (const row of ROWS) expectRow(row);
   });
 });

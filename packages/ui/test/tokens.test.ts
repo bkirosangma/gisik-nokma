@@ -9,6 +9,7 @@ import {
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
+  disabledOpacityVariableName,
   fontStackOf,
   fontVariableName,
   motionVariableName,
@@ -147,6 +148,12 @@ describe('CSS variable emission', () => {
       // The phone bar / top-bar heights (case 21.003) are declared once in the bare :root block, not as colour roles.
       '--gn-phone-bar-height',
       '--gn-phone-top-height',
+      // The one disabled opacity (UX fixes T6, 23.094) is a bare :root declaration like the phone heights.
+      disabledOpacityVariableName,
+      // `.gn-scroll-fade` (23.092) declares its own three variables on itself and reads them in the same rule family.
+      '--gn-scroll-fade-size',
+      '--gn-fade-from',
+      '--gn-fade-to',
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match

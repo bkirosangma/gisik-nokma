@@ -671,6 +671,9 @@ describe('R1(c) at the component layer', () => {
    * pins `surface-sunken` on both. The type row is a raised item (`surface-raised`
    * + `shadow-lift`, P-ROW) and the field row a recessed well (`surface-well`);
    * the neo arm is unchanged — neo keeps its pressed rows (B-D3).
+   *
+   * Amended 2026-10-02 by 23.095 (UX fixes T6, audit TT-04): the TICKET-TYPE row's neo arm is now FLAT (no shadow, a hairline,
+   * square corners — nothing sunken inside a raised card); the field row keeps its pressed neo shadow.
    */
   it('10.80 the ticket-type row and field row are pressed-in under neo, not merely coloured', () => {
     const BASE_GROUND: Record<string, string> = {
@@ -684,7 +687,12 @@ describe('R1(c) at the component layer', () => {
         base,
       );
       expect(base, selector).toMatch(new RegExp(`background:\\s*var\\(--gn-${BASE_GROUND[selector]}\\)`));
-      expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+      if (selector === '.ticket-type-list__row') {
+        expect(neo, selector).toMatch(/box-shadow:\s*none/);
+        expect(neo, selector).toMatch(/border-bottom:\s*1px solid var\(--gn-border\)/);
+      } else {
+        expect(neo, selector).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+      }
     }
   });
 
@@ -765,7 +773,7 @@ describe('R1(c) at the component layer', () => {
     // The prototype's OWN disabled number for this control (`:3161-3162`),
     // not `.gn-button`'s generic 0.55 — the distinction it shares with
     // `.gn-board-card__move:disabled`.
-    expect(rule('.ticket-type-list__move:disabled')).toMatch(/opacity:\s*0\.4/);
+    expect(rule('.ticket-type-list__move:disabled')).toMatch(/opacity:\s*var\(--gn-disabled-opacity\)/); // amended by 23.094: the one token, was 0.4
 
     // The pair sits BESIDE the row door, which is what the component's own
     // comment claims and what nothing honoured while `<li>` was

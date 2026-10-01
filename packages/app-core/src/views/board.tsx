@@ -17,7 +17,7 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon, useScrollEdges } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -1138,6 +1138,8 @@ function BoardGroupSection({
     railLeft: number;
   } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
+  // The rail scrolls sideways: `.gn-scroll-fade` reads these two attributes so a column running off an edge shows it.
+  const railEdgesRef = useScrollEdges<HTMLDivElement>('x', railRef);
   // Mobile plan FD8: on a phone the rail shows one column at a time (CSS scroll-snap) with a picker above it, and
   // the column collapse is not applied — a collapsed column renders a strip INSTEAD of its cards, so only the
   // DOM can expand it. The person's stored choices are left alone: the same memory collapses the column again
@@ -1306,9 +1308,9 @@ function BoardGroupSection({
         />
       ) : null}
       <div
-        className="gn-board__rail"
+        className="gn-board__rail gn-scroll-fade"
         id={railId}
-        ref={railRef}
+        ref={railEdgesRef}
         hidden={!expanded}
         // A card's `dragend` bubbles here from its slot: that covers Esc and a
         // drop outside every column, neither of which fires `drop`.
@@ -1447,7 +1449,7 @@ function BoardGroupSection({
             ) : (
               <>
             <header className="gn-board__column-header">
-              <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
+              <Chip tone={column.blocked ? 'waiting' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
               {/*
                * `Close all (N)` — spec §8.3's Board bullet: "A TERMINAL
@@ -2198,6 +2200,10 @@ function BoardCardView({
              markup's text is unchanged and the `·` stays `aria-hidden`. */
           <span className="gn-board-card__due-unit">
             <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
+            {/* Colour is never the only signal (UX fixes T6, 23.093): a past date SAYS "Overdue" as well as turning red. */}
+            <span className={late ? 'gn-board-card__due-label gn-board-card__due-label--late' : 'gn-board-card__due-label'}>
+              {late ? 'Overdue' : 'Due'}
+            </span>{' '}
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
               title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}

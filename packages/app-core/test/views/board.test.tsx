@@ -1392,8 +1392,8 @@ describe('20.602 the keys row binds the separator to the due label', () => {
     expect(unit.contains(sep)).toBe(true);
     expect(unit.contains(within(line).getByText(formatDate(DUE)))).toBe(true);
     expect(sep.getAttribute('aria-hidden')).toBe('true');
-    // The unwrapped row still reads `key priority · due`.
-    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
+    // The unwrapped row still reads `key priority · due` — amended by 23.093 (UX fixes T6): the due half now opens with the word "Due" ("Overdue" once late).
+    expect(line.textContent).toBe(`GN-1101P2 · Due ${formatDate(DUE)}`);
     // CONTROL — every `·` in the row is inside a unit, and a card with no due date draws neither.
     expect([...line.querySelectorAll('.gn-board-card__meta-sep')].every((el) => el.closest('.gn-board-card__due-unit') !== null)).toBe(true);
   });
@@ -1408,7 +1408,7 @@ describe('20.602 the keys row binds the separator to the due label', () => {
 /**
  * 13.1281 — the prototype's meta line (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
  * dueLabel].join(" · ")`), with the KEY first (owner, 2026-09-22). The due half keeps
- * the product's one date formatter and its late tone (13.1177) — the prototype's
+ * the product's one date formatter and its late tone (13.1177), now behind the word "Due" / "Overdue" (23.093: colour is never the only signal) — the prototype's
  * `Due 19 Oct` spelling is not transcribed, because a second date spelling on one
  * card is the drift ruling E5-2 closed. A `null` key (a workspace whose ledger holds
  * no prefix, or the offline replica) draws the due label alone: no dash, no
@@ -1430,17 +1430,57 @@ describe('13.1281 the board card meta line leads with the ticket key', () => {
     expect(key.className).toContain('gn-board-card__key');
     const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
     // `boardCardSeed`'s own default priority is P2 (the birth default).
-    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`GN-1101P2 · Due ${formatDate(DUE)}`);
     expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
   });
   it('13.1281 CONTROL — a null key draws the priority badge and the due label, with no key and no placeholder', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(`P2 · ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`P2 · Due ${formatDate(DUE)}`);
     expect(line.querySelector('.gn-board-card__key')).toBeNull();
   });
   it('13.1281 CONTROL — a key with no due date draws the key and the priority badge, with no due separator', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
     expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102P2');
+  });
+});
+
+/**
+ * 23.093 (UX fixes Task 6, audit NP-06, BRD-04): colour is never the only signal. The due date says "Overdue" or
+ * "Due" in words beside the date; the blocked column's chip is the amber `waiting` tone, which is not the danger red
+ * the `blocked` role paints.
+ */
+describe('23.093 the board never leans on colour alone', () => {
+  const TODAY = '2026-09-21';
+  const dueUnit = (date: string, today: string | undefined) => {
+    const { container, unmount } = render(
+      <Board board={errandBoard([boardCardSeed({ dueDate: { date, claim: claim() } })])} onOpenTicket={() => {}} today={today} />,
+    );
+    const unit = container.querySelector<HTMLElement>('.gn-board-card__due-unit')!;
+    return { unit, unmount };
+  };
+
+  it('23.093 a past due date reads "Overdue" in text, and an upcoming one reads "Due"', () => {
+    const late = dueUnit('2026-09-14', TODAY);
+    expect(within(late.unit).getByText('Overdue').className).toContain('gn-board-card__due-label--late');
+    expect(late.unit.textContent).toContain(formatDate('2026-09-14'));
+    late.unmount();
+    // CONTROL — a future date says "Due" and does not carry the late label tone.
+    const soon = dueUnit('2026-09-30', TODAY);
+    expect(within(soon.unit).getByText('Due').className).not.toContain('--late');
+    expect(within(soon.unit).queryByText('Overdue')).toBeNull();
+    soon.unmount();
+    // CONTROL — with no `today` nothing is late, so the word is "Due" for a past date too.
+    const unknown = dueUnit('2026-09-14', undefined);
+    expect(within(unknown.unit).getByText('Due')).toBeTruthy();
+  });
+
+  it('23.093 the Waiting column\'s chip is the waiting tone, not blocked; an ordinary column keeps its category tone', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    const waiting = screen.getByRole('region', { name: 'Waiting on counterparty' }).querySelector('.gn-chip')!;
+    expect(waiting.className).toContain('gn-chip--waiting');
+    expect(waiting.className).not.toContain('gn-chip--blocked');
+    // CONTROL — the same query finds the other columns' chips on their own tones.
+    expect(screen.getByRole('region', { name: 'Doing' }).querySelector('.gn-chip')!.className).toContain('gn-chip--active');
   });
 });

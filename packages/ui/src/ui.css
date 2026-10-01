@@ -157,7 +157,12 @@
   .gn-button--danger:active:not(:disabled) { transform: none; }
 }
 .gn-button:disabled {
-  opacity: 0.55;
+  opacity: var(--gn-disabled-opacity);
+  cursor: not-allowed;
+}
+/* A QUIET button (`aria-disabled`, still focusable): the same look as a disabled one, from the same token (UX fixes T6, 23.094). */
+.gn-button[aria-disabled='true'] {
+  opacity: var(--gn-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -236,6 +241,34 @@
 .gn-chip--pending .gn-chip__dot { background: var(--gn-pending); }
 .gn-chip--restricted .gn-chip__dot { background: var(--gn-restricted); }
 .gn-chip--contested .gn-chip__dot { background: var(--gn-contested); }
+/* "Waiting" (UX fixes T6, 23.093, audit NP-06): a column that waits on someone else is not a column that is stuck. It took
+   the BLOCKED red, which read as an error; the amber `--gn-pending` role (contrast-paired at 3:1 on the surface) says "in
+   someone else's court" and the chip's own text names it, so the colour is never the only signal. */
+.gn-chip--waiting .gn-chip__dot { background: var(--gn-pending); }
+
+/* SCROLL FADES (UX fixes T6, 23.092, audit SYS-14, BRD-07, ENT-13, SET-25, WF-10, PV-04): a scroller whose content runs
+   past an edge says so. `useScrollEdges` (the hook) writes `data-at-start` / `data-at-end` as "true" or "false"; with
+   both "true" (nothing hidden, or a scroller that does not scroll) there is NO mask at all, so a fitting scroller is
+   untouched. An edge with content past it fades over `--gn-scroll-fade-size` to transparent. `.gn-scroll-fade` runs left to
+   right, `--y` top to bottom. The mask clips the scroller's own box-shadow, so a scroller that wears a shadow keeps it on a
+   WRAPPER, not on the masked element. */
+.gn-scroll-fade {
+  --gn-scroll-fade-size: 1.5rem;
+  --gn-fade-from: #000;
+  --gn-fade-to: #000;
+}
+.gn-scroll-fade[data-at-start='false'] { --gn-fade-from: transparent; }
+.gn-scroll-fade[data-at-end='false'] { --gn-fade-to: transparent; }
+.gn-scroll-fade[data-at-start='false'],
+.gn-scroll-fade[data-at-end='false'] {
+  -webkit-mask-image: linear-gradient(to right, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to right, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+}
+.gn-scroll-fade--y[data-at-start='false'],
+.gn-scroll-fade--y[data-at-end='false'] {
+  -webkit-mask-image: linear-gradient(to bottom, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to bottom, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+}
 
 /* Rule 04 (styling refresh Plan A Task 4): every static panel rests on the lit-edge, falling `lift` shadow. neo's lift IS its raised pair; minimal draws none. A Card is never itself interactive (card.tsx), so hover lift is keyed on the interactive element's own class, never here (pattern P-LIFT). */
 .gn-card {
@@ -1432,6 +1465,7 @@ a.gn-ticket-sheet__crumb--link {
    the house chip fill (plan D19) — and no margin, because the epic and the
    title are ONE group (8px apart via the card's gap). */
 .gn-board-card__epic {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: flex;
   width: fit-content;
   align-items: center;
@@ -1462,6 +1496,7 @@ a.gn-ticket-sheet__crumb--link {
    accent — the accent is saved for the action (rule 03), and the underline is
    what tells it apart from the plain `key`/`due` text beside it. */
 .gn-board-card__parent-key {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   min-height: 1.5rem;
@@ -1659,6 +1694,7 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board__column--drop-refused { opacity: 0.55; cursor: not-allowed; }
 .gn-board__column--drop-refused .gn-board__card-slot { cursor: not-allowed; }
 .gn-board-card__title {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   font: inherit;
   font-size: 0.9375rem;
   line-height: 1.5rem;
@@ -1712,6 +1748,10 @@ a.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-subtle); font-size: 0.75rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* The word before the date (UX fixes T6, 23.093, audit BRD-04): "Due" or, once the date has passed, "Overdue", so a late
+   card is not late by red alone. The date keeps its own colour; the pair sits in `.gn-board-card__due-unit`. */
+.gn-board-card__due-label { color: var(--gn-text-subtle); font-size: 0.75rem; font-weight: 600; margin-inline-end: -0.25rem; }
+.gn-board-card__due-label--late { color: var(--gn-danger); }
 /* THE KEYS ROW (owner request, 2026-09-23; formerly "the prototype's meta
    line under the chips", `desktop.dc.html:2496-2504`, key first, owner
    2026-09-22): `[parent key badge] key [priority badge]`, then the due
@@ -1878,11 +1918,9 @@ a.gn-ticket-sheet__crumb--link {
   cursor: pointer;
   transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
 }
-/* Spec row "Move button, unavailable": `opacity:0.4; cursor:not-allowed` —
-   this component's OWN metric, not `.gn-button`'s generic `:disabled` rule
-   (0.55 — `:79-82` above): the spec gives this control its own number, kept
-   rather than folded into the shared default. */
-.gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Spec row "Move button, unavailable": the prototype gave this control its own 0.4. UX fixes T6 (23.094, audit SYS-09) folds it
+   into the ONE disabled token, `--gn-disabled-opacity`, so a disabled control reads the same everywhere. */
+.gn-board-card__move:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* The Move button (mobile plan Tasks 4–5): a ghost pill with a word, after the two arrows, wearing the arrows'
    own metrics and P-GHOST states (they share the class). Above 40rem the word is "Move to…"; the phone arm
    below swaps it for "Move". The 44px floor (rule 01) is restated here rather than inherited so that a later
@@ -1935,7 +1973,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 1px;
 }
 .gn-row-action:disabled,
-.gn-list__bulk-close:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* Styling refresh Plan B (Task B6): P-GHOST — a control inside a table row is a text control with no edge; hover or focus washes it. */
 .gn-row-action {
   display: inline-flex;
@@ -2021,7 +2059,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 0;
 }
 .gn-board-card__close:disabled,
-.gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-board__column-action:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 
 /* The board on a phone (mobile plan Task 4, FD8/FD13). The same 40rem the rest of the phone layer breaks at —
    `PHONE_BOARD_QUERY` (`packages/app-core/src/views/use-phone-board.ts`) is that width in JS, and case 21.040 reads
@@ -2368,9 +2406,9 @@ a.gn-ticket-sheet__crumb--link {
 .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
   color: var(--gn-text-inverted);
 }
-/* "Group header row": `padding 11px 16px; trayBg + trayShadow` — the same
-   pair `.gn-timeline__weeks` uses for identical prototype vocabulary
-   (`--gn-surface-sunken`/`--gn-shadow-sunken`). DECLARED DIVERGENCE, not a
+/* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair `.gn-timeline__weeks` uses
+   (`--gn-surface-sunken`/`--gn-shadow-sunken`); UX fixes T6 (23.095) flattened it to a quaternary tint, so the heading
+   no longer reads as a text field. DECLARED DIVERGENCE, not a
    match: the prototype draws this as a `<tr>` spanning the table's columns;
    this product's architecture already renders one grouping's rows as a
    SEPARATE `<table>` per section with an `<h3>` above it (Group-by wiring
@@ -2385,9 +2423,9 @@ a.gn-ticket-sheet__crumb--link {
   flex-wrap: wrap;
   margin: 0 0 0.4rem;
   padding: 0.6875rem 1rem;
-  /* Styling refresh Plan B (Task B6): a recessed track band with the card radius. */
-  background: var(--gn-surface-track);
-  box-shadow: var(--gn-shadow-track);
+  /* A flat tint with the card radius (UX fixes T6, 23.095, audit PV-17): this was a recessed track band, which read as a text
+     field; a heading is not a trough, so it takes the quaternary fill and no inset shadow. */
+  background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-card);
   font-size: 0.9375rem;
   line-height: 1.25rem;
@@ -2418,6 +2456,7 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-list__collapse,
 .gn-list__open {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   font: inherit;
   border: none;
   background: none;
@@ -2818,6 +2857,7 @@ a.gn-ticket-sheet__crumb--link {
 .gn-my-work__item,
 .gn-my-work__contested { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .gn-my-work__title {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   min-height: 1.5rem;
@@ -2943,7 +2983,7 @@ a.gn-ticket-sheet__crumb--link {
   transition: background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-ticket-sheet__delete:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
-.gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-ticket-sheet__delete:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* ⚠ `align-self`, `text-align` and `justify-content` are here because this block
    MOVED into the grid's `field-state` `<dd>` on 2026-09-22 (spec decision 1). That
    cell is right-aligned — `align-items: flex-end; text-align: right` on
@@ -3265,7 +3305,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transition: background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-ticket-sheet__attach-file:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
-.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: 0.6; }
+.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: var(--gn-disabled-opacity); }
 .gn-ticket-sheet__attach-file:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
@@ -3471,7 +3511,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
   text-align: right;
 }
-.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: 0.7; }
+.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: var(--gn-disabled-opacity); }
 .gn-visibility__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* Read-only viewer chips (spec decision 7, `desktop.dc.html:1214-1222`): no ×
@@ -3906,8 +3946,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem; /* 44px: the picker's tiles were 32px (UX fixes T6, 23.090, audit TT-06) */
+  height: 2.75rem;
   padding: 0;
   /* A real 1.5px transparent border, not the browser's default button chrome
      `border-color` alone would otherwise recolour: with no `border-style`/
@@ -4238,7 +4278,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   width: 100%;
   padding: 0.6rem 0.75rem;
   border: none;
-  border-radius: var(--gn-radius-card);
+  /* The INNER radius (UX fixes T6, 23.095, audit TT-04): the row sits in a card padded 0.5rem, so its corners are the card's
+     radius less that padding, which keeps the two curves concentric instead of a row rounder than the card holding it. */
+  border-radius: calc(var(--gn-radius-card) - 0.5rem);
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-lift);
   font: inherit;
@@ -4255,15 +4297,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    where nothing forces the distinction — the same argument `.gn-list__table-row`
    records for its own choice (`:1080-1087`).
 
-   `--fill4` → `--gn-fill-quaternary` is the mapping `.gn-members__row` already
-   uses for this identical construct (`apps/web/app/globals.css:1524`), which is
-   also where the parity is worked through.
+   `--fill4` → `--gn-fill-quaternary` is the mapping the Members roster used for this identical construct until UX fixes T6
+   (23.095) replaced that zebra with a hairline; the parity is worked through in this block, and the type rows keep the zebra.
 
    THE PRODUCT'S OTHER TWO ZEBRAS DIFFER, AND THAT IS RECORDED RATHER THAN
    HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2703`)
    both stripe the ODD child, so those two families read INVERTED against the
    prototype. **The measurement and its named owner already exist**
-   (`globals.css:1518-1523`: *"owner: whoever next touches those two families"*),
+   (the Members note that recorded it was removed with that zebra by UX fixes T6; the owner, "whoever next touches those two families", is unchanged),
    so this rule adds the third member of the matching set and re-records
    nothing — harmonising those two is not this screen's change. */
 .ticket-type-list__rows li:nth-child(even) .ticket-type-list__row {
@@ -4289,8 +4330,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    colours seem to be too bright... the feel of the neumorphic elements is
    greatly diminished"). Same pair `.ticket-type-list__badge` and `.gn-field__
    input` already wire in for exactly this reason. */
+/* UX fixes T6 (23.095, audit TT-04) REVERSED the sunken row above: a pressed-in row inside a card read as a field, and a stack of
+   them as a stack of text boxes. Under neo the row is now FLAT on the card, a hairline between neighbours and square corners, so
+   the depth belongs to the card alone (nothing sunken inside a raised card). The zebra and hover tints still apply. */
 [data-style="neo"] .ticket-type-list__row {
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid var(--gn-border);
 }
 .ticket-type-list__icon { display: inline-flex; color: var(--gn-text-muted); flex: none; }
 .ticket-type-list__info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; min-width: 0; }
@@ -5018,6 +5065,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   align-items: center;
   justify-content: center;
   min-height: 2.75rem; /* 44px */
+  min-width: 2.75rem; /* 44px: a bare arrow glyph is narrower than its 12px padding makes it (UX fixes T6, 23.090) */
   padding: 0 0.75rem; /* 12px */
   border: 1px solid var(--gn-border);
   border-radius: 999px;
@@ -6621,9 +6669,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    72ch of prose, which is exactly where a one-word orphan shows. */
 .gn-help__p { margin: 0 0 0.875rem; font-size: 1.0625rem; line-height: 1.375rem; text-wrap: pretty; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.0625rem; line-height: 1.375rem; }
-/* A TRAY CARD, not a ruled aside — the reference draws a quote as the same
-   `--trayBg`/`--trayShadow` box it uses for the search results, with no rule
-   down its side at all. The `3px solid var(--gn-accent)` border is gone with
+/* A flat tinted card, not a ruled aside — the reference drew a quote as its tray box (UX fixes T6 flattened it, see the fill
+   below), with no rule down its side at all. The `3px solid var(--gn-accent)` border is gone with
    the change: an accent bar is emphasis, and a pulled quote in a manual is an
    aside, which is the opposite. 14px/16px padding and 16px of air above and
    below are the reference's own. */
@@ -6631,8 +6678,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   margin: 1rem 0;
   padding: 0.875rem 1rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-well);
-  box-shadow: var(--gn-shadow-track);
+  /* A tinted FLAT fill, no inset shadow (UX fixes T6, 23.095, audit NP-21): a pulled quote is an aside, not a pressed-in control. */
+  background: var(--gn-fill-quaternary);
   font-size: 1.0625rem;
   line-height: 1.375rem;
   text-wrap: pretty;
@@ -7326,6 +7373,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    button in this file makes the same choice (`.gn-board-card__title`,
    `.gn-board__empty-create`, 37 more) — a convention, not a one-off. */
 .gn-project__filter-chip-remove {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   border: none;
   background: none;
   padding: 0;
@@ -7679,6 +7727,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 0.375rem;
   font-size: 0.75rem;
   line-height: 1rem;
   padding: 0.1875rem 0.5625rem 0.1875rem 0.8125rem;
@@ -7686,6 +7735,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-surface-sunken);
 }
 [data-style="neo"] .workflow-list__state { box-shadow: var(--gn-shadow-sunken-compact); }
+/* The category as a WORD beside the state name (UX fixes T6, 23.093, audit WF-12): the bar's colour was the only thing saying
+   Open / Active / Done. The bar stays, `aria-hidden`; the word carries it. */
+.workflow-list__state-category { color: var(--gn-text-muted); }
 .workflow-list__state-bar {
   position: absolute;
   left: 0;
@@ -7935,6 +7987,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    cluster's, not this control's, and it is reported with a named owner. */
 .gn-infotip { position: relative; display: inline-flex; align-items: center; }
 .gn-infotip__trigger {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8202,9 +8255,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    that for every control in the product is an owner visual decision, not one a
    screen's task should take on the review's behalf.
 
-   `:disabled { opacity: 0.4 }` is the prototype's OWN number for this control
-   (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`), not `.gn-button`'s generic
-   0.55 (`:126`) — the same distinction `.gn-board-card__move:disabled` records.
+   `:disabled` was the prototype's OWN 0.4 for this control (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`); UX fixes T6
+   (23.094) folds it into the one `--gn-disabled-opacity` token, as `.gn-board-card__move:disabled` was.
 
    **⚠ THE BODY BELOW IS A COPY OF `.gn-board-card__move`'s AND NOTHING GUARDS THE
    DRIFT — found by review 2026-09-20 and RECORDED rather than fixed.** The two are
@@ -8283,7 +8335,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 0;
 }
-.ticket-type-list__move:disabled { opacity: 0.4; cursor: not-allowed; }
+.ticket-type-list__move:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 
 /* --- The comment thread and its box (executor 2's comment-thread dispatch) ---
    Prototype: `design-system/interactive/desktop.dc.html:1268-1330` — the block
@@ -8585,3 +8637,27 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-note-badge--project { background: var(--gn-tint-warning); }
 .gn-note-badge--inherit { background: var(--gn-fill-secondary); }
 .gn-note-badge--explicit { background: var(--gn-fill-quaternary); }
+
+/* HIT AREAS (UX fixes T6, 23.090, audit SYS-10, PV-09, PV-18, ENT-13, SET-13): the controls below draw a box under 44px on
+   purpose (an inline link-button in a dense card, a 24px caret, a 24px ×, the (i) trigger). Their DRAWN box stays; a
+   transparent `::before` extends the HIT box to 2.75rem, centred, the technique `.gn-breadcrumb a::before` already uses
+   (20.616). Each control's BASE rule carries `position: relative` (so the pseudo anchors to it); this block holds only the
+   pseudo. `max(100%, 2.75rem)` keeps a wide link as wide as it is. The pseudo paints nothing: no fill, no border, no
+   shadow, so a hit-slop never changes how a control looks. Neighbouring slops overlap by a few pixels; the later sibling
+   wins the overlap, which is acceptable on a card whose own row is the larger target. */
+.gn-board-card__epic::before,
+.gn-board-card__title::before,
+.gn-board-card__parent-key::before,
+.gn-my-work__title::before,
+.gn-list__open::before,
+.gn-list__collapse::before,
+.gn-project__filter-chip-remove::before,
+.gn-infotip__trigger::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 2.75rem);
+  height: max(100%, 2.75rem);
+  transform: translate(-50%, -50%);
+}

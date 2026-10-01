@@ -4,7 +4,16 @@ import { cssOf, expectRow, flatBoundaryOffenders, type RosterRow } from './helpe
 
 /** Styling refresh Plan B, Task B16 — cases 20.351–20.352 (§20.36). */
 const ROWS: RosterRow[] = [
-  { sheet: 'ui', selectors: '.ticket-type-list__row', pattern: 'P-ROW' },
+  // Amended 2026-10-02 by 23.095 (UX fixes T6, TT-04): still the raised P-ROW ground and lift, but the INNER radius (the card's less its 0.5rem padding).
+  {
+    sheet: 'ui',
+    selectors: '.ticket-type-list__row',
+    declarations: {
+      background: 'var(--gn-surface-raised)',
+      'box-shadow': 'var(--gn-shadow-lift)',
+      'border-radius': 'calc(var(--gn-radius-card) - 0.5rem)',
+    },
+  },
   { sheet: 'ui', selectors: '.fields-editor__row', declarations: { background: 'var(--gn-surface-well)' } },
   { sheet: 'ui', selectors: '.ticket-type-list__move', pattern: 'P-GHOST', declarations: { 'min-width': '2.75rem' } },
   {

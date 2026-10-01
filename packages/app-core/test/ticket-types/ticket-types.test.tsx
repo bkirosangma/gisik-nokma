@@ -20,6 +20,8 @@ import { createFakeGateway, type FakeGatewaySeed } from '../../src/workflow-buil
 import { cloneTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import type { BuilderSession } from '../../src/workflow-builder/ui/builder-context.js';
 import { TicketTypeEditorScreen } from '../../src/workflow-builder/ticket-types/ticket-type-editor-screen.js';
+import { IconPicker } from '../../src/workflow-builder/ticket-types/icon-picker.js';
+import { TYPE_ICON_NAMES } from '../../src/workflow-builder/ticket-types/icons.js';
 import { TicketTypeListScreen } from '../../src/workflow-builder/ticket-types/ticket-type-list-screen.js';
 
 // The shared Select's panel is portal-rendered to document.body, so the
@@ -937,6 +939,8 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'task')!, {
       submitResults: [{ status: 'refused', eventId: 'evt', rule: 'permission.role', reason }],
     });
+    // Save is quiet on an unchanged form (23.094), so the admin changes something first.
+    await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'X');
     await user.click(await screen.findByRole('button', { name: 'Save ticket type' }));
     expect(await screen.findByText('The server refused this ticket type.')).toBeInTheDocument();
     expect(screen.getByText(reason)).toBeInTheDocument();
@@ -1878,5 +1882,58 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
     );
     expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
+  });
+});
+
+/**
+ * 23.091 / 23.094 (UX fixes Task 6, audit TT-06, TT-08).
+ */
+describe('23.091 the icon picker names every choice', () => {
+  it('23.091 each choice has an accessible name and a tooltip saying the same, and the chosen one is pressed', () => {
+    const value = TYPE_ICON_NAMES[0]!;
+    render(<IconPicker value={value} onChange={() => {}} />);
+    const choices = screen.getAllByRole('button');
+    expect(choices.length).toBe(TYPE_ICON_NAMES.length);
+    for (const choice of choices) {
+      const name = choice.getAttribute('aria-label') ?? '';
+      expect(name).toMatch(/^Icon: \S/);
+      expect(choice.getAttribute('title')).toBe(name);
+    }
+    expect(new Set(choices.map((choice) => choice.getAttribute('aria-label'))).size).toBe(choices.length);
+    // CONTROL — exactly one choice is pressed, and it is the value.
+    const pressed = choices.filter((choice) => choice.getAttribute('aria-pressed') === 'true');
+    expect(pressed.map((choice) => choice.getAttribute('aria-label'))).toEqual([`Icon: ${value}`]);
+  });
+});
+
+describe('23.094 Save is quiet while the form is unchanged', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  it('23.094 an unchanged type\'s Save is aria-disabled and not the primary; a change lights it, and undoing the change quiets it again', async () => {
+    const user = userEvent.setup();
+    renderEditor(task);
+    const name = await screen.findByRole('textbox', { name: 'Type name' });
+    const save = () => screen.getByRole('button', { name: 'Save ticket type' });
+    expect(save()).toHaveAttribute('aria-disabled', 'true');
+    expect(save().className).not.toContain('gn-button--primary');
+    // CONTROL — a change lights Save: the primary, no aria-disabled.
+    await user.type(name, 'X');
+    expect(save()).not.toHaveAttribute('aria-disabled');
+    expect(save().className).toContain('gn-button--primary');
+    await user.type(name, '{Backspace}');
+    expect(save()).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('23.094 a quiet Save does nothing when pressed, and a NEW type (nothing to compare against) lights its Save once valid', async () => {
+    const user = userEvent.setup();
+    const { onSaved } = renderEditor(task);
+    await screen.findByRole('textbox', { name: 'Type name' });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(onSaved).not.toHaveBeenCalled();
+    // CONTROL — the create form is not "unchanged": it has no saved state to be unchanged from.
+    cleanup();
+    renderEditor(null);
+    await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'Site inspection');
+    expect(screen.getByRole('button', { name: 'Save ticket type' }).className).toContain('gn-button--primary');
   });
 });
