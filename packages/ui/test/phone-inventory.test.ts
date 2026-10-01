@@ -21,7 +21,9 @@ describe('21.001 every route has a phone owner', () => {
 
 describe('21.002 the viewport opts into the safe area', () => {
   it('21.002 viewportFit cover + interactiveWidget resizes-content', () => {
-    const layout = readFileSync(join(REPO_ROOT, 'apps/web/app/layout.tsx'), 'utf8');
+    // CODE only: the export's own docblock names both settings, so a regex over the raw
+    // source would stay green with the settings deleted (the first mutation run survived).
+    const layout = readFileSync(join(REPO_ROOT, 'apps/web/app/layout.tsx'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(layout).toMatch(/export const viewport\b/);
     expect(layout).toMatch(/viewportFit:\s*'cover'/);
     expect(layout).toMatch(/interactiveWidget:\s*'resizes-content'/);
