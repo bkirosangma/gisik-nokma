@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NoteDetail } from '@gisik-nokma/domain';
@@ -84,6 +84,10 @@ describe('21.131 the note byline on a phone', () => {
     const trigger = screen.getByRole('button', { name: 'More actions for Compressor log' });
     expect(trigger.getAttribute('aria-haspopup')).toBe('menu');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    // The wrapper carries BOTH classes: the card menu's base (the list's anchor and placement) and the in-flow
+    // modifier — the byline dropping the modifier, or OverflowMenu dropping the base when given one, reddens here.
+    expect(trigger.parentElement?.classList.contains('gn-card-menu')).toBe(true);
+    expect(trigger.parentElement?.classList.contains('gn-card-menu--inline')).toBe(true);
 
     // Open: the three actions are menu items, in the inline order, and each runs its handler.
     await user.click(trigger);
@@ -108,6 +112,20 @@ describe('21.131 the note byline on a phone', () => {
     expect(screen.getByRole('button', { name: 'Delete…' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('21.131 a pointer-down outside the open menu closes it (OverflowMenu\'s second consumer keeps the card menu\'s behaviour); one inside the menu does not', async () => {
+    stubViewport(true);
+    const user = userEvent.setup();
+    byline();
+    const trigger = screen.getByRole('button', { name: 'More actions for Compressor log' });
+    await user.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Note actions' });
+    fireEvent.pointerDown(menu);
+    expect(screen.queryByRole('menu')).not.toBeNull();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('21.131 a reader (no Delete) gets a menu of Copy and History only', async () => {

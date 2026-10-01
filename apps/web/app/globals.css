@@ -4125,8 +4125,9 @@ input, textarea, select { font-family: inherit; }
    already the toggle panel below 60rem; this makes its toggle a real target, gives the document
    the full width, keeps the title to one line (the byline's actions are a "⋯" menu by script,
    `note-byline.tsx`, so the row has room) and makes the editor toolbar's controls 44px. The
-   toolbar rules are scoped under `.gn-notes__editor` so they out-rank editor.css's own bases,
-   which load from a different sheet. */
+   toolbar rules are scoped under `.gn-notes` — the editor AND the note comment composer, which both
+   draw `.ticket-editor__*` — so they out-rank editor.css's own bases, which load from a different
+   sheet. */
 @media (max-width: 40rem) {
   .gn-notes__tree-toggle {
     min-height: 2.75rem;
@@ -4141,14 +4142,14 @@ input, textarea, select { font-family: inherit; }
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .gn-notes__editor .ticket-editor__tool {
+  .gn-notes .ticket-editor__tool {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
-  .gn-notes__editor .ticket-editor__heading-select {
+  .gn-notes .ticket-editor__heading-select {
     min-height: 2.75rem;
   }
-  .gn-notes__editor .ticket-editor__tool-group {
+  .gn-notes .ticket-editor__tool-group {
     flex-wrap: wrap;
   }
 }

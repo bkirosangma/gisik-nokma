@@ -30,9 +30,26 @@ function position(css: string, selectors: string | readonly string[], atRule: st
   if (index === -1) throw new Error(`no rule "${wanted}" under ${atRule ?? 'top level'}`);
   return index;
 }
-/** The phone rule for `phoneSelector` comes AFTER the (top-level or tablet) base rule `baseSelector`. */
+/**
+ * Index of the LAST rule under `atRule` that names every one of `selectors` — a base rule may be split
+ * across the file, and the cascade lets the LAST one win, so "after the base" means after THAT one.
+ */
+function lastBase(css: string, selectors: string | readonly string[], atRule: string | null): number {
+  const wanted = typeof selectors === 'string' ? [selectors] : [...selectors];
+  let found = -1;
+  parseRules(css).forEach((rule, index) => {
+    if (rule.atRule === atRule && wanted.every((selector) => rule.selectors.includes(selector))) found = index;
+  });
+  if (found === -1) throw new Error(`no rule names ${wanted.join(', ')} under ${atRule ?? 'top level'}`);
+  return found;
+}
+/** The phone rule for `phoneSelector` comes AFTER the LAST (top-level or tablet) base rule `baseSelector`. */
 function after(css: string, baseSelector: string | readonly string[], baseAt: string | null, phoneSelector: string | readonly string[] = baseSelector): boolean {
-  return position(css, baseSelector, baseAt) < position(css, phoneSelector, PHONE);
+  return lastBase(css, baseSelector, baseAt) < position(css, phoneSelector, PHONE);
+}
+/** The property names a declaration block sets, in order. */
+function propertiesOf(body: string): string[] {
+  return [...body.matchAll(/(?:^|;|\{)\s*([a-z-]+)\s*:/g)].map((hit) => hit[1] ?? '');
 }
 /** Every declaration block under the phone arm that names `selector`, joined. */
 function phoneBodies(css: string, selector: string): string {
@@ -41,9 +58,9 @@ function phoneBodies(css: string, selector: string): string {
     .map((rule) => rule.body)
     .join('\n');
 }
-/** A phone rule scoped under `.gn-notes__editor` outranks the editor sheet's single-class base. */
+/** A phone rule scoped under `.gn-notes` outranks the editor sheet's single-class base. */
 function scopedOver(base: string): string {
-  const scoped = `.gn-notes__editor ${base}`;
+  const scoped = `.gn-notes ${base}`;
   expect(position(globals, scoped, PHONE), `${scoped} must sit under the phone arm`).toBeGreaterThanOrEqual(0);
   return ruleExactly(globals, scoped, PHONE);
 }
@@ -57,6 +74,7 @@ describe('21.130 Notes on a phone', () => {
     expect(valueOf(ruleExactly(globals, ".gn-notes__tree--drawer[data-open='true']", TABLET), 'display')).toBe('block');
     // …and the toggle itself is a real target, AFTER both rules that style it.
     expect(valueOf(ruleExactly(globals, '.gn-notes__tree-toggle', PHONE), 'min-height')).toBe('2.75rem');
+    expect(valueOf(ruleExactly(globals, '.gn-notes__tree-toggle', PHONE), 'padding')).toBe('0 1rem');
     expect(after(globals, '.gn-notes__tree-toggle', null)).toBe(true);
     expect(after(globals, '.gn-notes__tree-toggle', TABLET)).toBe(true);
 
@@ -71,9 +89,31 @@ describe('21.130 Notes on a phone', () => {
     expect(valueOf(scopedOver('.ticket-editor__tool'), 'min-width')).toBe('2.75rem');
     expect(valueOf(scopedOver('.ticket-editor__heading-select'), 'min-height')).toBe('2.75rem');
     expect(valueOf(scopedOver('.ticket-editor__tool-group'), 'flex-wrap')).toBe('wrap');
-    expect(after(globals, '.gn-notes__editor', null, '.gn-notes__editor .ticket-editor__tool')).toBe(true);
+    expect(after(globals, '.gn-notes__editor', null, '.gn-notes .ticket-editor__tool')).toBe(true);
     // The toolbar row itself already wraps in the editor sheet (the base the phone rules rely on).
     expect(valueOf(ruleExactly(editor, '.ticket-editor__toolbar'), 'flex-wrap')).toBe('wrap');
+
+    // The notes phone arm is EXACTLY these six rules, each setting EXACTLY these properties, in this order — so an
+    // added rule (`.gn-notes__editor { overflow-y: auto }`, `.gn-notes__tree--drawer { overflow-y: auto }`,
+    // `.gn-notes__body { flex: 1 }`) or an added declaration reddens here; 18.483 once ran a regex over the whole
+    // block and this restores that strength over the phone arm (review of 6ad9f916, survivors 9–11).
+    const armRules = parseRules(globals).filter((rule) => rule.atRule === PHONE && rule.selectors.some((selector) => /gn-note|ticket-editor/.test(selector)));
+    expect(armRules.map((rule) => rule.selectors.join(', '))).toEqual([
+      '.gn-notes__tree-toggle',
+      '.gn-notes__document',
+      '.gn-notes__title',
+      '.gn-notes .ticket-editor__tool',
+      '.gn-notes .ticket-editor__heading-select',
+      '.gn-notes .ticket-editor__tool-group',
+    ]);
+    expect(armRules.map((rule) => propertiesOf(rule.body))).toEqual([
+      ['min-height', 'padding'],
+      ['padding-left', 'padding-right'],
+      ['overflow', 'text-overflow', 'white-space'],
+      ['min-height', 'min-width'],
+      ['min-height'],
+      ['flex-wrap'],
+    ]);
 
     // CONTROL — the desktop toolbar keeps its 32px controls and the base group does not wrap.
     expect(valueOf(ruleExactly(editor, '.ticket-editor__tool'), 'min-height')).toBe('32px');
@@ -102,7 +142,10 @@ describe('21.131 a note\'s page on a phone', () => {
     // The menu is the workspace card's own, placed in flow instead of a card corner: the modifier follows the base.
     const inline = ruleExactly(globals, '.gn-card-menu--inline');
     expect(valueOf(inline, 'position')).toBe('relative');
-    expect(position(globals, '.gn-card-menu', null)).toBeLessThan(position(globals, '.gn-card-menu--inline', null));
+    // `top`/`right` reset: without them the in-flow menu inherits `.gn-card-menu`'s 0.5rem corner offsets.
+    expect(valueOf(inline, 'top')).toBe('auto');
+    expect(valueOf(inline, 'right')).toBe('auto');
+    expect(lastBase(globals, '.gn-card-menu', null)).toBeLessThan(position(globals, '.gn-card-menu--inline', null));
     // Its trigger is already a 44px target (the card menu's rule; the byline reuses the class).
     expect(valueOf(ruleExactly(globals, '.gn-card-menu__trigger'), 'min-height')).toBe('2.75rem');
 
@@ -119,6 +162,7 @@ describe('21.132 My work on a phone', () => {
     expect(valueOf(ruleExactly(ui, '.gn-my-work', PHONE), 'flex-direction')).toBe('column');
     const rows = ruleExactly(ui, ['.gn-my-work__item', '.gn-my-work__contested'], PHONE);
     expect(valueOf(rows, 'min-height')).toBe('2.75rem');
+    expect(valueOf(rows, 'align-items')).toBe('center');
     expect(valueOf(ruleExactly(ui, '.gn-my-work__title', PHONE), 'min-height')).toBe('2.75rem');
     expect(after(ui, '.gn-my-work', null)).toBe(true);
     expect(after(ui, ['.gn-my-work__item', '.gn-my-work__contested'], null)).toBe(true);
