@@ -19,7 +19,7 @@ import { appendTestEvent } from '../helpers/ledger.js';
 import { applyAll, seedMember, seedProject, seedTicket } from '../helpers/seed.js';
 
 /**
- * Cases 22.020–22.025. A prefix can change and the read side follows: the
+ * Cases 22.020–22.027. A prefix can change and the read side follows: the
  * project's former prefixes are kept (`proj_project_prefixes`), the keys re-read
  * under the new one, a derived prefix flees a RESERVED one, and the workspace
  * prefix is the last `workspace.prefix_changed`.
@@ -173,6 +173,24 @@ describe('22.023 the workspace prefix follows workspace.prefix_changed', () => {
       prefix: 'CC',
       formerPrefixes: [{ prefix: 'CD', until: iso(back.serverTime) }],
     });
+  });
+});
+
+describe('22.027 the former prefixes are listed oldest first', () => {
+  it('22.027 — AA → BB → CC: former is [AA, BB] in that order with increasing until; control: current is CC', async () => {
+    const { ws, actor } = await freshWorkspace();
+    const project = newUlid();
+    await seedProject(db.pool, ws, project, 'Shop operations', undefined, 'AA');
+    const toBb = await setPrefix(ws, actor, project, 'BB');
+    const toCc = await setPrefix(ws, actor, project, 'CC');
+
+    const held = (await projectPrefixHistory(db.pool, ws)).get(project)!;
+    expect(held.current).toBe('CC'); // control
+    expect(held.former).toEqual([
+      { prefix: 'AA', until: toBb.serverTime },
+      { prefix: 'BB', until: toCc.serverTime },
+    ]);
+    expect(Date.parse(held.former[0]!.until)).toBeLessThan(Date.parse(held.former[1]!.until));
   });
 });
 

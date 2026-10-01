@@ -12,7 +12,7 @@
 
 ## 22.2 Prefix history and derivation
 
-*Task 2. Ids `22.027`–`22.039` are unused. `22.026` is a Task 2 follow-up (the reader-side half of 22.024).*
+*Task 2. Ids `22.028`–`22.039` are unused. `22.026` is a Task 2 follow-up (the reader-side half of 22.024).*
 
 - ✅ **22.020 — after `project.updated {prefix:"SH"}` on a project founded with `SO`, the history reads current `SH`, former `[SO]` (with the instant it stopped), and its tickets' keys read `CCSH-n`;** control: before the update the keys read `CCSO-n` and there is no former. Mutation: leave `proj_projects.prefix` unchanged on update → red (also 22.021, 22.022, 22.026). (`apps/server/test/read/prefix-history.test.ts`; `apps/server/src/projections/proj-projects.ts`, `read/visible-projects.ts` `projectPrefixHistory`)
 - ✅ **22.021 — a project founded with NO entered prefix (derived `SO`) that changes to `SH` records the DERIVED `SO` as former;** control: before, current `SO` and no former. Mutation: record nothing for derived projects → red (also 22.026 and 22.025). (same file)
@@ -20,6 +20,7 @@
 - ✅ **22.023 — `workspace.prefix_changed {prefix:"CD"}` makes keys read `CDSO-n` and `workspaceIdentityFromLedger` returns `formerPrefixes` `[CC]` with the instant; changing back to `CC` lists `CD` and not `CC`;** control: before, `CC`, no formers, `CCSO-n`. Mutation: ignore `prefix_changed` in the ledger read → red. (same file; `apps/server/src/workspaces/workspace-name.ts`; the six `13.101x`/`13.1027` identity cases gain `formerPrefixes: []` in `test/read/ticket-key.test.ts`)
 - ✅ **22.024 — `resolveProjectPrefixes([{name:"Shop ops"}], new Set(["SO"]))` yields `SO2`, and with `SO`,`SO2` reserved `SO3`; an ENTERED `SO` is not moved by `reserved`;** control: without `reserved` it yields `SO`. Mutation: ignore `reserved` → red. (`packages/domain/test/prefix.test.ts`)
 - ✅ **22.025 — `verify-projections` stays green after project prefix changes (including a return to a former prefix) and a `workspace.prefix_changed`, with `proj_project_prefixes` non-empty;** control: the registry declares `proj_projects` and `proj_project_prefixes`. Mutation: omit the new table from `tables` → the declaration assertion goes red. **The verify verdict alone does NOT catch that omission** (measured): a projection that writes an undeclared table has no shadow copy, the replay's `search_path` falls through to the LIVE table, which is emptied and rebuilt in place from the ledger and diffs nothing; `projection-order.test.ts` ("declares the tables it writes") pins the list too. (`prefix-history.test.ts`, `apps/server/test/projection-order.test.ts`)
+- ✅ **22.027 — a project that moved `AA` → `BB` → `CC` lists its former prefixes `[AA, BB]` oldest first, with increasing `until` (each the `serverTime` of the move that left it);** control: current is `CC`. Mutation: `ORDER BY until_time DESC` in `projectPrefixHistory` → red (survived until this case). (`apps/server/test/read/prefix-history.test.ts`; `read/visible-projects.ts`)
 - ✅ **22.026 — after project A (derived `SO`) moves to `SH`, a later project whose name derives `SO` reads `SO2` in BOTH readers (`projectPrefixesInWorkspace` and `visibleProjects`), because `SO` is reserved;** control: A reads `SH`, and before the move A held `SO`. Mutation: drop `reserved` from either reader → red. (`prefix-history.test.ts`)
 
 ## 22.3 The door
