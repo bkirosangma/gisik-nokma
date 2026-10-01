@@ -989,6 +989,7 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
     // Mutations: refusal does not FLIP the target siblings back (no target record in `dropPending`); the mover is noted as a sibling of its own column.
     const write = deferred<IngestResult[]>();
     await mount(() => write.promise);
+    let backHome = false; // once the refusal has put tk_c back in To do, that slot lies far below the window
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const id = this.getAttribute('data-testid') ?? '';
       let left = 0;
@@ -999,6 +1000,7 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
         top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
         const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
         if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+        if (backHome && id === 'ticket-card-tk_c' && column === 'todo') top = 5000;
         if (cInDoing && id === 'ticket-card-tk_b') top -= 10; // above the landing slot: nothing makes it glide, whatever the layout does to it
       }
       return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
@@ -1008,6 +1010,8 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
     for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
     expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(false);
 
+    scrollIntoView.mockClear();
+    backHome = true;
     await act(async () => write.resolve(refused([{ id: 'x' }])));
     expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
     // tk_d was drawn at (325, 360) and is back at (300, 230): it starts 25px right of and 130px BELOW its slot.
@@ -1015,8 +1019,10 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
     expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-x')).toBe('25px');
     expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
     expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
-    // The mover itself glides back from the target (its own flight, not noted as a sibling's).
+    // The mover itself comes home on ITS OWN flight (not noted as a sibling's, which never scrolls): it glides, and since its slot is
+    // off-screen it scrolls itself into view like any landing.
     expect(slotOf('tk_c').classList.contains('gn-board__card-slot--flight')).toBe(true);
+    expect(scrollIntoView).toHaveBeenCalled();
   });
 });
 
