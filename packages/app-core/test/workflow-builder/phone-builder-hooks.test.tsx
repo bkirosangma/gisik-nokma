@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newUlid, type TicketTypeDef } from '@gisik-nokma/domain';
@@ -155,11 +155,13 @@ describe('21.175 / 21.176 the Panels sheet leaves a nested Select and the deskto
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    expect(screen.queryByRole('listbox')).toBeNull();
+    // react-aria unmounts the listbox and restores focus to the trigger ASYNCHRONOUSLY (FocusScope / overlay close),
+    // so those two are awaited; `data-open` is NOT — it is the 21.175 proof and must already be true.
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
     // The sheet stays: the Escape was the Select's.
     expect(aside).toHaveAttribute('data-open', 'true');
     // CONTROL — with the Select closed, the next Escape (focus back on its trigger, inside the sheet) closes the sheet.
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus());
     await user.keyboard('{Escape}');
     expect(aside).toHaveAttribute('data-open', 'false');
   });
