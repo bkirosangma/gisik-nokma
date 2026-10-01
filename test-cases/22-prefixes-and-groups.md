@@ -35,7 +35,7 @@
 
 ## 22.9 The group picker — four type-ahead levels, inline create
 
-*Task 9. Ids `22.167`–`22.179` are unused.*
+*Task 9. Ids `22.171`–`22.179` are unused.*
 
 - ✅ **22.160 — four comboboxes labelled "Level 1 group" … "Level 4 group"; level N+1 is disabled until level N has a value;** control: picking Shops enables level 2 and not level 3; the `disabled` prop disables all four. (`apps/web/test/group-picker.test.tsx`; `apps/web/src/group-picker.tsx`)
 - ✅ **22.161 — typing in level 2 lists only the children of the level-1 pick whose names contain the text, ignoring case;** control: a same-named group under another level-1 group is not offered, and the Retail chosen is the one under the picked branch (by id). Mutation: drop the parent filter → red. (same file)
@@ -44,3 +44,7 @@
 - ✅ **22.164 — emptying level 2 empties and disables levels 3 and 4 and keeps level 1;** control: before, all four were filled. Mutation: clear only the one level → red. (same file)
 - ✅ **22.165 — a pending name that the re-read groups now contain (the door answered `group.name-taken` and the form re-read) is adopted: the existing group is selected, "Using the existing Retail." is announced (`role="status"`), the New tag goes;** control: a pending name with no match stays pending. The picker is controlled — the form that submits owns the re-read and passes the fresh `groups`. Mutation: no adoption → red. (same file)
 - ✅ **22.166 — each combobox has a visible `<label for>` and its input rule floors at 2.75rem (44 px; read from `globals.css`, jsdom has no layout); a keyboard-only walk (Tab, type, ArrowDown, Enter) sets all four levels.** (same file)
+- ✅ **22.167 — under Shops, `Fran` ends the options with `Create “Fran”`, and the pointer, or ArrowDown to it then Enter, makes a pending group;** control: `retail` (an exact match) offers no Create option. Mutation: `showCreate = false` → red. (same file)
+- ✅ **22.168 — the picker keeps Enter and Escape to itself:** inside a `<form onSubmit>` Enter does not submit, and Escape with the list OPEN does not reach an outer `onKeyDown`; control: Escape with the list CLOSED does reach it. Mutations: drop the Enter `preventDefault` → red; drop the Escape `preventDefault`/`stopPropagation` → red. (same file)
+- ✅ **22.169 — `aria-activedescendant` follows the highlighted option:** after ArrowDown twice it is the id of the second option (`aria-selected`, `aria-expanded="true"`); control: before any arrow it is absent. Mutation: `aria-activedescendant={undefined}` → red. (same file)
+- ✅ **22.170 — `groupSeeds` refuses a chain deeper than level 4 (`GROUP_MAX_LEVEL`, imported from the domain):** two pending names under a level-3 pick throw; control: ONE gives a level-4 `group.created`. Mutation: the guard `if (false)` → red. (same file)

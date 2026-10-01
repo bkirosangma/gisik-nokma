@@ -1,5 +1,5 @@
 import type { EnvelopeSeed } from '@gisik-nokma/app-core';
-import { rankBetween, type GroupRow } from '@gisik-nokma/domain';
+import { GROUP_MAX_LEVEL, rankBetween, type GroupRow } from '@gisik-nokma/domain';
 
 /**
  * What a project form's group field says it wants: an EXISTING group (the deepest
@@ -7,9 +7,6 @@ import { rankBetween, type GroupRow } from '@gisik-nokma/domain';
  * The picker produces it; `groupSeeds` turns it into events.
  */
 export type GroupChoice = { groupId: string | null; pendingNames: string[] };
-
-/** The deepest a group may sit (`GROUP_MAX_LEVEL` in the domain's group events). */
-const MAX_LEVEL = 4;
 
 /**
  * The `group.created` events a choice needs, and the group id the project then
@@ -24,8 +21,11 @@ const MAX_LEVEL = 4;
  *   existing pick, else `null` (a project with no group).
  *
  * Pure, with the id source injected, so a test reads the SHAPE without a clock or
- * a random. The events are meant to be submitted in ONE batch ahead of the
- * project's own claim, so the whole thing lands or none of it does.
+ * a random. The events are meant to be submitted in ONE batch, in order, ahead
+ * of the project's own claim. An ingest batch is NOT atomic (FD3): each event
+ * commits or is refused on its own, and the door re-checks every one, so a
+ * refused `group.created` (say `group.name-taken`) can leave the earlier ones
+ * committed. The form that submits owns that outcome (22.165).
  */
 export function groupSeeds(
   workspaceId: string,
@@ -39,8 +39,10 @@ export function groupSeeds(
   }
   let parentId: string | null = choice.groupId;
   let level = (parentRow?.level ?? 0) + 1;
-  if (level + choice.pendingNames.length - 1 > MAX_LEVEL) {
-    throw new Error(`groupSeeds: ${choice.pendingNames.length} new groups under level ${level - 1} pass level ${MAX_LEVEL}`);
+  if (level + choice.pendingNames.length - 1 > GROUP_MAX_LEVEL) {
+    throw new Error(
+      `groupSeeds: ${choice.pendingNames.length} new groups under level ${level - 1} pass level ${GROUP_MAX_LEVEL}`,
+    );
   }
   const lastSiblingRank = groups
     .filter((row) => row.parentId === parentId)
