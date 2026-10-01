@@ -6,6 +6,7 @@ import {
   projectMemberAddedPayload,
   projectMemberRemovedPayload,
   projectRestoredPayload,
+  projectUpdatedPayload,
   workspaceCreatedPayload,
   workspaceRenamedPayload,
 } from './events/membership.js';
@@ -430,6 +431,13 @@ domainRegistry.register({
   version: 1,
   entityKind: 'project',
   payloadSchema: projectRestoredPayload,
+});
+
+domainRegistry.register({
+  type: 'project.updated',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectUpdatedPayload,
 });
 
 /**
