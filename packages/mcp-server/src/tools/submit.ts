@@ -1,4 +1,5 @@
 import { newSubmittedEvent, type SubmittedEvent } from '@gisik-nokma/domain';
+import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 
 type EventResult =
@@ -79,4 +80,27 @@ export function envelopeFor(
     // `'server'` remains refused at the client door.
     origin: 'mcp',
   });
+}
+
+/**
+ * `session.post` to a route that is not the event door, with a 400 or 422 turned
+ * into the server's own words. `HttpError`'s message is only "answered 400" — the
+ * body is what says why, and `registerTools` shows an assistant the message and
+ * nothing else. A 422 body is an ingest result (`refused` / `invalid`), spelled
+ * exactly as `submitOne` spells it; a 400 body is `{ error, message }`. Any
+ * other status, and anything that is not an `HttpError`, is rethrown untouched.
+ */
+export async function postJson(session: Session, path: string, body: unknown): Promise<unknown> {
+  try {
+    return await session.post(path, body);
+  } catch (error) {
+    if (!(error instanceof HttpError) || (error.status !== 400 && error.status !== 422)) throw error;
+    const b = (error.body ?? {}) as Record<string, unknown>;
+    if (b['status'] === 'refused') throw new Error(`refused by ${String(b['rule'])}: ${String(b['reason'])}`);
+    if (b['status'] === 'invalid') throw new Error(`${String(b['code'])}: ${String(b['message'])}`);
+    if (typeof b['message'] === 'string') {
+      throw new Error(typeof b['error'] === 'string' ? `${b['error']}: ${b['message']}` : b['message']);
+    }
+    throw new Error(`gisik-nokma answered ${error.status}: ${JSON.stringify(error.body)}`);
+  }
 }

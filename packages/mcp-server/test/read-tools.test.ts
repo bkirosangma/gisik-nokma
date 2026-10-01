@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readTools } from '../src/tools/read-tools.js';
+import { workspaceTools } from '../src/tools/workspace-tools.js';
 import type { Session } from '../src/session.js';
 
 /**
@@ -23,10 +24,14 @@ function tool(name: string, session: Session) {
 }
 
 describe('the read tools', () => {
+  // `list_workspaces` moved to `workspace-tools.ts` in MCP CRUD plan Task 6 (it gained `include`);
+  // this case stays here because its claim — a live workspace's directory row is passed through
+  // unchanged — is still a read-tool claim.
   it('14.60 list_workspaces passes the server body through unchanged', async () => {
     const body = { workspaces: [{ workspaceId: 'w1', name: 'Shop', role: 'owner', projects: [{ projectId: 'p1', name: 'Ops' }] }] };
     const { session, paths } = sessionRecording(body);
-    expect(await tool('list_workspaces', session).handler({})).toEqual(body);
+    const listWorkspaces = workspaceTools(session).find((t) => t.name === 'list_workspaces');
+    expect(await listWorkspaces?.handler({})).toEqual(body);
     expect(paths).toEqual(['/v1/me/workspaces']);
   });
 

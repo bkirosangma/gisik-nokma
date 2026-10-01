@@ -98,7 +98,16 @@ async function journey(app: FastifyInstance, otp: Parameters<typeof signInWithPh
 
   expect((await mcp(app, first.access_token, INIT)).statusCode).toBe(200);
   const list = await mcp(app, first.access_token, rpc('tools/list', {}, 2));
-  expect((list.json().result.tools as unknown[]).length).toBe(9);
+  // By name, not by count: the exact list is pinned in `mcp-http.test.ts` (14.262), and a count here
+  // would need editing with every tool the plan adds. The original nine and the workspace tools (MCP
+  // CRUD Task 6) must all be on the hosted door.
+  expect((list.json().result.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(
+    expect.arrayContaining([
+      'list_workspaces', 'list_projects', 'search_tickets', 'list_tickets', 'get_ticket',
+      'create_ticket', 'transition_ticket', 'add_comment', 'assign_ticket',
+      'get_workspace', 'create_workspace', 'delete_workspace',
+    ]),
+  );
   const call = async (name: string, args: Record<string, unknown>, token = first.access_token) => {
     const r = (await mcp(app, token, rpc('tools/call', { name, arguments: args }, 3))).json().result as { isError?: boolean; content: { text: string }[] };
     return { isError: r.isError === true, text: r.content[0]?.text ?? '' };

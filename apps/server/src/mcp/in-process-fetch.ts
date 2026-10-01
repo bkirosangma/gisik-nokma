@@ -36,7 +36,7 @@ export function inProcessFetch(app: FastifyInstance, outer: OuterCaller): typeof
 
 /**
  * The package's `Session` for one hosted call: the caller's own access token,
- * over the in-process fetch. Same nine tools, same code as the stdio server.
+ * over the in-process fetch. Every tool in `allTools`, same code as the stdio server.
  */
 export function hostedSession(
   app: FastifyInstance,
