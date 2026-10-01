@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# ctl gate <sha> [--base <branch>] — the forced gate at HEAD=<sha> through the gate-lock reference scripts; writes .git/ctl/gate-<sha> only when green.
+# ctl gate <sha> [--base <branch>] — the gate at HEAD=<sha> through the gate-lock reference scripts; writes .git/ctl/gate-<sha> only when green.
 # --base (default main; main or release/<name> only) is the branch HEAD must already contain; a release base writes gate.release+<name>-<sha>.
+# TWO KINDS (owner, 2026-10-02). main-kind (no --base, or --base main) is the release gate: GATE_MODE=fresh, `--force --concurrency=1`, every task
+# re-run. release-kind (--base release/<x>) is a task landing: GATE_MODE=cached, turbo cache ON, `--concurrency=2`. The cache is only sound because
+# turbo.json declares every cross-package reader's inputs (scripts/ctl/test/gate-cache.test.sh proves a changed input misses), and the fresh main-kind
+# gate sits above it as the net: nothing reaches main on a replay.
 set -u
 . "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 ctl_parse_common "$@" || exit 1
@@ -8,6 +12,8 @@ sha="${CTL_ARGS[0]:-}"; [ -n "$sha" ] || ctl_fail gate "usage: ctl gate <sha> [-
 CTL_BASE=main
 set -- "${CTL_ARGS[@]:1}"
 while [ $# -gt 0 ]; do case "$1" in --base) ctl_take_base gate "${2:-}"; shift $(($# >= 2 ? 2 : 1));; *) ctl_fail gate "unknown arg $1";; esac; done
+# The mode follows the base and nothing else: --base main is main-kind like no --base at all (ctl_marker_kind makes the same equation).
+if [ "$CTL_BASE" = main ]; then mode=fresh; else mode=cached; fi
 ctl_node22 || exit 1
 cd "$CTL_REPO" || exit 1
 head="$(/usr/bin/git rev-parse HEAD)"
@@ -30,15 +36,18 @@ log="$(ctl_log gate)"; console="$log.console"
 # (measured 2026-09-21 22:55 and 22:58: "line 216: timed: command not found", "line 238: code: unbound variable").
 # The copy is left in place after the run: it is the evidence of what ran.
 base="$(basename "$log" .log)"; work="$(dirname "$log")/gate-lock-${base#gate-}"
-if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
+if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_MODE=$mode GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
 mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
-GATE_REPO="$CTL_REPO" bash "$work/gate.sh" "$log" > "$console" 2>&1; echo "GATE_WRAPPER_EXIT=$?" >> "$console"
+GATE_MODE="$mode" GATE_REPO="$CTL_REPO" bash "$work/gate.sh" "$log" > "$console" 2>&1; echo "GATE_WRAPPER_EXIT=$?" >> "$console"
+# The mode that RAN is what gate.sh printed, not what this verb asked for: a copy of gate.sh that ignored GATE_MODE must fail here, not pass under the wrong name.
+ran=$(grep -m1 '^GATE_MODE=' "$console" | sed 's/^GATE_MODE=\([a-z]*\).*/\1/')
 E=$(grep -m1 '^EXIT=' "$console"); T=$(grep -m1 'Tasks:' "$log" | sed 's/^.*Tasks:/Tasks:/'); C=$(grep -m1 'Cached:' "$log" | sed 's/^.*Cached:/Cached:/')
 N=$(grep -m1 'NODE=' "$console"); eng=$(grep -c 'Unsupported engine' "$log"); to=$(grep -c 'Hook timed out' "$log")
 orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}' | wc -l | tr -d ' ')
-summary="$E · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
+summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
-echo "$T" | grep -q '33 successful, 33 total' || ctl_fail gate "$summary (log $log)"
+[ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
+echo "$T" | grep -q '34 successful, 34 total' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"

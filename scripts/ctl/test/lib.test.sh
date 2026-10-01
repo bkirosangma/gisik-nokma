@@ -38,8 +38,9 @@ check "gate: after merging origin/main → proceeds again" 'gate_dry | tail -1 |
 # dir on every call, so a sibling's `ctl checks` (→ selftest → gate --dry-run) rewrote locked-test.sh under a running gate.
 ld=$(mktemp -d)
 check "gate: --dry-run copies nothing into the log dir" 'CTL_LOG_DIR="$ld" gate_dry >/dev/null; [ "$(ls "$ld" | wc -l | tr -d " ")" -eq 0 ]'
-# a fixture gate.sh that prints what the verb reads: the summary lines into the log ($1), EXIT/NODE on its console
-( cd "$gr" && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    33 successful, 33 total\nCached:    0 cached, 33 total\n" > "$1"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo helper > docs/lanes/gate-lock/locked-test.sh && /usr/bin/git add -A && /usr/bin/git commit -q -m "fixture gate" && /usr/bin/git push -q origin HEAD:main && /usr/bin/git fetch -q origin )
+# a fixture gate.sh that prints what the verb reads: the summary lines into the log ($1), GATE_MODE/EXIT/NODE on its console
+# (GATE_MODE is what the verb requires to match the kind it asked for: fresh on main, cached on a release base)
+( cd "$gr" && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    34 successful, 34 total\nCached:    0 cached, 34 total\n" > "$1"' 'echo "GATE_MODE=${GATE_MODE:-unset}"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo helper > docs/lanes/gate-lock/locked-test.sh && /usr/bin/git add -A && /usr/bin/git commit -q -m "fixture gate" && /usr/bin/git push -q origin HEAD:main && /usr/bin/git fetch -q origin )
 # CTL_DRY_RUN=0 explicitly: the arg-parsing check above leaves CTL_DRY_RUN=1 in this shell, and a "real run" that is
 # silently a dry run prints `OK gate dry-run` — which a loose `^OK gate` grep accepted (measured writing this test).
 gate_real() { ( cd "$gr" && CTL_DRY_RUN=0 CTL_LOG_DIR="$ld" "$HERE/ctl" gate "$(/usr/bin/git rev-parse HEAD)" --repo "$gr" 2>&1 ); }
@@ -111,7 +112,7 @@ check "13.1501 base: ctl_base_valid refuses every other name, incl. traversal an
 check "13.1503 base: main keeps the marker kind the chain always used" '[ "$(ctl_marker_kind gate main)" = gate ] && [ "$(ctl_marker_kind checked main)" = checked ]'
 check "13.1503 base: a release base gets its OWN marker kind, injectively" '[ "$(ctl_marker_kind gate release/x)" = "gate.release+x" ] && [ "$(ctl_marker_kind gate release/a/b)" != "$(ctl_marker_kind gate release/a-b)" ]'
 bb=$(mktemp -d); $G init -q --bare "$bb"
-br=$(mktemp -d); ( cd "$br" && $G init -q . && $G symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes/gate-lock && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    33 successful, 33 total\nCached:    0 cached, 33 total\n" > "$1"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo one > f.txt && $G add -A && $G commit -q -m base && $G remote add origin "$bb" && $G push -q -u origin main && $G checkout -q -b release/x && echo rel > rel.txt && $G add -A && $G commit -q -m rel1 && $G push -q -u origin release/x && $G checkout -q -b task && echo task > task.txt && $G add -A && $G commit -q -m task1 && $G push -q origin task )
+br=$(mktemp -d); ( cd "$br" && $G init -q . && $G symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes/gate-lock && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    34 successful, 34 total\nCached:    0 cached, 34 total\n" > "$1"' 'echo "GATE_MODE=${GATE_MODE:-unset}"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo one > f.txt && $G add -A && $G commit -q -m base && $G remote add origin "$bb" && $G push -q -u origin main && $G checkout -q -b release/x && echo rel > rel.txt && $G add -A && $G commit -q -m rel1 && $G push -q -u origin release/x && $G checkout -q -b task && echo task > task.txt && $G add -A && $G commit -q -m task1 && $G push -q origin task )
 bump() { ( c=$(mktemp -d); rm -rf "$c"; $G clone -q "$bb" "$c" && cd "$c" && $G checkout -q "$1" && echo "$RANDOM" > "moved-$RANDOM.txt" && $G add -A && $G commit -q -m "$1 moved" && $G push -q origin "$1"; rm -rf "$c" ); }
 gb() { ( cd "$br" && CTL_LOG_DIR="$ld" "$HERE/ctl" gate "$($G rev-parse HEAD)" --repo "$br" "$@" 2>&1 ); }
 check "13.1502 base gate: --base release/x on a branch containing origin/release/x proceeds" 'gb --base release/x --dry-run | tail -1 | grep -q "^OK gate dry-run"'
@@ -130,6 +131,31 @@ gbr() { CTL_DRY_RUN=0 gb "$@"; }
 sha=$(cd "$br" && $G rev-parse HEAD); mk="$br/.git/ctl"
 check "13.1503 base gate: a real --base release/x run is green and writes the release-kind marker, NOT the main one" 'gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate.release+x-$sha" ] && [ ! -f "$mk/gate-$sha" ]'
 check "13.1503 base gate: REGRESSION — a default real run writes gate-<sha>, the marker land has always read" 'gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate-$sha" ]'
+# Gate modes (13.1700-13.1705, test-cases/13-deploy-and-ops.md): main-kind is fresh (`--force --concurrency=1`), a release base is
+# cached (cache on, `--concurrency=2`). The OK line names the mode that RAN, read from gate.sh's console, not the one asked for.
+# 13.1700: the REAL docs/lanes/gate-lock/gate.sh, beside a stub locked-test.sh and a stub pnpm that record argv.
+gm=$(mktemp -d); mkdir -p "$gm/bin" "$gm/repo/.git"; cp "$HERE/../../docs/lanes/gate-lock/gate.sh" "$gm/gate.sh"
+printf '%s\n' '#!/bin/bash' 'shift; "$@"' > "$gm/locked-test.sh"
+printf '%s\n' '#!/bin/bash' 'echo "$*" >> "$STUB_ARGV"' > "$gm/bin/pnpm"; chmod +x "$gm/bin/pnpm" "$gm/locked-test.sh"
+gm_run() { rm -f "$gm/argv"; ( cd "$gm/repo" && env "$@" PATH="$gm/bin:$PATH" STUB_ARGV="$gm/argv" GATE_REPO="$gm/repo" bash "$gm/gate.sh" "$gm/log" 2>&1 ); }
+check "13.1700 gate modes: GATE_MODE=fresh runs turbo --force --concurrency=1" 'gm_run GATE_MODE=fresh >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --force --concurrency=1" ]'
+check "13.1700 gate modes: GATE_MODE unset is fresh — a hand-run of gate.sh never picks the weaker mode" 'gm_run X=1 >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --force --concurrency=1" ]'
+check "13.1700 gate modes: GATE_MODE=cached runs turbo with --concurrency=2 and NO --force" 'gm_run GATE_MODE=cached >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --concurrency=2" ] && ! grep -q -- --force "$gm/argv"'
+check "13.1700 gate modes: the console states the mode that runs (the verb reads it)" 'gm_run GATE_MODE=cached | grep -q "^GATE_MODE=cached TURBO_FLAGS=--concurrency=2$" && gm_run GATE_MODE=fresh | grep -q "^GATE_MODE=fresh TURBO_FLAGS=--force --concurrency=1$"'
+check "13.1701 gate modes: CONTROL — an unknown mode refuses (exit 2, names the value) and turbo is never invoked" 'out=$(gm_run GATE_MODE=fast); rc=$?; [ "$rc" -eq 2 ] && printf "%s" "$out" | grep -q "GATE_MODE=.fast. is not fresh|cached" && [ ! -e "$gm/argv" ]'
+check "13.1701 gate modes: CONTROL — an empty mode is not fresh by accident of spelling, it is the default only when UNSET" 'out=$(gm_run GATE_MODE=); [ $? -eq 2 ] && [ ! -e "$gm/argv" ]'
+rm -rf "$gm"
+# 13.1702-13.1704: the verb. The fixture gate.sh at $br echoes GATE_MODE=${GATE_MODE:-unset}, so the OK line carries what the verb passed.
+mkline() { gbr "$@" | tail -1; }
+check "13.1702 gate modes: --base release/x is release-kind — the OK line says mode=cached and carries the cache count" 'l=$(mkline --base release/x); printf "%s" "$l" | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +34 successful, 34 total · Cached: +0 cached, 34 total"'
+check "13.1702 gate modes: CONTROL — the default (no --base) is main-kind: mode=fresh" 'l=$(mkline); printf "%s" "$l" | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · "'
+check "13.1702 gate modes: CONTROL — --base main spelled out is main-kind too: mode=fresh" 'l=$(mkline --base main); printf "%s" "$l" | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · "'
+check "13.1703 gate modes: --dry-run names the mode it would pass, per base" 'gb --base release/x --dry-run | grep -q "^DRY: GATE_MODE=cached " && gb --dry-run | grep -q "^DRY: GATE_MODE=fresh "'
+# 13.1704: a gate.sh that ignores GATE_MODE (a stale copy) must not pass under the wrong name.
+( cd "$br" && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    34 successful, 34 total\nCached:    0 cached, 34 total\n" > "$1"' 'echo "GATE_MODE=fresh"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && $G commit -q -am "stale gate.sh" )
+check "13.1704 gate modes: a gate.sh that ran fresh when cached was asked for FAILS the verb, naming both" 'out=$(gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*asked for cached, gate.sh ran fresh"'
+check "13.1704 gate modes: CONTROL — the same stale gate.sh is correct for main-kind, which asked for fresh" 'gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh"'
+( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
 #!/usr/bin/env bash
