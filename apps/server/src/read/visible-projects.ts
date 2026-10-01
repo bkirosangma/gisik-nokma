@@ -28,7 +28,10 @@ export type VisibleProject = {
    * column is nullable because no founding event before 2026-09-20 could carry
    * one, but a project with no stored prefix still needs a key, so a reader
    * resolves the two cases with ONE rule — the stored value where there is one,
-   * `derivePrefix(name)` where there is not (`packages/domain/src/prefix.ts`).
+   * `derivePrefix(foundingName)` where there is not (`packages/domain/src/prefix.ts`).
+   * **The derivation reads the FOUNDING name, never the current one** (owner,
+   * 2026-10-01): a rename never moves a key, entered or derived, so this value
+   * is the same before and after `project.updated`.
    * What comes out is a value no read site has to think about, which is the
    * only way an enumeration of eight render sites stays honest.
    *
@@ -99,6 +102,13 @@ export type VisibleProject = {
  * Two callers, one rule: a door that resolved prefixes its own way would accept
  * a prefix the read then hands to somebody else.
  *
+ * ## Derived from the FOUNDING name
+ *
+ * `projectPrefixRows` feeds `founding_name` to the resolver, not `name`. A
+ * rename (`project.updated`) rewrites `name` and must never re-key the project
+ * or shift a neighbour's derived prefix; reading `name` here did exactly that
+ * for every project founded without an entered prefix, from #862 until this fix.
+ *
  * ## Derived prefixes COUNT, and that is the whole point of the check
  *
  * A project founded with no entered prefix derives one, and `resolveProjectPrefixes`
@@ -114,7 +124,9 @@ export async function projectPrefixesInWorkspace(
   workspaceId: string,
 ): Promise<Map<string, string>> {
   const rows = await projectPrefixRows(db, workspaceId);
-  const resolved = resolveProjectPrefixes(rows.map((row) => ({ name: row.name, prefix: row.prefix })));
+  const resolved = resolveProjectPrefixes(
+    rows.map((row) => ({ name: row.foundingName, prefix: row.prefix })),
+  );
   // A MAP keyed by project id, not a Set of values, and the caller needs the
   // key: a project re-delivering its OWN `project.created` must not be refused
   // by a prefix it already holds. A Set cannot answer "is this value held by
@@ -128,18 +140,24 @@ export async function projectPrefixesInWorkspace(
 async function projectPrefixRows(
   db: Queryable,
   workspaceId: string,
-): Promise<Array<{ project_id: string; name: string; prefix: string | null }>> {
+): Promise<Array<{ project_id: string; foundingName: string; prefix: string | null }>> {
+  // `founding_name`, NOT `name`: the key an un-entered prefix derives from is
+  // frozen at founding, so a rename (`project.updated`) cannot re-key a project.
   const { rows } = await db.query<{
     project_id: string;
-    name: string;
+    founding_name: string;
     prefix: string | null;
   }>(
-    `SELECT project_id, name, prefix FROM proj_projects
+    `SELECT project_id, founding_name, prefix FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
   );
-  return rows;
+  return rows.map((row) => ({
+    project_id: row.project_id,
+    foundingName: row.founding_name,
+    prefix: row.prefix,
+  }));
 }
 
 export async function visibleProjects(
@@ -151,12 +169,13 @@ export async function visibleProjects(
   const { rows } = await db.query<{
     project_id: string;
     name: string;
+    founding_name: string;
     archived: boolean;
     description: string | null;
     prefix: string | null;
     deleted_at: Date | null;
   }>(
-    `SELECT project_id, name, archived, description, prefix, deleted_at FROM proj_projects
+    `SELECT project_id, name, founding_name, archived, description, prefix, deleted_at FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
@@ -176,8 +195,13 @@ export async function visibleProjects(
   // `resolveProjectPrefixes` documents as its input contract: a ULID compares
   // by creation, so the answer is a function of the SET and reproduces on
   // replay.
+  //
+  // **From `founding_name`, while the SERVED `name` stays `row.name`.** A rename
+  // moves the name a reader sees and must never move the key: deriving from the
+  // current name re-keyed every ticket of a project with no entered prefix, and
+  // could shift a neighbour's derived prefix when two bases collide.
   const resolved = resolveProjectPrefixes(
-    rows.map((row) => ({ name: row.name, prefix: row.prefix })),
+    rows.map((row) => ({ name: row.founding_name, prefix: row.prefix })),
   );
   // The workspace predicate is in the SQL and the ROLE decision is not: this
   // function restates nothing about who may see what, it asks `eff` — which is
