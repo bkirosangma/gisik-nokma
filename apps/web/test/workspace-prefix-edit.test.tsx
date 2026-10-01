@@ -132,3 +132,40 @@ describe('22.185 the workspace header Edit prefix', () => {
     expect(screen.getByLabelText('Workspace prefix')).toHaveValue('CCX');
   });
 });
+
+describe('22.189 the workspace confirmation also opens on Keep', () => {
+  it('22.189 control: Save on CX focuses "Keep CC"', async () => {
+    mount('admin');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit prefix' }));
+    await userEvent.clear(screen.getByLabelText('Workspace prefix'));
+    await userEvent.type(screen.getByLabelText('Workspace prefix'), 'CX');
+    await userEvent.click(screen.getByRole('button', { name: 'Save prefix' }));
+    const keep = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Keep CC' });
+    await waitFor(() => expect(keep).toHaveFocus());
+  });
+});
+
+describe('22.191 the workspace prefix form never sends an invalid prefix', () => {
+  it('22.191 an emptied or 4-letter prefix shows the hint, disables Save prefix, and Enter opens no dialog and sends nothing', async () => {
+    const { sent } = mount('admin');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit prefix' }));
+    const input = screen.getByLabelText('Workspace prefix');
+    for (const bad of ['', 'ABCD']) {
+      await userEvent.clear(input);
+      if (bad !== '') await userEvent.type(input, bad);
+      expect(screen.getByText('A prefix is 1 to 3 letters.')).toBeInTheDocument();
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('button', { name: 'Save prefix' })).toBeDisabled();
+      await userEvent.type(input, '{Enter}'); // past the disabled button
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(sent).toHaveLength(0);
+    }
+    // control: CX reaches the dialog
+    await userEvent.clear(input);
+    await userEvent.type(input, 'CX');
+    expect(screen.queryByText('A prefix is 1 to 3 letters.')).toBeNull();
+    await userEvent.type(input, '{Enter}');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+  });
+});

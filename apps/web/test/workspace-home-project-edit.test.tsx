@@ -414,3 +414,49 @@ describe('22.187 someone created the group first', () => {
     expect(groupAsks()).toBe(asksBefore);
   });
 });
+
+describe('22.189 the confirmation opens on the safe answer', () => {
+  it('22.189 Save on a changed prefix focuses "Keep CCSO"; Enter keeps (sends nothing, closes the dialog, form still open)', async () => {
+    const { sent } = mount([[workspaceAs('admin')]]);
+    const c = await card('p1');
+    await openEdit(c, 'Shop operations');
+    await userEvent.clear(c.getByLabelText('Prefix'));
+    await userEvent.type(c.getByLabelText('Prefix'), 'SH');
+    await userEvent.click(c.getByRole('button', { name: 'Save' }));
+    const keep = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Keep CCSO' });
+    await waitFor(() => expect(keep).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(sent).toHaveLength(0);
+    expect(c.getByLabelText('Prefix')).toHaveValue('SH'); // the form is still open on the typed value
+  });
+});
+
+describe('22.190 the project form never sends an invalid prefix', () => {
+  it('22.190 an emptied or non-letter prefix shows the hint, disables Save, and Enter opens no dialog and sends nothing', async () => {
+    const { sent } = mount([[workspaceAs('admin')]]);
+    const c = await card('p1');
+    await openEdit(c, 'Shop operations');
+    const prefix = c.getByLabelText('Prefix');
+    for (const bad of ['', 'S1']) {
+      await userEvent.clear(prefix);
+      if (bad !== '') await userEvent.type(prefix, bad);
+      const hint = c.getByText('A prefix is 1 to 3 letters.');
+      expect(prefix).toHaveAttribute('aria-invalid', 'true');
+      expect(prefix).toHaveAccessibleDescription('A prefix is 1 to 3 letters.');
+      expect(hint).toBeInTheDocument();
+      expect(c.getByRole('button', { name: 'Save' })).toBeDisabled();
+      await userEvent.type(prefix, '{Enter}'); // Enter submits the form natively, past the disabled button
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(sent).toHaveLength(0);
+    }
+    // control: a valid prefix enables Save and Enter reaches the dialog
+    await userEvent.clear(prefix);
+    await userEvent.type(prefix, 'SH');
+    expect(c.queryByText('A prefix is 1 to 3 letters.')).toBeNull();
+    expect(c.getByRole('button', { name: 'Save' })).toBeEnabled();
+    await userEvent.type(prefix, '{Enter}');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(sent).toHaveLength(0);
+  });
+});
