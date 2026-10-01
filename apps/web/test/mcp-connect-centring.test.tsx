@@ -86,10 +86,10 @@ describe('/mcp/connect — the card is centred (owner 2026-09-30, C1)', () => {
     const bottom = /padding-bottom:\s*([\d.]+rem)/.exec(page ?? '')?.[1];
     expect(top).toBeDefined();
     expect(bottom).toBe(top);
-    // A `padding:` shorthand here would reinstate 1.25rem sides on a phone.
+    // A `padding:` shorthand here would reinstate the shell's own sides on a phone.
     expect(page).not.toMatch(/(^|[\s;{])padding:/m);
     // CONTROL: the narrow-screen gutter it relies on is still supplied by `.gn-shell`'s media rule.
-    expect(css).toMatch(/\.gn-shell\s*\{\s*padding:\s*0 0\.75rem 2rem;\s*\}/);
+    expect(css).toMatch(/\.gn-shell\s*\{\s*padding:\s*0 var\(--gn-space-3\) 2rem;\s*\}/);
     // Tokens only: the layout rules carry no colour.
     const stageRule = ruleFor(css, /^\.gn-mcp-connect__stage\s*\{/) ?? '';
     expect(page + stageRule).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);

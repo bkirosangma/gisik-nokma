@@ -13,6 +13,7 @@ import { PhoneSwitcher } from "./phone-switcher.js";
 import { useSessionStatus } from "./providers.js";
 import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
+import { isWithin } from "./path-within.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
 
@@ -88,10 +89,11 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  *   what makes it safe for MCP tokens to have left its sidebar for `/account`
  *   in the same round — see `app/settings/page.tsx`.
  *
- * `inSettings`, which used to widen the pre-19c workspace-scoped link's
- * `aria-current` to any `/settings/*` sub-route, stays gone: the nav's
- * `Settings` is one literal route (`/settings`, `usePathname()` ignores the
- * query string), and plain equality (`current`, below) is enough.
+ * `inSettings`, which widened the pre-19c workspace-scoped link's
+ * `aria-current` to any `/settings/*` sub-route, was gone for a while and came back as
+ * `currentSection` (UX fixes Task 3, case 23.044): the link's target is the literal route
+ * `/settings` (`usePathname()` ignores the query string) but the editors live under
+ * `/w/<id>/settings/…`, so Settings is lit on a segment-bounded prefix of either root.
  *
  * Members was never part of this and is unchanged: the owner's own reference
  * (screenshots, 2026-09-09) keeps it as its own top-level link beside Settings
@@ -249,6 +251,15 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const showScopeNote = workspaceId === undefined && remembered.status === "none";
   const current = (target: string): "page" | undefined =>
     pathname === target ? "page" : undefined;
+  /**
+   * "Where am I" for a SECTION (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): lit on the route itself and on
+   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Only Settings uses it: its
+   * link points at `/settings?workspaceId=…` but the workflow and ticket-type editors live at
+   * `/w/<id>/settings/…`, so an exact match left the bar dark on the very pages that are Settings. The workspace link and
+   * the rest stay exact (`current`): `/w/<id>` is not "inside" `/w/<id>/members` (case 13.393).
+   */
+  const currentSection = (...roots: string[]): "page" | undefined =>
+    roots.some((root) => isWithin(pathname, root)) ? "page" : undefined;
 
   /**
    * **The phone-width disclosure (E4-11).** At 390 px this bar measured 390×310
@@ -388,7 +399,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/settings?workspaceId=${effectiveWorkspaceId}`}
-            aria-current={current("/settings")}
+            aria-current={currentSection("/settings", `/w/${effectiveWorkspaceId}/settings`)}
           >
             Settings
           </Link>
@@ -522,10 +533,10 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
-          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1).
-              Every other item is measured by `current()` above, which is exact
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings joined it in UX fixes Task 3).
+              Most items are measured by `current()` above, which is exact
               equality — and that is right for them: `/w/<id>` is not "inside"
-              `/w/<id>/members`. A note is different in kind. `/notes/<id>` is
+              `/w/<id>/members`. (Settings is the other section: `currentSection()`.) A note is different in kind. `/notes/<id>` is
               the SAME view as `/notes`, with a note open, so exact equality
               would leave the link dark on the page the reader is actually on.
               Case 18.182 walks both spellings and the control. */}

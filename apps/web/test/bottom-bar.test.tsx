@@ -436,3 +436,17 @@ describe('21.033 the script and the stylesheet name the same phone width', () =>
 const _all: readonly BarDestination[] = ['board', 'my-work', 'notes', 'inbox', 'list', 'calendar', 'timeline', 'backlog', 'members'];
 void _all;
 void fireEvent;
+
+describe('23.044 the bar lights a destination on the same segment-bounded prefix rule as the top nav', () => {
+  it('23.044 My work is current on a route under it, not on a lookalike; the project-tab slot rule is unchanged', async () => {
+    render(bar({ pathname: `/w/${WS}/my-work/anything` }));
+    await waitFor(() => expect(items()).toContain('My work'));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBe('page');
+
+    // CONTROL (same `it`): a lookalike segment is not current, and `/w/<id>` lights nothing in the bar.
+    cleanup();
+    render(bar({ pathname: `/w/${WS}/my-workshop` }));
+    await waitFor(() => expect(items()).toContain('My work'));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBeNull();
+  });
+});

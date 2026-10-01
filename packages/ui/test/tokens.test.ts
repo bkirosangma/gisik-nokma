@@ -143,6 +143,8 @@ describe('CSS variable emission', () => {
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
       ...FONT_ROLE_NAMES.map(fontVariableName),
       ...([1, 2, 3] as const).map(spaceVariableName),
+      // The prose measure (case 23.043) is declared once in the bare :root block, beside the spacing tokens.
+      '--gn-measure',
       ...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),
       // The phone bar / top-bar heights (case 21.003) are declared once in the bare :root block, not as colour roles.
       '--gn-phone-bar-height',

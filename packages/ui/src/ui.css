@@ -5944,9 +5944,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    stylesheet both of those apps already load, rather than in either app. Two
    copies of this block would be two help screens that drift apart. */
 
-/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the 72ch reading
+/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the reading
    column; it is now the two-column shell, and `.gn-help__column` inside it
-   carries the 72ch. Recorded because the old name did not change: a reader of
+   carries the measure (72ch then; `var(--gn-measure)`, 70ch, since UX fixes Task 3). Recorded because the old name did not change: a reader of
    a diff elsewhere in the tree would otherwise assume it still centres text.
 
    The reference's own shape (`Gisik Nokma Desktop`, the Help screen): an
@@ -6031,7 +6031,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    no section-to-section gap to copy. */
 .gn-help__column {
   width: 100%;
-  max-width: 72ch;
+  max-width: var(--gn-measure);
   padding-top: 1.75rem;
   display: flex;
   flex-direction: column;
@@ -6611,7 +6611,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.0625rem; line-height: 1.375rem; }
 /* `text-wrap: pretty` is the reference's own, on every paragraph. It costs
    nothing where unsupported and stops the short last line — this column is
-   72ch of prose, which is exactly where a one-word orphan shows. */
+   70ch of prose, which is exactly where a one-word orphan shows. */
 .gn-help__p { margin: 0 0 0.875rem; font-size: 1.0625rem; line-height: 1.375rem; text-wrap: pretty; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.0625rem; line-height: 1.375rem; }
 /* A TRAY CARD, not a ruled aside — the reference draws a quote as the same

@@ -22,7 +22,7 @@ describe('21.012 the phone top bar lives inside the 40rem arm', () => {
     expect(parseRules(css).filter((r) => r.atRule === null && r.selectors.includes('.gn-nav__links--member'))).toEqual([]);
 
     // CONTROL — the desktop/tablet bar is byte-identical outside the 40rem arm: every top-level
-    // `.gn-nav*` rule body equals the one snapshotted from `origin/release/mobile` before Task 2.
+    // `.gn-nav*` rule body equals the one snapshotted from `origin/release/mobile` before Task 2 — re-snapshotted deliberately by UX fixes Task 3 (case 23.044: the 24px gutter on `.gn-nav__inner`, the last-project divider and label, the lit link's indicator bar).
     const baseline = JSON.parse(readFileSync(join(REPO_ROOT, 'packages/ui/test/fixtures/gn-nav-top-level.json'), 'utf8')) as Record<string, string>;
     const now: Record<string, string> = {};
     for (const rule of parseRules(css)) {

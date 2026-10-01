@@ -1126,6 +1126,16 @@ export function spaceVariableName(step: SpaceStep): string {
 }
 
 /**
+ * The prose measure (UX fixes Task 3, case 23.043, audit SYS-16): the longest
+ * line a reading column or a helper sentence runs to. Like spacing it varies
+ * with neither style nor theme, so it is emitted ONCE under the bare `:root`
+ * and every prose container reads `max-width: var(--gn-measure)` — tables, the
+ * board and the other work surfaces never do.
+ */
+export const measure = '70ch';
+export const MEASURE_VARIABLE = '--gn-measure';
+
+/**
  * The phone shell's two heights (mobile-web plan Task 1, case 21.003): the
  * bottom bar and the slim top bar at ≤40rem. Like spacing and motion they vary
  * with neither style nor theme, so they are emitted ONCE under the bare `:root`
@@ -1880,7 +1890,7 @@ export function themeStylesheet(): string {
       Object.keys(spacing) as unknown as SpaceStep[]
     )
       .map((step) => `${spaceVariableName(step)}: ${spacing[step]};`)
-      .join(' ')} ${(Object.keys(motion) as MotionKey[])
+      .join(' ')} ${MEASURE_VARIABLE}: ${measure}; ${(Object.keys(motion) as MotionKey[])
       .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
       .join(' ')} ${(Object.keys(phone) as PhoneKey[])
       .map((key) => `${phoneVariableName(key)}: ${phone[key]};`)

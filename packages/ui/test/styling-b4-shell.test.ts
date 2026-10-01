@@ -92,6 +92,8 @@ const winnerFor = (css: string, element: keyof typeof CURRENT_TAIL, neo: boolean
   winningValue(
     css,
     (selector) =>
+      // A pseudo-element rule (the lit link's indicator bar, UX fixes 23.044) styles the ::after, not the element.
+      !selector.includes('::') &&
       selector.includes(`.gn-nav ${CURRENT_TAIL[element]}`) && (selector.startsWith('[data-style="neo"]') ? neo : true),
     property,
   );

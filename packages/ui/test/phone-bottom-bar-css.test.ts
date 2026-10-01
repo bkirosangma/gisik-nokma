@@ -17,7 +17,7 @@ describe('21.028 the bar is fixed above the safe area and the shell leaves room 
     expect(valueOf(ruleExactly(css, '.gn-shell:has(.gn-bottom-bar)', PHONE), 'padding-bottom')).toContain(BAR);
     expect(valueOf(ruleExactly(css, '.gn-bottom-bar'), 'display')).toBe('none');
     // CONTROL — the desktop shell's own padding is untouched (it still reads the shared token).
-    expect(valueOf(ruleExactly(css, '.gn-shell'), 'padding')).toBe('0 1.25rem var(--gn-shell-pad-bottom)');
+    expect(valueOf(ruleExactly(css, '.gn-shell'), 'padding')).toBe('0 var(--gn-space-3) var(--gn-shell-pad-bottom)');
   });
 });
 

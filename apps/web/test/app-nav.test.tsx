@@ -1576,3 +1576,51 @@ describe('the nav brand group', () => {
     }
   });
 });
+
+/**
+ * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings (audit SYS-20, NP-26, WS-08).
+ * The workspace link stays exact (`/w/<id>` is not "inside" `/w/<id>/members`, case 13.393).
+ */
+describe('23.044 Settings lights on every route under it', () => {
+  function renderAt(path: string) {
+    currentPath = path;
+    return render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+  }
+
+  it('23.044 /w/<id>/settings/workflows/<id> and /settings/* light Settings and nothing else', async () => {
+    renderAt('/w/ws_1/settings/workflows/wf_1');
+    const settings = await screen.findByRole('link', { name: 'Settings' });
+    expect(settings).toHaveAttribute('aria-current', 'page');
+    for (const other of screen.getAllByRole('link').filter((a) => a !== settings)) {
+      expect(other, other.textContent ?? '').not.toHaveAttribute('aria-current', 'page');
+    }
+    cleanup();
+    renderAt('/settings/anything');
+    expect(await screen.findByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+
+    // CONTROL (same `it`): `/settings` still lights Settings; a sibling route, a lookalike segment and a
+    // different workspace's settings do not; the workspace link stays exact on `/w/ws_1/members`.
+    for (const [path, lit] of [
+      ['/settings', true],
+      ['/w/ws_1/my-work', false],
+      ['/settingsx', false],
+      ['/w/ws_1/settingsx', false],
+      ['/w/ws_other/settings/workflows/wf_1', false],
+    ] as const) {
+      cleanup();
+      renderAt(path);
+      const link = await screen.findByRole('link', { name: 'Settings' });
+      if (lit) expect(link, path).toHaveAttribute('aria-current', 'page');
+      else expect(link, path).not.toHaveAttribute('aria-current');
+    }
+    cleanup();
+    renderAt('/w/ws_1/members');
+    await screen.findByRole('link', { name: 'Settings' });
+    expect(screen.getByRole('link', { name: 'Convenience Corner' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('aria-current', 'page');
+  });
+});
