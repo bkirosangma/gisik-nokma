@@ -89,14 +89,20 @@ function projectCreated(
 const gate = (env: ReturnType<typeof testEnvelope>, sessionUserId: string) =>
   checkPermission(env, { db: db.pool, sessionUserId });
 
-/** A workspace, an admin, and project A which entered `SO` and then moved to `SH`. */
-async function workspaceWhereSoWasRetired() {
+/**
+ * A workspace, an admin, and project A which entered `SO` and then moved to `SH`.
+ * `movedAt` FIXES the move's `serverTime` (default: the helper's own clock).
+ */
+async function workspaceWhereSoWasRetired(movedAt?: string) {
   const ws = newUlid();
   const admin = newUlid();
   const holder = newUlid();
   await seedMember(db.pool, ws, admin, 'admin');
   await seedProject(db.pool, ws, holder, 'Shop operations', undefined, 'SO');
-  const move = projectUpdated(ws, holder, admin, { prefix: 'SH' });
+  const move = {
+    ...projectUpdated(ws, holder, admin, { prefix: 'SH' }),
+    ...(movedAt === undefined ? {} : { serverTime: movedAt }),
+  };
   await applyAll(db.pool, [move]);
   return { ws, admin, holder, until: move.serverTime };
 }
@@ -157,6 +163,26 @@ describe('22.040-22.042 the door refuses a prefix that is held or reserved', () 
     // rules are not one message.
     expect((await gate(projectUpdated(ws, other, admin, { prefix: 'SO' }), admin))?.rule).toBe(
       PROJECT_PREFIX_RESERVED_RULE,
+    );
+  });
+});
+
+describe('22.046 the date in the refusal is the IST day', () => {
+  it('22.046 — a move at 2026-09-30T19:00Z (IST 1 Oct 00:30) reads "until 1 Oct", not the UTC day; control: a same-day instant reads that day', async () => {
+    const claimSo = async (movedAt: string) => {
+      const { ws, admin } = await workspaceWhereSoWasRetired(movedAt);
+      const other = newUlid();
+      await seedProject(db.pool, ws, other, 'Sunday orders');
+      return (await gate(projectUpdated(ws, other, admin, { prefix: 'SO' }), admin))?.reason;
+    };
+
+    // Control FIRST: 06:00Z is 11:30 IST the same calendar day, so UTC and IST agree.
+    expect(await claimSo('2026-09-30T06:00:00.000Z')).toBe(
+      "SO was Shop operations' prefix until 30 Sep. Its old ticket keys still point there, so it can't be reused.",
+    );
+    // 19:00Z is already 1 Oct in India; the UTC day would say 30 Sep.
+    expect(await claimSo('2026-09-30T19:00:00.000Z')).toBe(
+      "SO was Shop operations' prefix until 1 Oct. Its old ticket keys still point there, so it can't be reused.",
     );
   });
 });
