@@ -18,7 +18,6 @@ describe('14.250 package exports', () => {
     // the tools in their pinned order (the order `register.test.ts` pins).
     const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}) };
     expect(pkg.allTools(fake).map((t) => t.name)).toEqual([
-      'list_projects',
       'search_tickets',
       'list_tickets',
       'get_ticket',
@@ -35,6 +34,14 @@ describe('14.250 package exports', () => {
       'restore_workspace',
       'delete_workspace',
       'undelete_workspace',
+      'list_projects',
+      'get_project',
+      'create_project',
+      'update_project',
+      'archive_project',
+      'restore_project',
+      'delete_project',
+      'undelete_project',
     ]);
   });
 });

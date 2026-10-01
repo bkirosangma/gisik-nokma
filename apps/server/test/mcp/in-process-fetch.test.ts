@@ -6,6 +6,7 @@ import { hostedSession, inProcessFetch } from '../../src/mcp/in-process-fetch.js
 import { buildTestApp } from '../helpers/app.js';
 import { buildOAuthApp, hostedToken } from '../helpers/oauth.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedMember } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
@@ -238,3 +239,76 @@ describe('14.306 / 14.309 / 14.314 the workspace tools through the hosted door, 
   });
 });
 
+describe('14.317–14.324 the project tools through the hosted door, against the real server', () => {
+  it('14.317 14.318 14.320 14.321 14.322 14.324 create → update → archive → restore → delete → undelete, each as the caller; a member is refused and nothing lands', async () => {
+    const { app, otp } = buildOAuthApp(db);
+    await app.ready();
+    const owner = await signInWithPhone(app, otp, '+911100002317');
+    const toolsFor = async (userId: string) => {
+      const session = hostedSession(app, OUTER, await hostedToken(app, db.pool, userId), userId);
+      await session.ready();
+      const tools = allTools(session);
+      return (name: string, args: Record<string, unknown>) => {
+        const t = tools.find((x) => x.name === name);
+        if (t === undefined) throw new Error(`no tool ${name} — the hosted door must list every project tool`);
+        return t.handler(args);
+      };
+    };
+    const run = await toolsFor(owner.userId);
+
+    const { workspaceId } = (await run('create_workspace', { name: 'Project Round Trip' })) as { workspaceId: string };
+    const created = (await run('create_project', { workspaceId, name: 'Repairs', description: 'Fix list', prefix: 'RP' })) as {
+      projectId: string;
+    };
+    const projectId = created.projectId;
+    expect(await run('get_project', { projectId })).toMatchObject({
+      workspaceId, name: 'Repairs', description: 'Fix list', prefix: 'RP', archived: false,
+    });
+
+    // 14.318: only the given keys move; "" clears; the other key is left alone.
+    await run('update_project', { projectId, name: 'Repairs desk' });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', description: 'Fix list', prefix: 'RP' });
+    await run('update_project', { projectId, description: '' });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', description: null });
+
+    // 14.321 against the real directory: the OLD name is refused naming the NEW one, and nothing is sent.
+    await expect(run('archive_project', { projectId, confirm_name: 'Repairs' })).rejects.toThrow('confirm_name must be "Repairs desk"');
+    await run('archive_project', { projectId, confirm_name: 'Repairs desk' });
+    const names = async (include: string[]) =>
+      ((await run('list_projects', { workspaceId, include })) as { projects: Array<{ name: string }> }).projects.map((p) => p.name);
+    expect(await names([])).toEqual([]);
+    expect(await names(['archived'])).toEqual(['Repairs desk']);
+    await run('restore_project', { projectId });
+    expect(await names([])).toEqual(['Repairs desk']);
+
+    await run('delete_project', { projectId, confirm_name: 'Repairs desk' });
+    expect(await run('get_project', { projectId })).toMatchObject({ deleted: true, name: 'Repairs desk' });
+    expect(await names(['deleted'])).toEqual(['Repairs desk']);
+    await run('undelete_project', { projectId });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', archived: false });
+
+    const { rows } = await db.pool.query<{ type: string; origin: string; actor_id: string }>(
+      `SELECT type, origin, actor_id FROM events WHERE workspace_id = $1 AND entity_kind = 'project' ORDER BY seq`,
+      [workspaceId],
+    );
+    expect(rows.map((r) => r.type)).toEqual([
+      'project.created', 'project.member_added', 'project.updated', 'project.updated',
+      'project.archived', 'project.restored', 'project.deleted', 'project.undeleted',
+    ]); // 14.317 the pair, 14.320 soft only: no purge.marked among them
+    expect(rows.every((r) => r.origin === 'mcp' && r.actor_id === owner.userId)).toBe(true);
+
+    // 14.322: a member is refused in the product's own words, with the pair's index, and nothing lands.
+    const member = await signInWithPhone(app, otp, '+911100002322');
+    await seedMember(db.pool, workspaceId, member.userId, 'member', [{ projectId }]);
+    const asMember = await toolsFor(member.userId);
+    await expect(asMember('create_project', { workspaceId, name: 'Member project' })).rejects.toThrow(
+      'event 0 refused by permission.role: Only a workspace owner or admin can do this. Your role is member.',
+    );
+    await expect(asMember('update_project', { projectId, name: 'Member rename' })).rejects.toThrow(
+      'refused by permission.role: Only a workspace owner or admin can do this. Your role is member.',
+    );
+    const after = await db.pool.query(`SELECT name FROM proj_projects WHERE workspace_id = $1 ORDER BY name`, [workspaceId]);
+    expect(after.rows).toEqual([{ name: 'Repairs desk' }]); // CONTROL: the admin's project is intact, no 'Member project'
+    await app.close();
+  });
+});
