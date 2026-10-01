@@ -30,14 +30,28 @@ function position(css: string, selectors: string[], atRule: string | null): numb
 }
 
 /**
- * The arm comes after EVERY base rule it overrides (`bases`: the top-level rules whose selector lists
- * it covers; by default its own selector list).
+ * Index of the LAST top-level rule whose selector list names every one of `selectors` (a base rule may be split
+ * across the file, and a later top-level rule that undoes the arm must be seen — the FIRST one is not the check).
+ */
+function lastBaseIndex(css: string, selectors: string[]): number {
+  let found = -1;
+  parseRules(css).forEach((rule, i) => {
+    if (rule.atRule === null && selectors.every((selector) => rule.selectors.includes(selector))) found = i;
+  });
+  if (found === -1) throw new Error(`no top-level rule names ${selectors.join(', ')}`);
+  return found;
+}
+
+/**
+ * The arm comes after EVERY top-level rule that names the selectors it overrides — compared against the LAST
+ * such rule (`bases`: one selector list per base; by default the arm's own selector list).
  */
 function after(css: string, selectors: string[], bases: string[][] = [selectors]): void {
   for (const base of bases) {
-    expect(position(css, selectors, PHONE), `${selectors.join(', ')}: the phone arm must follow ${base.join(', ')}`).toBeGreaterThan(
-      position(css, base, null),
-    );
+    expect(
+      position(css, selectors, PHONE),
+      `${selectors.join(', ')}: the phone arm must follow the LAST top-level rule naming ${base.join(', ')}`,
+    ).toBeGreaterThan(lastBaseIndex(css, base));
   }
 }
 
@@ -53,6 +67,7 @@ describe('21.110 the project header: tabs scroll in their own track, search and 
     expect(valueOf(rail, 'overflow-x')).toBe('auto');
     expect(valueOf(rail, 'scroll-snap-type')).toBe('x proximity');
     expect(valueOf(rail, 'max-width')).toBe('100%');
+    expect(valueOf(rail, 'overscroll-behavior-x')).toBe('contain');
     const item = ruleExactly(globals, '.gn-project__rail .gn-segmented__item', PHONE);
     expect(valueOf(item, 'scroll-snap-align')).toBe('start');
     expect(valueOf(item, 'flex')).toBe('none');
@@ -111,21 +126,34 @@ describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close 
     expect(valueOf(row, 'display')).toBe('flex');
     expect(valueOf(row, 'flex-wrap')).toBe('wrap');
     expect(valueOf(row, 'position')).toBe('relative');
+    expect(valueOf(row, 'align-items')).toBe('center');
+    expect(valueOf(row, 'gap')).toBe('0.125rem 0.75rem');
+    expect(valueOf(row, 'padding')).toBe('0.625rem 1rem');
     // The title is the first line: first in order, and it takes the whole line.
     const title = ruleExactly(ui, '.gn-list__table-cell--title', PHONE);
     expect(valueOf(title, 'order')).toBe('-1');
     expect(valueOf(title, 'flex')).toBe('1 0 100%');
     expect(valueOf(title, 'min-width')).toBe('0');
+    expect(valueOf(title, 'padding')).toBe('0');
     // The meta cells (key · state · assignee · due) are small and may wrap their own text.
     const meta = ruleExactly(ui, '.gn-list__table-cell--data', PHONE);
     expect(valueOf(meta, 'padding')).toBe('0');
     expect(valueOf(meta, 'font-size')).toBe('0.8125rem');
+    expect(valueOf(meta, 'line-height')).toBe('1.125rem');
     expect(valueOf(meta, 'white-space')).toBe('normal');
     // The bulk-select checkbox sits in its own 44px square at the row's start, and the row makes room for it.
     const select = ruleExactly(ui, '.gn-list__select', PHONE);
     expect(valueOf(select, 'position')).toBe('absolute');
     expect(valueOf(select, 'width')).toBe('2.75rem');
     expect(valueOf(select, 'height')).toBe('2.75rem');
+    // …at the row's top-left corner (without `left`/`top` the absolute cell falls back to its static position, over the
+    // title), centred in the square, and the base `0.75rem 0 0.75rem 1rem` padding is zeroed.
+    expect(valueOf(select, 'top')).toBe('0');
+    expect(valueOf(select, 'left')).toBe('0');
+    expect(valueOf(select, 'display')).toBe('flex');
+    expect(valueOf(select, 'align-items')).toBe('center');
+    expect(valueOf(select, 'justify-content')).toBe('center');
+    expect(valueOf(select, 'padding')).toBe('0');
     expect(valueOf(ruleExactly(ui, '.gn-list__table-row:has(.gn-list__select)', PHONE), 'padding-left')).toBe('3.25rem');
     for (const selectors of [['.gn-list__table'], ['.gn-list__table-cell--title'], ['.gn-list__table-cell--data'], ['.gn-list__select']]) {
       after(ui, selectors);
@@ -135,6 +163,7 @@ describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close 
     expect(valueOf(ruleExactly(ui, '.gn-list__table'), 'min-width')).toBe('51.25rem');
     expect(valueOf(ruleExactly(ui, '.gn-list__table-cell--data'), 'white-space')).toBe('nowrap');
     expect(valueOf(ruleExactly(ui, '.gn-list__table-cell--title'), 'min-width')).toBe('16.25rem');
+    expect(valueOf(ruleExactly(ui, '.gn-list__select'), 'padding')).toBe('0.75rem 0 0.75rem 1rem');
     onlyInPhoneArm(ui, '.gn-list__table thead');
     onlyInPhoneArm(ui, '.gn-list__table-row');
   });
@@ -160,6 +189,7 @@ describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close 
 describe('21.112 Calendar: the month grid is a deliberate horizontal scroller with 3rem day cells', () => {
   it('21.112 the grid scrolls sideways, each week row is at least 22rem, every day track is minmax(3rem, 1fr), and the toolbar wraps', () => {
     expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overflow-x')).toBe('auto');
+    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overscroll-behavior-x')).toBe('contain');
     const tracks = ruleExactly(ui, ['.gn-calendar__weekday-head', '.gn-calendar__days', '.gn-calendar__items'], PHONE);
     expect(valueOf(tracks, 'grid-template-columns')).toBe('repeat(7, minmax(3rem, 1fr))');
     expect(valueOf(ruleExactly(ui, ['.gn-calendar__weekday-head', '.gn-calendar__week'], PHONE), 'min-width')).toBe('22rem');
@@ -190,6 +220,7 @@ describe('21.113 Timeline: the weeks band scrolls inside its track; the page doe
     expect(valueOf(track, 'overflow-x')).toBe('auto');
     expect(valueOf(track, 'max-width')).toBe('100%');
     expect(valueOf(track, 'min-width')).toBe('0');
+    expect(valueOf(track, 'overscroll-behavior-x')).toBe('contain');
     const bands = ruleExactly(ui, ['.gn-timeline__weeks', '.gn-timeline__row'], PHONE);
     expect(valueOf(bands, 'min-width')).toBe('40rem');
     expect(valueOf(bands, 'grid-template-columns')).toBe('9rem var(--timeline-week-columns)');

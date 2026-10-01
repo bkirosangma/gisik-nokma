@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import type { TicketTypeDef } from '@gisik-nokma/domain';
+import userEvent from '@testing-library/user-event';
+import type { TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import type { ListRow } from '@gisik-nokma/app-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
@@ -40,7 +42,7 @@ beforeEach(() => {
 // New ticket is offered only once the type ladder and the project's rows have answered (`createRegion`).
 const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand', fields: [] }] as unknown as TicketTypeDef[];
 
-const world = () =>
+const world = (overrides: Parameters<typeof stubServices>[0] = {}) =>
   stubServices({
     getTickets: async () => ({ projectId: PROJECT, rows: [] }),
     getTicketTypes: async () => TYPES,
@@ -56,6 +58,7 @@ const world = () =>
         projects: [{ id: PROJECT, name: 'Errand tracking', prefix: 'ET', archived: false, ticketCount: 4, blockedCount: 0 }],
       },
     ],
+    ...overrides,
   });
 
 describe('21.110 the project header carries the classes its phone rules key on', () => {
@@ -88,5 +91,87 @@ describe('21.110 the project header carries the classes its phone rules key on',
     expect(rail).toHaveClass('gn-project__rail');
     expect(rail).toHaveClass('gn-segmented');
     expect(rail.querySelectorAll('.gn-segmented__item').length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+/**
+ * 21.111 — the PAGE'S OWN bulk bar. The app-core hooks test hands `TicketList` a `controls` span it planted itself, so it can
+ * only find what it put there: the page's real `gn-list__bulk` / `gn-list__bulk-close` classes (the ones the full-width
+ * rules paint) were tied to nothing. This renders the project page's List tab and walks the real DOM.
+ */
+const PROVENANCE = {
+  actorId: ANSELMA,
+  actorName: 'Anselma Marak',
+  clientTime: '2026-09-18T09:00:00.000Z',
+  serverTime: '2026-09-18T09:00:01.000Z',
+};
+
+const doneRow: ListRow = {
+  ticketId: 't_1',
+  title: 'Deliver the crates',
+  key: 'ET-1',
+  typeId: 'task',
+  typeRank: 3,
+  parentId: null,
+  epicId: null,
+  stateId: 'done',
+  stateName: 'Done',
+  stateCategory: 'terminal',
+  stateProvenance: PROVENANCE,
+  assignee: null,
+  assignedProvenance: null,
+  dueDate: null,
+  priority: { value: 'P2', claim: PROVENANCE },
+  fields: {},
+  rollup: null,
+  hasRestrictedParent: false,
+  pending: false,
+  closed: null,
+  rank: null,
+};
+
+const WORKFLOW: WorkflowDef = {
+  id: 'wf-errand',
+  version: 1,
+  name: 'Errand',
+  initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [],
+};
+
+const listWorld = () =>
+  world({
+    getBoard: async () => ({ projectId: PROJECT, groups: [] }),
+    getMembers: async () => [],
+    getTickets: async () => ({ projectId: PROJECT, rows: [doneRow] }),
+    getWorkflowDef: async (_workspaceId, workflowId) => (workflowId === WORKFLOW.id ? WORKFLOW : null),
+  });
+
+describe('21.111 the project page’s real List bulk bar carries the classes the full-width rules key on', () => {
+  it('21.111 `.gn-list__controls-end > .gn-list__bulk > .gn-list__bulk-close` on the arming button, and again on Confirm close once armed', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers services={listWorld()}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await user.click(await screen.findByRole('tab', { name: 'List' }));
+    const arm = await screen.findByRole('button', { name: 'Bulk close' });
+    const CHAIN = '.gn-list__controls-end > .gn-list__bulk > .gn-list__bulk-close';
+    expect(arm.matches(CHAIN)).toBe(true);
+    // CONTROL — unarmed, there is no Confirm close yet; the arming button is the one `gn-list__bulk-close` in the bar.
+    expect(screen.queryByRole('button', { name: /^Confirm close/ })).toBeNull();
+    expect(document.querySelectorAll('.gn-list__bulk-close')).toHaveLength(1);
+
+    await user.click(arm);
+    const confirm = screen.getByRole('button', { name: 'Confirm close (0)' });
+    expect(confirm.matches(CHAIN)).toBe(true);
+    // …and the ✕ sits in the same bar beside it, and the arming button is gone (still the one `gn-list__bulk-close`).
+    expect(screen.getByRole('button', { name: 'Cancel bulk close' }).parentElement).toBe(confirm.parentElement);
+    expect(screen.queryByRole('button', { name: 'Bulk close' })).toBeNull();
+    expect(document.querySelectorAll('.gn-list__bulk-close')).toHaveLength(1);
   });
 });
