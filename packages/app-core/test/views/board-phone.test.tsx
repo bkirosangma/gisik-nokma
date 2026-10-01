@@ -237,6 +237,85 @@ describe('21.043 scrolling the rail moves the selected option to the column near
     scrollTo(2 * COLUMN_WIDTH);
     await waitFor(() => expect(selectedTab()).toEqual(['Waiting on counterparty 0']));
   });
+
+  /** The calls to `requestAnimationFrame` made while `fire` runs (react-aria and others also use it, so count the delta). */
+  function frameCallsDuring(spy: ReturnType<typeof vi.spyOn>, fire: () => void): number {
+    const before = spy.mock.calls.length;
+    fire();
+    return spy.mock.calls.length - before;
+  }
+
+  it('21.043 the scroll listener is throttled to ONE frame read: a burst in one tick asks for one frame; once it has run, the next scroll asks again', async () => {
+    await mount(boardOf(errandGroup()));
+    const rail = columnOf('todo').closest<HTMLElement>('.gn-board__rail');
+    if (rail === null) throw new Error('no rail');
+    plant(rail);
+    const frames = vi.spyOn(window, 'requestAnimationFrame');
+
+    expect(frameCallsDuring(frames, () => { for (let i = 0; i < 5; i += 1) fireEvent.scroll(rail); })).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 60)); // the queued frame runs and clears the latch
+    // CONTROL — the throttle is not a one-shot: a later scroll queues a frame again, once more for a burst.
+    expect(frameCallsDuring(frames, () => { for (let i = 0; i < 3; i += 1) fireEvent.scroll(rail); })).toBe(1);
+  });
+
+  /** The `scroll` listeners added to a board rail (whichever rail), spied on the prototype so the count is the whole story. */
+  function railScrollListeners(spy: ReturnType<typeof vi.spyOn>): HTMLElement[] {
+    return spy.mock.calls
+      .map((call, index) => ({ type: call[0], context: spy.mock.contexts[index] }))
+      .filter(({ type, context }) => type === 'scroll' && context instanceof HTMLElement && context.classList.contains('gn-board__rail'))
+      .map(({ context }) => context as HTMLElement);
+  }
+
+  it('21.043 above the phone breakpoint the rail gets no scroll listener and a scroll asks for no frame; on a phone the same rail does', async () => {
+    const listening = vi.spyOn(EventTarget.prototype, 'addEventListener');
+    viewport({ phone: false });
+    await mount(boardOf(errandGroup()));
+    const desktopRail = columnOf('todo').closest<HTMLElement>('.gn-board__rail');
+    if (desktopRail === null) throw new Error('no rail');
+    const frames = vi.spyOn(window, 'requestAnimationFrame');
+    expect(railScrollListeners(listening)).toEqual([]);
+    expect(frameCallsDuring(frames, () => fireEvent.scroll(desktopRail))).toBe(0);
+    cleanup();
+
+    viewport({ phone: true });
+    await mount(boardOf(errandGroup()));
+    const phoneRail = columnOf('todo').closest<HTMLElement>('.gn-board__rail');
+    expect(railScrollListeners(listening)).toEqual([phoneRail]); // CONTROL — same board, phone width: one listener, on the rail
+  });
+
+  it('21.043 on a phone a COLLAPSED group\'s rail gets no scroll listener; the expanded group\'s does', async () => {
+    const listening = vi.spyOn(EventTarget.prototype, 'addEventListener');
+    // A second, empty workflow rests collapsed (`Board`'s default for an empty group when there is more than one).
+    const other: BoardGroup = {
+      workflowId: 'wf-other',
+      workflowVersion: 1,
+      workflowName: 'Other',
+      columns: [{ stateId: 'x-open', name: 'Open', category: 'open', blocked: false, creatable: true, cards: [] }],
+    };
+    await mount(boardOf(errandGroup(), other));
+    const rails = [...document.querySelectorAll<HTMLElement>('.gn-board__rail')];
+    expect(rails).toHaveLength(2);
+    const [expandedRail, collapsedRail] = rails;
+    expect(expandedRail).not.toHaveAttribute('hidden');
+    expect(collapsedRail).toHaveAttribute('hidden');
+
+    expect(railScrollListeners(listening)).toEqual([expandedRail]);
+  });
+
+  it('21.043 a selected column that no longer exists reads as the FIRST column, not as nothing', async () => {
+    const user = userEvent.setup();
+    const { source, onMoved, rerender } = await mount(boardOf(errandGroup()));
+    await user.click(within(picker()).getByRole('tab', { name: 'Waiting on counterparty 0' }));
+    expect(selectedTab()).toEqual(['Waiting on counterparty 0']); // CONTROL — the pick took
+
+    const withoutWaiting = errandGroup();
+    withoutWaiting.columns = withoutWaiting.columns.filter((column) => column.stateId !== 'waiting');
+    const moves: BoardMoveCapability = { dataSource: source, workspaceId: WS, currentUserId: USER, onMoved };
+    rerender(<Board board={boardOf(withoutWaiting)} onOpenTicket={() => {}} moves={moves} currentUserId={USER} />);
+
+    expect(tabNames()).toEqual(['To do 1', 'Doing 1', 'Done 0']);
+    expect(selectedTab()).toEqual(['To do 1']);
+  });
 });
 
 describe('21.045 the Move button opens the same dialog over EVERY board destination', () => {
@@ -284,9 +363,38 @@ describe('21.047 a gated destination says so in the Move list', () => {
     expect(names).toContain('To do');
   });
 
+  /** From `doing`: a field-gated way back, an evidence-gated way sideways, and a two-rule way out. */
+  const GATED: WorkflowDef = {
+    ...WF_ERRAND,
+    transitions: [
+      { from: 'doing', to: 'todo', rules: [{ kind: 'require-field', field: 'estimate' }] },
+      { from: 'doing', to: 'waiting', rules: [{ kind: 'require-evidence' }] },
+      { from: 'doing', to: 'done', rules: [{ kind: 'require-comment' }, { kind: 'require-evidence' }] },
+    ],
+  };
+
+  it('21.047 require-evidence reads "needs evidence", require-field reads "needs <field>", and two rules are joined', async () => {
+    const user = userEvent.setup();
+    await mount(boardOf(errandGroup()), GATED);
+    const names = await offered(user, moveButtonIn('tk_b'), 'tk_b');
+
+    expect(names).toEqual([
+      'To do — needs estimate',
+      'Waiting on counterparty — needs evidence',
+      'Done — needs a comment, needs evidence',
+    ]);
+  });
+
   it('21.047 CONTROL — the arrows\' own picker keeps its plain option names (no mark)', async () => {
     const user = userEvent.setup();
     await mount(boardOf(errandGroup()));
+    const forward = await offered(user, within(slotOf('tk_b')).getByRole('button', { name: /^Move to next state/ }), 'tk_b');
+    expect(forward).toEqual(['Waiting on counterparty', 'Done']);
+  });
+
+  it('21.047 CONTROL — over the same gated workflow the arrows\' picker still shows bare names', async () => {
+    const user = userEvent.setup();
+    await mount(boardOf(errandGroup()), GATED);
     const forward = await offered(user, within(slotOf('tk_b')).getByRole('button', { name: /^Move to next state/ }), 'tk_b');
     expect(forward).toEqual(['Waiting on counterparty', 'Done']);
   });
@@ -332,6 +440,21 @@ describe('21.049 a Move submits through the same optimistic path as the arrows',
     expect(idsIn('doing')).toEqual([]);
     expect(slotOf('tk_b')).toHaveAttribute('data-move-phase', 'writing');
     await act(async () => write.resolve(committed([{ id: 'x' }])));
+  });
+
+  it('21.049 while a DIRECT move\'s write is open the card\'s Move is disabled; it is enabled again once the write settles', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    await mount(boardOf(errandGroup()), WF_ERRAND, () => write.promise);
+    expect(moveButtonIn('tk_a')).toBeEnabled(); // CONTROL — before the move
+
+    // To do has ONE rules-free exit, so › writes straight away (no dialog): the `submitting` latch is held for the write.
+    await user.click(within(slotOf('tk_a')).getByRole('button', { name: 'Move to Doing' }));
+    await waitFor(() => expect(slotOf('tk_a')).toHaveAttribute('data-move-phase', 'writing'));
+    expect(moveButtonIn('tk_a')).toBeDisabled();
+
+    await act(async () => write.resolve(committed([{ id: 'x' }])));
+    await waitFor(() => expect(moveButtonIn('tk_a')).toBeEnabled()); // CONTROL — settled
   });
 
   it('21.049 CONTROL — a server refusal keeps the dialog open with the refusal text, and cancelling sends the card back to Doing', async () => {
