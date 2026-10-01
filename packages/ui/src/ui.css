@@ -251,23 +251,23 @@
    both "true" (nothing hidden, or a scroller that does not scroll) there is NO mask at all, so a fitting scroller is
    untouched. An edge with content past it fades over `--gn-scroll-fade-size` to transparent. `.gn-scroll-fade` runs left to
    right, `--y` top to bottom. The mask clips the scroller's own box-shadow, so a scroller that wears a shadow keeps it on a
-   WRAPPER, not on the masked element. */
+   WRAPPER, not on the masked element. A mask reads only alpha; `black` is the opaque stop, not a colour. */
 .gn-scroll-fade {
   --gn-scroll-fade-size: 1.5rem;
-  --gn-fade-from: #000;
-  --gn-fade-to: #000;
+  --gn-fade-from: black;
+  --gn-fade-to: black;
 }
 .gn-scroll-fade[data-at-start='false'] { --gn-fade-from: transparent; }
 .gn-scroll-fade[data-at-end='false'] { --gn-fade-to: transparent; }
 .gn-scroll-fade[data-at-start='false'],
 .gn-scroll-fade[data-at-end='false'] {
-  -webkit-mask-image: linear-gradient(to right, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
-  mask-image: linear-gradient(to right, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  -webkit-mask-image: linear-gradient(to right, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to right, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
 }
 .gn-scroll-fade--y[data-at-start='false'],
 .gn-scroll-fade--y[data-at-end='false'] {
-  -webkit-mask-image: linear-gradient(to bottom, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
-  mask-image: linear-gradient(to bottom, var(--gn-fade-from), #000 var(--gn-scroll-fade-size), #000 calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  -webkit-mask-image: linear-gradient(to bottom, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to bottom, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
 }
 
 /* Rule 04 (styling refresh Plan A Task 4): every static panel rests on the lit-edge, falling `lift` shadow. neo's lift IS its raised pair; minimal draws none. A Card is never itself interactive (card.tsx), so hover lift is keyed on the interactive element's own class, never here (pattern P-LIFT). */

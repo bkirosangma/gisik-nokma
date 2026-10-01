@@ -74,6 +74,39 @@ describe('23.092 useScrollEdges', () => {
     expect(y.getByTestId('scroller').getAttribute('data-at-start')).toBe('true');
   });
 
+  it('23.092 a resize of the element re-measures: content that grows past the box fades the end edge', () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    const observed: Element[] = [];
+    const original = globalThis.ResizeObserver;
+    class RecordingResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        callbacks.push(callback);
+      }
+      observe(target: Element): void {
+        observed.push(target);
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    globalThis.ResizeObserver = RecordingResizeObserver as unknown as typeof ResizeObserver;
+    try {
+      Object.assign(DIMS, { scrollWidth: 200, clientWidth: 200 });
+      const { getByTestId } = render(<Scroller />);
+      const el = getByTestId('scroller');
+      expect(el.getAttribute('data-at-end')).toBe('true'); // it fits
+      expect(observed).toContain(el); // the scroller ITSELF is watched, not only its children
+      expect(callbacks).toHaveLength(1);
+
+      // Content arrives and the scrollable extent grows past the box. CONTROL — nothing is re-measured until the observer fires.
+      DIMS.scrollWidth = 500;
+      expect(el.getAttribute('data-at-end')).toBe('true');
+      callbacks[0]!([], {} as ResizeObserver);
+      expect(el.getAttribute('data-at-end')).toBe('false');
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
+
   it('23.092 the hook leaves the caller its own ref (the board rail already holds one)', () => {
     Object.assign(DIMS, { scrollWidth: 500, clientWidth: 200 });
     const own = createRef<HTMLDivElement>() as React.MutableRefObject<HTMLDivElement | null>;

@@ -9,6 +9,7 @@ import {
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
+  disabledOpacity,
   disabledOpacityVariableName,
   fontStackOf,
   fontVariableName,
@@ -163,6 +164,22 @@ describe('CSS variable emission', () => {
     // merely declared in TypeScript.
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
+  });
+
+  /**
+   * 23.094 — the token's VALUE. Every other 23.094 check reads only `var(--gn-disabled-opacity)`, so `0.55` would pass them
+   * all; this is the one place the number is pinned, and where it is emitted.
+   */
+  it('23.094 --gn-disabled-opacity is 0.5, emitted exactly once, in the bare :root block', () => {
+    expect(disabledOpacity).toBe('0.5');
+    const stylesheet = themeStylesheet();
+    const declaration = `${disabledOpacityVariableName}: 0.5;`;
+    expect(stylesheet.split(declaration)).toHaveLength(2); // exactly once
+    const at = stylesheet.indexOf(declaration);
+    const block = stylesheet.slice(stylesheet.lastIndexOf('}', at) + 1, stylesheet.indexOf('}', at) + 1).trim();
+    expect(block.startsWith(':root {')).toBe(true); // the bare :root, not a themed or media-wrapped one
+    // CONTROL — the bare :root is the block that also carries the phone heights, not a different :root.
+    expect(block).toContain('--gn-phone-bar-height');
   });
 
   /**
@@ -1465,8 +1482,11 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
-    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 10 (the field ring, text on the lifted raised surface, text and the accent fill on the stepped track/well; 23.001/23.006/23.007). A floor removed is a guarantee removed, and it would show here first.
-    expect(CONTRAST_PAIRS.length).toBe(54);
+    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 8 (the field ring on four grounds, and textAccent and the accent fill on the stepped track/well; 23.001/23.007; two candidate rows, textAccent and textSubtle on surfaceRaised, were already present). A floor removed is a guarantee removed, and it would show here first.
+    // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
+    // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
+    expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
+    expect(CONTRAST_PAIRS.length).toBe(52);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);

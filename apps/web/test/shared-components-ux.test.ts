@@ -85,15 +85,21 @@ describe('23.090 hit areas: every listed shared control reaches 44×44 (audit SY
   });
 });
 
-/** The seven scrollers and the source file that mounts each (case 23.092). */
-const SCROLLERS: ReadonlyArray<{ name: string; file: string; marker: RegExp }> = [
-  { name: 'the project view rail', file: 'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx', marker: /className="gn-project__rail"[\s\S]{0,200}?fade/ },
-  { name: 'the board rail', file: 'packages/app-core/src/views/board.tsx', marker: /className="gn-board__rail gn-scroll-fade"/ },
-  { name: 'the list table wrap', file: 'packages/app-core/src/views/ticket-list.tsx', marker: /className="gn-list__table-wrap gn-scroll-fade"/ },
-  { name: 'the settings phone track', file: 'apps/web/app/settings/page.tsx', marker: /className="gn-settings__sidebar gn-scroll-fade"/ },
-  { name: 'the help sidebar', file: 'packages/app-core/src/help/help-browser.tsx', marker: /className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y"/ },
-  { name: 'the board phone picker', file: 'packages/app-core/src/views/board-phone-picker.tsx', marker: /className="gn-board-phone-picker"[\s\S]{0,200}?fade/ },
-  { name: 'the workflow-builder left panel', file: 'packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx', marker: /className="workflow-builder-screen__left gn-scroll-fade gn-scroll-fade--y"/ },
+/**
+ * The seven scrollers and the source file that mounts each (case 23.092). `marker` is the utility class; `driver` is what
+ * makes it FADE: the element's opening tag carries the `useScrollEdges` ref and that name is bound to the hook — without the
+ * ref no `data-at-*` is ever written and the scroller never fades, however many `gn-scroll-fade` classes it wears. The two
+ * hosts that take a `fade` prop (the project rail, the phone picker) pin it in their marker, and `SegmentedControl`'s own
+ * wiring is pinned in `packages/ui/test/scroll-edges.test.tsx`, so they carry no `driver`.
+ */
+const SCROLLERS: ReadonlyArray<{ name: string; file: string; marker: RegExp; driver: readonly RegExp[] }> = [
+  { name: 'the project view rail', file: 'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx', marker: /className="gn-project__rail"[\s\S]{0,200}?fade/, driver: [] },
+  { name: 'the board rail', file: 'packages/app-core/src/views/board.tsx', marker: /className="gn-board__rail gn-scroll-fade"/, driver: [/className="gn-board__rail gn-scroll-fade"[^>]*?ref=\{railEdgesRef\}/, /const railEdgesRef = useScrollEdges</] },
+  { name: 'the list table wrap', file: 'packages/app-core/src/views/ticket-list.tsx', marker: /className="gn-list__table-wrap gn-scroll-fade"/, driver: [/className="gn-list__table-wrap gn-scroll-fade"[^>]*?ref=\{wrapEdgesRef\}/, /const wrapEdgesRef = useScrollEdges</] },
+  { name: 'the settings phone track', file: 'apps/web/app/settings/page.tsx', marker: /className="gn-settings__sidebar gn-scroll-fade"/, driver: [/className="gn-settings__sidebar gn-scroll-fade"[^>]*?ref=\{sidebarEdgesRef\}/, /const sidebarEdgesRef = useScrollEdges</] },
+  { name: 'the help sidebar', file: 'packages/app-core/src/help/help-browser.tsx', marker: /className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y"/, driver: [/className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y"[^>]*?ref=\{edgesRef\}/, /const edgesRef = useScrollEdges</] },
+  { name: 'the board phone picker', file: 'packages/app-core/src/views/board-phone-picker.tsx', marker: /className="gn-board-phone-picker"[\s\S]{0,200}?fade/, driver: [] },
+  { name: 'the workflow-builder left panel', file: 'packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx', marker: /className="workflow-builder-screen__left gn-scroll-fade gn-scroll-fade--y"/, driver: [/className="workflow-builder-screen__left gn-scroll-fade gn-scroll-fade--y"[^>]*?ref=\{leftEdgesRef\}/, /const leftEdgesRef = useScrollEdges</] },
 ];
 
 function codeOf(relative: string): string {
@@ -121,8 +127,10 @@ describe('23.092 scroll fades: one utility, applied to the seven scrollers (audi
   it('23.092 each of the seven scrollers wears the utility (and the hook that drives it)', () => {
     for (const scroller of SCROLLERS) {
       expect(codeOf(scroller.file), scroller.name).toMatch(scroller.marker);
-      expect(codeOf(scroller.file), `${scroller.name} drives its edges`).toMatch(/useScrollEdges|fade/);
+      for (const driver of scroller.driver) expect(codeOf(scroller.file), `${scroller.name} drives its edges: ${String(driver)}`).toMatch(driver);
     }
+    // CONTROL — the driver scan is not vacuous: five of the seven hosts are checked, each against its own ref.
+    expect(SCROLLERS.filter((scroller) => scroller.driver.length === 2)).toHaveLength(5);
     // CONTROL — the scan can fail: a scroller this task did not name is not in the list.
     expect(codeOf('packages/app-core/src/views/ticket-list.tsx')).not.toMatch(/className="gn-list__bulk-bar gn-scroll-fade/);
   });
