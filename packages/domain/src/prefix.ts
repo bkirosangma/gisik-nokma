@@ -12,7 +12,8 @@ import { z } from 'zod';
  * like CCSO-xxxx where the xx are the counter per project."* (2026-09-20.)
  *
  * So a prefix is up to three capital letters, ENTERED by a person at creation
- * time and immutable afterwards, and the number is scoped PER PROJECT.
+ * time (it can be changed later by an explicit event, 2026-10-01 R1/R2: the
+ * old one stays reserved), and the number is scoped PER PROJECT.
  *
  * ## Why a derivation exists at all, when the prefix is entered
  *
@@ -124,6 +125,14 @@ export type PrefixClaim = {
  * creation) rather than a clock, so the answer is the same on the live read and
  * on a rebuild.
  *
+ * ## Reserved prefixes (2026-10-02, owner spec 2026-10-01 R2)
+ *
+ * `reserved` is the set of FORMER prefixes in the workspace — a prefix a project
+ * once held stays that project's, so a derived prefix treats it as already taken
+ * and moves on (`SO` -> `SO2`). It applies to pass 2 ONLY: an ENTERED prefix was
+ * checked at the door, which lets the project that held a reserved prefix take it
+ * back, so pass 1 is unchanged.
+ *
  * ## The suffix
  *
  * A derived prefix that is already taken moves down `collisionCandidates`:
@@ -140,7 +149,10 @@ export type PrefixClaim = {
  * one governs what may be ENTERED and this governs what is DERIVED when nobody
  * entered anything. See `collisionCandidates` below, which says so at the digit.
  */
-export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[] {
+export function resolveProjectPrefixes(
+  claims: readonly PrefixClaim[],
+  reserved: ReadonlySet<string> = new Set(),
+): string[] {
   const assigned: Array<string | null> = claims.map(() => null);
   const taken = new Set<string>();
 
@@ -166,7 +178,7 @@ export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[]
     }
     const base = derivePrefix(claim.name);
     for (const candidate of collisionCandidates(base)) {
-      if (!taken.has(candidate)) {
+      if (!taken.has(candidate) && !reserved.has(candidate)) {
         assigned[index] = candidate;
         taken.add(candidate);
         return;
