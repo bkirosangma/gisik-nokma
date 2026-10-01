@@ -5537,6 +5537,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-inbox__more:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
+/* Phone (mobile-web plan Task 7, case 21.093). Here, not in `globals.css`, because source order is
+   the rule and the base rules above are this sheet's. A row keeps its 44px floor (restated, so the
+   phone arm owns it) and gains vertical room to tap; the unread dot and the badge are untouched.
+   "Load more" is the list's width: the base rule's 0.5rem side margins sit INSIDE it, so `100%`
+   alone would overflow by 1rem. */
+@media (max-width: 40rem) {
+  .gn-inbox__row { min-height: 2.75rem; padding: 0.75rem 0.5rem; }
+  .gn-inbox__more { display: flex; width: calc(100% - 1rem); }
+}
 /* The unread total, on whatever chrome opens the inbox. Text on accent — the
    declared contrast pair, not a hand-picked ink. */
 .gn-inbox__badge {
