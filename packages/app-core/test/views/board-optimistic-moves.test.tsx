@@ -1,4 +1,4 @@
-import { act, createEvent, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, createEvent, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
@@ -922,5 +922,177 @@ describe('20.166 nothing below, or nowhere to go: nothing glides and nothing thr
     expect(slotOf('tk_z').classList.contains('gn-board__card-slot--flight')).toBe(true); // CONTROL
     expect(slotOf('tk_a').classList.contains('gn-board__card-slot--flight')).toBe(false);
     expect(slotOf('tk_c').classList.contains('gn-board__card-slot--flight')).toBe(false);
+  });
+});
+
+describe('20.169 an ARROW move opens the slot in the target column: the cards below the landing index glide down', () => {
+  /**
+   * A stack layout (top = 100 + 130 × index, left = 300 × column). Once tk_c is drawn in Doing, tk_d — below its landing slot —
+   * also reflows 25px right, so the horizontal half of the FLIP is pinned beside the vertical one.
+   */
+  function plantTarget() {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      let left = 0;
+      let top = 0;
+      if (this.tagName === 'LI' && id.startsWith('ticket-card-')) {
+        const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+        left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+        top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
+        const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
+        if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+      }
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+  }
+  const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
+  const flip = (id: string) => [slotOf(id).style.getPropertyValue('--gn-flip-x'), slotOf(id).style.getPropertyValue('--gn-flip-y')];
+  const arrow = async (id: string) => userEvent.setup().click(within(slotOf(id)).getByRole('button', { name: 'Move to Doing' }));
+
+  it('20.169 pressing › on tk_c: tk_d slides down from (-25px, -130px) on the shared flight class (CONTROL: tk_b above stays; a DRAG of the same card records no target sibling; tk_z still closes up)', async () => {
+    // Mutations: drop the target-side recording; record target siblings on the drag path too; cards above the landing index glide too;
+    // the dx/dy sign flipped for target siblings; measured from the mover's rect; own timing instead of the token's.
+    const never = () => new Promise<IngestResult[]>(() => {});
+    await mount(never);
+    plantTarget();
+    drag('tk_c', 'doing');
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']);
+    expect(flies('tk_c')).toBe(true); // CONTROL — the harness does fly things
+    expect(flies('tk_d')).toBe(false); // the drop placeholder had opened the slot: the drag path records no target sibling
+    cleanup();
+    vi.restoreAllMocks();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    await mount(never);
+    plantTarget();
+    await arrow('tk_c');
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']);
+    // tk_d was drawn at (300, 230) and now sits at (325, 360): it starts 25px LEFT of and 130px ABOVE its slot.
+    expect(flies('tk_d')).toBe(true);
+    expect(flip('tk_d')).toEqual(['-25px', '-130px']);
+    expect(slotOf('tk_d').className).toBe(slotOf('tk_c').className);
+    expect(slotOf('tk_d').style.animation).toBe('');
+    expect(slotOf('tk_d').style.animationDuration).toBe('');
+    expect(flies('tk_b')).toBe(false); // above the landing index
+    expect(flies('tk_c')).toBe(true);
+    // The source column's glide (20.162) is unchanged.
+    expect(flip('tk_z')).toEqual(['0px', '130px']);
+    expect(flies('tk_a')).toBe(false);
+    fireEvent.animationEnd(slotOf('tk_d'));
+    expect(flies('tk_d')).toBe(false);
+  });
+});
+
+describe('20.170 a refused arrow move closes the target slot again: the cards below slide back up', () => {
+  it('20.170 tk_d glides down on the press and back UP on the refusal (CONTROL: tk_b, above, never glides)', async () => {
+    // Mutation: refusal does not FLIP the target siblings back (no target record in `dropPending`).
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      let left = 0;
+      let top = 0;
+      if (this.tagName === 'LI' && id.startsWith('ticket-card-')) {
+        const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+        left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+        top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
+        const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
+        if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+      }
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+    await userEvent.setup().click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to Doing' }));
+    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(true); // CONTROL — it opened the slot
+    for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(false);
+
+    await act(async () => write.resolve(refused([{ id: 'x' }])));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+    // tk_d was drawn at (325, 360) and is back at (300, 230): it starts 25px right of and 130px BELOW its slot.
+    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(true);
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-x')).toBe('25px');
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
+    expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
+  });
+});
+
+describe('20.171 under reduced motion the target cards open the slot instantly', () => {
+  it('20.171 no flight class on tk_d with reduced motion on (CONTROL: the same arrow move without it glided, in the same board)', async () => {
+    // Mutation: reduced motion not honoured for the target siblings.
+    let reduce = false;
+    window.matchMedia = ((query: string) => ({ matches: reduce && query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      await mount(() => new Promise<IngestResult[]>(() => {}));
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const id = this.getAttribute('data-testid') ?? '';
+        const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+        const left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+        const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
+        return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+      });
+      const user = userEvent.setup();
+      await user.click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to Doing' }));
+      expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(true); // CONTROL
+      for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+
+      reduce = true;
+      await user.click(within(slotOf('tk_a')).getByRole('button', { name: 'Move to Doing' })); // lands first in Doing: b, c and d all open the slot
+      expect(idsIn('doing')).toEqual(['tk_a', 'tk_b', 'tk_c', 'tk_d']);
+      expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(false);
+      expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
+    } finally {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+});
+
+describe('20.172 landing at the end, a flight consumed once, a stale flight: the target side behaves like the source side', () => {
+  const stack = () =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+      const left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+      const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+  const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
+  const press = (user: ReturnType<typeof userEvent.setup>, id: string) => user.click(within(slotOf(id)).getByRole('button', { name: 'Move to Doing' }));
+
+  it('20.172 tk_z lands LAST in Doing: no target sibling flies and nothing throws (CONTROL: the landing card flies)', async () => {
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    stack();
+    await press(userEvent.setup(), 'tk_z');
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d', 'tk_z']);
+    expect(flies('tk_z')).toBe(true); // CONTROL
+    expect(flies('tk_b')).toBe(false);
+    expect(flies('tk_d')).toBe(false);
+  });
+
+  it('20.172 a later overlay change (the commit) does not fly tk_d again (CONTROL: it flew once)', async () => {
+    // Mutation: the target flight is never consumed.
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise);
+    stack();
+    await press(userEvent.setup(), 'tk_c');
+    expect(flies('tk_d')).toBe(true); // CONTROL
+    fireEvent.animationEnd(slotOf('tk_d'));
+    await act(async () => write.resolve(committed([{ id: 'x' }])));
+    expect(slotOf('tk_c')).toHaveAttribute('data-move-phase', 'committed');
+    expect(flies('tk_d')).toBe(false);
+  });
+
+  it('20.172 a target flight older than FLIGHT_MAX_AGE_MS is ignored (CONTROL: a fresh one, same board, glides)', async () => {
+    // Mutation: the sibling claim has no age check (target side).
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    stack();
+    const user = userEvent.setup();
+    await press(user, 'tk_c');
+    expect(flies('tk_d')).toBe(true); // CONTROL
+    fireEvent.animationEnd(slotOf('tk_d'));
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += FLIGHT_MAX_AGE_MS + 1));
+    await press(user, 'tk_a');
+    expect(idsIn('doing')).toEqual(['tk_a', 'tk_b', 'tk_c', 'tk_d']);
+    expect(flies('tk_d')).toBe(false);
   });
 });

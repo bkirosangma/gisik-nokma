@@ -2415,10 +2415,11 @@ function MoveArrows({
   // then, but the transition dialog and `moveOutcome` are asked about the move it is making, from its source.
   const entry = pending[card.ticketId];
   const fromStateId = entry !== undefined && entry.phase !== 'committed' ? entry.fromStateId : displayedStateId;
-  const beginPending = (toStateId: string, phase: 'awaiting' | 'writing', from?: FlightRect): void =>
+  const beginPending = (toStateId: string, phase: 'awaiting' | 'writing', from?: FlightRect, byArrow = false): void =>
     moveState.beginPending(
       { ticketId: card.ticketId, workflowId: workflow.id, fromStateId, toStateId, phase },
       from,
+      byArrow,
     );
 
   /**
@@ -2672,13 +2673,13 @@ function MoveArrows({
     if (outcome.kind === 'direct') {
       // Assume it succeeds (owner, 2026-10-01): the card is drawn in its target NOW, at the slot the drop
       // placeholder showed; a refusal or a failure releases it and it glides back.
-      beginPending(outcome.toStateId, 'writing', from);
+      beginPending(outcome.toStateId, 'writing', from, source === 'arrow');
       void submitDirect(outcome.toStateId);
       return;
     }
     // The gesture meant exactly this one state: offer it alone, already aimed. The card waits in the
     // landing slot, faded, until the dialog is confirmed or cancelled.
-    beginPending(outcome.toStateId, 'awaiting', from);
+    beginPending(outcome.toStateId, 'awaiting', from, source === 'arrow');
     setDialog({ offer: [outcome.toStateId], preselect: outcome.toStateId });
   };
 
@@ -2823,7 +2824,8 @@ function MoveArrows({
     });
     // Confirming is the moment the card's target is certain (a picker offered several): lay the entry now
     // (a no-op upsert when the gesture already aimed it), so the card settles into the slot while it writes.
-    beginPending(submission.toStateId, 'writing');
+    // (a picker is reached by the arrows only: a drop aims a dialog at one state and has laid its entry already)
+    beginPending(submission.toStateId, 'writing', undefined, true);
     try {
       const results = await moves.dataSource.ingest([...fieldEvents, transition]);
       const failed = results.find((result) => result.status !== 'committed');

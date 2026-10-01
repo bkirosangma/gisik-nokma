@@ -157,7 +157,8 @@ export type FlightRect = {
   /**
    * Set on a card that does NOT change column but is shifted by one that does (a card below a mover in its source
    * column, closing the gap — or reopening it on a refusal). Such a card is already mounted, so it claims its
-   * flight after the render that moved it (not at mount) and never scrolls itself into view.
+   * flight after the render that moved it (not at mount) and never scrolls itself into view. The cards of the TARGET
+   * column below the landing slot are siblings too, but only on an arrow move (a drag's drop placeholder opened the slot).
    */
   sibling?: true;
 };
@@ -171,8 +172,11 @@ export type MoveState = {
   patchSession: (ticketId: string, patch: Partial<MoveSession>) => void;
   /** The session as of the latest render — for an async continuation, whose own closure is from when the write began. */
   sessionOf: (ticketId: string) => MoveSession;
-  /** Lays a move over the board. `from` is the flight's start (the drop point); when absent the card's own slot is measured. */
-  beginPending: (move: PendingMove, from?: FlightRect) => void;
+  /**
+   * Lays a move over the board. `from` is the flight's start (the drop point); when absent the card's own slot is measured.
+   * `byArrow` marks a move that no drop placeholder prepared: the target column's cards below the landing slot glide down.
+   */
+  beginPending: (move: PendingMove, from?: FlightRect, byArrow?: boolean) => void;
   setPhase: (ticketId: string, phase: PendingPhase) => void;
   /** Releases the overlay: the card glides back from where it is drawn now. */
   dropPending: (ticketId: string) => void;
@@ -197,6 +201,8 @@ export function useMoveState(realView: BoardView): MoveState {
   const grab = useRef<Grab | null>(null);
   // The list (a column's `<ul>`) each pending card was taken from: its other cards are what glide when the gap closes or reopens.
   const sourceLists = useRef(new Map<string, Element>());
+  // The target column (a `<section>`) of an ARROW move: its cards below the landing slot glide down, and back up on a refusal.
+  const targetSections = useRef(new Map<string, Element>());
 
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -210,7 +216,7 @@ export function useMoveState(realView: BoardView): MoveState {
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
 
-  const beginPending = useCallback((move: PendingMove, from?: FlightRect) => {
+  const beginPending = useCallback((move: PendingMove, from?: FlightRect, byArrow = false) => {
     // A flight exists only for a card that is about to CHANGE COLUMN. Re-asserting an entry that already
     // shows the card in this target (a dialog confirming) must not leave a flight behind for its next mount.
     if (pendingRef.current[move.ticketId]?.toStateId !== move.toStateId) {
@@ -223,13 +229,22 @@ export function useMoveState(realView: BoardView): MoveState {
         sourceLists.current.set(move.ticketId, list);
         recordSiblings(slots.current, flights.current, list, move.ticketId, source);
       }
+      // An arrow move opened no placeholder: the target's cards below the landing slot are about to shift down.
+      const section = byArrow && source !== undefined ? targetSectionOf(source, move.toStateId) : null;
+      if (section !== null) {
+        targetSections.current.set(move.ticketId, section);
+        recordBelow(slots.current, flights.current, section, move.ticketId);
+      }
     }
     setPending((current) => ({ ...current, [move.ticketId]: move }));
   }, []);
 
   const setPhase = useCallback((ticketId: string, phase: PendingPhase) => {
     // A committed move is never glided back: its source list is no longer needed.
-    if (phase === 'committed') sourceLists.current.delete(ticketId);
+    if (phase === 'committed') {
+      sourceLists.current.delete(ticketId);
+      targetSections.current.delete(ticketId);
+    }
     setPending((current) => {
       const entry = current[ticketId];
       if (entry === undefined) return current;
@@ -245,8 +260,12 @@ export function useMoveState(realView: BoardView): MoveState {
       // The source column's cards (closed over the gap) slide back down to reopen the slot.
       const list = sourceLists.current.get(ticketId);
       if (list !== undefined && list.isConnected) recordSiblings(slots.current, flights.current, list, ticketId);
+      // …and the target column's cards below the slot close it again.
+      const section = targetSections.current.get(ticketId);
+      if (section !== undefined && section.isConnected) recordBelow(slots.current, flights.current, section, ticketId);
     }
     sourceLists.current.delete(ticketId);
+    targetSections.current.delete(ticketId);
     setPending((current) => {
       if (current[ticketId] === undefined) return current;
       const next = { ...current };
@@ -298,6 +317,25 @@ function recordSiblings(
   for (const [id, element] of slots) {
     if (id === ticketId || element.parentElement !== list) continue;
     if (after !== undefined && !(after.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+    const start = rectOf(element);
+    if (start !== undefined) flights.set(id, { ...start, sibling: true });
+  }
+}
+
+/** The column `<section>` for `toStateId` beside the one `source` sits in (one group's columns share a rail), or null when it is not drawn. */
+function targetSectionOf(source: Element, toStateId: string): Element | null {
+  const rail = source.closest('[data-testid^="board-column-"]')?.parentElement;
+  if (rail == null) return null;
+  return [...rail.children].find((child) => child.getAttribute('data-testid') === `board-column-${toStateId}`) ?? null;
+}
+
+/**
+ * Note where the cards of the column `section` that sort AFTER `ticketId` are drawn now, as sibling flights: a column is
+ * ordered by ticket id (`landingIndex`), so those are exactly the cards below the mover's landing slot.
+ */
+function recordBelow(slots: Map<string, HTMLElement>, flights: Map<string, FlightRect>, section: Element, ticketId: string): void {
+  for (const [id, element] of slots) {
+    if (id <= ticketId || !section.contains(element)) continue;
     const start = rectOf(element);
     if (start !== undefined) flights.set(id, { ...start, sibling: true });
   }
