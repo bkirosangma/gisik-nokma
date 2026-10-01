@@ -27,3 +27,15 @@
 - ✅ **22.100 — every group event by a member is refused `permission.role`, an admin commits; a member may read, a guest and an outsider get 404.** Mutation: drop the four types from `ADMIN_ONLY_TYPES` → red. (`groups.test.ts`)
 - ✅ **22.101 — create, rename, reorder, assign and delete leave `verifyProjections` clean (in a ledger-only database);** control: a group row edited behind the ledger is reported on `proj_groups`. (`groups.test.ts`)
 - ✅ **22.102 — the `/v1/me/workspaces` mapper requires `groupId` on every project row:** a string and `null` map through, a missing key is refused naming `projects[0].groupId`; control: a number is refused. (`packages/app-core/test/online/mappers.test.ts`; `mappers.ts`)
+
+## 22.9 The group picker — four type-ahead levels, inline create
+
+*Task 9. Ids `22.167`–`22.179` are unused.*
+
+- ✅ **22.160 — four comboboxes labelled "Level 1 group" … "Level 4 group"; level N+1 is disabled until level N has a value;** control: picking Shops enables level 2 and not level 3; the `disabled` prop disables all four. (`apps/web/test/group-picker.test.tsx`; `apps/web/src/group-picker.tsx`)
+- ✅ **22.161 — typing in level 2 lists only the children of the level-1 pick whose names contain the text, ignoring case;** control: a same-named group under another level-1 group is not offered, and the Retail chosen is the one under the picked branch (by id). Mutation: drop the parent filter → red. (same file)
+- ✅ **22.162 — an exact match, ignoring case, is selected on blur or Enter (`RETAIL` → Retail, no New tag);** control: a near miss (`Marketplace`) becomes a pending new group, never a match. Mutation: case-sensitive match → red. (same file)
+- ✅ **22.163 — a name with no match, then leaving the field, shows the name with a "New" tag and `pendingNames` holds it; `groupSeeds` emits `group.created` with the right parent, level and rank (after the parent's last child; later ones the midpoint) and returns the deepest new id;** control: nothing pending emits nothing and returns the existing pick; every payload parses with `groupCreatedPayload`. Mutation: rank not after the last sibling → red. (same file; `apps/web/src/group-picker-seeds.ts`)
+- ✅ **22.164 — emptying level 2 empties and disables levels 3 and 4 and keeps level 1;** control: before, all four were filled. Mutation: clear only the one level → red. (same file)
+- ✅ **22.165 — a pending name that the re-read groups now contain (the door answered `group.name-taken` and the form re-read) is adopted: the existing group is selected, "Using the existing Retail." is announced (`role="status"`), the New tag goes;** control: a pending name with no match stays pending. The picker is controlled — the form that submits owns the re-read and passes the fresh `groups`. Mutation: no adoption → red. (same file)
+- ✅ **22.166 — each combobox has a visible `<label for>` and its input rule floors at 2.75rem (44 px; read from `globals.css`, jsdom has no layout); a keyboard-only walk (Tab, type, ArrowDown, Enter) sets all four levels.** (same file)
