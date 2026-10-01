@@ -814,7 +814,7 @@ describe('20.162 a card with its dialog open is not glided, whichever move shift
 });
 
 describe('20.163 a refused move reopens the slot: the cards below slide down again', () => {
-  it('20.163 tk_z glides up on the drop and back DOWN on the refusal (CONTROL: tk_a, above, and tk_d, in the target, never glide)', async () => {
+  it('20.163 tk_z glides up on the drop and back DOWN on the refusal (CONTROL: tk_a, above, never glides; tk_d, in the target, held open by the placeholder, stood still at the drop and glides back UP on the refusal — 20.176)', async () => {
     // Mutation: refusal does not FLIP the siblings back (no sibling record in `dropPending`).
     const write = deferred<IngestResult[]>();
     await mount(() => write.promise);
@@ -836,7 +836,8 @@ describe('20.163 a refused move reopens the slot: the cards below slide down aga
     expect(slotOf('tk_z').classList.contains('gn-board__card-slot--flight')).toBe(true);
     expect(slotOf('tk_z').style.getPropertyValue('--gn-flip-y')).toBe('-130px');
     expect(slotOf('tk_a').classList.contains('gn-board__card-slot--flight')).toBe(false);
-    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(false);
+    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(true); // the placeholder's opening closes smoothly (20.176)
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
   });
 });
 
@@ -1145,13 +1146,13 @@ describe('20.175 an ARROW move that opens the transition dialog: the target slot
   }
   const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
 
-  it('20.175 › into a gated target: tk_d opens the slot at once (only a card with its OWN dialog stays still) and Cancel glides it back up (CONTROL: a DRAG into the same dialog, cancelled, records no target flight)', async () => {
+  it('20.175 › into a gated target: tk_d opens the slot at once (only a card with its OWN dialog stays still) and Cancel glides it back up (CONTROL: a DRAG into the same dialog records no target flight at begin)', async () => {
     // Mutation: the dialog-awaiting arrow path does not pass the arrow flag to `beginPending` (`attemptMove`, the `'awaiting'` call).
     const never = () => new Promise<IngestResult[]>(() => {});
     const user = userEvent.setup();
     await mount(never, GATED);
     plant();
-    // The drag: the drop placeholder opened the slot, so no target sibling is noted at begin or on Cancel (the same layout would show one).
+    // The drag: the drop placeholder opened the slot, so no target sibling is noted at begin (the same layout would show one); Cancel closes it smoothly (20.176).
     drag('tk_c', 'doing');
     let dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
     expect(flies('tk_z')).toBe(true); // CONTROL — the source column closed up, so the harness glides
@@ -1159,7 +1160,7 @@ describe('20.175 an ARROW move that opens the transition dialog: the target slot
     for (const id of ['tk_z', 'tk_c']) fireEvent.animationEnd(slotOf(id));
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
-    expect(flies('tk_d')).toBe(false);
+    expect(flies('tk_d')).toBe(true);
     cleanup();
     vi.restoreAllMocks();
     Element.prototype.scrollIntoView = scrollIntoView;
@@ -1182,5 +1183,190 @@ describe('20.175 an ARROW move that opens the transition dialog: the target slot
     expect(flies('tk_d')).toBe(true);
     expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
     expect(flies('tk_b')).toBe(false);
+  });
+});
+
+describe('20.176 a REFUSED or CANCELLED drag closes the target slot smoothly: the cards the placeholder held open glide back up', () => {
+  /** tk_d, below tk_c's landing slot, also reflows 25px right while tk_c is drawn in Doing; tk_b above drifts 10px (a card nothing may glide). */
+  function plant() {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      let left = 0;
+      let top = 0;
+      if (this.tagName === 'LI' && id.startsWith('ticket-card-')) {
+        const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+        left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+        top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
+        const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
+        if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+        if (cInDoing && id === 'ticket-card-tk_b') top -= 10;
+      }
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+  }
+  const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
+  const flip = (id: string) => [slotOf(id).style.getPropertyValue('--gn-flip-x'), slotOf(id).style.getPropertyValue('--gn-flip-y')];
+
+  it('20.176 a refused drag: tk_d glides back up from (25px, 130px) on the shared class (CONTROL: nothing flew at the drop; tk_b above never glides; tk_c comes home itself)', async () => {
+    // Mutations: the section is not remembered for a drag (the defect); a drag also records target siblings at BEGIN; `dropPending` records
+    // nothing for a drag; the refusal records the cards ABOVE too; dx/dy sign flipped; own timing.
+    const write = deferred<IngestResult[]>();
+    await mount(() => write.promise);
+    plant();
+    drag('tk_c', 'doing');
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']);
+    expect(flies('tk_c')).toBe(true); // CONTROL — the harness flies things
+    expect(flies('tk_d')).toBe(false); // the placeholder had opened the slot: nothing is noted at the drop
+    expect(flies('tk_b')).toBe(false);
+    for (const id of ['tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+
+    await act(async () => write.resolve(refused([{ id: 'x' }])));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+    expect(flies('tk_d')).toBe(true);
+    expect(flip('tk_d')).toEqual(['25px', '130px']);
+    expect(slotOf('tk_d').className).toBe(slotOf('tk_c').className);
+    expect(slotOf('tk_d').style.animation).toBe('');
+    expect(flies('tk_b')).toBe(false);
+    expect(flies('tk_c')).toBe(true);
+  });
+
+  it('20.176 a drag whose dialog is CANCELLED: the same glide-up (CONTROL: tk_d stood still while the dialog was open)', async () => {
+    // Mutation: as above — the cancel path is `dropPending` too.
+    const user = userEvent.setup();
+    await mount(() => new Promise<IngestResult[]>(() => {}), GATED);
+    plant();
+    drag('tk_c', 'doing');
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(flies('tk_z')).toBe(true); // CONTROL — the source column closed up
+    expect(flies('tk_d')).toBe(false);
+    for (const id of ['tk_z', 'tk_c']) fireEvent.animationEnd(slotOf(id));
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
+    expect(flip('tk_d')).toEqual(['25px', '130px']);
+    expect(flies('tk_b')).toBe(false);
+  });
+});
+
+describe('20.177 a drag that COMMITS releases its target section: nothing is left to glide', () => {
+  it('20.177 committed, then released: no sibling flight is recorded (CONTROL: the same sequence released without the commit records tk_d)', () => {
+    // Mutation: a committed drag keeps its section (no `targetSections` delete in `setPhase`), so a later release glides.
+    const view: BoardView = { projectId: 'prj_1', groups: [] };
+    const { result } = renderHook(() => useMoveState(view));
+    const rail = document.createElement('div');
+    const section = (id: string, tickets: string[]) => {
+      const el = document.createElement('section');
+      el.setAttribute('data-testid', `board-column-${id}`);
+      const ul = document.createElement('ul');
+      for (const t of tickets) {
+        const li = document.createElement('li');
+        ul.appendChild(li);
+        result.current.slots.current.set(t, li);
+      }
+      el.appendChild(ul);
+      rail.appendChild(el);
+    };
+    section('todo', ['tk_c']);
+    section('doing', ['tk_b', 'tk_d']);
+    document.body.appendChild(rail);
+    try {
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ left: 0, top: 50, right: 1, bottom: 51, width: 1, height: 1, x: 0, y: 50, toJSON: () => ({}) }) as DOMRect);
+      const move: PendingMove = { ticketId: 'tk_c', workflowId: 'wf-errand', fromStateId: 'todo', toStateId: 'doing', phase: 'writing' };
+      const siblings = () => [...result.current.flights.current.entries()].filter(([, f]) => f.sibling === true).map(([id]) => id);
+
+      act(() => result.current.beginPending(move, { left: 0, top: 0, at: Date.now() })); // a DRAG: from given, no arrow flag
+      expect(siblings()).toEqual([]); // nothing at begin
+      act(() => result.current.dropPending('tk_c')); // released while still writing (a refusal): tk_d glides
+      expect(siblings()).toEqual(['tk_d']); // CONTROL
+      result.current.flights.current.clear();
+
+      act(() => result.current.beginPending(move, { left: 0, top: 0, at: Date.now() }));
+      act(() => result.current.setPhase('tk_c', 'committed'));
+      result.current.flights.current.clear();
+      act(() => result.current.dropPending('tk_c'));
+      expect(siblings()).toEqual([]);
+    } finally {
+      rail.remove();
+    }
+  });
+});
+
+describe('20.178 the drag refusal glide honours reduced motion, the end of the column, one claim and the clock', () => {
+  const stack = () =>
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+      const left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+      const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+  const flies = (id: string) => slotOf(id).classList.contains('gn-board__card-slot--flight');
+  /** Every write waits; `answer(n)` refuses the n-th. */
+  function writes() {
+    const list: ReturnType<typeof deferred<IngestResult[]>>[] = [];
+    return { ingest: () => { const d = deferred<IngestResult[]>(); list.push(d); return d.promise; }, refuse: async (n: number) => { await waitFor(() => expect(list.length).toBeGreaterThan(n)); await act(async () => list[n]!.resolve(refused([{ id: 'x' }]))); } };
+  }
+
+  it('20.178 reduced motion: no flight on tk_d when a drag is refused (CONTROL: the same refusal without it glided)', async () => {
+    // Mutation: reduced motion not honoured on this path.
+    let reduce = false;
+    window.matchMedia = ((query: string) => ({ matches: reduce && query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      const w = writes();
+      await mount(w.ingest);
+      stack();
+      drag('tk_c', 'doing');
+      await w.refuse(0);
+      expect(flies('tk_d')).toBe(true); // CONTROL
+      for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+      reduce = true;
+      drag('tk_a', 'doing'); // lands first: b, d (and c is back in To do) — tk_b and tk_d are below the slot
+      await w.refuse(1);
+      expect(flies('tk_d')).toBe(false);
+      expect(flies('tk_b')).toBe(false);
+    } finally {
+      delete (window as { matchMedia?: unknown }).matchMedia;
+    }
+  });
+
+  it('20.178 the card lands LAST and the drag is refused: no sibling flies, nothing throws (CONTROL: the mover comes home)', async () => {
+    const w = writes();
+    await mount(w.ingest);
+    stack();
+    drag('tk_z', 'doing');
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_d', 'tk_z']);
+    for (const id of ['tk_z']) fireEvent.animationEnd(slotOf(id));
+    await w.refuse(0); // (a throw here fails the test)
+    expect(flies('tk_z')).toBe(true); // CONTROL
+    expect(flies('tk_b')).toBe(false);
+    expect(flies('tk_d')).toBe(false);
+  });
+
+  it('20.178 the glide-back flight is consumed once: a later overlay change does not fly tk_d again (CONTROL: it flew once)', async () => {
+    // Mutation: the target flight is never consumed.
+    const w = writes();
+    await mount(w.ingest);
+    stack();
+    drag('tk_c', 'doing');
+    await w.refuse(0);
+    expect(flies('tk_d')).toBe(true); // CONTROL
+    for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+    drag('tk_a', 'doing'); // the overlay changes again
+    expect(flies('tk_d')).toBe(false);
+  });
+
+  it('20.178 a flight older than FLIGHT_MAX_AGE_MS is ignored (CONTROL: a fresh one, same board, glided)', async () => {
+    // Mutation: the sibling claim has no age check (drag refusal).
+    const w = writes();
+    await mount(w.ingest);
+    stack();
+    drag('tk_c', 'doing');
+    await w.refuse(0);
+    expect(flies('tk_d')).toBe(true); // CONTROL
+    for (const id of ['tk_d', 'tk_c', 'tk_z']) fireEvent.animationEnd(slotOf(id));
+    drag('tk_a', 'doing');
+    let clock = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += FLIGHT_MAX_AGE_MS + 1));
+    await w.refuse(1);
+    expect(flies('tk_d')).toBe(false);
   });
 });
