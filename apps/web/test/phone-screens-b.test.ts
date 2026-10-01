@@ -93,7 +93,8 @@ describe('21.130 Notes on a phone', () => {
     // The toolbar row itself already wraps in the editor sheet (the base the phone rules rely on).
     expect(valueOf(ruleExactly(editor, '.ticket-editor__toolbar'), 'flex-wrap')).toBe('wrap');
 
-    // The notes phone arm is EXACTLY these six rules, each setting EXACTLY these properties, in this order — so an
+    // The notes phone arm is EXACTLY these seven rules (AMENDED 2026-10-01, case 21.137: the seventh drops the toolbar
+    // dividers so the bar is two rows — `notes-toolbar-phone.test.tsx`), each setting EXACTLY these properties, in this order — so an
     // added rule (`.gn-notes__editor { overflow-y: auto }`, `.gn-notes__tree--drawer { overflow-y: auto }`,
     // `.gn-notes__body { flex: 1 }`) or an added declaration reddens here; 18.483 once ran a regex over the whole
     // block and this restores that strength over the phone arm (review of 6ad9f916, survivors 9–11).
@@ -105,6 +106,7 @@ describe('21.130 Notes on a phone', () => {
       '.gn-notes .ticket-editor__tool',
       '.gn-notes .ticket-editor__heading-select',
       '.gn-notes .ticket-editor__tool-group',
+      '.gn-notes .ticket-editor__tool-divider',
     ]);
     expect(armRules.map((rule) => propertiesOf(rule.body))).toEqual([
       ['min-height', 'padding'],
@@ -113,6 +115,7 @@ describe('21.130 Notes on a phone', () => {
       ['min-height', 'min-width'],
       ['min-height'],
       ['flex-wrap'],
+      ['display'],
     ]);
 
     // CONTROL — the desktop toolbar keeps its 32px controls and the base group does not wrap.

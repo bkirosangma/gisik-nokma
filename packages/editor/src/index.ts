@@ -65,6 +65,8 @@ export { TicketEditor, type TicketEditorProps } from './components/TicketEditor.
 export {
   EditorToolbar,
   MARKDOWN_HINT,
+  PHONE_TOOLBAR_QUERY,
+  PHONE_VISIBLE_TOOLS,
   type EditorToolbarProps,
 } from './components/EditorToolbar.js';
 export { LinkEditorPopover, type LinkEditorPopoverProps } from './components/LinkEditorPopover.js';

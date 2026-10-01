@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { getMarkRange } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 import { TablePicker } from './TablePicker.js';
@@ -217,12 +217,108 @@ function detectMac(): boolean {
   return /Mac|iPhone|iPod|iPad/i.test(platform || ua);
 }
 
+/**
+ * Every toolbar glyph is an inline 16px stroke SVG (`currentColor`, decorative — the button's
+ * `aria-label` is its name), drawn in the common 24-grid outline idiom; no icon package (owner,
+ * 2026-10-01: icons instead of word labels, the usual symbol for each tool).
+ */
+function Icon({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+
+const BOLD_ICON = (
+  <Icon>
+    <path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" />
+  </Icon>
+);
+
+const ITALIC_ICON = (
+  <Icon>
+    <path d="M19 4h-9M14 20H5M15 4 9 20" />
+  </Icon>
+);
+
+const STRIKE_ICON = (
+  <Icon>
+    <path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6M4 12h16" />
+  </Icon>
+);
+
+const CODE_ICON = (
+  <Icon>
+    <path d="m16 18 6-6-6-6M8 6l-6 6 6 6" />
+  </Icon>
+);
+
+const LINK_ICON = (
+  <Icon>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </Icon>
+);
+
+const BULLET_LIST_ICON = (
+  <Icon>
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  </Icon>
+);
+
+const NUMBERED_LIST_ICON = (
+  <Icon>
+    <path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+  </Icon>
+);
+
+const QUOTE_ICON = (
+  <Icon>
+    <path d="M9 7H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v3a3 3 0 0 1-3 3M19 7h-3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v3a3 3 0 0 1-3 3" />
+  </Icon>
+);
+
+const TASK_LIST_ICON = (
+  <Icon>
+    <rect x="3" y="4" width="6" height="6" rx="1" />
+    <path d="m4.5 7 1.5 1.5L8 6" />
+    <rect x="3" y="14" width="6" height="6" rx="1" />
+    <path d="M13 7h8M13 17h8" />
+  </Icon>
+);
+
+const CODE_BLOCK_ICON = (
+  <Icon>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="m10 9-3 3 3 3M14 9l3 3-3 3" />
+  </Icon>
+);
+
+const COLLAPSIBLE_ICON = (
+  <Icon>
+    <path d="m5 7 5 5-5 5M14 8h7M14 16h7" />
+  </Icon>
+);
+
+const RULE_ICON = (
+  <Icon>
+    <path d="M3 12h18M7 6h10M7 18h10" />
+  </Icon>
+);
+
+const MORE_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 12h.01M12 12h.01M19 12h.01" />
+  </svg>
+);
+
 const NOTE_ICON = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <Icon>
     <path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
     <path d="M14 3v4h4" />
-    <path d="M8 12h8M8 16h5" />
-  </svg>
+    <path d="M12 11v6M9 14h6" />
+  </Icon>
 );
 
 const TICKET_ICON = (
@@ -253,7 +349,42 @@ const REDO_ICON = (
   </svg>
 );
 
-type ToolGroup = 'history' | 'marks' | 'blocks' | 'insert';
+/**
+ * The phone breakpoint — the SAME string as `PHONE_BOARD_QUERY` (app-core `views/use-phone-board.ts`)
+ * and the `@media (max-width: 40rem)` arms in the stylesheets. This package cannot import app-core
+ * (the dependency runs the other way), so the string is repeated and pinned by case 21.136.
+ */
+export const PHONE_TOOLBAR_QUERY = '(max-width: 40rem)';
+
+function subscribePhone(onChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+  const list = window.matchMedia(PHONE_TOOLBAR_QUERY);
+  list.addEventListener('change', onChange);
+  return () => list.removeEventListener('change', onChange);
+}
+
+function phoneSnapshot(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE_TOOLBAR_QUERY).matches;
+}
+
+/** True at ≤40rem; false on the server and wherever `matchMedia` is missing (jsdom). */
+function usePhoneToolbar(): boolean {
+  return useSyncExternalStore(subscribePhone, phoneSnapshot, () => false);
+}
+
+/**
+ * The tools that stay on the bar at ≤40rem, in the owner's order (2026-10-01): undo, redo, bold,
+ * italic, link, bullet list, numbered list, task list — and the heading select, rendered after them.
+ * Every other tool moves into the "More tools" tray. Above 40rem nothing moves.
+ */
+export const PHONE_VISIBLE_TOOLS: readonly string[] = ['undo', 'redo', 'bold', 'italic', 'link', 'list', 'orderedList', 'task'];
+
+/** How long a finger must rest on a tool before its name shows (the touch stand-in for hover). */
+const LONG_PRESS_MS = 500;
+/** How long that name stays up after the finger lifts. */
+const LONG_PRESS_LINGER_MS = 1500;
+
+type ToolGroup = 'history' | 'marks' | 'blocks' | 'insert' | 'more';
 
 type ToolControl = {
   key: string;
@@ -277,6 +408,7 @@ const GROUP_LABEL: Record<ToolGroup, string> = {
   marks: 'Text formatting',
   blocks: 'Blocks',
   insert: 'Insert',
+  more: 'More',
 };
 
 /**
@@ -290,6 +422,24 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
   const tooltipId = useId();
   const show = hovered || focused;
   const tooltipRef = useRef<HTMLSpanElement>(null);
+
+  // LONG-PRESS (touch): a phone has no hover and iOS does not focus a tapped button, so the name
+  // would never show. A finger resting on the tool for LONG_PRESS_MS shows it; the click that ends
+  // that press is swallowed (reading "Bold" must not toggle bold), and the name lingers a moment.
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lingerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
+  const clearTimers = () => {
+    if (pressTimer.current !== null) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+  useEffect(
+    () => () => {
+      clearTimers();
+      if (lingerTimer.current !== null) clearTimeout(lingerTimer.current);
+    },
+    [],
+  );
 
   // Keep the panel inside the composer that clips it. `.editor-slot` is `overflow: hidden`
   // (it owns the corners), so a panel wider than the room to its button's right — a long name on a
@@ -330,14 +480,45 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
         aria-describedby={show ? tooltipId : undefined}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        onPointerDown={(event) => {
+          if (event.pointerType !== 'touch') return;
+          longPressed.current = false;
+          clearTimers();
+          if (lingerTimer.current !== null) clearTimeout(lingerTimer.current);
+          pressTimer.current = setTimeout(() => {
+            longPressed.current = true;
+            setHovered(true);
+          }, LONG_PRESS_MS);
+        }}
+        onPointerUp={() => {
+          clearTimers();
+          if (!longPressed.current) return;
+          lingerTimer.current = setTimeout(() => setHovered(false), LONG_PRESS_LINGER_MS);
+        }}
+        onPointerCancel={() => {
+          clearTimers();
+          if (longPressed.current) setHovered(false);
+        }}
+        onContextMenu={(event) => {
+          // A long-press raises the platform's context menu on some browsers; the name is the answer.
+          if (longPressed.current || pressTimer.current !== null) event.preventDefault();
+        }}
         onKeyDown={(event) => {
+          longPressed.current = false;
           if (event.key === 'Escape' && show) {
             event.stopPropagation();
             setHovered(false);
             setFocused(false);
           }
         }}
-        onClick={control.run}
+        onClick={(event) => {
+          if (longPressed.current) {
+            longPressed.current = false;
+            event.preventDefault();
+            return;
+          }
+          control.run();
+        }}
         {...(control.expanded === undefined ? {} : { 'aria-expanded': control.expanded, 'aria-haspopup': 'true' as const })}
         {...extraProps}
       >
@@ -414,6 +595,10 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
   const [linkOpen, setLinkOpen] = useState(false);
   const [href, setHref] = useState('');
   const [tableOpen, setTableOpen] = useState(false);
+  const phone = usePhoneToolbar();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const trayId = useId();
+  const toolbarRef = useRef<HTMLDivElement>(null);
   // The transaction subscription that re-reads `isActive`. Same shape and same
   // reason as `ImageWrapMenu`'s repaint: `useEditor` does not re-render this
   // tree on every transaction, and a toggle button that never updates its own
@@ -511,7 +696,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'bold',
-      label: 'B',
+      label: BOLD_ICON,
       name: 'Bold',
       active: editor.isActive('bold'),
       run: markToggle(() => editor.chain().focus().toggleBold().run()),
@@ -519,7 +704,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'italic',
-      label: 'i',
+      label: ITALIC_ICON,
       name: 'Italic',
       active: editor.isActive('italic'),
       run: markToggle(() => editor.chain().focus().toggleItalic().run()),
@@ -527,7 +712,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'strike',
-      label: <s>S</s>,
+      label: STRIKE_ICON,
       name: 'Strikethrough',
       active: editor.isActive('strike'),
       run: markToggle(() => editor.chain().focus().toggleStrike().run()),
@@ -535,7 +720,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'code',
-      label: 'code',
+      label: CODE_ICON,
       name: 'Code',
       active: editor.isActive('code'),
       run: () => editor.chain().focus().toggleCode().run(),
@@ -543,7 +728,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'link',
-      label: 'link',
+      label: LINK_ICON,
       name: 'Link',
       active: linkIsActive,
       run: () => {
@@ -561,7 +746,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'list',
-      label: 'list',
+      label: BULLET_LIST_ICON,
       name: 'Bullet list',
       active: editor.isActive('bulletList'),
       run: () => editor.chain().focus().toggleBulletList().run(),
@@ -569,7 +754,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'orderedList',
-      label: '1.',
+      label: NUMBERED_LIST_ICON,
       name: 'Numbered list',
       active: editor.isActive('orderedList'),
       run: () => editor.chain().focus().toggleOrderedList().run(),
@@ -577,7 +762,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'quote',
-      label: 'quote',
+      label: QUOTE_ICON,
       name: 'Quote',
       active: editor.isActive('blockquote'),
       run: () => editor.chain().focus().toggleBlockquote().run(),
@@ -592,7 +777,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     // the attrs are NOT free).
     {
       key: 'task',
-      label: '☐',
+      label: TASK_LIST_ICON,
       name: 'Task item',
       active: editor.isActive('taskItem'),
       run: () => editor.chain().focus().toggleTaskList().run(),
@@ -600,7 +785,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'codeBlock',
-      label: '</>',
+      label: CODE_BLOCK_ICON,
       name: 'Code block',
       active: editor.isActive('codeBlock'),
       run: () => editor.chain().focus().toggleCodeBlock().run(),
@@ -608,7 +793,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'collapsible',
-      label: '▸',
+      label: COLLAPSIBLE_ICON,
       name: 'Collapsible',
       active: editor.isActive('details'),
       // `updateAttributes` IS PART OF THE COMMAND, not a flourish. The Details
@@ -623,7 +808,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'rule',
-      label: '—',
+      label: RULE_ICON,
       name: 'Horizontal rule',
       active: null,
       run: () => editor.chain().focus().setHorizontalRule().run(),
@@ -641,6 +826,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
         <TablePicker
           onSelect={(rows, cols) => {
             setTableOpen(false);
+            setMoreOpen(false);
             editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
           }}
           onClose={() => setTableOpen(false)}
@@ -656,12 +842,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     // same reason the old `[[` button never opened one of its own either.
     {
       key: 'insertNote',
-      label: (
-        <>
-          {NOTE_ICON}
-          <span className="ticket-editor__tool-label">Insert note</span>
-        </>
-      ),
+      label: NOTE_ICON,
       name: 'Insert note',
       active: null,
       run: () => editor.chain().focus().insertContent(':note ').run(),
@@ -669,12 +850,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
     {
       key: 'insertTicket',
-      label: (
-        <>
-          {TICKET_ICON}
-          <span className="ticket-editor__tool-label">Insert ticket</span>
-        </>
-      ),
+      label: TICKET_ICON,
       name: 'Insert ticket',
       active: null,
       run: () => editor.chain().focus().insertContent(':ticket ').run(),
@@ -682,26 +858,76 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
   ];
 
-  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['history', 'marks', 'blocks', 'insert'] as ToolGroup[])
-    .map((key) => ({ key, controls: controls.filter((control) => control.group === key) }))
+  // PHONE (≤40rem, owner 2026-10-01): at most two rows. The tools in PHONE_VISIBLE_TOOLS stay on the
+  // bar and the rest move into a tray opened by one "More tools" button. The tray is an in-place
+  // disclosure (a `role="group"` of the SAME `ToolButton`s, below the bar) and not a floating menu:
+  // `.editor-slot` is `overflow: hidden` and a note comment composer is only ~88px of body, so a
+  // popover would be clipped; a text menu would also lose `aria-pressed`, `disabled`, the tooltips
+  // and the table picker. Above 40rem nothing moves and there is no More.
+  const trayControls = phone ? controls.filter((control) => !PHONE_VISIBLE_TOOLS.includes(control.key)) : [];
+  const barControls = phone ? controls.filter((control) => PHONE_VISIBLE_TOOLS.includes(control.key)) : controls;
+  const trayOpen = phone && moreOpen;
+  if (phone) {
+    barControls.push({
+      key: 'more',
+      label: MORE_ICON,
+      name: 'More tools',
+      active: null,
+      expanded: trayOpen,
+      run: () => setMoreOpen((was) => !was),
+      group: 'more',
+    });
+  }
+  // Running a tray tool closes the tray; the table button only toggles its size grid, which lives in
+  // the tray, so it keeps it open (the grid's own `onSelect` closes both).
+  const closeTray = (control: ToolControl): ToolControl =>
+    control.key === 'table' ? control : { ...control, run: () => { control.run(); setMoreOpen(false); } };
+
+  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['history', 'marks', 'blocks', 'insert', 'more'] as ToolGroup[])
+    .map((key) => ({ key, controls: barControls.filter((control) => control.group === key) }))
     .filter((group) => group.controls.length > 0);
 
+  const buttonFor = (control: ToolControl) => (
+    <ToolButton
+      key={control.key}
+      control={control}
+      isMac={isMac}
+      extraProps={
+        control.key === 'link'
+          ? { 'aria-expanded': linkOpen }
+          : control.key === 'more'
+            ? { 'aria-controls': trayOpen ? trayId : undefined, 'aria-haspopup': undefined, 'data-tool': 'more' }
+            : undefined
+      }
+    />
+  );
+
   return (
-    <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting">
+    <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting" ref={toolbarRef}>
       {groups.map((group, index) => (
         <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
           {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
-          {group.key === 'blocks' ? <HeadingSelect editor={editor} /> : null}
-          {group.controls.map((control) => (
-            <ToolButton
-              key={control.key}
-              control={control}
-              isMac={isMac}
-              extraProps={control.key === 'link' ? { 'aria-expanded': linkOpen } : undefined}
-            />
-          ))}
+          {group.key === 'blocks' && !phone ? <HeadingSelect editor={editor} /> : null}
+          {group.controls.map(buttonFor)}
+          {group.key === 'blocks' && phone ? <HeadingSelect editor={editor} /> : null}
         </div>
       ))}
+      {trayOpen ? (
+        <div
+          id={trayId}
+          className="ticket-editor__tray"
+          role="group"
+          aria-label="More tools"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            setMoreOpen(false);
+            toolbarRef.current?.querySelector<HTMLElement>('[data-tool="more"]')?.focus();
+          }}
+        >
+          {trayControls.map((control) => buttonFor(closeTray(control)))}
+        </div>
+      ) : null}
       {linkOpen ? (
         <input
           className="ticket-editor__link-url"
