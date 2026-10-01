@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import { NewTicketDialog, TicketSheet, type TicketRead } from '@gisik-nokma/app-core';
 import { PHONE_TOOLBAR_QUERY, TicketEditorSlot } from '@gisik-nokma/editor';
-import { parseRules, readUiCss, ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns.js';
 import { stubServices } from './helpers/stub-services.js';
 import { PHONE, SELECT_WIDTH, pack, packingRules, px, readEditorCss, type PackingRules } from './helpers/toolbar-packing.js';
@@ -240,15 +240,46 @@ const ui = readUiCss();
  *             `.gn-sheet__body { padding: 0 1.5rem 1.5rem }` (`ui.css:949`) — the description is a `section` in the body.
  *   - dialog: `.gn-dialog { width: 100% }` in the phone arm (`ui.css:979`) and `.gn-dialog__body` (`ui.css:948`, the same rule).
  */
-function hostWidths(): { sheetSide: number; dialogSide: number } {
-  const bodyRule = (selector: string): string => {
-    const hit = parseRules(ui).find((rule) => rule.atRule === null && rule.selectors.includes(selector));
-    if (hit === undefined) throw new Error(`no ${selector} rule`);
-    return hit.body;
+const bodyRule = (selector: string): string => {
+  const hit = parseRules(ui).find((rule) => rule.atRule === null && rule.selectors.includes(selector));
+  if (hit === undefined) throw new Error(`no ${selector} rule`);
+  return hit.body;
+};
+/** Left + right padding and margin a declaration block adds, in px (shorthands read as CSS orders them). */
+function sideSpace(body: string): number {
+  const sides = (value: string | null): number => {
+    if (value === null) return 0;
+    const parts = value.split(/\s+/).map((part) => px(part, 0));
+    if (parts.length === 1) return (parts[0] ?? 0) * 2;
+    return (parts[1] ?? 0) + (parts[parts.length === 4 ? 3 : 1] ?? 0);
   };
+  const single = (property: string): number => px(valueOf(body, property), 0);
+  return (
+    sides(valueOf(body, 'padding')) + sides(valueOf(body, 'margin')) +
+    single('padding-left') + single('padding-right') + single('margin-left') + single('margin-right')
+  );
+}
+function hostWidths(): { sheetSide: number; dialogSide: number } {
   const side = (selector: string): number => px((valueOf(bodyRule(selector), 'padding') ?? '').split(/\s+/)[1] ?? null, 0);
   expect(valueOf(ruleExactly(ui, '.gn-sheet', PHONE), 'width')).toBe('100%');
   expect(valueOf(ruleExactly(ui, '.gn-dialog', PHONE), 'width')).toBe('100%');
+  // The model's 24px is only true while NOTHING between the viewport and the toolbar adds side space: no phone arm
+  // re-pads either body, and no rule on the wrappers (scrims, the panel, the description section, the dialog's field,
+  // the slot) carries a non-zero left/right padding or margin. (The bar's tolerance at 360 is 6.5px, so a stray 1rem
+  // would silently invalidate the bound.)
+  const globals = readGlobalsCss();
+  for (const sheet of [ui, globals]) {
+    for (const body of ['.gn-sheet__body', '.gn-dialog__body']) {
+      expect(rulesNaming(sheet, body).filter((rule) => rule.atRule === PHONE), `a phone arm re-pads ${body}`).toEqual([]);
+    }
+  }
+  const wrappers = ['.gn-sheet', '.gn-dialog', '.gn-sheet__scrim', '.gn-dialog__scrim', '.gn-ticket-sheet__details', '.gn-ticket-sheet__description', '.gn-new-ticket__field', '.editor-slot'];
+  const offenders = [ui, globals, editorCss].flatMap((sheet) =>
+    wrappers.flatMap((selector) => rulesNaming(sheet, selector).filter((rule) => sideSpace(rule.body) !== 0).map((rule) => `${selector}: ${rule.body.trim()}`)),
+  );
+  expect(offenders, 'a wrapper adds side space the packing model does not know about').toEqual([]);
+  // CONTROL (same function): the detector sees the body's own 1.5rem, so an empty offender list is not blindness.
+  expect(sideSpace(bodyRule('.gn-sheet__body'))).toBe(48);
   return { sheetSide: side('.gn-sheet__body'), dialogSide: side('.gn-dialog__body') };
 }
 const VIEWPORTS = [360, 390, 430, 466] as const;
