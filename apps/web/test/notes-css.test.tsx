@@ -149,7 +149,12 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
     // the EXACT COMPLEMENT of the first (`width > 60rem` is every width the
     // `max-width: 60rem` block does not cover), so there is still ONE breakpoint —
     // 60rem — with a rule set on each side of it; no third point was added.
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'width > 60rem']);
+    // AMENDED 2026-10-01 (mobile-web Task 9, 21.130–21.131): the middle entry is the phone arm — the
+    // product's one 40rem phone breakpoint (FD1), which every screen shares — holding the toggle's,
+    // document's, title's and toolbar's phone rules. It adds no layout breakpoint of the notes page's own.
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem']);
+    // …and the phone arm is no LAYOUT breakpoint: it sets no grid of its own (the notes page's one split stays at 60rem).
+    expect(blocks[1]!.body).not.toMatch(/grid-template/);
 
     const narrow = blocks[0]!.body;
     expect(narrow).toMatch(/\.gn-notes__body\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/);
@@ -801,7 +806,10 @@ describe('18.483 at and below 60rem NOTHING changes', () => {
    */
   it('18.483 no region scrolls, fills the viewport or is pinned outside the wide block; the two conditions are exact complements; CONTROL: the narrow block still holds the drawer rules', () => {
     const blocks = mediaBlocksTouching(CSS, 'gn-notes');
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'width > 60rem']);
+    // AMENDED 2026-10-01 (mobile-web Task 9): the middle entry is the shared 40rem phone arm; it reads only
+    // `blocks[0]` below, so the phone arm's no-scroll / no-height rule is held by 21.130's `phoneBodies` loop
+    // (`phone-screens-b.test.ts`) instead.
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'max-width: 40rem', 'width > 60rem']);
     const narrow = blocks[0]!.body;
     expect(narrow).toMatch(/\.gn-notes__tree--drawer\s*\{[^}]*display:\s*none;/); // CONTROL: this is the block that matters
     expect(narrow).not.toMatch(/overflow|overscroll|100dvh|min-height|grid-template-rows|flex:|scroll-margin/);

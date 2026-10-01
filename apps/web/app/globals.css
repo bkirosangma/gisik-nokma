@@ -4271,6 +4271,40 @@ input, textarea, select { font-family: inherit; }
   cursor: text;
 }
 
+/* ── The notes screen on a phone (mobile-web plan Task 9, cases 21.130–21.131) ───────────────
+   After every base rule it overrides (the tree toggle, the title, the document). The tree is
+   already the toggle panel below 60rem; this makes its toggle a real target, gives the document
+   the full width, keeps the title to one line (the byline's actions are a "⋯" menu by script,
+   `note-byline.tsx`, so the row has room) and makes the editor toolbar's controls 44px. The
+   toolbar rules are scoped under `.gn-notes` — the editor AND the note comment composer, which both
+   draw `.ticket-editor__*` — so they out-rank editor.css's own bases, which load from a different
+   sheet. */
+@media (max-width: 40rem) {
+  .gn-notes__tree-toggle {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+  }
+  .gn-notes__document {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .gn-notes__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gn-notes .ticket-editor__tool {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .gn-notes .ticket-editor__heading-select {
+    min-height: 2.75rem;
+  }
+  .gn-notes .ticket-editor__tool-group {
+    flex-wrap: wrap;
+  }
+}
+
 /* ── Task 6: the History panel ──────────────────────────────────────────── */
 
 /* The version view's own wrapper — the banner, the read-only editor and the
@@ -5065,12 +5099,15 @@ input, textarea, select { font-family: inherit; }
    named at the moment it matters). Plain text ink, never a tint. */
 .gn-trash-notice { margin: 0.75rem 0 0; color: var(--gn-text); }
 
-/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe placed
-   on a card. The anchor is the card itself (`--menu`), and the head gives way so
+/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe, now `OverflowMenu`
+   (`src/overflow-menu.tsx`, also the note byline's phone menu), placed on a card. The anchor is the card itself (`--menu`), and the head gives way so
    a long name never runs under the trigger. */
 .gn-workspace-card--menu { position: relative; }
 .gn-workspace-card--menu .gn-workspace-card__head { padding-right: 2.75rem; }
 .gn-card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
+/* The note byline's phone menu sits IN its flex row rather than in a card's corner (mobile-web
+   plan Task 9, case 21.131) — the same menu, in flow; its list still hangs from this box. */
+.gn-card-menu--inline { position: relative; top: auto; right: auto; }
 /* 44px, round, ink-muted until hovered — a quiet control on an informational card. */
 .gn-card-menu__trigger {
   display: inline-flex;

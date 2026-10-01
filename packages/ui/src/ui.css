@@ -2773,6 +2773,12 @@ a.gn-ticket-sheet__crumb--link {
    slabs. Dense in-list controls get 24, standalone controls get 44 — the same
    call `/help`'s table-of-contents links got.
 
+   AT ≤40rem (mobile-web plan Task 9, cases 21.132 and 21.134) the ROW is 44px: `.gn-my-work__title` and
+   `.gn-attention__item` in the phone arm below `.gn-my-work__claim`, a finger being the input there. The
+   strip's row is the click surface (the title's `::after` stretches over it), so lifting the ROW is what
+   makes the target 44px. Case 13.893 allows exactly this ONE phone rule per family selector, after its base
+   (orchestrator ruling 2026-10-01); a second rule anywhere else is still refused.
+
    `inline-flex` is the load-bearing half: `padding: 0` on a bare button means
    its height IS its line box, and `min-height` alone does nothing to it. */
 .gn-attention__title {
@@ -2828,6 +2834,18 @@ a.gn-ticket-sheet__crumb--link {
 .gn-my-work__due { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-my-work__reason { margin: 0; width: 100%; }
 .gn-my-work__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
+/* My work on a phone (mobile-web plan Task 9, case 21.132): after the base rules it overrides. The
+   sections stay ONE column (restated so a later multi-column desktop treatment cannot reach a
+   phone), every row and its title button is a 44px target — the attention strip's rows too (21.134),
+   centred in the taller row — and the rows keep wrapping their project / due / reason onto further lines
+   rather than overflowing. */
+@media (max-width: 40rem) {
+  .gn-my-work { flex-direction: column; }
+  .gn-my-work__item,
+  .gn-my-work__contested { align-items: center; min-height: 2.75rem; }
+  .gn-my-work__title { min-height: 2.75rem; }
+  .gn-attention__item { min-height: 2.75rem; align-items: center; }
+}
 
 /* The three `.gn-ticket-sheet__tabs*` rules that stood here are DELETED, by the
    change that orphaned them: the sheet's tabs now render the shared
