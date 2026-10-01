@@ -8,8 +8,8 @@ from its own scratchpad, because the paths inside are per-worktree.
 `locked-test.sh <logfile> <command...>` — takes the machine-wide gate lock, waits
 for peer worker pools to drain, selects Node 22, cds to the repo root, sweeps
 orphaned test databases, runs the command, and reports the numbers a PR body
-needs. `gate.sh <logfile>` is a thin wrapper that runs the full forced gate
-through it. `sweep-test-dbs.sh` drops idle orphaned `gisik_test_*` databases.
+needs. `GATE_MODE=fresh|cached gate.sh <logfile>` is a thin wrapper that runs the gate
+through it (fresh = the full forced gate, the default; cached = see "Gate modes" below). `sweep-test-dbs.sh` drops idle orphaned `gisik_test_*` databases.
 
 ## Why v3, in one paragraph
 
@@ -134,3 +134,62 @@ scratchpad copies every lane actually runs.
 **Copying these files still requires one decision per lane**: run them from your
 worktree root, or export `GATE_REPO`. That is now a loud failure instead of a
 silent misattribution.
+
+## Gate modes, the turbo cache, and measured timings (`task/gate-speedup`, owner 2026-10-02)
+
+`gate.sh` takes `GATE_MODE=fresh|cached` (unset = `fresh`; anything else refuses, exit 2). `ctl gate` picks it from `--base`
+and states the mode that RAN in its OK line, read from the console (`… EXIT=0 · mode=cached · Tasks: 34 successful, 34 total ·
+Cached: 26 cached, 34 total …`); a `gate.sh` that ran a different mode than asked fails the verb.
+
+| kind | command | turbo flags | when |
+|---|---|---|---|
+| main-kind | `ctl gate <sha>` / `--base main` | `--force --concurrency=1` | before a merge to `main` — the fresh net under everything cached |
+| release-kind | `ctl gate <sha> --base release/<x>` | `--concurrency=1`, cache ON | a task landing into a release branch |
+
+**The cache is only as sound as `turbo.json`'s `inputs`.** `scripts/ctl/test/gate-cache.test.sh` (a `ctl selftest` step) proves a
+changed cross-package reader changes the task hash (`ui#test` after an `apps/web/src` edit; `mobile#test` after a
+`packages/editor` CSS edit) and that an unrelated file does not; `--real` shows it through turbo's own cache (warm → HIT → change →
+MISS), run 2026-10-02: `warm=miss rerun=hit unrelated-change=hit reader-change=miss` for both. The audit found, and `turbo.json`
+now declares: ui (client source roots + `apps/*/test`, `packages/*/test`, the `package.json` globs), app-core (the help suite walks
+`apps/**` and `packages/**`, minus build output — the `!` negations are mandatory: a glob input walks the DISK and ignores
+`.gitignore`, and without them 3431 build outputs were hashed — plus `docs/manual.md`, `docs/faq.md`, `scripts/help-content.mjs`),
+server (`.env.example`, `deploy/**`, compose files, Dockerfiles, `reference/**`), editor (app-core views, server attachments, mobile
+editor), mobile (`packages/editor` webview bundle) and `tsconfig.base.json` as a global dependency. **Stale-build root cause:**
+`mobile#test` reads the editor's built webview bundle but nothing built it first; `build:webview` is now a task and `mobile#test`
+depends on it. The first real gate with that ordering failed `mobile#test` — the checked-in `editor-html.generated.ts` WAS stale
+against the release (a domain change reaches the bundle) — and was regenerated.
+
+**The cache is a shared worktree cache** (`/Users/kiro/my_projects/gisik-nokma/.turbo/cache`; every worktree reads and writes it).
+Local only — no remote cache.
+
+**Cost of soundness:** a change anywhere under `apps/` or `packages/` re-runs `app-core#test` (the help walker) and, for a client
+source file, `ui#test`; a server edit still re-runs `ui`, `app-core`, `server` and `web` tests (measured below).
+
+### Measured (2026-10-02, this machine, local runs; `ctl gate` OK lines, wall = the verb, turbo = turbo's own `Time:`)
+
+| run | mode | cached | wall | turbo | result |
+|---|---|---|---|---|---|
+| unchanged tree, 2nd gate | cached (c=2) | 34/34 | 66 s | 0.1 s | green — wall is the lock + peer-pool drain floor |
+| CSS-only (`apps/web/app/globals.css`) | cached (c=2) | 30/34 | 93 s | 87 s | green |
+| server-only (`apps/server/src/index.ts`) | cached (c=2) | 31/34 | 232 s | 166 s | green |
+| mixed (server + web `.tsx` + editor CSS) | cached (c=2) | 28/34 | 64 s | 58 s | green, **invalid**: its server edit was byte-identical to the previous run's and hit that cache |
+| mixed, new bytes (×2) | cached (c=2) | 19/34 | 574 s / 201 s | — / 3m12 | **red** both times: 5 s vitest timeouts in app-core's jsdom tests |
+| server-only | cached (c=1) | 26/34 | 371 s | 5m04 | green, 4 foreign vitest workers at start |
+| mixed | cached (c=1) | 19/34 | 335 s | 4m29 | green |
+| CSS-only | cached (c=1) | 2/34 | 417 s | 6m36 | green — a release delta (domain) rode in, so nearly everything missed |
+| CSS-only | cached (c=1) | 29/34 | 491 s | 3m04 | **red**: two web tests timed out at 5.9 s / 5.2 s; load average 200 on 10 cores |
+| CSS-only, new merge | cached (c=1) | 26/34 | 335 s | 4m29 | green |
+| any tree | **main-kind fresh** | 0/34 | **274 s** | — | green (quiet box); baseline was 3.5–4.2 min |
+
+Read this table for what it is: **the saving is real and proportional to the hit count, but the box is shared and wall times are
+dominated by load.** The quiet-box c=2 runs (87–166 s) show the potential; the c=1 runs ran at load average 30–200 and mostly
+measured the neighbours. The first release-kind gate after a release delta re-runs everything the delta touches.
+
+**Why `cached` is `--concurrency=1`, not 2 (the brief asked for 2).** At 2, both miss-heavy runs failed with 5 s vitest timeouts
+that pass in <1 s alone (7.4 s and 5.3 s); two vitest pools at once oversubscribe a 10-core / 16 GB box. At 1, 1 of 5 runs hit the same
+class of timeout, at load 200 — a property of the load, not the mode. 1 is the conservative setting (the standing protocol of
+2026-09-06); flipping it is one line in `gate.sh` and the `13.1700` arm.
+
+**Residual limits.** (1) `token-discipline.test.ts`'s `ESCAPE` regex (a test that reaches outside its package) was not extended; the
+fresh main-kind gate is the net. (2) The first gate after a release delta, or after `turbo.json` changes, is mostly misses.
+(3) A vitest 5 s timeout under load is a flake, not a regression: re-run the gate before suspecting the diff.
