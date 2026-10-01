@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PREFIX_MAX_LENGTH,
   derivePrefix,
+  parseTicketKey,
   prefixSchema,
   resolveProjectPrefixes,
   ticketKey,
@@ -182,5 +183,19 @@ describe('22.024 resolveProjectPrefixes skips reserved prefixes', () => {
     expect(resolveProjectPrefixes([{ name: 'Shop ops', prefix: 'SO' }], new Set(['SO']))).toEqual(['SO']);
     // Reserved values are taken in order: SO and SO2 both reserved -> SO3.
     expect(resolveProjectPrefixes([{ name: 'Shop ops' }], new Set(['SO', 'SO2']))).toEqual(['SO3']);
+  });
+});
+
+describe('22.060 parseTicketKey turns key-shaped text into its letters and number', () => {
+  it('22.060 — " ccso-12 " is {CCSO, 12}; control: "CCSO12", "C-1", "hello" and friends are null', () => {
+    expect(parseTicketKey(' ccso-12 ')).toEqual({ letters: 'CCSO', number: 12 });
+    expect(parseTicketKey('CCSO-12')).toEqual({ letters: 'CCSO', number: 12 }); // already canonical
+    expect(parseTicketKey('ab-1')).toEqual({ letters: 'AB', number: 1 }); // two letters is the shortest
+    expect(parseTicketKey('ABCDEF-1234567')).toEqual({ letters: 'ABCDEF', number: 1234567 }); // the longest
+
+    // CONTROL, same `it`: text that is NOT key-shaped is null, so a search for it stays lexical.
+    for (const text of ['CCSO12', 'C-1', 'hello', 'CCSO-', '-12', 'CCSO-1a', 'CCSO-12345678', 'ABCDEFG-1', 'CC SO-12', 'CC1O-12', 'CCSO-12 extra', '']) {
+      expect(parseTicketKey(text), JSON.stringify(text)).toBeNull();
+    }
   });
 });

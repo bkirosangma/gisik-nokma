@@ -254,6 +254,30 @@ function* collisionCandidates(base: string): Generator<string> {
 }
 
 /**
+ * A ticket key's two halves, read back from text a person typed — the inverse of `ticketKey`
+ * for the one shape search can recognise (prefixes and groups plan Task 4, FD1).
+ *
+ * `letters` is the WORKSPACE prefix and the PROJECT prefix run together, because the text carries
+ * no marker between them (`CCSO-12` is `CC` + `SO` or `C` + `CSO`): the caller splits it against
+ * the prefixes a workspace actually has, and R2 (project prefixes are unique within a workspace,
+ * former ones stay reserved) is what makes that split unambiguous there. So this only decides
+ * whether the text IS key-shaped: two to six ASCII letters (1–3 + 1–3), a hyphen, one to seven
+ * digits. Trims and upper-cases first, so `' ccso-12 '` reads as `CCSO-12`.
+ *
+ * Returns `null` for anything else, so a query that is not a key stays an ordinary text search.
+ * `CCSO12` (no hyphen) and `C-1` (too short to be two prefixes) are deliberately not keys.
+ * The letters are matched as ASCII BEFORE they are upper-cased, so a character whose upper case
+ * happens to be an ASCII letter (`ſ` → `S`) does not turn into one.
+ */
+export function parseTicketKey(text: string): { letters: string; number: number } | null {
+  const match = /^([A-Za-z]{2,6})-([0-9]{1,7})$/.exec(text.trim());
+  if (match === null) {
+    return null;
+  }
+  return { letters: match[1]!.toUpperCase(), number: Number(match[2]) };
+}
+
+/**
  * The key, from its two halves and its number.
  *
  * The owner ruled a BARE key sufficient at every display site — *"it is
