@@ -174,7 +174,8 @@ export type MoveState = {
   sessionOf: (ticketId: string) => MoveSession;
   /**
    * Lays a move over the board. `from` is the flight's start (the drop point); when absent the card's own slot is measured.
-   * `byArrow` marks a move that no drop placeholder prepared: the target column's cards below the landing slot glide down.
+   * `byArrow` marks a move that no drop placeholder prepared: the target column's cards below the landing slot glide down
+   * (a drag's placeholder had opened it). A release (refusal, Cancel) glides them back up for either.
    */
   beginPending: (move: PendingMove, from?: FlightRect, byArrow?: boolean) => void;
   setPhase: (ticketId: string, phase: PendingPhase) => void;
@@ -201,7 +202,7 @@ export function useMoveState(realView: BoardView): MoveState {
   const grab = useRef<Grab | null>(null);
   // The list (a column's `<ul>`) each pending card was taken from: its other cards are what glide when the gap closes or reopens.
   const sourceLists = useRef(new Map<string, Element>());
-  // The target column (a `<section>`) of an ARROW move: its cards below the landing slot glide down, and back up on a refusal.
+  // The target column (a `<section>`) of a move: its cards below the landing slot glide back up when the move is released (and, for an arrow, down when it begins).
   const targetSections = useRef(new Map<string, Element>());
 
   const sessionsRef = useRef(sessions);
@@ -229,11 +230,12 @@ export function useMoveState(realView: BoardView): MoveState {
         sourceLists.current.set(move.ticketId, list);
         recordSiblings(slots.current, flights.current, list, move.ticketId, source);
       }
-      // An arrow move opened no placeholder: the target's cards below the landing slot are about to shift down.
-      const section = byArrow && source !== undefined ? targetSectionOf(source, move.toStateId) : null;
+      // The target column is remembered for BOTH gestures, so a release can close its slot smoothly. Only an ARROW move
+      // notes the cards below the landing slot now: a drag's drop placeholder had already opened it.
+      const section = source !== undefined ? targetSectionOf(source, move.toStateId) : null;
       if (section !== null) {
         targetSections.current.set(move.ticketId, section);
-        recordBelow(slots.current, flights.current, section, move.ticketId);
+        if (byArrow) recordBelow(slots.current, flights.current, section, move.ticketId);
       }
     }
     setPending((current) => ({ ...current, [move.ticketId]: move }));
