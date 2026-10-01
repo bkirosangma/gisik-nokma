@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newUlid, type TicketTypeDef } from '@gisik-nokma/domain';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { cloneTemplate, draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { TemplateGallery } from '../../src/workflow-builder/ui/template-gallery.js';
+import { createDraftStore } from '../../src/workflow-builder/draft-store.js';
 import { WorkflowBuilderScreen } from '../../src/workflow-builder/ui/workflow-builder-screen.js';
 import { WorkflowListScreen } from '../../src/workflow-builder/ui/workflow-list-screen.js';
 import { TicketTypeEditorScreen } from '../../src/workflow-builder/ticket-types/ticket-type-editor-screen.js';
@@ -35,12 +36,23 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
 });
 
-async function renderBuilder() {
+/** jsdom has no `matchMedia`; the sheet's auto-open (21.176) asks whether the window is a phone, so the tests say which. */
+function stubMatchMedia(phone: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: phone && query === '(max-width: 40rem)',
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+async function renderBuilder(initialDraft = draftFromTemplate(kanban)) {
   const view = render(
-    <WorkflowBuilderScreen workspaceId={newUlid()} session={session} gateway={createFakeGateway()} initialDraft={draftFromTemplate(kanban)} />,
+    <WorkflowBuilderScreen workspaceId={newUlid()} session={session} gateway={createFakeGateway()} initialDraft={initialDraft} />,
   );
   await screen.findByRole('textbox', { name: 'Workflow name' });
   const aside = view.container.querySelector<HTMLElement>('aside.workflow-builder-screen__left')!;
@@ -99,6 +111,8 @@ describe('21.170 the Panels sheet: the column is `data-open`, a Panels button op
   });
 
   it('21.170 tapping a canvas node writes a selection and opens the sheet (its row lives in the column); the draft’s starting selection does not', async () => {
+    // AMENDED 2026-10-01 (T13 carry-over, 21.176): the auto-open is a PHONE behaviour, so the window says it is one.
+    stubMatchMedia(true);
     const user = userEvent.setup();
     const { aside } = await renderBuilder();
     expect(aside).toHaveAttribute('data-open', 'false');
@@ -119,6 +133,52 @@ describe('21.170 the Panels sheet: the column is `data-open`, a Panels button op
     await user.click(openRow);
     expect(openRow).toHaveAttribute('aria-expanded', 'false');
     expect(aside).toHaveAttribute('data-open', 'false');
+  });
+});
+
+describe('21.175 / 21.176 the Panels sheet leaves a nested Select and the desktop column alone (T13 browser pass carry-overs)', () => {
+  async function renderWithRequireFieldRule() {
+    const seed = createDraftStore(draftFromTemplate(kanban));
+    seed.actions.addRule(0, { kind: 'require-field', field: 'dueDate' });
+    return renderBuilder(seed.getState());
+  }
+
+  it('21.175 Escape inside a Select that is open in the sheet closes only the Select; the next Escape closes the sheet', async () => {
+    stubMatchMedia(true);
+    const user = userEvent.setup();
+    const { aside } = await renderWithRequireFieldRule();
+    await user.click(screen.getByRole('button', { name: 'Panels' }));
+    const transitions = within(aside).getByRole('heading', { name: /^Transitions \(/ }).closest('section')!;
+    await user.click(within(transitions).getAllByRole('button').find((button) => button.className.includes('builder-row__head'))!);
+    const trigger = within(aside).getAllByRole('button').find((button) => button.className.includes('gn-select__trigger') && button.getAttribute('aria-expanded') === 'false' && /due/i.test(button.textContent ?? ''))!;
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    // react-aria unmounts the listbox and restores focus to the trigger ASYNCHRONOUSLY (FocusScope / overlay close),
+    // so those two are awaited; `data-open` is NOT — it is the 21.175 proof and must already be true.
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
+    // The sheet stays: the Escape was the Select's.
+    expect(aside).toHaveAttribute('data-open', 'true');
+    // CONTROL — with the Select closed, the next Escape (focus back on its trigger, inside the sheet) closes the sheet.
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await user.keyboard('{Escape}');
+    expect(aside).toHaveAttribute('data-open', 'false');
+  });
+
+  it('21.176 above 40rem the selection never opens the sheet: `panelsOpen` stays false, no scrim, `data-open` false; control: on a phone the same tap opens it', async () => {
+    stubMatchMedia(false);
+    const user = userEvent.setup();
+    const { aside, container } = await renderBuilder();
+    await user.click(await screen.findByTestId('state-node-doing'));
+    expect(aside).toHaveAttribute('data-open', 'false');
+    expect(container.querySelector('.workflow-builder-screen__scrim')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Panels' })).toHaveAttribute('aria-expanded', 'false');
+    cleanup();
+    stubMatchMedia(true);
+    const phone = await renderBuilder();
+    await user.click(await screen.findByTestId('state-node-doing'));
+    expect(phone.aside).toHaveAttribute('data-open', 'true');
   });
 });
 
