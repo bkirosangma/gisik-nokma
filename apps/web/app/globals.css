@@ -2930,6 +2930,20 @@ input, textarea, select { font-family: inherit; }
    every container-filling site (`/sign-in`, `/inbox`) still shares its row. */
 .gn-project__rail { align-self: flex-start; flex-wrap: wrap; }
 .gn-project__rail .gn-segmented__item { flex: none; }
+/* The web app on phones — the view tabs (Plan Task 8, case 21.110). At <=40rem the five tabs are a deliberate
+   horizontal scroller in their own track (never wrapped onto a second line): `nowrap`, `overflow-x: auto`, bounded
+   to the column, and each tab snaps to the track's start. AFTER the base rules above, so source order decides;
+   above 40rem the rail wraps and does not scroll. */
+@media (max-width: 40rem) {
+  .gn-project__rail {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+  }
+  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; }
+}
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
    2.75rem again, and here it is a DELIBERATE departure from the export, whose
