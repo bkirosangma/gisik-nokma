@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
+import { useIsPhone } from "./use-is-phone.js";
 import { NavBrand } from "./nav-brand.js";
 import { NotesNavLink } from "./notes-nav-link.js";
+import { BottomBar } from "./bottom-bar.js";
 import { PhoneSwitcher } from "./phone-switcher.js";
 import { useCurrentUser } from "./providers.js";
 import { LastProjectNav } from "./last-project-nav.js";
@@ -199,6 +201,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   // shows the menu or the signed-out Help/Account fallback below, and which
   // user the remembered workspace must belong to.
   const user = useCurrentUser();
+  const isPhone = useIsPhone();
   const remembered = useLastWorkspace(workspaceId, user?.id ?? null);
 
   // The workspace this bar is ABOUT, which is no longer only the one in the
@@ -258,13 +261,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
    * and `data-open` only decides whether the stylesheet paints them. A closed
    * bar is a visual state, not a missing link — and it keeps every route to
    * My Work / Members / Settings in the accessibility tree from 40rem up. (At
-   * ≤40rem the group is `display: none` and those routes are the bottom bar's
-   * — Task 3 — so a painted-away link is reachable through its replacement
-   * rather than missing.)
+   * ≤40rem the group is `display: none` and those routes are the phone bottom
+   * bar's (`bottom-bar.tsx`: slots or More), so a painted-away link is
+   * reachable through its replacement rather than missing.)
    */
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
+    <>
     <nav
       className="gn-nav"
       /* exec1 P31: this bar rendered `<nav className="gn-nav">` with NO
@@ -501,7 +505,9 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
       ) : null}
       {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
           both outside `.gn-nav__links` so they stay pinned as a pair at the
-          bar's end rather than wrapping into the destination group. */}
+          bar's end rather than wrapping into the destination group. (At phone
+          width — `isPhone` — Notes and Inbox are the bottom bar's and the corner
+          is the avatar alone.) */}
       {/* E5-31: the whole corner is signed-in only. `AccountMenu` already
           rendered nothing without a session, but `InboxNavLink` did — an
           unlabelled icon pointing at a session-gated route, which is the
@@ -515,12 +521,32 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
               the SAME view as `/notes`, with a note open, so exact equality
               would leave the link dark on the page the reader is actually on.
               Case 18.182 walks both spellings and the control. */}
-          <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
-          <InboxNavLink active={pathname === "/inbox"} />
+          {!isPhone ? (
+            <>
+              <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
+              <InboxNavLink active={pathname === "/inbox"} />
+            </>
+          ) : null}
           <AccountMenu />
         </div>
       ) : null}
       </div>
     </nav>
+    {/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.020–21.032). Rendered only at phone
+        width, by script (`useIsPhone`), and INSTEAD of the corner's Notes and Inbox links above — a
+        second set of the same links would be a second unread poller and a duplicate for anything that
+        reads the DOM rather than the page. It is a sibling of the bar, not a child: a `nav` inside a
+        `nav` is a landmark inside a landmark, and the bar's own sticky stacking context is not the
+        place for a `position: fixed` thing. The workspace is the EFFECTIVE one (`undefined` while
+        `noWorkspace`), so a remembered id that never resolves gets no scoped slot (plan FD5). */}
+    {user !== null && isPhone ? (
+      <BottomBar
+        workspaceId={noWorkspace ? undefined : effectiveWorkspaceId}
+        projectId={projectIdOf(pathname)}
+        userId={user.id}
+        pathname={pathname}
+      />
+    ) : null}
+    </>
   );
 }

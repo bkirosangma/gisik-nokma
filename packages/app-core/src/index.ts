@@ -306,6 +306,16 @@ export { InboxView, type InboxViewProps } from './inbox/inbox-view.js';
 // which is where the schema that validates them lives.
 export type { PreferencesGateway } from './preferences/preferences-gateway.js';
 export {
+  BAR_DESTINATIONS,
+  BOTTOM_BAR_KEY,
+  DEFAULT_BAR,
+  MAX_SLOTS,
+  readBottomBar,
+  rememberBottomBar,
+  resetBottomBar,
+  type BarDestination,
+} from './preferences/bottom-bar.js';
+export {
   MAX_SAVED_FILTERS,
   SavedFilterRefused,
   deleteSavedFilter,

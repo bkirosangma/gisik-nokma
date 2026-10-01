@@ -65,6 +65,53 @@ export const REFRESH_MS = 60_000;
  * interval would keep firing after the nav is gone.
  */
 export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
+  const unread = useInboxUnread();
+
+  return (
+    <Link
+      href="/inbox"
+      className="gn-nav__inbox"
+      aria-current={active ? 'page' : undefined}
+      /* THE COUNT DID NOT GO AWAY — it moved into the accessible name (Round 24,
+         owner ruling: "dot visually, count in the accessible name").
+
+         The visible signal is now a dot, and a dot can only say "some". If the
+         accessible name were also just "Inbox", this change would have deleted
+         the unread count from the product's chrome for exactly the people least
+         able to go looking for it, which is a downgrade wearing a restyle's
+         clothes. It would also leave the unread state signalled by COLOUR ALONE
+         (WCAG 1.4.1); the name is what keeps that honest.
+
+         At zero the name is a bare "Inbox" and no dot renders: an absence, which
+         claims nothing, exactly as `UnreadBadge` returning null did. */
+      aria-label={
+        unread > 0
+          ? `Inbox, ${unread} unread notification${unread === 1 ? '' : 's'}`
+          : 'Inbox'
+      }
+    >
+      <InboxIcon />
+      {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
+    </Link>
+  );
+}
+
+/**
+ * Inline rather than from an icon package: this repo ships no icon dependency,
+ * and adding one for a single glyph would put a package in the bundle of every
+ * page in the product. `aria-hidden` because the link's own `aria-label` is the
+ * accessible name — an unlabelled `<svg>` here would be announced as a second,
+ * nameless thing inside the link.
+ */
+/**
+ * The unread count, polled once a minute while a session exists — the effect `InboxNavLink`'s own
+ * docblock above is about, extracted unchanged so the phone bottom bar's Inbox slot
+ * (`bottom-bar.tsx`, mobile-web Task 3) shows the same number from the same rule. Every sentence of
+ * that docblock about gating on the session, a failed refresh keeping the last count, and the count
+ * not outliving its session describes THIS hook. At ≤40rem the bar replaces the corner link rather
+ * than joining it (`AppNav` renders one or the other), so the two never poll together.
+ */
+export function useInboxUnread(): number {
   const { notifications } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
@@ -103,43 +150,9 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
       clearInterval(timer);
     };
   }, [notifications, signedIn]);
-
-  return (
-    <Link
-      href="/inbox"
-      className="gn-nav__inbox"
-      aria-current={active ? 'page' : undefined}
-      /* THE COUNT DID NOT GO AWAY — it moved into the accessible name (Round 24,
-         owner ruling: "dot visually, count in the accessible name").
-
-         The visible signal is now a dot, and a dot can only say "some". If the
-         accessible name were also just "Inbox", this change would have deleted
-         the unread count from the product's chrome for exactly the people least
-         able to go looking for it, which is a downgrade wearing a restyle's
-         clothes. It would also leave the unread state signalled by COLOUR ALONE
-         (WCAG 1.4.1); the name is what keeps that honest.
-
-         At zero the name is a bare "Inbox" and no dot renders: an absence, which
-         claims nothing, exactly as `UnreadBadge` returning null did. */
-      aria-label={
-        unread > 0
-          ? `Inbox, ${unread} unread notification${unread === 1 ? '' : 's'}`
-          : 'Inbox'
-      }
-    >
-      <InboxIcon />
-      {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
-    </Link>
-  );
+  return unread;
 }
 
-/**
- * Inline rather than from an icon package: this repo ships no icon dependency,
- * and adding one for a single glyph would put a package in the bundle of every
- * page in the product. `aria-hidden` because the link's own `aria-label` is the
- * accessible name — an unlabelled `<svg>` here would be announced as a second,
- * nameless thing inside the link.
- */
 function InboxIcon() {
   return (
     <svg
