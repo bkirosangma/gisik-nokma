@@ -197,6 +197,7 @@ export function TimelineView(props: TimelineViewProps) {
     () =>
       buildTimelineModel(props.tickets, {
         anchor,
+        today: props.today,
         userName: props.userName,
         ...(props.filter === undefined ? {} : { filter: props.filter }),
         ...(props.laneEpicId === undefined ? {} : { laneEpicId: props.laneEpicId }),
@@ -206,6 +207,7 @@ export function TimelineView(props: TimelineViewProps) {
       }),
     [
       props.tickets,
+      props.today,
       props.userName,
       props.filter,
       props.laneEpicId,
@@ -313,10 +315,23 @@ export function TimelineView(props: TimelineViewProps) {
                   data-pending={row.pending ? 'true' : undefined}
                   data-clipped-start={row.bar.clippedStart ? 'true' : undefined}
                   data-clipped-end={row.bar.clippedEnd ? 'true' : undefined}
+                  data-day-from={row.days.from}
+                  data-day-to={row.days.to}
                   /* Column 1 is the title, so week `i` is column `i + 2`; the end
-                     is exclusive, hence `+ 3`. The one genuinely computed style
-                     in this file. */
-                  style={{ gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}` }}
+                     is exclusive, hence `+ 3`. The bar sits in the WEEK columns
+                     it touches and the stylesheet trims it to its real days
+                     (UX fixes T8, 23.142): `lead` days before it in its first
+                     week and `tail` days after it in its last, over `weeks`
+                     weeks, so a Mon–Wed bar ends on Wednesday and not on the
+                     Sunday that closes its week. */
+                  style={
+                    {
+                      gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}`,
+                      '--timeline-bar-lead': row.days.from % 7,
+                      '--timeline-bar-tail': 6 - (row.days.to % 7),
+                      '--timeline-bar-weeks': row.bar.toWeek - row.bar.fromWeek + 1,
+                    } as CSSProperties
+                  }
                   title={detail}
                   aria-describedby={detailId}
                   onClick={() => props.onOpenTicket(row.ticketId)}
@@ -326,6 +341,20 @@ export function TimelineView(props: TimelineViewProps) {
                 <span id={detailId} className="gn-visually-hidden">
                   {detail}
                 </span>
+                {/* The today line (UX fixes T8, 23.142, audit PV-10): one hairline per row, on the prop's day, so
+                    "are we late?" is answerable from the page. Drawn for the eye only. */}
+                {model.todayDay !== null && (
+                  <span
+                    className="gn-timeline__today"
+                    aria-hidden="true"
+                    style={
+                      {
+                        gridColumn: `${Math.floor(model.todayDay / 7) + 2} / ${Math.floor(model.todayDay / 7) + 3}`,
+                        '--timeline-today-lead': model.todayDay % 7,
+                      } as CSSProperties
+                    }
+                  />
+                )}
               </div>
             );
           })}
@@ -344,6 +373,7 @@ export function TimelineView(props: TimelineViewProps) {
         <aside className="gn-timeline__side" aria-label="Undated or partially dated">
           {/* The model chose between two headings — one true only of entries
               waiting on a missing claim, one true of a mixed list. Verbatim. */}
+          <h3 className="gn-timeline__side-heading">Not on the timeline yet ({model.sideList.length})</h3>
           <p className="gn-timeline__side-copy">{model.sideListCopy}</p>
           <ul className="gn-timeline__side-list">
             {model.sideList.map((entry) => (
@@ -364,6 +394,16 @@ export function TimelineView(props: TimelineViewProps) {
                     is not told it has "no claimed dates". */}
                 <span className="gn-timeline__side-note">{entry.note}</span>
                 {entry.customClaims.length > 0 && <CustomClaimList claims={entry.customClaims} />}
+                {/* "Add dates" (UX fixes T8, 23.143, audit PV-11): the way forward the list never offered. It opens
+                    the ticket's sheet, where the dates are set — there is no scroll-to-field door to open it at. */}
+                <button
+                  type="button"
+                  className="gn-button gn-button--ghost gn-timeline__add-dates"
+                  aria-label={`Add dates to ${entry.title}`}
+                  onClick={() => props.onOpenTicket(entry.ticketId)}
+                >
+                  Add dates
+                </button>
               </li>
             ))}
           </ul>

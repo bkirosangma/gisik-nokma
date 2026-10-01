@@ -1013,3 +1013,109 @@ describe("11.223 a timeline bar's date span is a linked DESCRIPTION, not folded 
     expect(bar).toHaveAttribute('title', description!.textContent);
   });
 });
+
+describe('23.142 timeline bars end on their real day, and today has a line (audit PV-10)', () => {
+  const bar = (title: string, start: string, due: string) =>
+    ticket({ fields: { title: claimField(title), startDate: claimField({ date: start }), dueDate: claimField({ date: due }) } });
+  const barOf = (title: string) => screen.getByRole('button', { name: title });
+  const days = (title: string) => {
+    const node = barOf(title);
+    return { from: Number(node.getAttribute('data-day-from')), to: Number(node.getAttribute('data-day-to')) };
+  };
+  const prop = (title: string, name: string) => barOf(title).style.getPropertyValue(name);
+
+  it('23.142 a bar spans [start day, end day]: Mon–Wed is THREE day columns and Mon–Fri leaves the weekend free', () => {
+    // The window opens on Mon 17 Aug, so Mon 24 Aug is day 7.
+    renderTimeline([
+      bar('Mon to Wed', '2026-08-24', '2026-08-26'),
+      bar('Mon to Fri', '2026-08-24', '2026-08-28'),
+      bar('Across the weekend', '2026-08-26', '2026-09-01'),
+    ]);
+    expect(days('Mon to Wed')).toEqual({ from: 7, to: 9 });
+    expect(days('Mon to Wed').to - days('Mon to Wed').from + 1).toBe(3);
+    // Days inside the week the bar starts/ends in: the bar's margins are these, as a share of its own weeks.
+    expect(prop('Mon to Wed', '--timeline-bar-lead')).toBe('0');
+    expect(prop('Mon to Wed', '--timeline-bar-tail')).toBe('4');
+    expect(prop('Mon to Fri', '--timeline-bar-tail')).toBe('2');
+    expect(prop('Mon to Fri', '--timeline-bar-weeks')).toBe('1');
+    // Two weeks, starting Wednesday and ending Tuesday.
+    expect(days('Across the weekend')).toEqual({ from: 9, to: 15 });
+    expect(prop('Across the weekend', '--timeline-bar-lead')).toBe('2');
+    expect(prop('Across the weekend', '--timeline-bar-tail')).toBe('5');
+    expect(prop('Across the weekend', '--timeline-bar-weeks')).toBe('2');
+    expect(barOf('Across the weekend')).toHaveStyle({ gridColumn: '3 / 5' });
+
+    // CONTROL — a bar that fills whole weeks (Mon–Sun) has no lead and no tail: the week index and the day
+    // index agree exactly where the old whole-week answer was right, so the new one is not a different drawing.
+    document.body.innerHTML = '';
+    renderTimeline([bar('Whole week', '2026-08-24', '2026-08-30')]);
+    expect(prop('Whole week', '--timeline-bar-lead')).toBe('0');
+    expect(prop('Whole week', '--timeline-bar-tail')).toBe('0');
+    expect(days('Whole week')).toEqual({ from: 7, to: 13 });
+  });
+
+  it('23.142 a bar clipped by the window keeps its edge on the window and zero lead / tail there', () => {
+    renderTimeline([bar('Runs past the end', '2026-10-05', '2026-12-31'), bar('Starts before', '2026-08-01', '2026-08-19')], {
+      weeksCount: 8,
+    });
+    // 8 weeks from 17 Aug is 56 days (0–55).
+    expect(days('Runs past the end').to).toBe(55);
+    expect(prop('Runs past the end', '--timeline-bar-tail')).toBe('0');
+    expect(days('Starts before').from).toBe(0);
+    expect(prop('Starts before', '--timeline-bar-lead')).toBe('0');
+    expect(prop('Starts before', '--timeline-bar-tail')).toBe('4');
+  });
+
+  it('23.142 a today line sits on the prop\'s day in every row, and is absent when today is outside the window', () => {
+    const { container, unmount } = renderTimeline([bar('One', '2026-08-24', '2026-08-26'), bar('Two', '2026-08-25', '2026-08-27')], {
+      today: '2026-08-26',
+    });
+    const lines = [...container.querySelectorAll<HTMLElement>('.gn-timeline__today')];
+    // One per row — "spanning the rows" — drawn for the eye only.
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      expect(line).toHaveAttribute('aria-hidden', 'true');
+      // The window opens on the Monday of today's week (24 Aug), so Wed 26 Aug is day 2: the first week (column 2), two days in.
+      expect(line).toHaveStyle({ gridColumn: '2 / 3' });
+      expect(line.style.getPropertyValue('--timeline-today-lead')).toBe('2');
+    }
+    unmount();
+
+    // CONTROL — the line follows the PROP, not a device clock: a day inside the window moves it, and a day outside removes it.
+    const moved = renderTimeline([bar('One', '2026-08-24', '2026-08-26')], { today: '2026-08-17' });
+    expect(moved.container.querySelector('.gn-timeline__today')?.getAttribute('style')).toContain('--timeline-today-lead: 0');
+    moved.unmount();
+    const outside = renderTimeline([bar('One', '2026-08-24', '2026-08-26')], { today: '2027-01-01' });
+    expect(outside.container.querySelector('.gn-timeline__today')).toBeNull();
+  });
+});
+
+describe('23.143 the undated list speaks to the person and offers "Add dates" (audit PV-11)', () => {
+  const bare = (title: string) => ticket({ fields: { title: claimField(title) } });
+
+  it('23.143 a list of undated tickets reads "These tickets have no dates yet.", under a counted heading, with an Add dates button per ticket', () => {
+    const { onOpenTicket } = renderTimeline([bare('Order till roll'), bare('Call the CA')]);
+    const side = within(sideList());
+    expect(side.getByRole('heading', { name: 'Not on the timeline yet (2)' })).toBeInTheDocument();
+    expect(side.getByText('These tickets have no dates yet.')).toBeInTheDocument();
+    // The builder's voice is gone, from the heading and from the whole list.
+    expect(sideList().textContent).not.toContain('No bar is invented');
+    expect(TIMELINE_SIDE_LIST_COPY).not.toContain('No bar is invented');
+    expect(TIMELINE_SIDE_LIST_UNDRAWABLE_COPY).not.toContain('No bar is invented');
+
+    const add = side.getByRole('button', { name: 'Add dates to Order till roll' });
+    expect(add).toHaveTextContent('Add dates');
+    fireEvent.click(add);
+    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+    expect(onOpenTicket).toHaveBeenCalledWith(expect.stringMatching(/^t\d+$/));
+    // One action per ticket, no more.
+    expect(side.getAllByRole('button', { name: /^Add dates to / })).toHaveLength(2);
+
+    // CONTROL — "no dates yet" is only said while it is TRUE: a due-only ticket has a date, so the list says what it lacks.
+    document.body.innerHTML = '';
+    renderTimeline([bare('Order till roll'), ticket({ fields: { title: claimField('Due only'), dueDate: claimField({ date: '2026-08-28' }) } })]);
+    expect(within(sideList()).queryByText('These tickets have no dates yet.')).toBeNull();
+    expect(within(sideList()).getByText(TIMELINE_SIDE_LIST_COPY)).toBeInTheDocument();
+    expect(TIMELINE_SIDE_LIST_COPY).toBe('Add a start and a due date to place a ticket on the timeline.');
+  });
+});

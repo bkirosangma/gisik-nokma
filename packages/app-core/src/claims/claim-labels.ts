@@ -166,18 +166,23 @@ export const CALENDAR_ALL_HIDDEN_COPY =
   'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
 
 /**
- * The side-list heading when the list holds ONLY work with a MISSING claim.
- *
- * The sentence states a LEAVING condition — "until it carries both" — so it is
- * true exactly of entries that will leave the moment the missing claim
- * arrives: `no-dates`, `start-only`, `due-only`. It is FALSE over the other
- * two: a `start-after-due` entry already carries both and is still here, and
- * so is one whose claimed day is not a day on the calendar. That is why the
- * model chooses between this heading and the one below rather than printing
- * this one unconditionally as the plan's Task 10 does.
+ * The side-list sentence when EVERY entry is a ticket with no start and no due date at all (UX fixes T8, 23.143,
+ * audit PV-11). Plain words to the person looking at the page — the builder's "No bar is invented" was a design
+ * principle addressed to a developer. It is said ONLY while it is true: a ticket with one date is not "without
+ * dates", so a list holding one gets the sentence below instead.
  */
-export const TIMELINE_SIDE_LIST_COPY =
-  'No bar is invented: work appears here until it carries both a claimed start and a claimed needed-by.';
+export const TIMELINE_SIDE_LIST_NO_DATES_COPY = 'These tickets have no dates yet.';
+
+/**
+ * The side-list sentence when the list holds ONLY work with a MISSING claim, at least one of which has a date.
+ *
+ * It states a LEAVING condition — add both and the ticket is drawn — so it is true exactly of entries that will
+ * leave the moment the missing claim arrives: `no-dates`, `start-only`, `due-only`. It is FALSE over the other
+ * two: a `start-after-due` entry already carries both and is still here, and so is one whose claimed day is not a
+ * day on the calendar. That is why the model chooses between this sentence and the one below rather than
+ * printing this one unconditionally as the plan's Task 10 does.
+ */
+export const TIMELINE_SIDE_LIST_COPY = 'Add a start and a due date to place a ticket on the timeline.';
 
 /**
  * The side-list heading for a list that holds ANY entry the plain heading is
@@ -188,7 +193,7 @@ export const TIMELINE_SIDE_LIST_COPY =
  * lets it carry a mixed list truthfully.
  */
 export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
-  'No bar is invented: work appears here whenever its claims cannot draw a period — a missing start or needed-by, a start after its needed-by, or a claimed day that is not on the calendar.';
+  'These tickets cannot be drawn as a bar yet: a start or due date is missing, a start comes after its due date, or a date is not a day on the calendar.';
 
 /**
  * The FIRST empty timeline: nothing here has a date claim at all.
