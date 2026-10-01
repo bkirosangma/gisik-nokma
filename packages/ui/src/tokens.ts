@@ -1125,6 +1125,19 @@ export function spaceVariableName(step: SpaceStep): string {
   return `--gn-space-${step}`;
 }
 
+/**
+ * The phone shell's two heights (mobile-web plan Task 1, case 21.003): the
+ * bottom bar and the slim top bar at ≤40rem. Like spacing and motion they vary
+ * with neither style nor theme, so they are emitted ONCE under the bare `:root`
+ * and every phone rule reads the token — a rule that spelled `3.5rem` itself
+ * would be a second copy to forget when the bar grows.
+ */
+export const phone = { 'bar-height': '3.5rem', 'top-height': '3.25rem' } as const;
+export type PhoneKey = keyof typeof phone;
+export function phoneVariableName(key: PhoneKey): string {
+  return `--gn-phone-${key}`;
+}
+
 export const motion = {
   feedback: '100ms',
   move: '200ms',
@@ -1869,6 +1882,8 @@ export function themeStylesheet(): string {
       .map((step) => `${spaceVariableName(step)}: ${spacing[step]};`)
       .join(' ')} ${(Object.keys(motion) as MotionKey[])
       .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
+      .join(' ')} ${(Object.keys(phone) as PhoneKey[])
+      .map((key) => `${phoneVariableName(key)}: ${phone[key]};`)
       .join(' ')} }`,
     `:root { ${declarationsFor('hig', 'light')} }`,
     `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
