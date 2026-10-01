@@ -2529,7 +2529,7 @@ function ProjectBoard() {
                 <button
                   ref={filtersButtonRef}
                   type="button"
-                  className="gn-button gn-button--ghost"
+                  className="gn-button gn-button--ghost gn-project__filters"
                   aria-haspopup="dialog"
                   onClick={() => setFiltersOpen(true)}
                 >
