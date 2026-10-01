@@ -112,6 +112,11 @@ describe('14.337 §16 says what the assistant can do, and the safety rules for d
     expect(can).toContain('deleted items');
     expect(can).toContain('15 days');
     expect(can).toContain('exact name');
+    // AMENDED 2026-10-01 (MCP CRUD Task 9 fix 1): the "It can do what you can do" bullet no longer lists only jobs —
+    // it names the workspace and project powers and points at this entry. It lives in "What connecting does".
+    const connecting = text(entry('What connecting does'));
+    expect(connecting).toContain('workspaces and projects');
+    expect(connecting).toContain('what your assistant can do');
     // The workspace page's section gains "Edit a project", by the control's own label.
     const edit = manual()
       .sections.flatMap((s) => s.entries)

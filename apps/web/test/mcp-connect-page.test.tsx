@@ -62,7 +62,8 @@ describe('the consent page', () => {
     expect(await screen.findByText(/wants to use Gisik Nokma as/)).toBeTruthy();
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('(claude.ai)', { exact: false })).toBeTruthy();
-    expect(screen.getByText(/It will be able to see and change everything you can — read tickets, create them, move them, comment and assign — in all your workspaces\./)).toBeTruthy();
+    // AMENDED 2026-10-01 (MCP CRUD Task 9 fix 1): the copy names the workspace and project powers and the 15-day restore.
+    expect(screen.getByText(/It will be able to see and change everything you can — read tickets, create them, move them, comment and assign, and create, rename, archive or delete workspaces and projects \(deleted ones can be restored for 15 days\) — in all your workspaces\./)).toBeTruthy();
     expect(screen.getByText(/You can disconnect it any time from Account → Connected assistants\./)).toBeTruthy();
     expect(calls[0]).toMatchObject({ url: '/v1/mcp/oauth/requests/req_x', method: 'GET' });
     first.unmount();
