@@ -29,7 +29,7 @@ Owner, 2026-10-01: *"need to enhance the mcp. need CRUD for workspaces and proje
 
 - **`confirm_name`** is compared exactly (case and whitespace), against the CURRENT name read at call time; a mismatch is refused with `confirm_name must be "<current name>"`. Restore/undelete tools need no confirmation.
 - **Deleted/archived items** are listed only with `include`; `get_*` on a deleted item says so (and how to undelete).
-- **Prefix:** optional at create; the product's existing prefix rules (format, uniqueness) apply; not editable afterwards unless the product already allows it (the plan checks).
+- **Prefix:** optional at create; the product's existing prefix rules (format, uniqueness) apply; not editable afterwards unless the product already allows it (the plan checks). *Superseded 2026-10-01 by `2026-10-01-prefixes-groups-create-buttons-design.md` R1/R2: prefixes are now editable (`workspace.prefix_changed`, `project.updated.prefix`).*
 - **Pagination** for the workspace scope reuses the project scope's cursor shape; a page never mixes in projects the caller cannot see.
 - **Tool descriptions** are written for an assistant serving a non-technical person: what each does, that deletes are recoverable, and that `confirm_name` must be the exact current name.
 - **Help §16** gains "What your assistant can do".
