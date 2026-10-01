@@ -3,6 +3,7 @@
 import { createAuthClient } from 'better-auth/react';
 import { magicLinkClient, phoneNumberClient } from 'better-auth/client/plugins';
 import { passkeyClient } from '@better-auth/passkey/client';
+import { noteRetryAfter } from './session-retry.js';
 
 /**
  * The client half of the four passwordless methods, matched to the version the
@@ -37,4 +38,10 @@ export const authClient = createAuthClient({
    */
   baseURL: typeof window === 'undefined' ? 'http://localhost:3001' : window.location.origin,
   plugins: [phoneNumberClient(), magicLinkClient(), passkeyClient()],
+  /**
+   * A 429's `Retry-After` is on the response and nowhere on the error the
+   * session hook hands back, so it is read here for the shell notice's backoff
+   * (`session-retry.ts`, SYS-01).
+   */
+  fetchOptions: { onResponse: (context) => noteRetryAfter(context.response) },
 });

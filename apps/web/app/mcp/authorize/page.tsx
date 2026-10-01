@@ -133,7 +133,7 @@ function AuthorizeScreen(): React.JSX.Element {
       <h1 className="gn-page-title">Connect an assistant</h1>
 
       <Card className="gn-mcp-authorize__card">
-        {session.kind === 'loading' ? (
+        {session.kind === 'loading' || session.kind === 'error' ? (
           <p>Checking your session…</p>
         ) : session.kind === 'signed-out' ? (
           /* 401 handled BEFORE the form rather than after a failed POST: asking

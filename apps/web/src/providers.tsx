@@ -223,9 +223,9 @@ function userDisplayName(user: { name: string; id: string; email?: unknown }): s
  * absence, and the menu omits the line rather than drawing a blank one.
  */
 export function useCurrentUser(): { id: string; name: string; email: string | null } | null {
-  const session = authClient.useSession();
-  const user = session.data?.user;
-  if (user === undefined || user === null) return null;
+  const resolved = resolveSession(authClient.useSession());
+  if (resolved.kind !== 'signed-in') return null;
+  const { user } = resolved;
   return {
     id: user.id,
     // The RAW name, deliberately: the shell's one reading of "what do we call
@@ -237,7 +237,7 @@ export function useCurrentUser(): { id: string; name: string; email: string | nu
     // `name → email → id` fallback lives on in `useSessionStatus` below, whose
     // consumers print a name and have no label helper.
     name: user.name,
-    email: typeof user.email === 'string' && user.email !== '' ? user.email : null,
+    email: user.email,
   };
 }
 
@@ -260,13 +260,88 @@ export function useCurrentUser(): { id: string; name: string; email: string | nu
 export type SessionStatus =
   | { kind: 'loading' }
   | { kind: 'signed-out' }
-  | { kind: 'signed-in'; user: { id: string; name: string } };
+  | { kind: 'signed-in'; user: { id: string; name: string } }
+  /**
+   * The session read FAILED (a 429, a 5xx, a dropped connection) and there is
+   * no earlier answer to fall back on — first load. It is neither "nobody is
+   * signed in" nor "still loading": a consumer must not print "Sign in to …"
+   * over it (SYS-01). Once a user HAS been seen, a failed read keeps answering
+   * `signed-in` with that last known user instead; `useSessionFailure` carries
+   * the failure itself for the shell's notice.
+   */
+  | { kind: 'error' };
 
-export function useSessionStatus(): SessionStatus {
-  const session = authClient.useSession();
+/**
+ * The ONE reading of `authClient.useSession()` — `useCurrentUser`,
+ * `useSessionStatus` and `useSessionFailure` all go through it, so the nav and
+ * the pages' "Sign in to …" fallbacks cannot disagree again (SYS-01 had two
+ * code paths, one blind to `error`).
+ *
+ * **The last known user is module state**, written here and read when a later
+ * read fails: better-auth keeps `data` across a failed REFETCH but not across a
+ * failed first read, and a person who was signed in a minute ago has not signed
+ * out because the server said 429. It is cleared only by an answer that means
+ * it — a read that resolved with nobody, or a 401 — never by a failure.
+ */
+type KnownUser = { id: string; name: string; email: string | null; displayName: string };
+let lastKnownUser: KnownUser | null = null;
+
+/** Tests only: the last known user outlives a render, so a case starts from none. */
+export function resetLastKnownUser(): void {
+  lastKnownUser = null;
+}
+
+type Resolved =
+  | { kind: 'loading' | 'signed-out' | 'error' }
+  | { kind: 'signed-in'; user: KnownUser };
+
+function resolveSession(session: ReturnType<typeof authClient.useSession>): Resolved {
   const user = session.data?.user;
   if (user !== undefined && user !== null) {
-    return { kind: 'signed-in', user: { id: user.id, name: userDisplayName(user) } };
+    lastKnownUser = {
+      id: user.id,
+      name: user.name,
+      email: typeof user.email === 'string' && user.email !== '' ? user.email : null,
+      displayName: userDisplayName(user),
+    };
+    return { kind: 'signed-in', user: lastKnownUser };
   }
-  return session.isPending ? { kind: 'loading' } : { kind: 'signed-out' };
+  const error = session.error;
+  if (error !== undefined && error !== null && (error as { status?: number }).status !== 401) {
+    return lastKnownUser === null ? { kind: 'error' } : { kind: 'signed-in', user: lastKnownUser };
+  }
+  if (session.isPending) return { kind: 'loading' };
+  lastKnownUser = null;
+  return { kind: 'signed-out' };
+}
+
+export function useSessionStatus(): SessionStatus {
+  const resolved = resolveSession(authClient.useSession());
+  if (resolved.kind === 'signed-in') {
+    return { kind: 'signed-in', user: { id: resolved.user.id, name: resolved.user.displayName } };
+  }
+  return resolved;
+}
+
+/**
+ * Whether the session read is failing right now, and how to ask again — the
+ * shell notice's two inputs. `failed` stays true across the retry's own
+ * in-flight window (better-auth clears `error` when a refetch starts), so the
+ * notice does not blink off and on while it is still trying.
+ */
+export function useSessionFailure(): { failed: boolean; error: unknown; retry: () => void } {
+  const session = authClient.useSession();
+  const hasError =
+    session.error !== undefined && session.error !== null && (session.error as { status?: number }).status !== 401;
+  const wasFailed = useRef(false);
+  const failed = hasError || (wasFailed.current && session.isRefetching === true);
+  wasFailed.current = failed;
+  const refetch = session.refetch;
+  return {
+    failed,
+    error: hasError ? session.error : null,
+    retry: () => {
+      if (typeof refetch === 'function') void refetch();
+    },
+  };
 }
