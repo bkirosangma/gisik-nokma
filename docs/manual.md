@@ -1800,7 +1800,8 @@ assistant, sign in the way you always do, and press **Allow**.
 Three things are worth knowing before you press it:
 
 - **It can do what you can do — all of it.** It can see and change everything you can, in every workspace
-  you belong to: read jobs, create them, move them through their stages, comment and assign. There is no
+  you belong to: read jobs, create them, move them through their stages, comment and assign, and create,
+  rename, archive or delete workspaces and projects — see **What your assistant can do** below. There is no
   read-only choice and no picking one workspace.
 - **It can never do more than you can.** A job you cannot see, it cannot see. A move your role does not
   allow is refused for the assistant in the same words it would be refused for you.

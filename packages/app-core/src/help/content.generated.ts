@@ -9226,7 +9226,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign. There is no read-only choice and no picking one workspace."
+                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign, and create, rename, archive or delete workspaces and projects — see "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "What your assistant can do"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " below. There is no read-only choice and no picking one workspace."
                     }
                   ],
                   [
