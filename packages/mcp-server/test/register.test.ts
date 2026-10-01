@@ -40,6 +40,7 @@ function fakeSession(over: Partial<Session> = {}): Session {
     // the workspace directory and folds it, so a shapeless answer would make
     // the sweep in 14.88 fail for a reason that has nothing to do with stdout.
     get: async () => ({ workspaces: [] }),
+    post: async () => ({}),
     postEvents: async () => COMMITTED,
     ...over,
   };

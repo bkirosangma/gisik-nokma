@@ -10,6 +10,7 @@ function sessionRecording(answer: unknown): { session: Session; paths: string[] 
   const session: Session = {
     userId: () => '01J0USER0000000000000000AA',
     get: async (path) => { paths.push(path); return answer; },
+    post: async () => { throw new Error('not a read'); },
     postEvents: async () => { throw new Error('not a read'); },
   };
   return { session, paths };

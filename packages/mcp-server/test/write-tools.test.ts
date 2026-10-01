@@ -23,6 +23,7 @@ function sessionCapturing(result: unknown): { session: Session; sent: unknown[][
   const session: Session = {
     userId: () => USER,
     get: async () => { throw new Error('not a write'); },
+    post: async () => { throw new Error('not a write'); },
     postEvents: async (events) => { sent.push(events); return result; },
   };
   return { session, sent };
@@ -180,5 +181,24 @@ describe('a refusal arrives with its own words', () => {
         workspaceId: '01J0WS000000000000000000AA', projectId: '01J0PRJ000000000000000000A', typeId: 'task', title: 'x',
       }),
     ).rejects.toThrow(/invalid-payload/);
+  });
+
+  it('14.303 all four writes still go through the shared submit module: ticket entity, origin mcp, the session actor', async () => {
+    // Guard for the move of `submitOne`/`envelope` into `tools/submit.ts` (MCP CRUD plan Task 5):
+    // the existing 14.70–14.77 cases pin each tool; this one pins the common envelope across all four.
+    const { session, sent } = sessionCapturing(COMMITTED);
+    const ws = '01J0WS000000000000000000AA';
+    const ticketId = '01J0TCK000000000000000000A';
+    await tool('create_ticket', session).handler({ workspaceId: ws, projectId: '01J0PRJ000000000000000000A', typeId: 'task', title: 'x' });
+    await tool('transition_ticket', session).handler({ workspaceId: ws, ticketId, to: 'done' });
+    await tool('add_comment', session).handler({ workspaceId: ws, ticketId, text: 'hi' });
+    await tool('assign_ticket', session).handler({ workspaceId: ws, ticketId, assigneeId: null });
+    const events = sent.flat() as Array<{ origin: string; actorId: string; entity: { kind: string }; workspaceId: string }>;
+    expect(events).toHaveLength(4);
+    for (const e of events) {
+      expect(e).toMatchObject({ origin: 'mcp', actorId: USER, entity: { kind: 'ticket' }, workspaceId: ws });
+    }
+    // CONTROL, same `it`: each event is its own envelope (one POST per call, not one accumulated batch).
+    expect(sent.map((batch) => batch.length)).toEqual([1, 1, 1, 1]);
   });
 });

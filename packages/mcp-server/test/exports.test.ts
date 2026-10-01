@@ -16,7 +16,7 @@ describe('14.250 package exports', () => {
     expect(typeof pkg.lazySession).toBe('function');
     // CONTROL, same `it`: the export is not merely present, it is THE registry —
     // the nine tools in their pinned order (the order `register.test.ts` pins).
-    const fake = { userId: () => 'u', get: async () => ({}), postEvents: async () => ({}) };
+    const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}) };
     expect(pkg.allTools(fake).map((t) => t.name)).toEqual([
       'list_workspaces',
       'list_projects',

@@ -48,6 +48,7 @@ export function hostedSession(
   return lazySession(async () => ({
     userId: () => userId,
     get: (path) => client.get(path, accessToken),
+    post: (path, body) => client.post(path, body, accessToken),
     postEvents: (events) => client.post('/v1/events', { events }, accessToken),
   }));
 }

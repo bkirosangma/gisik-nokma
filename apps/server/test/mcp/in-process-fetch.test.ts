@@ -142,3 +142,35 @@ describe('14.253 a tool run through hostedSession is the caller, origin mcp', ()
     await app.close();
   });
 });
+
+describe('14.301 the hosted session post goes through the in-process transport with the caller bearer', () => {
+  it('14.301 post founds a workspace as the token owner; a post without the bearer would be a 401; get is unchanged', async () => {
+    const { app, otp } = buildTestApp(db);
+    await app.ready();
+    const user = await signInWithPhone(app, otp, '+911100002301');
+    const session = hostedSession(app, OUTER, user.token, user.userId);
+    await session.ready();
+
+    const founded = (await session.post('/v1/workspaces', { name: 'Posted Corner' })) as { workspaceId: string };
+    expect(typeof founded.workspaceId).toBe('string');
+    // The bearer is the proof: the founding door answers 201 only for an authenticated caller,
+    // and the founder is the token's owner.
+    const { rows } = await db.pool.query<{ actor_id: string }>(
+      `SELECT actor_id FROM events WHERE workspace_id = $1 AND type = 'workspace.created'`,
+      [founded.workspaceId],
+    );
+    expect(rows).toEqual([{ actor_id: user.userId }]);
+
+    // CONTROL, same `it`: the unauthenticated route is a 401 (what a post without the bearer would draw) …
+    const bare = await inProcessFetch(app, OUTER)('http://in-process/v1/workspaces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'No bearer' }),
+    });
+    expect(bare.status).toBe(401);
+    // … and `get` through the same session is unchanged.
+    const listed = (await session.get('/v1/me/workspaces')) as { workspaces: Array<{ workspaceId: string }> };
+    expect(listed.workspaces.map((w) => w.workspaceId)).toContain(founded.workspaceId);
+    await app.close();
+  });
+});
