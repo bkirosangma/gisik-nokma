@@ -108,15 +108,18 @@ export const projectCreatedPayload = z.object({
    * **OPTIONAL, for `description`'s reason exactly**: every `project.created`
    * in the ledger written before this field existed parses unchanged, and an
    * event that mentions no prefix is an event whose project still needs a key,
-   * so the key's half is DERIVED from the name (`../prefix.ts`) rather than
-   * omitted. Required-ness would make the key a precondition of founding a
+   * so the key's half is DERIVED from the name (`../prefix.ts`) — the name it
+   * is FOUNDED under, see below — rather than omitted. Required-ness would make the key a precondition of founding a
    * project rather than a consequence of it, and would refuse the whole
    * pre-existing ledger in the same breath.
    *
    * **IMMUTABLE after creation**: `project.updated` (2026-10-01) renames a
    * project but deliberately carries no prefix, so the key's half rides with
    * the founding event and is permanent — a rename moves the name and never
-   * the ticket keys.
+   * the ticket keys, **entered or derived**. An un-entered prefix is derived
+   * from THIS event's `name` (`proj_projects.founding_name`), never from the
+   * project's current name, so a later `project.updated` cannot re-key it or
+   * shift a neighbour's derived prefix.
    *
    * **UNIQUE WITHIN THE WORKSPACE** (owner ruling 2026-09-20). That is a
    * constraint on the value, not a shape this schema can express — a payload
@@ -245,7 +248,10 @@ export type ProjectRestoredPayload = z.infer<typeof projectRestoredPayload>;
  * the column has been nullable since door A precisely so a later edit could clear
  * it (see `projectCreatedPayload.description`); an absent key leaves it alone.
  * The PREFIX is not here and never will be: it is immutable after creation
- * (owner spec 2026-09-20), so a rename moves the name and never the ticket keys.
+ * (owner spec 2026-09-20), so a rename moves the name and never the ticket keys
+ * — entered or DERIVED: a project with no entered prefix derives it from its
+ * FOUNDING name (`project.created`'s `name`), which this event cannot touch
+ * (owner, 2026-10-01).
  */
 export const projectUpdatedPayload = z
   .object({ name: displayName.optional(), description: descriptionText.nullable().optional() })

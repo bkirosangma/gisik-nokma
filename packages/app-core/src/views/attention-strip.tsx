@@ -16,6 +16,8 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
  * is exactly why the compiler has to be the one holding it.
  */
 const KIND_TONE: Record<AttentionKind, ChipTone> = {
+  // The danger tone — but the WORD carries the meaning, never the colour alone (NP-06).
+  overdue: 'blocked',
   blocked: 'blocked',
   stale: 'pending',
   'due-soon': 'pending',
@@ -23,11 +25,29 @@ const KIND_TONE: Record<AttentionKind, ChipTone> = {
 };
 
 const KIND_LABEL: Record<AttentionKind, string> = {
+  overdue: 'Overdue',
   blocked: 'Blocked',
   stale: 'Stale',
   'due-soon': 'Due soon',
   contested: 'Contested',
 };
+
+/**
+ * What the strip draws, in order (NP-06):
+ *
+ * - **Overdue FIRST.** A missed date is the most urgent line here, whatever
+ *   order a source handed the items over in; every other kind keeps its order.
+ * - **A ticket that is overdue AND stale is one row**, the overdue one. Both say
+ *   "this has waited too long", the overdue reason names the date, and the
+ *   stale row under it was the NP-05 repeat. This is the ONE pair collapsed:
+ *   a ticket that is also Blocked keeps its Blocked row, because that is a
+ *   different fact and not the same urgency said twice.
+ */
+export function orderAttention(items: AttentionItem[]): AttentionItem[] {
+  const overdueTickets = new Set(items.filter((item) => item.kind === 'overdue').map((item) => item.ticketId));
+  const kept = items.filter((item) => !(item.kind === 'stale' && overdueTickets.has(item.ticketId)));
+  return [...kept.filter((item) => item.kind === 'overdue'), ...kept.filter((item) => item.kind !== 'overdue')];
+}
 
 export type AttentionStripProps = {
   items: AttentionItem[];
@@ -114,7 +134,7 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
         Needs your attention
       </p>
       <ul className="gn-attention__items">
-        {items.map((item) => (
+        {orderAttention(items).map((item) => (
           <li key={`${item.kind}:${item.ticketId}`} className="gn-attention__item">
             <button
               type="button"

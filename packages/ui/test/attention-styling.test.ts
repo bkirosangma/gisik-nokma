@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parseRules } from './helpers/css-rules.js';
 
 /**
  * Case 13.893 — the attention strip's Part 2 styling, measured against the
@@ -46,6 +47,16 @@ import { describe, expect, it } from 'vitest';
  * `globals.css` as the second stylesheet a rule could hide in, and `layout.tsx`
  * loads `ui.css` before `globals.css`, so a marker appended there wins. Both
  * stylesheets are now scanned and both are witnessed.
+ *
+ * ## AMENDED 2026-10-01 — one PHONE rule per family selector is allowed (mobile-web plan Task 9, fix 2)
+ *
+ * Orchestrator ruling (a): the plan's Global Constraint is "targets ≥44px", and a strip row is ~38px on a
+ * phone. The uniqueness claim exists to stop a SECOND rule at the same cascade level silently overriding
+ * the first; a single override inside the product's ONE phone arm, declared AFTER its base with the order
+ * asserted, is the pattern every mobile task uses, so the guard is narrowed rather than the target
+ * dropped. `familyViolations` now allows each family selector AT MOST ONCE at top level and AT MOST ONCE
+ * inside `@media (max-width: 40rem)`, the phone rule after the base. A second rule in either place, a
+ * phone rule before (or without) its base, or a rule in ANY other at-rule is still red — each is witnessed.
  */
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const UI_CSS_PATH = resolve(TEST_DIR, '../src/ui.css');
@@ -72,6 +83,37 @@ const cleanUiCss = stripComments(uiCss);
 const cleanGlobalsCss = stripComments(globalsCss);
 
 const FAMILY_SELECTOR = /^\.gn-attention/;
+
+/** The one phone arm — the product's FD1 breakpoint (mobile-web plan), the only at-rule a family selector may sit in. */
+const PHONE_ARM = '@media (max-width: 40rem)';
+
+/**
+ * Every way `css` breaks the family's cascade rule, as readable lines: a family selector declared more than
+ * once at top level, more than once inside the phone arm, inside ANY other at-rule, or in the phone arm
+ * before (or with no) top-level base. Empty means the family is clean. Reads the parsed rules (source order
+ * kept), not lines, so an at-rule cannot be mistaken for the top level.
+ */
+function familyViolations(css: string): string[] {
+  const declarations = parseRules(css).flatMap((rule, index) =>
+    rule.selectors.filter((selector) => FAMILY_SELECTOR.test(selector)).map((selector) => ({ selector, atRule: rule.atRule, index })),
+  );
+  const violations: string[] = [];
+  for (const selector of [...new Set(declarations.map((d) => d.selector))]) {
+    const group = declarations.filter((d) => d.selector === selector);
+    const top = group.filter((d) => d.atRule === null);
+    const phone = group.filter((d) => d.atRule === PHONE_ARM);
+    const other = group.filter((d) => d.atRule !== null && d.atRule !== PHONE_ARM);
+    if (top.length > 1) violations.push(`${selector}: declared ${top.length} times at top level`);
+    if (phone.length > 1) violations.push(`${selector}: declared ${phone.length} times in the phone arm`);
+    for (const d of other) violations.push(`${selector}: declared inside ${d.atRule}, not the phone arm`);
+    const firstPhone = phone[0];
+    const base = top[0];
+    if (firstPhone !== undefined && (base === undefined || firstPhone.index < base.index)) {
+      violations.push(`${selector}: the phone rule comes ${base === undefined ? 'with no top-level base' : 'before its base'}`);
+    }
+  }
+  return violations;
+}
 
 /**
  * The rule whose selector is EXACTLY `selector`, body included.
@@ -273,12 +315,7 @@ describe('13.893 — the attention strip is the prototype’s tint card, adopted
       ['ui.css', cleanUiCss],
       ['globals.css', cleanGlobalsCss],
     ] as const) {
-      const selectors = familyRules(css).map(({ selector }) => selector);
-      const duplicated = selectors.filter((selector, i) => selectors.indexOf(selector) !== i);
-      expect(
-        duplicated,
-        `${name} declares a family selector more than once: ${JSON.stringify(duplicated)}`,
-      ).toEqual([]);
+      expect(familyViolations(css), `${name} breaks the family's cascade rule`).toEqual([]);
     }
   });
 
@@ -339,7 +376,23 @@ describe('13.893 — the attention strip is the prototype’s tint card, adopted
     // never read the second rule at all.
     const duplicated = `${cleanUiCss}\n.gn-attention__reason {\n  border-left: 4px solid var(--gn-pending);\n}\n`;
     expect(familyRules(duplicated).filter(({ body }) => /border-left\s*:/.test(body))).not.toEqual([]);
-    const selectors = familyRules(duplicated).map(({ selector }) => selector);
-    expect(selectors.filter((s, i) => selectors.indexOf(s) !== i)).toEqual(['.gn-attention__reason']);
+    // CONTROL first: the real files are clean, so each plant below is the only thing the scan can be reacting to.
+    expect(familyViolations(cleanUiCss)).toEqual([]);
+    expect(familyViolations(cleanGlobalsCss)).toEqual([]);
+    // 2026-10-01 amendment — each way of breaking the narrowed rule is still red:
+    // a planted SECOND top-level rule…
+    expect(familyViolations(duplicated)).toEqual(['.gn-attention__reason: declared 2 times at top level']);
+    // …a planted SECOND phone-arm rule (the real file has the one allowed)…
+    const secondPhone = `${cleanUiCss}\n${PHONE_ARM} {\n  .gn-attention__item {\n    min-height: 3rem;\n  }\n}\n`;
+    expect(familyViolations(secondPhone)).toEqual(['.gn-attention__item: declared 2 times in the phone arm']);
+    // …a rule in ANOTHER media query, even a phone-like one…
+    const tablet = `${cleanUiCss}\n@media (max-width: 60rem) {\n  .gn-attention__reason {\n    color: red;\n  }\n}\n`;
+    expect(familyViolations(tablet)).toEqual(['.gn-attention__reason: declared inside @media (max-width: 60rem), not the phone arm']);
+    // …and a phone rule placed BEFORE its base, or with no base at all. CONTROL: the same two rules in the right order are clean.
+    const base = '.gn-attention__row {\n  min-height: 1rem;\n}\n';
+    const phoneRule = `${PHONE_ARM} {\n  .gn-attention__row {\n    min-height: 2.75rem;\n  }\n}\n`;
+    expect(familyViolations(`${base}${phoneRule}`)).toEqual([]);
+    expect(familyViolations(`${phoneRule}${base}`)).toEqual(['.gn-attention__row: the phone rule comes before its base']);
+    expect(familyViolations(phoneRule)).toEqual(['.gn-attention__row: the phone rule comes with no top-level base']);
   });
 });

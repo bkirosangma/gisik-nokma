@@ -87,9 +87,11 @@ function istDaysBetween(fromDay: string, toDay: string): number {
  * 2. **stale** — visible tickets in an `active`-category state whose state-entry
  *    `serverTime` falls on or before the IST day `staleDays` back from today.
  *    `daysInFlight` is the IST day count, and the reason names the IST day.
- * 3. **due-soon** — visible NON-TERMINAL tickets whose due-date CLAIM falls on
- *    or before the IST day `dueSoonDays` from today. Overdue is included, since
- *    a missed date is not less urgent. Only `state: 'claimed'` qualifies: a
+ * 3. **overdue** and **due-soon** — visible NON-TERMINAL tickets whose due-date
+ *    CLAIM falls on or before the IST day `dueSoonDays` from today. A day before
+ *    today is `overdue` (it leads the array: a missed date is the most urgent
+ *    thing here, NP-06); today through the horizon is `due-soon`. Only
+ *    `state: 'claimed'` qualifies: a
  *    `cleared` due date is an attributed removal and a `never-claimed` one is
  *    the absence of any statement, and neither is a deadline.
  *
@@ -249,8 +251,12 @@ export async function readAttention(
   // The due window runs to the end of the IST day `dueSoonDays` from today.
   // `dueDate.claim.date` is already a day claim in the same calendar, so the
   // comparison is day-string to day-string — fixed-width `YYYY-MM-DD` sorts
-  // chronologically — and needs no second clock reading.
+  // chronologically — and needs no second clock reading. A day BEFORE today is
+  // `overdue` (NP-06: it used to ride in `due-soon` and read "due within 7
+  // days" over a 45-day-old date); today through the horizon is `due-soon`.
   const horizon = addIstDays(today, settings.dueSoonDays);
+  const overdueItems: AttentionItem[] = [];
+  const dueSoonItems: AttentionItem[] = [];
   for (const card of cards) {
     if (card.stateCategory === 'terminal') continue;
     // Only a live claim is a deadline: `cleared` is somebody's removal and
@@ -258,15 +264,18 @@ export async function readAttention(
     // so neither can be mistaken for the other here.
     if (card.dueDate.state !== 'claimed') continue;
     const due = card.dueDate.claim;
-    if (due.date > horizon) continue;
-    items.push({
-      kind: 'due-soon',
-      card,
-      due,
-      windowDays: settings.dueSoonDays,
-      reason: `Needed by ${due.date} — due within ${settings.dueSoonDays} days.`,
-    });
+    const verdict = classifyDue(due.date, today, horizon);
+    if (verdict === null) continue;
+    if (verdict.kind === 'overdue') {
+      overdueItems.push({ kind: 'overdue', card, due, daysOverdue: verdict.days, reason: verdict.reason });
+    } else {
+      dueSoonItems.push({ kind: 'due-soon', card, due, windowDays: settings.dueSoonDays, reason: verdict.reason });
+    }
   }
+  // Overdue is the most urgent thing on the strip, so it leads the array; the
+  // client keeps that order and does not re-rank.
+  items.unshift(...overdueItems);
+  items.push(...dueSoonItems);
 
   return {
     workspaceId,
@@ -274,6 +283,46 @@ export async function readAttention(
     settings,
     items,
   };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** `2026-08-17` → `17 Aug` — with the year when it differs from the current year, so a date a year back is not read as this one. */
+function dueDayLabel(day: string, today: string): string {
+  const [year = '', month = '', date = ''] = day.split('-');
+  const label = `${Number(date)} ${MONTHS[Number(month) - 1] ?? month}`;
+  return year === today.slice(0, 4) ? label : `${label} ${year}`;
+}
+
+/**
+ * Where a live due-date claim sits against today (IST), or `null` when it is
+ * further out than the due-soon horizon (NP-06).
+ *
+ * - **A day strictly BEFORE today is `overdue`.** Today itself is not: a ticket
+ *   needed by today still can be done today, and calling it overdue at 00:00 IST
+ *   would be wrong for the whole of the day it is due.
+ * - Today through the horizon (inclusive) is `due-soon`.
+ *
+ * All three arguments are `YYYY-MM-DD` IST days, so the comparison is string to
+ * string and `days` is an IST day count through `istDaysBetween`, never a
+ * millisecond quotient. The reasons carry the date and the distance in words
+ * (`was due 17 Aug (45 days ago)`, `due 5 Oct (in 4 days)`) because the strip
+ * renders them verbatim under a chip that names the kind.
+ */
+export function classifyDue(
+  dueDay: string,
+  today: string,
+  horizon: string,
+): { kind: 'overdue' | 'due-soon'; days: number; reason: string } | null {
+  if (dueDay < today) {
+    const days = istDaysBetween(dueDay, today);
+    const when = days === 1 ? 'yesterday' : `${days} days ago`;
+    return { kind: 'overdue', days, reason: `was due ${dueDayLabel(dueDay, today)} (${when})` };
+  }
+  if (dueDay > horizon) return null;
+  const days = istDaysBetween(today, dueDay);
+  const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+  return { kind: 'due-soon', days, reason: `due ${dueDayLabel(dueDay, today)} (${when})` };
 }
 
 /**

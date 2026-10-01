@@ -2642,7 +2642,7 @@ export function mapWorkspaceSettings(
 }
 
 /**
- * One of the three SHIPPED attention kinds → `AttentionItem`.
+ * One of the four SHIPPED attention kinds → `AttentionItem`.
  *
  * Each server arm nests the whole `TicketCard` and adds its own evidence
  * fields; the client item is flat and carries the four facts the strip renders.
@@ -2656,7 +2656,7 @@ export function mapWorkspaceSettings(
  *
  * - `blocked` and `stale` are both about the state the ticket is IN, so the
  *   claim is `card.stateProvenance` — who moved it there and when.
- * - `due-soon` is about the DUE DATE, so the claim is the due claim, not the
+ * - `overdue` and `due-soon` are about the DUE DATE, so the claim is the due claim, not the
  *   state's. Using `stateProvenance` there would attribute a deadline to
  *   whoever last transitioned the ticket.
  *
@@ -2686,14 +2686,17 @@ function mapAttentionItem(
       claim: mapProvenance(card['stateProvenance'], `${path}.card.stateProvenance`, roster),
     };
   }
-  if (kind === 'due-soon') {
+  // `overdue` (NP-06) is about the same fact as `due-soon` — the due claim —
+  // so it carries the same claim; the server only decides which side of today
+  // the date falls on.
+  if (kind === 'due-soon' || kind === 'overdue') {
     return {
       ...base,
       kind,
       claim: mapProvenance(record['due'], `${path}.due`, roster),
     };
   }
-  throw new MappingError(`${path}.kind`, "one of blocked/stale/due-soon");
+  throw new MappingError(`${path}.kind`, "one of overdue/blocked/stale/due-soon");
 }
 
 /**

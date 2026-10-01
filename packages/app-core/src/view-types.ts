@@ -860,7 +860,7 @@ export type MyWorkView = {
   shared: WorkItem[];
 };
 
-export type AttentionKind = 'blocked' | 'stale' | 'due-soon' | 'contested';
+export type AttentionKind = 'overdue' | 'blocked' | 'stale' | 'due-soon' | 'contested';
 
 /** Computed, never authored (spec §7). `claim` is the underlying claim's provenance when one exists. */
 export type AttentionItem = {

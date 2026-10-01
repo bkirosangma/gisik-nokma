@@ -320,8 +320,16 @@ export function rememberProjectTab(
   } catch {
     // See the write in `useLastProject`: a lost convenience, never a failure
     // the page should surface. This one runs inside a click handler.
+    return;
   }
+  // Tell this document it changed. `storage` events only reach OTHER tabs, and the phone bottom
+  // bar (`bottom-bar.tsx`) marks the project tab the page is on — it re-reads on this event so a
+  // tab switch inside the page moves the bar's indicator without a navigation.
+  window.dispatchEvent(new Event(PROJECT_TAB_CHANGED_EVENT));
 }
+
+/** Fired on `window` after `rememberProjectTab` has written. See the dispatch above. */
+export const PROJECT_TAB_CHANGED_EVENT = 'gn-project-tab-changed';
 
 function isProjectTab(value: unknown): value is ProjectTab {
   return typeof value === 'string' && (PROJECT_TABS as readonly string[]).includes(value);

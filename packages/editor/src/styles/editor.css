@@ -247,6 +247,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  -webkit-touch-callout: none;
   transition: background 150ms ease, box-shadow 150ms ease;
 }
 /* The active mark. `ImageWrapMenu`'s own `--active` rule is the precedent, and
@@ -309,8 +310,20 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-.ticket-editor__tool-label {
-  white-space: nowrap;
+/* The glyph never shrinks inside a flex button. (`.ticket-editor__tool` above carries
+   `-webkit-touch-callout: none` so iOS raises no callout on the long-press that shows a tool's name,
+   case 21.135.) */
+.ticket-editor__tool svg {
+  flex: none;
+}
+/* The phone "More tools" tray (≤40rem only — it is never rendered above): the tools that do not fit
+   on the bar, in a row of their own under it. */
+.ticket-editor__tray {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 /* Groups (marks / blocks / insert), each `role="group"` in the markup — a
    thin divider between clusters rather than a bigger gap alone, so the
@@ -333,6 +346,36 @@
 .ticket-editor__tool-wrap {
   position: relative;
   display: inline-flex;
+}
+/* THE PHONE ARM (≤40rem — the query `EditorToolbar` switches its eight-tool bar on, `PHONE_TOOLBAR_QUERY`;
+   AUDIT BRD-08, cases 21.235–21.237). It lives HERE, after the bases it overrides, because the editor is mounted
+   in every host (the ticket sheet, the new-ticket dialog, Notes, comments, the mobile webview): the 44px floors
+   and the divider drop were `.gn-notes …` rules in `globals.css` until 2026-10-02 and left the sheet and the
+   dialog at 32px with dividers drawn. Same specificity as the bases, so SOURCE ORDER decides — this arm must stay
+   below `.ticket-editor__tool`, `.ticket-editor__heading-select` and `.ticket-editor__tool-divider` above.
+   The dividers cost 5px a group; without dropping them the second row of the two-row bar overflows its box.
+   The side padding is trimmed 0.5rem → 0.25rem for the same reason: in the sheet and the dialog the bar's box is
+   the viewport less 2 × 1.5rem (312px at 360), and the second row (heading select, three lists, More = 297.5px)
+   needs more than the 296px the base padding leaves — a third row, where Notes' wider box never saw one (21.236). */
+@media (max-width: 40rem) {
+  .ticket-editor__toolbar {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+  .ticket-editor__tool {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .ticket-editor__heading-select {
+    min-height: 2.75rem;
+  }
+  .ticket-editor__tool-divider {
+    display: none;
+  }
+  /* A group wider than the row wraps inside itself rather than being clipped by `.editor-slot` (the audit's cut row). */
+  .ticket-editor__tool-group {
+    flex-wrap: wrap;
+  }
 }
 /* The tooltip itself — `role="tooltip"` in the markup, shown on hover AND
    keyboard focus (never `title=`: `packages/ui/src/ui.css` records the

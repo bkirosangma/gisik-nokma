@@ -126,7 +126,7 @@ function ConnectScreen(): React.JSX.Element {
         <h1 className="gn-page-title">Connect an assistant</h1>
 
         <Card className="gn-mcp-authorize__card">
-          {session.kind === 'loading' ? (
+          {session.kind === 'loading' || session.kind === 'error' ? (
             <p>Checking your session…</p>
           ) : session.kind === 'signed-out' ? (
             <p className="gn-mcp-authorize__signed-out">

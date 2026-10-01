@@ -2,9 +2,16 @@
 
 import { Avatar, Button, NoteBadge } from '@gisik-nokma/ui';
 import type { NoteDetail } from '@gisik-nokma/domain';
-import { DELETE_TRIGGER_LABEL, type RosterMember, type WorkspaceRef } from '@gisik-nokma/app-core';
+import { DELETE_TRIGGER_LABEL, moreActionsFor, type RosterMember, type WorkspaceRef } from '@gisik-nokma/app-core';
+import { OverflowMenu } from '../overflow-menu.js';
+import { useIsPhone } from '../use-is-phone.js';
 import { ticketSheetPath } from '../ticket-location.js';
 import { ScopeEditor } from './scope-editor.js';
+
+const COPY_MARKDOWN_LABEL = 'Copy as Markdown';
+const HISTORY_LABEL = 'History';
+/** The phone menu's accessible name (case 21.131); case 13.1059 wants every `role="menu"` named. */
+const NOTE_MENU_LABEL = 'Note actions';
 
 /**
  * Who wrote it, when it changed, who may see it, what it is pinned to, and how
@@ -86,6 +93,7 @@ export function NoteByline({
    */
   onDelete?: () => void;
 }) {
+  const isPhone = useIsPhone();
   return (
     <div className="gn-notes__byline">
       <Avatar name={authorName} tint={note.authorId} size="small" />
@@ -117,18 +125,35 @@ export function NoteByline({
       </span>
 
       <span className="gn-notes__byline-actions">
-        <Button onClick={onCopyMarkdown}>Copy as Markdown</Button>
-        {/* Open to every viewer, not just an editor: spec §9.6 makes History
-            "view only" for a reader — RESTORE is what `canEdit` gates, inside
-            the panel itself, not the door to it. */}
-        <Button variant="ghost" onClick={onOpenHistory}>
-          History
-        </Button>
-        {onDelete !== undefined ? (
-          <Button variant="ghost" onClick={onDelete}>
-            {DELETE_TRIGGER_LABEL}
-          </Button>
-        ) : null}
+        {isPhone ? (
+          // At phone width the three actions share one "⋯" menu (case 21.131) so the title keeps
+          // its line; the SAME `OverflowMenu` the workspace card uses, items in the inline order.
+          <OverflowMenu
+            className="gn-card-menu--inline"
+            triggerLabel={moreActionsFor(note.title)}
+            menuLabel={NOTE_MENU_LABEL}
+            items={[
+              { label: COPY_MARKDOWN_LABEL, onSelect: onCopyMarkdown },
+              { label: HISTORY_LABEL, onSelect: onOpenHistory },
+              ...(onDelete !== undefined ? [{ label: DELETE_TRIGGER_LABEL, onSelect: onDelete }] : []),
+            ]}
+          />
+        ) : (
+          <>
+            <Button onClick={onCopyMarkdown}>{COPY_MARKDOWN_LABEL}</Button>
+            {/* Open to every viewer, not just an editor: spec §9.6 makes History
+                "view only" for a reader — RESTORE is what `canEdit` gates, inside
+                the panel itself, not the door to it. */}
+            <Button variant="ghost" onClick={onOpenHistory}>
+              {HISTORY_LABEL}
+            </Button>
+            {onDelete !== undefined ? (
+              <Button variant="ghost" onClick={onDelete}>
+                {DELETE_TRIGGER_LABEL}
+              </Button>
+            ) : null}
+          </>
+        )}
       </span>
     </div>
   );

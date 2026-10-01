@@ -27,7 +27,10 @@ import { z } from 'zod';
  * directions.
  *
  * `derivePrefix` is the answer to that, and it is a DERIVATION and not a
- * guess: it is a pure function of the name, and the name IS in the ledger. So
+ * guess: it is a pure function of the name, and the name IS in the ledger.
+ * **A project derives from the name it was FOUNDED under**, never its current
+ * one — a rename must not re-key it (`proj_projects.founding_name`; a workspace
+ * does the same, `workspaces/workspace-name.ts`). So
  * a workspace or project with no stored prefix still composes a key that is
  * stable across replays, and one that matches what its owner would have typed
  * — the three rows the owner named on 2026-09-20 come out of this rule as

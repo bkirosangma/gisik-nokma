@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkflowDef } from '@gisik-nokma/domain';
-import { arrowTarget, arrowTargets } from '../../src/views/board-arrows.js';
+import { allBoardTargets, arrowTarget, arrowTargets } from '../../src/views/board-arrows.js';
+import { transitionOptions } from '../../src/views/transition-dialog.js';
 import { WF_ERRAND } from '../helpers/seed.js';
 
 /**
@@ -127,5 +128,30 @@ describe('arrowTargets — every declared target in that direction, nearest firs
     expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'todo', 'previous')).toEqual([]);
     expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'done', 'next')).toEqual([]);
     expect(arrowTargets(WF_ERRAND, ERRAND_COLUMN_ORDER, 'nowhere', 'next')).toEqual([]);
+  });
+});
+
+/**
+ * 21.044 — the Move button's list: every destination the BOARD offers from a
+ * state, both directions in one list. The plan's own snippet expected
+ * `['waiting', 'done']` from `doing`; `WF_ERRAND` also declares `* -> todo`,
+ * so `todo` is a legal move from every state and comes first in declaration
+ * order. The control's fixture likewise has to drop the wildcard, or `waiting`
+ * still has a non-Backlog exit.
+ */
+describe('21.044 allBoardTargets — transitionOptions minus Backlog, declaration order', () => {
+  it('21.044 doing offers todo, waiting and done in declaration order, never Backlog', () => {
+    expect(allBoardTargets(WF_ERRAND, 'doing')).toEqual(['todo', 'waiting', 'done']);
+    expect(allBoardTargets(WF_ERRAND, 'doing')).not.toContain('backlog');
+    // CONTROL — Backlog IS a real transitionOptions target here, so the filter has something to remove …
+    const options = transitionOptions(WF_ERRAND, 'doing').map((option) => option.toStateId);
+    expect(options).toContain('backlog');
+    // … and a state whose only exit is Send to Backlog offers nothing on the board.
+    const onlyBacklog: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.filter((t) => t.from !== 'waiting' && t.from !== '*'),
+    };
+    expect(transitionOptions(onlyBacklog, 'waiting').map((option) => option.toStateId)).toEqual(['backlog']);
+    expect(allBoardTargets(onlyBacklog, 'waiting')).toEqual([]);
   });
 });

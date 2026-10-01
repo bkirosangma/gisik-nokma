@@ -191,3 +191,38 @@ export const SCREEN_OWNERS: Record<string, string> = {
   'apps/web/app/privacy/page.tsx': 'B20',
   'apps/web/app/terms/page.tsx': 'B20',
 };
+
+/**
+ * The phone pass's inventory (mobile-web plan Task 1, FD3): route → the task
+ * that owns its phone rules. Beside `SCREEN_OWNERS` and policed the same way
+ * (`phone-inventory.test.ts`, case 21.001): a new `page.tsx` with no owner here
+ * fails, and so does an owner naming a route that no longer exists.
+ */
+export const PHONE_OWNERS: Record<string, string> = {
+  'apps/web/app/page.tsx': 'T12',
+  'apps/web/app/sign-in/page.tsx': 'T12',
+  'apps/web/app/invite/[token]/page.tsx': 'T12',
+  'apps/web/app/mcp/connect/page.tsx': 'T12',
+  'apps/web/app/mcp/authorize/page.tsx': 'T12',
+  'apps/web/app/workspaces/page.tsx': 'T7',
+  'apps/web/app/w/[workspaceId]/page.tsx': 'T7',
+  'apps/web/app/w/[workspaceId]/members/page.tsx': 'T7',
+  'apps/web/app/inbox/page.tsx': 'T7',
+  'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 'T4, T6, T8',
+  'apps/web/app/notes/page.tsx': 'T9',
+  'apps/web/app/notes/[noteId]/page.tsx': 'T9',
+  'apps/web/app/w/[workspaceId]/my-work/page.tsx': 'T9',
+  'apps/web/app/account/page.tsx': 'T10',
+  'apps/web/app/settings/page.tsx': 'T10',
+  'apps/web/app/mcp/tokens/page.tsx': 'T10',
+  'apps/web/app/help/page.tsx': 'T10',
+  'apps/web/app/privacy/page.tsx': 'T10',
+  'apps/web/app/terms/page.tsx': 'T10',
+  'apps/web/app/w/[workspaceId]/settings/workflows/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/workflows/new/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/history/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/ticket-types/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/ticket-types/new/page.tsx': 'T11',
+  'apps/web/app/w/[workspaceId]/settings/ticket-types/[typeId]/page.tsx': 'T11',
+};

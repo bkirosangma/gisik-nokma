@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { Viewport } from 'next';
 import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import '@gisik-nokma/ui/ui.css';
 import '@gisik-nokma/editor/editor.css';
@@ -8,6 +9,26 @@ import { SkipLink } from '../src/skip-link.js';
 import { RouteAnnouncer } from '../src/route-announcer.js';
 
 export const metadata = { title: 'Gisik Nokma', icons: { icon: '/favicon.svg' } };
+
+/**
+ * The phone layer's two opt-ins (mobile-web plan Task 1, FD9, case 21.002).
+ *
+ * `viewportFit: 'cover'` is what makes `env(safe-area-inset-*)` non-zero on iOS:
+ * without it the browser letterboxes the page inside the safe area and every
+ * `env()` the bottom bar reads resolves to 0, so the bar would sit under the
+ * home indicator the day a device has one. `interactiveWidget:
+ * 'resizes-content'` makes the on-screen keyboard shrink the layout viewport
+ * (Chrome/Android), so a fixed bottom element rides above it instead of being
+ * painted over the field being typed in. `width`/`initialScale` are what every
+ * page already got from Next's default and are spelled out so this export
+ * REPLACES that default without losing it.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
+};
 
 /**
  * `@gisik-nokma/ui/tokens`, not `@gisik-nokma/ui`.

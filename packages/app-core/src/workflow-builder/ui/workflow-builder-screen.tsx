@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
 import { Button } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
@@ -93,6 +94,33 @@ export function WorkflowBuilderScreen(props: {
   });
   const [data, setData] = useState<{ members: WorkspaceMember[]; ticketTypes: TicketTypeDef[] } | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Phone only (Plan Task 11, 21.170): the States / Transitions / System rules / Issues column is a bottom sheet
+  // opened from the "Panels" button. Above 40rem the button, the scrim and the Done button are `display: none` and
+  // this state paints nothing, so the side-by-side layout is untouched.
+  const [panelsOpen, setPanelsOpen] = useState(false);
+  const panelsButtonRef = useRef<HTMLButtonElement>(null);
+  const panelsDoneRef = useRef<HTMLButtonElement>(null);
+  const closePanels = () => {
+    setPanelsOpen(false);
+    panelsButtonRef.current?.focus();
+  };
+
+  useEffect(() => {
+    // A tap on a canvas node or arrow writes the draft's one `selection`, and the row it opens lives in the panels
+    // column — on a phone that column is hidden until asked for, so a NEW selection opens the sheet (once per change,
+    // never for the draft's own starting selection). Phone only (T13, 21.176): above 40rem the column is always
+    // on screen, and flipping `panelsOpen` there would leave a stale open sheet for the next resize to the phone.
+    let last = store.getState().selection;
+    return store.subscribe(() => {
+      const next = store.getState().selection;
+      if (next !== last && next.kind !== 'none' && window.matchMedia?.(PHONE_BOARD_QUERY).matches) setPanelsOpen(true);
+      last = next;
+    });
+  }, [store]);
+
+  useEffect(() => {
+    if (panelsOpen) panelsDoneRef.current?.focus();
+  }, [panelsOpen]);
 
   useEffect(() => {
     // Written on every change, not only on unmount — a tab CLOSE fires no
@@ -179,6 +207,15 @@ export function WorkflowBuilderScreen(props: {
             <WorkflowNameField />
             <div className="workflow-builder-screen__actions">
               <AddStateButton />
+              <Button
+                ref={panelsButtonRef}
+                className="workflow-builder-screen__panels"
+                aria-expanded={panelsOpen}
+                aria-controls="workflow-builder-panels"
+                onClick={() => setPanelsOpen(true)}
+              >
+                Panels
+              </Button>
               <PublishControls
                 onPublished={(payload) => {
                   // The recovered draft is now the server's own truth — clearing
@@ -197,7 +234,18 @@ export function WorkflowBuilderScreen(props: {
           </div>
         </header>
         <div className="workflow-builder-screen__layout">
-          <aside className="workflow-builder-screen__left">
+          {panelsOpen ? <div className="workflow-builder-screen__scrim" aria-hidden="true" onClick={closePanels} /> : null}
+          <aside
+            id="workflow-builder-panels"
+            className="workflow-builder-screen__left"
+            data-open={panelsOpen ? 'true' : 'false'}
+            onKeyDown={(keyEvent) => {
+              if (keyEvent.key === 'Escape' && panelsOpen) closePanels();
+            }}
+          >
+            <Button ref={panelsDoneRef} className="workflow-builder-screen__panels-done" onClick={closePanels}>
+              Done
+            </Button>
             <BuilderPanels />
             <SystemRulesPanel />
             <IssuesPanel />

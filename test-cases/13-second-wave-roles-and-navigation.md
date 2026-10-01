@@ -1272,6 +1272,8 @@ written beside the code.
   caught (**1 failed / 6**, the uniqueness case), and the helper's docblock names the residual it still
   does not cover rather than implying the set is closed.
 
+  **AMENDED 2026-10-01 (orchestrator ruling (a), mobile T9 fix-2).** "Declared twice" is narrowed, not dropped: each family selector may be declared at most once at top level AND at most once inside the one `@media (max-width: 40rem)` arm, the phone rule AFTER its base; any other at-rule, a second rule in either place, or a phone rule before (or without) its base stays red — each witnessed (case 21.134 uses the one allowed phone rule).
+
 ## The members screen's styling, measured against the prototype (executor 2, 2026-09-18) — ids `13.886`–`13.889`
 
 The owner's instruction, verbatim: *"next task to queue up is the workspace members UI. check the prototype

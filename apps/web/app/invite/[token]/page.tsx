@@ -178,7 +178,7 @@ export default function InvitePage() {
                 {`This link lapses ${onDay(invite.expiresAt)}.`}
               </p>
             )}
-            {session.kind === 'loading' ? (
+            {session.kind === 'loading' || session.kind === 'error' ? (
               <p role="status">Checking whether you are signed in…</p>
             ) : session.kind === 'signed-out' ? (
               <p>

@@ -5,9 +5,13 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
+import { useIsPhone } from "./use-is-phone.js";
 import { NavBrand } from "./nav-brand.js";
 import { NotesNavLink } from "./notes-nav-link.js";
-import { useCurrentUser } from "./providers.js";
+import { BottomBar } from "./bottom-bar.js";
+import { PhoneSwitcher } from "./phone-switcher.js";
+import { useSessionStatus } from "./providers.js";
+import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
@@ -49,7 +53,9 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * (its one caller) stopped passing it in the same change.
  *
  * **The scope note below still says "pick one to reach its board, members and
- * settings", and that is still TRUE** — checked rather than assumed, because
+ * settings", and that is still TRUE** (it stays in the DOM at every width; at
+ * ≤40rem the stylesheet hides it and `PhoneSwitcher`'s "Choose a workspace"
+ * carries the same fact — mobile-web plan FD2) — checked rather than assumed, because
  * case 13.391 was made green last round on exactly that sentence's accuracy.
  * It describes what picking a workspace gets you, not what this bar renders: a
  * board is one click from the workspace home's project grid. Members and
@@ -184,13 +190,26 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  * that has projects, because a closed-set tripwire that cannot see the newest
  * member of the set is exactly the check that cannot fail.
  */
+/** `/w/<workspace>/p/<project>[/…]` → the project id, else `undefined` — the phone switcher's one route read. */
+function projectIdOf(pathname: string): string | undefined {
+  return /^\/w\/[^/]+\/p\/([^/?#]+)/.exec(pathname)?.[1];
+}
+
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const pathname = usePathname();
   // The sign-out CALL moved into `AccountMenu` with the control that used it
-  // (Round 24). `useCurrentUser` stayed, for two branches: whether this bar
+  // (Round 24). The session read stayed, for two branches: whether this bar
   // shows the menu or the signed-out Help/Account fallback below, and which
   // user the remembered workspace must belong to.
-  const user = useCurrentUser();
+  // The session through `useSessionStatus`, the one reading every page's
+  // "Sign in to …" fallback uses (SYS-01): `useCurrentUser` answered null for
+  // loading, error AND signed-out alike, and this bar swapped to "Sign in" on
+  // all three. Now only a genuine `signed-out` draws the door; a failed read
+  // keeps the last known user's chrome and `SessionNotice` says what happened.
+  const session = useSessionStatus();
+  const user = session.kind === "signed-in" ? session.user : null;
+  const signedOut = session.kind === "signed-out";
+  const isPhone = useIsPhone();
   const remembered = useLastWorkspace(workspaceId, user?.id ?? null);
 
   // The workspace this bar is ABOUT, which is no longer only the one in the
@@ -239,16 +258,25 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
    * `docs/pre-launch-checklist.md`); it was never a ruling that the bar may
    * take five rows.
    *
-   * So below 40rem the workspace-scoped links move behind one disclosure while
+   * (SUPERSEDED at ≤40rem by the phone shell, mobile-web plan Task 2: from 40rem
+   * down the whole `.gn-nav__links--member` group — Workspaces, the toggle, the
+   * links — is hidden and `PhoneSwitcher` stands in; this disclosure now serves
+   * 40rem–70rem only. The paragraph below describes the mechanism it still is.)
+   *
+   * So below 70rem the workspace-scoped links move behind one disclosure while
    * `Workspaces`, the toggle and the corner stay on a single line. This is
    * STATE, but not CONDITIONAL RENDERING: the links are always in the document
    * and `data-open` only decides whether the stylesheet paints them. A closed
    * bar is a visual state, not a missing link — and it keeps every route to
-   * My Work / Members / Settings in the accessibility tree at every width.
+   * My Work / Members / Settings in the accessibility tree from 40rem up. (At
+   * ≤40rem the group is `display: none` and those routes are the phone bottom
+   * bar's (`bottom-bar.tsx`: slots or More), so a painted-away link is
+   * reachable through its replacement rather than missing.)
    */
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
+    <>
     <nav
       className="gn-nav"
       /* exec1 P31: this bar rendered `<nav className="gn-nav">` with NO
@@ -275,7 +303,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           deliberately OUTSIDE this div: see `.gn-nav__signout`'s own
           docblock in globals.css for why it is pinned instead of sharing
           this group's wrap. */}
-      <div className="gn-nav__links">
+      <div className={user !== null ? "gn-nav__links gn-nav__links--member" : "gn-nav__links"}>
         {/* E5-31: gated on the session, because signed out there is nothing
             behind it. The bar used to offer Workspaces, an inbox icon, an
             account menu and a scope note to a visitor who could use none of
@@ -394,7 +422,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             This is a real branch, not defensive padding: `/help` renders for a
             signed-out reader by design, and it is the route most likely to be
             wanted by someone who cannot get in. */}
-        {user === null ? (
+        {signedOut ? (
           <>
             <Link href="/help" aria-current={current("/help")}>
               Help
@@ -464,9 +492,30 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         ) : null}
         <span className="gn-nav__spacer" />
       </div>
+      {/* PHONE-ONLY (mobile-web plan Task 2, cases 21.010–21.011). `display: none`
+          above 40rem (`.gn-phone-switcher`, globals.css); at ≤40rem it takes the
+          place of the link row and the scope note above, which the same arm
+          hides. It sits AFTER the link row in the DOM, not beside the brand, so the
+          brand's next sibling stays `.gn-nav__links` (case 13.1474, unmodified);
+          with the row `display: none` it is visually second all the same. Signed-in only, for the reason that row's own signed-out arm is
+          kept: a visitor with no session needs the way IN, and `Help`/`Sign in`
+          stay painted for them at every width. The workspace passed is the bar's
+          EFFECTIVE one — `undefined` while `noWorkspace` — so a remembered
+          workspace that never resolves reads "Choose a workspace" and cannot name
+          something the person cannot open (Rounds 22–25, plan FD5). The project
+          comes from the route, the one place a bar can know it is in one. */}
+      {user !== null ? (
+        <PhoneSwitcher
+          workspaceId={noWorkspace ? undefined : effectiveWorkspaceId}
+          workspaceName={workspaceName}
+          projectId={projectIdOf(pathname)}
+        />
+      ) : null}
       {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
           both outside `.gn-nav__links` so they stay pinned as a pair at the
-          bar's end rather than wrapping into the destination group. */}
+          bar's end rather than wrapping into the destination group. (At phone
+          width — `isPhone` — Notes and Inbox are the bottom bar's and the corner
+          is the avatar alone.) */}
       {/* E5-31: the whole corner is signed-in only. `AccountMenu` already
           rendered nothing without a session, but `InboxNavLink` did — an
           unlabelled icon pointing at a session-gated route, which is the
@@ -480,12 +529,34 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
               the SAME view as `/notes`, with a note open, so exact equality
               would leave the link dark on the page the reader is actually on.
               Case 18.182 walks both spellings and the control. */}
-          <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
-          <InboxNavLink active={pathname === "/inbox"} />
+          {!isPhone ? (
+            <>
+              <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
+              <InboxNavLink active={pathname === "/inbox"} />
+            </>
+          ) : null}
           <AccountMenu />
         </div>
       ) : null}
       </div>
     </nav>
+    {/* The ONE shell notice for a failed session read (SYS-01) — renders nothing while the read is healthy. */}
+    <SessionNotice />
+    {/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.020–21.032). Rendered only at phone
+        width, by script (`useIsPhone`), and INSTEAD of the corner's Notes and Inbox links above — a
+        second set of the same links would be a second unread poller and a duplicate for anything that
+        reads the DOM rather than the page. It is a sibling of the bar, not a child: a `nav` inside a
+        `nav` is a landmark inside a landmark, and the bar's own sticky stacking context is not the
+        place for a `position: fixed` thing. The workspace is the EFFECTIVE one (`undefined` while
+        `noWorkspace`), so a remembered id that never resolves gets no scoped slot (plan FD5). */}
+    {user !== null && isPhone ? (
+      <BottomBar
+        workspaceId={noWorkspace ? undefined : effectiveWorkspaceId}
+        projectId={projectIdOf(pathname)}
+        userId={user.id}
+        pathname={pathname}
+      />
+    ) : null}
+    </>
   );
 }

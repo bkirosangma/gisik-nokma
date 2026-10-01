@@ -1018,7 +1018,9 @@ describe('the rename control (13.962–13.965)', () => {
       mount([[workspaceAs(role)]]);
       // The NAME still renders — this asserts the control's absence, not that
       // the workspace is hidden from them.
-      expect(await screen.findByText('Convenience Corner')).toBeInTheDocument();
+      // (`findAllBy…`: the nav now paints the name twice — the bar's own label and, from
+      // mobile-web Task 2, the phone switcher's, one of them `display: none` at any width.)
+      expect((await screen.findAllByText('Convenience Corner')).length).toBeGreaterThan(0);
       expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
     }
   });

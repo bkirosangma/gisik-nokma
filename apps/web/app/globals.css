@@ -1083,6 +1083,19 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
   text-wrap: pretty;
 }
+/* ── `/account` on a phone (mobile-web plan Task 10, case 21.150). The sections are already ONE
+   column at every width, so what changes is the measure (the 42.5rem cap gives way to the
+   viewport) and the rows that put a label beside an action. The label block takes the whole line
+   (`flex-basis: 100%`) and the action — "Sign out this device", the stale tag, Delete — wraps
+   UNDER it: the rows are already `flex-wrap`, so no direction flips and the 44px action keeps its
+   own width. Only the device and passkey rows: the notification row's switch belongs at the
+   trailing edge beside its label, and the workspace row is one door. Compound selectors (0,2,0)
+   so `.gn-account__row-text`'s own `flex: 1 1 auto` (0,1,0) cannot undo it whatever the order. */
+@media (max-width: 40rem) {
+  .gn-account__column { max-width: none; gap: 1rem; padding-top: 0.5rem; }
+  .gn-account__session-row .gn-account__row-text,
+  .gn-account__passkey-row .gn-account__row-text { flex-basis: 100%; }
+}
 /* ── Task 19: the workspace home (`/w/[workspaceId]`). ──────────────────────
    Spacing and one muted text role, exactly like the Task 18 block above, and
    for the same reason: the pieces this page lays out (`.gn-card`, `.gn-chip`,
@@ -1130,6 +1143,11 @@ input, textarea, select { font-family: inherit; }
    instead of matching the pre-Task-6 2.4px — zeroed rather than restored. */
 .gn-workspace-home__header-titles .gn-workspace-list__role--pinned { margin-top: 0; }
 .gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 1.4rem 0 0; }
+/* Phone (case 21.091): the section cards are one column BY RULE. `auto-fit` already lands on one
+   below ~34rem, but "one column" is the phone's promise, not an accident of a 15rem minimum. */
+@media (max-width: 40rem) {
+  .gn-workspace-home__links { grid-template-columns: minmax(0, 1fr); }
+}
 .gn-workspace-home__link {
   background: var(--gn-surface-raised);
   /* Styling refresh Plan B (Task B13): P-RAISED — the lit-edge `lift` shadow, with the P-LIFT transition (hover and press below). */
@@ -1434,6 +1452,27 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-settings__sidebar-item--disabled { color: var(--gn-text-muted); }
 .gn-settings__content { flex: 1 1 20rem; min-width: 0; }
+/* ── `/settings` on a phone (mobile-web plan Task 10, case 21.151). The sidebar becomes a TRACK above
+   the content: a single row of the sections that scrolls sideways inside its own box (the page
+   never does — `min-width: 0` lets the flex item shrink below its content). CSS-only, so it is the
+   scrolling-track form the plan allows rather than a `Select`. Flipping `.gn-settings` to a column
+   turns the base `flex` basis (15.5rem / 20rem) into a HEIGHT, so both are restated. The current
+   section keeps the base rule's FILLED pill (a shape, not text colour alone); this arm adds no
+   `aria-current` rule of its own — case 13.910 allows exactly one in `.gn-settings`. Targets stay
+   the base rule's 2.75rem. */
+@media (max-width: 40rem) {
+  .gn-settings { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0.75rem; }
+  .gn-settings__sidebar {
+    flex: 0 0 auto;
+    flex-direction: row;
+    min-width: 0;
+    overflow-x: auto;
+    gap: 0.25rem;
+  }
+  .gn-settings__sidebar a,
+  .gn-settings__sidebar-item--disabled { flex: none; white-space: nowrap; }
+  .gn-settings__content { flex: 1 1 auto; }
+}
 
 /* ── Two founding-form class families (Round 19b, owner feedback item 3). ───
    Until now both forms shared `.gn-founding`, a raised card. The owner's
@@ -1461,6 +1500,13 @@ input, textarea, select { font-family: inherit; }
   font-weight: 600;
 }
 .gn-workspace-founding__submit { align-self: flex-start; }
+/* Phone (mobile-web plan Task 7, case 21.090): the 420px cap goes, so the block is the screen's
+   width, and the submit takes the line — a full-width target, not a pill stranded at the start.
+   AFTER the two base rules above: at equal specificity the later rule decides. */
+@media (max-width: 40rem) {
+  .gn-workspace-founding { max-width: none; }
+  .gn-workspace-founding__submit { align-self: stretch; }
+}
 
 /* `.gn-project-founding` — the workspace home's "New project" row. A raised
    card (Task 15's reasoning for `.gn-card`'s own roles applies unchanged:
@@ -1482,6 +1528,13 @@ input, textarea, select { font-family: inherit; }
   box-shadow: var(--gn-shadow-lift);
 }
 .gn-project-founding__field { flex: 1; min-width: 13.75rem; }
+/* Phone (case 21.091): the New project row stacks — the field over the button, both the card's
+   width. Without this the field wraps at its 13.75rem floor and the button sits under it at
+   content width, a second, smaller target. The floor goes so a narrow phone never forces overflow. */
+@media (max-width: 40rem) {
+  .gn-project-founding { flex-direction: column; align-items: stretch; }
+  .gn-project-founding__field { min-width: 0; }
+}
 
 /* Task 8 (workspaces-prototype-port, 2026-09-15) — the invitations banner
    becomes a flat warning wash, not a card you could open. The prototype
@@ -1571,6 +1624,12 @@ input, textarea, select { font-family: inherit; }
 .gn-invitations__failure { margin: 1.1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
+/* The invite accept card on a phone (mobile-web plan Task 12, case 21.191): the card already fills the
+   shell's width, so what changes is the action — "Join <workspace>" (and the unreachable state's
+   Retry) is a full-width 3rem target. The variant stays the page's: `primary`. */
+@media (max-width: 40rem) {
+  .gn-invite .gn-button { width: 100%; min-height: 3rem; justify-content: center; }
+}
 
 /* ── `/w/[workspaceId]/members` — the roster (2026-09-18). ──────────────────
    Ported from the prototype's `isMembers` screen
@@ -1792,6 +1851,24 @@ input, textarea, select { font-family: inherit; }
 .gn-members__role { font-weight: 500; }
 /* R5: the role control and the quiet "Remove from workspace…" action share the cell. */
 .gn-members__role-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+/* Phone (case 21.092): the roster is stacked rows, not a table. The table's 51.25rem floor is what
+   made the card scroll sideways, so it goes with the table layout: table, body and row are blocks,
+   each cell is its own line (name + email over the role control), and the Select and Remove stack at
+   the full width, the static role chip staying its own size. The header band is hidden — every cell
+   names itself (the name line; `aria-label="Role for …"`; the chip's text). The zebra (13.887) lives
+   on the row's background, which a block row still paints, so no rule here names `.gn-members__row`:
+   the rows are reached as `tr`, because that guard counts rules that name the class. AFTER the base
+   rules above (`.gn-members__table`, `__cell`, `__role`, `__role-cell`). */
+@media (max-width: 40rem) {
+  .gn-members__table { display: block; min-width: 0; }
+  .gn-members__table thead { display: none; }
+  .gn-members__table tbody { display: block; }
+  .gn-members__table tr { display: block; }
+  .gn-members__cell { display: block; padding: 0.75rem 1rem 0.25rem; }
+  .gn-members__cell + .gn-members__cell { padding-top: 0.25rem; padding-bottom: 0.75rem; }
+  .gn-members__role-cell { flex-direction: column; align-items: stretch; }
+  .gn-members__role { align-self: flex-start; }
+}
 /* The confirm dialog reuses the delete dialog's layout, declaration for declaration. */
 .gn-members__remove-dialog { display: flex; flex-direction: column; gap: 1rem; max-width: 32rem; }
 .gn-members__remove-note { margin: 0; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.5; }
@@ -2190,6 +2267,45 @@ input, textarea, select { font-family: inherit; }
     min-width: 0;
   }
 }
+/* THE PHONE SWITCHER'S WRAPPER (mobile-web plan Task 2, case 21.012). A `<div>`, not the
+   button, carries the show/hide, because `.gn-nav button { display: inline-flex }` (0,1,1) outranks
+   any single-class `display: none` a button could wear — the cascade failure
+   `.gn-nav .gn-nav__more-toggle { display: none }` above is spelled out for. Hidden by default; the
+   40rem arm below paints it. Not a `.gn-nav*` selector, so no top-level `.gn-nav*` rule changed. */
+.gn-phone-switcher { display: none; }
+/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.028–21.031): hidden by default; the 40rem arm
+   below paints it. `AppNav` also renders it only at phone width (`use-is-phone.ts`), so this is the
+   belt for the first frame before that effect has run. */
+.gn-bottom-bar { display: none; }
+/* THE SHELL'S SESSION NOTICE (SYS-01, cases 21.239–21.241): shown by `SessionNotice` only while the
+   session read is failing. Wording is the signal, not the tint — the left rule is `--gn-warning`
+   (the `.gn-shell__expired` shape), the sentence says what happened, and Try again is a real
+   button at the 44px floor on every width (so no phone arm is needed). It wraps rather than
+   scrolls: the button drops under the sentence on a narrow screen. */
+.gn-session-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--gn-radius-control);
+  color: var(--gn-text);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-warning);
+}
+.gn-session-notice__retry {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--gn-border, currentColor);
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 @media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
      promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
@@ -2199,6 +2315,204 @@ input, textarea, select { font-family: inherit; }
      already carried before this round. */
   .gn-nav__wordmark { display: none; }
 }
+
+/* ── THE PHONE TOP BAR (mobile-web plan Task 2, cases 21.012–21.013) ──────────────────────────
+   Everything below lives INSIDE the 40rem arm: above it the desktop/tablet bar is byte-identical
+   (the control in 21.012 snapshots every top-level `.gn-nav*` rule). */
+@media (max-width: 40rem) {
+  /* The link row and the scope note give way to the switcher. Only the SIGNED-IN row
+     (`.gn-nav__links--member`): the signed-out row is `Help` + `Sign in`, the one way in, and
+     keeps painting. The note renders signed-in only, so hiding it by its own class is safe. */
+  .gn-nav__links--member { display: none; }
+  .gn-nav__scope { display: none; }
+  /* The bar is one row of `--gn-phone-top-height`: the 2.75rem control plus 0.25rem above and
+     below (3.25rem). Centred, because the desktop `flex-start` leaves a one-control row top-heavy. */
+  .gn-nav__inner { align-items: center; padding-block: 0.25rem; gap: 0.5rem; }
+  /* Things that stick under the bar read this: it is no longer 4.35rem tall. */
+  /* `html:root` (0,1,1) beats the bare `:root` (0,1,0) declaration above it by specificity, not
+     source order; spelled so the token's single top-level declaration stays the only `:root` one
+     (case 10.164 counts them). */
+  html:root { --app-nav-offset: var(--gn-phone-top-height); }
+  .gn-phone-switcher { display: inline-flex; flex: 1 1 0; min-width: 0; }
+  /* `.gn-phone-switcher .gn-phone-switcher__button` is two classes deep to beat
+     `.gn-nav button`'s centring and sizing (0,1,1). Quiet by design — a tertiary fill, no
+     accent, no primary: the one loud element on a phone page is the page's own action. */
+  .gn-phone-switcher .gn-phone-switcher__button {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+    background: var(--gn-fill-tertiary);
+    color: var(--gn-text);
+    font: inherit;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    text-align: start;
+  }
+  .gn-phone-switcher__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gn-phone-switcher__chevron { flex: none; color: var(--gn-text-muted); }
+  /* One line at the phone size, long names cut with an ellipsis. The element's TEXT stays whole
+     (nothing is removed from the DOM), so assistive tech reads the full title. The size is the
+     house's heading step below the 34px display type (1.375rem / 1.75rem). The account page pins
+     its own 34px (`.gn-account .gn-page-title`, two classes deep), so it needs its own line here. */
+  .gn-page-title {
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gn-account .gn-page-title { font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; }
+
+  /* ── The bottom bar (Task 3). Fixed to the bottom, one bar-height tall PLUS the home-indicator
+     inset (`viewport-fit: cover` makes `env(safe-area-inset-bottom)` real on iOS, FD9), the
+     inset taken as padding so the items stay centred in the 3.5rem above it. `--gn-phone-bar-height`
+     is the one number (case 21.003); the shell below reads the same calc so no content hides behind
+     it. Depth from above: a hairline on its TOP edge, the page's own surface under it. */
+  .gn-bottom-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: calc(var(--gn-phone-bar-height) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    align-items: stretch;
+    background: var(--gn-surface);
+    border-top: 1px solid var(--gn-fill-tertiary);
+  }
+  /* The on-screen keyboard is up (`use-keyboard-open.ts`): the bar steps aside, so it can never sit
+     between a person and the field they are typing in. The shell keeps its bottom padding. */
+  .gn-bottom-bar[data-keyboard="open"] { display: none; }
+  /* Content stops above the bar. Only where a bar exists (`:has`) — the sign-in, help and legal pages
+     render no bar and must not carry a 5rem gap. Nested calc so the bar's own height stays one
+     expression the 21.028 case can read. */
+  .gn-shell:has(.gn-bottom-bar) { padding-bottom: calc(calc(var(--gn-phone-bar-height) + env(safe-area-inset-bottom)) + 2rem); }
+  /* `.gn-bottom-bar__item` is a link or a button; one class so both get the same box. 44px is the
+     floor both ways; five items share the width, so at 360px each is 72px. Three text tiers + one
+     accent: muted at rest, the accent for the current one. */
+  .gn-bottom-bar__item {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    padding: 0.25rem 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    font: inherit;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--gn-text-muted);
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gn-bottom-bar__item:focus-visible { outline: 2px solid var(--gn-text-accent); outline-offset: -2px; }
+  .gn-bottom-bar__item[aria-current="page"] { color: var(--gn-text-accent); font-weight: 600; }
+  /* NOT COLOUR ALONE: the current item also draws this bar on its top edge (and is bolder). */
+  .gn-bottom-bar__indicator {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1.75rem;
+    height: 0.1875rem;
+    transform: translateX(-50%);
+    border-radius: 0 0 0.1875rem 0.1875rem;
+    background: var(--gn-text-accent);
+    opacity: 0;
+  }
+  .gn-bottom-bar__item[aria-current="page"] .gn-bottom-bar__indicator { opacity: 1; }
+  .gn-bottom-bar__icon { flex: none; }
+  /* The unread dot, the same signal as the corner's (`.gn-nav__inbox-dot`), over the icon's corner. */
+  .gn-bottom-bar__dot {
+    position: absolute;
+    top: 0.4rem;
+    left: calc(50% + 0.5rem);
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--gn-success);
+    box-shadow: 0 0 0 0.125rem var(--gn-surface);
+  }
+  /* Notes and Inbox are the bar's now; `AppNav` stops rendering them in the corner at this width, so
+     nothing here hides them. The corner keeps the avatar (the switcher is the only other thing in the row). */
+}
+
+/* The More and Edit sheets. Portalled to <body> (so none of `.gn-nav a`'s sizing applies) and only
+   rendered while open, so these can live at the top level without painting anything on a wide screen. */
+.gn-bar-sheet { display: flex; flex-direction: column; gap: 1.5rem; }
+.gn-bar-sheet__heading { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-bar-sheet__note { margin: 0 0 0.5rem; color: var(--gn-text-muted); font-size: 0.9rem; }
+.gn-bar-sheet__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gn-bar-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: none;
+  font: inherit;
+  color: var(--gn-text);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.gn-bar-sheet__row:hover, .gn-bar-sheet__row:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-bar-sheet__row[aria-current="page"] { font-weight: 600; color: var(--gn-text-accent); }
+.gn-bar-sheet__row--edit { color: var(--gn-text-accent); font-weight: 600; }
+.gn-bar-sheet__edit-row { display: flex; align-items: center; gap: 0.25rem; min-height: 2.75rem; }
+.gn-bar-sheet__edit-label { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0.75rem; padding: 0 0.5rem; }
+.gn-bar-sheet__tool {
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  font: inherit;
+  font-size: 1.125rem;
+  cursor: pointer;
+}
+.gn-bar-sheet__tool:disabled { opacity: 0.4; cursor: default; }
+
+/* The switcher's sheet: portalled to <body>, so none of `.gn-nav a`'s sizing applies and each row
+   states its own 44px. Rows are links with a text span and, for the current one, a check mark —
+   `aria-current` for assistive tech, the mark for sighted people (never colour alone). */
+.gn-phone-switcher__sheet { display: flex; flex-direction: column; gap: 1.5rem; }
+.gn-phone-switcher__heading { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-phone-switcher__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gn-phone-switcher__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.75rem;
+  color: var(--gn-text);
+  text-decoration: none;
+}
+.gn-phone-switcher__link:hover, .gn-phone-switcher__link:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-phone-switcher__link[aria-current] { font-weight: 600; }
+.gn-phone-switcher__link-text { min-width: 0; overflow-wrap: anywhere; }
+.gn-phone-switcher__check { flex: none; color: var(--gn-text-accent); }
+.gn-phone-switcher__link--all { color: var(--gn-text-accent); margin-top: 0.25rem; }
+.gn-phone-switcher__note { margin: 0 0 0.5rem; color: var(--gn-text-muted); font-size: 0.9rem; }
 /* Never shrinks and never wraps — the other half of the split above. Its
    rendered width is fixed (the inbox icon + the avatar), so unlike
    `.gn-nav__links` it does not need `min-width: 0` to be safe: there is no
@@ -2572,6 +2886,22 @@ input, textarea, select { font-family: inherit; }
    `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */
 .gn-sign-in__hint,
 .gn-sign-in__legal { margin: 0; text-align: center; font-size: 1rem; color: var(--gn-text-muted); }
+/* ── Sign-in on a phone (mobile-web plan Task 12, case 21.190). The 26rem column and the card's own cap
+   give way to the viewport, with a 1rem gutter (a LONGHAND on the `--centred` modifier: the `.gn-shell`
+   shorthand at ≤60rem supplies 0.75rem and must stay the one `padding` there). The page is still
+   centred on both axes — only the width changes. Every action is a full-width 3rem (48px) button:
+   the method forms' submit and send-code, and the passkey button (a direct child of the
+   alternatives block; the second alternatives block holds the hint and the marks). The provider marks
+   keep their icon-only shape but share the row between them instead of hugging two 56px tiles. No
+   bottom bar: this page never mounts `AppNav`, the bar's only mount (plan FD3, asserted). */
+@media (max-width: 40rem) {
+  .gn-shell--centred { padding-inline: 1rem; }
+  .gn-shell--centred > * { max-width: none; }
+  .gn-sign-in { max-width: none; }
+  .gn-sign-in__method .gn-button,
+  .gn-sign-in__alternatives > .gn-button { width: 100%; min-height: 3rem; justify-content: center; }
+  .gn-sign-in__mark { flex: 1 1 0; min-height: 3rem; }
+}
 
 /* A refusal is a first-class rendering, not an error state. ⚠ CORRECTED
    2026-09-20: this read "six of the twelve `DataSourceQuery` methods answer with a
@@ -2722,6 +3052,20 @@ input, textarea, select { font-family: inherit; }
    every container-filling site (`/sign-in`, `/inbox`) still shares its row. */
 .gn-project__rail { align-self: flex-start; flex-wrap: wrap; }
 .gn-project__rail .gn-segmented__item { flex: none; }
+/* The web app on phones — the view tabs (Plan Task 8, case 21.110). At <=40rem the five tabs are a deliberate
+   horizontal scroller in their own track (never wrapped onto a second line): `nowrap`, `overflow-x: auto`, bounded
+   to the column, and each tab snaps to the track's start. AFTER the base rules above, so source order decides;
+   above 40rem the rail wraps and does not scroll. */
+@media (max-width: 40rem) {
+  .gn-project__rail {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+  }
+  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; }
+}
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
    2.75rem again, and here it is a DELIBERATE departure from the export, whose
@@ -3011,6 +3355,22 @@ input, textarea, select { font-family: inherit; }
   .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }
   .gn-notfound__actions { flex-direction: column; align-items: stretch; }
   .gn-notfound__link { justify-content: center; }
+
+  /* The two reading pages and Help on a phone (mobile-web plan Task 10, case 21.153). The 72ch/68ch
+     measures give way to the viewport, with a 1rem gutter in all: `.gn-shell` already insets
+     0.75rem at ≤60rem, so the column adds 0.25rem — `padding-inline`, never the `padding`
+     shorthand on a `.gn-shell` selector, which would clobber the bottom bar's `:has()` padding.
+     `overflow-wrap: anywhere` on the title and the prose (the section carries its headings, lists
+     and links) so a long word or URL wraps rather than pushing the page sideways. */
+  .gn-legal__column { max-width: none; padding-inline: 0.25rem; }
+  .gn-legal__title { overflow-wrap: anywhere; }
+  .gn-legal__meta { max-width: none; }
+  .gn-legal__section { max-width: none; overflow-wrap: anywhere; }
+  /* Help's base rules live in `ui.css` (shared with apps/desktop); its own ≤47.9375rem arm zeroes the
+     pane's side padding, and this sheet loads after it, so the equal-specificity rules here win. The
+     code blocks and tables keep their own scroll boxes. */
+  .gn-help__main { padding-inline: 0.25rem; }
+  .gn-help__column { max-width: none; overflow-wrap: anywhere; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3160,6 +3520,17 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-surface-well);
   color: var(--gn-text);
 }
+/* ── The MCP connect and approval screens on a phone (mobile-web plan Task 12, case 21.191). The 34rem
+   measures give way to the viewport; the centring the owner chose for `/mcp/connect` (C1: the stage's
+   `margin: auto`) is NOT touched here — the stage is full width AND still centred, so a tall stage
+   still top-aligns under the gutter. The decision buttons stack, each a full-width 3rem target: the
+   primary (Allow on `/mcp/connect`) first, Deny under it. `/mcp/authorize`'s Approve keeps the page's
+   own variant (ghost, equal weight with Deny by design) — this arm only widens it. */
+@media (max-width: 40rem) {
+  .gn-mcp-connect__stage { max-width: none; }
+  .gn-mcp-authorize__card { max-width: none; }
+  .gn-mcp-authorize__actions .gn-button { flex: 1 1 100%; min-height: 3rem; justify-content: center; }
+}
 
 /* ── /mcp/tokens — the revoke surface (MCP plan Task 12) ────────────────────
    Same restraint as the approval screen one directory over: a raised row and a
@@ -3252,6 +3623,18 @@ input, textarea, select { font-family: inherit; }
 .gn-mcp-tokens__subtitle { margin: 0 0 0.75rem; font-weight: 600; }
 .gn-mcp-tokens__connect { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
 .gn-mcp-tokens__url { overflow-wrap: anywhere; }
+/* ── The MCP rows on a phone (mobile-web plan Task 10, cases 21.150 and 21.152): on `/mcp/tokens` and
+   in `/account`'s Connected assistants card alike. The label block takes the whole line and the
+   buttons — Rename, Revoke, Disconnect — wrap UNDER it; the rows stay `flex-wrap` rather than
+   becoming a column, because Rename and Revoke are two siblings of the label block and a column
+   would stack each on its own line. The Copy URL address takes a line of its own (it already
+   breaks anywhere) with Copy and the link under it; the rename form's field fills its row instead
+   of holding a 12rem minimum. */
+@media (max-width: 40rem) {
+  .gn-mcp-tokens__when { flex-basis: 100%; }
+  .gn-mcp-tokens__url { flex-basis: 100%; overflow-wrap: anywhere; }
+  .gn-mcp-tokens__naming .gn-field { min-width: 0; flex: 1 1 100%; }
+}
 
 .gn-mcp-tokens__refusal {
   margin: 1rem 0 0;
@@ -3282,10 +3665,23 @@ input, textarea, select { font-family: inherit; }
    title would, and the title it precedes is the builder's name field. */
 .gn-builder-crumb { margin: var(--gn-builder-crumb-gap) 0 0; line-height: var(--gn-builder-crumb-line); }
 .gn-builder-crumb a {
+  position: relative;
   font-size: 0.8125rem;
   line-height: 1.125rem;
   color: var(--gn-text-muted);
   text-decoration: none;
+}
+/* Touch target (T13 browser pass, 2026-10-01; case 21.177): HIT-SLOP, the same technique as
+   `.gn-breadcrumb a::before` (20.616). The 126x15 link reaches a 44px hit box; the crumb's gap and
+   line, which the builder's height calc subtracts, do not move. */
+.gn-builder-crumb a::before {
+  content: '';
+  position: absolute;
+  left: -0.25rem;
+  right: -0.25rem;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
 }
 .gn-builder-crumb a:hover,
 .gn-builder-crumb a:focus-visible { color: var(--gn-text-accent); text-decoration: underline; }
@@ -3346,6 +3742,11 @@ input, textarea, select { font-family: inherit; }
   border-top: 1px solid var(--gn-fill-secondary);
 }
 .gn-workspace-settings__readonly { margin: 0; color: var(--gn-text-muted); }
+/* Save is the card's one action on a phone: full width, label centred (mobile-web plan Task 10,
+   case 21.151). The read-only sentence beside it is not a `.gn-button` and is untouched. */
+@media (max-width: 40rem) {
+  .gn-workspace-settings__actions .gn-button { flex: 1 1 100%; justify-content: center; }
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    `.gn-type-editor-header` — Task 5b (2026-09-18). APPENDED AT EOF ON PURPOSE.
@@ -3389,6 +3790,12 @@ input, textarea, select { font-family: inherit; }
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* The web app on phones — the ticket type editor's header actions take the whole row, so Save (full width, see
+   `.ticket-type-editor__save` in `ui.css`) is not squeezed beside the title (Plan Task 11, case 21.173). AFTER the base. */
+@media (max-width: 40rem) {
+  .gn-type-editor-header__actions { flex: 1 1 100%; }
 }
 
 /* The inbox's header ROW — the title and the filter tabs, which the prototype
@@ -3910,6 +4317,29 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
   min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem);
   cursor: text;
+}
+
+/* ── The notes screen on a phone (mobile-web plan Task 9, cases 21.130–21.131) ───────────────
+   After every base rule it overrides (the tree toggle, the title, the document). The tree is
+   already the toggle panel below 60rem; this makes its toggle a real target, gives the document
+   the full width, keeps the title to one line (the byline's actions are a "⋯" menu by script,
+   `note-byline.tsx`, so the row has room). The editor toolbar's 44px controls, hidden dividers and
+   wrapping groups are NOT here: they are `editor.css`'s own ≤40rem arm (AMENDED 2026-10-02, AUDIT BRD-08,
+   cases 21.235–21.237), so every host of the editor gets them, not only `.gn-notes`. */
+@media (max-width: 40rem) {
+  .gn-notes__tree-toggle {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+  }
+  .gn-notes__document {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .gn-notes__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* ── Task 6: the History panel ──────────────────────────────────────────── */
@@ -4706,12 +5136,15 @@ input, textarea, select { font-family: inherit; }
    named at the moment it matters). Plain text ink, never a tint. */
 .gn-trash-notice { margin: 0.75rem 0 0; color: var(--gn-text); }
 
-/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe placed
-   on a card. The anchor is the card itself (`--menu`), and the head gives way so
+/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe, now `OverflowMenu`
+   (`src/overflow-menu.tsx`, also the note byline's phone menu), placed on a card. The anchor is the card itself (`--menu`), and the head gives way so
    a long name never runs under the trigger. */
 .gn-workspace-card--menu { position: relative; }
 .gn-workspace-card--menu .gn-workspace-card__head { padding-right: 2.75rem; }
 .gn-card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
+/* The note byline's phone menu sits IN its flex row rather than in a card's corner (mobile-web
+   plan Task 9, case 21.131) — the same menu, in flow; its list still hangs from this box. */
+.gn-card-menu--inline { position: relative; top: auto; right: auto; }
 /* 44px, round, ink-muted until hovered — a quiet control on an informational card. */
 .gn-card-menu__trigger {
   display: inline-flex;
@@ -4887,6 +5320,10 @@ input, textarea, select { font-family: inherit; }
 @media (max-width: 40rem) {
   .gn-invite-pending__address { flex-basis: 100%; }
   .gn-invite-pending__withdraw { margin-left: 0; }
+  /* Case 21.092: the invite form's input and submit are the card's full width (the Select trigger
+     already is, `.gn-select__trigger { width: 100% }`). */
+  .gn-invite-mint .gn-field__input { width: 100%; }
+  .gn-invite-mint .gn-button { width: 100%; }
 }
 /* ══ access-and-invites: end ══ */
 

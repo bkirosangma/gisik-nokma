@@ -131,7 +131,9 @@ export function useBuilderWiring(workspaceId: string): BuilderWiring {
     };
   }, [authoring, workspaceId, userId]);
 
-  if (status.kind === 'loading') return { kind: 'loading' };
+  // `error` is a failed read, not an answer: it waits like `loading` rather than
+  // saying "sign in" (SYS-01); the shell's SessionNotice says what happened.
+  if (status.kind === 'loading' || status.kind === 'error') return { kind: 'loading' };
   if (status.kind === 'signed-out') return { kind: 'signed-out' };
   if (role.kind === 'asking') return { kind: 'loading' };
   if (role.kind === 'refused') return { kind: 'refused', why: role.why };

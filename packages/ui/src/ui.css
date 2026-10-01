@@ -948,6 +948,44 @@ a.gn-ticket-sheet__crumb--link {
 .gn-dialog__body,
 .gn-sheet__body { padding: 0 1.5rem 1.5rem; overflow-y: auto; }
 
+/* The ticket sheet's header "Move" shortcut (case 21.071): a phone-only second door to the State row's
+   Move…, so it is not painted at all above 40rem. It follows `.gn-button` (same specificity), so this
+   `display: none` wins over `.gn-button`'s `inline-flex`. */
+.gn-sheet__move { display: none; }
+
+/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
+   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
+   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
+   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). */
+@media (max-width: 40rem) {
+  /* The ticket sheet fills the screen: the `.gn-sheet--full` form, forced (21.070). */
+  .gn-sheet {
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--gn-surface);
+  }
+  /* The header stays put while the body scrolls under it, and carries the Move shortcut (21.071). */
+  .gn-sheet__header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--gn-surface);
+  }
+  .gn-sheet__move { display: inline-flex; }
+  /* Dialogs become bottom sheets (21.072): pinned to the bottom edge, full width, rounded on top only. */
+  .gn-dialog__scrim { align-items: flex-end; }
+  .gn-dialog {
+    width: 100%;
+    max-width: none;
+    border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
 /* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
    wraps a `Chip` (tone `terminal`) rather than restyling it, so its colour
    comes from `.gn-chip--terminal` alone — this rule is layout only, nothing
@@ -1845,6 +1883,12 @@ a.gn-ticket-sheet__crumb--link {
    (0.55 — `:79-82` above): the spec gives this control its own number, kept
    rather than folded into the shared default. */
 .gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* The Move button (mobile plan Tasks 4–5): a ghost pill with a word, after the two arrows, wearing the arrows'
+   own metrics and P-GHOST states (they share the class). Above 40rem the word is "Move to…"; the phone arm
+   below swaps it for "Move". The 44px floor (rule 01) is restated here rather than inherited so that a later
+   edit to the arrows' glyph metrics cannot quietly shrink the one control a phone user has. */
+.gn-board-card__move-to { min-height: 2.75rem; min-width: 2.75rem; padding: 0 1rem; font-size: 0.9375rem; }
+.gn-board-card__move-label--phone { display: none; }
 /* Backlog/closed spec §5.2 (2026-09-17) — the terminal-column Close button,
    beside the two arrows in the same `.gn-board-card__moves` flex row.
    Reuses `.gn-board-card__move`'s own metrics verbatim (height, radius,
@@ -1978,6 +2022,33 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-board-card__close:disabled,
 .gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The board on a phone (mobile plan Task 4, FD8/FD13). The same 40rem the rest of the phone layer breaks at —
+   `PHONE_BOARD_QUERY` (`packages/app-core/src/views/use-phone-board.ts`) is that width in JS, and case 21.040 reads
+   both. The rail becomes a scroll-snap container showing one full-width column at a time (the picker above it,
+   rendered only on a phone, scrolls it); the 18rem lane above is the desktop board and is untouched. Collapse is
+   not applied on a phone: the DOM draws no strip (a collapsed column is a different markup, so `usePhoneBoard`
+   decides that), and the toggle that would make one is hidden here. There is no touch drag-and-drop (FD13), so the
+   ‹ › arrows give way to the Move button — the arrows' selector is `:not(.gn-board-card__move-to)` because both
+   wear `.gn-board-card__move`'s metrics, and the specificity (0,2,0) beats the base rule's (0,1,0) wherever it
+   sits. Move keeps the 44px floor (rule 01) and carries a word, not a glyph. */
+@media (max-width: 40rem) {
+  .gn-board__rail { scroll-snap-type: x mandatory; overflow-x: auto; }
+  .gn-board__column { flex: 0 0 100%; scroll-snap-align: start; }
+  .gn-board__column-collapse { display: none; }
+  .gn-board__column-strip { display: none; }
+  .gn-board-card__move:not(.gn-board-card__move-to) { display: none; }
+  .gn-board-card__move-to {
+    display: inline-flex;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.9375rem;
+  }
+  .gn-board-phone-picker { max-width: 100%; margin-bottom: 0.5rem; overflow-x: auto; }
+  .gn-board-card__move-label--phone { display: inline; }
+  .gn-board-card__move-label--wide { display: none; }
+}
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
@@ -2593,6 +2664,52 @@ a.gn-ticket-sheet__crumb--link {
   cursor: pointer;
   accent-color: var(--gn-accent);
 }
+
+/* The web app on phones — List and Backlog (Plan Task 8, case 21.111). Both render `TicketList`, so one arm
+   serves both. At <=40rem the table stops being a table: it, its body and each row become blocks/flex lines,
+   the column-header row is clipped (visually hidden, not removed), the title cell takes the first line and the
+   key · state · assignee · due cells wrap beneath it as small meta. The bulk-select checkbox is lifted to its
+   own 44px square at the row's start (the row reserves room with `:has`). The bulk-close bar's slot takes a
+   full row and the Confirm close button fills it, the cancel ✕ beside it. Inside the one 40rem arm and AFTER
+   every base rule it overrides. */
+@media (max-width: 40rem) {
+  .gn-list__table { display: block; min-width: 0; }
+  .gn-list__table tbody { display: block; }
+  .gn-list__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .gn-list__table-row {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.125rem 0.75rem;
+    padding: 0.625rem 1rem;
+  }
+  .gn-list__table-row:has(.gn-list__select) { padding-left: 3.25rem; }
+  .gn-list__select {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+  }
+  .gn-list__table-cell--title { order: -1; flex: 1 0 100%; min-width: 0; padding: 0; }
+  .gn-list__table-cell--data { padding: 0; font-size: 0.8125rem; line-height: 1.125rem; white-space: normal; }
+  .gn-list__controls-end { flex: 1 1 100%; margin-left: 0; display: flex; }
+  .gn-list__bulk { flex: 1 1 100%; display: flex; }
+  .gn-list__bulk-close { flex: 1 1 auto; }
+}
 /* The attention strip is the prototype's tinted card, adopted WHOLE (owner
    ruling, 2026-09-18): `--tintWarning` fill, `--cardR` radius, `18px 20px`
    padding (`desktop.dc.html:561-575`). No value here is a literal — each is the
@@ -2656,6 +2773,12 @@ a.gn-ticket-sheet__crumb--link {
    slabs. Dense in-list controls get 24, standalone controls get 44 — the same
    call `/help`'s table-of-contents links got.
 
+   AT ≤40rem (mobile-web plan Task 9, cases 21.132 and 21.134) the ROW is 44px: `.gn-my-work__title` and
+   `.gn-attention__item` in the phone arm below `.gn-my-work__claim`, a finger being the input there. The
+   strip's row is the click surface (the title's `::after` stretches over it), so lifting the ROW is what
+   makes the target 44px. Case 13.893 allows exactly this ONE phone rule per family selector, after its base
+   (orchestrator ruling 2026-10-01); a second rule anywhere else is still refused.
+
    `inline-flex` is the load-bearing half: `padding: 0` on a bare button means
    its height IS its line box, and `min-height` alone does nothing to it. */
 .gn-attention__title {
@@ -2711,6 +2834,18 @@ a.gn-ticket-sheet__crumb--link {
 .gn-my-work__due { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-my-work__reason { margin: 0; width: 100%; }
 .gn-my-work__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
+/* My work on a phone (mobile-web plan Task 9, case 21.132): after the base rules it overrides. The
+   sections stay ONE column (restated so a later multi-column desktop treatment cannot reach a
+   phone), every row and its title button is a 44px target — the attention strip's rows too (21.134),
+   centred in the taller row — and the rows keep wrapping their project / due / reason onto further lines
+   rather than overflowing. */
+@media (max-width: 40rem) {
+  .gn-my-work { flex-direction: column; }
+  .gn-my-work__item,
+  .gn-my-work__contested { align-items: center; min-height: 2.75rem; }
+  .gn-my-work__title { min-height: 2.75rem; }
+  .gn-attention__item { min-height: 2.75rem; align-items: center; }
+}
 
 /* The three `.gn-ticket-sheet__tabs*` rules that stood here are DELETED, by the
    change that orphaned them: the sheet's tabs now render the shared
@@ -3858,6 +3993,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    checked. */
 .fields-editor__required { flex: none; }
 
+/* The web app on phones — the field rows (Plan Task 11, case 21.173): the name and type fields take a full row each
+   (their 8rem / 9rem floors would leave a ragged half row), and Add field fills the width. Inside the one 40rem arm,
+   AFTER the base rules. */
+@media (max-width: 40rem) {
+  .fields-editor__name,
+  .fields-editor__type { flex: 1 1 100%; min-width: 0; }
+  .fields-editor__add { align-self: stretch; }
+}
+
 /* The `appearance="raised"` coat for this trigger is NOT declared here, and a
    reader looking for it will not find it by scrolling this block. It sits
    immediately after `[data-style="neo"] .gn-field__input` at the foot of the
@@ -4059,6 +4203,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    leading and sat visibly lighter and smaller than the drawing. */
 .ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
+/* The web app on phones — New ticket type is the list's one primary on its own full row (Plan Task 11, case 21.173).
+   Inside the one 40rem arm, AFTER `.ticket-type-list__header`. */
+@media (max-width: 40rem) {
+  .ticket-type-list__new { flex: 1 1 100%; }
+}
 /* E5-14 — the on-screen reason the ↑/↓ controls are disabled, and the tie-break
    under it. Muted and small like the summary above it, because it is an aside
    about the controls rather than a message: it renders whether or not any arrow
@@ -4239,6 +4388,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    radius, beside a shared `Button` that is 44px, border-less and
    control-radiused, against a prototype that draws 44. */
 .ticket-type-editor__save { align-self: flex-start; }
+/* The web app on phones — the ticket type editor's Save takes its own full row (Plan Task 11, case 21.173). */
+@media (max-width: 40rem) {
+  .ticket-type-editor__save { flex: 1 1 100%; }
+}
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
@@ -4453,6 +4606,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .template-gallery__door:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .template-gallery__name { font-size: 1.05rem; font-weight: 600; }
 .template-gallery__tagline { font-size: 0.8rem; color: var(--gn-text-muted); }
+
+/* The web app on phones — the template doors (Plan Task 11, case 21.172). One column: the doors stack (the base
+   track's `auto-fit` 15rem floor is a grid; a phone's list is a column). Inside the one 40rem arm, AFTER the
+   base rule. */
+@media (max-width: 40rem) {
+  .template-gallery__cards { grid-template-columns: minmax(0, 1fr); }
+}
 .workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
 /* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
    preference. `danger` used as TEXT on `surface` measures **4.40** under
@@ -4609,6 +4769,54 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (max-width: 64rem) {
   .workflow-builder-screen__layout { grid-template-columns: minmax(0, 1fr); }
   .workflow-builder-screen__canvas { order: -1; }
+}
+
+/* The web app on phones — the workflow editor (Plan Task 11, cases 21.170, 21.171). Above 40rem the "Panels"
+   button, the sheet's Done button and the scrim are not painted at all (`display: none`, declared BEFORE the
+   arm so the arm's `display` wins on source order). */
+.workflow-builder-screen__panels,
+.workflow-builder-screen__panels-done,
+.workflow-builder-screen__scrim { display: none; }
+/* At <=40rem the canvas fills the screen and pans (it is the `overflow: auto` card; React Flow pans inside it),
+   and the States / Transitions / System rules / Issues column becomes a bottom sheet the "Panels" button opens
+   (`data-open="true"` on the aside, set by the component), above the scrim and the bottom bar. The screen is
+   bounded to the window minus the chrome around it, INCLUDING the phone bottom bar: the shell's bottom padding
+   is `calc(bar + inset) + 2rem` here, not `--gn-shell-pad-bottom` (case 10.164's allowance, which the bar
+   outgrows). The header stacks: the name on its own row, then Add state · Panels · Publish, Publish — the one
+   primary — full width. Inside the one 40rem arm and AFTER every base rule it overrides. */
+@media (max-width: 40rem) {
+  .workflow-builder-screen {
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--gn-builder-crumb-gap, 0px) - var(--gn-builder-crumb-line, 0px) - (var(--gn-phone-bar-height) + env(safe-area-inset-bottom)) - 2rem);
+    min-height: 28rem;
+  }
+  .workflow-builder-screen__title-row { flex-direction: column; align-items: stretch; }
+  .workflow-builder-screen__name { min-height: 2.75rem; font-size: 1.5rem; line-height: 2rem; }
+  .workflow-builder-screen__actions { width: 100%; }
+  .workflow-builder-screen__add-state,
+  .workflow-builder-screen__panels { flex: 1 1 0; min-height: 2.75rem; }
+  .workflow-builder-screen__panels { display: inline-flex; }
+  .publish-controls { flex: 1 1 100%; }
+  .publish-controls__publish { align-self: stretch; }
+  .workflow-builder-screen__layout { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .workflow-builder-screen__canvas { max-height: 100%; }
+  .workflow-builder-screen__left { display: none; }
+  .workflow-builder-screen__left[data-open='true'] {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 41;
+    max-height: 85dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem 1rem max(1rem, env(safe-area-inset-bottom));
+    background: var(--gn-surface);
+    border-radius: var(--gn-radius-track) var(--gn-radius-track) 0 0;
+    box-shadow: var(--gn-shadow-overlay);
+  }
+  .workflow-builder-screen__scrim { display: block; position: fixed; inset: 0; z-index: 40; background: var(--gn-surface-overlay); }
+  .workflow-builder-screen__panels-done { display: inline-flex; align-self: flex-end; min-height: 2.75rem; }
 }
 
 /* The inspector card, shared by both inspectors (`:1080`: cardBg + cardShadow +
@@ -5110,6 +5318,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 
+/* The web app on phones — the Calendar (Plan Task 8, case 21.112). At <=40rem the month grid is a DELIBERATE
+   horizontal scroller: the grid scrolls, each week row (and the weekday head) keeps a 22rem floor, and every
+   day track is `minmax(3rem, 1fr)` (7 x 3rem = 21rem + gaps) so a day cell never shrinks to unreadable; the
+   items track shares the same columns so a chip stays under its day. The page itself does not overflow — the
+   calendar is bounded to its column — and the month toolbar wraps. Inside the one 40rem arm and AFTER every
+   base rule it overrides. */
+@media (max-width: 40rem) {
+  .gn-calendar { min-width: 0; max-width: 100%; }
+  .gn-calendar__header { flex-wrap: wrap; }
+  /* `position: relative` (21.115): the scroller must be the containing block of the day chips' absolutely placed
+     visually-hidden text, or that text escapes the scroller's clip and the page scrolls sideways by the chip's overhang. */
+  .gn-calendar__grid { position: relative; overflow-x: auto; overscroll-behavior-x: contain; }
+  .gn-calendar__weekday-head,
+  .gn-calendar__days,
+  .gn-calendar__items { grid-template-columns: repeat(7, minmax(3rem, 1fr)); }
+  .gn-calendar__weekday-head,
+  .gn-calendar__week { min-width: 22rem; }
+}
+
 /* Plan 9 Task 11 — the timeline's week columns.
 
    NO NEW ROLE. The plan's `tokens.color.barActive`, `pendingHatch`, `ink`,
@@ -5244,6 +5471,19 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem;
   font-weight: 600;
   color: var(--gn-text-muted);
+}
+
+/* The web app on phones — the Timeline (Plan Task 8, case 21.113). At <=40rem `.gn-timeline` itself is the
+   horizontal scroller (the component has no inner track), so the weeks band and the rows scroll inside it and
+   the PAGE does not. The band and each row keep a 40rem floor and a 9rem title column (14.375rem above), so a
+   week track stays about 3.75rem wide; the toolbar wraps and is `sticky; left: 0`, so Today and the week
+   arrows stay in view while the grid scrolls under them. Inside the one 40rem arm and AFTER every base rule it
+   overrides. */
+@media (max-width: 40rem) {
+  .gn-timeline { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+  .gn-timeline__header { flex-wrap: wrap; position: sticky; left: 0; }
+  .gn-timeline__weeks,
+  .gn-timeline__row { grid-template-columns: 9rem var(--timeline-week-columns); min-width: 40rem; }
 }
 
 .gn-timeline__group-heading {
@@ -5466,6 +5706,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-inbox__more:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
+/* Phone (mobile-web plan Task 7, case 21.093). Here, not in `globals.css`, because source order is
+   the rule and the base rules above are this sheet's. A row keeps its 44px floor (restated, so the
+   phone arm owns it) and gains vertical room to tap; the unread dot and the badge are untouched.
+   "Load more" is the list's width: the base rule's 0.5rem side margins sit INSIDE it, so `100%`
+   alone would overflow by 1rem. */
+@media (max-width: 40rem) {
+  .gn-inbox__row { min-height: 2.75rem; padding: 0.75rem 0.5rem; }
+  .gn-inbox__more { display: flex; width: calc(100% - 1rem); }
+}
 /* The unread total, on whatever chrome opens the inbox. Text on accent — the
    declared contrast pair, not a hand-picked ink. */
 .gn-inbox__badge {
@@ -7098,6 +7347,20 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline-offset: 1px;
 }
 
+/* The web app on phones — the project header (Plan Task 8, case 21.110). At <=40rem the controls row takes the
+   whole width of the head: the search fills the first row with Filters beside it (`order` lifts them above
+   the workflow picker and the active-only switch, which keep their DOM order after them), and New ticket —
+   the header's one primary button, a direct child — takes a full row of its own. Inside the one 40rem arm and
+   AFTER `.gn-project__header` and `.gn-project__search`, so source order decides. `.gn-project__filters` is a
+   hook the page puts on the Filters button; nothing paints it above 40rem. The view tabs' scroller lives
+   with `.gn-project__rail` in `globals.css`. */
+@media (max-width: 40rem) {
+  .gn-project__header { flex: 1 1 100%; }
+  .gn-project__search { order: -2; flex: 1 1 0; min-width: 0; }
+  .gn-project__filters { order: -1; flex: none; }
+  .gn-project__header > .gn-button--primary { flex: 1 1 100%; }
+}
+
 /* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
    Metrics: spec, Filters sheet `:1367-1417`; the plan's own prototype→product
    table (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`)
@@ -7344,8 +7607,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
 /* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
-   20rem floor is what makes this a grid of cards at desktop width and a single
-   column on a phone, with no media query. */
+   20rem floor is what makes this a grid of cards at desktop width. It is NOT
+   what makes a phone single-column: 20rem overflows a 320px screen, so the
+   phone arm below (`@media (max-width: 40rem)`, `minmax(0, 1fr)`) does that. */
 .workflow-list__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
@@ -7387,6 +7651,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__state-bar--terminal { background: var(--gn-category-terminal); }
 .workflow-list__meta { margin: 0; font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
 .workflow-list__actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+/* The web app on phones — the workflow list (Plan Task 11, case 21.172). One column of cards (the base track's
+   20rem floor would overflow a 320px screen), the New workflow primary on its own full row, and the Open /
+   History pair sharing the card's width. Inside the one 40rem arm and AFTER the base rules it overrides. */
+@media (max-width: 40rem) {
+  .workflow-list__cards { grid-template-columns: minmax(0, 1fr); }
+  .workflow-list__new { flex: 1 1 100%; }
+  .workflow-list__open,
+  .workflow-list__history { flex: 1 1 0; }
+}
 
 /* ── The version history (Task 3, owner-lifted 2026-09-19) ──────────────────
    The first screen in this product the prototype does not draw, so these rules
