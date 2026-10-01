@@ -458,7 +458,19 @@ planted in `rebuild.sh` (2), a `docker system prune` planted in the dry-run (3).
   `…, pruned build cache + unused images >24h, disk: images …, build cache …, Docker VM disk NN% used (log
   …)`, the dev stack stays Up and healthy, the three named volumes (`gisik-nokma-dev_pg-dev-data`,
   `gisik-nokma-dev_minio-data`, the test Postgres's) are still listed by `docker volume ls`, and the Docker
-  VM disk figure falls. Measured result recorded below when run.
+  VM disk figure falls.
+  **Run 2026-10-01 (controller, LOCAL, Docker Desktop) — PARTLY:** (1) the first `ctl rebuild` after this merged
+  printed the OLD OK line (no prune, no disk line) — expected, not a bug: the running `rebuild.sh` is the file
+  that was on disk when it started, and its own `git pull` brought the new one. (2) A second `ctl rebuild` on the
+  unchanged tree **FAILed** `gisik-nokma-dev-server-1 image created … is not newer than start` — with every layer
+  CACHED the image keeps its old `.Created`, so a no-op rebuild trips the freshness check; this predates the
+  change and is a separate finding (open), and it means the new final step is not reached on a no-op rebuild.
+  (3) So the functions were run for real, as the final step would: `ctl_prune` rc=0, build cache **3.743 GB → 0 B**,
+  Docker VM disk **25% → 18% used**, the disk line read `disk: images 6.004GB (reclaimable 1.578GB (26%)), build
+  cache 0B (reclaimable 0B), Docker VM disk 18% used`; `docker volume ls` identical before and after (13 volumes);
+  both dev containers Up, server healthy. The unused-image prune removed nothing (no unused image older than 24 h).
+  **Still 🧪:** the full path — a `ctl rebuild` that BUILDS new code and ends with the new OK line — is first
+  exercised by the next landing's rebuild.
 
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 
