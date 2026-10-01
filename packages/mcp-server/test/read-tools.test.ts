@@ -195,6 +195,44 @@ describe('list_members (14.328)', () => {
   });
 });
 
+describe('list_members fallback is ONLY for a 404 (14.332, 14.334)', () => {
+  const MEMBERS = `/v1/workspaces/${WS}/members`;
+  const NAMES = `/v1/workspaces/${WS}/actor-names`;
+  const guestList = { workspaceId: WS, names: [{ userId: 'G', displayName: 'Asha' }] };
+
+  it('14.332 a 403 or a 500 from /members propagates and /actor-names is never read; a 404 DOES fall back', async () => {
+    for (const status of [403, 500]) {
+      const failing = sessionAnswering({ [MEMBERS]: new HttpError(status, null), [NAMES]: guestList });
+      await expect(readTool('list_members', failing.session).handler({ workspaceId: WS })).rejects.toThrow(`gisik-nokma answered ${status}`);
+      expect(failing.paths).toEqual([MEMBERS]);
+    }
+    // CONTROL, same `it`: the same setup with a 404 falls back and returns the guest list.
+    const guest = sessionAnswering({ [MEMBERS]: notFound(), [NAMES]: guestList });
+    expect(await readTool('list_members', guest.session).handler({ workspaceId: WS })).toStrictEqual({
+      workspaceId: WS,
+      members: [{ userId: 'G', name: 'Asha' }],
+    });
+    expect(guest.paths).toEqual([MEMBERS, NAMES]);
+  });
+
+  it('14.334 /members 404 then /actor-names 500 surfaces the 500, not "not visible"; /actor-names 404 says the sentence', async () => {
+    const broken = sessionAnswering({ [MEMBERS]: notFound(), [NAMES]: new HttpError(500, null) });
+    const failure = await readTool('list_members', broken.session).handler({ workspaceId: WS }).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(HttpError);
+    expect((failure as HttpError).status).toBe(500);
+    expect((failure as Error).message).not.toContain('not visible');
+    expect(broken.paths).toEqual([MEMBERS, NAMES]);
+    // CONTROL, same `it`: both routes 404 IS the visibility ruling, in words.
+    const outsider = sessionAnswering({ [MEMBERS]: notFound(), [NAMES]: notFound() });
+    await expect(readTool('list_members', outsider.session).handler({ workspaceId: WS })).rejects.toThrow(
+      'workspace not found or not visible to you',
+    );
+  });
+});
+
 describe('list_tickets scopes (14.329, 14.330)', () => {
   const LIST = { projectId: PROJECT, groupBy: 'status', limit: 25 } as const;
 
@@ -288,5 +326,27 @@ describe('list_tickets filters (14.331, 14.333)', () => {
       [`/v1/workspaces/${WS}/ticket-list?limit=5`]: new HttpError(400, { error: 'invalid_limit' }),
     });
     await expect(readTool('list_tickets', otherBadRequest).handler({ workspaceId: WS, limit: 5 })).rejects.toThrow('gisik-nokma answered 400');
+  });
+
+  it('14.331 the invalid-filter sentence keeps the HttpError as `cause`, and ONLY a 400 is rewritten', async () => {
+    const filter = { closed: true };
+    const path = `/v1/workspaces/${WS}/ticket-list?filter=${encodeURIComponent(JSON.stringify(filter))}`;
+    const run = (status: number) =>
+      readTool('list_tickets', sessionAnswering({ [path]: new HttpError(status, { error: 'invalid_filter' }) }).session)
+        .handler({ workspaceId: WS, filter })
+        .then(() => undefined, (error: unknown) => error as Error);
+
+    // The rewrite at 400 carries the original HttpError as its cause.
+    const rewritten = await run(400);
+    expect(rewritten?.message).toMatch(/invalid_filter: /);
+    expect(rewritten?.cause).toBeInstanceOf(HttpError);
+    expect((rewritten?.cause as HttpError).status).toBe(400);
+
+    // CONTROL, same `it`: the SAME body at 500 is not a filter refusal — rethrown unchanged, not the sentence.
+    const passedThrough = await run(500);
+    expect(passedThrough).toBeInstanceOf(HttpError);
+    expect((passedThrough as HttpError).status).toBe(500);
+    expect(passedThrough?.message).toBe('gisik-nokma answered 500');
+    expect(passedThrough?.message).not.toMatch(/invalid_filter/);
   });
 });
