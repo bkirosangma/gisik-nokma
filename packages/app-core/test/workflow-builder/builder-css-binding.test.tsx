@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { CONTRAST_PAIRS } from '@gisik-nokma/ui';
@@ -241,6 +241,12 @@ async function collectClasses(): Promise<{ rendered: string[]; exempt: string[];
     screen.findByRole('textbox', { name: 'Workflow name' }),
   );
 
+  // 2b — the loaded arm with the phone Panels sheet OPEN: the scrim renders only then (21.170).
+  await withFake(createFakeGateway(), async () => {
+    await screen.findByRole('textbox', { name: 'Workflow name' });
+    fireEvent.click(screen.getByRole('button', { name: 'Panels' }));
+  });
+
   // 3 — the load-refused arm. Only `listTicketTypes` is fatal to this screen
   // (a member's roster refusal is an empty roster, not a failure), so that is
   // the read made to reject.
@@ -339,7 +345,10 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
   it('the two sets are EQUAL once the shared-component exemptions are removed', async () => {
     const { rendered, exempt } = await collectClasses();
     const unexempted = rendered.filter((name) => !exempt.includes(name));
-    const styled = styledClasses(css);
+    // The shared-component elements are styled in place by the shared layer, so the equality leaves them out of
+    // BOTH sides: the phone arm (21.170) also gives three of them a rule of their own, which is not a reason
+    // to demand the other half of the pair render them as plain classes.
+    const styled = styledClasses(css).filter((name) => !exempt.includes(name));
 
     // FLOORS, not counts — the reason `saved-filters-css-binding.test.tsx`
     // records: two empty walks are equal, and an equality of two empty lists
@@ -357,8 +366,15 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
     // wrong reason: with an empty exemption the equality would fail on
     // `__add-state`, and with the rule working it must name exactly that class.
     const { rendered, exempt } = await collectClasses();
-    expect(exempt).toEqual(['workflow-builder-screen__add-state']);
+    // `__panels` and `__panels-done` are the phone Panels sheet's two `Button`s (21.170) — shared-component elements too.
+    expect(exempt).toEqual([
+      'workflow-builder-screen__add-state',
+      'workflow-builder-screen__panels',
+      'workflow-builder-screen__panels-done',
+    ]);
     expect(rendered).toContain('workflow-builder-screen__add-state');
+    // The scrim renders only while the sheet is open — the open arm above is what puts it in the set.
+    expect(rendered).toContain('workflow-builder-screen__scrim');
   });
 
   it('every control a person can tab to is in the focus-ring rule, and the reverse', async () => {
@@ -544,7 +560,9 @@ describe('13.768 the new block names no colour of its own and adds no role', () 
       .filter((rule) => ruleNamesOurs(rule[1] ?? ''))
       .map((rule) => rule[2] ?? '')
       .join('\n');
-    const outside = rules
+    // The web app's own stylesheet counts as "the stylesheet already draws with": the phone arm reads
+    // `--gn-phone-bar-height`, which globals.css declares and draws with (21.003, 10.164).
+    const outside = [...rules, ...WEB_CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter((rule) => !ruleNamesOurs(rule[1] ?? ''))
       .map((rule) => rule[2] ?? '')
       .join('\n');

@@ -3750,6 +3750,12 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
 }
 
+/* The web app on phones — the ticket type editor's header actions take the whole row, so Save (full width, see
+   `.ticket-type-editor__save` in `ui.css`) is not squeezed beside the title (Plan Task 11, case 21.173). AFTER the base. */
+@media (max-width: 40rem) {
+  .gn-type-editor-header__actions { flex: 1 1 100%; }
+}
+
 /* The inbox's header ROW — the title and the filter tabs, which the prototype
    puts on one line (its bulk action shares the row and is not built yet).
    `flex-wrap` because 390px cannot hold "Inbox" and a three-segment control
