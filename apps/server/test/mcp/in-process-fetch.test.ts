@@ -4,6 +4,7 @@ import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { SecurityOptions } from '../../src/app.js';
 import { hostedSession, inProcessFetch } from '../../src/mcp/in-process-fetch.js';
 import { buildTestApp } from '../helpers/app.js';
+import { buildOAuthApp, hostedToken } from '../helpers/oauth.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 
@@ -176,12 +177,14 @@ describe('14.301 the hosted session post goes through the in-process transport w
   });
 });
 
-describe('14.306 / 14.309 the workspace tools through the hosted door, against the real server', () => {
-  it('14.306 14.309 create → rename → archive → restore → delete → undelete, each as the caller; deletes are soft', async () => {
-    const { app, otp } = buildTestApp(db);
+describe('14.306 / 14.309 / 14.314 the workspace tools through the hosted door, against the real server', () => {
+  it('14.306 14.309 14.314 create → rename → archive → restore → delete → undelete, each as the caller; deletes are soft', async () => {
+    const { app, otp } = buildOAuthApp(db);
     await app.ready();
     const user = await signInWithPhone(app, otp, '+911100002306');
-    const session = hostedSession(app, OUTER, user.token, user.userId);
+    // A real HOSTED access token (consent, then the code exchange), exactly what `/mcp` resolves — NOT the
+    // browser-session bearer: that authenticates as 'session' and would record `web` (14.314).
+    const session = hostedSession(app, OUTER, await hostedToken(app, db.pool, user.userId), user.userId);
     await session.ready();
     const tools = allTools(session);
     const run = (name: string, args: Record<string, unknown>) => {
@@ -218,9 +221,12 @@ describe('14.306 / 14.309 the workspace tools through the hosted door, against t
       `SELECT type, origin FROM events WHERE workspace_id = $1 ORDER BY seq`,
       [workspaceId],
     );
-    // Only the tools' own acts are asserted here: the founding door (`POST /v1/workspaces`) sets its own origin
-    // for `workspace.created` and its seed events — see the Task 6 report, not a property this test blesses.
-    const lifecycle = rows.filter((r) => r.origin === 'mcp');
+    // 14.314: an assistant's founding is recorded as an MCP act, not a web one. The founding sequence the server
+    // appends beside it (workflow, types, owner grant) stays the server's own record: `server`.
+    expect(rows.find((r) => r.type === 'workspace.created')?.origin).toBe('mcp');
+    const lifecycle = rows.filter((r) => /^workspace\.(renamed|archived|restored|deleted|undeleted)$/.test(r.type));
+    expect(lifecycle.every((r) => r.origin === 'mcp')).toBe(true);
+    expect(rows.filter((r) => r.origin === 'web')).toEqual([]);
     expect(lifecycle.map((r) => r.type)).toEqual([
       'workspace.renamed', 'workspace.archived', 'workspace.restored', 'workspace.deleted', 'workspace.undeleted',
     ]);
