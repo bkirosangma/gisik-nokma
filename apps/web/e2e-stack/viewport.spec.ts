@@ -471,13 +471,13 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    *
    * Task 19's `/w/<id>` is the first entry. Its probes are the three things the
    * workspace home adds that nothing else on this route list has: the sections
-   * nav, an archive control named for its project, and the archived disclosure
+   * nav, a more-actions control named for its project, and the archived disclosure
    * named for its workspace.
    */
   const MUST_NAME: Record<string, Array<{ role: 'navigation' | 'button' | 'link'; name: RegExp }>> = {
     'stack-phone-390|/w/:workspaceId': [
       { role: 'navigation', name: /^Workspace sections$/ },
-      { role: 'button', name: /^Archive / },
+      { role: 'button', name: /^More actions for / },
       { role: 'link', name: /^Ticket types$/ },
     ],
   };
@@ -626,7 +626,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
        a floor of the seven: it is the only one carrying admin-gated MUTATION
        controls, so a restyle that dropped an `aria-label` here would leave a
        person with a screen reader unable to tell which project a bare
-       "Archive" button belongs to. Its `MUST_NAME` probes are what give this
+       "More actions" button belongs to. Its `MUST_NAME` probes are what give this
        route's FIRST run teeth — see that map. */
     { path: `/w/${workspaceId}`, key: 'stack-phone-390|/w/:workspaceId' },
   ];

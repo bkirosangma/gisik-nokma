@@ -1606,3 +1606,17 @@ describe('19.189 purgedAmong — the online twin', () => {
     expect(none.calls).toEqual([]);
   });
 });
+
+describe('22.123 getGroups reads the workspace group tree', () => {
+  it('22.123 GETs /v1/workspaces/:id/groups and maps the rows; a refusal (a guest’s 404) surfaces rather than answering an empty tree', async () => {
+    const group = { id: 'g1', parentId: null, level: 1, name: 'Retail', rank: 'a1', projectCount: 2, childCount: 0 };
+    const { fetchImpl, calls } = recordingFetch({ [`/v1/workspaces/${WORKSPACE}/groups`]: { workspaceId: WORKSPACE, groups: [group] } });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    expect(await source.query.getGroups(WORKSPACE)).toEqual([group]);
+    expect(calls.map((call) => call.input)).toEqual([`/v1/workspaces/${WORKSPACE}/groups`]);
+
+    // CONTROL: the same read against a route that answers 404 REJECTS — "no groups" is never inferred from it.
+    const refused = createOnlineDataSource({ baseUrl: '', fetchImpl: recordingFetch({}).fetchImpl });
+    await expect(refused.query.getGroups(WORKSPACE)).rejects.toBeInstanceOf(HttpError);
+  });
+});

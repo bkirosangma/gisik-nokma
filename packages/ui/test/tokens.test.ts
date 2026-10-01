@@ -1452,7 +1452,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
     // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows. A floor removed is a guarantee removed, and it would show here first.
-    expect(CONTRAST_PAIRS.length).toBe(44);
+    expect(CONTRAST_PAIRS.length).toBe(48);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
