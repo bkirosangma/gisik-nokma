@@ -13,8 +13,9 @@ export interface ProjectEditValues {
  * workspace home's card and the project page's header render THIS, so the two
  * screens cannot describe one act two ways.
  *
- * - **Name and description only.** The prefix is immutable after creation and
- *   is not offered (`projectUpdatedPayload` refuses the key).
+ * - **Name and description only, for now.** `projectUpdatedPayload` carries
+ *   `prefix` and `groupId` since the prefixes and groups plan Task 1, but this
+ *   form does not offer them until that plan's Task 10.
  * - **ONE primary** (`Save`); `Cancel` is the quiet secondary. Both are the
  *   shared `Button`, so the 44 px target comes from it; the inputs are the
  *   shared recessed field (`gn-field__input`).

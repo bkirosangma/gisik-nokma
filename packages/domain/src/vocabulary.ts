@@ -8,6 +8,7 @@ import {
   projectRestoredPayload,
   projectUpdatedPayload,
   workspaceCreatedPayload,
+  workspacePrefixChangedPayload,
   workspaceRenamedPayload,
 } from './events/membership.js';
 import {
@@ -92,6 +93,13 @@ domainRegistry.register({
   version: 1,
   entityKind: 'workspace',
   payloadSchema: workspaceRenamedPayload,
+});
+
+domainRegistry.register({
+  type: 'workspace.prefix_changed',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspacePrefixChangedPayload,
 });
 
 domainRegistry.register({
