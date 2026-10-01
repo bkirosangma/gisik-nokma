@@ -3636,10 +3636,23 @@ input, textarea, select { font-family: inherit; }
    title would, and the title it precedes is the builder's name field. */
 .gn-builder-crumb { margin: var(--gn-builder-crumb-gap) 0 0; line-height: var(--gn-builder-crumb-line); }
 .gn-builder-crumb a {
+  position: relative;
   font-size: 0.8125rem;
   line-height: 1.125rem;
   color: var(--gn-text-muted);
   text-decoration: none;
+}
+/* Touch target (T13 browser pass, 2026-10-01; case 21.177): HIT-SLOP, the same technique as
+   `.gn-breadcrumb a::before` (20.616). The 126x15 link reaches a 44px hit box; the crumb's gap and
+   line, which the builder's height calc subtracts, do not move. */
+.gn-builder-crumb a::before {
+  content: '';
+  position: absolute;
+  left: -0.25rem;
+  right: -0.25rem;
+  top: 50%;
+  height: 2.75rem;
+  margin-top: -1.375rem;
 }
 .gn-builder-crumb a:hover,
 .gn-builder-crumb a:focus-visible { color: var(--gn-text-accent); text-decoration: underline; }

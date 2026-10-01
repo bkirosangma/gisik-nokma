@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
 import { Button } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
@@ -107,11 +108,12 @@ export function WorkflowBuilderScreen(props: {
   useEffect(() => {
     // A tap on a canvas node or arrow writes the draft's one `selection`, and the row it opens lives in the panels
     // column — on a phone that column is hidden until asked for, so a NEW selection opens the sheet (once per change,
-    // never for the draft's own starting selection).
+    // never for the draft's own starting selection). Phone only (T13, 21.176): above 40rem the column is always
+    // on screen, and flipping `panelsOpen` there would leave a stale open sheet for the next resize to the phone.
     let last = store.getState().selection;
     return store.subscribe(() => {
       const next = store.getState().selection;
-      if (next !== last && next.kind !== 'none') setPanelsOpen(true);
+      if (next !== last && next.kind !== 'none' && window.matchMedia?.(PHONE_BOARD_QUERY).matches) setPanelsOpen(true);
       last = next;
     });
   }, [store]);

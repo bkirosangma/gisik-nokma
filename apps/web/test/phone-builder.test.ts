@@ -275,3 +275,36 @@ describe('21.173 ticket types: form fields full width; the reorder targets stay 
     expect(valueOf(ruleExactly(ui, '.ticket-type-list__reorder'), 'gap')).toBe('0.5rem');
   });
 });
+
+describe('21.177 the builder\u2019s "Settings \u203a Workflows" crumb has a 44px hit box without moving a pixel of the drawn page', () => {
+  /**
+   * Found by the T13 browser pass (2026-10-01): 126x15 at every phone width and every style x theme, and `elementFromPoint`
+   * at 44px landed on the page, not the link. `.gn-breadcrumb a` got its hit-slop in 20.616; this crumb is a different class
+   * (`.gn-builder-crumb`), so the rule never reached it. HIT-SLOP and not padding, because the builder's height calc subtracts
+   * the crumb's gap and line (`--gn-builder-crumb-gap` / `--gn-builder-crumb-line`) and padding would push the canvas off the screen.
+   */
+  it('21.177 the link is the positioning context; a centred, empty, 2.75rem-tall ::before reaches 44px and paints nothing', () => {
+    expect(valueOf(ruleExactly(globals, '.gn-builder-crumb a'), 'position')).toBe('relative');
+    const slop = ruleExactly(globals, '.gn-builder-crumb a::before');
+    expect(valueOf(slop, 'content')).toBe("''");
+    expect(valueOf(slop, 'position')).toBe('absolute');
+    expect(valueOf(slop, 'top')).toBe('50%');
+    expect(valueOf(slop, 'height')).toBe('2.75rem');
+    expect(valueOf(slop, 'margin-top')).toBe('-1.375rem');
+    expect(valueOf(slop, 'left')).toBe('-0.25rem');
+    expect(valueOf(slop, 'right')).toBe('-0.25rem');
+    for (const property of ['background', 'background-color', 'border', 'box-shadow', 'outline', 'color', 'opacity']) {
+      expect(valueOf(slop, property), `::before ${property}`).toBeNull();
+    }
+  });
+
+  it('21.177 CONTROL \u2014 the drawn crumb is as it was: the link adds no padding / margin / display / min-height, and the crumb keeps the gap and line the builder\u2019s height calc subtracts', () => {
+    const link = ruleExactly(globals, '.gn-builder-crumb a');
+    for (const property of ['padding', 'margin', 'display', 'min-height']) expect(valueOf(link, property), `.gn-builder-crumb a ${property}`).toBeNull();
+    expect(valueOf(link, 'font-size')).toBe('0.8125rem');
+    expect(valueOf(link, 'line-height')).toBe('1.125rem');
+    const crumb = ruleExactly(globals, '.gn-builder-crumb');
+    expect(valueOf(crumb, 'margin')).toBe('var(--gn-builder-crumb-gap) 0 0');
+    expect(valueOf(crumb, 'line-height')).toBe('var(--gn-builder-crumb-line)');
+  });
+});
