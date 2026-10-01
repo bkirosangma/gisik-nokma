@@ -61,3 +61,11 @@
 - ✅ **21.048 — with no legal destination the Move button is `disabled` and its accessible description is `refusalCopy`;** control: an enabled Move has no description. Mutation: hide the button instead of disabling it.
 - ✅ **21.049 — a Move submits through the same optimistic path as the arrows' picker (`submitFromDialog` → `beginPending`: the card is in the target, `data-move-phase="writing"`, while the write is open);** control: a server refusal keeps the dialog open with the refusal text and Cancel sends the card back (20.129 — the dialog path, not the direct-move glide-back). Mutation: submit without `beginPending`.
 - ✅ **21.050 — CSS: at ≤40rem the ‹ › arrows (`.gn-board-card__move:not(.gn-board-card__move-to)`) are `display: none` and `.gn-board-card__move-to` is `inline-flex` at ≥2.75rem;** control: no top-level rule hides the arrows and they stay `inline-flex`. Mutation: show the arrows on phones.
+
+## 21.5 Desktop Move to…
+
+*Task 5. Tests: `packages/app-core/test/views/board-move-to.test.tsx` and the stylesheet halves in `packages/ui/test/board-phone-css.test.ts`. Amends 20.052 (the footer's button list) — the amendment is recorded on that case.*
+
+- ✅ **21.060 — above 40rem each card's footer carries a ghost "Move to…" after the ‹ › arrows (DOM order previous, next, Move to another state, then Close on a terminal card), ≥2.75rem tall and wide;** control: the arrows keep their behaviour (› from Doing still offers only its forward two). Mutation: render it before the arrows (board test); drop the top-level 44px rule (CSS test).
+- ✅ **21.061 — it opens the same dialog with `allBoardTargets` (To do, Waiting, Done from Doing — both directions);** control: a terminal card's Close button is still after Move and still submits `ticket.closed`. Mutation: offer one direction.
+- ✅ **21.062 — the button's accessible name is "Move to another state" at a phone width and above; the visible word is "Move" at ≤40rem and "Move to…" above (two spans, swapped by CSS: the phone word is `display: none` at the top level and shown in the 40rem arm, the wide word the reverse);** control: both spans are `aria-hidden="true"`. Mutation: give the spans no `aria-hidden` (board test); stop hiding the phone word above 40rem (CSS test).

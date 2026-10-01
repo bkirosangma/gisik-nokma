@@ -1845,6 +1845,12 @@ a.gn-ticket-sheet__crumb--link {
    (0.55 — `:79-82` above): the spec gives this control its own number, kept
    rather than folded into the shared default. */
 .gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* The Move button (mobile plan Tasks 4–5): a ghost pill with a word, after the two arrows, wearing the arrows'
+   own metrics and P-GHOST states (they share the class). Above 40rem the word is "Move to…"; the phone arm
+   below swaps it for "Move". The 44px floor (rule 01) is restated here rather than inherited so that a later
+   edit to the arrows' glyph metrics cannot quietly shrink the one control a phone user has. */
+.gn-board-card__move-to { min-height: 2.75rem; min-width: 2.75rem; padding: 0 1rem; font-size: 0.9375rem; }
+.gn-board-card__move-label--phone { display: none; }
 /* Backlog/closed spec §5.2 (2026-09-17) — the terminal-column Close button,
    beside the two arrows in the same `.gn-board-card__moves` flex row.
    Reuses `.gn-board-card__move`'s own metrics verbatim (height, radius,
@@ -2002,6 +2008,8 @@ a.gn-ticket-sheet__crumb--link {
     font-size: 0.9375rem;
   }
   .gn-board-phone-picker { max-width: 100%; margin-bottom: 0.5rem; overflow-x: auto; }
+  .gn-board-card__move-label--phone { display: inline; }
+  .gn-board-card__move-label--wide { display: none; }
 }
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices

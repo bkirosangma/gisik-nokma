@@ -2469,10 +2469,10 @@ function MoveArrows({
 
   const previousTargets = arrowTargets(workflow, columnOrder, fromStateId, 'previous');
   const nextTargets = arrowTargets(workflow, columnOrder, fromStateId, 'next');
-  // The Move button (mobile plan FD6): every board destination, both directions, in one list — the same
-  // `transitionOptions` the arrows read, so no second move rule. Task 4 draws it on a phone only; the arrows are
-  // hidden there (FD13, no touch drag-and-drop).
-  const phone = usePhoneBoard();
+  // The Move button (mobile plan FD6, Task 5): every board destination, both directions, in one list — the same
+  // `transitionOptions` the arrows read, so no second move rule. It is drawn at EVERY width: on a phone it is
+  // the only way to move a card (the arrows are hidden there, FD13 — no touch drag-and-drop), above it a ghost
+  // "Move to…" after the arrows.
   const boardTargets = allBoardTargets(workflow, fromStateId);
   const moveRefusalId = useId();
   /**
@@ -2918,29 +2918,33 @@ function MoveArrows({
       >
         ›
       </button>
-      {phone ? (
-        <>
-          <button
-            type="button"
-            className="gn-board-card__move gn-board-card__move-to"
-            disabled={boardTargets.length === 0 || submitting}
-            aria-label="Move to another state"
-            aria-describedby={boardTargets.length === 0 ? moveRefusalId : undefined}
-            onClick={moveClick}
-          >
-            Move
-          </button>
-          {boardTargets.length === 0 ? (
-            // Disabled, never absent (as the arrows are): the reason is the board's own refusal sentence, read
-            // off the same `transitionOptions` list `moveOutcome` would name — `refusalCopy` drops Backlog itself.
-            <span id={moveRefusalId} hidden>
-              {refusalCopy(
-                workflow,
-                transitionOptions(workflow, fromStateId).map((option) => option.toStateId),
-              )}
-            </span>
-          ) : null}
-        </>
+      <button
+        type="button"
+        className="gn-board-card__move gn-board-card__move-to"
+        disabled={boardTargets.length === 0 || submitting}
+        aria-label="Move to another state"
+        aria-describedby={boardTargets.length === 0 ? moveRefusalId : undefined}
+        onClick={moveClick}
+      >
+        {/* The word differs by width — "Move" on a phone, "Move to…" above — and the stylesheet picks one
+            (`.gn-board-card__move-label--*`). Both are `aria-hidden`: the accessible name is the one `aria-label`
+            at every width, and a visible word read on top of it would be said twice. */}
+        <span className="gn-board-card__move-label--phone" aria-hidden="true">
+          Move
+        </span>
+        <span className="gn-board-card__move-label--wide" aria-hidden="true">
+          Move to…
+        </span>
+      </button>
+      {boardTargets.length === 0 ? (
+        // Disabled, never absent (as the arrows are): the reason is the board's own refusal sentence, read
+        // off the same `transitionOptions` list `moveOutcome` would name — `refusalCopy` drops Backlog itself.
+        <span id={moveRefusalId} hidden>
+          {refusalCopy(
+            workflow,
+            transitionOptions(workflow, fromStateId).map((option) => option.toStateId),
+          )}
+        </span>
       ) : null}
       {/* Backlog/closed spec §5.2 — terminal columns only; `category` is
           computed once above, alongside `previousTargets`/`nextTargets`. */}

@@ -51,3 +51,27 @@ describe('21.050 on a phone the arrows give way to a Move button', () => {
     expect(valueOf(ruleExactly(css, '.gn-board-card__move'), 'display')).toBe('inline-flex');
   });
 });
+
+describe('21.060 above 40rem the Move button is a 44px ghost pill with a word', () => {
+  it('21.060 the top-level rule restates the 44px floor and carries the label metrics', () => {
+    const move = ruleExactly(css, '.gn-board-card__move-to');
+    expect(valueOf(move, 'min-height')).toBe('2.75rem');
+    expect(valueOf(move, 'min-width')).toBe('2.75rem');
+    expect(valueOf(move, 'padding')).toBe('0 1rem');
+  });
+
+  it('21.060 CONTROL — it shares the arrows\' ghost class, so it wears their transparent ground', () => {
+    expect(valueOf(ruleExactly(css, '.gn-board-card__move'), 'background')).toBe('transparent');
+  });
+});
+
+describe('21.062 the visible word is swapped by the phone arm', () => {
+  it('21.062 "Move" is hidden at the top level and shown at ≤40rem; "Move to…" is the reverse', () => {
+    expect(valueOf(ruleExactly(css, '.gn-board-card__move-label--phone'), 'display')).toBe('none');
+    expect(valueOf(phone('.gn-board-card__move-label--phone'), 'display')).toBe('inline');
+    expect(valueOf(phone('.gn-board-card__move-label--wide'), 'display')).toBe('none');
+    // CONTROL — nothing hides the wide word at the top level.
+    const topLevel = parseRules(css).filter((rule) => rule.atRule === null && rule.selectors.includes('.gn-board-card__move-label--wide'));
+    expect(topLevel).toEqual([]);
+  });
+});
