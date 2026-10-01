@@ -1571,6 +1571,12 @@ input, textarea, select { font-family: inherit; }
 .gn-invitations__failure { margin: 1.1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
+/* The invite accept card on a phone (mobile-web plan Task 12, case 21.191): the card already fills the
+   shell's width, so what changes is the action — "Join <workspace>" (and the unreachable state's
+   Retry) is a full-width 3rem target. The variant stays the page's: `primary`. */
+@media (max-width: 40rem) {
+  .gn-invite .gn-button { width: 100%; min-height: 3rem; justify-content: center; }
+}
 
 /* ── `/w/[workspaceId]/members` — the roster (2026-09-18). ──────────────────
    Ported from the prototype's `isMembers` screen
@@ -2780,6 +2786,22 @@ input, textarea, select { font-family: inherit; }
    `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */
 .gn-sign-in__hint,
 .gn-sign-in__legal { margin: 0; text-align: center; font-size: 1rem; color: var(--gn-text-muted); }
+/* ── Sign-in on a phone (mobile-web plan Task 12, case 21.190). The 26rem column and the card's own cap
+   give way to the viewport, with a 1rem gutter (a LONGHAND on the `--centred` modifier: the `.gn-shell`
+   shorthand at ≤60rem supplies 0.75rem and must stay the one `padding` there). The page is still
+   centred on both axes — only the width changes. Every action is a full-width 3rem (48px) button:
+   the method forms' submit and send-code, and the passkey button (a direct child of the
+   alternatives block; the second alternatives block holds the hint and the marks). The provider marks
+   keep their icon-only shape but share the row between them instead of hugging two 56px tiles. No
+   bottom bar: this page never mounts `AppNav`, the bar's only mount (plan FD3, asserted). */
+@media (max-width: 40rem) {
+  .gn-shell--centred { padding-inline: 1rem; }
+  .gn-shell--centred > * { max-width: none; }
+  .gn-sign-in { max-width: none; }
+  .gn-sign-in__method .gn-button,
+  .gn-sign-in__alternatives > .gn-button { width: 100%; min-height: 3rem; justify-content: center; }
+  .gn-sign-in__mark { flex: 1 1 0; min-height: 3rem; }
+}
 
 /* A refusal is a first-class rendering, not an error state. ⚠ CORRECTED
    2026-09-20: this read "six of the twelve `DataSourceQuery` methods answer with a
@@ -3367,6 +3389,17 @@ input, textarea, select { font-family: inherit; }
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-well);
   color: var(--gn-text);
+}
+/* ── The MCP connect and approval screens on a phone (mobile-web plan Task 12, case 21.191). The 34rem
+   measures give way to the viewport; the centring the owner chose for `/mcp/connect` (C1: the stage's
+   `margin: auto`) is NOT touched here — the stage is full width AND still centred, so a tall stage
+   still top-aligns under the gutter. The decision buttons stack, each a full-width 3rem target: the
+   primary (Allow on `/mcp/connect`) first, Deny under it. `/mcp/authorize`'s Approve keeps the page's
+   own variant (ghost, equal weight with Deny by design) — this arm only widens it. */
+@media (max-width: 40rem) {
+  .gn-mcp-connect__stage { max-width: none; }
+  .gn-mcp-authorize__card { max-width: none; }
+  .gn-mcp-authorize__actions .gn-button { flex: 1 1 100%; min-height: 3rem; justify-content: center; }
 }
 
 /* ── /mcp/tokens — the revoke surface (MCP plan Task 12) ────────────────────
