@@ -117,6 +117,12 @@ export type FilterFieldClause = z.infer<typeof filterFieldClauseSchema>;
  * so admitting it would not be tolerance of hostile input, it would be a
  * guaranteed 500. It is still a refusal and still not a rewrite.
  */
+/**
+ * A list of ids for the plural filter keys (MCP CRUD plan Task 3, 2026-10-01):
+ * 1–20 values, each held to the singular key's own bound and NUL guard.
+ */
+const idList = z.array(noNul(z.string().min(1).max(200))).min(1).max(20);
+
 export const filterSpecSchema = z
   .object({
     assigneeId: noNul(z.string().min(1).max(200)).optional(),
@@ -126,6 +132,20 @@ export const filterSpecSchema = z
     stateCategory: stateCategorySchema.optional(),
     /** One level (spec 2026-09-22). Singular like `stateId`, so `toServerFilterSpec` maps it the same way. */
     priority: prioritySchema.optional(),
+    /**
+     * The PLURAL keys (MCP CRUD plan FD11, owner ruling M6, 2026-10-01): "assigned
+     * to Asha or Ravi", "To do or Doing". New keys rather than a widened singular
+     * so the product's own call sites and `toServerFilterSpec` (which sends only
+     * the singular keys) are untouched. Each is mutually exclusive with its
+     * singular twin (the refine below) and is compiled to ONE bound array
+     * (`= ANY($n::text[])`) — a match on ANY listed value.
+     */
+    assigneeIds: idList.optional(),
+    collaboratorIds: idList.optional(),
+    typeIds: idList.optional(),
+    stateIds: idList.optional(),
+    stateCategories: z.array(stateCategorySchema).min(1).max(3).optional(),
+    priorities: z.array(prioritySchema).min(1).max(20).optional(),
     blocked: z.boolean().optional(),
     /**
      * The closed flag (backlog/closed spec §3.2, 2026-09-17): `true` = closed
@@ -169,5 +189,42 @@ export const filterSpecSchema = z
       .optional(),
     fields: z.array(filterFieldClauseSchema).max(10).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (s) =>
+      !(
+        (s.assigneeId !== undefined && s.assigneeIds !== undefined) ||
+        (s.collaboratorId !== undefined && s.collaboratorIds !== undefined) ||
+        (s.typeId !== undefined && s.typeIds !== undefined) ||
+        (s.stateId !== undefined && s.stateIds !== undefined) ||
+        (s.stateCategory !== undefined && s.stateCategories !== undefined) ||
+        (s.priority !== undefined && s.priorities !== undefined)
+      ),
+    'a field takes a single value OR a list, not both',
+  );
 export type FilterSpec = z.infer<typeof filterSpecSchema>;
+
+/** The plural keys above, named once so a door that must refuse them (saved filters) cannot drift from the schema. */
+const PLURAL_FILTER_KEYS = [
+  'assigneeIds',
+  'collaboratorIds',
+  'typeIds',
+  'stateIds',
+  'stateCategories',
+  'priorities',
+] as const satisfies readonly (keyof FilterSpec)[];
+
+/**
+ * `filterSpecSchema` minus the plural keys: what a SAVED filter may hold.
+ *
+ * A saved filter is read back by the web client, which has no plural wire term —
+ * its own `assigneeIds` is the client-side array axis, not this key — and ruling
+ * P26 (cases 11.97, 11.106) refuses the client's plural spelling at the saved-filter
+ * door so a stored filter is always one the client can show and edit. The plural
+ * server keys (MCP CRUD plan FD11, 2026-10-01) reach the schema above for the
+ * list/search reads; they must not slip in here by the same name.
+ */
+export const savedFilterSpecSchema = filterSpecSchema.refine(
+  (spec) => PLURAL_FILTER_KEYS.every((key) => spec[key] === undefined),
+  'a saved filter takes single values, not the plural list keys',
+);

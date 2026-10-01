@@ -11,7 +11,7 @@ import {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
+import { BLOCKED_STATES_CTE, compileFilterSpec, resolveMeInSpec } from '../read/compile-filter.js';
 import { epicAncestors, type EpicOf } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { assembleListCards } from '../read/list-cards.js';
@@ -427,7 +427,8 @@ export function registerListRoutes(
         // refusal that quotes what it refused is a mirror an attacker can aim.
         return reply.status(400).send({ error: 'invalid_filter' });
       }
-      spec = validated.data;
+      // `"me"` → the caller, once, before the compiler (MCP CRUD plan FD12).
+      spec = resolveMeInSpec(validated.data, viewerId);
     }
 
     let limit = DEFAULT_LIMIT;
