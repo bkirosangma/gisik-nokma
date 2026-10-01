@@ -23,12 +23,14 @@ import { seedNotesFixture, type NotesFixture } from '../helpers/notes-fixture.js
  * `Registrations` is `RE`, and its first two tickets are `TP` and `TE`, so the
  * first ticket THIS file makes is `-3` and the second `-4`.
  *
- * ## The cases run in order and share one world
+ * ## 22.080 and 22.081 share one world; 22.082 makes its own
  *
- * 22.080 moves the project to `SH`; 22.081 then moves the workspace to `CD` and
- * so reads `CDSH-4`; 22.082 verifies everything written before it. One database
- * per file (`seedNotesFixture` refuses a second seed), and nothing in `events`
- * is ever truncated.
+ * 22.080 moves the fixture's project to `SH`; 22.081 then moves the workspace
+ * to `CD` and so reads `CDSH-4`. One database per file (`seedNotesFixture`
+ * refuses a second seed), and nothing in `events` is ever truncated. 22.082
+ * founds its OWN project and note and makes both changes itself, so it reads no
+ * state the earlier cases left and passes in any order (it asserts no literal
+ * that carries the workspace prefix, which 22.081 moves).
  */
 let db: TestDatabase;
 let fixture: NotesFixture;
@@ -62,19 +64,22 @@ const ev = (
 ): LedgerEvent => makeCommitted({ workspaceId: fixture.WS, actorId, entity, type, payload });
 
 /** A ticket in the fixture's project and a workspace-scoped note attached to it. */
-async function noteAttachedToNewTicket(title: string): Promise<{ note: string; ticket: string }> {
+async function noteAttachedToNewTicket(
+  title: string,
+  projectId: string = fixture.P,
+): Promise<{ note: string; ticket: string }> {
   const note = newUlid();
   const ticket = newUlid();
   await applyCommitted(db.pool, [
     ev({ kind: 'ticket', id: ticket }, fixture.ids.author, 'ticket.created', {
       typeId: 'task',
-      projectId: fixture.P,
+      projectId,
       parentId: null,
       title,
     }),
     ev({ kind: 'note', id: note }, fixture.ids.author, 'note.created', {
       title: `Note on ${title}`,
-      homeProjectId: fixture.P,
+      homeProjectId: projectId,
       scope: { mode: 'workspace' },
       attachTicketId: ticket,
     }),
@@ -82,7 +87,7 @@ async function noteAttachedToNewTicket(title: string): Promise<{ note: string; t
   return { note, ticket };
 }
 
-describe('22.080–22.082 the note search index follows a prefix change', () => {
+describe('22.080–22.081 the note search index follows a prefix change', () => {
   it('22.080 — project.updated {prefix:SH} re-keys ticket_text to CCSH-3 and a note search for CCSH-3 finds the note; control: before, CCRE-3 found it', async () => {
     const { note } = await noteAttachedToNewTicket('Fix the freezer');
     expect(await ticketTextOf(note), 'control: the old key is what is indexed first').toBe('ccre-3 fix the freezer');
@@ -109,10 +114,36 @@ describe('22.080–22.082 the note search index follows a prefix change', () => 
     expect(await ticketTextOf(note)).toBe('cdsh-4 mend the shutter');
     expect(await searchNotes('CDSH-4')).toContain(note);
   });
+});
 
-  it('22.082 — verifyProjections stays clean after a project and a workspace prefix change', async () => {
-    const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() });
-    expect(report.diffs, report.diffs.map((diff) => diff.table).join(', ')).toEqual([]);
-    expect(report.clean).toBe(true);
+describe('22.082 the lexeme vocabulary follows each prefix change on its own', () => {
+  it('22.082 — verifyProjections is clean right after a PROJECT prefix change and again after a WORKSPACE one; control: the note is re-keyed at each step', async () => {
+    const project = newUlid();
+    await applyCommitted(db.pool, [
+      ev({ kind: 'project', id: project }, fixture.ids.owner, 'project.created', { name: 'Lexemes', prefix: 'ZA' }),
+    ]);
+    const { note } = await noteAttachedToNewTicket('Polish the brass', project);
+    const verify = async () => {
+      const report = await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() });
+      expect(report.diffs, report.diffs.map((diff) => diff.table).join(', ')).toEqual([]);
+      expect(report.clean).toBe(true);
+    };
+    expect(await ticketTextOf(note), 'control: the founding key is what is indexed').toMatch(/^[a-z]+za-1 polish the brass$/);
+    await verify();
+
+    // Checkpoint 1: the project path ALONE. The workspace change below
+    // re-derives the whole vocabulary and would hide a missing re-derive here.
+    await applyCommitted(db.pool, [
+      ev({ kind: 'project', id: project }, fixture.ids.owner, 'project.updated', { prefix: 'ZB' }),
+    ]);
+    expect(await ticketTextOf(note), 'control: the project change re-keyed the note').toMatch(/^[a-z]+zb-1 polish the brass$/);
+    await verify();
+
+    // Checkpoint 2: the workspace path. `CF` is neither the fixture's `CC` nor 22.081's `CD`.
+    await applyCommitted(db.pool, [
+      ev({ kind: 'workspace', id: fixture.WS }, fixture.ids.owner, 'workspace.prefix_changed', { prefix: 'CF' }),
+    ]);
+    expect(await ticketTextOf(note), 'control: the workspace change re-keyed it again').toBe('cfzb-1 polish the brass');
+    await verify();
   });
 });
