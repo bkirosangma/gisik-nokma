@@ -57,3 +57,37 @@ describe('21.022 at most 4, deduped, known destinations only', () => {
     expect(readBottomBar('u')).toEqual([...DEFAULT_BAR]);
   });
 });
+
+describe('21.034 a saved EMPTY bar is a choice, not a failure', () => {
+  it('21.034 remembering [] reads back as [] and is never promoted to the default; a saved non-empty bar reads as saved', () => {
+    rememberBottomBar('u', []);
+    expect(readBottomBar('u')).toEqual([]);
+    // The stored bytes carry the empty array itself (not a removed record, which WOULD read as the default).
+    expect(JSON.parse(localStorage.getItem(BOTTOM_BAR_KEY) ?? 'null')).toEqual({ userId: 'u', slots: [] });
+    // CONTROL — a non-empty saved bar reads as saved, so the `[]` above is the stored choice and not a blanket answer.
+    rememberBottomBar('u', ['calendar']);
+    expect(readBottomBar('u')).toEqual(['calendar']);
+  });
+});
+
+describe('21.035 the owner’s default bar, spelled out', () => {
+  it('21.035 DEFAULT_BAR is exactly Board · My work · Notes · Inbox, four entries (More is not counted)', () => {
+    expect([...DEFAULT_BAR]).toEqual(['board', 'my-work', 'notes', 'inbox']);
+    expect(DEFAULT_BAR).toHaveLength(4);
+    // CONTROL — the same literal is what an unreadable store answers.
+    expect(readBottomBar('nobody')).toEqual(['board', 'my-work', 'notes', 'inbox']);
+  });
+});
+
+describe('21.036 the write side cuts to four known ids as well', () => {
+  it('21.036 the bytes rememberBottomBar wrote hold at most four known, de-duplicated ids', () => {
+    const stored = (): { userId: string; slots: string[] } => JSON.parse(localStorage.getItem(BOTTOM_BAR_KEY) ?? 'null');
+    rememberBottomBar('u', ['board', 'my-work', 'notes', 'inbox', 'list']);
+    expect(stored().slots).toEqual(['board', 'my-work', 'notes', 'inbox']);
+    rememberBottomBar('u', ['notes', 'notes', 'zz' as never, 'inbox']);
+    expect(stored().slots).toEqual(['notes', 'inbox']);
+    // CONTROL — three valid slots are stored as three, under this user.
+    rememberBottomBar('u', ['board', 'notes', 'inbox']);
+    expect(stored()).toEqual({ userId: 'u', slots: ['board', 'notes', 'inbox'] });
+  });
+});

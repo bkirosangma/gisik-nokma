@@ -215,7 +215,14 @@ describe('21.025 Edit bottom bar', () => {
     await user.click(within(edit).getByRole('button', { name: 'Remove Notes' }));
     expect(readBottomBar(U)).toEqual([]);
     await waitFor(() => expect(items()).toEqual(['More']));
-    const offered = within(edit).getAllByRole('button', { name: /^Add / });
+    // 21.034 — and a fresh mount reads the saved EMPTY bar as a choice: only More, not the default four.
+    cleanup();
+    render(bar());
+    await waitFor(() => expect(items()).toEqual(['More']));
+    await user.click(within(phoneNav()).getByRole('button', { name: 'More' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'More' })).getByRole('button', { name: 'Edit bottom bar' }));
+    const reopened = await screen.findByRole('dialog', { name: 'Edit bottom bar' });
+    const offered = within(reopened).getAllByRole('button', { name: /^Add / });
     expect(offered).toHaveLength(9);
   });
 });
@@ -354,6 +361,63 @@ describe('21.031 the bar steps aside while the on-screen keyboard is open', () =
       fire();
     });
     await waitFor(() => expect(phoneNav().getAttribute('data-keyboard')).toBeNull());
+  });
+});
+
+describe('21.037 / 21.038 AppNav renders the bar ONLY at phone width, and instead of the corner links', () => {
+  function services() {
+    return stubServices({ getMyWorkspaces: async () => [] }, { notifications: { unreadCount: async () => 0 } });
+  }
+  const names = (name: string): HTMLElement[] => screen.queryAllByRole('link', { name });
+
+  it('21.037 no phone viewport → no nav[aria-label="Phone"] in the DOM; a phone viewport → the bar is there', async () => {
+    stubPhoneViewport(false);
+    render(
+      <Providers services={services()}>
+        <AppNav />
+      </Providers>,
+    );
+    await screen.findByRole('link', { name: 'Notes' });
+    expect(document.querySelector('nav[aria-label="Phone"]')).toBeNull();
+
+    // CONTROL — the same bar, same session, at a phone viewport does render it.
+    cleanup();
+    stubPhoneViewport(true);
+    render(
+      <Providers services={services()}>
+        <AppNav />
+      </Providers>,
+    );
+    await waitFor(() => expect(document.querySelector('nav[aria-label="Phone"]')).not.toBeNull());
+  });
+
+  it('21.038 the corner carries Notes and Inbox above the phone width; at phone width the bar carries them, once each', async () => {
+    stubPhoneViewport(false);
+    render(
+      <Providers services={services()}>
+        <AppNav />
+      </Providers>,
+    );
+    await screen.findByRole('link', { name: 'Notes' });
+    expect(names('Notes')).toHaveLength(1);
+    expect(names('Inbox')).toHaveLength(1);
+    expect(names('Notes')[0]?.closest('.gn-nav__corner')).not.toBeNull();
+    expect(names('Inbox')[0]?.closest('.gn-nav__corner')).not.toBeNull();
+
+    // At phone width: exactly one of each, and it is the bar's — not the corner's plus the bar's (a second unread poller).
+    cleanup();
+    stubPhoneViewport(true);
+    render(
+      <Providers services={services()}>
+        <AppNav />
+      </Providers>,
+    );
+    await waitFor(() => expect(document.querySelector('nav[aria-label="Phone"]')).not.toBeNull());
+    expect(names('Notes')).toHaveLength(1);
+    expect(names('Inbox')).toHaveLength(1);
+    expect(names('Notes')[0]?.closest('nav[aria-label="Phone"]')).not.toBeNull();
+    expect(names('Inbox')[0]?.closest('nav[aria-label="Phone"]')).not.toBeNull();
+    expect(document.querySelector('.gn-nav__corner a[href="/notes"], .gn-nav__corner a[href="/inbox"]')).toBeNull();
   });
 });
 

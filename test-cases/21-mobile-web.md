@@ -24,7 +24,7 @@
 
 ## 21.3 Bottom bar
 
-*Task 3. Ids `21.034`–`21.039` are unused.*
+*Task 3. Id `21.039` is unused.*
 
 - ✅ **21.020 — the store reads `DEFAULT_BAR` when nothing is saved, when storage throws, and when the saved value is malformed (bad JSON, `slots` not an array);** control: a valid saved value is returned as saved; a throwing write is swallowed. Mutation: return `[]` on a throw. (`packages/app-core/test/preferences/bottom-bar.test.ts`; `packages/app-core/src/preferences/bottom-bar.ts`)
 - ✅ **21.021 — the store is keyed by user: a value saved for A is not read for B;** control: A reads its own. Mutation: drop the user check. (same file)
@@ -40,3 +40,8 @@
 - ✅ **21.031 — `useKeyboardOpen` is true when `visualViewport.height < 0.75 × innerHeight` and the bar gets `data-keyboard="open"` → `display: none` (CSS half in the same id);** control: false at full height and false with no `visualViewport` (older browsers). Mutation: invert the comparison. (`apps/web/test/bottom-bar.test.tsx`, `packages/ui/test/phone-bottom-bar-css.test.ts`)
 - ✅ **21.032 — where the keyboard resizes the LAYOUT viewport (`interactiveWidget: 'resizes-content'`, so `innerHeight` falls with `visualViewport.height`) a focused field still reads as keyboard-open against the height the page had before;** control: the same shrink with no field focused is not a keyboard. Mutation: compare against the current `innerHeight` only. (`apps/web/test/bottom-bar.test.tsx`; `apps/web/src/use-keyboard-open.ts`)
 - ✅ **21.033 — the script's phone query and the stylesheet's phone arm are the same `40rem`;** control: the bottom bar's box rule is drawn under that arm. Mutation: change `PHONE_QUERY` to another width. (`apps/web/test/bottom-bar.test.tsx`; `apps/web/src/use-is-phone.ts`)
+- ✅ **21.034 — a saved EMPTY bar is a choice: remembering `[]` reads back as `[]` (stored as `slots: []`), never promoted to the default, and a fresh mount after removing the last slot shows only More;** control: a saved non-empty bar reads as saved. Mutation: `return s.length === 0 ? [...DEFAULT_BAR] : s`. (`packages/app-core/test/preferences/bottom-bar.test.ts`, `apps/web/test/bottom-bar.test.tsx`)
+- ✅ **21.035 — `DEFAULT_BAR` is literally Board · My work · Notes · Inbox, four entries (More not counted);** control: an unreadable store answers the same literal. Mutation: swap My work and Notes. (`packages/app-core/test/preferences/bottom-bar.test.ts`)
+- ✅ **21.036 — the write side cuts too: the BYTES `rememberBottomBar` wrote hold at most four known, de-duplicated ids;** control: three valid slots are stored as three under the user. Mutation: stringify the uncut `slots`. (same file)
+- ✅ **21.037 — `AppNav` renders `nav[aria-label="Phone"]` only at a phone viewport (no bar in the DOM above it);** control: the same session at a phone viewport renders it. Mutation: drop `isPhone` from the bar's condition. (`apps/web/test/bottom-bar.test.tsx`)
+- ✅ **21.038 — above phone width the corner carries Notes and Inbox (one of each); at phone width the bar carries them, once each, and the corner carries neither (one unread poller);** control: both halves in the same case. Mutation: render the corner links unconditionally. (same file)
