@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import { NewTicketDialog, TicketSheet, type TicketRead } from '@gisik-nokma/app-core';
@@ -111,7 +111,7 @@ async function mountDialog(phone: boolean): Promise<Mounted & { unmount: () => v
       userId={USER}
       workspaceId={WS}
       assigneeCandidates={[]}
-      typeOptions={[{ id: 'task', name: 'Task' }]}
+      typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: WF.id }]}
       parentCandidates={[]}
       onCreate={vi.fn()}
       onClose={() => undefined}
@@ -289,4 +289,3 @@ describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, i
   });
 });
 
-void act;
