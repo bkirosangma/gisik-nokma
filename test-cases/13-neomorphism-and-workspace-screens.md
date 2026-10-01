@@ -56,6 +56,10 @@ card-scale) and is recorded here only for completeness, not as a call.
   knowingly, not hidden.** A positive control guards `rule()`'s substring matching: the neo selector and
   the base selector must read back DIFFERENT bodies. *Mutation-witnessed: giving the neo override a
   border reddens this case alone (227/228 pass). Restored, checksum-verified.* — (`packages/ui/test/components.test.tsx`)
+  **AMENDED 2026-10-02 (UX fixes T1, U5–U8, owner: "borders on buttons AND text fields"; cases 23.002, 23.004):
+  the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
+  (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
+  their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
 - **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
   (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
   makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
@@ -264,7 +268,8 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   route "is among the five routes this sweep visits"). The sweep still cannot compute a `box-shadow`'s
   contrast ratio (`sweepBorders` composites `border-{side}-*` only, by design), so this does not become a
   fifth measured route in the ordinary sense: a live DOM check on each route confirms the field genuinely
-  has `border: none` and a non-`none` `box-shadow` (grounding the waiver's premise against THIS tree
+  has `border: none` and a non-`none` `box-shadow` — **AMENDED 2026-10-02 (UX fixes T1, U5): the neo field now
+  has a 1px solid ring, so the e2e DOM check expects `solid` and the waiver is superseded** (grounding the waiver's premise against THIS tree
   rather than trusting Task 13's report unverified), and Task 13's own measured numbers (1.24 light / 1.16
   dark) are then recorded as a SANCTIONED entry in the persisted roster — appended after `below` is
   computed, so it can never trip the zero-below-3 assertion, since that assertion is about what this

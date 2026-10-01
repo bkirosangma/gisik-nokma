@@ -458,12 +458,18 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
  * with `neoNavyRaised`/`neoNavySunken` reverted to `neoNavy`, holding dark
  * to ANY separation floor while light already gets `neoPaper` — one hex,
  * zero separation, depth from shadow alone — was the inconsistency. `neo`'s
- * whole visual language is shadow-only depth in both themes now.
+ * visual language is shadow-first depth in both themes.
  *
  * Mutation: reintroduce `neo` into `DARK_SEPARATION_FLOORS` with any floor
  * above `1.0` → reddens, naming the exact regression this exemption guards
- * against (`neoNavyRaised`/`neoNavySunken` drifting away from `neoNavy`
- * again without updating this test to match).
+ * against (`neoNavySunken` drifting away from `neoNavy` again without updating
+ * this test to match).
+ *
+ * **Amended UX T1 (owner U8, 2026-10-02; 23.006): `neoNavyRaised` is the one
+ * dark neo surface that DID step**, `#1b2340` → `#232c50` (1.14 off the page),
+ * so the neo/dark case below no longer says raised is the SAME hex. It still
+ * pins that depth is mostly shadow (sunken stays the surface hex) and the step
+ * is pinned as a literal so a drift reddens here.
  */
 describe('13.341 dark-theme fill separation per style (rule (c))', () => {
   const DARK_SEPARATION_FLOORS: Record<'hig' | 'minimal', { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
@@ -483,11 +489,12 @@ describe('13.341 dark-theme fill separation per style (rule (c))', () => {
     });
   }
 
-  it('neo/dark: surface, surfaceRaised and surfaceSunken are the SAME hex — depth comes from shadow, not fill, matching neo/light', () => {
+  it('neo/dark: surface and surfaceSunken are the SAME hex; surfaceRaised steps to #232c50 (U8, 23.006) — depth is shadow first, fill second', () => {
     const surface = colorOf('dark', 'surface', 'neo');
     const raised = colorOf('dark', 'surfaceRaised', 'neo');
     const sunken = colorOf('dark', 'surfaceSunken', 'neo');
-    expect(raised).toBe(surface);
+    expect(raised).toBe('#232c50');
+    expect(raised).not.toBe(surface);
     expect(sunken).toBe(surface);
   });
 });
@@ -1090,7 +1097,7 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
     // Dark clears bare surface/raised (see `textAccentDark`'s own docblock)
     // AND, since 2026-09-10, the neo sunken surface too — `neoNavySunken`
     // was reverted to `neoNavy` itself (the prototype's exact dark+neo hex;
-    // see `tokens.ts`'s `neoNavyRaised` docblock), and a darker background
+    // see `tokens.ts`'s `neoNavySunken`, still `neoNavy`), and a darker background
     // only helps a light foreground like `accent` read MORE clearly. This
     // is a changed FACT, not a claim this test still needs to hold the old
     // way — `accent` still carries no GUARANTEE on a sunken background in
@@ -1451,8 +1458,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
-    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows. A floor removed is a guarantee removed, and it would show here first.
-    expect(CONTRAST_PAIRS.length).toBe(44);
+    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 10 (the field ring, text on the lifted raised surface, text and the accent fill on the stepped track/well; 23.001/23.006/23.007). A floor removed is a guarantee removed, and it would show here first.
+    expect(CONTRAST_PAIRS.length).toBe(54);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
@@ -1606,7 +1613,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * **The chip's fill is a depth problem, and the measurement is what says so.**
  * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3184`),
  * which is `--gn-surface-sunken` on this product's role layer — and under `neo`
- * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex, so a chip on a
+ * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex (in LIGHT; neo dark's raised
+ * stepped to `#232c50` with UX T1, 2026-10-02, see the dark half below), so a chip on a
  * `.gn-card` composites to exactly the card's own colour and its fill draws no
  * boundary at all. **That is asserted here as a fact about the palette**
  * (1.0000, both themes, exactly as case 13.732 asserts it for the avatar), which
@@ -1684,13 +1692,21 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
     // than one, and asserted as equality so a future palette that separates the
     // surface roles reddens here — which would be the signal to re-derive the
     // rule rather than to keep a shadow that had stopped being needed.
-    for (const theme of THEME_NAMES) {
-      const card = colorOf(theme, 'surfaceRaised', 'neo');
-      expect(
-        over(colorOf(theme, chipFill, 'neo'), card),
-        `neo/${theme}: the chip fill no longer collapses onto the card, so this case's premise has moved`,
-      ).toBe(card);
-    }
+    //
+    // Amended UX T1 (owner U8, 2026-10-02; 23.006): neo/dark's raised surface stepped to `#232c50`, so in DARK the chip
+    // (`surfaceSunken`, still `neoNavy`) no longer composites to exactly the card. It is a 1.14 step, though, well under
+    // the 3:1 a boundary owes, so the shadow is still the chip's boundary and the premise holds in the weaker form
+    // asserted for dark below: still no boundary by fill alone.
+    const lightCard = colorOf('light', 'surfaceRaised', 'neo');
+    expect(
+      over(colorOf('light', chipFill, 'neo'), lightCard),
+      `neo/light: the chip fill no longer collapses onto the card, so this case's premise has moved`,
+    ).toBe(lightCard);
+    const darkCard = colorOf('dark', 'surfaceRaised', 'neo');
+    expect(
+      contrastRatio(over(colorOf('dark', chipFill, 'neo'), darkCard), darkCard),
+      `neo/dark: the chip fill now separates from the card by 3:1 or more, so the shadow is no longer what supplies the boundary`,
+    ).toBeLessThan(3);
 
     // THE CONTROL, and it is the whole reason the paragraph above is a claim
     // about `neo` rather than about the palette: under hig/minimal the two roles
@@ -1746,8 +1762,8 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * `.gn-card`'s `--gn-surface-raised`. The first draft of this case measured
  * against `surfaceSunken`, the fill the stripe replaces, and two of its four
  * pinned readings therefore described a layer that is not on screen. Under `neo`
- * the two roles are the same hex (`neoPaper`), which is why the error hid there
- * and only showed under `hig`. 13.920 composites its chip over `surfaceRaised`
+ * LIGHT the two roles are the same hex (`neoPaper`), which is why the error hid there
+ * and only showed under `hig` (neo dark's raised stepped to `#232c50` with UX T1). 13.920 composites its chip over `surfaceRaised`
  * for the same reason.
  *
  * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the row is now a raised
@@ -1880,7 +1896,8 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     expect(measured['minimal/light']).toBeCloseTo(1.1026, 3);
     expect(measured['minimal/dark']).toBeCloseTo(1.2727, 3);
     expect(measured['neo/light']).toBeCloseTo(1.0757, 3);
-    expect(measured['neo/dark']).toBeCloseTo(1.1727, 3);
+    // neo/dark moved 1.1727 -> 1.1684 with UX T1 (owner U8, 2026-10-02): the card the stripe sits on is now `#232c50`.
+    expect(measured['neo/dark']).toBeCloseTo(1.1684, 3);
   });
 
   it('the h2 carries the prototype metrics, so the third string is ported and not just relabelled', () => {
