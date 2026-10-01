@@ -151,8 +151,14 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   useEffect(() => (treeRef.current === null ? undefined : carryTreeScroll(treeRef.current)), []);
   const [headings, setHeadings] = useState<ReadingMeta['headings']>([]);
 
-  /** The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css). */
-  const [treeOpen, setTreeOpen] = useState(false);
+  /**
+   * The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css).
+   * With NO note open the list IS the page, so it starts expanded (UX fixes T9, 23.161, audit NP-02): a phone
+   * landing on `/notes` used to show filters for a list it hid, and an instruction to "create one" pointing at
+   * nothing. With a note open the document is the page and the list starts closed. Above 60rem the attribute
+   * is inert (the tree is always drawn).
+   */
+  const [treeOpen, setTreeOpen] = useState(noteId === undefined);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -225,15 +231,17 @@ export function NotesPage({ noteId }: { noteId?: string }) {
               the DOM — CSS alone decides whether it is painted, `aria-expanded`
               is the observable a test (or a screen reader) can see regardless
               of viewport, and `aria-controls` names the tree it opens. */}
-          <button
-            type="button"
+          {/* A ghost `Button` (UX fixes T9, 23.160, audit NP-01): the bare `<button>` it was drew the browser's
+              grey slab, the one square object on a neo screen. `.gn-button` brings the fill, pill radius, font and
+              the 44px floor; `.gn-notes__tree-toggle` still decides WHEN it is drawn. */}
+          <Button
             className="gn-notes__tree-toggle"
             aria-expanded={treeOpen}
             aria-controls="gn-notes-tree"
             onClick={() => setTreeOpen((open) => !open)}
           >
-            Notes list
-          </button>
+            Notes
+          </Button>
           <nav
             ref={treeRef}
             aria-label="Notes"
@@ -254,7 +262,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
                 the same empty tree. */}
             {signedIn && refusal === null && workspaces !== null ? (
               <div className="gn-notes__tree-head">
-                <Button onClick={() => setCreateOpen(true)}>New note</Button>
+                <Button onClick={() => setCreateOpen(true)}>Create note</Button>
                 {workspaces.length > 0 ? (
                   <input
                     type="text"

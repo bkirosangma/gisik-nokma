@@ -278,7 +278,7 @@ Owner, 2026-10-01: *"yes, add it as recommended."* Every other board suite mocks
 
 - ✅ **20.301 — the notes page's Deleted-notes separator is a decorative hairline and a comment's code block sits in a recessed well;** control: the notes fields keep their 1px `border` edge. Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-comment__code`.
 - ✅ **20.302 — no notes, comment or editor-chrome rule paints a flat boundary or the retired constant;** control: the scan reads more than 60 rules under `gn-notes` and more than 10 under `gn-comment`, and with no kept list it reports exactly neo's unchecked task-list box (a control's own sunken coat, kept, and it still carries `border-strong`). Mutations: delete `border-color` from that neo rule; and plant `background: var(--gn-surface-sunken)` into `.gn-notes__deleted`.
-- ✅ **20.303 — Create is the new-note dialog's ONE loud element: exactly one primary `Button` is on the page while it is open and it is Create;** control: the list's New note is a named button and is not a primary. Mutation: drop `variant="primary"` from Create in `create-note-dialog.tsx`.
+- ✅ **20.303 — Create is the new-note dialog's ONE loud element: exactly one primary `Button` is on the page while it is open and it is Create;** control: the list's Create note (called New note until UX fixes T9, 23.161) is a named button and is not a primary. Mutation: drop `variant="primary"` from Create in `create-note-dialog.tsx`.
 - ✅ **20.304 — Keep is the draft-restore banner's one loud action; Discard is quiet;** control: both are named buttons. Mutation: add `variant="primary"` to Discard in `draft-restore-banner.tsx`.
 
 ## 20.30 Plan B — My work
