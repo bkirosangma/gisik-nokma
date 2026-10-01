@@ -62,6 +62,22 @@ const taskType: TicketTypeDef = {
   fields: [{ id: newUlid(), name: 'Shop', type: 'text' }],
 };
 
+/**
+ * A user-event with NO inter-action delay. MEASURED 2026-10-01 on the member sweep (22 buttons clicked, load ~30):
+ * `user.click` was 534 ms of a 1.26 s sweep -- ~24 ms a click -- because the default `delay: 0` puts a
+ * `setTimeout(0)` between pointer actions, and under CI/gate load (load average 60-170) a starved timer turns each
+ * one into tens of ms: two gates in a row timed out at the 5 s default here. Nothing in this file depends on
+ * timing between pointer events (every gesture is awaited to its result), so the delay buys nothing.
+ */
+const fastUser = () => userEvent.setup({ delay: null });
+
+/**
+ * The two sweep tests click EVERY button the member is offered and re-run a whole-tree `queryAllByRole('button')`
+ * after each click (measured idle: the invariant pass ~327 ms and the lookup ~183 ms over 22 clicks, beside 534 ms of
+ * clicking). That is genuinely a lot of work, so they carry an explicit, larger timeout than the 5 s default.
+ */
+const SWEEP_TIMEOUT_MS = 20_000;
+
 function renderBuilder(session: BuilderSession, gateway = createFakeGateway()) {
   render(
     <WorkflowBuilderScreen
@@ -178,7 +194,7 @@ describe('read-only workflow views for non-admins', () => {
   });
 
   it('a member can inspect a transition but cannot edit its rules', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     // Transition 8 is `In progress -> Done`, the errand template's own edge.
@@ -198,7 +214,7 @@ describe('read-only workflow views for non-admins', () => {
   });
 
   it('control: the identical gesture as an admin opens the same inspector WITH Add rule, Remove rule and Delete transition', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await user.click(await screen.findByTestId('transition-label-8'));
@@ -357,7 +373,7 @@ describe('no authoring action is reachable by any path the builder screen offers
    * would appear.
    */
   it('offers a member only jump buttons — clicking every one of them, and selecting a state and a transition, never surfaces an authoring button', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await screen.findByTestId('state-node-later');
@@ -398,10 +414,10 @@ describe('no authoring action is reachable by any path the builder screen offers
     await user.click(await screen.findByTestId('state-node-waiting'));
     expect(screen.getByRole('textbox', { name: 'State name' })).toBeDisabled();
     everyButtonIsAJump();
-  });
+  }, SWEEP_TIMEOUT_MS);
 
   it('control: the same three gestures as an admin surface the authoring buttons at every step', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await screen.findByTestId('state-node-later');
@@ -419,7 +435,7 @@ describe('no authoring action is reachable by any path the builder screen offers
   });
 
   it('never reaches gateway.submit for a member, however the screen is worked (control: the admin publish does submit)', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     const memberGateway = renderBuilder(memberSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await screen.findByTestId('state-node-later');
@@ -436,7 +452,7 @@ describe('no authoring action is reachable by any path the builder screen offers
     await user.click(await screen.findByRole('button', { name: 'Publish' }));
     // The gate is the ONLY difference: the identical draft, submitted.
     expect(adminGateway.submitted).toHaveLength(1);
-  });
+  }, SWEEP_TIMEOUT_MS);
 });
 
 /**
@@ -467,7 +483,7 @@ describe('the bulk migration — the one irreversible call — is unreachable fo
   }
 
   it('locks the binding itself, so the divergence section a migration lives in never opens', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     const gateway = renderEditor(memberSession);
     const picker = await screen.findByRole('combobox', { name: 'Workflow' });
     expect(picker).toBeDisabled();
@@ -480,7 +496,7 @@ describe('the bulk migration — the one irreversible call — is unreachable fo
   });
 
   it('control: the identical gesture as an admin does open the divergence section and offer the move', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     renderEditor(adminSession);
     const picker = await screen.findByRole('combobox', { name: 'Workflow' });
     expect(picker).toBeEnabled();
@@ -503,7 +519,7 @@ describe('the server, not the UI, is the enforcer', () => {
    * 10.48 — planted defect: permission.role refusal rendered character for character.
    */
   it('renders a permission.role refusal verbatim (planted defect: the gate is down but the server still refuses)', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     const reason = 'Only a workspace owner or admin can do this. Your role is member.';
     renderBuilder(
       adminSession, // the UI believes this user may publish…
@@ -523,7 +539,7 @@ describe('the server, not the UI, is the enforcer', () => {
   // the paraphrase the pinned copy forbids. Same banner, a rule string this
   // package has no knowledge of whatsoever.
   it('renders a refusal under a rule name this client has never heard of, with no table to look it up in', async () => {
-    const user = userEvent.setup();
+    const user = fastUser();
     const reason = 'This workspace is read-only while its billing is being reconciled.';
     renderBuilder(
       adminSession,
