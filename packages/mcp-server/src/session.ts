@@ -8,6 +8,8 @@ export type Session = {
    *  permission gate refuses any envelope where it is not. */
   userId(): string;
   get(path: string): Promise<unknown>;
+  /** A JSON POST to a route other than the event door (founding a workspace is `POST /v1/workspaces`). */
+  post(path: string, body: unknown): Promise<unknown>;
   postEvents(events: unknown[]): Promise<unknown>;
 };
 
@@ -61,6 +63,7 @@ export async function createSession(deps: {
   return {
     userId: () => cached.userId,
     get: (path) => withReauth((token) => deps.client.get(path, token)),
+    post: (path, body) => withReauth((token) => deps.client.post(path, body, token)),
     postEvents: (events) => withReauth((token) => deps.client.post('/v1/events', { events }, token)),
   };
 }

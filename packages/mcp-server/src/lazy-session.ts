@@ -65,6 +65,10 @@ export function lazySession(open: () => Promise<Session>): LazySession {
       await ready();
       return resolved().get(path);
     },
+    post: async (path, body) => {
+      await ready();
+      return resolved().post(path, body);
+    },
     postEvents: async (events) => {
       await ready();
       return resolved().postEvents(events);

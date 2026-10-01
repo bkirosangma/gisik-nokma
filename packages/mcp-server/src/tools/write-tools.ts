@@ -1,66 +1,12 @@
 import { z } from 'zod';
-import { newSubmittedEvent, newUlid, plainTextToDoc, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newUlid, plainTextToDoc } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
+import { envelopeFor, submitOne } from './submit.js';
 
-/**
- * The single write path, for all four tools.
- *
- * `POST /v1/events` answers 200 for a refusal — refusals ride INSIDE
- * `results[]`, index-aligned with the request array, and only a malformed
- * BATCH is an HTTP error. So a caller that checked the status code alone would
- * report every refusal as a success. This function is the one place that
- * reads the result, and it throws the server's own words rather than a summary
- * of them.
- */
-async function submitOne(session: Session, event: SubmittedEvent): Promise<unknown> {
-  const body = (await session.postEvents([event])) as {
-    results: (
-      | { status: 'committed'; eventId: string; seq: number; serverTime: string }
-      | { status: 'invalid'; eventId: string | null; code: string; message: string }
-      | { status: 'refused'; eventId: string; rule: string; reason: string }
-    )[];
-  };
-  const result = body.results[0];
-  if (result === undefined) {
-    throw new Error('gisik-nokma returned no result for the submitted event');
-  }
-  if (result.status === 'refused') {
-    // VERBATIM. The rule's name and the reason's own sentence, because a
-    // refusal is the product explaining itself to a person and a reworded
-    // refusal is a different product.
-    throw new Error(`refused by ${result.rule}: ${result.reason}`);
-  }
-  if (result.status === 'invalid') {
-    throw new Error(`${result.code}: ${result.message}`);
-  }
-  return result;
-}
-
-function envelope(
-  session: Session,
-  workspaceId: string,
-  entityId: string,
-  type: string,
-  payload: unknown,
-): SubmittedEvent {
-  return newSubmittedEvent({
-    workspaceId,
-    entity: { kind: 'ticket', id: entityId },
-    type,
-    payload,
-    // The session user, always. The permission gate's first question is
-    // whether the actor is the person submitting, and it refuses any envelope
-    // where they differ.
-    actorId: session.userId(),
-      // `'mcp'` — owner ruling 1. This was `'web'` while ORIGINS had no
-      // fifth member; Task 0 adds one, and the whole reason it exists is
-      // that a ledger which cannot distinguish a person's claim from their
-      // assistant's is a ledger lying about who acted. `'server'` remains
-      // refused at the client door.
-    origin: 'mcp',
-  });
-}
+/** One ticket-entity envelope (the four write tools here all act on a ticket). */
+const envelope = (session: Session, workspaceId: string, ticketId: string, type: string, payload: unknown) =>
+  envelopeFor(session, workspaceId, { kind: 'ticket', id: ticketId }, type, payload);
 
 export function writeTools(session: Session): ToolDefinition[] {
   return [

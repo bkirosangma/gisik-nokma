@@ -65,11 +65,19 @@ export const INVALID_NAME_BODY = {
  * deliberately: Plan 11's seed CLIs found workspaces through the same path, so
  * there is exactly one founding sequence between them.
  *
- * ## `origin: 'web'` and `actorId: currentUserId`
+ * ## `origin` follows `authKind`, and `actorId: currentUserId`
  *
- * Envelope-origin `'web'`, not `'server'`: this is a person's claim to have
- * founded a workspace, and the gate refuses a client-submitted event wearing
- * the server's provenance. `actorId` must equal the session user for the same
+ * Envelope-origin is `'mcp'` when the request authenticated as an MCP token
+ * (`request.authKind === 'mcp-token'`: a device-flow PAT, which is what the
+ * stdio server holds, or a hosted-door bearer) and `'web'` for a person's
+ * browser session. Both are a person's claim to have founded a workspace — an
+ * assistant founding on their behalf is still their act, recorded as the
+ * assistant's door (the plan's Global Constraint: every MCP write carries
+ * `'mcp'`). Never `'server'`: the gate refuses a client-submitted event
+ * wearing the server's provenance, so it would not be accepted, and it must
+ * not become a way to forge it. The origin is derived from HOW the request
+ * authenticated, never from anything it says — the body schema is closed and
+ * no header is read. `actorId` must equal the session user for the same
  * reason — the gate's first question is whether the actor is the person
  * submitting.
  */
@@ -134,7 +142,7 @@ export function registerWorkspaceRoutes(
         // shape an `in`-based reader cannot tell from a claim.
         payload: { name, ...(prefix === undefined ? {} : { prefix }) },
         actorId: request.currentUserId,
-        origin: 'web',
+        origin: request.authKind === 'mcp-token' ? 'mcp' : 'web',
         clientTime: new Date().toISOString(),
       };
 
