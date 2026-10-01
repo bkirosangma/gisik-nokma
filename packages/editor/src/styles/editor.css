@@ -247,6 +247,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  -webkit-touch-callout: none;
   transition: background 150ms ease, box-shadow 150ms ease;
 }
 /* The active mark. `ImageWrapMenu`'s own `--active` rule is the precedent, and
@@ -309,8 +310,20 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-.ticket-editor__tool-label {
-  white-space: nowrap;
+/* The glyph never shrinks inside a flex button. (`.ticket-editor__tool` above carries
+   `-webkit-touch-callout: none` so iOS raises no callout on the long-press that shows a tool's name,
+   case 21.135.) */
+.ticket-editor__tool svg {
+  flex: none;
+}
+/* The phone "More tools" tray (≤40rem only — it is never rendered above): the tools that do not fit
+   on the bar, in a row of their own under it. */
+.ticket-editor__tray {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 /* Groups (marks / blocks / insert), each `role="group"` in the markup — a
    thin divider between clusters rather than a bigger gap alone, so the

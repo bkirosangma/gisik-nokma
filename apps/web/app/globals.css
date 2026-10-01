@@ -4322,6 +4322,11 @@ input, textarea, select { font-family: inherit; }
   .gn-notes .ticket-editor__tool-group {
     flex-wrap: wrap;
   }
+  /* The dividers cost 5px a group; with them the second row of the two-row bar (heading select,
+     bullet, numbered and task list, then More) overflows 320px by a hair (21.133, 21.137). */
+  .gn-notes .ticket-editor__tool-divider {
+    display: none;
+  }
 }
 
 /* ── Task 6: the History panel ──────────────────────────────────────────── */
