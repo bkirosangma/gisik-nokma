@@ -1098,11 +1098,15 @@ test('records non-text contrast across the signed-in surface, with a positive co
       const computed = getComputedStyle(el);
       return { borderStyle: computed.borderStyle, boxShadow: computed.boxShadow };
     });
+    // AMENDED 2026-10-02 (UX fixes T1, owner U5: "borders on buttons AND text fields"; cases 23.002, 13.339): the neo
+    // field now wears a 1px solid ring in `--gn-field-rim`, so the border is `solid`, not `none`. The 1.18/1.0 waiver
+    // below is SUPERSEDED for text fields: this sweep now composites the ring itself (>= 3:1), and the persisted
+    // roster entry is kept only as the record of what the owner once accepted.
     expect(
       style.borderStyle,
-      `13.356: .gn-field__input on ${routeLabel} has a border (${style.borderStyle}) — the pure-neo ` +
-        `no-border ruling (13.339) no longer holds, so the sanctioned waiver below is unearned.`,
-    ).toBe('none');
+      `13.356: .gn-field__input on ${routeLabel} has no ring (${style.borderStyle}) — the neo field ring ` +
+        `(U5, 23.002) no longer holds.`,
+    ).toBe('solid');
     expect(
       style.boxShadow,
       `13.356: .gn-field__input on ${routeLabel} has no box-shadow — there is no boundary at all here, ` +
@@ -1197,12 +1201,14 @@ test('records non-text contrast across the signed-in surface, with a positive co
       backdrop: 'surface (neo)',
       routes: ['/sign-in', '/workspaces'],
       citation:
+        'SUPERSEDED 2026-10-02 (UX fixes T1, owner U5): the neo text field now wears a 1px ring, so this waiver ' +
+        'no longer applies to it; kept as the record. ' +
         'Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo ' +
         'look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) ' +
         'at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in ' +
         'packages/ui/src/ui.css\'s [data-style="neo"] .gn-field__input docblock and case 13.339. ' +
         'Light confirmed by this run\'s own DOM check; dark is arithmetic (surface === surfaceSunken ' +
-        'post-revert, tokens.ts\'s neoNavyRaised docblock), not re-measured.',
+        'post-revert, tokens.ts\'s neoNavySunken, still neoNavy), not re-measured.',
     },
   ];
 
