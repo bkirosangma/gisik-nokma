@@ -19,15 +19,16 @@ import type { Session } from '../src/session.js';
  */
 
 /**
- * Every tool, in the order `allTools` composes them: the four reads that remain in
- * `read-tools.ts`, the four ticket writes, then the workspace tools (MCP CRUD plan
- * Task 6 — `list_workspaces` moved there and gained `include`).
+ * Every tool, in the order `allTools` composes them: the five reads in `read-tools.ts` (the fifth,
+ * `list_members`, is MCP CRUD plan Task 8), the four ticket writes, then the workspace tools (Task 6 —
+ * `list_workspaces` moved there and gained `include`).
  */
 const TOOL_NAMES = [
   'list_projects',
   'search_tickets',
   'list_tickets',
   'get_ticket',
+  'list_members',
   'create_ticket',
   'transition_ticket',
   'add_comment',
@@ -47,13 +48,14 @@ const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serve
 function fakeSession(over: Partial<Session> = {}): Session {
   return {
     userId: () => '01J0A5ER0000000000000000AA',
-    // One workspace `w` named `W` (and an empty Deleted items list) rather than a
+    // One workspace `w` named `W` (an empty Deleted items list and an empty roster) rather than a
     // bare stub: `list_projects` and the workspace tools read the directory, and
     // the sweep in 14.88 drives `archive_workspace` with `confirm_name: 'W'` — a
     // shapeless answer would fail it for a reason that has nothing to do with stdout.
     get: async () => ({
       workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }],
       items: [],
+      members: [], // `list_members` reads `/members`
     }),
     post: async () => ({}),
     postEvents: async () => COMMITTED,
@@ -68,6 +70,7 @@ const ARGS: Record<string, Record<string, unknown>> = {
   search_tickets: { workspaceId: 'w', query: 'q' },
   list_tickets: { projectId: 'p' },
   get_ticket: { workspaceId: 'w', ticketId: 't' },
+  list_members: { workspaceId: 'w' },
   create_ticket: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' },
   transition_ticket: { workspaceId: 'w', ticketId: 't', to: 'done' },
   add_comment: { workspaceId: 'w', ticketId: 't', text: 'hello' },

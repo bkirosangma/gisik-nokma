@@ -105,7 +105,7 @@ async function journey(app: FastifyInstance, otp: Parameters<typeof signInWithPh
     [
       'list_workspaces', 'get_workspace', 'create_workspace', 'rename_workspace', 'archive_workspace',
       'restore_workspace', 'delete_workspace', 'undelete_workspace',
-      'list_projects', 'search_tickets', 'list_tickets', 'get_ticket',
+      'list_projects', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
       'create_ticket', 'transition_ticket', 'add_comment', 'assign_ticket',
     ].sort(),
   );

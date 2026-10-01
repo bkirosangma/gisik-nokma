@@ -22,6 +22,7 @@ describe('14.250 package exports', () => {
       'search_tickets',
       'list_tickets',
       'get_ticket',
+      'list_members',
       'create_ticket',
       'transition_ticket',
       'add_comment',

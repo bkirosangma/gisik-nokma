@@ -65,7 +65,9 @@ the token is cached — you will not be asked again unless it is revoked.
 
 ## What the assistant can then do
 
-Read: `list_workspaces`, `list_projects`, `search_tickets`, `list_tickets`, `get_ticket`.
+Read: `list_projects`, `search_tickets`, `list_tickets` (the tickets of one project, or of every project you can see in a workspace; filters take lists and `"me"`), `get_ticket`, `list_members` (the people in a workspace — a guest is shown only the people on tickets shared with them).
+
+Manage workspaces: `list_workspaces`, `get_workspace`, `create_workspace`, `rename_workspace`, `archive_workspace`, `restore_workspace`, `delete_workspace`, `undelete_workspace` — archiving and deleting need the workspace's exact name, and a delete goes to Deleted items, never to permanent removal.
 
 Write, **as you**: `create_ticket`, `transition_ticket`, `add_comment`, `assign_ticket`.
 
