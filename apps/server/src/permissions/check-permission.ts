@@ -380,6 +380,8 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   // work vanished from their boards.
   'project.archived',
   'project.restored',
+  // MCP CRUD plan Task 1 (M1): renaming a project is the same workspace act as archiving it.
+  'project.updated',
   // Trash series, Plan 1 Task 3 (spec §4 "Authority"): soft delete/undelete is
   // the same class of act as archive/restore two lines up — it takes the
   // project out of (or back into) every list of live work for the whole
@@ -921,6 +923,9 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
     // does not exist, rather than silently writing nothing and answering 201.
     case 'project.archived':
     case 'project.restored':
+    // MCP CRUD plan Task 1: filed against the project entity too (a name and/or
+    // description payload, never a project id), so it inherits the same precondition.
+    case 'project.updated':
     // Trash series, Plan 1 Task 3: same reasoning as the archive pair above —
     // both are filed against the project entity with an empty payload, so
     // `checkProjectExists` must be asked before `checkRolePermission`'s

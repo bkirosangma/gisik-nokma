@@ -2657,3 +2657,13 @@ token docblocks so the move is legible.
   computed, not painted** — no browser was run for this change; the derivation is arithmetic from the
   token table, and the suite that asserts it is arithmetic too. Package suites: ui 410, web 639, app-core
   1722, all green.
+
+## 13.20 Project rename and description (MCP CRUD plan, Task 1–2; block 13.1600–13.1619)
+
+- ✅ **13.1600 — `project.updated` parses with a name, a description, or both, and refuses an empty payload, an unknown key, a blank name and a 501-char description;** control: `{ name: 'Store ops' }` parses. Mutation: drop the at-least-one refine. `packages/domain/test/project-updated.test.ts` — the mutation reddens it (run 2026-10-01, LOCAL).
+- ✅ **13.1601 — the projection renames the project and replaces its description;** control: a `project.updated` for another project leaves this row untouched. Mutation: skip the `name` update. `apps/server/test/projections/proj-projects.test.ts`.
+- ✅ **13.1602 — `description: null` clears the description and leaves the name; an absent `description` leaves it as it was;** control: `description: 'x'` sets it. Mutation: treat absent as null. `proj-projects.test.ts`; the payload arm (`{ description: null }` alone parses) is in `project-updated.test.ts`.
+- ✅ **13.1603 — a workspace MEMBER is refused `project.updated` with the admin-only reason; an admin and the owner commit;** control: the same member's `ticket.created` in that project is not refused. Mutation: remove `project.updated` from `ADMIN_ONLY_TYPES`. `apps/server/test/permissions/project-updated-permission.test.ts`.
+- ✅ **13.1604 — `project.updated` naming a project nobody founded is refused `project-unknown`;** control: a founded project commits. Mutation: drop it from `projectsNamedBy`. `project-updated-permission.test.ts`.
+- ✅ **13.1605 — the prefix never changes: a `project.updated` payload carrying `prefix` is refused as an unknown key (at the door it answers `invalid`), and the row's prefix is unchanged after a rename;** control: the rename without a prefix commits and moves the name only. Mutation: allow `prefix` in the schema. `project-updated.test.ts` (schema), `project-updated-permission.test.ts` (door), `proj-projects.test.ts` (row).
+- ✅ **13.1606 — a rebuild of `proj_projects` from the ledger equals the live table after created → updated → updated;** control: `verifyProjections` reports no drift. Mutation: skip the `project.updated` handler (the rebuilt row stays at its founding values). `proj-projects.test.ts`.
