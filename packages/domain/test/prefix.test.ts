@@ -199,3 +199,14 @@ describe('22.060 parseTicketKey turns key-shaped text into its letters and numbe
     }
   });
 });
+
+describe('22.067 parseTicketKey reads the digit a derived collision prefix carries', () => {
+  it('22.067 — " ccso2-12 " is {CCSO2, 12}; control: a digit in the middle, two digits, a leading digit and a digit 1 stay null', () => {
+    expect(parseTicketKey(' ccso2-12 ')).toEqual({ letters: 'CCSO2', number: 12 });
+    expect(parseTicketKey('CCSO9-1')).toEqual({ letters: 'CCSO9', number: 1 }); // 9 is the last collision digit
+    // CONTROL, same `it`: only ONE trailing digit 2-9 after letters is a key; everything else stays lexical.
+    for (const text of ['CC1O-12', 'CCSO22-1', 'CCSO1-1', 'CCSO0-1', '2CCSO-1', 'CCSO2A-1', 'C2-1', 'ABCDEF2-1234567x']) {
+      expect(parseTicketKey(text), JSON.stringify(text)).toBeNull();
+    }
+  });
+});

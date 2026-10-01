@@ -268,3 +268,34 @@ describe('22.066 the hosted MCP search_tickets finds a ticket by its current or 
     await app.close();
   });
 });
+
+/** A project with NO entered prefix: its prefix is DERIVED from the name, so a collision moves it to `SO2`-style. */
+async function foundDerivedProject(name: string, title: string): Promise<Founded> {
+  const projectId = newUlid();
+  const ticket = newUlid();
+  const ws = { workspaceId: WS(), actorId: owner() };
+  await applyCommitted(db.pool, [
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name } }),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: owner(), projectAdmin: true } }),
+    makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: read.world.member, projectAdmin: false } }),
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: ticket }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: null, title } }),
+  ]);
+  return { projectId, tickets: [ticket] };
+}
+
+describe('22.068 a key whose project prefix took a collision digit is found', () => {
+  it('22.068 — two projects deriving the same prefix hold ZO and ZO2: "<ws>ZO2-1" finds the second project\'s ticket; control: "<ws>ZO-1" finds the first\'s', async () => {
+    const ws = await wsPrefix();
+    // Project ids ascend in creation order, which is what decides who keeps the bare derivation.
+    const first = await foundDerivedProject('Zulu Orchard', 'Plant the zulu trees');
+    const second = await foundDerivedProject('Zebra Outpost', 'Stock the zebra hut');
+    expect(first.projectId < second.projectId).toBe(true);
+
+    const second1 = await hits('member', `${ws}ZO2-1`);
+    expect(ids(second1)).toEqual([second.tickets[0]]);
+    expect(second1[0]?.card.key).toBe(`${ws}ZO2-1`); // the key the product SHOWS is the key that searches
+    // CONTROL, same `it`: the bare derivation still finds the first project's ticket, and not the second's.
+    expect(ids(await hits('member', `${ws}ZO-1`))).toEqual([first.tickets[0]]);
+    expect(await hits('member', `${ws}ZO3-1`)).toEqual([]); // a digit nothing took finds nothing
+  });
+});

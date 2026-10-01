@@ -261,8 +261,14 @@ function* collisionCandidates(base: string): Generator<string> {
  * no marker between them (`CCSO-12` is `CC` + `SO` or `C` + `CSO`): the caller splits it against
  * the prefixes a workspace actually has, and R2 (project prefixes are unique within a workspace,
  * former ones stay reserved) is what makes that split unambiguous there. So this only decides
- * whether the text IS key-shaped: two to six ASCII letters (1–3 + 1–3), a hyphen, one to seven
- * digits. Trims and upper-cases first, so `' ccso-12 '` reads as `CCSO-12`.
+ * whether the text IS key-shaped: two to six ASCII letters (1–3 + 1–3), optionally ONE trailing digit
+ * 2–9, a hyphen, one to seven digits. Trims and upper-cases first, so `' ccso-12 '` reads as `CCSO-12`.
+ *
+ * The one trailing digit is the collision suffix of a DERIVED project prefix (`collisionCandidates`
+ * yields `SO2`…`SO9`, and `ticketKey` shows it as `CCSO2-3`): the product shows that key, so search
+ * must read it. It can only be the LAST character, and only of the project half — workspace prefixes
+ * are letters only — so a digit anywhere else (`CC1O-12`), `1`, `0` or a second digit (`CCSO22-1`)
+ * is not a key; the split against the workspace's real prefixes rejects the rest.
  *
  * Returns `null` for anything else, so a query that is not a key stays an ordinary text search.
  * `CCSO12` (no hyphen) and `C-1` (too short to be two prefixes) are deliberately not keys.
@@ -270,7 +276,7 @@ function* collisionCandidates(base: string): Generator<string> {
  * happens to be an ASCII letter (`ſ` → `S`) does not turn into one.
  */
 export function parseTicketKey(text: string): { letters: string; number: number } | null {
-  const match = /^([A-Za-z]{2,6})-([0-9]{1,7})$/.exec(text.trim());
+  const match = /^([A-Za-z]{2,6}[2-9]?)-([0-9]{1,7})$/.exec(text.trim());
   if (match === null) {
     return null;
   }
