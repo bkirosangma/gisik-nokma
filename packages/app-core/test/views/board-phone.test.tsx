@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { userEvent } from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
@@ -239,7 +239,7 @@ describe('21.043 scrolling the rail moves the selected option to the column near
   });
 
   /** The calls to `requestAnimationFrame` made while `fire` runs (react-aria and others also use it, so count the delta). */
-  function frameCallsDuring(spy: ReturnType<typeof vi.spyOn>, fire: () => void): number {
+  function frameCallsDuring(spy: MockInstance<typeof window.requestAnimationFrame>, fire: () => void): number {
     const before = spy.mock.calls.length;
     fire();
     return spy.mock.calls.length - before;
