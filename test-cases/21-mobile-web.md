@@ -56,6 +56,16 @@
 - ✅ **21.073 — the bottom-sheet dialog keeps its `gnRise` entrance and has no animation under reduced motion: the phone arm restates no `animation` (it would sit after, and defeat, the `prefers-reduced-motion` arm);** control: the desktop rise (`gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1)`) is unchanged and the phone scrim adds none. Mutation: drop the reduced-motion arm; restate `animation` in the phone arm. (`packages/ui/test/phone-overlays.test.ts`)
 - 🧪 **21.074 — at 360px the transition dialog, the delete dialog, the reopen dialog and the remove-member dialog are fully visible with their actions within the bottom 30% of the screen.**
 
+## 21.10 Account, Settings, MCP tokens, Help, Privacy, Terms
+
+*Task 10. Ids `21.155`–`21.169` are unused.*
+
+- ✅ **21.150 — Account: sections single column; devices rows stack (label + tag, activity, sign-out under); passkeys and Connected assistants rows stack; the Copy URL field wraps;** control: desktop unchanged (the 42.5rem column, the unbased label block, the notification row not stacked). Mutation: keep side-by-side rows (drop the `flex-basis: 100%` on the label block). (`apps/web/test/phone-screens-c.test.ts`)
+- ✅ **21.151 — Settings: the sidebar becomes a horizontally scrolling track above the content (`flex-direction: row; overflow-x: auto`, the column's `flex` basis restated so it is not a height), the current section keeping its filled pill (no second `aria-current` rule: 13.910); Save full width;** control: desktop sidebar unchanged (15.5rem column, 2.75rem items). Mutation: keep the sidebar column. (same file)
+- ✅ **21.152 — `/mcp/tokens`: rows stack; Rename / Revoke / Disconnect sit under the label; the rename form's field fills the row;** control: desktop unchanged (the rows keep `flex-wrap`, 12rem naming minimum). Mutation: drop the `__when` `flex-basis`. (same file)
+- ✅ **21.153 — Help, Privacy, Terms: reading width 100% with 1rem gutters (0.75rem shell inset + 0.25rem), headings wrap, long words never overflow (`overflow-wrap: anywhere` on prose; Help's sheet-order dependency on `ui.css` asserted);** control: desktop measure unchanged (72ch column, 68ch sections, no truncation). Mutation: drop `overflow-wrap`. (same file)
+- 🧪 **21.154 — the six at every P8 phone width: no horizontal overflow** — Account, Settings (all three tabs), `/mcp/tokens` (also inside Account), Help (manual and FAQ), Privacy, Terms at 360, 375, 390, 412, 430 and 466px, in hig / minimal / neo × light / dark: `document.documentElement.scrollWidth <= innerWidth`, the Settings track scrolls inside its own box, nothing hides behind the bottom bar. Controller's browser pass (Task 13). Known gap from the shell lane: Settings has no bottom-bar slot (not regressed here).
+
 ## 21.12 Sign-in, invite accept, MCP connect/authorize, the root page
 
 *Task 12. Ids `21.194`–`21.209` are unused. These seven routes (the five here, `/privacy` and `/terms`) render no `AppNav` and so get NO bottom bar (plan FD3).*
