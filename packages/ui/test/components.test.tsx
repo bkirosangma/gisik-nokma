@@ -1355,10 +1355,12 @@ describe('13.523 — a card that can be opened but not dragged still shows a poi
  * `data-mode` attribute these selectors key off.
  */
 describe('13.551 — tri-state choice rules', () => {
-  it("include is the accent ground with accent text", () => {
+  it("include is the quiet track ground with the main text at weight 600 (AMENDED 2026-10-02, UX fixes T2 / 23.020: it was the accent ground with accent text)", () => {
     const body = rule(".gn-filters__choice[data-mode='include']");
-    expect(body).toMatch(/background:\s*var\(--gn-accent\)/);
-    expect(body).toMatch(/color:\s*var\(--gn-accent-text\)/);
+    expect(body).toMatch(/background:\s*var\(--gn-surface-track\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text\)/);
+    expect(body).toMatch(/font-weight:\s*600/);
+    expect(body).not.toMatch(/--gn-accent/); // control: the accent is no longer on the selected choice
   });
   it('exclude strikes the LABEL through and does not reach for the danger tone', () => {
     const body = rule(".gn-filters__choice[data-mode='exclude'] .gn-filters__choice-label");
