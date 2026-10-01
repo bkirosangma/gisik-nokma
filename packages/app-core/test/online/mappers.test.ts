@@ -27,6 +27,7 @@ import {
   mapAttention,
   mapBoardView,
   mapDeletedItems,
+  mapGroupRows,
   mapHistory,
   mapIngestResults,
   mapListPage,
@@ -3360,5 +3361,24 @@ describe('6.253 mapActorNames — a former member reads "Name (removed)"', () =>
       // Only the boolean `true` counts — the mapper's existing strictness.
       { id: 'u3', name: 'Ambe' },
     ]);
+  });
+});
+
+describe('22.123 mapGroupRows reads the group tree', () => {
+  const row = { id: 'g1', parentId: null, level: 1, name: 'Retail', rank: 'a1', projectCount: 2, childCount: 1 };
+
+  it('22.123 maps every row, keeping a null parent as null; a wrong level, a missing field and a stranger body are refused', () => {
+    expect(mapGroupRows({ workspaceId: 'w', groups: [row, { ...row, id: 'g2', parentId: 'g1', level: 2 }] })).toEqual([
+      row,
+      { ...row, id: 'g2', parentId: 'g1', level: 2 },
+    ]);
+    expect(mapGroupRows({ workspaceId: 'w', groups: [] })).toEqual([]);
+    // CONTROL: each refusal names the field, so a drifted route fails loudly rather than drawing a half-tree.
+    expect(() => mapGroupRows({ groups: [{ ...row, level: 5 }] })).toThrow(MappingError);
+    expect(() => mapGroupRows({ groups: [{ ...row, level: '1' }] })).toThrow(MappingError);
+    expect(() => mapGroupRows({ groups: [{ ...row, name: undefined }] })).toThrow(MappingError);
+    expect(() => mapGroupRows({ groups: [{ ...row, projectCount: 'many' }] })).toThrow(MappingError);
+    expect(() => mapGroupRows({ groups: 'nope' })).toThrow(MappingError);
+    expect(() => mapGroupRows(null)).toThrow(MappingError);
   });
 });

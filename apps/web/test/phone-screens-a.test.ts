@@ -57,10 +57,13 @@ describe('21.090 /workspaces on a phone', () => {
 });
 
 describe('21.091 the workspace home on a phone', () => {
-  it('21.091 project cards and section cards are one column, the New project form is stacked and full width; the door-card hover rule (B13) is unchanged', () => {
+  it('21.091 project cards are one column, the section cards are a scrollable chip row (22.148), the New project form is stacked and full width; the door-card hover rule (B13) is unchanged', () => {
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__projects', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
     expect(position(globals, '.gn-workspace-home__projects', TABLET)).toBeLessThan(position(globals, '.gn-workspace-home__projects', PHONE));
-    expect(valueOf(ruleExactly(globals, '.gn-workspace-home__links', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
+    // The section cards are no longer a one-column stack: 22.148 (prefixes and groups Task 7) made them a
+    // horizontally scrollable row of chips on a phone, and `workspace-home-grouped.test.tsx` holds that.
+    // What stays true here is that the phone arm still follows its base rule.
+    expect(valueOf(ruleExactly(globals, '.gn-workspace-home__links', PHONE), 'overflow-x')).toBe('auto');
     expect(after(globals, '.gn-workspace-home__links', null)).toBe(true);
     // The New project row: a column whose children stretch, and the field drops its 220px floor.
     const form = ruleExactly(globals, '.gn-project-founding', PHONE);

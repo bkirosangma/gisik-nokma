@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,7 +6,6 @@ import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { tintIndexOf } from '@gisik-nokma/ui';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import { Providers } from '../src/providers.js';
-import { ruleFor } from './helpers/css-rule-scan.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -38,12 +34,6 @@ import { stubServices } from './helpers/stub-services.js';
 const WORKSPACE = '01J9WORKSPACE0000000000000';
 const OTHER_WORKSPACE = '01J9WORKSPACE1111111111111';
 const KIRO = '01J9USER000000000000000000';
-
-/** The stylesheet the project card's rules live in, read as SOURCE — see
- * 13.1297 at the foot of this file for why that is the only available
- * instrument here. */
-const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -145,6 +135,15 @@ function mount(
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
 
+/**
+ * The project card's acts live in an overflow menu (WS-03, case 22.147): open the card's menu and press
+ * one item. The trigger is named for the PROJECT, so a grid of cards never presents identical buttons.
+ */
+async function pickProjectAct(projectId: string, projectName: string, item: string): Promise<void> {
+  await userEvent.click(within(row(projectId)).getByRole('button', { name: `More actions for ${projectName}` }));
+  await userEvent.click(within(row(projectId)).getByRole('menuitem', { name: item }));
+}
+
 beforeEach(() => vi.clearAllMocks());
 
 /**
@@ -240,7 +239,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     // gone — the name is inside that one link, named by it, rather than plain
     // text beside a second link to the same target.
     expect(within(only).getByText('Shop operations')).toBeInTheDocument();
-    expect(within(only).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
+    expect(within(only).getByRole('link', { name: 'Open Shop operations' })).toHaveAttribute(
       'href',
       `/w/${WORKSPACE}/p/p1`,
     );
@@ -289,7 +288,11 @@ describe('13.384 the workspace home lists projects with the caller’s own count
  * enforcement" fail at their own sites.
  */
 describe('13.385 every admin affordance is gated on the caller’s served role', () => {
-  const CONTROLS = ['Archive Shop operations', 'Restore Old signage'];
+  // [project id, project name, the menu item the card offers] — WS-03: the acts are an overflow menu now.
+  const CONTROLS: Array<[string, string, string]> = [
+    ['p1', 'Shop operations', 'Archive'],
+    ['p3', 'Old signage', 'Restore'],
+  ];
 
   it.each([
     ['owner', true],
@@ -308,10 +311,15 @@ describe('13.385 every admin affordance is gated on the caller’s served role',
       screen.getByRole('button', { name: 'Show archived projects in Convenience Corner' }),
     );
 
-    for (const control of CONTROLS) {
-      const found = screen.queryByRole('button', { name: control });
-      if (allowed) expect(found, `${role} should be offered "${control}"`).not.toBeNull();
-      else expect(found, `${role} must not be offered "${control}"`).toBeNull();
+    for (const [id, name, item] of CONTROLS) {
+      const trigger = within(row(id)).queryByRole('button', { name: `More actions for ${name}` });
+      if (allowed) {
+        expect(trigger, `${role} should be offered the menu on ${name}`).not.toBeNull();
+        await userEvent.click(trigger!);
+        expect(within(row(id)).queryByRole('menuitem', { name: item }), `${role} should be offered "${item}"`).not.toBeNull();
+      } else {
+        expect(trigger, `${role} must not be offered the menu on ${name}`).toBeNull();
+      }
     }
     const form = screen.queryByRole('button', { name: 'Create project' });
     if (allowed) expect(form).not.toBeNull();
@@ -367,9 +375,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
       { ingest: (events) => sent.push(events) },
     );
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Archive Shop operations' }),
-    );
+    await screen.findByTestId('project-row-p1');
+    await pickProjectAct('p1', 'Shop operations', 'Archive');
 
     // The claim, before the screen: one event, the right type, the right entity.
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -389,7 +396,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
     );
     expect(within(row('p1')).getByText('Archived')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Restore Shop operations' }));
+    await pickProjectAct('p1', 'Shop operations', 'Restore');
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[1]![0]!.type).toBe('project.restored');
     // Back in the live list, and the disclosure is gone with nothing left
@@ -415,9 +422,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
       }),
     });
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Archive Shop operations' }),
-    );
+    await screen.findByTestId('project-row-p1');
+    await pickProjectAct('p1', 'Shop operations', 'Archive');
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('permission.role: Only a workspace owner or admin can do this.');
@@ -489,9 +495,14 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.673 the workspace-section links resolve to the real routes', () => {
-  it('carries four links, two workspace-scoped and two query-scoped', async () => {
+  it('carries four links, two workspace-scoped and two query-scoped, ABOVE the Projects heading (22.120)', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
+    // 22.120 (prefixes and groups Task 7): the section row moved from the foot of the page to the top —
+    // it now PRECEDES the Projects heading, where Round 20 had put it after the projects and the form.
+    // CONTROL: the four links below keep their names and hrefs, so the move changed nothing but the place.
+    const projectsHeading = screen.getByRole('heading', { name: 'Projects' });
+    expect(nav.compareDocumentPosition(projectsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const expected: Array<[string, string]> = [
       ['My Work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
@@ -670,13 +681,13 @@ describe('13.396 archived projects still open, through the same door a live one 
     );
     const archivedRow = row('p3');
     expect(
-      within(archivedRow).getByRole('link', { name: 'Old signage, archived' }),
+      within(archivedRow).getByRole('link', { name: 'Open Old signage, archived' }),
     ).toHaveAttribute('href', `/w/${WORKSPACE}/p/p3`);
     expect(within(archivedRow).queryByText(/read-only/i)).toBeNull();
     // The POSITIVE CONTROL for the name above: a LIVE project in the same
     // render is named WITHOUT the suffix. Asserting only the archived name
     // passes against a page that appended ", archived" to every project.
-    expect(within(row('p1')).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    expect(within(row('p1')).getByRole('link', { name: 'Open Shop operations' })).toBeInTheDocument();
     expect(within(row('p1')).queryByRole('link', { name: /archived/ })).toBeNull();
   });
 });
@@ -693,9 +704,9 @@ describe('13.396 archived projects still open, through the same door a live one 
  *    arrived at from the other side. An implementation that merely wrapped the
  *    existing row in a link passes every other assertion here and fails this.
  *
- * 2. **Archive/Restore is NOT a descendant of the anchor.** `<a>` may not
- *    contain `<button>`; a nested one is invalid HTML that renders, so nothing
- *    would look wrong. jsdom will not complain either — the containment is
+ * 2. **The admin control (since 22.147, the overflow menu's trigger) is NOT a
+ *    descendant of the anchor.** `<a>` may not contain `<button>`; a nested one
+ *    is invalid HTML that renders, so nothing would look wrong. jsdom will not complain either — the containment is
  *    asserted directly.
  *
  * 3. **The archived cards sort to the END of the disclosed grid** (Round 21,
@@ -729,11 +740,12 @@ describe('13.413 each project card is one door, with the admin control outside t
     expect(within(liveCard).getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('link', { name: 'Open board' })).toBeNull();
 
-    // 2 — the button exists, and the anchor does not contain it.
-    const door = within(liveCard).getByRole('link', { name: 'Shop operations' });
-    const archiveButton = within(liveCard).getByRole('button', { name: 'Archive Shop operations' });
-    expect(door.contains(archiveButton)).toBe(false);
-    expect(archiveButton.closest('a')).toBeNull();
+    // 2 — the overflow button (WS-03: the acts are a menu now, case 22.147) exists, and the anchor does
+    // not contain it.
+    const door = within(liveCard).getByRole('link', { name: 'Open Shop operations' });
+    const menuButton = within(liveCard).getByRole('button', { name: 'More actions for Shop operations' });
+    expect(door.contains(menuButton)).toBe(false);
+    expect(menuButton.closest('a')).toBeNull();
   });
 
   /**
@@ -1278,11 +1290,12 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
  * accessible name, so "the project's link" is a UNIQUE query on this page.
  *
  * `e2e-stack/helpers/board.ts` asks for the seeded project with
- * `getByRole('link', { name: 'Shop operations', exact: true })` and asserts
+ * `getByRole('link', { name: 'Open Shop operations', exact: true })` (WS-03, case
+ * 22.147, renamed the door "Open <project>"; the bar's item keeps the bare name) and asserts
  * `toHaveCount(1)` — deliberately, because that file's docblock records that a
  * positional pick is how it measured the WRONG board once already. The deployed
  * stack answered **2** (`measured 2026-09-22, the desktop viewport the stack
- * suite runs at`): the card's door, which carries the project's name because it
+ * suite runs at`): the card's door, which carried the project's name because it
  * IS the project's row, and the bar's "last open project" item, which carried
  * the same name because nothing had ever needed them to differ.
  *
@@ -1313,75 +1326,16 @@ describe('13.1217 the bar’s project item and the card door do not share one na
     await screen.findByTestId('project-row-p1');
     await screen.findByRole('link', { name: 'Shop operations, projects menu' });
 
-    // The door, pinned to the project's own name and its own href.
-    const door = within(row('p1')).getByRole('link', { name: 'Shop operations' });
+    // The door, pinned to its own name and its own href. WS-03 (case 22.147) renamed it "Open <project>",
+    // so the project's bare name no longer names the card at all — the collision is closed from both sides.
+    const door = within(row('p1')).getByRole('link', { name: 'Open Shop operations' });
     expect(door).toHaveAttribute('href', `/w/${WORKSPACE}/p/p1`);
 
-    // THE WHOLE PAGE, not the row: exactly one link answers to the project's
-    // name, and it is the door. Two would be the defect this case exists for.
-    expect(screen.getAllByRole('link', { name: 'Shop operations' })).toEqual([door]);
-  });
-});
-
-/**
- * 13.1297 — the project card's Archive/Restore strip is the BUTTON's size, not
- * the card's width (owner request, 2026-09-22, one screenshot).
- *
- * ## What the owner measured
- *
- * On this page the card's actions container `div.gn-project-card__actions`
- * measured **362.66 × 44** while the Archive button inside it is about **186**
- * wide, and the instruction was *"make the container size be the same as the
- * button size"*. The 176px between them is not cosmetic. `.gn-project-card` is
- * a column flex container, so its default `align-items: stretch` widened every
- * item to the card's inner width — and this strip is the ONE child also raised
- * above the door's stretched `::after` (`position: relative; z-index: 1`, the
- * very lift the control arm below holds). So every pixel of the strip that was
- * NOT the button sat over the door rather than under it: the pointer there hit
- * the strip, not the overlay, and the card neither lit nor navigated. The
- * card's clickable area was a rectangle with a 176px hole in it.
- *
- * ## Why a source scan rather than a render
- *
- * These component tests never load the real stylesheet into jsdom, so nothing
- * rendered here could observe a flex stretch — the same reason
- * `workspace-restricted-spacing.test.ts` (13.408) reads the source. The fix is
- * one declaration, so the source text is the whole claim.
- *
- * ## The control arm, and why it is in the same `it`
- *
- * `align-self: flex-start` is what makes a child of a column container
- * shrink-to-fit. The control asserts `position: relative` and `z-index: 1` are
- * STILL declared, because the shrink only helps while the strip also stays
- * above the door: a "fix" that bought the width by dropping the lift would put
- * the door's transparent overlay back over Archive/Restore and eat the click on
- * exactly the pixels this change rescues. The two are one assertion about one
- * shape — a separate `it` would let the destructive variant report green on the
- * arm that matters.
- *
- * The selector is ANCHORED (`^`) and the rule is a single line, both
- * deliberately: `globals.css:1248`–`:1256` open three further rules beginning
- * with `.gn-project-card__actions ` (then a space and `.gn-button`), so an
- * unanchored substring match would find one of those on a LATER line first —
- * the first-match landmine 3.974 records.
- */
-describe('13.1297 the project card’s actions strip is content-sized', () => {
-  it('13.1297 declares align-self: flex-start, keeping the lift above the door', () => {
-    const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
-    const rule = ruleFor(css, /^\.gn-project-card__actions\s*\{/);
-    expect(rule, 'no rule found for .gn-project-card__actions').toBeDefined();
-
-    // The fix: shrink-to-fit, so the strip is the button's box, not the card's.
-    expect(rule).toMatch(/align-self:\s*flex-start/);
-
-    // The control: the lift that keeps Archive/Restore above the door is
-    // unmoved. See the docblock — an `align-self` that arrived by deleting
-    // either of these is not a fix.
-    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
-      /position:\s*relative/,
-    );
-    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
-      /z-index:\s*1\b/,
-    );
+    // THE WHOLE PAGE, not the row: exactly one link answers to the door's name, and it is the door. Two
+    // would be the defect this case exists for.
+    expect(screen.getAllByRole('link', { name: 'Open Shop operations' })).toEqual([door]);
+    // CONTROL: the bar item still answers to ITS own name, and the bare project name matches no link.
+    expect(screen.getAllByRole('link', { name: 'Shop operations, projects menu' })).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Shop operations' })).toBeNull();
   });
 });
