@@ -1862,7 +1862,7 @@ function BoardCardSlot({
     const flights = moveState?.flights;
     if (element === null || flights === undefined) return;
     const from = flights.current.get(card.ticketId);
-    if (from === undefined) return;
+    if (from === undefined || from.sibling === true) return;
     flights.current.delete(card.ticketId);
     if (Date.now() - from.at > FLIGHT_MAX_AGE_MS) return;
     const rect = element.getBoundingClientRect();
@@ -1882,6 +1882,31 @@ function BoardCardSlot({
     // Once per mount: the flight is consumed by the card that mounts for it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * A card the move SHIFTED (below the mover in its source column) is already mounted: after the render that moved
+   * it, it glides from where it was drawn to where it is — the same FLIP, the same `flights` map and the same
+   * `.gn-board__card-slot--flight` class as the landing card, never a scroll. Consumed once; a stale entry, reduced
+   * motion and an open dialog (a transform would drag its fixed scrim) each mean it simply snaps.
+   */
+  const pendingMoves = moveState?.pending;
+  useLayoutEffect(() => {
+    const element = slotRef.current;
+    const flights = moveState?.flights;
+    if (element === null || flights === undefined) return;
+    const from = flights.current.get(card.ticketId);
+    if (from === undefined || from.sibling !== true) return;
+    flights.current.delete(card.ticketId);
+    if (Date.now() - from.at > FLIGHT_MAX_AGE_MS) return;
+    if (prefersReducedMotion() || moveState?.sessions[card.ticketId]?.dialog != null) return;
+    const rect = element.getBoundingClientRect();
+    const dx = from.left - rect.left;
+    const dy = from.top - rect.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    setFlight({ dx, dy });
+    // Keyed on the overlay: the render that moves a sibling is always one that changed it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMoves]);
 
   const slotClass = [
     'gn-board__card-slot',

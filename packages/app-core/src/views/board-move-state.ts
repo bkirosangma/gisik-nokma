@@ -150,7 +150,17 @@ export const EMPTY_SESSION: MoveSession = {
 };
 
 /** Where a card flies FROM (its top-left corner, viewport coordinates); `at` is when it was taken, so a flight nobody claimed goes stale. */
-export type FlightRect = { left: number; top: number; at: number };
+export type FlightRect = {
+  left: number;
+  top: number;
+  at: number;
+  /**
+   * Set on a card that does NOT change column but is shifted by one that does (a card below a mover in its source
+   * column, closing the gap — or reopening it on a refusal). Such a card is already mounted, so it claims its
+   * flight after the render that moved it (not at mount) and never scrolls itself into view.
+   */
+  sibling?: true;
+};
 
 /** Where the pointer grabbed the dragged card — lets the drop point be turned back into a card rectangle. */
 export type Grab = { ticketId: string; offsetX: number; offsetY: number };
@@ -185,6 +195,8 @@ export function useMoveState(realView: BoardView): MoveState {
   const slots = useRef(new Map<string, HTMLElement>());
   const flights = useRef(new Map<string, FlightRect>());
   const grab = useRef<Grab | null>(null);
+  // The list (a column's `<ul>`) each pending card was taken from: its other cards are what glide when the gap closes or reopens.
+  const sourceLists = useRef(new Map<string, Element>());
 
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -204,11 +216,20 @@ export function useMoveState(realView: BoardView): MoveState {
     if (pendingRef.current[move.ticketId]?.toStateId !== move.toStateId) {
       const start = from ?? rectOf(slots.current.get(move.ticketId));
       if (start !== undefined) flights.current.set(move.ticketId, start);
+      // The cards BELOW it in the source column close the gap: note where each is drawn now.
+      const source = slots.current.get(move.ticketId);
+      const list = source?.parentElement;
+      if (source !== undefined && list != null) {
+        sourceLists.current.set(move.ticketId, list);
+        recordSiblings(slots.current, flights.current, list, move.ticketId, source);
+      }
     }
     setPending((current) => ({ ...current, [move.ticketId]: move }));
   }, []);
 
   const setPhase = useCallback((ticketId: string, phase: PendingPhase) => {
+    // A committed move is never glided back: its source list is no longer needed.
+    if (phase === 'committed') sourceLists.current.delete(ticketId);
     setPending((current) => {
       const entry = current[ticketId];
       if (entry === undefined) return current;
@@ -221,7 +242,11 @@ export function useMoveState(realView: BoardView): MoveState {
     if (pendingRef.current[ticketId] !== undefined) {
       const start = rectOf(slots.current.get(ticketId));
       if (start !== undefined) flights.current.set(ticketId, start);
+      // The source column's cards (closed over the gap) slide back down to reopen the slot.
+      const list = sourceLists.current.get(ticketId);
+      if (list !== undefined && list.isConnected) recordSiblings(slots.current, flights.current, list, ticketId);
     }
+    sourceLists.current.delete(ticketId);
     setPending((current) => {
       if (current[ticketId] === undefined) return current;
       const next = { ...current };
@@ -256,4 +281,24 @@ function rectOf(element: HTMLElement | undefined): FlightRect | undefined {
   if (element === undefined) return undefined;
   const rect = element.getBoundingClientRect();
   return { left: rect.left, top: rect.top, at: Date.now() };
+}
+
+/**
+ * Note where the cards of `list` other than `ticketId` are drawn now, as sibling flights. With `after` given only
+ * the cards FOLLOWING that element are noted (the ones below a card that is leaving); without it, every card is,
+ * and the ones that did not move are dropped by the claim (a displacement under a pixel flies nowhere).
+ */
+function recordSiblings(
+  slots: Map<string, HTMLElement>,
+  flights: Map<string, FlightRect>,
+  list: Element,
+  ticketId: string,
+  after?: Element,
+): void {
+  for (const [id, element] of slots) {
+    if (id === ticketId || element.parentElement !== list) continue;
+    if (after !== undefined && !(after.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+    const start = rectOf(element);
+    if (start !== undefined) flights.set(id, { ...start, sibling: true });
+  }
 }
