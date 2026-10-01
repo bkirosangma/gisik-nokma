@@ -1,13 +1,14 @@
 import { z } from 'zod';
 import { ulidString } from './envelope.js';
-import { filterSpecSchema, groupingSchema, noNul } from './filter-spec.js';
+import { groupingSchema, noNul, savedFilterSpecSchema } from './filter-spec.js';
 
 /**
  * One saved filter: a NAMED query, not a claim about anything.
  *
- * `filterSpec` is `filterSpecSchema` itself — consumed, never restated — so a
- * saved filter can express exactly what a live filter can, and the day the
- * filter language grows a term the saved ones grow it too. It follows that a
+ * `filterSpec` is `filterSpecSchema` itself minus its plural list keys
+ * (`savedFilterSpecSchema` — consumed, never restated) — so a saved filter
+ * can express what a live filter can on the web client's single-valued wire,
+ * and the day the filter language grows a term the saved ones grow it too. It follows that a
  * saved filter is NOT checked against reality: it may name a state id, an
  * assignee or a custom field that no longer exists, and that is correct. A
  * filter is a question; a question about nothing is answered with nothing, and
@@ -25,7 +26,7 @@ export const savedFilterSchema = z
   .object({
     id: noNul(z.string().min(1).max(64)),
     name: noNul(z.string().min(1).max(120)),
-    filterSpec: filterSpecSchema,
+    filterSpec: savedFilterSpecSchema,
   })
   .strict();
 export type SavedFilter = z.infer<typeof savedFilterSchema>;
