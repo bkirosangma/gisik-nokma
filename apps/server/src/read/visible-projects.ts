@@ -133,7 +133,7 @@ export async function projectPrefixesInWorkspace(
   // by a prefix it already holds. A Set cannot answer "is this value held by
   // somebody else", and asking it the wrong question made an idempotent retry
   // fail with `project.prefix-taken` instead of the `duplicate-event-id` the
-  // ledger answers — see `checkProjectPrefixUnique`.
+  // ledger answers — see `checkPrefixReservation`.
   return new Map(rows.map((row, index) => [row.project_id, resolved[index]!]));
 }
 
