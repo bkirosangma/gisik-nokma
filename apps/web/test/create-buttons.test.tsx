@@ -92,13 +92,17 @@ const SHOP = {
   blockedCount: 3,
 };
 
-function mountHome(role: string, projects: WorkspaceRef['projects'] = [SHOP]) {
+function mountHome(
+  role: string,
+  projects: WorkspaceRef['projects'] = [SHOP],
+  ingest: (event: SubmittedEvent) => IngestResult = COMMITTED,
+) {
   route.params = { workspaceId: WORKSPACE };
   route.path = `/w/${WORKSPACE}`;
   const services = stubServices({
     getMyWorkspaces: async () => [workspaceAs(role, projects)],
   });
-  services.dataSource.ingest = async (events) => events.map(COMMITTED);
+  services.dataSource.ingest = async (events) => events.map(ingest);
   render(
     <Providers services={services}>
       <WorkspaceHomePage />
@@ -229,6 +233,42 @@ describe('22.152 the workspace home: Create project is a primary icon button in 
     mountHome('member');
     expect(await screen.findByText('Only an owner or admin can create a project.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create project' })).toBeNull();
+  });
+});
+
+describe('22.156 a refusal of Create project is announced once, inside the dialog that is open', () => {
+  it('while the dialog is open exactly one role=alert carries the refusal and it is inside the dialog; once it closes the page’s own alert shows it', async () => {
+    const REFUSED = (event: SubmittedEvent): IngestResult => ({
+      status: 'refused',
+      eventId: event.id,
+      rule: 'project.prefix-taken',
+      reason: 'that prefix is already in use',
+    });
+    mountHome('admin', [SHOP], REFUSED);
+    const heading = await vi.waitFor(() => {
+      const found = document.querySelector<HTMLElement>('.gn-workspace-home__projects-heading');
+      if (found === null) throw new Error('no projects heading row yet');
+      return found;
+    });
+    await userEvent.click(within(heading).getByRole('button', { name: 'Create project' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Create project' });
+    await userEvent.type(within(dialog).getByPlaceholderText('e.g. Phase 2 rollout'), 'Phase 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create project' }));
+
+    const text = 'project.prefix-taken: that prefix is already in use';
+    await within(dialog).findByText(text);
+    // ONE alert in the whole document, and it is the dialog's.
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts).toHaveLength(1);
+    expect(dialog).toContainElement(alerts[0]!);
+    expect(alerts[0]).toHaveTextContent(text);
+
+    // CONTROL: closing the dialog hands the same refusal to the page's own alert.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const after = screen.getAllByRole('alert');
+    expect(after).toHaveLength(1);
+    expect(after[0]).toHaveTextContent(text);
   });
 });
 

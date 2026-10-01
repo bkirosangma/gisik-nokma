@@ -12,7 +12,7 @@
 
 ## 22.8 The Create buttons
 
-*Task 8. Ids `22.156`–`22.159` are unused.*
+*Task 8. Ids `22.157`–`22.159` are unused.*
 
 - ✅ **22.150 — the project page's create button is named exactly "Create ticket", carries one `svg[aria-hidden]`, is the ONLY `.gn-button--primary` in `.gn-project__header`, and opens a dialog titled "Create ticket";** control: the old "New ticket" name is absent. Mutation: add a second primary to the header → red. (`apps/web/test/create-buttons.test.tsx`)
 - ✅ **22.151 — `/workspaces` shows a primary "Create workspace" with one icon in `.gn-workspaces__head` and NO always-visible founding form; pressing it opens a dialog titled "Create workspace" with the name and prefix fields;** control: pressing the button opens the dialog (13.394 pins that no `.gn-workspace-founding` exists before the press). Mutation: render the form beside the button → red. Founding itself (3.124–3.128, 13.1032–13.1033) now runs through the dialog. (`apps/web/test/create-buttons.test.tsx`, `apps/web/test/founding.test.tsx`)
@@ -20,4 +20,5 @@
 - ✅ **22.153 — an admin's empty workspace reads "No projects yet. Create the first one." and the word "below" appears nowhere in it;** control: the button the sentence points at is on the page. (`apps/web/test/create-buttons.test.tsx`)
 - ❌ **22.154 — `pnpm check:help` passes with `docs/manual.md` saying "Create ticket" and describing the founding dialogs.** Not covered by this task: the brief forbids editing the manual here, so the manual lines are handed to the orchestrator (`check:help` itself passes today against the unchanged manual).
 - ✅ **22.155 — one action, one name (BRD-19): no string literal or JSX text under `packages/app-core/src`, `apps/web/app` or `apps/web/src` says "Add a ticket", "Create a ticket", "New ticket" (the object, not "New ticket type") or a bare "Create" submit;** control: the AST walk finds "Create ticket" in the flow, the dialog (at least twice: title and submit) and the board (at least twice: banner and per-column). The per-column button keeps the accessible name `Create ticket in <column>`. Mutation: restore "Add a ticket" in the board → red. (`apps/web/test/create-buttons.test.tsx`)
+- ✅ **22.156 — a refusal of Create project is announced ONCE: while the dialog is open exactly one `role="alert"` is in the document, it carries the refusal and it is inside the dialog;** control, same `it`: after the dialog closes the page's own alert shows the same refusal. Mutation: drop `&& !createOpen` from the page's alert (`apps/web/app/w/[workspaceId]/page.tsx`) → two alerts → red. (`apps/web/test/create-buttons.test.tsx`)
 

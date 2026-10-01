@@ -27,7 +27,7 @@ export type DialogProps = {
  * restoring none. Three consequences, all measured:
  *
  *  - focus stayed on the button that opened the dialog (the reviewer painted
- *    `document.activeElement` still the *Create ticket* button at 300 ms and at
+ *    `document.activeElement` still the *New ticket* button (now *Create ticket*) at 300 ms and at
  *    1 800 ms, with `closest('[role=dialog]')` → null);
  *  - a real Tab walked straight out of the open dialog into the page behind it —
  *    the escape `board.tsx:385-393` has to REFUSE a column action for, judging it

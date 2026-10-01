@@ -397,7 +397,7 @@
 }
 /* The dialog RISES IN, at the prototype's own `.24s cubic-bezier(.32,.72,0,1)`
    and over its `translateY(14px)` — `desktop.dc.html@6d7b67c0a52c:1571`, the
-   centred "Create ticket" modal, whose own scrim carries the same
+   centred "New ticket" modal, whose own scrim carries the same
    `gnFade .2s ease` the rule above gives ours. `mobile.dc.html:1208` draws the
    same pair for the bottom-sheet form of it.
 
@@ -7327,7 +7327,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    quietly took a side on a question everything else has left alone. The
    metric's own colour is left unset (`color: var(--gn-text)`, matching
    `.gn-project__search`'s input beside it) rather than `--gn-text-accent`:
-   the spec's own table gives Filters and Create ticket an explicit "accent"
+   the spec's own table gives Filters and New ticket an explicit "accent"
    entry and gives this row none, so this control is not styled as a
    call-to-action the way those two are. */
 .gn-project__workflow-select {

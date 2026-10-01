@@ -1288,7 +1288,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
  * Case `13.1139` — E4-13 — the Title field wears the product's own field
  * treatment instead of painting as raw user-agent chrome.
  *
- * Opened *Create ticket* on the board and measured the first control a person
+ * Opened *New ticket* (now *Create ticket*) on the board and measured the first control a person
  * types into: `getComputedStyle(input)` gave `border: 2px inset rgb(118,118,118)`,
  * `background-color: rgb(255,255,255)`, `border-radius: 0px`,
  * `padding: 1px 2px`, `font-size: 13.33px`, and `getBoundingClientRect` gave
