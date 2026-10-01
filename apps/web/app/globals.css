@@ -4294,10 +4294,9 @@ input, textarea, select { font-family: inherit; }
    After every base rule it overrides (the tree toggle, the title, the document). The tree is
    already the toggle panel below 60rem; this makes its toggle a real target, gives the document
    the full width, keeps the title to one line (the byline's actions are a "⋯" menu by script,
-   `note-byline.tsx`, so the row has room) and makes the editor toolbar's controls 44px. The
-   toolbar rules are scoped under `.gn-notes` — the editor AND the note comment composer, which both
-   draw `.ticket-editor__*` — so they out-rank editor.css's own bases, which load from a different
-   sheet. */
+   `note-byline.tsx`, so the row has room). The editor toolbar's 44px controls, hidden dividers and
+   wrapping groups are NOT here: they are `editor.css`'s own ≤40rem arm (AMENDED 2026-10-02, AUDIT BRD-08,
+   cases 21.235–21.237), so every host of the editor gets them, not only `.gn-notes`. */
 @media (max-width: 40rem) {
   .gn-notes__tree-toggle {
     min-height: 2.75rem;
@@ -4311,21 +4310,6 @@ input, textarea, select { font-family: inherit; }
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .gn-notes .ticket-editor__tool {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
-  }
-  .gn-notes .ticket-editor__heading-select {
-    min-height: 2.75rem;
-  }
-  .gn-notes .ticket-editor__tool-group {
-    flex-wrap: wrap;
-  }
-  /* The dividers cost 5px a group; with them the second row of the two-row bar (heading select,
-     bullet, numbered and task list, then More) overflows 320px by a hair (21.133, 21.137). */
-  .gn-notes .ticket-editor__tool-divider {
-    display: none;
   }
 }
 

@@ -12,8 +12,9 @@ import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns
  * Every phone rule is read from the ONE `@media (max-width: 40rem)` arm AND must come after the base
  * rule it overrides — `after()` reads source order from `parseRules`, and only compares two rules of
  * the SAME sheet (order across `ui.css`, `globals.css` and `editor.css` is the bundler's). The editor's
- * toolbar bases live in `editor.css`, so the phone rules for them are scoped under `.gn-notes__editor`
- * and win on specificity instead; `scopedOver()` asserts exactly that shape.
+ * toolbar bases live in `editor.css`, and (AMENDED 2026-10-02, AUDIT BRD-08, cases 21.235–21.237) so do
+ * the phone rules for them: `editor.css` has its own ≤40rem arm after its bases, for EVERY host of the editor.
+ * They are no longer `.gn-notes …` rules in `globals.css`; this file asserts the Notes arm no longer carries them.
  */
 const PHONE = '@media (max-width: 40rem)';
 const TABLET = '@media (max-width: 60rem)';
@@ -58,15 +59,8 @@ function phoneBodies(css: string, selector: string): string {
     .map((rule) => rule.body)
     .join('\n');
 }
-/** A phone rule scoped under `.gn-notes` outranks the editor sheet's single-class base. */
-function scopedOver(base: string): string {
-  const scoped = `.gn-notes ${base}`;
-  expect(position(globals, scoped, PHONE), `${scoped} must sit under the phone arm`).toBeGreaterThanOrEqual(0);
-  return ruleExactly(globals, scoped, PHONE);
-}
-
 describe('21.130 Notes on a phone', () => {
-  it('21.130 the tree toggle is a 44px target after its tablet rule, the document drops its side padding, and the toolbar controls are 44px (scoped over editor.css); the split scroll stays above 60rem', () => {
+  it('21.130 the tree toggle is a 44px target after its tablet rule, the document drops its side padding, and the toolbar controls are 44px (the editor.css phone arm, after its bases); the split scroll stays above 60rem', () => {
     // The tree is the existing toggle panel below 60rem — hidden unless open, opened from the toggle.
     expect(valueOf(ruleExactly(globals, '.gn-notes__tree-toggle'), 'display')).toBe('none');
     expect(valueOf(ruleExactly(globals, '.gn-notes__tree-toggle', TABLET), 'display')).toBe('inline-flex');
@@ -84,38 +78,32 @@ describe('21.130 Notes on a phone', () => {
     expect(valueOf(documentRule, 'padding-right')).toBe('0');
     expect(after(globals, '.gn-notes__document', null)).toBe(true);
 
-    // The editor toolbar: every control 44px, the cluster wraps rather than overflowing 358px.
-    expect(valueOf(scopedOver('.ticket-editor__tool'), 'min-height')).toBe('2.75rem');
-    expect(valueOf(scopedOver('.ticket-editor__tool'), 'min-width')).toBe('2.75rem');
-    expect(valueOf(scopedOver('.ticket-editor__heading-select'), 'min-height')).toBe('2.75rem');
-    expect(valueOf(scopedOver('.ticket-editor__tool-group'), 'flex-wrap')).toBe('wrap');
-    expect(after(globals, '.gn-notes__editor', null, '.gn-notes .ticket-editor__tool')).toBe(true);
+    // The editor toolbar: every control 44px, the cluster wraps rather than overflowing 358px — from editor.css's OWN
+    // phone arm (AMENDED 2026-10-02, BRD-08), which is after its bases and covers every host, not only `.gn-notes`.
+    expect(valueOf(ruleExactly(editor, '.ticket-editor__tool', PHONE), 'min-height')).toBe('2.75rem');
+    expect(valueOf(ruleExactly(editor, '.ticket-editor__tool', PHONE), 'min-width')).toBe('2.75rem');
+    expect(valueOf(ruleExactly(editor, '.ticket-editor__heading-select', PHONE), 'min-height')).toBe('2.75rem');
+    expect(valueOf(ruleExactly(editor, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('wrap');
+    expect(after(editor, '.ticket-editor__tool', null, '.ticket-editor__tool')).toBe(true);
     // The toolbar row itself already wraps in the editor sheet (the base the phone rules rely on).
     expect(valueOf(ruleExactly(editor, '.ticket-editor__toolbar'), 'flex-wrap')).toBe('wrap');
 
-    // The notes phone arm is EXACTLY these seven rules (AMENDED 2026-10-01, case 21.137: the seventh drops the toolbar
-    // dividers so the bar is two rows — `notes-toolbar-phone.test.tsx`), each setting EXACTLY these properties, in this order — so an
-    // added rule (`.gn-notes__editor { overflow-y: auto }`, `.gn-notes__tree--drawer { overflow-y: auto }`,
-    // `.gn-notes__body { flex: 1 }`) or an added declaration reddens here; 18.483 once ran a regex over the whole
-    // block and this restores that strength over the phone arm (review of 6ad9f916, survivors 9–11).
+    // The notes phone arm is EXACTLY these three rules (AMENDED 2026-10-02, BRD-08: the four `.gn-notes .ticket-editor__*`
+    // rules — tool, heading select, group wrap, divider — moved to editor.css's own arm, cases 21.235–21.237), each setting
+    // EXACTLY these properties, in this order — so an added rule (`.gn-notes__editor { overflow-y: auto }`,
+    // `.gn-notes__tree--drawer { overflow-y: auto }`, `.gn-notes__body { flex: 1 }`), a re-scoped toolbar rule or an added
+    // declaration reddens here; 18.483 once ran a regex over the whole block and this restores that strength over the phone
+    // arm (review of 6ad9f916, survivors 9–11).
     const armRules = parseRules(globals).filter((rule) => rule.atRule === PHONE && rule.selectors.some((selector) => /gn-note|ticket-editor/.test(selector)));
     expect(armRules.map((rule) => rule.selectors.join(', '))).toEqual([
       '.gn-notes__tree-toggle',
       '.gn-notes__document',
       '.gn-notes__title',
-      '.gn-notes .ticket-editor__tool',
-      '.gn-notes .ticket-editor__heading-select',
-      '.gn-notes .ticket-editor__tool-group',
-      '.gn-notes .ticket-editor__tool-divider',
     ]);
     expect(armRules.map((rule) => propertiesOf(rule.body))).toEqual([
       ['min-height', 'padding'],
       ['padding-left', 'padding-right'],
       ['overflow', 'text-overflow', 'white-space'],
-      ['min-height', 'min-width'],
-      ['min-height'],
-      ['flex-wrap'],
-      ['display'],
     ]);
 
     // CONTROL — the desktop toolbar keeps its 32px controls and the base group does not wrap.
