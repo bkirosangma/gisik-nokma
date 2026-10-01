@@ -3367,7 +3367,7 @@ describe('6.253 mapActorNames — a former member reads "Name (removed)"', () =>
 describe('22.123 mapGroupRows reads the group tree', () => {
   const row = { id: 'g1', parentId: null, level: 1, name: 'Retail', rank: 'a1', projectCount: 2, childCount: 1 };
 
-  it('22.123 maps every row, keeping a null parent as null; a wrong level, a missing field and a stranger body are refused', () => {
+  it('22.123 maps every row, keeping a null parent as null; a wrong level, a missing field (parentId included) and a stranger body are refused', () => {
     expect(mapGroupRows({ workspaceId: 'w', groups: [row, { ...row, id: 'g2', parentId: 'g1', level: 2 }] })).toEqual([
       row,
       { ...row, id: 'g2', parentId: 'g1', level: 2 },
@@ -3378,6 +3378,12 @@ describe('22.123 mapGroupRows reads the group tree', () => {
     expect(() => mapGroupRows({ groups: [{ ...row, level: '1' }] })).toThrow(MappingError);
     expect(() => mapGroupRows({ groups: [{ ...row, name: undefined }] })).toThrow(MappingError);
     expect(() => mapGroupRows({ groups: [{ ...row, projectCount: 'many' }] })).toThrow(MappingError);
+    // A row with no `parentId` KEY is refused — required-but-nullable, not defaulted to a root.
+    const { parentId: _omitted, ...noParent } = row;
+    expect(() => mapGroupRows({ groups: [noParent] })).toThrow(MappingError);
+    expect(() => mapGroupRows({ groups: [{ ...row, parentId: 7 }] })).toThrow(MappingError);
+    // CONTROL: `parentId: null` is a real value and maps to `null`.
+    expect(mapGroupRows({ groups: [{ ...row, parentId: null }] })[0]!.parentId).toBeNull();
     expect(() => mapGroupRows({ groups: 'nope' })).toThrow(MappingError);
     expect(() => mapGroupRows(null)).toThrow(MappingError);
   });
