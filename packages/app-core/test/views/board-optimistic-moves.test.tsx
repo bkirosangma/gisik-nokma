@@ -763,6 +763,35 @@ describe('20.162 the cards below a card that leaves glide up into the gap — th
   });
 });
 
+describe('20.168 a sibling that also shifts sideways flies from its old x as well as its old y', () => {
+  it('20.168 tk_z reflowed 25px right as tk_a leaves: --gn-flip-x is old − new (-25px) beside --gn-flip-y 130px (CONTROL: tk_c, shifted only vertically, has x 0)', async () => {
+    // Mutation: `dx = from.left - rect.left` → `rect.left - from.left` in the sibling effect (every other sibling test moves vertically only).
+    await mount(() => new Promise<IngestResult[]>(() => {}));
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      let left = 0;
+      let top = 0;
+      if (this.tagName === 'LI' && id.startsWith('ticket-card-')) {
+        const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+        left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+        top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
+        const aLeft = document.querySelector('[data-testid="board-column-todo"] [data-testid="ticket-card-tk_a"]') === null;
+        if (aLeft && id === 'ticket-card-tk_z') left += 25; // a reflow: tk_z alone slides 25px right once tk_a has gone
+      }
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+    drag('tk_a', 'doing');
+    expect(idsIn('todo')).toEqual(['tk_c', 'tk_z']);
+    const flip = (id: string) => [slotOf(id).style.getPropertyValue('--gn-flip-x'), slotOf(id).style.getPropertyValue('--gn-flip-y')];
+    // tk_z was drawn at (0, 360) and now sits at (25, 230): it starts 25px LEFT of and 130px BELOW its slot.
+    expect(flip('tk_z')).toEqual(['-25px', '130px']);
+    // CONTROL — tk_c has only the vertical displacement (no horizontal component), and both siblings fly.
+    expect(flip('tk_c')).toEqual(['0px', '130px']);
+    expect(slotOf('tk_z').classList.contains('gn-board__card-slot--flight')).toBe(true);
+    expect(slotOf('tk_c').classList.contains('gn-board__card-slot--flight')).toBe(true);
+  });
+});
+
 describe('20.162 a card with its dialog open is not glided, whichever move shifts it', () => {
   it('20.162 tk_z awaiting in Doing keeps still while tk_b above it leaves; tk_d, with no dialog, glides (CONTROL)', async () => {
     // Mutation: the sibling claim ignores an open dialog (a transform would drag the fixed scrim with it).
