@@ -91,12 +91,13 @@ describe('20.052 a terminal card has no tick, and its footer holds who·when the
       .map((button) => button.className);
   }
 
-  it('20.052 title, provenance, previous, next, Close — in that order, nothing else', async () => {
+  it('20.052 title, provenance, previous, next, Move to…, Close — in that order, nothing else', async () => {
     expect(await buttonsOf('done')).toEqual([
       'gn-board-card__title',
       'gn-board-card__provenance',
       'gn-board-card__move',
       'gn-board-card__move',
+      'gn-board-card__move gn-board-card__move-to', // amended 2026-10-01 by 21.060: the footer gains Move to…
       'gn-board-card__close',
     ]);
     const footer = document.querySelector('.gn-board-card__footer') as HTMLElement;
@@ -111,6 +112,7 @@ describe('20.052 a terminal card has no tick, and its footer holds who·when the
       'gn-board-card__provenance',
       'gn-board-card__move',
       'gn-board-card__move',
+      'gn-board-card__move gn-board-card__move-to', // amended 2026-10-01 by 21.060
     ]);
   });
 });

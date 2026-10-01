@@ -1,4 +1,4 @@
-import type { WorkflowDef } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, type WorkflowDef } from '@gisik-nokma/domain';
 import { transitionOptions } from './transition-dialog.js';
 
 export type ArrowDirection = 'previous' | 'next';
@@ -88,4 +88,20 @@ export function arrowTargets(
   const scanRange =
     direction === 'next' ? columnOrder.slice(index + 1) : columnOrder.slice(0, index).reverse();
   return scanRange.filter((stateId) => declared.has(stateId));
+}
+
+/**
+ * EVERY state the board offers a card in `fromStateId`, in both directions at once — what the phone's (and, from
+ * Task 5, the desktop's) "Move" button asks the dialog to list. It is `transitionOptions` and nothing more, in its
+ * declaration order, minus Backlog: Backlog is never a board column (`refusalCopy` makes the same cut), and the
+ * only door to it is the ticket sheet's own "Move to Backlog". No second move rule lives here — a state returned
+ * is, by construction, one `moveOutcome` would accept, exactly as for `arrowTargets`.
+ *
+ * Unlike `arrowTargets` it takes no `columnOrder`: it does not walk columns, it reads declared edges. A state with
+ * no declared exit (only the universal Send-to-Backlog) answers `[]`, and the Move button disables itself.
+ */
+export function allBoardTargets(def: WorkflowDef, fromStateId: string): string[] {
+  return transitionOptions(def, fromStateId)
+    .map((option) => option.toStateId)
+    .filter((stateId) => stateId !== BACKLOG_STATE_ID);
 }
