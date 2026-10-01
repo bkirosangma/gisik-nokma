@@ -25,6 +25,18 @@
 - ✅ **22.029 — a workspace purge deletes every former prefix in the workspace and none in another;** control: before, W1 held two, and W2 keeps both after. Mutation: remove the `proj_project_prefixes` rule from `PURGE_TABLE_RULES` → red here and in 19.081/19.083 (the guard that found it). (same file; `apps/server/src/purge/table-rules.ts`)
 - ✅ **22.026 — after project A (derived `SO`) moves to `SH`, a later project whose name derives `SO` reads `SO2` in BOTH readers (`projectPrefixesInWorkspace` and `visibleProjects`), because `SO` is reserved;** control: A reads `SH`, and before the move A held `SO`. Mutation: drop `reserved` from either reader → red. (`prefix-history.test.ts`)
 
+## 22.3 The door
+
+*Task 3. Ids `22.047`–`22.059` are unused.*
+
+- ✅ **22.040 — `project.updated {prefix:"SO"}` on project B, where project A moved off `SO`, is refused `project.prefix-reserved` with *"SO was Shop operations' prefix until <d MMM, IST>. Its old ticket keys still point there, so it can't be reused."*; after A is renamed the text names A's CURRENT name (`Store's`);** control: `{prefix:"SX"}` is accepted. Mutation: drop the reserved branch → red (also 22.041, 22.044, 22.045). (`apps/server/test/permissions/prefix-reservation.test.ts`; `check-permission.ts` `checkPrefixReservation`)
+- ✅ **22.041 — `project.created {prefix:"SO"}` on a retired prefix is refused the same way;** control: a free prefix on the same creation is accepted. Mutation: as 22.040. (same file)
+- ✅ **22.042 — another project's CURRENT prefix is refused with the existing `project.prefix-taken` text, unchanged;** control: the prefix that project was retired from answers `project.prefix-reserved`. Mutation: skip the taken branch → red. (same file)
+- ✅ **22.043 — `workspace.prefix_changed` by a member is refused `permission.role`; by an admin it is accepted.** Mutation: drop it from `ADMIN_ONLY_TYPES` → red. (same file)
+- ✅ **22.044 — project A going `SO` → `SH` → `SO` is accepted at every step, and re-claiming its own former or current prefix is accepted;** control: another project asking for those prefixes is refused (`taken` for `SO`, `reserved` for `SH`). Mutation: stop excluding the project itself (taken or reserved) → red. (same file)
+- ✅ **22.045 — through the real `POST /v1/events`, a re-delivered EARLIER event (`SO` → `SH`, sent after `SH` → `SO`) and a re-delivered LATEST one both answer `duplicate-event-id`, not a prefix refusal;** control: a NEW event from another project asking for `SH` is refused `project.prefix-reserved`. Mutation: stop excluding the project itself on either branch → red. The order of the two refusals is not pinned: the sets are disjoint (a held prefix is never another's former one), so swapping them is an equivalent mutant. (same file)
+- ✅ **22.046 — the date in the reserved refusal is the IST day: a move whose `serverTime` is fixed at `2026-09-30T19:00:00Z` (IST 1 Oct 00:30, UTC 30 Sep) reads "… until 1 Oct.";** control: a move at `2026-09-30T06:00:00Z` reads "until 30 Sep". Mutation: `istDayOf(instant)` → `instant.slice(0, 10)` (the UTC day) → red (it survived 22.040, whose expectation was computed from a live `serverTime` far from a day boundary). (same file)
+
 ## 22.4 Find a ticket by its key
 
 *Task 4. Ids `22.069`–`22.079` are unused. `22.067`–`22.068` are a Task 4 fix (reviewer A): the key the product SHOWS for a collided derived prefix is searchable.*
