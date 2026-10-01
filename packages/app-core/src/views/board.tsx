@@ -1,6 +1,7 @@
 import {
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -29,7 +30,9 @@ import type {
   BoardGroup,
   BoardView as BoardViewData,
 } from '../view-types.js';
-import { arrowTargets } from './board-arrows.js';
+import { allBoardTargets, arrowTargets } from './board-arrows.js';
+import { BoardPhonePicker, useActiveRailColumn } from './board-phone-picker.js';
+import { usePhoneBoard } from './use-phone-board.js';
 import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
 import {
@@ -63,7 +66,7 @@ import {
 } from '../preferences/column-collapse.js';
 import { BulkCloseDialog, type BulkCloseTicket } from './bulk-close-dialog.js';
 import { formatRollup } from './rollup-text.js';
-import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
+import { TransitionDialog, transitionOptions, type TransitionSubmission } from './transition-dialog.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 export type BoardProps = {
@@ -1135,6 +1138,16 @@ function BoardGroupSection({
     railLeft: number;
   } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
+  // Mobile plan FD8: on a phone the rail shows one column at a time (CSS scroll-snap) with a picker above it, and
+  // the column collapse is not applied — a collapsed column renders a strip INSTEAD of its cards, so only the
+  // DOM can expand it. The person's stored choices are left alone: the same memory collapses the column again
+  // the moment the screen is wide enough.
+  const phone = usePhoneBoard();
+  const { activeStateId, pick: pickColumn } = useActiveRailColumn(
+    railRef,
+    group.columns.map((column) => column.stateId),
+    phone && expanded,
+  );
   useHydrationLayoutEffect(() => {
     const pending = pendingFocusRef.current;
     if (pending === null) return;
@@ -1284,6 +1297,14 @@ function BoardGroupSection({
         the columns, their per-column empty copy and their `Add a ticket` with
         it (`13.1409`).
       */}
+      {phone && expanded && activeStateId !== null ? (
+        <BoardPhonePicker
+          columns={group.columns.map((column) => ({ stateId: column.stateId, name: column.name, count: column.cards.length }))}
+          railRef={railRef}
+          activeStateId={activeStateId}
+          onPick={pickColumn}
+        />
+      ) : null}
       <div
         className="gn-board__rail"
         id={railId}
@@ -1300,7 +1321,7 @@ function BoardGroupSection({
         {group.columns.map((column) => {
           // No `column.category` test: every column collapses (plan D27, resolved).
           const collapsed =
-            columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false && springOpen !== column.stateId;
+            !phone && columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false && springOpen !== column.stateId;
           const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
           const over = column.stateId === dropTarget;
           const verdict = over ? verdictOf(column.stateId) : 'unknown';
@@ -1337,6 +1358,7 @@ function BoardGroupSection({
             role="region"
             aria-label={column.name}
             data-testid={`board-column-${column.stateId}`}
+            data-state-id={column.stateId}
             className={
               (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
               (collapsed ? ' gn-board__column--collapsed' : '') +
@@ -2447,6 +2469,12 @@ function MoveArrows({
 
   const previousTargets = arrowTargets(workflow, columnOrder, fromStateId, 'previous');
   const nextTargets = arrowTargets(workflow, columnOrder, fromStateId, 'next');
+  // The Move button (mobile plan FD6): every board destination, both directions, in one list — the same
+  // `transitionOptions` the arrows read, so no second move rule. Task 4 draws it on a phone only; the arrows are
+  // hidden there (FD13, no touch drag-and-drop).
+  const phone = usePhoneBoard();
+  const boardTargets = allBoardTargets(workflow, fromStateId);
+  const moveRefusalId = useId();
   /**
    * Backlog/closed spec §5.2 (2026-09-17) — "a card in a terminal column
    * gains a Close button beside the arrows." Derived HERE, from `workflow`
@@ -2700,6 +2728,22 @@ function MoveArrows({
     }
   };
 
+  /**
+   * The Move button's own click: the dialog over EVERY destination, never `moveOutcome` (nothing has been chosen
+   * yet for it to judge). One destination opens already aimed at it; several open on "Choose a state". The pick is
+   * submitted by `submitFromDialog`, the path the arrows' picker already takes, so the card lands optimistically.
+   */
+  const moveClick = (): void => {
+    if (submitting || boardTargets.length === 0) return;
+    patchSession({
+      source: 'arrow',
+      refusal: null,
+      serverRefusal: null,
+      transportError: null,
+      dialog: { offer: boardTargets, preselect: boardTargets.length === 1 ? (boardTargets[0] ?? null) : null, markRules: true },
+    });
+  };
+
   /** "Move to Doing" for one target; "Move to next state — Doing or Done" for a choice; the "unavailable" sentence for none. */
   const arrowLabel = (direction: 'previous' | 'next', targets: string[]): string => {
     if (targets.length === 0) return `Move to ${direction} state — unavailable`;
@@ -2874,6 +2918,30 @@ function MoveArrows({
       >
         ›
       </button>
+      {phone ? (
+        <>
+          <button
+            type="button"
+            className="gn-board-card__move gn-board-card__move-to"
+            disabled={boardTargets.length === 0 || submitting}
+            aria-label="Move to another state"
+            aria-describedby={boardTargets.length === 0 ? moveRefusalId : undefined}
+            onClick={moveClick}
+          >
+            Move
+          </button>
+          {boardTargets.length === 0 ? (
+            // Disabled, never absent (as the arrows are): the reason is the board's own refusal sentence, read
+            // off the same `transitionOptions` list `moveOutcome` would name — `refusalCopy` drops Backlog itself.
+            <span id={moveRefusalId} hidden>
+              {refusalCopy(
+                workflow,
+                transitionOptions(workflow, fromStateId).map((option) => option.toStateId),
+              )}
+            </span>
+          ) : null}
+        </>
+      ) : null}
       {/* Backlog/closed spec §5.2 — terminal columns only; `category` is
           computed once above, alongside `previousTargets`/`nextTargets`. */}
       {category === 'terminal' ? (
@@ -2931,6 +2999,7 @@ function MoveArrows({
           ticketFields={{}}
           offerStateIds={dialog.offer}
           initialToStateId={dialog.preselect}
+          markRules={dialog.markRules}
           onClose={() => {
             patchSession({ dialog: null, serverRefusal: null, transportError: null });
             // Cancel: the card glides back out of the landing slot. (A committed entry is left to its read.)

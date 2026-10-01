@@ -1978,6 +1978,31 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-board-card__close:disabled,
 .gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* The board on a phone (mobile plan Task 4, FD8/FD13). The same 40rem the rest of the phone layer breaks at —
+   `PHONE_BOARD_QUERY` (`packages/app-core/src/views/use-phone-board.ts`) is that width in JS, and case 21.040 reads
+   both. The rail becomes a scroll-snap container showing one full-width column at a time (the picker above it,
+   rendered only on a phone, scrolls it); the 18rem lane above is the desktop board and is untouched. Collapse is
+   not applied on a phone: the DOM draws no strip (a collapsed column is a different markup, so `usePhoneBoard`
+   decides that), and the toggle that would make one is hidden here. There is no touch drag-and-drop (FD13), so the
+   ‹ › arrows give way to the Move button — the arrows' selector is `:not(.gn-board-card__move-to)` because both
+   wear `.gn-board-card__move`'s metrics, and the specificity (0,2,0) beats the base rule's (0,1,0) wherever it
+   sits. Move keeps the 44px floor (rule 01) and carries a word, not a glyph. */
+@media (max-width: 40rem) {
+  .gn-board__rail { scroll-snap-type: x mandatory; overflow-x: auto; }
+  .gn-board__column { flex: 0 0 100%; scroll-snap-align: start; }
+  .gn-board__column-collapse { display: none; }
+  .gn-board__column-strip { display: none; }
+  .gn-board-card__move:not(.gn-board-card__move-to) { display: none; }
+  .gn-board-card__move-to {
+    display: inline-flex;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.9375rem;
+  }
+  .gn-board-phone-picker { max-width: 100%; margin-bottom: 0.5rem; overflow-x: auto; }
+}
 /* Ruling 28 (board-prototype-port coordinator, 2026-09-16) — a pure layout
    no-op. `board.tsx` wraps the three mutually-exclusive move notices
    (`MoveRefusalNotice` / server-refusal / transport-error) in one `<div
