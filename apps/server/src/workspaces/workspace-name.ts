@@ -71,15 +71,15 @@ export async function workspaceNameFromLedger(
  *   never moves it. `workspace.renamed` does not carry one and deliberately
  *   cannot (`events/membership.ts`): moving the prefix on a rename would change
  *   every ticket key in the workspace under readers who had already quoted one.
- *   **`workspace.prefix_changed` (2026-10-02) now exists and this query does
- *   not read it yet**; the prefixes and groups plan Task 2 makes the prefix the
- *   LAST such event and returns the former prefixes.
+ *   `workspace.prefix_changed` (2026-10-02) is the only event that moves it: the
+ *   fold below starts from the founding prefix and applies each such event in
+ *   ledger order, and the earlier values come back as `formerPrefixes`.
  *
  * A single `ORDER BY workspace_seq DESC LIMIT 1`, which the name's own fold used
  * before this function existed, cannot answer the prefix at all once a rename
  * has happened — the latest event has no prefix on it. So the query takes the
- * whole naming history for the workspace (two event types, and in practice two
- * rows) and the two ends are read off it.
+ * whole naming history for the workspace (three event types, and in practice
+ * a handful of rows) and the two ends are read off it.
  *
  * ## The prefix is never absent for a NAMED workspace
  *
@@ -100,23 +100,35 @@ export async function workspaceNameFromLedger(
 export async function workspaceIdentityFromLedger(
   db: Queryable,
   workspaceId: string,
-): Promise<{ name: string | null; prefix: string | null }> {
-  const { rows } = await db.query<{ payload: { name?: unknown; prefix?: unknown } }>(
-    `SELECT payload FROM events
-      WHERE workspace_id = $1 AND type IN ('workspace.created', 'workspace.renamed')
+): Promise<{
+  name: string | null;
+  prefix: string | null;
+  /** Every earlier prefix, with the instant (ISO-8601) it stopped being the workspace's, oldest first. */
+  formerPrefixes: Array<{ prefix: string; until: string }>;
+}> {
+  const { rows } = await db.query<{
+    type: string;
+    server_time: Date;
+    payload: { name?: unknown; prefix?: unknown };
+  }>(
+    `SELECT type, server_time, payload FROM events
+      WHERE workspace_id = $1
+        AND type IN ('workspace.created', 'workspace.renamed', 'workspace.prefix_changed')
       ORDER BY workspace_seq ASC`,
     [workspaceId],
   );
-  const name = rows.at(-1)?.payload.name;
+  // The NAME is the last naming event; `workspace.prefix_changed` carries none.
+  const naming = rows.filter((row) => row.type !== 'workspace.prefix_changed');
+  const name = naming.at(-1)?.payload.name;
   const named = typeof name === 'string' ? name : null;
   if (named === null) {
-    return { name: null, prefix: null };
+    return { name: null, prefix: null, formerPrefixes: [] };
   }
   // `?? null` over the FIRST row and not `Array.prototype.find`: a founding
   // claim written before the field existed has no key at all, so `find` would
   // walk the history looking for a prefix no later event can carry — there is
   // exactly one candidate and it is the first.
-  const stored = rows[0]?.payload.prefix;
+  const stored = naming[0]?.payload.prefix;
   // ⚠ THE DERIVATION READS THE **FOUNDING** NAME, NOT THE CURRENT ONE, and that
   // is a defect fix rather than a tidy-up. Deriving from `named` made the
   // prefix a function of whatever the workspace is called TODAY: renaming
@@ -131,9 +143,27 @@ export async function workspaceIdentityFromLedger(
   //
   // The founding name is immutable: no event
   // rewrites a `workspace.created` payload (`events` refuses UPDATE). So
-  // reading it makes the derived half exactly as stable as the stored one (until
-  // a `workspace.prefix_changed`, which names the prefix outright).
-  const foundingName = rows[0]?.payload.name;
+  // reading it makes the derived half exactly as stable as the stored one — the
+  // STARTING prefix; `workspace.prefix_changed` events then move it, below.
+  const foundingName = naming[0]?.payload.name;
   const derived = derivePrefix(typeof foundingName === 'string' ? foundingName : named);
-  return { name: named, prefix: typeof stored === 'string' ? stored : derived };
+  let current = typeof stored === 'string' ? stored : derived;
+
+  // Fold the changes in ledger order. A change away from `current` files it as
+  // former (reserved) with the instant it stopped; a change BACK to a former
+  // prefix takes it off the list again, so a prefix is never both.
+  const former = new Map<string, string>();
+  for (const row of rows) {
+    const next = row.type === 'workspace.prefix_changed' ? row.payload.prefix : undefined;
+    if (typeof next !== 'string' || next === current) continue;
+    former.delete(current);
+    former.set(current, row.server_time.toISOString());
+    former.delete(next);
+    current = next;
+  }
+  return {
+    name: named,
+    prefix: current,
+    formerPrefixes: [...former].map(([prefix, until]) => ({ prefix, until })),
+  };
 }
