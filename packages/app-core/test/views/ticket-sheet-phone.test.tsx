@@ -66,6 +66,11 @@ describe('21.071 the header Move shortcut opens the SAME single dialog', () => {
 
     const shortcut = headerMove();
     expect(shortcut.closest('.gn-sheet__header')).not.toBeNull();
+    // The class is what ties this button to the CSS half: `.gn-sheet__move` is `display: none` above 40rem and
+    // `inline-flex` at the phone size. Without it the shortcut paints at every width.
+    expect(shortcut).toHaveClass('gn-sheet__move');
+    // CONTROL — the state row's Move… is not the shortcut and must not carry the class (it shows at every width).
+    expect(stateRowMove()).not.toHaveClass('gn-sheet__move');
     expect(shortcut).toBeEnabled();
     await user.click(shortcut);
     // Exactly ONE Move dialog (plus the sheet itself) — never a second dialog from a second handler.
