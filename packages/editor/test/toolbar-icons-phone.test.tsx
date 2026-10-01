@@ -7,6 +7,7 @@ import type { Editor } from '@tiptap/core';
 import { TicketEditor, type TicketEditorProps } from '../src/components/TicketEditor.js';
 import { PHONE_TOOLBAR_QUERY, PHONE_VISIBLE_TOOLS } from '../src/components/EditorToolbar.js';
 import type { DocJson } from '../src/doc.js';
+import { ruleExactly, valueOf } from '../../ui/test/helpers/css-rules.js';
 
 /**
  * Mobile web — the Notes toolbar: icons instead of word labels (every width), a visible name on hover /
@@ -164,7 +165,25 @@ describe('21.135 every tool button keeps its accessible name AND shows it as a t
     fireEvent.pointerCancel(bold, { pointerType: 'touch' });
     act(() => vi.advanceTimersByTime(600));
     expect(tooltipFor(view, bold)).toBeNull();
+
+    // The platform's CONTEXT MENU a long-press can raise is suppressed while a touch press is held (the name is the
+    // answer to the press)...
+    fireEvent.pointerDown(bold, { pointerType: 'touch' });
+    expect(fireEvent.contextMenu(bold), 'contextmenu during a touch press').toBe(false);
+    fireEvent.pointerUp(bold, { pointerType: 'touch' });
+    // ...and ONLY then. CONTROL: with no press in progress, or a mouse press, a right-click keeps its menu.
+    expect(fireEvent.contextMenu(bold), 'contextmenu at rest').toBe(true);
+    fireEvent.pointerDown(bold, { pointerType: 'mouse' });
+    expect(fireEvent.contextMenu(bold), 'contextmenu on a mouse press').toBe(true);
     view.unmount();
+  });
+
+  it('21.135 CSS half: `.ticket-editor__tool` carries `-webkit-touch-callout: none` (iOS raises no callout over the long-press)', () => {
+    const editorCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css'), 'utf8');
+    const rule = ruleExactly(editorCss, '.ticket-editor__tool');
+    expect(valueOf(rule, '-webkit-touch-callout')).toBe('none');
+    // CONTROL: the same rule still carries its other declarations, so a read of the wrong rule would fail here.
+    expect(valueOf(rule, 'cursor')).toBe('pointer');
   });
 });
 
@@ -283,7 +302,15 @@ describe('21.140 the "More tools" tray behaves like a toolbar disclosure', () =>
     fireEvent.click(more);
     fireEvent.click(tool(view, 'Insert table'));
     expect(view.container.querySelector('.ticket-editor__tray')).not.toBeNull();
-    expect(view.container.querySelector('.ticket-editor__table-picker, [class*="table-picker"]')).not.toBeNull();
+    expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+
+    // Picking a size inserts the table AND closes the tray (the grid's own `onSelect` closes both).
+    const cell = view.container.querySelector('.ticket-editor__table-cell[aria-label="2 × 3 table"]') as HTMLElement;
+    fireEvent.click(cell);
+    expect(editor.getJSON().content?.some((node) => node.type === 'table')).toBe(true);
+    expect(view.container.querySelector('.ticket-editor__tray')).toBeNull();
+    expect(view.container.querySelector('[role="group"][aria-label="More tools"]')).toBeNull();
+    expect(more.getAttribute('aria-expanded')).toBe('false');
     view.unmount();
   });
 });
