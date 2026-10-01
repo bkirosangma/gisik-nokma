@@ -2808,6 +2808,15 @@ export function TicketSheet({
   // OPTIONAL on `TicketState` (441 fixtures predate it, spec §1.2,
   // 2026-09-17); every reader spells the same `?? null`.
   const closed = state.closed ?? null;
+  /*
+    ONE handler for BOTH Move doors (the state row's `Move…` and the header's phone shortcut), so
+    exactly one `TransitionDialog` can open and both clear the same stale refusal first (case 21.071).
+  */
+  const openMove = () => {
+    setServerRefusal(null);
+    setTransportError(null);
+    setMoveOpen(true);
+  };
 
   /**
    * THE ASSIGNEE ROW — a control, a claim line, and FOUR arms for the candidate
@@ -3150,6 +3159,22 @@ export function TicketSheet({
         and the body all move together, and all three belong to `Sheet`.
       */
       headerActions={
+        <>
+        {/*
+          The phone-only Move shortcut (plan FD10, case 21.071): the Move… button lives in the State
+          row, a long scroll down in the full-screen sheet, so the sticky header carries a second door
+          to the SAME handler. `.gn-sheet__move` is `display: none` above 40rem. Its accessible name is
+          "Move this ticket" — distinct from the state row's "Move…" and the dialog's "Move" confirm, so
+          no exact-name query on either is made ambiguous by the shortcut being in the tree.
+        */}
+        <Button
+          className="gn-sheet__move"
+          aria-label="Move this ticket"
+          onClick={openMove}
+          disabled={closed !== null}
+        >
+          Move
+        </Button>
         <button
           type="button"
           className="gn-sheet__full"
@@ -3173,6 +3198,7 @@ export function TicketSheet({
           </svg>
           {sheetFull ? 'Exit full screen' : 'Full screen'}
         </button>
+        </>
       }
     >
       {/*
@@ -3526,14 +3552,7 @@ export function TicketSheet({
                     naming a fact that has nothing to do with the move being
                     attempted.
                   */}
-                  <Button
-                    onClick={() => {
-                      setServerRefusal(null);
-                      setTransportError(null);
-                      setMoveOpen(true);
-                    }}
-                    disabled={closed !== null}
-                  >
+                  <Button onClick={openMove} disabled={closed !== null}>
                     Move…
                   </Button>
                   {closed !== null ? (
