@@ -241,7 +241,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
    * is a bound this client chose, and no route change clears it (12.382). So the control
    * is offered, and the parent picker — not the form — carries the refusal.
    */
-  it('offers New ticket and names the missing parent list, rather than withholding the whole control', async () => {
+  it('offers Create ticket and names the missing parent list, rather than withholding the whole control', async () => {
     render(
       <Providers
         services={stubServices({
@@ -263,7 +263,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
 
     // The control IS offered now — creation at project root never needed the list.
     const user = userEvent.setup();
-    const open = await screen.findByRole('button', { name: 'New ticket' });
+    const open = await screen.findByRole('button', { name: 'Create ticket' });
     fireEvent.click(open);
 
     // And the half that keeps 3.142's claim true: there is no parent `<select>` at
@@ -330,13 +330,13 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
     // Still exactly these two, and still in this order, after the shared-Select migration: the
     // synthetic `{ value: '', label: 'None (project root)' }` option replaces the hand-written
     // `<option value="">` one-for-one at the head of the list rather than adding to it.
     expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
     // The paired absence is the REASON, not the old refusal. `"…could be a parent, so
-    // New ticket is not offered"` was deleted with `createRegion`'s list arm and is
+    // Create ticket is not offered"` was deleted with `createRegion`'s list arm and is
     // produced by no source file now, so asserting it absent asserted nothing — it
     // could not have been present. This string can be.
     expect(
@@ -371,7 +371,7 @@ describe('3.158 a preferences failure does not claim the parent list cannot be s
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
 
     // The true thing present...
     expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
@@ -397,7 +397,7 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
 
     // Read ONCE and asserted three times: opening the panel is now a real interaction, so three
     // separate reads would be three open/close cycles of the same list to no purpose.
@@ -432,7 +432,7 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
     expect(await typeOptionLabels(user)).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
     // The sentence that stops the ladder from passing itself off as the answer.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
@@ -453,12 +453,12 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
     );
     expect(
       await screen.findByText(
-        /This workspace’s ticket types, so New ticket is not offered could not be loaded/,
+        /This workspace’s ticket types, so Create ticket is not offered could not be loaded/,
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/HTTP 404 for \/v1\/workspaces\/.*\/ticket-types/)).toBeInTheDocument();
     // Both falsehoods absent: no control, and no ladder shown as the answer.
-    expect(screen.queryByRole('button', { name: 'New ticket' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).not.toBeInTheDocument();
     expect(screen.queryByText(BUILTIN_LADDER_NOTICE)).not.toBeInTheDocument();
   });
 });
@@ -481,8 +481,8 @@ describe('3.144 the write door is never offered an empty actor', () => {
     // who they were.
     session = { data: null, isPending: true };
     render(<Providers services={servedWorld()}><ProjectPage /></Providers>);
-    expect(await screen.findByText('Preparing the New ticket form…')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New ticket' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Preparing the Create ticket form…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).not.toBeInTheDocument();
     expect(screen.queryByText('Sign in to create a ticket.')).not.toBeInTheDocument();
   });
 
@@ -490,10 +490,10 @@ describe('3.144 the write door is never offered an empty actor', () => {
     session = { data: null, isPending: false };
     render(<Providers services={servedWorld()}><ProjectPage /></Providers>);
     expect(await screen.findByText('Sign in to create a ticket.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New ticket' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).not.toBeInTheDocument();
     // The two no-user states are DISTINGUISHED, which is the whole point of
     // reading `useSessionStatus` rather than `useCurrentUser`.
-    expect(screen.queryByText('Preparing the New ticket form…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing the Create ticket form…')).not.toBeInTheDocument();
   });
 
   it('WHEN SIGNED IN: the control is offered, and the event it submits carries the real actor', async () => {
@@ -510,9 +510,9 @@ describe('3.144 the write door is never offered an empty actor', () => {
     };
     render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Order the new sign');
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     // The actor id, printed. `not.toBe('')` alone would pass for `undefined`.
     await waitFor(() => expect(ingested.map((event) => event.actorId)).toEqual([ANSELMA]));
@@ -612,7 +612,7 @@ describe('13.591f the birth-state control does not depend on which parent a REAL
     };
     render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
 
     const birthState = (): HTMLElement => screen.getByRole('checkbox', { name: 'Starts in the backlog?' });
 
@@ -637,7 +637,7 @@ describe('13.591f the birth-state control does not depend on which parent a REAL
     // say one thing while the wire says another.
     await user.click(birthState());
     await user.type(screen.getByLabelText('Title'), 'Order the new sign');
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() =>
       expect(
@@ -652,14 +652,14 @@ describe('13.591f the birth-state control does not depend on which parent a REAL
  * its control, at the mount where the control had to be wired.
  *
  * `Board`'s empty state renders *"No tickets here yet — create one."* and a
- * "Create a ticket" button gated on `onCreateTicket`. **No caller in this app
+ * "Create ticket" button gated on `onCreateTicket`. **No caller in this app
  * passed it** — `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered 0
  * across 63 files at the ruling — so the sentence instructed an action the page
  * made impossible from where it was read, while the control itself sat three
  * centimetres to the left in this header. The board's half of the fix is in
  * `packages/app-core/test/views/board.test.tsx` (V1); this is the shell's half:
  * the page lifts `CreateTicketFlow`'s open state and passes a real handler, so
- * the banner's button opens the SAME dialog the header's "New ticket" does.
+ * the banner's button opens the SAME dialog the header's "Create ticket" does.
  */
 describe('V1 an empty project’s board offers the control its sentence names', () => {
   const emptyWorld = () =>
@@ -679,7 +679,10 @@ describe('V1 an empty project’s board offers the control its sentence names', 
     );
 
     expect(await screen.findByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
-    const create = screen.getByRole('button', { name: 'Create a ticket' });
+    // The BANNER's button; the header draws one of the same name (BRD-19: one action, one name).
+    const create = screen
+      .getAllByRole('button', { name: 'Create ticket' })
+      .find((el) => el.classList.contains('gn-board__empty-create'))!;
     // No dialog before the press — otherwise the assertion below would pass on a
     // page that opened one on load.
     expect(screen.queryByRole('combobox', { name: 'Parent' })).not.toBeInTheDocument();
@@ -694,7 +697,7 @@ describe('V1 an empty project’s board offers the control its sentence names', 
 
 /**
  * Case 13.1442 — starting-status design, 2026-09-23. The end-to-end claim:
- * clicking an empty COLUMN's "Add a ticket" opens the New-ticket dialog
+ * clicking an empty COLUMN's "Create ticket" opens the New-ticket dialog
  * pre-filled with THAT column's type and status, and a submit from there
  * carries `stateId` on the wire — while the header's own unscoped "New
  * ticket" still opens with the workflow's initial state and NO `stateId` at
@@ -801,9 +804,9 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
       </Providers>,
     );
 
-    // The empty `Doing` column's own "Add a ticket" — not the header's.
+    // The empty `Doing` column's own "Create ticket" — not the header's.
     const doingColumn = await screen.findByRole('region', { name: 'Doing' });
-    await user.click(within(doingColumn).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(doingColumn).getByRole('button', { name: /^Create ticket in / }));
 
     // Pre-filled: `epic` is `WORKSPACE_TYPES`' FIRST entry sharing
     // `wf-errands`, and it is NOT what renders — `task` is, because this
@@ -819,7 +822,7 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
     expect(screen.getByRole('checkbox', { name: 'Starts in the backlog?' })).not.toBeChecked();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Fix the loose hinge' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(ingested).toHaveLength(1));
     const columnEvent = ingested[0];
@@ -835,7 +838,7 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
     // selection at all — the workflow's initial state (`todo`), and NO
     // `stateId` key on the wire (13.1439's own omission rule, exercised here
     // through the real page rather than a fixture).
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Patch the fence' } });
     // `chore` is the ordinary default here (rank 3, tied with `task` and won
     // on id) — picked past explicitly, since this control is about the
@@ -843,7 +846,7 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
     // to.
     await user.click(screen.getByLabelText('Type'));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Epic' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(ingested).toHaveLength(2));
     const headerEvent = ingested[1];

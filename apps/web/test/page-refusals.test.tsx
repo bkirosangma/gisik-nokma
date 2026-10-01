@@ -340,7 +340,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
    * **It measured more than 12.322 records, and the measurement has since been acted
    * on.** That row says a project past the cap *"loses three of four tabs"*. One
    * `useTicketList` read fed all four consumers on this page — the create region,
-   * Calendar, Timeline and List — so `New ticket` was not offered either, and a user
+   * Calendar, Timeline and List — so `Create ticket` was not offered either, and a user
    * whose project grew past the bound could not create a ticket in it on any tab. The
    * create region no longer gates on that read (project-root creation never needed a
    * parent), so what remains here is the LIST half, on the tabs that show a list.
@@ -354,7 +354,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
           // Types are stubbed so ONLY the list refuses, keeping the page in the state
           // this case names. **It is not load-bearing for any assertion here** —
           // deleting it leaves all ten cases green, measured — because nothing below
-          // reads `New ticket`; the creation half is 3.142's, in its own harness. Kept
+          // reads `Create ticket`; the creation half is 3.142's, in its own harness. Kept
           // so the fixture describes one refusing read rather than two, and said
           // plainly rather than claimed to protect an assertion it does not.
           getTicketTypes: async () => [
@@ -377,8 +377,8 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // Timeline arms. It used to be tab-independent, because `createRegion` — which sits
     // inside the tablist and renders on every tab — refused there. Decoupling creation
     // from the list read removed that renderer, deliberately: its `what` read *"The
-    // tickets that could be a parent, so New ticket is not offered"*, and that sentence
-    // is now FALSE — `New ticket` IS offered, at project root. A refusal cannot be left
+    // tickets that could be a parent, so Create ticket is not offered"*, and that sentence
+    // is now FALSE — `Create ticket` IS offered, at project root. A refusal cannot be left
     // standing on a tab to say something untrue.
     //
     // Nothing false replaces it on the board: the board tab draws the BOARD read, which
