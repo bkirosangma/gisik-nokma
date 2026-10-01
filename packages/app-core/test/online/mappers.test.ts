@@ -2819,7 +2819,7 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
  */
 describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
   function row(extra: Record<string, unknown>): Record<string, unknown> {
-    return { projectId: 'p1', name: 'Delivery', prefix: 'DE', archived: false, description: null, ...extra };
+    return { projectId: 'p1', name: 'Delivery', prefix: 'DE', archived: false, description: null, groupId: null, ...extra };
   }
   function body(projects: Record<string, unknown>[]): { workspaces: unknown[] } {
     return {
@@ -2882,6 +2882,18 @@ describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
     // assertions above would also pass if `mapWorkspaceRefs` refused this body
     // for an unrelated reason.
     expect(() => mapWorkspaceRefs(body([row({})]))).not.toThrow();
+  });
+
+  it('22.102 — a project row carries groupId: a string and null both map through, a missing key is refused naming its path', () => {
+    const [ref] = mapWorkspaceRefs(body([row({ groupId: '01GROUP' }), row({ projectId: 'p2', groupId: null })]));
+    expect(ref!.projects[0]!.groupId).toBe('01GROUP');
+    expect(ref!.projects[1]!.groupId).toBeNull();
+    const orphan = row({});
+    delete orphan['groupId'];
+    expect(() => mapWorkspaceRefs(body([orphan]))).toThrow(/projects\[0\]\.groupId/);
+    expect(() => mapWorkspaceRefs(body([orphan]))).toThrow(/never omitted/);
+    // CONTROL: a number is not a group id either, so the string arm above is a real check.
+    expect(() => mapWorkspaceRefs(body([row({ groupId: 7 })]))).toThrow(MappingError);
   });
 });
 
@@ -2971,7 +2983,7 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
     // body the server can produce, and every case below would fail on the
     // missing key rather than on the count it is actually about. `...extra`
     // spreads LAST, so a case can still override it.
-    return { projectId: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, description: null, ...extra };
+    return { projectId: 'p1', name: 'Shop operations', prefix: 'SO', archived: false, description: null, groupId: null, ...extra };
   }
   function withProjects(
     workspace: Record<string, unknown>,
@@ -3046,6 +3058,7 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
       // because the server resolves stored-or-derived before it answers.
       prefix: 'SO',
       archived: true,
+      groupId: null,
       ticketCount: null,
       blockedCount: null,
     });

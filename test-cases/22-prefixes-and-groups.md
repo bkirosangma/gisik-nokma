@@ -9,3 +9,21 @@
 
 - ✅ **22.001 — `workspace.prefix_changed` is a registered event filed against the workspace and carries exactly one valid prefix (`{ prefix: "SH" }`);** control: `"sh"`, `"ABCD"`, `""`, `{}`, a stranger key and a non-workspace entity kind are all refused. Mutation: register it with `.passthrough()` or against the project kind → red. (`packages/domain/test/prefix-events.test.ts`; `packages/domain/src/events/membership.ts`, `vocabulary.ts`)
 - ✅ **22.002 — `project.updated` may carry only a `prefix`, or only a `groupId` (a string, or `null` to ungroup);** control: `{}`, a malformed prefix (`"sh"`) and an empty `groupId` are refused. Mutation: drop `prefix` from the refine → the prefix-only payload is refused → red. (`packages/domain/test/prefix-events.test.ts`; `projectUpdatedPayload`)
+
+## 22.2 The group tree — events, projection, door, read route
+
+*Task 6. Ids `22.103`–`22.119` are unused.*
+
+- ✅ **22.090 — `group.created` carries a level that agrees with its parent being present (L1 has none, L2–L4 have one); `group.renamed` takes a name, `group.reordered` a rank, `group.deleted` nothing;** control: L1 with a parent, L2 without, L5, a stranger key and a non-group entity are refused. Mutation: drop the level/parent refine → the L1-with-a-parent payload parses → red. (`packages/domain/test/group-events.test.ts`; `packages/domain/src/events/groups.ts`)
+- ✅ **22.091 — the tree is served with levels, parents and counts to a member;** control: another workspace's owner sees none of these rows. (`apps/server/test/groups/groups.test.ts`; `routes/groups.ts`)
+- ✅ **22.092 — an L2 under an L2 is refused `group.level-mismatch`;** control: the L3 under it commits. Mutation: skip the level check → red. (`groups.test.ts`; `checkGroupRules`)
+- ✅ **22.093 — a parent from another workspace is refused `group.unknown`, like a fabricated one;** control: the same name under a real parent commits. (`groups.test.ts`)
+- ✅ **22.094 — `retail` beside `Retail` is refused `group.name-taken` naming the existing one;** control: the same name under a different parent commits. Mutation: compare names case-sensitively → red. (`groups.test.ts`)
+- ✅ **22.095 — renaming onto a sibling (any case) is refused; renaming to a free name, or to its own name in another letter case, commits.** Same mutation as 22.094 → red. (`groups.test.ts`)
+- ✅ **22.096 — deleting a group a project is filed under is refused `group.in-use`, naming the project;** control: after the project moves out the delete commits. Mutation: skip the in-use check → red. (`groups.test.ts`)
+- ✅ **22.097 — deleting a group with children is refused `group.has-children`;** control: the child itself deletes. (`groups.test.ts`)
+- ✅ **22.098 — an unused leaf deletes and the route no longer lists it;** control: its sibling stays. (`groups.test.ts`)
+- ✅ **22.099 — a project filed under a group from another workspace, a deleted one or a fabricated one is refused `project.group-unknown`;** control: a live group commits. (`groups.test.ts`)
+- ✅ **22.100 — every group event by a member is refused `permission.role`, an admin commits; a member may read, a guest and an outsider get 404.** Mutation: drop the four types from `ADMIN_ONLY_TYPES` → red. (`groups.test.ts`)
+- ✅ **22.101 — create, rename, reorder, assign and delete leave `verifyProjections` clean (in a ledger-only database);** control: a group row edited behind the ledger is reported on `proj_groups`. (`groups.test.ts`)
+- ✅ **22.102 — the `/v1/me/workspaces` mapper requires `groupId` on every project row:** a string and `null` map through, a missing key is refused naming `projects[0].groupId`; control: a number is refused. (`packages/app-core/test/online/mappers.test.ts`; `mappers.ts`)

@@ -113,7 +113,8 @@ export const projProjects: Projection = {
       await tx.query(
         `UPDATE proj_projects
             SET name = COALESCE($3, name),
-                description = CASE WHEN $4::boolean THEN $5 ELSE description END
+                description = CASE WHEN $4::boolean THEN $5 ELSE description END,
+                group_id = CASE WHEN $6::boolean THEN $7 ELSE group_id END
           WHERE project_id = $1 AND workspace_id = $2`,
         [
           event.entity.id,
@@ -121,6 +122,10 @@ export const projProjects: Projection = {
           payload.name ?? null,
           payload.description !== undefined,
           payload.description ?? null,
+          // `groupId` follows `description`'s rule: `null` is a real value (UNGROUP)
+          // and must not COALESCE away, so presence is its own flag. Task 6.
+          payload.groupId !== undefined,
+          payload.groupId ?? null,
         ],
       );
       return;
