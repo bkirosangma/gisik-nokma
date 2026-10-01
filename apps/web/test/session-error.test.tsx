@@ -144,6 +144,25 @@ describe('21.239 a session error keeps the signed-in chrome', () => {
     setSession({ ...SIGNED_OUT, error: { status: 401, statusText: 'Unauthorized' } });
     expect(screen.getByTestId('page').textContent).toBe('Sign in to open settings');
     expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
+    // …and a 401 is no outage: no notice, no Try again (the failure is the 429 above, not this answer)
+    expect(screen.queryByText(NOTICE)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
+  it('21.239 sign-out forgets the user: signed in → a genuine "nobody" → a failed read is `error`, not the old user; CONTROL: before the sign-out the same failure DID keep the user', async () => {
+    const { container } = render(shell());
+    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeTruthy();
+    setSession(tooMany());
+    expect(screen.getByTestId('page').textContent).toBe('status:signed-in');
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeTruthy();
+
+    setSession(SIGNED_OUT);
+    expect(screen.getByTestId('page').textContent).toBe('Sign in to open settings');
+    setSession(tooMany());
+    expect(screen.getByTestId('page').textContent).toBe('status:error');
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Phone' })).toBeNull();
+    expect(container.textContent ?? '').not.toMatch(/Sign in/);
   });
 });
 
@@ -164,6 +183,24 @@ describe('21.240 the notice and Try again', () => {
     expect(screen.queryByText(NOTICE)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Workspaces' })).toBeTruthy();
+  });
+
+  it('21.240 no blink while a retry is in flight: the notice and Try again stay through the refetch (no error, isRefetching) and go only on success; CONTROL: a refetch that was never preceded by a failure shows nothing', () => {
+    // CONTROL — better-auth's refetch-start state on a HEALTHY session is not a failure
+    render(shell());
+    setSession({ data: null, isPending: true, isRefetching: true, error: null });
+    expect(screen.queryByText(NOTICE)).toBeNull();
+    setSession(SIGNED_IN);
+
+    setSession(tooMany());
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    // what better-auth sets when a refetch starts (`client/query.mjs` onRequest): error cleared, isRefetching on
+    setSession({ data: null, isPending: true, isRefetching: true, error: null });
+    expect(screen.getByRole('status').textContent).toMatch(NOTICE);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    setSession(SIGNED_IN);
+    expect(screen.queryByText(NOTICE)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it("21.240 a failure retries on its own with backoff — the server's Retry-After when a 429 gave one, 1 s doubling to a 30 s ceiling when not", () => {
@@ -194,6 +231,17 @@ describe('21.240 the notice and Try again', () => {
     setSession(SIGNED_IN);
     act(() => void vi.advanceTimersByTime(60_000));
     expect(refetch).toHaveBeenCalledTimes(2);
+
+    // the backoff RESETS on recovery: a NEW failure retries after the first step (1 s) again, not the third (4 s)
+    setSession(tooMany());
+    act(() => void vi.advanceTimersByTime(900));
+    expect(refetch).toHaveBeenCalledTimes(2);
+    act(() => void vi.advanceTimersByTime(200));
+    expect(refetch).toHaveBeenCalledTimes(3);
+
+    // a zero wait is still a wait (floor 1 s), and a huge one is capped (120 s)
+    expect(retryDelayMs(0, 0)).toBe(1000);
+    expect(retryDelayMs(0, 600_000)).toBe(120_000);
   });
 });
 
