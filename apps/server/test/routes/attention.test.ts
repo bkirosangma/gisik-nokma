@@ -551,7 +551,7 @@ function zoneSensitiveShape(response: AttentionResponse): unknown {
       ...(item.kind === 'stale'
         ? { enteredStateAt: item.enteredStateAt, daysInFlight: item.daysInFlight }
         : {}),
-      ...(item.kind === 'due-soon' ? { date: item.due.date } : {}),
+      ...(item.kind === 'due-soon' || item.kind === 'overdue' ? { date: item.due.date } : {}),
     })),
   };
 }
@@ -616,16 +616,21 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
       'In an active state since 2026-08-01 — past the 7-day staleness threshold.',
     );
 
-    // due-soon — the claim due 2026-08-25 (inside 7 days of 2026-08-20), the
-    // OVERDUE one from the 10th, and the one due on the 23rd. The terminal
-    // ticket's date and the cleared one are both inside the window too and
-    // neither is here (7.115, 7.116).
-    expect(idsOf(response, 'due-soon')).toEqual(
-      [read.world.taskInEpicId, fx.overdueId, fx.dueOn23Id].sort(),
-    );
+    // overdue — the claim from the 10th is before today (2026-08-20, IST), so
+    // it is its own kind and no longer rides in due-soon under "due within 7
+    // days" (NP-06, cases 21.242–21.243).
+    expect(idsOf(response, 'overdue')).toEqual([fx.overdueId]);
+    const late = onlyOfKind(response, 'overdue', fx.overdueId);
+    expect(late.daysOverdue).toBe(10);
+    expect(late.reason).toBe('was due 10 Aug (10 days ago)');
+
+    // due-soon — the claim due 2026-08-25 (inside 7 days of 2026-08-20) and the
+    // one due on the 23rd. The terminal ticket's date and the cleared one are
+    // both inside the window too and neither is here (7.115, 7.116).
+    expect(idsOf(response, 'due-soon')).toEqual([read.world.taskInEpicId, fx.dueOn23Id].sort());
     const soon = onlyOfKind(response, 'due-soon', read.world.taskInEpicId);
     expect(soon.windowDays).toBe(7);
-    expect(soon.reason).toBe('Needed by 2026-08-25 — due within 7 days.');
+    expect(soon.reason).toBe('due 25 Aug (in 5 days)');
     // The item carries the CLAIM — the date, who claimed it, and both clocks —
     // rather than a bare date. The server clock is asserted against what the
     // projection actually stored, so a route that invented one would be caught
@@ -641,15 +646,16 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
       serverTime: rows[0]!.claim.serverTime,
     });
 
-    // The buckets arrive in the documented order: every blocked item, then every
-    // stale one, then every due-soon one.
+    // The buckets arrive in the documented order: overdue FIRST (the most urgent
+    // thing on the strip), then every blocked item, every stale one, every
+    // due-soon one.
     expect(response.items.map((item) => item.kind)).toEqual([
+      'overdue',
       'blocked',
       'blocked',
       'stale',
       'stale',
       'stale',
-      'due-soon',
       'due-soon',
       'due-soon',
     ]);
@@ -699,7 +705,8 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // The 2-day horizon is 2026-08-22, so the 25th and the 23rd drop out and the
     // OVERDUE one stays — the positive control that keeps the empty stale bucket
     // above from passing on a route that simply answered nothing.
-    expect(idsOf(response, 'due-soon')).toEqual([fx.overdueId]);
+    expect(idsOf(response, 'due-soon')).toEqual([]);
+    expect(idsOf(response, 'overdue')).toEqual([fx.overdueId]);
     // And blocked ignores both knobs: it is a flag on a state, not a window.
     expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId, fx.openBlockedId].sort());
   });
@@ -718,9 +725,8 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(member.body).toContain(fx.overdueId);
 
     const memberStrip = member.json() as AttentionResponse;
-    expect(idsOf(memberStrip, 'due-soon')).toEqual(
-      [read.world.taskInEpicId, fx.overdueId, fx.dueOn23Id].sort(),
-    );
+    expect(idsOf(memberStrip, 'due-soon')).toEqual([read.world.taskInEpicId, fx.dueOn23Id].sort());
+    expect(idsOf(memberStrip, 'overdue')).toEqual([fx.overdueId]);
 
     // The same instant, the same window, the owner: the hidden ticket's date is
     // real and inside it. So the member's answer is the visibility predicate
@@ -728,14 +734,9 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // LENGTH does not count a ticket they cannot see.
     const owner = await strip('owner');
     expect(idsOf(owner, 'due-soon')).toEqual(
-      [
-        read.world.taskInEpicId,
-        read.world.hiddenTaskId,
-        fx.overdueId,
-        fx.dueOn23Id,
-        fx.guestDueId,
-      ].sort(),
+      [read.world.taskInEpicId, read.world.hiddenTaskId, fx.dueOn23Id, fx.guestDueId].sort(),
     );
+    expect(idsOf(owner, 'overdue')).toEqual([fx.overdueId]);
     const hidden = onlyOfKind(owner, 'due-soon', read.world.hiddenTaskId);
     expect(hidden.due.date).toBe('2026-08-21');
   });
@@ -779,7 +780,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(rows[0]!.claim!.value).toBeNull();
     expect(rows[0]!.claim!.actorId).toBe(read.world.member);
     // And the twin that kept its date, seeded the same way, IS in the bucket.
-    expect(idsOf(response, 'due-soon')).toContain(fx.overdueId);
+    expect(idsOf(response, 'overdue')).toContain(fx.overdueId);
   });
 
   it('7.121 the blocked flag is keyed by WORKFLOW and state — two tickets in a state id spelled the same way, one flagged and one not', async () => {
@@ -885,15 +886,17 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     // 18:29:59.999Z is still 2026-08-20 in India, horizon 2026-08-22, so a claim
     // due on the 23rd is outside the window.
     const justBefore = await readAt('member', '2026-08-20T18:29:59.999Z');
-    expect(idsOf(justBefore, 'due-soon')).toEqual([fx.overdueId]);
+    expect(idsOf(justBefore, 'due-soon')).toEqual([]);
+    expect(idsOf(justBefore, 'overdue')).toEqual([fx.overdueId]);
 
     // One millisecond later it is 2026-08-21 in India, horizon 2026-08-23, and
     // the same claim is inside. Both instants sit on the SAME UTC day, so
     // UTC-based math cannot tell these two reads apart at all.
     const justAfter = await readAt('member', '2026-08-20T18:30:00.000Z');
-    expect(idsOf(justAfter, 'due-soon')).toEqual([fx.overdueId, fx.dueOn23Id].sort());
+    expect(idsOf(justAfter, 'due-soon')).toEqual([fx.dueOn23Id]);
+    expect(idsOf(justAfter, 'overdue')).toEqual([fx.overdueId]);
     const later = await readAt('member', '2026-08-20T18:31:00.000Z');
-    expect(idsOf(later, 'due-soon')).toEqual([fx.overdueId, fx.dueOn23Id].sort());
+    expect(idsOf(later, 'due-soon')).toEqual([fx.dueOn23Id]);
 
     expect(justBefore.generatedAt.slice(0, 10)).toBe(justAfter.generatedAt.slice(0, 10));
     expect(justBefore.generatedAt.slice(0, 10)).toBe('2026-08-20');

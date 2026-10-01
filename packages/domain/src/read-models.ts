@@ -664,7 +664,12 @@ export type AttentionItem =
       thresholdDays: number;
       reason: string;
     }
-  | { kind: 'due-soon'; card: TicketCard; due: DueDateClaim; windowDays: number; reason: string };
+  | { kind: 'due-soon'; card: TicketCard; due: DueDateClaim; windowDays: number; reason: string }
+  /**
+   * A live due-date claim on a day BEFORE today (IST). `daysOverdue` is the IST
+   * day count (1 = yesterday); today itself is `due-soon`, not this (NP-06).
+   */
+  | { kind: 'overdue'; card: TicketCard; due: DueDateClaim; daysOverdue: number; reason: string };
 
 /**
  * The attention strip, as the server computes it at `generatedAt` and never
