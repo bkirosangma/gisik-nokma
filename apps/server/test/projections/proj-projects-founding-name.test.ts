@@ -129,6 +129,63 @@ describe('13.1616 the migration backfills founding_name from each project’s pr
   });
 });
 
+describe('13.1618 the backfill takes the FIRST project.created by seq', () => {
+  it('a project with two founding claims backfills to the LOWER-seq name, and a rebuild agrees', async () => {
+    const { up, down } = halves();
+    const twice = newUlid();
+    const once = newUlid();
+    // Nothing at the door refuses a second `project.created` (fresh event id)
+    // for an already-founded project, so a ledger can hold two. The projection
+    // is first-writer-wins (`ON CONFLICT DO NOTHING`) and a rebuild replays by
+    // seq: the backfill must pick the same claim or `verify-projections` drifts.
+    const first = created(twice, 'Alpha');
+    const second = created(twice, 'Gamma');
+    expect(first.seq).toBeLessThan(second.seq);
+    const client = await db.pool.connect();
+    try {
+      for (const event of [first, second, updated(twice, 'Beta'), created(once, 'Delta')]) {
+        await insertEvent(client, event);
+      }
+    } finally {
+      client.release();
+    }
+
+    // The pre-migration row exactly as the projection wrote it: the first
+    // claim's name, then renamed.
+    await db.pool.query(down);
+    await db.pool.query(
+      `INSERT INTO proj_projects (project_id, workspace_id, name, created_by, created_at)
+       VALUES ($1, $3, 'Beta',  'seed', now()),
+              ($2, $3, 'Delta', 'seed', now())`,
+      [twice, once, WS],
+    );
+    await db.pool.query(up);
+
+    const { rows } = await db.pool.query<{ project_id: string; founding_name: string }>(
+      'SELECT project_id, founding_name FROM proj_projects WHERE project_id = ANY($1)',
+      [[twice, once]],
+    );
+    const byId = new Map(rows.map((r) => [r.project_id, r.founding_name]));
+    // CONTROL, same `it`: a project with ONE claim backfills to that claim's
+    // name, so the Alpha answer is the ORDER being read, not a lucky pick.
+    expect(byId.get(once)).toBe('Delta');
+    expect(byId.get(twice)).toBe('Alpha');
+
+    // Bonus: the rebuild (first writer wins) lands on the same value, and the
+    // verifier finds the backfilled live table equal to it.
+    const projections = buildProjectionRegistry();
+    for (const projection of projections.all()) {
+      await rebuildProjection(projection.name, { pool: db.pool, projections });
+    }
+    const rebuilt = await db.pool.query(
+      'SELECT founding_name FROM proj_projects WHERE project_id = $1',
+      [twice],
+    );
+    expect(rebuilt.rows).toEqual([{ founding_name: 'Alpha' }]);
+    expect(await verifyProjections({ pool: db.pool, projections })).toEqual({ clean: true, diffs: [] });
+  });
+});
+
 describe('13.1617 verify-projections stays green after a rename, and founding_name is reproducible', () => {
   it('created → updated rebuilds to the same table, with founding_name still the founding name', async () => {
     const projectId = newUlid();
@@ -154,5 +211,42 @@ describe('13.1617 verify-projections stays green after a rename, and founding_na
     const report = await verifyProjections({ pool: db.pool, projections });
     expect(report.clean).toBe(false);
     expect(report.diffs.map((diff) => diff.table)).toEqual(['proj_projects']);
+  });
+});
+
+describe('13.1619 the migration does not fail a deploy on a row no project.created made', () => {
+  it('a proj_projects row with NO ledger event completes the migration and takes its own name', async () => {
+    const { up, down } = halves();
+    const orphan = newUlid();
+    const normal = newUlid();
+    const client = await db.pool.connect();
+    try {
+      await insertEvent(client, created(normal, 'Alpha'));
+    } finally {
+      client.release();
+    }
+
+    await db.pool.query(down);
+    await db.pool.query(
+      `INSERT INTO proj_projects (project_id, workspace_id, name, created_by, created_at)
+       VALUES ($1, $3, 'Renamed', 'seed', now()),
+              ($2, $3, 'Orphan',  'seed', now())`,
+      [normal, orphan, WS],
+    );
+    // Without the fallback line, `SET NOT NULL` throws here and the deploy dies.
+    await expect(db.pool.query(up)).resolves.toBeDefined();
+
+    const { rows } = await db.pool.query<{ project_id: string; name: string; founding_name: string }>(
+      'SELECT project_id, name, founding_name FROM proj_projects WHERE project_id = ANY($1)',
+      [[normal, orphan]],
+    );
+    const byId = new Map(rows.map((r) => [r.project_id, r]));
+    // CONTROL, same `it`: the row WITH an event still backfills from the event
+    // (not from its renamed `name`), so the fallback is confined to the orphan.
+    expect(byId.get(normal)).toMatchObject({ name: 'Renamed', founding_name: 'Alpha' });
+    expect(byId.get(orphan)).toMatchObject({ name: 'Orphan', founding_name: 'Orphan' });
+
+    // Not a state a rebuild reproduces — leave none behind for the verifier.
+    await db.pool.query('DELETE FROM proj_projects WHERE project_id = $1', [orphan]);
   });
 });
