@@ -1160,23 +1160,23 @@ control that silently does nothing is indistinguishable from one that worked.
   **The door's VERB branches (E4-34, 2026-09-21):** it read a bare `Edit ${type.name}` for everyone, so a
   person the read-only banner directly above the list addresses — *"You can look, not touch"* — heard
   `Edit Invoice` five times over. The verb is now `canAuthor ? 'Edit' : 'Open'`, which is the branch the
-  same file already makes for the banner and for the reorder gate. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  same file already makes for the banner and for the reorder gate. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the pair is gone — a CUSTOM row carries one `Reorder <name>` control (a sibling of the door), a built-in none.
 - ✅ **13.929 — the ends are disabled, asserted on the RENDERED control, and the same test names a control
   that is NOT disabled.** The first row's ↑ and the last row's ↓ are `toBeDisabled()`; the movable control
   (`Invoice`, between a built-in and a custom type) is `toBeEnabled()`. The second half is not decoration —
   a screen that disabled every control would satisfy the first half perfectly, which is this repo's
-  "check that cannot fail" shape. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  "check that cannot fail" shape. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the ends are the `Move up` / `Move down` items in the Reorder menu; a built-in row has no control to disable.
 - ✅ **13.930 — a swap submits two `ticket-type.defined` events through the EXISTING door, exchanging the
   two ranks.** Asserted on the submitted payloads' `rank` values — a computed value, not the presence of a
   call — plus the two `id`s and `fields` carried through untouched, because this is a re-rank and not a
-  redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the swap is driven from the Reorder menu's `Move down`; the two events are unchanged.
 - ✅ **13.931 — the arrow that would move a built-in is disabled, read from BOTH sides, and it SAYS WHY to
   a reader who cannot hover it.** `Invoice`'s ↑ (pointing at the built-in above it) and the last built-in's
   ↓ (pointing at the custom type below it, but itself a built-in) are both disabled. **Amended
   2026-09-21 (T-P32):** the reason was in `title` on the disabled control, which a disabled button is out
   of the focus order for — so it reached a mouse user who hovered and nobody else. It is now also attached
   via `aria-describedby`, and the case asserts the attribute resolves to a node carrying the sentence.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** a built-in carries no control at all; the blocked menu item for a custom row beside a built-in is disabled and says why in text.
 - ✅ **13.932 — a server refusal is displayed with its reason rather than silently doing nothing.** Seeded
   as two refused `IngestResult`s; the server's own sentence reaches the reader through a `role="alert"`,
   and the list does not re-order for a swap whose ranks did not change.
@@ -1202,7 +1202,7 @@ control that silently does nothing is indistinguishable from one that worked.
   **The case's own first draft was a check that could not fail** — it waited on `Move Invoice up`, which
   is disabled in *every* state because a built-in sits above it, so `waitFor` returned instantly and
   asserted nothing. It now waits on `Move Invoice down`, which is enabled before the click and disabled
-  only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the in-flight guard is read from the Reorder menu's items (reopened mid-swap they are disabled with "A reorder is already in flight.").
 
 ### Task 8 — the ticket-type list's `"N tickets"` count (2026-09-19)
 

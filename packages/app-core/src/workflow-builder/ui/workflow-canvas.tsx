@@ -2,8 +2,10 @@ import { useCallback, useMemo } from 'react';
 import {
   Background,
   MarkerType,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Connection,
   type Node,
 } from '@xyflow/react';
@@ -18,11 +20,21 @@ import { TransitionEdge } from './transition-edge.js';
 const NODE_TYPES = { state: StateNode, anyState: AnyStateNode };
 const EDGE_TYPES = { transition: TransitionEdge };
 
+/**
+ * UX fixes T10 (WF-02, 23.175): the lowest zoom a fit may reach. React Flow's own default floor (0.5) also caps
+ * `fitView`, so a graph wider than the canvas opened cropped — the E4-20 floor of 1:1 below traded "the whole
+ * graph is visible" for "no control is drawn smaller than its CSS". The audit's reading wins: the canvas opens
+ * on the WHOLE graph, and the "Fit to screen" control brings it back after the reader has panned or zoomed.
+ */
+const FIT_MIN_ZOOM = 0.25;
+const FIT_OPTIONS = { minZoom: FIT_MIN_ZOOM, padding: 0.1 };
+
 function CanvasInner() {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   const draft = useDraft();
   const summaryCtx = useSummaryCtx();
+  const { fitView } = useReactFlow();
   const { nodes, edges } = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
 
   const onConnect = useCallback(
@@ -54,18 +66,25 @@ function CanvasInner() {
         nodesConnectable={canAuthor}
         nodesDraggable
         elementsSelectable
+        // `fitView` runs ONCE, when the canvas opens — never again on an edit, so the reader's own zoom
+        // and pan survive every change (23.175's control). E4-20 had floored the fit at 1:1 (`minZoom: 1`)
+        // so no control was drawn smaller than its CSS; that opened wide graphs cropped (WF-02), so the
+        // floor is lowered and `minZoom` is passed to the instance too, which otherwise caps the fit at 0.5.
         fitView
-        // E4-20: `fitView` alone shrinks BELOW 1:1 whenever the graph is
-        // wider than the canvas — measured 0.745 at 1512px, 0.52 at 390px —
-        // which paints every control on a state node (the 44px Blocked
-        // checkbox included) smaller than it is declared. `minZoom: 1` floors
-        // the fit at 1:1: a graph that overflows the canvas is panned and
-        // scrolled into, never shrunk to fit, so on-screen controls are never
-        // smaller than their own CSS says.
-        fitViewOptions={{ minZoom: 1 }}
+        minZoom={FIT_MIN_ZOOM}
+        fitViewOptions={FIT_OPTIONS}
         defaultEdgeOptions={{ type: 'transition', markerEnd: { type: MarkerType.ArrowClosed } }}
       >
         <Background />
+        <Panel position="bottom-left">
+          <button
+            type="button"
+            className="gn-workflow-canvas__fit"
+            onClick={() => void fitView({ ...FIT_OPTIONS, duration: 200 })}
+          >
+            Fit to screen
+          </button>
+        </Panel>
       </ReactFlow>
     </div>
   );

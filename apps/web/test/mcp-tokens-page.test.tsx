@@ -153,12 +153,12 @@ describe('14.97 the list shows what is honestly available', () => {
     // measured, it did not: removing `timeZone: 'Asia/Kolkata'` left this case
     // green, because THIS RUNNER IS ALREADY IN IST and the ambient default
     // agreed. The options object is what makes the claim falsifiable anywhere.
-    expect(screen.getByText(/Approved 8 Sept 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Created 8 Sept 2026/)).toBeInTheDocument();
     expect(zone.mock.calls[0]?.[1]).toMatchObject({ timeZone: 'Asia/Kolkata' });
     // `mcp_tokens` stores only sha256(token). A row that printed the id would
     // be showing a hash while implying it had the credential.
     expect(document.body.textContent ?? '').not.toContain(ID);
-    expect(screen.getByRole('button', { name: 'Revoke' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revoke this token' })).toBeInTheDocument();
   });
 
   it('says where a connection comes from when there are none', async () => {
@@ -280,8 +280,8 @@ describe('14.103 last used', () => {
 
     // Both halves, in one case, because either alone passes for a component
     // that renders one string unconditionally.
-    expect(screen.getByText('Never used')).toBeInTheDocument();
-    expect(screen.getByText('Last used 8 Sept 2026')).toBeInTheDocument();
+    expect(screen.getByText('Created 8 Sept 2026 · never used')).toBeInTheDocument();
+    expect(screen.getByText('Created 6 Sept 2026 · last used 8 Sept 2026')).toBeInTheDocument();
   });
 });
 
@@ -313,7 +313,7 @@ describe('D — naming a connection from the row', () => {
     expect(screen.getByRole('button', { name: /^Rename the connection/ })).toBeInTheDocument();
   });
 
-  it('16.11 a connection nobody named draws no name element, and the control says Name', async () => {
+  it('16.11 a connection nobody named draws no name element, and the control says Add a name', async () => {
     fetchStub(rowScript(null));
     mount();
     await screen.findByTestId('mcp-tokens-list');
@@ -322,7 +322,7 @@ describe('D — naming a connection from the row', () => {
     // a text assertion, because an empty span has no text to assert against and
     // would pass every content-shaped check.
     expect(list.querySelector('.gn-mcp-tokens__name')).toBeNull();
-    expect(screen.getByRole('button', { name: /^Name the connection/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Add a name to the connection/ })).toBeInTheDocument();
   });
 
   it('16.12 sends the draft AS TYPED, to the token it belongs to, and re-reads the list', async () => {
@@ -412,16 +412,16 @@ describe('14.274 hosted connections beside the local tokens', () => {
     hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN, { ...CONN, id: 'conn_2', clientName: 'ChatGPT', redirectHost: 'chatgpt.com', lastUsedAt: null }] } };
     fetchStub(tokensOnly([LOCAL]));
     mount();
-    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
-    expect(screen.getByText('ChatGPT · chatgpt.com')).toBeInTheDocument();
+    expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument();
+    expect(screen.getByText('ChatGPT (chatgpt.com)')).toBeInTheDocument();
     const list = screen.getByTestId('mcp-connections-list');
     expect(list).toHaveTextContent(/Connected .*2026/);
     expect(list).toHaveTextContent(/Last used .*2026/);
     expect(list).toHaveTextContent('Never used');
     const disconnect = screen.getByTestId('mcp-connections-disconnect-conn_1');
-    expect(disconnect).toHaveTextContent('Disconnect'); // the visible label, not only the accessible name
+    expect(disconnect).toHaveTextContent('Disconnect Claude'); // the visible label, not only the accessible name
     expect(screen.getByRole('button', { name: 'Disconnect Claude (claude.ai)' })).toBeInTheDocument();
-    expect(screen.getByTestId(`mcp-tokens-revoke-${ID}`)).toHaveTextContent('Revoke'); // CONTROL — the local row is unchanged
+    expect(screen.getByTestId(`mcp-tokens-revoke-${ID}`)).toHaveTextContent('Revoke this token'); // CONTROL — the local row is unchanged
     expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
   });
 
@@ -438,7 +438,7 @@ describe('14.274 zero local tokens, live hosted connections', () => {
     hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
     fetchStub(tokensOnly([]));
     mount();
-    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument(); // both reads have landed
+    expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument(); // both reads have landed
     await waitFor(() => expect(calls.some((c) => c.method === 'GET')).toBe(true));
     expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
     expect(screen.queryByText(/No assistants are connected/)).toBeNull();
@@ -461,10 +461,10 @@ describe('14.275 Disconnect', () => {
     const button = await screen.findByTestId('mcp-connections-disconnect-conn_1');
     await userEvent.setup().click(button);
     await waitFor(() => expect(hostedCalls.some((c) => c.method === 'DELETE' && c.url === '/v1/me/mcp-connections/conn_1')).toBe(true));
-    expect(screen.getByText('Claude · claude.ai')).toBeInTheDocument(); // CONTROL — still there mid-request
+    expect(screen.getByText('Claude (claude.ai)')).toBeInTheDocument(); // CONTROL — still there mid-request
     expect(screen.getByTestId('mcp-connections-disconnect-conn_1')).toHaveTextContent('Disconnecting…');
     release({ status: 204 });
-    await waitFor(() => expect(screen.queryByText('Claude · claude.ai')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('Claude (claude.ai)')).toBeNull());
   });
 
   it('shows the server\'s reason when the DELETE fails, and keeps the row', async () => {
@@ -474,7 +474,7 @@ describe('14.275 Disconnect', () => {
     mount();
     await userEvent.setup().click(await screen.findByTestId('mcp-connections-disconnect-conn_1'));
     expect(await screen.findByTestId('mcp-tokens-refused')).toHaveTextContent('The server could not disconnect that right now.');
-    expect(screen.getByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(screen.getByText('Claude (claude.ai)')).toBeInTheDocument();
   });
 });
 
@@ -525,7 +525,7 @@ describe('14.277 the two lists are read independently', () => {
     fetchStub((call) => (call.method === 'GET' ? { status: 500, body: {} } : { status: 204 }));
     mount();
     expect(await screen.findByTestId('mcp-tokens-failed')).toBeInTheDocument();
-    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument();
     expect(screen.queryByTestId('mcp-connections-failed')).toBeNull();
   });
 
@@ -566,9 +566,49 @@ describe('14.277 the two lists are read independently', () => {
     hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
     fetchStub(tokensOnly([LOCAL]));
     mount();
-    expect(await screen.findByText('Claude · claude.ai')).toBeInTheDocument();
+    expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument();
     expect(screen.getByTestId('mcp-tokens-list')).toBeInTheDocument();
     expect(screen.queryByTestId('mcp-connections-failed')).toBeNull();
   });
 });
 
+
+/**
+ * UX fixes T10 (FD1 / audit SET-02) — a row says what it IS in words, and never offers a button whose
+ * visible text is the bare noun "Name".
+ */
+describe('23.170 a connected-assistant row speaks plainly', () => {
+  it('23.170 a token row reads "Assistant connected with a token", Created · last used, and "Revoke this token"; a hosted row reads "<app> (<host>)" with "Disconnect <app>"; no button reads "Name"', async () => {
+    hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
+    fetchStub(
+      tokensOnly([
+        { id: ID, name: null, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null },
+        { id: OTHER, name: 'Claude Desktop — Anjali', createdAt: '2026-09-06T10:00:00.000Z', lastUsedAt: '2026-09-07T19:52:00.000Z' },
+      ]),
+    );
+    mount();
+    await screen.findByTestId('mcp-connections-list');
+    const tokens = screen.getByTestId('mcp-tokens-list');
+    const unnamed = tokens.querySelectorAll('li')[0]!;
+    expect(unnamed).toHaveTextContent('Assistant connected with a token');
+    expect(unnamed).toHaveTextContent('Created 8 Sept 2026 · never used');
+    expect(screen.getAllByRole('button', { name: 'Revoke this token' })).toHaveLength(2);
+    const named = tokens.querySelectorAll('li')[1]!;
+    expect(named).toHaveTextContent('Created 6 Sept 2026 · last used 8 Sept 2026');
+
+    const hostedRow = screen.getByTestId('mcp-connections-list');
+    expect(hostedRow).toHaveTextContent('Claude (claude.ai)');
+    expect(screen.getByTestId('mcp-connections-disconnect-conn_1')).toHaveTextContent('Disconnect Claude');
+
+    // NO ROW'S VISIBLE BUTTON TEXT IS "Name" — the unnamed token's control says what it does.
+    const visible = [...document.querySelectorAll('.gn-mcp-tokens__row button')].map((b) => (b.textContent ?? '').trim());
+    expect(visible).not.toContain('Name');
+    expect(visible).toContain('Add a name');
+
+    // CONTROL — the named row's own control and the generic line's absence: a NAMED token keeps its name
+    // line and does not also claim to be an anonymous one.
+    expect(visible).toContain('Rename');
+    expect(named).toHaveTextContent('Claude Desktop — Anjali');
+    expect(named).not.toHaveTextContent('Assistant connected with a token');
+  });
+});

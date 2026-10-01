@@ -1624,6 +1624,8 @@ input, textarea, select { font-family: inherit; }
 .gn-invitations__failure { margin: 1.1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
+/* UX fixes T10 (ENT-04): the dead link's headline — the card's own h1, at the heading size the other cards' titles use. */
+.gn-invite__dead-title { margin: 0; font-size: 1.5rem; font-weight: 700; }
 /* The invite accept card on a phone (mobile-web plan Task 12, case 21.191): the card already fills the
    shell's width, so what changes is the action — "Join <workspace>" (and the unreachable state's
    Retry) is a full-width 3rem target. The variant stays the page's: `primary`. */
@@ -2809,6 +2811,10 @@ input, textarea, select { font-family: inherit; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
+/* UX fixes T10 (ENT-01, 23.172): the "Send magic link" primary is full width at EVERY width, the base rule — it sits in a
+   bare <form>, so as an inline-flex it shrank to its label while the passkey button below it (a flex-column child, stretched)
+   ran the card's width. Same width as the passkey button, so the primary is never the narrower of the two. */
+.gn-sign-in__method-form .gn-button { display: flex; width: 100%; justify-content: center; }
 
 /* ── The vendor marks. Icon-only controls, and the size is not decorative. ──
 
@@ -3574,7 +3580,10 @@ input, textarea, select { font-family: inherit; }
    bold name, then the token's own facts in muted text beneath it. It inherits
    `__when`'s column and gap, so a named row gains one line and an unnamed one
    gains none — no empty span, per the render's own comment. */
-.gn-mcp-tokens__name { font-weight: 600; }
+/* UX fixes T10 (23.170): an unnamed token's first line (`__generic`) carries the same weight, so a row never
+   leads with its date. */
+.gn-mcp-tokens__name,
+.gn-mcp-tokens__generic { font-weight: 600; }
 /* The inline naming form, drawn in the row's action slot while one row is being
    renamed. `flex-wrap` and `align-items: flex-end` are `.gn-project-founding`'s
    own pair, for the same reason: the input and its buttons are a single row at

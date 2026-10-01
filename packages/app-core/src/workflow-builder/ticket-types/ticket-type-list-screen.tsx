@@ -1,6 +1,6 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
-import { Button, Card } from '@gisik-nokma/ui';
+import { Button, Card, Popover } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -285,26 +285,24 @@ export function TicketTypeListScreen(props: {
    * new gateway op — the same door the editor's own `"Hierarchy rank"` field
    * uses (`ticket-type-editor-screen.tsx:283-309`).
    */
-  async function moveType(index: number, delta: -1 | 1): Promise<void> {
-    const target = index + delta;
-    const moving = orderedTypes[index]!;
-    const other = orderedTypes[target]!;
+  async function moveType(index: number, target: number): Promise<void> {
+    // The span the move touches: every type from the nearer end to the farther. The moved type takes
+    // the slot at `target`; each type between slides one place toward where it was, and the SLOTS'
+    // ranks stay where they are — so the ranks held by the span are only re-dealt, never invented.
+    const lo = Math.min(index, target);
+    const hi = Math.max(index, target);
+    const span = orderedTypes.slice(lo, hi + 1);
+    const ranks = span.map((type) => type.rank);
+    const reordered = span.filter((type) => type.id !== orderedTypes[index]!.id);
+    reordered.splice(target - lo, 0, orderedTypes[index]!);
+    const next = reordered.map((type, offset) => ({ ...type, rank: ranks[offset]! }));
     setReorderPending(true);
     try {
-      const results = await gateway.submit([
-        buildTicketTypeDefinedEvent({
-          workspaceId,
-          actorId: props.session.userId,
-          origin: 'web',
-          def: { ...moving, rank: other.rank },
-        }),
-        buildTicketTypeDefinedEvent({
-          workspaceId,
-          actorId: props.session.userId,
-          origin: 'web',
-          def: { ...other, rank: moving.rank },
-        }),
-      ]);
+      const results = await gateway.submit(
+        next.map((def) =>
+          buildTicketTypeDefinedEvent({ workspaceId, actorId: props.session.userId, origin: 'web', def }),
+        ),
+      );
       const refusal = results.find((result) => result.status === 'refused');
       if (refusal !== undefined && refusal.status === 'refused') {
         setReorderRefusal({ rule: refusal.rule, reason: refusal.reason });
@@ -325,22 +323,24 @@ export function TicketTypeListScreen(props: {
       // as it is NOW, never against the render-scope `orderedTypes` snapshot this
       // click was born in. Applying a snapshot is what let a second click inside
       // the round-trip overwrite the first swap's result.
+      const committed = new Map(next.map((type) => [type.id, type.rank]));
       setTypes((previous) =>
         previous === null
           ? null
           : previous
-              .map((type) =>
-                type.id === moving.id
-                  ? { ...type, rank: other.rank }
-                  : type.id === other.id
-                    ? { ...type, rank: moving.rank }
-                    : type,
-              )
+              .map((type) => (committed.has(type.id) ? { ...type, rank: committed.get(type.id)! } : type))
               .sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
       );
     } finally {
       setReorderPending(false);
     }
+  }
+
+  /** Where "Move to top" goes: the first slot of the unbroken run of custom types ending at `index`. */
+  function topOfCustomRun(index: number): number {
+    let top = index;
+    while (top > 0 && !builtinIds.has(orderedTypes[top - 1]!.id)) top -= 1;
+    return top;
   }
   /**
    * The `"N tickets"` meta segment, LAST in the line — which is where the
@@ -397,65 +397,6 @@ export function TicketTypeListScreen(props: {
         <ul className="ticket-type-list__rows">
           {types.map((type, index) => (
             <li key={type.id}>
-              {canAuthor ? (
-                // SIBLINGS of the row, never children: the whole row is one
-                // `<button>` (`:387-416`, the row-as-door ruling), and a button
-                // inside a button is an invalid tree jsdom renders without
-                // complaint — so the controls sit beside the door.
-                <span className="ticket-type-list__reorder">
-                  <button
-                    type="button"
-                    className="ticket-type-list__move"
-                    aria-label={`Move ${type.name} up`}
-                    /*
-                      WHY A BLOCKED MOVE IS DISABLED, made reachable. These two
-                      controls explain themselves through `title` on a DISABLED
-                      button — out of the focus order, so the sentence reached
-                      only a mouse user who hovered. `aria-describedby` attaches
-                      the same words to the control wherever it is reached; the
-                      `title` stays for the hovering reader. The id carries the
-                      TYPE's id because this component renders one control pair
-                      per row and a shared id would point every row at the
-                      first row's sentence.
-                    */
-                    aria-describedby={
-                      moveBlocker(index, -1) === null ? undefined : `${reorderReasonId}-up-${type.id}`
-                    }
-                    title={moveBlocker(index, -1) ?? `Move ${type.name} up`}
-                    disabled={moveBlocker(index, -1) !== null}
-                    onClick={() => {
-                      void moveType(index, -1);
-                    }}
-                  >
-                    <span aria-hidden="true">↑</span>
-                    {moveBlocker(index, -1) !== null && (
-                      <span id={`${reorderReasonId}-up-${type.id}`} style={VISUALLY_HIDDEN}>
-                        {moveBlocker(index, -1)}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="ticket-type-list__move"
-                    aria-label={`Move ${type.name} down`}
-                    aria-describedby={
-                      moveBlocker(index, 1) === null ? undefined : `${reorderReasonId}-down-${type.id}`
-                    }
-                    title={moveBlocker(index, 1) ?? `Move ${type.name} down`}
-                    disabled={moveBlocker(index, 1) !== null}
-                    onClick={() => {
-                      void moveType(index, 1);
-                    }}
-                  >
-                    <span aria-hidden="true">↓</span>
-                    {moveBlocker(index, 1) !== null && (
-                      <span id={`${reorderReasonId}-down-${type.id}`} style={VISUALLY_HIDDEN}>
-                        {moveBlocker(index, 1)}
-                      </span>
-                    )}
-                  </button>
-                </span>
-              ) : null}
               <button
                 type="button"
                 className="ticket-type-list__row"
@@ -486,6 +427,24 @@ export function TicketTypeListScreen(props: {
                 </span>
                 {builtinIds.has(type.id) ? <span className="ticket-type-list__badge">Built-in</span> : null}
               </button>
+              {canAuthor && !builtinIds.has(type.id) ? (
+                // A SIBLING of the row door, never a child: the whole row is one `<button>` (the row-as-door
+                // ruling), and a button inside a button is an invalid tree jsdom renders without complaint.
+                // UX fixes T10 (SET-03): one "Reorder" door on a CUSTOM row, after the door so every row's
+                // door starts at the same left edge; a built-in is rank-locked and carries no control at all.
+                <span className="ticket-type-list__reorder">
+                  <ReorderMenu
+                    name={type.name}
+                    typeId={type.id}
+                    reasonId={reorderReasonId}
+                    upBlocker={moveBlocker(index, -1)}
+                    downBlocker={moveBlocker(index, 1)}
+                    onUp={() => void moveType(index, index - 1)}
+                    onDown={() => void moveType(index, index + 1)}
+                    onTop={() => void moveType(index, topOfCustomRun(index))}
+                  />
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -510,5 +469,68 @@ export function TicketTypeListScreen(props: {
         </p>
       </Card>
     </section>
+  );
+}
+
+/**
+ * The "Reorder" menu on a custom row (UX fixes T10, SET-03, case 23.171): Move up / Move down / Move to top
+ * in the shared `Popover`. A blocked item stays disabled and says why in words — a visually-hidden reason the
+ * button points at, plus the `title` for a hovering reader (the pair the arrows carried).
+ */
+function ReorderMenu(props: {
+  name: string;
+  typeId: string;
+  reasonId: string;
+  upBlocker: string | null;
+  downBlocker: string | null;
+  onUp: () => void;
+  onDown: () => void;
+  onTop: () => void;
+}): ReactNode {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const item = (key: 'up' | 'down' | 'top', label: string, blocker: string | null, run: () => void): ReactNode => (
+    <>
+      <button
+        type="button"
+        className="ticket-type-list__menu-item"
+        disabled={blocker !== null}
+        aria-describedby={blocker === null ? undefined : `${props.reasonId}-${key}-${props.typeId}`}
+        title={blocker ?? label}
+        onClick={() => {
+          setOpen(false);
+          run();
+        }}
+      >
+        {label}
+      </button>
+      {blocker !== null && (
+        <span id={`${props.reasonId}-${key}-${props.typeId}`} style={VISUALLY_HIDDEN}>
+          {blocker}
+        </span>
+      )}
+    </>
+  );
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="ticket-type-list__move"
+        aria-label={`Reorder ${props.name}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        Reorder
+      </button>
+      <Popover triggerRef={triggerRef} open={open} onClose={() => setOpen(false)} aria-label={`Reorder ${props.name}`}>
+        <div className="ticket-type-list__menu">
+          {item('up', 'Move up', props.upBlocker, props.onUp)}
+          {item('down', 'Move down', props.downBlocker, props.onDown)}
+          {item('top', 'Move to top', props.upBlocker, props.onTop)}
+        </div>
+      </Popover>
+    </>
   );
 }
