@@ -37,6 +37,8 @@ const HEIGHT: Record<string, number> = { tk_a: 96, tk_c: 180, tk_m: 120, tk_z: 1
 const GAP = 8;
 const COLUMN_TOP = 100;
 const COLUMN_LEFT: Record<string, number> = { todo: 0, doing: 300, done: 600 };
+/** What a SLOT carries beyond its card, by ticket (a returned card's refusal notice sits under it, inside the `<li>`). Empty unless a case plants some. */
+const BELOW_CARD: Record<string, number> = {};
 
 /** Ticket ids sort as text, so To do's order is a < c < m < z and a card lands in Doing by that order (b, d there). */
 const TODO = ['tk_a', 'tk_c', 'tk_m', 'tk_z'];
@@ -87,7 +89,7 @@ const ticketOf = (element: Element): string | undefined => {
 /** What a list child takes up: a card its own height, the drop placeholder what its inline style asks for. */
 function extentOf(child: Element): number {
   const ticket = ticketOf(child);
-  if (ticket !== undefined) return HEIGHT[ticket] ?? 0;
+  if (ticket !== undefined) return (HEIGHT[ticket] ?? 0) + (BELOW_CARD[ticket] ?? 0);
   if (child.classList.contains('gn-board__drop-placeholder')) return parseFloat((child as HTMLElement).style.height);
   return 0;
 }
@@ -110,7 +112,7 @@ function plantLayout(): void {
     const column = (element: Element) =>
       element.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
     const own = ticketOf(this);
-    if (this.tagName === 'LI' && own !== undefined) return rect(COLUMN_LEFT[column(this)] ?? 0, topOf(this), HEIGHT[own] ?? 0);
+    if (this.tagName === 'LI' && own !== undefined) return rect(COLUMN_LEFT[column(this)] ?? 0, topOf(this), (HEIGHT[own] ?? 0) + (BELOW_CARD[own] ?? 0));
     // The card inside a slot (what `dragstart` measures for the placeholder): the slot's own box.
     const slot = this.parentElement;
     const inner = slot !== null && ticketOf(slot) !== undefined && slot.firstElementChild === this ? ticketOf(slot) : undefined;
@@ -122,6 +124,7 @@ function plantLayout(): void {
 /** A fresh board on the fixture layout — a second scenario in the same `it` is a CONTROL, not a leftover of the first. */
 async function scenario(ingest: IngestScript) {
   cleanup();
+  for (const id of Object.keys(BELOW_CARD)) delete BELOW_CARD[id];
   vi.restoreAllMocks();
   Element.prototype.scrollIntoView = scrollIntoView;
   await mount(ingest);
@@ -213,6 +216,34 @@ describe('20.410 the drop placeholder is exactly the DRAGGED card’s measured h
       fireEvent.dragEnd(slotOf(ticketId), { dataTransfer });
       expect(within(columnOf('doing')).queryByTestId(PLACEHOLDER_OF('doing'))).toBeNull();
     }
+  });
+});
+
+describe('20.416 the placeholder is the CARD’s height, not its slot’s', () => {
+  it('20.416 a slot 40px taller than its card (a refusal notice under it) still opens a placeholder of the CARD’s 180px (CONTROL: with no notice, the same card gives the same height)', async () => {
+    // Mutation: measure the slot (`event.currentTarget`) instead of the card inside it in the drag-begin handler.
+    const placeholderFor = async (ticketId: string) => {
+      const dataTransfer = dragData();
+      fireAt('dragStart', slotOf(ticketId), dataTransfer);
+      fireEvent.dragEnter(columnOf('doing'), { dataTransfer });
+      fireEvent.dragOver(columnOf('doing'), { dataTransfer });
+      const height = screen.getByTestId(PLACEHOLDER_OF('doing')).style.height;
+      fireEvent.dragEnd(slotOf(ticketId), { dataTransfer });
+      return height;
+    };
+    await scenario(never);
+    // CONTROL — slot and card report the same box: the card's height.
+    expect(slotOf('tk_c').getBoundingClientRect().height).toBe(measuredHeight('tk_c'));
+    expect(await placeholderFor('tk_c')).toBe(px(HEIGHT.tk_c!));
+
+    // The notice makes the slot taller than the card; the placeholder is still the card's.
+    const NOTICE = 40;
+    BELOW_CARD.tk_c = NOTICE;
+    BELOW_CARD.tk_a = NOTICE;
+    expect(slotOf('tk_c').getBoundingClientRect().height, 'the fixture slot is taller than its card').toBe(HEIGHT.tk_c! + NOTICE);
+    expect(measuredHeight('tk_c')).toBe(HEIGHT.tk_c);
+    expect(await placeholderFor('tk_c')).toBe(px(HEIGHT.tk_c!));
+    expect(await placeholderFor('tk_a')).toBe(px(HEIGHT.tk_a!));
   });
 });
 
