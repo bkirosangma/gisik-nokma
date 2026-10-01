@@ -59,6 +59,26 @@ import type { Projection } from './registry.js';
  * own ruling is that a key is not worth refusing a read over, and dropping the
  * line would hide a ticket the reader can see.
  *
+ * **A prefix change re-indexes too** (prefixes and groups plan Task 5, FD7). The
+ * key baked into `ticket_text` is the one in force when the row was last
+ * derived, so `project.updated` carrying a `prefix` re-derives the notes
+ * attached to that project's tickets, and `workspace.prefix_changed` re-derives
+ * every note in the workspace with an attachment. Without it a note is found by
+ * a key the ticket no longer wears, and for the workspace prefix
+ * `verify-projections` drifts: the rebuild reads the whole ledger's prefix
+ * (`events` has no shadow copy) while the live row kept the old one. Only the
+ * NEW key is indexed: the old one still finds the TICKET through the key search
+ * (plan Task 4, FD1), which covers tickets and not notes.
+ *
+ * **The vocabulary is re-derived too, and that is not optional.** Lexemes are
+ * never deleted, so the old key's words (`ccre`) would stay in
+ * `proj_note_lexemes` live; a `verify-projections` rebuild reads every other
+ * projection's table (and the workspace prefix in `events`) in its FINAL state
+ * and never produces them, so the diff reports them as extra. A prefix change is
+ * the one event that retires words wholesale, so it ends with
+ * `rederiveWorkspaceLexemes` — exactly what the rebuild yields. (A ticket
+ * rename that drops a word has the same latent drift; it is not changed here.)
+ *
  * **The cost is named rather than hidden.** Those three reads run on every note
  * event that HAS an attachment, and `ticketNumbers` scans the workspace's
  * `ticket.created` events. A note with no attachments — the common case —
@@ -110,6 +130,19 @@ export const noteSearchProjection: Projection = {
       if (!(NOTE_EVENT_TYPES as readonly string[]).includes(event.type)) return;
       if (event.type === 'comment.added') return;
       await reindexNote(tx, event.entity.id);
+      return;
+    }
+
+    // A prefix change re-keys tickets without any note or ticket event, so the
+    // `ticket_text` that baked the old key is re-derived here (FD7).
+    if (event.type === 'workspace.prefix_changed') {
+      await reindexNotesAttachedInWorkspace(tx, event.workspaceId);
+      return;
+    }
+    if (event.type === 'project.updated') {
+      if ((event.payload as { prefix?: unknown }).prefix !== undefined) {
+        await reindexNotesAttachedInProject(tx, event.workspaceId, event.entity.id);
+      }
       return;
     }
 
@@ -168,6 +201,42 @@ async function reindexNotesAttachedTo(tx: PoolClient, ticketId: string): Promise
   for (const row of rows) {
     await reindexNote(tx, row.note_id);
   }
+}
+
+/** Every note attached to a ticket of one project — the notes a project prefix change re-keys. */
+async function reindexNotesAttachedInProject(
+  tx: PoolClient,
+  workspaceId: string,
+  projectId: string,
+): Promise<void> {
+  const { rows } = await tx.query<{ note_id: string }>(
+    `SELECT DISTINCT na.note_id
+       FROM proj_note_attachments na
+       JOIN proj_tickets t ON t.ticket_id = na.ticket_id
+      WHERE t.workspace_id = $1 AND t.project_id = $2
+      ORDER BY na.note_id`,
+    [workspaceId, projectId],
+  );
+  for (const row of rows) {
+    await reindexNote(tx, row.note_id);
+  }
+  if (rows.length > 0) await rederiveWorkspaceLexemes(tx, workspaceId);
+}
+
+/** Every note with an attachment in one workspace — the notes a workspace prefix change re-keys. */
+async function reindexNotesAttachedInWorkspace(tx: PoolClient, workspaceId: string): Promise<void> {
+  const { rows } = await tx.query<{ note_id: string }>(
+    `SELECT DISTINCT na.note_id
+       FROM proj_note_attachments na
+       JOIN proj_notes n ON n.note_id = na.note_id
+      WHERE n.workspace_id = $1
+      ORDER BY na.note_id`,
+    [workspaceId],
+  );
+  for (const row of rows) {
+    await reindexNote(tx, row.note_id);
+  }
+  if (rows.length > 0) await rederiveWorkspaceLexemes(tx, workspaceId);
 }
 
 /**
