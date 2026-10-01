@@ -1,8 +1,8 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GroupRow } from '@gisik-nokma/domain';
-import { readProjectGrouping, type WorkspaceRef } from '@gisik-nokma/app-core';
+import type { GroupRow, IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+import { readProjectGrouping, rememberProjectGrouping, type WorkspaceRef } from '@gisik-nokma/app-core';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import { Providers } from '../src/providers.js';
 import { parseRules, ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
@@ -11,7 +11,7 @@ import { stubServices } from './helpers/stub-services.js';
 
 /**
  * Prefixes and groups plan Task 7 — the workspace home's nav row on top, the Projects heading row and
- * the grouped view. Cases 22.120–22.122 and 22.140–22.148 (bucket 22, `test-cases/22-prefixes-and-groups.md`).
+ * the grouped view. Cases 22.120–22.122, 22.140–22.149 (bucket 22, `test-cases/22-prefixes-and-groups.md`).
  * 22.120 is the amended 13.673 in `workspace-home.test.tsx`; 22.143 is `packages/ui/test/level-colours.test.ts`.
  */
 const WORKSPACE = '01J9WORKSPACE0000000000000';
@@ -68,13 +68,18 @@ function workspaceAs(role: string, over: Partial<WorkspaceRef> = {}): WorkspaceR
 
 function mount(workspace: WorkspaceRef, groups: () => Promise<GroupRow[]> = async () => GROUPS) {
   const getGroups = vi.fn(groups);
-  const services = stubServices({ getMyWorkspaces: async () => [workspace], getGroups });
+  const getMyWorkspaces = vi.fn(async () => [workspace]);
+  const services = stubServices({ getMyWorkspaces, getGroups });
+  // A COMMITTING ingest: the stub's default `[]` is "the server answered 0 of 1 claims", which the page
+  // reports as a failure and does not reload on.
+  services.dataSource.ingest = async (events: SubmittedEvent[]): Promise<IngestResult[]> =>
+    events.map((event) => ({ status: 'committed', eventId: event.id, seq: 1, serverTime: '2026-10-02T10:00:00.000Z' }));
   render(
     <Providers services={services}>
       <WorkspaceHomePage />
     </Providers>,
   );
-  return { getGroups };
+  return { getGroups, getMyWorkspaces };
 }
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
@@ -177,6 +182,13 @@ describe('22.140 the grouped view nests the groups, level by level', () => {
     expect(sectionNameOf('p7')).toBe('Online');
     // CONTROL: the same page files Deliveries under Operations, not under the first group on the page.
     expect(sectionNameOf('p2')).toBe('Operations');
+    // The headings step with the level: h3 for L1 down to h6 for L4, under the page's own h2 "Projects".
+    expect(screen.getByRole('heading', { name: 'Retail', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Stores', level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Kiosks', level: 5 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Carts', level: 6 })).toBeInTheDocument();
+    // CONTROL: "Ungrouped" has no level of its own and sits at the top of the tree, an h3.
+    expect(screen.getByRole('heading', { name: 'Ungrouped', level: 3 })).toBeInTheDocument();
     // Nested for real: Carts' section is inside Kiosks', inside Stores', inside Retail's.
     expect(screen.getByRole('region', { name: 'Retail' }).contains(screen.getByRole('region', { name: 'Carts' }))).toBe(true);
     expect(screen.getByRole('region', { name: 'Operations' }).contains(screen.getByRole('region', { name: 'Carts' }))).toBe(false);
@@ -222,6 +234,72 @@ describe('22.142 the plain view is unchanged', () => {
   });
 });
 
+describe('22.143 each level strip uses its own level token', () => {
+  it('22.143 the rule for .gn-group-section__strip[data-level="N"] paints var(--gn-level-N), for N = 1…4', () => {
+    const globals = readGlobalsCss();
+    for (const level of [1, 2, 3, 4]) {
+      const rule = ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`);
+      expect(valueOf(rule, 'background'), `level ${level}`).toBe(`var(--gn-level-${level})`);
+    }
+    // CONTROL: the four rules are four rules, not one shared one — a test that cannot fail would pass here too.
+    const painted = new Set(
+      [1, 2, 3, 4].map((level) => valueOf(ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`), 'background')),
+    );
+    expect(painted.size).toBe(4);
+  });
+});
+
+describe('22.144 a project or group pointing at nothing still shows', () => {
+  it('22.144 an unknown groupId files the project under “Ungrouped”; a group with an unknown parent is a top-level section holding its project', async () => {
+    const orphanGroup: GroupRow = { id: 'g-orphan', parentId: 'g-gone', level: 2, name: 'Orphan', rank: 'a1', projectCount: 1, childCount: 0 };
+    const workspace = workspaceAs('owner');
+    workspace.projects = [
+      { id: 'q1', name: 'Lost project', prefix: 'LP', archived: false, ticketCount: 1, blockedCount: 0, groupId: 'g-gone' },
+      { id: 'q2', name: 'Orphan project', prefix: 'OP', archived: false, ticketCount: 1, blockedCount: 0, groupId: 'g-orphan' },
+      { id: 'q3', name: 'Filed project', prefix: 'FP', archived: false, ticketCount: 1, blockedCount: 0, groupId: 'g-ops' },
+    ];
+    await showGrouped(workspace, async () => [...GROUPS, orphanGroup]);
+    await screen.findByRole('region', { name: 'Orphan' });
+    expect(sectionNameOf('q1')).toBe('Ungrouped');
+    expect(sectionNameOf('q2')).toBe('Orphan');
+    const topLevel = [...document.querySelectorAll('.gn-grouped-projects > section')].map((section) =>
+      document.getElementById(section.getAttribute('aria-labelledby')!)?.textContent,
+    );
+    expect(topLevel).toContain('Orphan');
+    // CONTROL: a project with a known group stays in it.
+    expect(sectionNameOf('q3')).toBe('Operations');
+  });
+});
+
+describe('22.145 the groups are re-read after a committed act', () => {
+  const act = async (): Promise<void> => {
+    await userEvent.click(within(row('p1')).getByRole('button', { name: 'More actions for Shop operations' }));
+    await userEvent.click(within(row('p1')).getByRole('menuitem', { name: 'Archive' }));
+  };
+
+  it('22.145 in Grouped, archiving a project through its menu reads the groups once more; control: in Plain the same act makes no groups request', async () => {
+    const { getGroups, getMyWorkspaces } = await showGrouped();
+    await screen.findByRole('region', { name: 'Retail' });
+    await waitFor(() => expect(getGroups).toHaveBeenCalled());
+    const reads = getMyWorkspaces.mock.calls.length;
+    const before = getGroups.mock.calls.length;
+    await act();
+    // Other components read the directory too, so the act's reload is "more reads", not "exactly one".
+    await waitFor(() => expect(getMyWorkspaces.mock.calls.length).toBeGreaterThan(reads));
+    await waitFor(() => expect(getGroups.mock.calls.length).toBeGreaterThan(before));
+
+    // CONTROL: Plain asks for nothing, before or after the same act.
+    cleanup();
+    window.localStorage.clear();
+    const plain = mount(workspaceAs('owner'));
+    await screen.findByRole('heading', { name: 'Projects' });
+    const plainReads = plain.getMyWorkspaces.mock.calls.length;
+    await act();
+    await waitFor(() => expect(plain.getMyWorkspaces.mock.calls.length).toBeGreaterThan(plainReads));
+    expect(plain.getGroups).not.toHaveBeenCalled();
+  });
+});
+
 describe('22.146 empty groups render nothing', () => {
   it('22.146 a group with no projects and no descendants with projects has no section; Ungrouped is absent when every project has a group', async () => {
     await showGrouped();
@@ -238,6 +316,24 @@ describe('22.146 empty groups render nothing', () => {
     await showGrouped(filed);
     await screen.findByRole('region', { name: 'Operations' });
     expect(screen.queryByRole('region', { name: 'Ungrouped' })).toBeNull();
+  });
+});
+
+describe('22.149 a guest never asks for the groups', () => {
+  it('22.149 with Grouped remembered, a guest gets the plain list, no groups request and no “could not be loaded” line; control: a member with the same stored choice asks', async () => {
+    rememberProjectGrouping(KIRO, WORKSPACE, 'grouped');
+    const guest = mount(workspaceAs('guest'));
+    await screen.findByRole('heading', { name: 'Projects' });
+    await screen.findByTestId('project-row-p5');
+    expect(guest.getGroups).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-level]')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+
+    // CONTROL: the same remembered value, as a member, DOES ask.
+    cleanup();
+    const member = mount(workspaceAs('member'));
+    await waitFor(() => expect(member.getGroups).toHaveBeenCalledWith(WORKSPACE));
   });
 });
 
