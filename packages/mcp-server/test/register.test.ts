@@ -12,23 +12,43 @@ import type { Session } from '../src/session.js';
  *
  * These run against a REAL `McpServer` and a REAL `Client` over
  * `InMemoryTransport` — not a recording double. A double records whatever it
- * is handed and would pass even if the SDK rejected all nine definitions,
+ * is handed and would pass even if the SDK rejected every tool definition,
  * which is exactly the question Step 1 of this task exists to answer. Neither
  * a network nor a child process is involved: the session is a fake and the
  * transport is a linked pair of in-memory queues.
  */
 
-/** The nine, in the order `allTools` composes them: five read, then four write. */
-const NINE = [
-  'list_workspaces',
-  'list_projects',
+/**
+ * Every tool, in the order `allTools` composes them: the four reads that remain in
+ * `read-tools.ts` (`list_members` is MCP CRUD plan Task 8), the four ticket writes, the workspace tools
+ * (Task 6 — `list_workspaces` moved there and gained `include`), then the project tools (Task 7 —
+ * `list_projects` moved there and gained `include`).
+ */
+const TOOL_NAMES = [
   'search_tickets',
   'list_tickets',
   'get_ticket',
+  'list_members',
   'create_ticket',
   'transition_ticket',
   'add_comment',
   'assign_ticket',
+  'list_workspaces',
+  'get_workspace',
+  'create_workspace',
+  'rename_workspace',
+  'archive_workspace',
+  'restore_workspace',
+  'delete_workspace',
+  'undelete_workspace',
+  'list_projects',
+  'get_project',
+  'create_project',
+  'update_project',
+  'archive_project',
+  'restore_project',
+  'delete_project',
+  'undelete_project',
 ];
 
 const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-09-08T00:00:00.000Z' }] };
@@ -36,26 +56,48 @@ const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serve
 function fakeSession(over: Partial<Session> = {}): Session {
   return {
     userId: () => '01J0A5ER0000000000000000AA',
-    // `{ workspaces: [] }` rather than a bare stub: `list_projects` reads
-    // the workspace directory and folds it, so a shapeless answer would make
-    // the sweep in 14.88 fail for a reason that has nothing to do with stdout.
-    get: async () => ({ workspaces: [] }),
-    postEvents: async () => COMMITTED,
+    // One workspace `w` named `W` (an empty Deleted items list and an empty roster) rather than a
+    // bare stub: `list_projects` and the workspace tools read the directory, and
+    // the sweep in 14.88 drives `archive_workspace` with `confirm_name: 'W'` and `archive_project` with `'P'` — a
+    // shapeless answer would fail it for a reason that has nothing to do with stdout.
+    get: async () => ({
+      workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [{ projectId: 'p', name: 'P', description: null, prefix: 'P', archived: false }] }],
+      items: [],
+      members: [], // `list_members` reads `/members`
+    }),
+    post: async () => ({}),
+    // One committed result per event sent: `create_project` sends a pair, and a short answer is refused.
+    postEvents: async (events) => ({ results: events.map(() => COMMITTED.results[0]) }),
     ...over,
   };
 }
 
-/** Every tool's arguments, valid, so a sweep can drive all nine handlers. */
+/** Every tool's arguments, valid, so a sweep can drive every handler. */
 const ARGS: Record<string, Record<string, unknown>> = {
   list_workspaces: {},
   list_projects: { workspaceId: 'w' },
   search_tickets: { workspaceId: 'w', query: 'q' },
   list_tickets: { projectId: 'p' },
   get_ticket: { workspaceId: 'w', ticketId: 't' },
+  list_members: { workspaceId: 'w' },
   create_ticket: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' },
   transition_ticket: { workspaceId: 'w', ticketId: 't', to: 'done' },
   add_comment: { workspaceId: 'w', ticketId: 't', text: 'hello' },
   assign_ticket: { workspaceId: 'w', ticketId: 't', assigneeId: null },
+  get_workspace: { workspaceId: 'w' },
+  create_workspace: { name: 'X' },
+  rename_workspace: { workspaceId: 'w', name: 'Y' },
+  archive_workspace: { workspaceId: 'w', confirm_name: 'W' },
+  restore_workspace: { workspaceId: 'w' },
+  delete_workspace: { workspaceId: 'w', confirm_name: 'W' },
+  undelete_workspace: { workspaceId: 'w' },
+  get_project: { projectId: 'p' },
+  create_project: { workspaceId: 'w', name: 'X' },
+  update_project: { projectId: 'p', name: 'Y' },
+  archive_project: { projectId: 'p', confirm_name: 'P' },
+  restore_project: { projectId: 'p' },
+  delete_project: { projectId: 'p', confirm_name: 'P' },
+  undelete_project: { projectId: 'p' },
 };
 
 async function connected(session: LazySession): Promise<Client> {
@@ -76,38 +118,43 @@ function textOf(result: unknown): string {
   return first.text;
 }
 
-describe('the nine tools, registered', () => {
-  it('14.80 allTools yields exactly the nine, in a stable order, each named once and described', () => {
+describe('the tools, registered', () => {
+  it('14.80 allTools yields exactly the pinned tools, in a stable order, each named once and described', () => {
     const tools = allTools(fakeSession());
-    expect(tools.map((t) => t.name)).toEqual(NINE);
+    expect(tools.map((t) => t.name)).toEqual(TOOL_NAMES);
     // A duplicate name would make the second registration throw at startup —
     // but only if there IS a second one, so the uniqueness is asserted here
     // rather than inferred from the server not crashing.
-    expect(new Set(tools.map((t) => t.name)).size).toBe(NINE.length);
+    expect(new Set(tools.map((t) => t.name)).size).toBe(TOOL_NAMES.length);
     for (const tool of tools) {
       expect(tool.description.length, `${tool.name} has no description`).toBeGreaterThan(0);
     }
   });
 
-  it('14.81 a REAL McpServer accepts all nine and a REAL client lists them', async () => {
+  it('14.81 a REAL McpServer accepts every tool and a REAL client lists them', async () => {
     const client = await connected(lazySession(async () => fakeSession()));
     const listed = await client.listTools();
-    expect(listed.tools.map((t) => t.name)).toEqual(NINE);
+    expect(listed.tools.map((t) => t.name)).toEqual(TOOL_NAMES);
     for (const tool of listed.tools) {
       expect(tool.description ?? '', `${tool.name}`).not.toBe('');
       expect(tool.inputSchema.type, `${tool.name}`).toBe('object');
     }
   });
 
-  it('14.82 the empty raw shape and the imported .strict() FilterSpec both survive into real JSON Schema', async () => {
+  it('14.82 the optional `include` enum and the imported .strict() FilterSpec both survive into real JSON Schema', async () => {
     const client = await connected(lazySession(async () => fakeSession()));
     const listed = await client.listTools();
 
-    // `list_workspaces` declares `inputSchema: {}`. An empty raw shape is the
-    // shape most likely to degrade into "no schema at all" — which would make
-    // the tool accept anything.
-    const empty = listed.tools.find((t) => t.name === 'list_workspaces')?.inputSchema;
-    expect(empty).toMatchObject({ type: 'object', properties: {} });
+    // `list_workspaces` declares `include` as an OPTIONAL array of a two-value enum (MCP CRUD plan
+    // Task 6; before it, this tool was the one empty raw shape). The enum is what tells an
+    // assistant the only legal values, and an optional key must not become required.
+    const workspaces = listed.tools.find((t) => t.name === 'list_workspaces')?.inputSchema as unknown as {
+      properties: { include: { type: string; items: { enum: string[] } } };
+      required?: string[];
+    };
+    expect(workspaces.properties.include.type).toBe('array');
+    expect(workspaces.properties.include.items.enum).toEqual(['archived', 'deleted']);
+    expect(workspaces.required ?? []).not.toContain('include');
 
     // `filter` is `filterSpecSchema` from @gisik-nokma/domain — imported, not
     // restated — and it is `.strict()`. `additionalProperties: false` reaching

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ProjectRef } from '@gisik-nokma/app-core';
+import { useProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
 
 /**
@@ -21,6 +22,13 @@ import { useAppServices, useSessionStatus } from './providers.js';
  * answers to one question — so the filtering and the ordering belong to the
  * caller, and this is the rows. Cases 13.860 pins the order; the nav's own
  * cases pin the filter.
+ *
+ * ## It re-asks when `projects-version.ts` is bumped
+ *
+ * A committed project write (an Edit's rename, an archive, a founding) bumps the
+ * counter and this hook reads the list again, so the nav's project link does not
+ * keep a name the product has just changed. The cache is overwritten by that
+ * read, never edited.
  *
  * ## `null` and `[]` are different claims
  *
@@ -108,6 +116,8 @@ export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRe
   // pass it would silently fall back to the width of the cache this exists to
   // narrow.
   const userId = session.kind === 'signed-in' ? session.user.id : null;
+  // Re-asks after a committed project write (rename, archive, founding), see `projects-version.ts`.
+  const version = useProjectsVersion();
   const [projects, setProjects] = useState<ProjectRef[] | null>(
     // The remount's head start; `useState`'s initialiser runs once per mount.
     // MODULE-SCOPED for the reason `use-workspace-name.ts` records for its own
@@ -159,7 +169,7 @@ export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRe
     return () => {
       cancelled = true;
     };
-  }, [dataSource, userId, workspaceId]);
+  }, [dataSource, userId, workspaceId, version]);
 
   return projects;
 }

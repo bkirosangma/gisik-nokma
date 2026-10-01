@@ -10,7 +10,7 @@ import {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
+import { BLOCKED_STATES_CTE, compileFilterSpec, resolveMeInSpec } from '../read/compile-filter.js';
 import { FTS_CONFIG } from '../read/fts.js';
 import { HEADLINE_OPTIONS } from '../read/headline.js';
 import { lexicalNoteSearch, meaningNoteSearch } from '../read/note-search.js';
@@ -436,7 +436,8 @@ export function registerSearchRoutes(
         if (validated.data.text !== undefined) {
           return reply.status(400).send({ error: 'invalid_filter' });
         }
-        spec = validated.data;
+        // `"me"` → the caller, once, before the compiler (MCP CRUD plan FD12).
+        spec = resolveMeInSpec(validated.data, viewerId);
       }
 
       // Spec §7.7's four new parameters. Each is validated BEFORE anything is

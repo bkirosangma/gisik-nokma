@@ -14,7 +14,7 @@ import { hostedSession } from '../mcp/in-process-fetch.js';
  * transport, answers with a JSON body, and tears both down. There is no session
  * id to look up, so no second instance, restart or deploy can strand a client,
  * and no per-connection state exists to go stale when a person is removed from a
- * workspace (14.266) — the nine tools call the API's own routes as the caller on
+ * workspace (14.266) — the tools call the API's own routes as the caller on
  * every request.
  *
  * The transport is the web-standard one, driven with a web `Request` built from

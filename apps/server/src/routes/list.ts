@@ -1,4 +1,4 @@
-import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { FastifyInstance, FastifyReply, preHandlerHookHandler } from 'fastify';
 import {
   filterSpecSchema,
   groupingSchema,
@@ -11,7 +11,7 @@ import {
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
-import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
+import { BLOCKED_STATES_CTE, compileFilterSpec, resolveMeInSpec } from '../read/compile-filter.js';
 import { epicAncestors, type EpicOf } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { assembleListCards } from '../read/list-cards.js';
@@ -51,7 +51,8 @@ export type ListQuery = {
 };
 
 /**
- * One project's tickets: the caller's visible slice, filtered, ordered by
+ * One project's tickets — or, with `projectId === null`, the whole workspace's —
+ * the caller's visible slice, filtered, ordered by
  * `ticket_id`, cut into keyset pages, and arranged into groups.
  *
  * Exported beside the route for the reason `readBoard` is: the route is a shell
@@ -62,7 +63,11 @@ export type ListQuery = {
  * ## The scope clauses, and which of them is falsifiable
  *
  * Four conjuncts stand between a caller and the table, and they are not equally
- * checkable:
+ * checkable. (With `projectId === null` — the workspace scope of
+ * `GET /v1/workspaces/:workspaceId/ticket-list`, MCP CRUD plan Task 4 — the
+ * first one is not a project clause but the exclusion of ARCHIVED projects'
+ * tickets; the other three are unchanged and the caller is gated by
+ * `requireMember` alone, there being no project to resolve.)
  *
  * - `t.project_id` — the caller's URL parameter, but only AFTER
  *   `workspaceOfProject` resolved it to a workspace and `requireMember`
@@ -110,13 +115,21 @@ export async function readList(
   eff: EffectiveRole,
   viewerId: string,
   workspaceId: string,
-  projectId: string,
+  projectId: string | null,
   query: ListQuery,
 ): Promise<ListResponse> {
   const params = new SqlParams();
   const where = [
     `t.workspace_id = ${params.add(workspaceId)}`,
-    `t.project_id = ${params.add(projectId)}`,
+    // The project scope names its project; the workspace scope (`projectId ===
+    // null`, MCP CRUD plan Task 4) names none and instead leaves out the tickets
+    // of ARCHIVED projects — an archived project is out of every list of live
+    // work (`check-permission.ts:370-380`). Workspace scope ONLY: a project's own
+    // list still shows its own tickets when it is archived (13.1164), and a
+    // DELETED project's tickets are already gone via `LIVE_TICKET_WHERE` below.
+    projectId !== null
+      ? `t.project_id = ${params.add(projectId)}`
+      : 'NOT EXISTS (SELECT 1 FROM proj_projects ap WHERE ap.project_id = t.project_id AND ap.archived)',
     visibleTicketsWhere(eff, viewerId, params),
     // A soft-deleted ticket is in no view, and a list is a view. Beside the
     // visibility predicate, never folded into it — see `LIVE_TICKET_WHERE`.
@@ -176,6 +189,7 @@ export async function readList(
     // names, and the roster it joins for that is keyed by workspace — see
     // `ListResponse.workspaceId`.
     workspaceId,
+    // `null` for the workspace scope: no one project was read.
     projectId,
     groupBy: query.groupBy,
     groups,
@@ -342,6 +356,70 @@ function bucket(
     .map((key) => ({ key, label: labelOf(key), cards: buckets.get(key) ?? [] }));
 }
 
+type ListQuerystring = { groupBy?: string; filter?: string; parentId?: string; cursor?: string; limit?: string };
+
+/**
+ * Everything AFTER the door, shared by the project route and the workspace
+ * route: parse the query (a named 400 on a bad `groupBy`, `filter` or `limit`),
+ * resolve `"me"`, read. The doors differ — a project route resolves the project's
+ * workspace first, the workspace route has none to resolve — and nothing else
+ * does, so a filter, a grouping or a page size cannot mean one thing on one route
+ * and its sibling another.
+ */
+async function answerList(
+  deps: { pool: Queryable },
+  raw: ListQuerystring,
+  reply: FastifyReply,
+  eff: EffectiveRole,
+  viewerId: string,
+  workspaceId: string,
+  projectId: string | null,
+): Promise<ListResponse | FastifyReply> {
+  const groupBy = groupingSchema.safeParse(raw.groupBy ?? 'flat');
+  if (!groupBy.success) {
+    return reply.status(400).send({ error: 'invalid_grouping' });
+  }
+
+  let spec: FilterSpec = {};
+  if (raw.filter !== undefined) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw.filter);
+    } catch {
+      return reply.status(400).send({ error: 'invalid_filter' });
+    }
+    const validated = filterSpecSchema.safeParse(parsed);
+    if (!validated.success) {
+      // The zod issue list is deliberately NOT echoed. It names the schema's
+      // own field paths and, for a refused value, the value itself — a
+      // refusal that quotes what it refused is a mirror an attacker can aim.
+      return reply.status(400).send({ error: 'invalid_filter' });
+    }
+    // `"me"` → the caller, once, before the compiler (MCP CRUD plan FD12).
+    spec = resolveMeInSpec(validated.data, viewerId);
+  }
+
+  let limit = DEFAULT_LIMIT;
+  if (raw.limit !== undefined) {
+    // `Number` and not `parseInt`: `parseInt('2.5')` is 2 and `parseInt('9z')`
+    // is 9, so a bound checked after parseInt would silently accept a limit
+    // the caller did not write. `Number('2.5')` is 2.5 and fails the integer
+    // test; `Number('9z')` is NaN and fails it too.
+    limit = Number(raw.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+      return reply.status(400).send({ error: 'invalid_limit' });
+    }
+  }
+
+  return readList(deps.pool, eff, viewerId, workspaceId, projectId, {
+    spec,
+    groupBy: groupBy.data,
+    ...(raw.parentId === undefined ? {} : { parentId: raw.parentId }),
+    ...(raw.cursor === undefined ? {} : { cursor: raw.cursor }),
+    limit,
+  });
+}
+
 /**
  * `GET /v1/projects/:projectId/tickets`.
  *
@@ -405,49 +483,37 @@ export function registerListRoutes(
       return reply.status(404).send(READ_NOT_FOUND_BODY);
     }
 
-    const raw = request.query;
-
-    const groupBy = groupingSchema.safeParse(raw.groupBy ?? 'flat');
-    if (!groupBy.success) {
-      return reply.status(400).send({ error: 'invalid_grouping' });
-    }
-
-    let spec: FilterSpec = {};
-    if (raw.filter !== undefined) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw.filter);
-      } catch {
-        return reply.status(400).send({ error: 'invalid_filter' });
-      }
-      const validated = filterSpecSchema.safeParse(parsed);
-      if (!validated.success) {
-        // The zod issue list is deliberately NOT echoed. It names the schema's
-        // own field paths and, for a refused value, the value itself — a
-        // refusal that quotes what it refused is a mirror an attacker can aim.
-        return reply.status(400).send({ error: 'invalid_filter' });
-      }
-      spec = validated.data;
-    }
-
-    let limit = DEFAULT_LIMIT;
-    if (raw.limit !== undefined) {
-      // `Number` and not `parseInt`: `parseInt('2.5')` is 2 and `parseInt('9z')`
-      // is 9, so a bound checked after parseInt would silently accept a limit
-      // the caller did not write. `Number('2.5')` is 2.5 and fails the integer
-      // test; `Number('9z')` is NaN and fails it too.
-      limit = Number(raw.limit);
-      if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
-        return reply.status(400).send({ error: 'invalid_limit' });
-      }
-    }
-
-    return readList(deps.pool, eff, viewerId, workspaceId, projectId, {
-      spec,
-      groupBy: groupBy.data,
-      ...(raw.parentId === undefined ? {} : { parentId: raw.parentId }),
-      ...(raw.cursor === undefined ? {} : { cursor: raw.cursor }),
-      limit,
-    });
+    return answerList(deps, request.query, reply, eff, viewerId, workspaceId, projectId);
   });
+
+  /**
+   * `GET /v1/workspaces/:workspaceId/ticket-list` (MCP CRUD plan Task 4, owner
+   * ruling M7, 2026-10-01): every project's visible tickets in one workspace,
+   * with the project route's query parameters and `ListResponse` shape
+   * (`projectId` is `null`).
+   *
+   * **Why not `/tickets`.** The plan named `GET /v1/workspaces/:workspaceId/tickets`,
+   * but that path is Plan 4's visibility list — `{ tickets }`, `200 []` for an
+   * outsider, a recorded ruling (`test-cases/16-remaining-doors.md`) with its own
+   * suites — and a second handler on it would be a duplicate-route boot failure.
+   * This is its sibling, and the old route is untouched.
+   *
+   * The gate is `requireSession` then `requireMember` alone: there is no
+   * `workspaceOfProject` step (no project in the URL), and a non-member is the
+   * same 404 body the project route answers, never an empty list. Visibility is
+   * `readList`'s, exactly as on the project route.
+   */
+  app.get<{ Params: { workspaceId: string }; Querystring: ListQuerystring }>(
+    '/v1/workspaces/:workspaceId/ticket-list',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId } = request.params;
+      const viewerId = request.currentUserId;
+      const eff = await requireMember(deps.pool, viewerId, workspaceId);
+      if (eff === null) {
+        return reply.status(404).send(READ_NOT_FOUND_BODY);
+      }
+      return answerList(deps, request.query, reply, eff, viewerId, workspaceId, null);
+    },
+  );
 }

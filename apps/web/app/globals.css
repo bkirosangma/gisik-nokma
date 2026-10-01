@@ -5313,3 +5313,22 @@ input, textarea, select { font-family: inherit; }
   .gn-invite-mint .gn-button { width: 100%; }
 }
 /* ══ access-and-invites: end ══ */
+
+/* `.gn-project-edit` — the inline Edit form shared by the workspace home's project card and
+   the project page's header (MCP CRUD plan Task 2). A column of two shared fields and an
+   actions row: ONE primary (Save) beside the quiet Cancel, both the shared `Button`
+   (44 px target). `min-width: 0` lets the form shrink inside a grid card instead of
+   widening it; the card's own padding supplies the inset, so the form adds none. */
+.gn-project-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.gn-project-edit__field { min-width: 0; }
+.gn-project-edit__hint { margin: 0; font-size: 0.8125rem; color: var(--gn-danger); }
+.gn-project-edit__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+/* The header's title and its Edit sit on one line; the heading keeps its own metrics. */
+.gn-project__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }

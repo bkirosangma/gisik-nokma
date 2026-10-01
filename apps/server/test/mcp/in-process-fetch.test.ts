@@ -4,13 +4,15 @@ import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { SecurityOptions } from '../../src/app.js';
 import { hostedSession, inProcessFetch } from '../../src/mcp/in-process-fetch.js';
 import { buildTestApp } from '../helpers/app.js';
+import { buildOAuthApp, hostedToken } from '../helpers/oauth.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { seedMember } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * Hosted MCP plan, Task 6. Cases 14.251–14.253.
  *
- * The hosted `/mcp` route runs the package's nine tools over an in-process
+ * The hosted `/mcp` route runs the package's tools over an in-process
  * `fetch` that calls the API's OWN routes with `app.inject`. Nothing here is
  * stubbed: the real `buildApp`, the real auth, the real ledger.
  */
@@ -136,9 +138,177 @@ describe('14.253 a tool run through hostedSession is the caller, origin mcp', ()
     );
     expect(rows).toEqual([{ origin: 'mcp', actor_id: user.userId }]);
 
-    // CONTROL, same `it`: a read tool returns exactly what the REST route returns.
+    // CONTROL, same `it`: a read tool returns what the REST route returns (the one workspace here is live;
+    // `list_workspaces` drops ARCHIVED ones by default since MCP CRUD Task 6).
     const rest = await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers });
     expect(await tool('list_workspaces').handler({})).toEqual(rest.json());
+    await app.close();
+  });
+});
+
+describe('14.301 the hosted session post goes through the in-process transport with the caller bearer', () => {
+  it('14.301 post founds a workspace as the token owner; a post without the bearer would be a 401; get is unchanged', async () => {
+    const { app, otp } = buildTestApp(db);
+    await app.ready();
+    const user = await signInWithPhone(app, otp, '+911100002301');
+    const session = hostedSession(app, OUTER, user.token, user.userId);
+    await session.ready();
+
+    const founded = (await session.post('/v1/workspaces', { name: 'Posted Corner' })) as { workspaceId: string };
+    expect(typeof founded.workspaceId).toBe('string');
+    // The bearer is the proof: the founding door answers 201 only for an authenticated caller,
+    // and the founder is the token's owner.
+    const { rows } = await db.pool.query<{ actor_id: string }>(
+      `SELECT actor_id FROM events WHERE workspace_id = $1 AND type = 'workspace.created'`,
+      [founded.workspaceId],
+    );
+    expect(rows).toEqual([{ actor_id: user.userId }]);
+
+    // CONTROL, same `it`: the unauthenticated route is a 401 (what a post without the bearer would draw) …
+    const bare = await inProcessFetch(app, OUTER)('http://in-process/v1/workspaces', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'No bearer' }),
+    });
+    expect(bare.status).toBe(401);
+    // … and `get` through the same session is unchanged.
+    const listed = (await session.get('/v1/me/workspaces')) as { workspaces: Array<{ workspaceId: string }> };
+    expect(listed.workspaces.map((w) => w.workspaceId)).toContain(founded.workspaceId);
+    await app.close();
+  });
+});
+
+describe('14.306 / 14.309 / 14.314 the workspace tools through the hosted door, against the real server', () => {
+  it('14.306 14.309 14.314 create → rename → archive → restore → delete → undelete, each as the caller; deletes are soft', async () => {
+    const { app, otp } = buildOAuthApp(db);
+    await app.ready();
+    const user = await signInWithPhone(app, otp, '+911100002306');
+    // A real HOSTED access token (consent, then the code exchange), exactly what `/mcp` resolves — NOT the
+    // browser-session bearer: that authenticates as 'session' and would record `web` (14.314).
+    const session = hostedSession(app, OUTER, await hostedToken(app, db.pool, user.userId), user.userId);
+    await session.ready();
+    const tools = allTools(session);
+    const run = (name: string, args: Record<string, unknown>) => {
+      const t = tools.find((x) => x.name === name);
+      if (t === undefined) throw new Error(`no tool ${name} — the hosted door must list every workspace tool`);
+      return t.handler(args);
+    };
+
+    const { workspaceId } = (await run('create_workspace', { name: 'Round Trip' })) as { workspaceId: string };
+    expect(await run('get_workspace', { workspaceId })).toMatchObject({ name: 'Round Trip', role: 'owner', archived: false });
+
+    await run('rename_workspace', { workspaceId, name: 'Round Trip Two' });
+    expect(await run('get_workspace', { workspaceId })).toMatchObject({ name: 'Round Trip Two' });
+
+    // The CURRENT name is read from the real directory: the old one is refused with the new one named, and nothing is sent.
+    await expect(run('archive_workspace', { workspaceId, confirm_name: 'Round Trip' })).rejects.toThrow('confirm_name must be "Round Trip Two"');
+    await run('archive_workspace', { workspaceId, confirm_name: 'Round Trip Two' });
+    expect(await run('get_workspace', { workspaceId })).toMatchObject({ archived: true });
+    const names = async (include: string[]) =>
+      ((await run('list_workspaces', { include })) as { workspaces: Array<{ name: string }> }).workspaces.map((w) => w.name);
+    expect(await names([])).toEqual([]);
+    expect(await names(['archived'])).toEqual(['Round Trip Two']);
+    await run('restore_workspace', { workspaceId });
+
+    await run('delete_workspace', { workspaceId, confirm_name: 'Round Trip Two' });
+    expect(await run('get_workspace', { workspaceId })).toMatchObject({ deleted: true, name: 'Round Trip Two' });
+    expect(await names(['deleted'])).toEqual(['Round Trip Two']);
+    await run('undelete_workspace', { workspaceId });
+    const back = await run('get_workspace', { workspaceId });
+    expect(back).toMatchObject({ archived: false, name: 'Round Trip Two' });
+    expect(back).not.toHaveProperty('deleted');
+
+    const { rows } = await db.pool.query<{ type: string; origin: string }>(
+      `SELECT type, origin FROM events WHERE workspace_id = $1 ORDER BY seq`,
+      [workspaceId],
+    );
+    // 14.314: an assistant's founding is recorded as an MCP act, not a web one. The founding sequence the server
+    // appends beside it (workflow, types, owner grant) stays the server's own record: `server`.
+    expect(rows.find((r) => r.type === 'workspace.created')?.origin).toBe('mcp');
+    const lifecycle = rows.filter((r) => /^workspace\.(renamed|archived|restored|deleted|undeleted)$/.test(r.type));
+    expect(lifecycle.every((r) => r.origin === 'mcp')).toBe(true);
+    expect(rows.filter((r) => r.origin === 'web')).toEqual([]);
+    expect(lifecycle.map((r) => r.type)).toEqual([
+      'workspace.renamed', 'workspace.archived', 'workspace.restored', 'workspace.deleted', 'workspace.undeleted',
+    ]);
+    expect(rows.some((r) => r.type === 'purge.marked')).toBe(false); // 14.309: never
+
+    // CONTROL, same `it`: an id the server does not know is refused in the server's own words, not reworded.
+    await expect(run('restore_workspace', { workspaceId: newUlid() })).rejects.toThrow(/^refused by /);
+    await app.close();
+  });
+});
+
+describe('14.317–14.324 the project tools through the hosted door, against the real server', () => {
+  it('14.317 14.318 14.320 14.321 14.322 14.324 create → update → archive → restore → delete → undelete, each as the caller; a member is refused and nothing lands', async () => {
+    const { app, otp } = buildOAuthApp(db);
+    await app.ready();
+    const owner = await signInWithPhone(app, otp, '+911100002317');
+    const toolsFor = async (userId: string) => {
+      const session = hostedSession(app, OUTER, await hostedToken(app, db.pool, userId), userId);
+      await session.ready();
+      const tools = allTools(session);
+      return (name: string, args: Record<string, unknown>) => {
+        const t = tools.find((x) => x.name === name);
+        if (t === undefined) throw new Error(`no tool ${name} — the hosted door must list every project tool`);
+        return t.handler(args);
+      };
+    };
+    const run = await toolsFor(owner.userId);
+
+    const { workspaceId } = (await run('create_workspace', { name: 'Project Round Trip' })) as { workspaceId: string };
+    const created = (await run('create_project', { workspaceId, name: 'Repairs', description: 'Fix list', prefix: 'RP' })) as {
+      projectId: string;
+    };
+    const projectId = created.projectId;
+    expect(await run('get_project', { projectId })).toMatchObject({
+      workspaceId, name: 'Repairs', description: 'Fix list', prefix: 'RP', archived: false,
+    });
+
+    // 14.318: only the given keys move; "" clears; the other key is left alone.
+    await run('update_project', { projectId, name: 'Repairs desk' });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', description: 'Fix list', prefix: 'RP' });
+    await run('update_project', { projectId, description: '' });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', description: null });
+
+    // 14.321 against the real directory: the OLD name is refused naming the NEW one, and nothing is sent.
+    await expect(run('archive_project', { projectId, confirm_name: 'Repairs' })).rejects.toThrow('confirm_name must be "Repairs desk"');
+    await run('archive_project', { projectId, confirm_name: 'Repairs desk' });
+    const names = async (include: string[]) =>
+      ((await run('list_projects', { workspaceId, include })) as { projects: Array<{ name: string }> }).projects.map((p) => p.name);
+    expect(await names([])).toEqual([]);
+    expect(await names(['archived'])).toEqual(['Repairs desk']);
+    await run('restore_project', { projectId });
+    expect(await names([])).toEqual(['Repairs desk']);
+
+    await run('delete_project', { projectId, confirm_name: 'Repairs desk' });
+    expect(await run('get_project', { projectId })).toMatchObject({ deleted: true, name: 'Repairs desk' });
+    expect(await names(['deleted'])).toEqual(['Repairs desk']);
+    await run('undelete_project', { projectId });
+    expect(await run('get_project', { projectId })).toMatchObject({ name: 'Repairs desk', archived: false });
+
+    const { rows } = await db.pool.query<{ type: string; origin: string; actor_id: string }>(
+      `SELECT type, origin, actor_id FROM events WHERE workspace_id = $1 AND entity_kind = 'project' ORDER BY seq`,
+      [workspaceId],
+    );
+    expect(rows.map((r) => r.type)).toEqual([
+      'project.created', 'project.member_added', 'project.updated', 'project.updated',
+      'project.archived', 'project.restored', 'project.deleted', 'project.undeleted',
+    ]); // 14.317 the pair, 14.320 soft only: no purge.marked among them
+    expect(rows.every((r) => r.origin === 'mcp' && r.actor_id === owner.userId)).toBe(true);
+
+    // 14.322: a member is refused in the product's own words, with the pair's index, and nothing lands.
+    const member = await signInWithPhone(app, otp, '+911100002322');
+    await seedMember(db.pool, workspaceId, member.userId, 'member', [{ projectId }]);
+    const asMember = await toolsFor(member.userId);
+    await expect(asMember('create_project', { workspaceId, name: 'Member project' })).rejects.toThrow(
+      'event 0 refused by permission.role: Only a workspace owner or admin can do this. Your role is member.',
+    );
+    await expect(asMember('update_project', { projectId, name: 'Member rename' })).rejects.toThrow(
+      'refused by permission.role: Only a workspace owner or admin can do this. Your role is member.',
+    );
+    const after = await db.pool.query(`SELECT name FROM proj_projects WHERE workspace_id = $1 ORDER BY name`, [workspaceId]);
+    expect(after.rows).toEqual([{ name: 'Repairs desk' }]); // CONTROL: the admin's project is intact, no 'Member project'
     await app.close();
   });
 });
