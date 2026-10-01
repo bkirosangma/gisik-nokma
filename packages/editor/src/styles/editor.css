@@ -310,8 +310,9 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 1px;
 }
-/* The glyph never shrinks inside a flex button. `-webkit-touch-callout` keeps iOS from raising its
-   link/image callout on the long-press that shows a tool's name (case 21.135). */
+/* The glyph never shrinks inside a flex button. (`.ticket-editor__tool` above carries
+   `-webkit-touch-callout: none` so iOS raises no callout on the long-press that shows a tool's name,
+   case 21.135.) */
 .ticket-editor__tool svg {
   flex: none;
 }

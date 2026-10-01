@@ -275,7 +275,8 @@ const NUMBERED_LIST_ICON = (
 
 const QUOTE_ICON = (
   <Icon>
-    <path d="M9 7H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v3a3 3 0 0 1-3 3M19 7h-3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h3v3a3 3 0 0 1-3 3" />
+    <path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
+    <path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z" />
   </Icon>
 );
 
@@ -303,7 +304,7 @@ const COLLAPSIBLE_ICON = (
 
 const RULE_ICON = (
   <Icon>
-    <path d="M3 12h18M7 6h10M7 18h10" />
+    <path d="M3 12h18M5 6h8M5 18h6" />
   </Icon>
 );
 
