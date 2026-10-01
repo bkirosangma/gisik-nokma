@@ -101,6 +101,9 @@ describe('23.022 one destructive treatment: a quiet danger button in a list, the
     'packages/app-core/src/account/deleted-items-section.tsx',
     'packages/app-core/src/account/passkeys-section.tsx',
     'packages/app-core/src/workflow-builder/ticket-types/fields-editor.tsx',
+    // The builder's three destructive buttons ("Remove rule", "Delete transition", "Delete state") wear the same variant.
+    'packages/app-core/src/workflow-builder/ui/transition-inspector.tsx',
+    'packages/app-core/src/workflow-builder/ui/state-inspector.tsx',
   ];
   const CONFIRM = ['packages/app-core/src/views/delete-dialog.tsx', 'apps/web/app/w/[workspaceId]/members/page.tsx'];
 
@@ -110,7 +113,14 @@ describe('23.022 one destructive treatment: a quiet danger button in a list, the
     expect(valueOf(quiet, 'color')).toBe('var(--gn-danger)');
     expect(valueOf(quiet, 'border')).toBe('1px solid var(--gn-danger)');
     expect(valueOf(quiet, 'box-shadow')).toBe('none');
-    expect(valueOf(selectionRule(ui, '.gn-button--danger-quiet:hover:not(:disabled)'), 'transform')).toBe('none');
+    // The hover THICKENS the edge with an inset ring on the same ground, and never lifts; the press drops the ring.
+    const hover = selectionRule(ui, '.gn-button--danger-quiet:hover:not(:disabled)');
+    expect(valueOf(hover, 'box-shadow')).toBe('inset 0 0 0 1px var(--gn-danger)');
+    expect(valueOf(hover, 'background')).toBe('transparent');
+    expect(valueOf(hover, 'transform')).toBe('none');
+    const press = selectionRule(ui, '.gn-button--danger-quiet:active:not(:disabled)');
+    expect(valueOf(press, 'box-shadow')).toBe('none');
+    expect(valueOf(press, 'transform')).toBe('none');
     // Danger as ink on the grounds these buttons sit on (a raised card, a well) clears 4.5, the edge therefore 3.
     for (const [style, theme] of COMBOS) {
       for (const ground of ['surfaceRaised', 'surfaceWell'] as const) {
@@ -131,7 +141,7 @@ describe('23.022 one destructive treatment: a quiet danger button in a list, the
     expect(filled).not.toContain('danger-quiet');
   });
 
-  it('23.022 the three in-list sites use danger-quiet and the two confirm sites stay danger; CONTROL: the confirm sites really carry variant="danger"', () => {
+  it('23.022 the five in-list sites (both builder inspectors included) use danger-quiet and the two confirm sites stay danger; CONTROL: the confirm sites really carry variant="danger"', () => {
     for (const path of IN_LIST) {
       const source = read(path);
       expect(source, path).toContain('variant="danger-quiet"');

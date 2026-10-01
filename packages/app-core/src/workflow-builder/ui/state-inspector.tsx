@@ -13,9 +13,9 @@ import { useBuilderEnv, useBuilderStore, useDraft } from './builder-context.js';
  * `.gn-field__input` for the field (the same three `passkeys-section.tsx:114-120`
  * and `profile-section.tsx:40-46` use, so this input inherits the measured
  * contrast pair and the `[data-style="neo"]` sunken override for free) and
- * `<Button>` for the actions, with `variant="danger"` on the destructive one —
- * the precedent `fields-editor.tsx:151` set for exactly this action on the
- * sibling builder screen.
+ * `<Button>` for the actions, with `variant="danger-quiet"` on the destructive one
+ * (UX fixes T2, case 23.022) — the same variant `fields-editor.tsx:151` wears for
+ * exactly this action on the sibling builder screen.
  *
  * ## What the prototype draws here that is NOT built
  *
@@ -57,7 +57,7 @@ export function StateInspector(props: { stateId: string }) {
           >
             Set as start
           </Button>
-          <Button variant="danger" className="builder-quiet-danger" onClick={() => store.actions.removeState(state.id)}>
+          <Button variant="danger-quiet" className="builder-quiet-danger" onClick={() => store.actions.removeState(state.id)}>
             Delete state
           </Button>
         </div>

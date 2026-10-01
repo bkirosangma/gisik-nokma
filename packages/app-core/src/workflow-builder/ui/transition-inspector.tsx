@@ -22,7 +22,7 @@ export function TransitionInspector(props: { index: number }) {
             <span className="transition-inspector__rule-summary">{summarizeRule(rule, summaryCtx)}</span>
             {canAuthor ? (
               <Button
-                variant="danger"
+                variant="danger-quiet"
                 className="builder-quiet-danger"
                 aria-label="Remove rule"
                 onClick={() => store.actions.removeRule(props.index, ruleIndex)}
@@ -39,7 +39,7 @@ export function TransitionInspector(props: { index: number }) {
       {canAuthor ? (
         <div className="transition-inspector__actions">
           <AddRuleMenu transitionIndex={props.index} />
-          <Button variant="danger" className="builder-quiet-danger" onClick={() => store.actions.removeTransition(props.index)}>
+          <Button variant="danger-quiet" className="builder-quiet-danger" onClick={() => store.actions.removeTransition(props.index)}>
             Delete transition
           </Button>
         </div>

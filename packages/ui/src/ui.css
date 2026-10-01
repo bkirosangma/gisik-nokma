@@ -4921,34 +4921,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: none;
   padding: 0.5rem;
 }
-/* W1c (2026-10-01, case 10.159): the destructive buttons inside the well — "Remove rule" and "Delete transition"
-   (`transition-inspector.tsx`), "Delete state" (`state-inspector.tsx`) — are QUIET danger buttons: danger ink on a
-   transparent ground, a 1px danger ring on hover, in every style. The filled variant's own geometry (48px, the lift, the 4% hover
-   scale) is the confirm button of a dialog; in neo it read as a large red pill dominating the recessed well. Same
-   shape as `.gn-ticket-sheet__delete`. The variant class stays on the element (still the destructive affordance by
-   class, colour AND label); the class is `builder-quiet-danger`, deliberately NOT in a `builder-row*` family: an
-   element that also carries `gn-button` is exempt from 13.767's rendered == styled set, and a styled-but-exempt class
-   would break that equality. This rule sits one class above `.gn-button--danger` and its `:hover:not(:disabled)`.
-   Danger as ink on `surfaceWell` clears 4.5 in all six style x theme combinations (`tokens.test.ts`, case 10.160).
-   The hover is a RING and not `.gn-button--ghost`'s `fill-quaternary` wash, and that is a measurement: danger ink on the
-   wash over the well is 4.18 (hig/minimal light) and 4.47 (hig/minimal dark), below 4.5, while a ring leaves the ground
-   and so the ink at its rest ratio (4.60 worst). */
+/* W1c (2026-10-01, case 10.159; repainted by UX fixes T2, case 23.022): the destructive buttons inside the well —
+   "Remove rule" and "Delete transition" (`transition-inspector.tsx`), "Delete state" (`state-inspector.tsx`) — are QUIET
+   danger buttons, in every style. The filled variant's own geometry (48px, the lift, the 4% hover scale) is the confirm
+   button of a dialog; in neo it read as a large red pill dominating the recessed well. The three buttons now wear
+   `variant="danger-quiet"`, so the PAINT (a 1px danger edge, danger ink, a transparent ground, a ring on hover) comes
+   from `.gn-button--danger-quiet` (case 23.022), the one destructive treatment for every list; this class carries only
+   the builder's METRICS (44px, 1rem of padding, the inherited font size). It declares no `background`, `color`,
+   `box-shadow` or `border`, and has no `:hover` / `:active` arm: a paint declaration here would fork the treatment again
+   (case 10.159). It stays on the element for that reason and for 13.767: it is deliberately NOT in a `builder-row*`
+   family, because an element that also carries `gn-button` is exempt from 13.767's rendered == styled set, and a
+   styled-but-exempt class would break that equality. This rule is (0,2,0), so it beats the variant's single-class
+   `min-height` / `padding` / `font-size`. Danger as ink on `surfaceWell` clears 4.5 in all six style x theme
+   combinations (`tokens.test.ts`, case 10.160).
+   History, still true of the variant's hover: it is a RING and not `.gn-button--ghost`'s `fill-quaternary` wash, and that
+   is a measurement: danger ink on the wash over the well is 4.18 (hig/minimal light) and 4.47 (hig/minimal dark), below
+   4.5, while a ring leaves the ground and so the ink at its rest ratio (4.60 worst). */
 .gn-button.builder-quiet-danger {
   min-height: 2.75rem;
   padding: 0 1rem;
-  background: transparent;
-  color: var(--gn-danger);
-  box-shadow: none;
   font-size: inherit;
-}
-.gn-button.builder-quiet-danger:hover:not(:disabled) {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--gn-danger);
-  transform: none;
-}
-.gn-button.builder-quiet-danger:active:not(:disabled) {
-  box-shadow: none;
-  transform: none;
 }
 
 /* E4-28: a visually-hidden description node, referenced by `aria-describedby`
@@ -7064,9 +7056,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    ground, no lift. The filled `.gn-button--danger` is the confirm dialog's loud element and nothing else. Danger as ink
    clears 4.5:1 on a raised card and on a well in all six style x theme combinations (so the edge clears 3); on bare
    `surface` it is 4.40 in hig/minimal light, which no site uses. Hover THICKENS the edge to 2px (an inset ring) rather
-   than washing the ground: the ink on `fill-quaternary` over a well is under 4.5 (the same measurement the builder's
-   `.gn-button.builder-quiet-danger` below records), a ring leaves the ink at its rest ratio. That builder arm is the
-   precedent and keeps its own class (several pinned tests name it); this is the variant for every other row. */
+   than washing the ground: the ink on `fill-quaternary` over a well is under 4.5 (the measurement the builder's
+   `.gn-button.builder-quiet-danger` comment above records), a ring leaves the ink at its rest ratio. The builder's
+   three destructive buttons wear this variant too and keep `builder-quiet-danger` only as their metrics hook. */
 .gn-button--danger-quiet {
   border: 1px solid var(--gn-danger);
   background: transparent;

@@ -1859,10 +1859,6 @@ input, textarea, select { font-family: inherit; }
 .gn-members__role { font-weight: 500; }
 /* R5: the role control and the quiet "Remove from workspace…" action share the cell. */
 .gn-members__role-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-/* UX fixes T2 (case 23.023): the row's overflow ("More actions for <name>") sits beside the role control. `.gn-members`
-   is `overflow: auto` (the phone's sideways scroll), so a menu opening BELOW the last row's trigger would add a scroll
-   inside the card; it opens to the trigger's LEFT, centred on it, where the cell has room. */
-.gn-members__more .gn-card-menu__list { top: 50%; right: calc(100% + 0.25rem); transform: translateY(-50%); }
 /* Phone (case 21.092): the roster is stacked rows, not a table. The table's 51.25rem floor is what
    made the card scroll sideways, so it goes with the table layout: table, body and row are blocks,
    each cell is its own line (name + email over the role control), and the Select and Remove stack at
@@ -5187,6 +5183,10 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-lift-near);
 }
+/* UX fixes T2 (case 23.023): the row's overflow ("More actions for <name>") sits beside the role control. `.gn-members`
+   is `overflow: auto` (the phone's sideways scroll), so a menu opening BELOW the last row's trigger would add a scroll
+   inside the card; it opens to the trigger's LEFT, centred on it, where the cell has room. */
+.gn-members__more .gn-card-menu__list { top: 50%; right: calc(100% + 0.25rem); transform: translateY(-50%); }
 /* Items in plain text ink, deliberately NOT `--gn-danger` for Delete…: danger text
    on a raised surface measured 4.29:1 (`sessions-section.tsx`'s own record),
    under the 4.5 body text owes. The destructive colour lives on the dialog's
