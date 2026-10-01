@@ -40,6 +40,13 @@
 - **FD10: the Settings shell is `apps/web/app/settings/page.tsx`** (tabs `ticket-types | workflows | workspace`, l.14-18, sidebar l.182). Groups is a fourth tab there, not a new `/w/[id]/settings/groups` route.
 - **FD11: `Select` has no "create new" path** (`packages/ui/src/select/select.tsx`). The group picker (Task 10) is a new `GroupPicker` built on the same `@react-aria/combobox` hooks.
 
+
+## Audit items absorbed (owner, 2026-10-02: "your recommendation for the rest")
+The UI/UX audit (`gisik-nokma-lanes/audit-2026-10-01/AUDIT-REPORT.md`) found three defects on screens this plan rebuilds anyway, so they're fixed here, not in the later UX-fixes release:
+- **WS-03 → Task 7.** A project card shows only Archive and Delete…, with no cue that the card opens the project. Add a visible "Open" affordance (a chevron on the card's title row, with the whole card the link target as today), and move Archive and Delete… into a ⋯ overflow menu on the card. Case **22.147**: the card exposes one link named "Open <project>" and an overflow button named "More actions for <project>". Control: Archive and Delete are reachable in the menu. Mutation: actions left inline.
+- **BRD-19 → Task 8.** One action, five names (New ticket / Add a ticket / Create a ticket / Create). Every create-ticket entry point and the dialog's submit say **"Create ticket"**; the empty-column affordance says "Create ticket" too. Case **22.155**: a grep-style test over the app-core and web sources finds no "Add a ticket" / "New ticket" / bare "Create" submit in the create-ticket flow. Control: "Create ticket" is present at each entry point.
+- **Phone page header on the workspace home → Task 7.** At ≤40rem the title takes one line; the Grouped/Plain toggle and Create project sit in one row under it; the nav cards (moved to the top) are a horizontally scrollable row of compact chips, not four stacked cards, so projects stay on the first screen. The audit's WS notes found four stacked cards push projects off the first screen at 360. Case **22.148**: at ≤40rem the section links are one scrollable row (`overflow-x: auto`, `flex-wrap: nowrap`). Control: above 40rem they are the card grid.
+
 ## Review focus
 1. **A reserved prefix entered by the project that held it** must be ALLOWED: a project going `SO` → `SH` → `SO` is legal (R2). Task 3, case 22.044.
 2. **A key typed in lower case or with stray spaces** (`ccso-12`, ` CCSO-12 `) must still find the ticket. Task 4, case 22.064.
