@@ -229,7 +229,23 @@ export type TransitionDialogProps = {
    * cancelled pick surviving into the next open.
    */
   initialToStateId?: string | null;
+  /**
+   * Say, beside each destination whose edge carries rules the dialog will prompt for, what it will ask for —
+   * "Done — needs a comment". The Move button opens the dialog over EVERY destination at once (mobile plan
+   * FD6), so the person is choosing between edges and should not have to pick one to learn which is gated.
+   * Off by default: the arrows offer one direction at a time and their option names are asserted as bare names.
+   */
+  markRules?: boolean;
 };
+
+/** What picking `rules` will ask for, in words — `''` when the edge asks for nothing this dialog prompts for. */
+function ruleMark(rules: TransitionRules): string {
+  const asks: string[] = [];
+  if (rules.some((rule) => rule.kind === 'require-comment')) asks.push('needs a comment');
+  if (rules.some((rule) => rule.kind === 'require-evidence')) asks.push('needs evidence');
+  for (const rule of rules) if (rule.kind === 'require-field') asks.push(`needs ${rule.field}`);
+  return asks.length === 0 ? '' : ` — ${asks.join(', ')}`;
+}
 
 /**
  * The prompts are the workflow's own declared rules, read off the chosen edge:
@@ -259,6 +275,7 @@ export function TransitionDialog({
   uploadEvidence,
   offerStateIds,
   initialToStateId,
+  markRules,
 }: TransitionDialogProps) {
   const options = transitionOptions(workflow, fromStateId).filter(
     (option) => offerStateIds === undefined || offerStateIds.includes(option.toStateId),
@@ -448,7 +465,10 @@ export function TransitionDialog({
       <div className="gn-transition__field">
         <span>Move to</span>
         <Select
-          options={options.map((option) => ({ value: option.toStateId, label: option.name }))}
+          options={options.map((option) => ({
+            value: option.toStateId,
+            label: markRules === true ? `${option.name}${ruleMark(option.rules)}` : option.name,
+          }))}
           value={toStateId === '' ? null : toStateId}
           onChange={setToStateId}
           placeholder="Choose a state"
