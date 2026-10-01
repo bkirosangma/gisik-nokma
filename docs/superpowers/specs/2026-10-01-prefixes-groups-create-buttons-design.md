@@ -17,7 +17,7 @@
 | R2 | **A retired prefix stays reserved to the project (or workspace) that used it.** Another project, new or changing, is refused it, with a plain reason naming its holder and the date. The original holder may take it back. Derived (automatic) prefixes also skip reserved ones. There is no "free this prefix" action. |
 | R3 | **Four group levels, L1 (top) to L4.** A group belongs to one level for good: an L1 is only ever an L1. |
 | R4 | **A lower group belongs to exactly one parent** (an L2 "North" under "Retail" and another under "Wholesale" are two groups). |
-| R5 | **The workspace has a Groups settings page that shows the groups as a tree**, laid out left to right as in the owner's sketch: L1 boxes on the left, children to the right, joined by connector lines. Each box has a **colour tag** (the strip on its left edge) and a **⊕** that adds a child at the next level (none on L4). |
+| R5 | **The workspace has a Groups settings page that shows the groups as a tree**, laid out left to right as in the owner's sketch: L1 boxes on the left, children to the right, joined by connector lines. Each box has a **colour tag** (the strip on its left edge) that shows the group's LEVEL: one colour per level, L1 to L4, the same for every group at that level (owner, 2026-10-01: *"it only indicates the levels of the group. not different colour for different groups."*) and a **⊕** that adds a child at the next level (none on L4). |
 | R6 | **Groups can also be created while assigning them** (option A): the project form's group fields are type-aheads. Typing shows matching groups at that level **under the parent picked above**. An exact case-insensitive match auto-selects. With no match selected, saving creates the group under that parent. |
 | R7 | **Defaults accepted:** groups belong to one workspace; levels fill from the top, with no skipping (a project picks one group and its chain follows); projects with no group appear last under **Ungrouped** in grouped view; the grouped/plain toggle is remembered per person on each device. |
 
@@ -40,16 +40,15 @@ Everything is a ledger event (the product's one source of truth; projections are
 
 ### 3.2 Groups
 - **Events:**
-  - `group.created { groupId, parentId | null, level 1–4, name, colour }`
+  - `group.created { groupId, parentId | null, level 1–4, name }`
   - `group.renamed { name }`
-  - `group.recoloured { colour }`
   - `group.reordered` (a rank among siblings, the same rank scheme the product already uses)
   - `group.deleted`
 - **Rules:**
   - `level` equals the parent's level + 1 (L1 has no parent), and it never changes (R3, R4).
   - Names are unique among siblings, ignoring case.
   - A group can be deleted only when no project and no child group uses it; otherwise the request is refused with a plain reason.
-- **Colour:** one of a fixed palette chosen for contrast in both themes and all three styles. Colour is never the only signal: the name is always shown beside it. A group created from the project form gets the next palette colour after its siblings'.
+- **Colour = level, not group (R5):** four fixed level colours (L1–L4) as design tokens, each with contrast checked in both themes and all three styles. No colour is stored on a group, there is no colour picker, and there is no recolour event. Colour is never the only signal: the level is also stated in words (an accessible label such as "Level 2 group"), and the name is always shown.
 - **A project's group:** `project.updated` gains an optional `groupId` (null clears it). A project points at ONE group at any level; its L1…Ln chain is read from the tree (R7, no skipped levels).
 - **Inline creation (R6)** sends `group.created` and `project.updated` together as one batch, so a failed save creates no orphan group.
 
@@ -59,16 +58,16 @@ Everything is a ledger event (the product's one source of truth; projections are
   - The header.
   - **The My Work / Members / Ticket types / Workflows row**, moved to the top.
   - **Projects**, with a **Grouped / Plain** toggle and **Create project** (the one primary, with icon) at the top right.
-  - In grouped view, nested L1 → L4 sections, each headed by its colour tag and name; **Ungrouped** comes last. The toggle is remembered per person on each device (wrapped storage, like the board's collapsed columns).
+  - In grouped view, nested L1 → L4 sections, each headed by its level's colour strip and its name; **Ungrouped** comes last. The toggle is remembered per person on each device (wrapped storage, like the board's collapsed columns).
 - **Create project** opens a panel the same way Create ticket does: name, description, prefix, and the **group picker**, four type-ahead fields left to right (R6). A lower field is disabled until the one above it has a group.
 - **Project Edit** (on the card and in the header, from MCP CRUD) gains **prefix** and **group**. **Workspace edit** gains **prefix**.
 - **A prefix change is confirmed in plain words** before saving, for example: *"Tickets will be renumbered CCSH-… Old CCSO- keys still work."*
 - **`/workspaces`:** **Create workspace** (the one primary, with icon) at the top right opens the form. The always-visible "New workspace" block goes.
 - **Project page:** **Create ticket**, with an icon, replaces "New ticket". It stays the one primary.
 - **Settings → Groups** (new page beside Ticket types and Workflows):
-  - The left-to-right tree from the sketch: each box has its colour strip and name, and a ⊕ adds a child (none on L4).
+  - The left-to-right tree from the sketch: each box has its level's colour strip and its name, and a ⊕ adds a child (none on L4).
   - **Add group** creates an L1.
-  - Click a name to rename it; click the strip to pick a colour; drag to reorder siblings.
+  - Click a name to rename it; drag to reorder siblings.
   - **Delete** shows only on a group nothing uses.
   - Owner and admin can change it; everyone else can only view it.
   - At phone width (≤ 40 rem), the tree renders as an indented list.
