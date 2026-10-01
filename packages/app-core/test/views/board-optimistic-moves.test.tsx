@@ -941,6 +941,7 @@ describe('20.169 an ARROW move opens the slot in the target column: the cards be
         top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
         const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
         if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+        if (cInDoing && id === 'ticket-card-tk_b') top -= 10; // above the landing slot: nothing makes it glide, whatever the layout does to it
       }
       return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
     });
@@ -984,8 +985,8 @@ describe('20.169 an ARROW move opens the slot in the target column: the cards be
 });
 
 describe('20.170 a refused arrow move closes the target slot again: the cards below slide back up', () => {
-  it('20.170 tk_d glides down on the press and back UP on the refusal (CONTROL: tk_b, above, never glides)', async () => {
-    // Mutation: refusal does not FLIP the target siblings back (no target record in `dropPending`).
+  it('20.170 tk_d glides down on the press and back UP on the refusal (CONTROL: tk_b, above, never glides; tk_c glides back itself)', async () => {
+    // Mutations: refusal does not FLIP the target siblings back (no target record in `dropPending`); the mover is noted as a sibling of its own column.
     const write = deferred<IngestResult[]>();
     await mount(() => write.promise);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -998,6 +999,7 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
         top = 100 + 130 * Array.from(this.parentElement!.children).indexOf(this);
         const cInDoing = document.querySelector('[data-testid="board-column-doing"] [data-testid="ticket-card-tk_c"]') !== null;
         if (cInDoing && id === 'ticket-card-tk_d') left += 25;
+        if (cInDoing && id === 'ticket-card-tk_b') top -= 10; // above the landing slot: nothing makes it glide, whatever the layout does to it
       }
       return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
     });
@@ -1013,6 +1015,8 @@ describe('20.170 a refused arrow move closes the target slot again: the cards be
     expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-x')).toBe('25px');
     expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('130px');
     expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
+    // The mover itself glides back from the target (its own flight, not noted as a sibling's).
+    expect(slotOf('tk_c').classList.contains('gn-board__card-slot--flight')).toBe(true);
   });
 });
 
@@ -1094,5 +1098,31 @@ describe('20.172 landing at the end, a flight consumed once, a stale flight: the
     await press(user, 'tk_a');
     expect(idsIn('doing')).toEqual(['tk_a', 'tk_b', 'tk_c', 'tk_d']);
     expect(flies('tk_d')).toBe(false);
+  });
+});
+
+describe('20.173 an arrow move reached through the picker (several targets one way) opens the target slot the same way', () => {
+  it('20.173 › offers Doing or Done; confirming Doing glides tk_d down (CONTROL: tk_b above stays)', async () => {
+    // Mutation: the picker's confirm lays its entry without the arrow flag (the target siblings snap).
+    const user = userEvent.setup();
+    const several: WorkflowDef = { ...WF_ERRAND, transitions: [...WF_ERRAND.transitions, { from: 'todo', to: 'done', rules: [] }] };
+    await mount(() => new Promise<IngestResult[]>(() => {}), several);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const id = this.getAttribute('data-testid') ?? '';
+      const column = this.closest('[data-testid^="board-column-"]')?.getAttribute('data-testid')?.slice('board-column-'.length) ?? '';
+      const left = 300 * Math.max(0, ['todo', 'doing', 'done'].indexOf(column));
+      const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
+      return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
+    });
+    await user.click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to next state — Doing or Done' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    expect(idsIn('doing')).toEqual(['tk_b', 'tk_c', 'tk_d']);
+    expect(slotOf('tk_z').classList.contains('gn-board__card-slot--flight')).toBe(true); // CONTROL — the source column closed up, so the harness glides
+    expect(slotOf('tk_d').classList.contains('gn-board__card-slot--flight')).toBe(true);
+    expect(slotOf('tk_d').style.getPropertyValue('--gn-flip-y')).toBe('-130px');
+    expect(slotOf('tk_b').classList.contains('gn-board__card-slot--flight')).toBe(false);
   });
 });
