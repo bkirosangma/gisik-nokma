@@ -84,6 +84,7 @@ import { peopleProps } from '../../../../../src/people-props.js';
 import { ticketSheetPath } from '../../../../../src/ticket-location.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../../src/ticket-ref-callbacks.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
+import { ProjectTitle } from '../../../../../src/project-title.js';
 import {
   DEFAULT_PROJECT_TAB,
   readProjectTab,
@@ -2348,7 +2349,9 @@ function ProjectBoard() {
                 {workspaceName !== null ? (
                   <p className="gn-project__breadcrumb">{workspaceName}</p>
                 ) : null}
-                {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+                {projectName !== null ? (
+                  <ProjectTitle workspaceId={workspaceId} projectId={projectId} projectName={projectName} />
+                ) : null}
                 {/* The SAME component and the SAME word the workspace home's card
                     uses for this state, so the two screens cannot describe one fact
                     two ways. A sentence is deliberately NOT added: everything else

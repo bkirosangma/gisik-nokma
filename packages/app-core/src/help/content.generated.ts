@@ -1299,6 +1299,94 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "edit-a-project",
+            "title": "Edit a project",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If you own a workspace or are an admin of it, a project's card on the workspace's page has an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Archive"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and the project's own page has the same "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " next to its name. It opens a small form with the project's "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Name"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Description"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to keep your changes, or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Cancel"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (or Escape) to leave things as they were. A project needs a name — leave it blank and the form says so. The new name shows up for everybody in the workspace."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The project's short prefix, the letters at the start of every job's number, is chosen when the project is started and cannot be edited. Members who are not owners or admins do not see "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "deleted-items-and-getting-things-back",
             "title": "Deleted items, and getting things back",
             "blocks": [
@@ -9138,7 +9226,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign. There is no read-only choice and no picking one workspace."
+                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign, and create, rename, archive or delete workspaces and projects — see "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "What your assistant can do"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " below. There is no read-only choice and no picking one workspace."
                     }
                   ],
                   [
@@ -9161,6 +9257,109 @@ export const HELP_CONTENT: HelpContent = [
                       "text": ", like any other change in the job's history."
                     }
                   ]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-your-assistant-can-do",
+            "title": "What your assistant can do",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Ask in ordinary words; it uses the same permissions you have, so each of these works only where you could do it yourself."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Workspaces."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " See the workspaces you belong to, start a new one (you become its owner), rename one, archive or restore one, and delete one or bring it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Projects."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. A project's short prefix is fixed when it is started and cannot be changed afterwards."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "People."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " See who is in a workspace. If you are a guest, you are shown only the people on the jobs shared with you — never the full list, and never anyone's email address."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Jobs."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Read them one project at a time, or across a whole workspace at once — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "everything assigned to me"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " works — and add, move, comment on and assign them."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Deleting is never final here."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " When your assistant deletes a workspace or a project it goes to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Archiving and deleting need the exact name."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The assistant must give the workspace's or project's name exactly as it is written now — same capitals, same spaces — or nothing happens and it is told what the name is. That is so a misheard instruction cannot hit the wrong thing. Renaming something changes the name it must give."
+                  }
                 ]
               }
             ]

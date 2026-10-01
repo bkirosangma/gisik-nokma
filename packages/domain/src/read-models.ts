@@ -416,7 +416,14 @@ export type ListResponse = {
    * site, rather than `undefined` reaching a mapper that would degrade silently.
    */
   workspaceId: string;
-  projectId: string;
+  /**
+   * The project the list was read for — or `null` for the WORKSPACE scope
+   * (`GET /v1/workspaces/:workspaceId/ticket-list`, MCP CRUD plan Task 4), which
+   * spans every project and so names none. Still required: a body that forgot it
+   * is still a compile error; `null` is a claim ("no one project"), never an absence.
+   * The project route always answers a string, and the web client reads only that route.
+   */
+  projectId: string | null;
   groupBy: Grouping;
   groups: ListGroup[];
   nextCursor: string | null;

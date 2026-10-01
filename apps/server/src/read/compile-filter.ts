@@ -105,6 +105,20 @@ export function compileFilterSpec(spec: FilterSpec, params: SqlParams): Compiled
   // `priority` (spec 2026-09-22): a plain comparison over `t` itself, so like
   // `closed` below it reaches no other table and needs no correlation.
   if (spec.priority !== undefined) clauses.push(`(t.fields -> 'priority' ->> 'value') = ${params.add(spec.priority)}`);
+  // The plural keys (MCP CRUD plan FD11): each is ONE bound array, matched with
+  // ANY — never a value list spliced into the SQL text, so a quote in a value
+  // is data. `collaborator_ids` is jsonb (a string array), so `?|` is its "any
+  // of these" and `t.collaborator_ids @> to_jsonb($n::text)` above is its "this".
+  if (spec.assigneeIds !== undefined) clauses.push(`t.assignee_id = ANY(${params.add(spec.assigneeIds)}::text[])`);
+  if (spec.collaboratorIds !== undefined) clauses.push(`t.collaborator_ids ?| ${params.add(spec.collaboratorIds)}::text[]`);
+  if (spec.typeIds !== undefined) clauses.push(`t.type_id = ANY(${params.add(spec.typeIds)}::text[])`);
+  if (spec.stateIds !== undefined) clauses.push(`t.state_id = ANY(${params.add(spec.stateIds)}::text[])`);
+  if (spec.stateCategories !== undefined) {
+    clauses.push(`t.state_category = ANY(${params.add(spec.stateCategories)}::text[])`);
+  }
+  if (spec.priorities !== undefined) {
+    clauses.push(`(t.fields -> 'priority' ->> 'value') = ANY(${params.add(spec.priorities)}::text[])`);
+  }
   if (spec.blocked !== undefined) {
     needsBlockedCte = true;
     clauses.push(spec.blocked ? BLOCKED_MEMBERSHIP : `NOT (${BLOCKED_MEMBERSHIP})`);
@@ -146,4 +160,23 @@ export function compileFilterSpec(spec: FilterSpec, params: SqlParams): Compiled
     }
   }
   return { clauses, needsBlockedCte };
+}
+
+/**
+ * `"me"` in a person slot means the caller (MCP CRUD plan FD12, owner ruling
+ * M5, 2026-10-01). Resolved HERE, once, before `compileFilterSpec`, by every
+ * read route that takes a filter (project list, workspace list, search) — the
+ * compiler never sees the word. It only rewrites a value the caller already
+ * sent into the caller's own id; the visibility predicate is a separate
+ * conjunct, so `"me"` can never widen what a viewer may see.
+ */
+export function resolveMeInSpec(spec: FilterSpec, viewerId: string): FilterSpec {
+  const me = (value: string): string => (value === 'me' ? viewerId : value);
+  return {
+    ...spec,
+    ...(spec.assigneeId !== undefined ? { assigneeId: me(spec.assigneeId) } : {}),
+    ...(spec.collaboratorId !== undefined ? { collaboratorId: me(spec.collaboratorId) } : {}),
+    ...(spec.assigneeIds !== undefined ? { assigneeIds: spec.assigneeIds.map(me) } : {}),
+    ...(spec.collaboratorIds !== undefined ? { collaboratorIds: spec.collaboratorIds.map(me) } : {}),
+  };
 }

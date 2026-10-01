@@ -36,7 +36,7 @@ export function inProcessFetch(app: FastifyInstance, outer: OuterCaller): typeof
 
 /**
  * The package's `Session` for one hosted call: the caller's own access token,
- * over the in-process fetch. Same nine tools, same code as the stdio server.
+ * over the in-process fetch. Every tool in `allTools`, same code as the stdio server.
  */
 export function hostedSession(
   app: FastifyInstance,
@@ -48,6 +48,7 @@ export function hostedSession(
   return lazySession(async () => ({
     userId: () => userId,
     get: (path) => client.get(path, accessToken),
+    post: (path, body) => client.post(path, body, accessToken),
     postEvents: (events) => client.post('/v1/events', { events }, accessToken),
   }));
 }

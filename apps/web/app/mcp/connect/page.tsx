@@ -147,7 +147,8 @@ function ConnectScreen(): React.JSX.Element {
               </p>
               <p className="gn-mcp-authorize__consent">
                 It will be able to see and change everything you can — read tickets, create them, move them, comment
-                and assign — in all your workspaces.
+                and assign, and create, rename, archive or delete workspaces and projects (deleted ones can be
+                restored for 15 days) — in all your workspaces.
               </p>
               <p className="gn-mcp-authorize__revoke">
                 You can disconnect it any time from Account → Connected assistants.

@@ -2,6 +2,7 @@ import {
   projectArchivedPayload,
   projectCreatedPayload,
   projectRestoredPayload,
+  projectUpdatedPayload,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { Projection } from './registry.js';
@@ -43,8 +44,8 @@ import type { Projection } from './registry.js';
  *
  * `ON CONFLICT DO NOTHING` makes a re-delivered `project.created` inert, and it
  * is first-writer-wins under BOTH orders that matter: live arrival, and the
- * canonical `(entity_kind, entity_id, seq)` replay a rebuild uses. THREE event
- * types are read now (Task 16 added the archive pair) and all three are filed
+ * canonical `(entity_kind, entity_id, seq)` replay a rebuild uses. FOUR event
+ * types are read now (Task 16 added the archive pair, MCP CRUD Task 1 the update) and all are filed
  * against the project entity, so this table's contents are still a pure
  * function of the project streams alone — there is no cross-entity write here
  * to interleave, and a project's own stream is totally ordered, so the
@@ -71,11 +72,14 @@ import type { Projection } from './registry.js';
  * workspace — but a projection is the last place to leave a tenancy clause off
  * on the grounds that another invariant currently covers it.
  *
- * ## No `project.renamed` handler, because no such event is registered
+ * ## `project.updated` is last-writer-wins on `name` and `description` alone
  *
- * `name` is therefore whatever the founding claim said, permanently. When a
- * rename event is added it lands here, and the row becomes last-writer-wins on
- * that column alone.
+ * MCP CRUD plan Task 1 (owner ruling M1, 2026-10-01) added the rename this
+ * docblock used to promise. It folds onto the row `project.created` made, keyed
+ * on `(project_id, workspace_id)`, and touches only the columns its payload
+ * names: an absent `name`/`description` leaves the column alone and
+ * `description: null` clears it. The `prefix` is deliberately not a column it can
+ * move — the payload schema refuses the key — so ticket keys never change.
  */
 export const projProjects: Projection = {
   name: 'proj_projects',
@@ -94,6 +98,25 @@ export const projProjects: Projection = {
         `UPDATE proj_projects SET archived = $3
           WHERE project_id = $1 AND workspace_id = $2`,
         [event.entity.id, event.workspaceId, event.type === 'project.archived'],
+      );
+      return;
+    }
+    if (event.type === 'project.updated') {
+      const payload = projectUpdatedPayload.parse(event.payload);
+      // COALESCE keeps an absent `name` as it was; `description` uses a separate
+      // flag because `null` is a real value (clear) and must not COALESCE away.
+      await tx.query(
+        `UPDATE proj_projects
+            SET name = COALESCE($3, name),
+                description = CASE WHEN $4::boolean THEN $5 ELSE description END
+          WHERE project_id = $1 AND workspace_id = $2`,
+        [
+          event.entity.id,
+          event.workspaceId,
+          payload.name ?? null,
+          payload.description !== undefined,
+          payload.description ?? null,
+        ],
       );
       return;
     }
