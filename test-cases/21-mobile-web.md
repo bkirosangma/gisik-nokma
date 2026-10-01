@@ -46,6 +46,16 @@
 - ✅ **21.037 — `AppNav` renders `nav[aria-label="Phone"]` only at a phone viewport (no bar in the DOM above it);** control: the same session at a phone viewport renders it. Mutation: drop `isPhone` from the bar's condition. (`apps/web/test/bottom-bar.test.tsx`)
 - ✅ **21.038 — above phone width the corner carries Notes and Inbox (one of each); at phone width the bar carries them, once each, and the corner carries neither (one unread poller);** control: both halves in the same case. Mutation: render the corner links unconditionally. (same file)
 
+## 21.6 Sheet and dialogs on a phone
+
+*Task 6.*
+
+- ✅ **21.070 — at ≤40rem `.gn-sheet` is `width: 100%; max-width: none; border-radius: 0; box-shadow: none` on the `.gn-sheet--full` ground and the Full-screen toggle (`aria-label` "Full screen") is `display: none`, the arm sitting AFTER the base rule it overrides;** control: above 40rem the sheet keeps `min(40rem, 94vw)`, its left-rounded corners, its shadow and its toggle. Mutation: keep the radius on phones. (`packages/ui/test/phone-overlays.test.ts`)
+- ✅ **21.071 — the sheet's header is `position: sticky; top: 0` at ≤40rem and carries a "Move" shortcut (accessible name "Move this ticket", hidden above 40rem) that calls the SAME handler as the state row's Move… — one Move dialog opens, and a stale refusal is cleared by either door; both are disabled on a closed ticket;** control: the state row's Move… still opens the one dialog, and an open ticket enables both. Mutation: wire the shortcut to a second handler (it opens the dialog but leaves a stale refusal behind); un-stick the header; show the shortcut above 40rem. (`packages/ui/test/phone-overlays.test.ts`, `packages/app-core/test/views/ticket-sheet-phone.test.tsx`)
+- ✅ **21.072 — at ≤40rem `.gn-dialog__scrim` aligns `flex-end`, `.gn-dialog` is `width: 100%; max-width: none`, rounded only on top (`var(--gn-radius-track) var(--gn-radius-track) 0 0`), `max-height: 90dvh`, `padding-bottom: max(1rem, env(safe-area-inset-bottom))`, both arms after their base rules;** control: above 40rem the centred `min(34rem, 92vw)` dialog is unchanged. Mutation: keep `align-items: center`; drop the safe-area inset. (`packages/ui/test/phone-overlays.test.ts`)
+- ✅ **21.073 — the bottom-sheet dialog keeps its `gnRise` entrance and has no animation under reduced motion: the phone arm restates no `animation` (it would sit after, and defeat, the `prefers-reduced-motion` arm);** control: the desktop rise (`gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1)`) is unchanged and the phone scrim adds none. Mutation: drop the reduced-motion arm; restate `animation` in the phone arm. (`packages/ui/test/phone-overlays.test.ts`)
+- 🧪 **21.074 — at 360px the transition dialog, the delete dialog, the reopen dialog and the remove-member dialog are fully visible with their actions within the bottom 30% of the screen.**
+
 ## 21.10 Account, Settings, MCP tokens, Help, Privacy, Terms
 
 *Task 10. Ids `21.155`–`21.169` are unused.*
