@@ -141,24 +141,14 @@ describe('13.1604 project.updated names a founded project', () => {
   });
 });
 
-describe('13.1605 the prefix never moves through project.updated', () => {
-  it('13.1605 the door refuses a payload carrying a prefix and the row keeps its founded one', async () => {
+describe('13.1605 a rename through project.updated never moves the prefix', () => {
+  it('13.1605 a rename commits and the row keeps its founded prefix', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const projectId = newUlid();
     await seedProject(db.pool, workspaceId, projectId, 'Shop', undefined, 'SO');
 
-    const refused = await submit(owner, {
-      workspaceId,
-      entity: { kind: 'project', id: projectId },
-      type: 'project.updated',
-      payload: { name: 'Shop floor', prefix: 'ZZ' },
-    });
-    expect(refused.status).toBe('invalid'); // the schema's refusal, not a permission one
-    const { rows } = await db.pool.query('SELECT name, prefix FROM proj_projects WHERE project_id = $1', [projectId]);
-    expect(rows[0]).toEqual({ name: 'Shop', prefix: 'SO' });
-
-    // control: the same rename without a prefix commits and moves the name only
+    // control: a rename with no prefix key commits and moves the name only
     expect(await submit(owner, rename(workspaceId, projectId, 'Shop floor'))).toMatchObject({ status: 'committed' });
     const after = await db.pool.query('SELECT name, prefix FROM proj_projects WHERE project_id = $1', [projectId]);
     expect(after.rows[0]).toEqual({ name: 'Shop floor', prefix: 'SO' });

@@ -79,8 +79,8 @@ import type { Projection } from './registry.js';
  * on `(project_id, workspace_id)`, and touches only the columns its payload
  * names: an absent `name`/`description` leaves the column alone and
  * `description: null` clears it. **A rename never moves a ticket key, entered
- * or derived.** The `prefix` is not a column it can move — the payload schema
- * refuses the key — and `founding_name`, the name an UN-entered prefix is
+ * or derived.** The payload's `prefix` is not applied by this branch yet (prefix
+ * history is the prefixes and groups plan Task 2), and `founding_name`, the name an UN-entered prefix is
  * derived from, is written by `project.created` and never by this branch. Until
  * 2026-10-01 the reader derived from `name`, so a rename re-keyed every ticket
  * of a project with no entered prefix (and could shift a neighbour's); the
