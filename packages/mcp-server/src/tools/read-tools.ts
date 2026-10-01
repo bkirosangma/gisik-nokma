@@ -17,15 +17,6 @@ const filterArg = filterSpecSchema.optional();
 export function readTools(session: Session): ToolDefinition[] {
   return [
     {
-      name: 'list_workspaces',
-      description:
-        'List the gisik-nokma workspaces you belong to, with your role in each and the projects ' +
-        'you can see inside them. The project list is deliberately partial: a project you are not ' +
-        'a member of is absent rather than named.',
-      inputSchema: {},
-      handler: async () => session.get('/v1/me/workspaces'),
-    },
-    {
       name: 'list_projects',
       description:
         'List the projects you can see inside one workspace. Reads the same workspace directory as ' +

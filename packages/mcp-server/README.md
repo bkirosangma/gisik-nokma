@@ -44,7 +44,7 @@ inside a directory created mode `0700`.
 
 ## Authorize
 
-Nothing happens at startup. The server connects its transport immediately, advertises its nine tools,
+Nothing happens at startup. The server connects its transport immediately, advertises its tools,
 and fetches a credential the first time the assistant actually calls one — because a device flow can
 take as long as it takes you to find your browser, and a server that spends that time silent is a
 server your MCP client marks as failed to start.

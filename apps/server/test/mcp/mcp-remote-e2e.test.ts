@@ -98,7 +98,17 @@ async function journey(app: FastifyInstance, otp: Parameters<typeof signInWithPh
 
   expect((await mcp(app, first.access_token, INIT)).statusCode).toBe(200);
   const list = await mcp(app, first.access_token, rpc('tools/list', {}, 2));
-  expect((list.json().result.tools as unknown[]).length).toBe(9);
+  // EXACT and order-insensitive: the set of names, so a tool silently added or dropped goes red here as well as
+  // in `mcp-http.test.ts` (14.262, which also pins the order). A count would say less; `arrayContaining`
+  // would let a dropped tool through.
+  expect((list.json().result.tools as Array<{ name: string }>).map((t) => t.name).sort()).toEqual(
+    [
+      'list_workspaces', 'get_workspace', 'create_workspace', 'rename_workspace', 'archive_workspace',
+      'restore_workspace', 'delete_workspace', 'undelete_workspace',
+      'list_projects', 'search_tickets', 'list_tickets', 'get_ticket',
+      'create_ticket', 'transition_ticket', 'add_comment', 'assign_ticket',
+    ].sort(),
+  );
   const call = async (name: string, args: Record<string, unknown>, token = first.access_token) => {
     const r = (await mcp(app, token, rpc('tools/call', { name, arguments: args }, 3))).json().result as { isError?: boolean; content: { text: string }[] };
     return { isError: r.isError === true, text: r.content[0]?.text ?? '' };

@@ -293,7 +293,7 @@ microseconds under test and a reader can see there is no hidden clock.*
 *Passthroughs of routes that already exist. The interesting decisions are all about what these tools do
 NOT do: invent routes, normalise the server's shapes, or restate the domain's schema.*
 
-- **14.60** ✅ `list_workspaces` passes the server body through unchanged. — (`packages/mcp-server/test/read-tools.test.ts`)
+- **14.60** ✅ `list_workspaces` passes the server body through unchanged *for live workspaces* (since MCP CRUD Task 6 it is in `workspace-tools.ts` and drops ARCHIVED ones unless `include` asks for them; the test calls it through `workspaceTools`). — (`packages/mcp-server/test/read-tools.test.ts`)
 - **14.61** ✅ **`list_projects` reads the WORKSPACES route, because no projects route exists.** Verified
   against the tree rather than taken from the plan: `/v1/projects/:projectId/*` serves `board` and
   `tickets` and nothing else. — (`packages/mcp-server/test/read-tools.test.ts`)
@@ -385,15 +385,14 @@ These cases run against a **real `McpServer` and a real `Client` over `InMemoryT
 recording double records whatever it is handed and would pass even if the SDK rejected all nine
 definitions, which is the one question Step 1 of this task exists to answer.*
 
-- **14.80** ✅ `allTools` yields **exactly the nine**, in a stable order, each named once and each
+- **14.80** ✅ `allTools` yields **exactly the pinned tool list** (nine until MCP CRUD Task 6, which added the workspace tools — see `register.test.ts`), in a stable order, each named once and each
   described. A tool dropped from either half disappears from the assistant's world silently — there is
   no error, the capability simply stops existing. — (`packages/mcp-server/test/register.test.ts`)
   *Mutation: drop one write tool → 14.80 and 14.81 both fail.*
-- **14.81** ✅ A **real `McpServer`** accepts all nine and a **real client** lists them, each with a
+- **14.81** ✅ A **real `McpServer`** accepts **every tool** and a **real client** lists them, each with a
   description and an object input schema. — (`packages/mcp-server/test/register.test.ts`)
-- **14.82** ✅ The **empty raw shape** (`list_workspaces`) and the **imported `.strict()` FilterSpec**
-  (`search_tickets`) both survive into real JSON Schema — `{type:'object',properties:{}}` rather than no
-  schema at all, and `additionalProperties: false` three levels deep. The second is the proof that the
+- **14.82** ✅ *(amended by MCP CRUD Task 6: the optional `include` enum of `list_workspaces` replaced the empty raw shape, which no tool has any more — the test now asserts an array of `['archived','deleted']`, not required.)* The **imported `.strict()` FilterSpec**
+  (`search_tickets`) survives into real JSON Schema — and `additionalProperties: false` three levels deep. The second is the proof that the
   SDK walked the SAME zod instance `@gisik-nokma/domain` built the schema with; two copies of zod in the
   tree would misclassify it and it would be absent. — (`packages/mcp-server/test/register.test.ts`)
 - **14.83** ✅ The SDK **enforces** that schema **before the handler runs**: a call missing a required
@@ -420,7 +419,7 @@ definitions, which is the one question Step 1 of this task exists to answer.*
   (`packages/mcp-server/test/register.test.ts`)
   *Mutations: authenticate eagerly in `lazySession` → fails; drop the `await session.ready()` in
   `registerTools` → fails.*
-- **14.88** ✅ **Nothing on the tool path writes to STDOUT** — registration, all nine handlers, and the
+- **14.88** ✅ **Nothing on the tool path writes to STDOUT** — registration, every handler, and the
   login prompt `main.ts` installs, with `process.stdout.write` recorded. stdout IS the transport: one
   stray line lands in the middle of the JSON-RPC stream and the client answers with a parse error
   instead of a tool result. The prompt goes to stderr and names both the verification URI and the user
@@ -637,11 +636,11 @@ that the list is unknown rather than empty, and the one recovery there is.
 
 ## 14.7 Hosted MCP — one tool code path (hosted remote MCP plan, Task 6; block `14.200`–`14.299`)
 
-The hosted `/mcp` route runs the SAME nine tools as the stdio server, from the same package, over an in-process
+The hosted `/mcp` route runs the SAME tools as the stdio server, from the same package, over an in-process
 `fetch` that calls the API's own routes. This section is the seam that makes that true; the route itself is
 Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/plans/2026-09-30-remote-mcp-server.md`).
 
-- ✅ **14.250 — `@gisik-nokma/mcp-server` exports `registerTools`, `allTools` and `lazySession`, and `allTools` still yields the nine tools in their pinned order;** control: the same `it` reads the nine names in order. Mutation: drop `registerTools` from the index. — (`packages/mcp-server/test/exports.test.ts`)
+- ✅ **14.250 — `@gisik-nokma/mcp-server` exports `registerTools`, `allTools` and `lazySession`, and `allTools` still yields the pinned tools in their pinned order (nine, then sixteen with MCP CRUD Task 6);** control: the same `it` reads the names in order. Mutation: drop `registerTools` from the index. — (`packages/mcp-server/test/exports.test.ts`)
 - ✅ **14.251 — `inProcessFetch` turns a `fetch('http://in-process/v1/me/workspaces', { headers: { authorization } })` into `app.inject` and returns a real `Response` with the route's status, JSON body and headers;** control: a 404 route comes back as a 404 `Response` (not a throw) and a call with no credential comes back 401. Mutation: always return status 200. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
 - ✅ **14.252 — the in-process request carries the OUTER caller's `remoteAddress` and `x-forwarded-for` (FD7): the rate-limit key seen by the events route is the outer key, not `127.0.0.1`;** control: two different outer callers land in two buckets and the same caller spends its own. Mutation: omit `remoteAddress` from `inject` (and, for the `trustProxy` case, omit the `x-forwarded-for` header). — (`apps/server/test/mcp/in-process-fetch.test.ts`)
 - ✅ **14.253 — a tool run through `hostedSession` writes an event with `origin: 'mcp'` and `actorId` = the token's owner;** control: a read tool returns the same JSON the REST route returns. Mutation: build the session with a different `userId`. — (`apps/server/test/mcp/in-process-fetch.test.ts`)
@@ -740,12 +739,12 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 
 ## 14.8 Hosted MCP — the /mcp endpoint
 
-*Remote-MCP plan Task 7 (14.260–14.269). Tests: `apps/server/test/mcp/mcp-http.test.ts`. Run LOCALLY (CI does not run on a dev PR). Every case runs the real `buildApp`, the real OAuth token exchange and the real nine tools over the API's own routes; nothing is stubbed.*
+*Remote-MCP plan Task 7 (14.260–14.269). Tests: `apps/server/test/mcp/mcp-http.test.ts`. Run LOCALLY (CI does not run on a dev PR). Every case runs the real `buildApp`, the real OAuth token exchange and the real tools over the API's own routes; nothing is stubbed.*
 
 - ✅ **14.260 — no bearer → 401 with `WWW-Authenticate: Bearer resource_metadata="<public>/.well-known/oauth-protected-resource/mcp"`;** control: the same header on an expired token (one that authenticated a moment earlier). Mutation: answer 401 with no header.
 - ✅ **14.261 — a local (device-flow) token is REFUSED at `/mcp` (401): the hosted door takes hosted tokens only;** control: the same token is accepted by the REST API, and a hosted token of the same person is accepted at `/mcp`. Mutation: accept any resolvable token. *(Keeps the two doors' credentials apart — a leaked local token cannot be pasted into a remote client.)*
-- ✅ **14.262 — `initialize` then `tools/list` return the nine tools with their descriptions, as JSON (`enableJsonResponse`), and NO `mcp-session-id` header (stateless);** control: every tool carries a description. Mutation: set `sessionIdGenerator: () => randomUUID()`.
-- ✅ **14.263 — `tools/call list_workspaces` returns the caller's workspaces (the same JSON as `GET /v1/me/workspaces`);** control: a second person sees their own (none). Mutation: build the session from a fixed user.
+- ✅ **14.262 — `initialize` then `tools/list` return every tool (nine, then sixteen with MCP CRUD Task 6) with their descriptions, as JSON (`enableJsonResponse`), and NO `mcp-session-id` header (stateless);** control: every tool carries a description. Mutation: set `sessionIdGenerator: () => randomUUID()`.
+- ✅ **14.263 — `tools/call list_workspaces` returns the caller's LIVE workspaces (the same JSON as `GET /v1/me/workspaces` for a person with no archived workspace — since MCP CRUD Task 6 archived ones need `include`);** control: a second person sees their own (none). Mutation: build the session from a fixed user.
 - ✅ **14.264 — `tools/call create_ticket` writes an event with `origin: 'mcp'`, `actorId` = the token's owner;** control: `transition_ticket` refused by the rule engine returns `isError: true` with the server's own reason text. Mutation: catch and reword the error.
 - ✅ **14.265 — `Origin` present and not allowed (`https://evil.example`) → 403 before auth (even with a valid token); absent `Origin` (server-to-server connectors) and `https://claude.ai` are admitted;** control: `https://chatgpt.com` is admitted (reaches the 401). Mutation: skip the Origin check.
 - ✅ **14.266 — a person removed from every workspace (R5 `membership.revoked`) with a live connection gets `list_workspaces` → `{ workspaces: [] }` and a write → the REST refusal, never data;** control: before removal the same calls return data. Mutation: cache the membership on the connection. *(Review Focus 3)*
@@ -762,3 +761,32 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.292 — the device flow still works end to end after all of this (stdio door unchanged, D2): mint → approve → token → `/v1/me/workspaces`;** control: the hosted door beside it works for the same person (and `require-session-pat.test.ts`'s 14.30 is green in the same run). Mutation: make `resolveMcpToken` require `kind='hosted'`.
 - ✅ **14.293 — a hosted access token cannot approve or deny a device code or decide a consent (each 403), so a connected app cannot mint itself more access;** control: a web session can do all three on the very same codes and request. Mutation: drop any one `authKind` fence (approve, deny, decision — each run separately).
 - ✅ **14.294 — the dev stack (`docker-compose.dev.yml`, server service) declares `MCP_PUBLIC_URL: "${MCP_PUBLIC_URL:-}"`: empty by default, so the hosted door is OFF on the dev stack exactly as in a deploy that has not set it, and the shell's value (`MCP_PUBLIC_URL=http://localhost:3000 ctl rebuild`) reaches `loadConfig` unchanged;** control: both halves in the same `it`, through the real `loadConfig`. Mutation: delete the key; hard-code the URL on; hard-code it empty (not switchable). *(`apps/server/test/deploy/compose-dev-contract.test.ts`; it also made 13.159 substitute compose's `${NAME:-default}` before calling `loadConfig`, which a declared-empty URL otherwise breaks.)*
+
+## 14.12 MCP CRUD — plumbing and workspace tools (MCP CRUD plan Tasks 5–6; block `14.300`–`14.359`)
+
+*Tests: `packages/mcp-server/test/session.test.ts`, `submit.test.ts`, `write-tools.test.ts`, `apps/server/test/mcp/in-process-fetch.test.ts`. Run LOCALLY (CI does not run on a dev PR).*
+
+- ✅ **14.300 — `Session.post` sends a JSON POST with the cached token and re-authenticates once on 401, like `get`;** control: a 403 is thrown after one send, not retried. Mutation: no re-auth on post (`session.test.ts`, red: the 401 surfaces).
+- ✅ **14.301 — the hosted door's session `post` goes through the in-process transport with the caller's bearer (same as `get`/`postEvents`);** control: `get` unchanged, and the same route without a bearer is a 401. Mutation: post without the bearer (`in-process-fetch.test.ts`, red: `HttpError 401`).
+- ✅ **14.302 — `submitBatch` returns every committed result, and on a refusal throws `event <i> refused by <rule>: <reason>` verbatim (an invalid result: `event <i> <code>: <message>`; a short answer is refused);** control: an all-committed batch returns n results. Mutation: report only the last result (`submit.test.ts`, red).
+- ✅ **14.303 — `write-tools` behaviour is unchanged after the move to `tools/submit.ts` (the existing 14.70–14.77 cases stay green);** control: guard. Mutation: none.
+
+*Task 6 — workspace tools (14.304–14.312). Tests: `packages/mcp-server/test/workspace-tools.test.ts` (unit, fake session), `test/register.test.ts` / `exports.test.ts` and `apps/server/test/mcp/mcp-http.test.ts` 14.262 (both doors list the tools), and `apps/server/test/mcp/in-process-fetch.test.ts` (the tools run against the real server through the hosted door, citing 14.306 and 14.309).*
+
+- ✅ **14.304 — `create_workspace` POSTs `/v1/workspaces` `{name, prefix?}` and returns `{workspaceId}`; a 400/422 is passed through in the server's words;** control: no prefix → body without the key (asserted with `toStrictEqual`, which sees `prefix: undefined`). Mutation: send `prefix: undefined` (red).
+- ✅ **14.305 — `get_workspace` answers name, prefix, role, archived and project counts from the directory, and for a deleted workspace says it is deleted and names `undelete_workspace`;** control: an unknown id, and a deleted PROJECT with that id, → "workspace not found or not visible to you". Mutation: memoise the directory read (red).
+- ✅ **14.306 — `rename_workspace` emits `workspace.renamed {name}` against the workspace entity with origin `mcp`; a refusal comes back verbatim;** control: the envelope passes `parseEvent`. Mutation: origin `web` (red).
+- ✅ **14.307 — `archive_workspace` and `delete_workspace` refuse without `confirm_name` or with a non-matching one (wrong case, trailing space), naming the expected name, and send NOTHING;** control: the exact name sends one event. Mutation: compare case-insensitively (red).
+- ✅ **14.308 — `confirm_name` is checked against the CURRENT name (read at call time), so after a rename the old name is refused with the new one named;** control: the new name passes. Mutation: memoise the directory / compare against an earlier-read name (red).
+- ✅ **14.309 — `delete_workspace` emits `workspace.deleted` and NEVER `purge.marked`; its result says it is restorable from Deleted items for 15 days;** control: `undelete_workspace` emits `workspace.undeleted`. Mutation: append `purge.marked` (red).
+- ✅ **14.310 — `restore_workspace` / `undelete_workspace` need no `confirm_name`;** control: an unknown id is still refused with the server's own reason. Mutation: require `confirm_name` (red).
+- ✅ **14.311 — an owner-only refusal (a member archiving, deleting or restoring) returns `refused by permission.role: Only the workspace owner can archive, delete or restore a workspace.` verbatim, full-string equality;** control: the owner commits. Mutation: reword the refusal in `submitOne` (red).
+- ✅ **14.312 — `list_workspaces` defaults to LIVE workspaces; `include: ['archived']` adds archived (flagged); `include: ['deleted']` adds deleted ones from Deleted items (flagged `deleted: true`), and only then is Deleted items read;** control: with both includes, all three kinds appear once and a deleted PROJECT is not listed. Mutation: default to archived-included (red).
+
+*Lane-3 review fixes (14.313–14.316). Tests: `apps/server/test/routes/workspace-founding-origin.test.ts` (14.313, 14.315), `apps/server/test/mcp/in-process-fetch.test.ts` (14.314, in the 14.306/14.309 hosted round trip, with a real HOSTED token — a browser-session bearer would authenticate as `session` and record `web`), `packages/mcp-server/test/lazy-session.test.ts` (14.316). The seeds `bootstrapWorkspace` appends beside `workspace.created` are `server` by design and are not moved. Run LOCALLY.*
+
+- ✅ **14.313 — `POST /v1/workspaces` authenticated as an MCP token (a real device-flow token) records `workspace.created` with origin `mcp`, and the founding seeds stay `server`;** control, same `it`: a browser session founds with `web`. Mutations: hardcode `'web'` (red on the mcp half), hardcode `'mcp'` (red on the control).
+- ✅ **14.314 — `create_workspace` through the hosted door (`hostedSession` over the in-process fetch, with a hosted access token) records `workspace.created` with origin `mcp` and no `web` row in the ledger;** control: the lifecycle rows of the same round trip are all `mcp`. Mutation: hardcode `'web'` in the route (red).
+- ✅ **14.315 — the origin is chosen only by `authKind`: a body naming `origin` (`server`, or `mcp` from a browser session) is a 400 that appends nothing, and `x-origin` / `x-gisik-origin` headers change nothing;** control: the two accepted origins, token → `mcp` and session → `web`. Mutation: open the body schema and read the origin from the body (red: the forged `server` is no longer a 400).
+- ✅ **14.316 — `lazySession.post` waits for the credential and forwards path and body to the resolved session;** control, same `it`: `get` still forwards and the session is opened once. Mutations: `post` returns without calling the resolved session (red), `post` skips `ready()` (red).
+

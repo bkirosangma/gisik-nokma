@@ -93,4 +93,35 @@ describe('the session', () => {
     await expect(session.get('/v1/x')).rejects.toMatchObject({ status: 404, body: { error: 'not_found' } });
     expect(post).not.toHaveBeenCalled();
   });
+
+  it('14.300 post sends the cached token and re-authenticates ONCE on a 401, like get; a 403 is thrown, not retried', async () => {
+    const config = scratchConfig();
+    await writeCachedToken(config.tokenPath, { token: 'stale', userId: 'old' });
+    const posted: Array<[string, unknown, string | null]> = [];
+    const client: GisikClient = {
+      get: async () => ({}),
+      post: async (path, body, token) => {
+        if (path === '/v1/mcp/device/code') {
+          return { deviceCode: 'd', userCode: 'BCDF-GHJK', verificationUri: 'http://web/a', expiresInSec: 600, pollIntervalSec: 1 };
+        }
+        if (path === '/v1/mcp/device/token') return { status: 'issued', token: 'fresh', userId: '01J0USER0000000000000000BB' };
+        posted.push([path, body, token]);
+        if (token === 'stale') throw new HttpError(401, { error: 'unauthenticated' });
+        if (body && (body as { name?: string }).name === 'Forbidden') throw new HttpError(403, { error: 'forbidden' });
+        return { workspaceId: 'W' };
+      },
+    };
+    const session = await createSession({ config, client, prompt: () => {}, sleep: async () => {}, now: () => 0 });
+    await expect(session.post('/v1/workspaces', { name: 'X' })).resolves.toEqual({ workspaceId: 'W' });
+    // The first call carried the cached (stale) token, the retry the fresh one: two sends, one login.
+    expect(posted).toEqual([
+      ['/v1/workspaces', { name: 'X' }, 'stale'],
+      ['/v1/workspaces', { name: 'X' }, 'fresh'],
+    ]);
+
+    // CONTROL, same `it`: a 403 is the answer — thrown after ONE send, no second login.
+    posted.length = 0;
+    await expect(session.post('/v1/workspaces', { name: 'Forbidden' })).rejects.toMatchObject({ status: 403 });
+    expect(posted).toHaveLength(1);
+  });
 });
