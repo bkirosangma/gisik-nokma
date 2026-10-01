@@ -2190,6 +2190,12 @@ input, textarea, select { font-family: inherit; }
     min-width: 0;
   }
 }
+/* THE PHONE SWITCHER'S WRAPPER (mobile-web plan Task 2, case 21.012). A `<div>`, not the
+   button, carries the show/hide, because `.gn-nav button { display: inline-flex }` (0,1,1) outranks
+   any single-class `display: none` a button could wear — the cascade failure
+   `.gn-nav .gn-nav__more-toggle { display: none }` above is spelled out for. Hidden by default; the
+   40rem arm below paints it. Not a `.gn-nav*` selector, so no top-level `.gn-nav*` rule changed. */
+.gn-phone-switcher { display: none; }
 @media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
      promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
@@ -2199,6 +2205,83 @@ input, textarea, select { font-family: inherit; }
      already carried before this round. */
   .gn-nav__wordmark { display: none; }
 }
+
+/* ── THE PHONE TOP BAR (mobile-web plan Task 2, cases 21.012–21.013) ──────────────────────────
+   Everything below lives INSIDE the 40rem arm: above it the desktop/tablet bar is byte-identical
+   (the control in 21.012 snapshots every top-level `.gn-nav*` rule). */
+@media (max-width: 40rem) {
+  /* The link row and the scope note give way to the switcher. Only the SIGNED-IN row
+     (`.gn-nav__links--member`): the signed-out row is `Help` + `Sign in`, the one way in, and
+     keeps painting. The note renders signed-in only, so hiding it by its own class is safe. */
+  .gn-nav__links--member { display: none; }
+  .gn-nav__scope { display: none; }
+  /* The bar is one row of `--gn-phone-top-height`: the 2.75rem control plus 0.25rem above and
+     below (3.25rem). Centred, because the desktop `flex-start` leaves a one-control row top-heavy. */
+  .gn-nav__inner { align-items: center; padding-block: 0.25rem; gap: 0.5rem; }
+  /* Things that stick under the bar read this: it is no longer 4.35rem tall. */
+  /* `html:root` (0,1,1) beats the bare `:root` (0,1,0) declaration above it by specificity, not
+     source order; spelled so the token's single top-level declaration stays the only `:root` one
+     (case 10.164 counts them). */
+  html:root { --app-nav-offset: var(--gn-phone-top-height); }
+  .gn-phone-switcher { display: inline-flex; flex: 1 1 0; min-width: 0; }
+  /* `.gn-phone-switcher .gn-phone-switcher__button` is two classes deep to beat
+     `.gn-nav button`'s centring and sizing (0,1,1). Quiet by design — a tertiary fill, no
+     accent, no primary: the one loud element on a phone page is the page's own action. */
+  .gn-phone-switcher .gn-phone-switcher__button {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+    background: var(--gn-fill-tertiary);
+    color: var(--gn-text);
+    font: inherit;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    text-align: start;
+  }
+  .gn-phone-switcher__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gn-phone-switcher__chevron { flex: none; color: var(--gn-text-muted); }
+  /* One line at the phone size, long names cut with an ellipsis. The element's TEXT stays whole
+     (nothing is removed from the DOM), so assistive tech reads the full title. The size is the
+     house's heading step below the 34px display type (1.375rem / 1.75rem). The account page pins
+     its own 34px (`.gn-account .gn-page-title`, two classes deep), so it needs its own line here. */
+  .gn-page-title {
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .gn-account .gn-page-title { font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; }
+}
+
+/* The switcher's sheet: portalled to <body>, so none of `.gn-nav a`'s sizing applies and each row
+   states its own 44px. Rows are links with a text span and, for the current one, a check mark —
+   `aria-current` for assistive tech, the mark for sighted people (never colour alone). */
+.gn-phone-switcher__sheet { display: flex; flex-direction: column; gap: 1.5rem; }
+.gn-phone-switcher__heading { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-phone-switcher__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gn-phone-switcher__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.75rem;
+  color: var(--gn-text);
+  text-decoration: none;
+}
+.gn-phone-switcher__link:hover, .gn-phone-switcher__link:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-phone-switcher__link[aria-current] { font-weight: 600; }
+.gn-phone-switcher__link-text { min-width: 0; overflow-wrap: anywhere; }
+.gn-phone-switcher__check { flex: none; color: var(--gn-text-accent); }
+.gn-phone-switcher__link--all { color: var(--gn-text-accent); margin-top: 0.25rem; }
+.gn-phone-switcher__note { margin: 0 0 0.5rem; color: var(--gn-text-muted); font-size: 0.9rem; }
 /* Never shrinks and never wraps — the other half of the split above. Its
    rendered width is fixed (the inbox icon + the avatar), so unlike
    `.gn-nav__links` it does not need `min-width: 0` to be safe: there is no
