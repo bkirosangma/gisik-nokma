@@ -230,6 +230,14 @@ export const primitives = {
   neoNavyRaised: '#232c50',
   neoNavySunken: '#1b2340',
   /**
+   * `neo` DARK `textSubtle` (UX fixes T1, found by 18.306 on the first run): `textSubtleDark` `#a0a0a5` reads 5.21 on
+   * the lifted `neoNavyRaised`, but a field's placeholder sits on its translucent fill COMPOSITED over that surface
+   * (`#313755`), where it measured 4.46, under the 4.5 the neo contexts are held to (`field-placeholder-contrast.test.ts`).
+   * `#a3a3a8` is the smallest neutral lift that clears it (4.62 composited, 5.40 on raised, 6.82 on the well); `hig`
+   * and `minimal` dark keep `#a0a0a5` (their floor is 3 and they did not move). Mapped for `neo`/dark only.
+   */
+  neoTextSubtleDark: '#a3a3a8',
+  /**
    * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
    *
    * **U5: a neo text field wears a 1px full ring.** The shadow edge of the sunken field measured 1.18 light and
@@ -249,14 +257,6 @@ export const primitives = {
    * one-hex `neoPaper`/`neoNavy` those two grounds used, so a recessed well reads as recessed by fill as well as
    * by its shadow. `surfaceSunken` (the field ground) is unchanged.
    */
-  /**
-   * `neo` DARK `textSubtle` (UX fixes T1, found by 18.306 on the first run): `textSubtleDark` `#a0a0a5` reads 5.21 on
-   * the lifted `neoNavyRaised`, but a field's placeholder sits on its translucent fill COMPOSITED over that surface
-   * (`#313755`), where it measured 4.46, under the 4.5 the neo contexts are held to (`field-placeholder-contrast.test.ts`).
-   * `#a3a3a8` is the smallest neutral lift that clears it (4.62 composited, 5.40 on raised, 6.82 on the well); `hig`
-   * and `minimal` dark keep `#a0a0a5` (their floor is 3 and they did not move). Mapped for `neo`/dark only.
-   */
-  neoTextSubtleDark: '#a3a3a8',
   neoFieldRimLight: '#927c6a',
   neoFieldRimOnWellLight: '#897362',
   neoFieldRimDark: '#6f7997',
@@ -1742,16 +1742,17 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'border', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'border', bg: 'surfaceWell', minimum: 3 },
   /**
-   * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Ten rows, so the
-   * roster is 54.
+   * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Eight rows, so the
+   * roster is 52.
    *
    * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. Under `hig`
    *   and `minimal` it is `border`, which already clears these. Neo measures 3.31 (light, on the well) and
    *   3.14 (dark, on the lifted raised surface; the binding pair that moved `neoFieldRimDark` off the owner's
    *   `#6b7491`, 2.93 there).
-   * - `textAccent` and `textSubtle` on `surfaceRaised` (4.5): the neo-dark raised step to `#232c50` (5.40 for
-   *   neo's `textSubtle`). `accent` on `#232c50` (5.62) is asserted by 23.006 and is NOT a row: it is a fill, and
-   *   `tokens.ts` retired that pairing as a text guarantee.
+   * - `textAccent` and `textSubtle` on `surfaceRaised` (4.5) were ALREADY rows (`textAccent`, Round 2d;
+   *   `textSubtle`, 2026-09-15), so none is added here. U8's neo-dark raised step to `#232c50` re-clears both (5.40
+   *   for neo's `textSubtle`), and 23.006 asserts those neo-dark readings. `accent` on `#232c50` (5.62) is asserted
+   *   by 23.006 and is NOT a row: it is a fill, and `tokens.ts` retired that pairing as a text guarantee.
    * - `textAccent` (4.5) and the `accent` FILL (3) on the track and the well, now that neo's steps are real
    *   fills. `text`, `textMuted` and `textSubtle` on both were already rows.
    */
@@ -1759,8 +1760,6 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'fieldRim', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'fieldRim', bg: 'surfaceSunken', minimum: 3 },
   { fg: 'fieldRim', bg: 'surfaceWell', minimum: 3 },
-  { fg: 'textAccent', bg: 'surfaceRaised', minimum: 4.5 },
-  { fg: 'textSubtle', bg: 'surfaceRaised', minimum: 4.5 },
   { fg: 'textAccent', bg: 'surfaceTrack', minimum: 4.5 },
   { fg: 'textAccent', bg: 'surfaceWell', minimum: 4.5 },
   { fg: 'accent', bg: 'surfaceTrack', minimum: 3 },
