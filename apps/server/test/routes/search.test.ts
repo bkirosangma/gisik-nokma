@@ -442,6 +442,17 @@ describe('GET /v1/search — finding text across a workspace', () => {
     ]);
   });
 
+  it('7.704 `assigneeId: "me"` narrows a search to the caller\'s own tickets, alone and inside `assigneeIds`; a real id still works', async () => {
+    // taskInEpic is the seeded member's own ticket and matches `the`; sharedTask is unassigned.
+    expect(await hitIds('member', 'the')).toEqual([read.world.taskInEpicId, read.world.sharedTaskId]);
+    expect(await hitIds('member', 'the', { assigneeId: 'me' })).toEqual([read.world.taskInEpicId]);
+    expect(await hitIds('member', 'the', { assigneeIds: ['me'] })).toEqual([read.world.taskInEpicId]);
+    // the owner is assigned nothing here, so the SAME filter answers a different (empty) set
+    expect(await hitIds('owner', 'the', { assigneeId: 'me' })).toEqual([]);
+    // control: a real id is not rewritten
+    expect(await hitIds('member', 'the', { assigneeId: read.world.member })).toEqual([read.world.taskInEpicId]);
+  });
+
   it('7.23 refuses a filter that smuggles its own text term, and every other malformed filter, as `invalid_filter`', async () => {
     const smuggled = await seededSearch('member', 'the', { text: 'licence' });
     expect(smuggled.statusCode).toBe(400);

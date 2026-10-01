@@ -1380,3 +1380,131 @@ describe('GET /v1/projects/:projectId/tickets — a soft-deleted epic ancestor (
     expect(child?.epicId).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// MCP CRUD plan Task 3 — plural filter keys and "me" (cases 7.701–7.705).
+//
+// Two projects of this block's own, so every assertion is project-scoped and
+// independent of what the shared world's earlier cases did to it. The people:
+// the owner (assigned a1, b1), the member (a2), the guest (gVisible, which the
+// guest is named on; gHidden, assigned to the guest with an owner-only audience,
+// so the guest reaches it through the assignee arm alone). The owner's a1 and b1
+// are the rows a `"me"` that widened past the visibility predicate would surface
+// to the guest.
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/projects/:projectId/tickets — several values and "me" (MCP CRUD Task 3)', () => {
+  const projA = newUlid();
+  const projB = newUlid();
+  const a1 = newUlid(); // owner, P1
+  const a2 = newUlid(); // member, P3
+  const a3 = newUlid(); // nobody, P2 (born)
+  const b1 = newUlid(); // owner; collaborator: member
+  const gVisible = newUlid(); // assigned to the guest, audience [owner, guest]
+  const gHidden = newUlid(); // assigned to the guest, audience [owner] only (reachable by assignment)
+
+  beforeAll(async () => {
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    const project = (projectId: string, name: string): LedgerEvent[] => [
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: read.world.owner, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: read.world.member, projectAdmin: false } }),
+    ];
+    const ticket = (id: string, projectId: string, title: string): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: null, title } });
+    const assign = (id: string, assigneeId: string): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'ticket.assigned', payload: { assigneeId } });
+    const audience = (id: string, userIds: string[]): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'visibility.set', payload: { ticketId: id, mode: 'explicit', userIds } });
+    const priority = (id: string, value: string): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'ticket.field_set', payload: { fieldId: 'priority', value } });
+
+    await applyCommitted(db.pool, [
+      ...project(projA, 'Plural A'),
+      ...project(projB, 'Plural B'),
+      ticket(a1, projA, 'Plural a1'), assign(a1, read.world.owner), priority(a1, 'P1'),
+      ticket(a2, projA, 'Plural a2'), assign(a2, read.world.member), priority(a2, 'P3'),
+      ticket(a3, projA, 'Plural a3'),
+      ticket(b1, projB, 'Plural b1'), assign(b1, read.world.owner),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: b1 }, type: 'ticket.collaborator_added', payload: { userId: read.world.member } }),
+      ticket(gVisible, projB, 'Plural gVisible'), assign(gVisible, read.userIds.guest), audience(gVisible, [read.world.owner, read.userIds.guest]),
+      ticket(gHidden, projA, 'Plural gHidden'), assign(gHidden, read.userIds.guest), audience(gHidden, [read.world.owner]),
+    ]);
+  }, 60_000);
+
+  it('7.701 assigneeIds answers the union of the listed assignees and nobody else; stateIds and stateCategories likewise', async () => {
+    const owner = read.world.owner;
+    const member = read.world.member;
+    // control: ONE assignee answers that person's tickets only
+    expect(await idsOf('owner', projA, { filter: { assigneeId: owner } })).toEqual([a1]);
+    expect(await idsOf('owner', projA, { filter: { assigneeIds: [owner, member] } })).toEqual([a1, a2].sort());
+    // a list naming a person nobody assigned adds nothing (ANY, not ALL — ALL of two distinct people is empty)
+    expect(await idsOf('owner', projA, { filter: { assigneeIds: [owner, newUlid()] } })).toEqual([a1]);
+
+    // state lists: every ticket here is in the workflow's initial state, so a list naming it and an
+    // unused state answers all of them, and a list naming only the unused state answers none.
+    const all = await idsOf('owner', projA, { filter: { stateCategories: ['open', 'active', 'terminal'] } });
+    expect(all).toEqual([a1, a2, a3, gHidden].sort());
+    const initial = (await listOf('owner', projA)).groups[0]?.cards[0]?.stateId ?? '';
+    expect(initial).not.toBe('');
+    expect(await idsOf('owner', projA, { filter: { stateIds: ['no-such-state', initial] } })).toEqual(all);
+    expect(await idsOf('owner', projA, { filter: { stateIds: ['no-such-state'] } })).toEqual([]);
+  });
+
+  it('7.702 priorities, typeIds and collaboratorIds answer the union', async () => {
+    // control: one level answers one ticket
+    expect(await idsOf('owner', projA, { filter: { priority: 'P1' } })).toEqual([a1]);
+    expect(await idsOf('owner', projA, { filter: { priorities: ['P1', 'P3'] } })).toEqual([a1, a2].sort());
+    expect(await idsOf('owner', projA, { filter: { typeIds: ['epic', 'task'] } })).toEqual(
+      [a1, a2, a3, gHidden].sort(),
+    );
+    expect(await idsOf('owner', projA, { filter: { typeIds: ['epic'] } })).toEqual([]);
+    // collaborators: b1 names the member; control — the singular key finds the same ticket
+    expect(await idsOf('owner', projB, { filter: { collaboratorId: read.world.member } })).toEqual([b1]);
+    expect(await idsOf('owner', projB, { filter: { collaboratorIds: [newUlid(), read.world.member] } })).toEqual([b1]);
+    expect(await idsOf('owner', projB, { filter: { collaboratorIds: [newUlid()] } })).toEqual([]);
+  });
+
+  it('7.703 a list value that is hostile text is data: it matches nothing and breaks nothing', async () => {
+    const hostile = ["x'); DROP TABLE proj_tickets; --", 'a"b', '%_\\'];
+    expect(await idsOf('owner', projA, { filter: { assigneeIds: hostile } })).toEqual([]);
+    expect(await idsOf('owner', projA, { filter: { stateIds: hostile, typeIds: hostile, collaboratorIds: hostile } })).toEqual([]);
+    // control: the table is intact and the list route still answers
+    expect(await idsOf('owner', projA, { filter: { assigneeIds: [read.world.owner] } })).toEqual([a1]);
+  });
+
+  it('7.704 "me" answers the caller\'s own tickets — alone, inside a list, and as a collaborator; a real id still works', async () => {
+    expect(await idsOf('owner', projA, { filter: { assigneeId: 'me' } })).toEqual([a1]);
+    expect(await idsOf('member', projA, { filter: { assigneeId: 'me' } })).toEqual([a2]);
+    expect(await idsOf('member', projA, { filter: { assigneeIds: ['me', read.world.owner] } })).toEqual([a1, a2].sort());
+    expect(await idsOf('member', projB, { filter: { collaboratorId: 'me' } })).toEqual([b1]);
+    expect(await idsOf('member', projB, { filter: { collaboratorIds: ['me'] } })).toEqual([b1]);
+    // control: a real id is not rewritten
+    expect(await idsOf('member', projA, { filter: { assigneeId: read.world.owner } })).toEqual([a1]);
+  });
+
+  it('7.705 a guest\'s "me" resolves to the guest and the visibility predicate still applies', async () => {
+    // The guest reaches gVisible through its audience and gHidden ONLY through being its assignee
+    // (the assignee arm, W3/R1: an assigned ticket is reachable whatever its audience). What they
+    // must NOT reach is the owner's a1 — assigned to someone else, audience-less for a guest.
+    expect(await idsOf('guest', projB, { filter: { assigneeId: 'me' } })).toEqual([gVisible]);
+    expect(await idsOf('guest', projA, { filter: { assigneeId: 'me' } })).toEqual([gHidden]);
+    // A list naming "me" AND the owner: the owner's tickets are in the filter's answer set but outside
+    // the guest's visibility, so only the guest's own ticket comes back — a "me" that widened would
+    // surface a1 (projA) and b1 (projB) here.
+    expect(await idsOf('guest', projA, { filter: { assigneeIds: ['me', read.world.owner] } })).toEqual([gHidden]);
+    expect(await idsOf('guest', projB, { filter: { assigneeIds: ['me', read.world.owner] } })).toEqual([gVisible]);
+    expect(await idsOf('guest', projA, { filter: { assigneeId: read.world.owner } })).toEqual([]);
+    // controls: the owner sees the owner's tickets by the same filter, and "me" is the owner's own
+    expect(await idsOf('owner', projA, { filter: { assigneeIds: ['me', read.userIds.guest] } })).toEqual([a1, gHidden].sort());
+    expect(await idsOf('owner', projB, { filter: { assigneeIds: ['me', read.userIds.guest] } })).toEqual([b1, gVisible].sort());
+  });
+
+  it('7.700 the route refuses a singular+plural pair and an empty list as `invalid_filter`, naming nothing', async () => {
+    for (const filter of [{ assigneeId: read.world.owner, assigneeIds: [read.world.owner] }, { assigneeIds: [] }]) {
+      const response = await getList('owner', projA, { filter: filter as FilterSpec });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: 'invalid_filter' });
+    }
+  });
+});

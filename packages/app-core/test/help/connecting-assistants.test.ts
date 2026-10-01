@@ -103,3 +103,30 @@ describe('14.282 the anchor the "How to connect" link lands on', () => {
     expect(new Set(every).size).toBe(every.length);
   });
 });
+
+describe('14.337 §16 says what the assistant can do, and the safety rules for deleting', () => {
+  it('14.337 lists workspaces, projects, people and jobs; deletes go to Deleted items for 15 days and need the exact name', () => {
+    const can = text(entry('What your assistant can do'));
+    for (const word of ['workspaces', 'projects', 'people', 'jobs']) expect(can).toContain(word);
+    expect(can).toContain('across a whole workspace');
+    expect(can).toContain('deleted items');
+    expect(can).toContain('15 days');
+    expect(can).toContain('exact name');
+    // AMENDED 2026-10-01 (MCP CRUD Task 9 fix 1): the "It can do what you can do" bullet no longer lists only jobs —
+    // it names the workspace and project powers and points at this entry. It lives in "What connecting does".
+    const connecting = text(entry('What connecting does'));
+    expect(connecting).toContain('workspaces and projects');
+    expect(connecting).toContain('what your assistant can do');
+    // The workspace page's section gains "Edit a project", by the control's own label.
+    const edit = manual()
+      .sections.flatMap((s) => s.entries)
+      .find((e) => e.title === 'Edit a project');
+    expect(edit).toBeDefined();
+    expect(text(edit as HelpEntry)).toContain('edit button beside archive');
+    expect(text(edit as HelpEntry)).toContain('owner');
+    // CONTROL, same `it`: the check reads the right place — the older §16 entry names none of this,
+    // so a regeneration that dropped the new entry's words could not be satisfied by it.
+    expect(text(entry('What connecting does'))).not.toContain('15 days');
+    expect(text(entry('What connecting does'))).not.toContain('exact name');
+  });
+});

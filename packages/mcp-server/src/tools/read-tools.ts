@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { filterSpecSchema } from '@gisik-nokma/domain';
+import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 
 export type ToolDefinition = {
@@ -9,38 +10,34 @@ export type ToolDefinition = {
   handler(args: Record<string, unknown>): Promise<unknown>;
 };
 
-/** `filter` is the domain schema, imported and not restated. It is `.strict()`,
- *  and its assignee/collaborator keys are SINGULAR — a caller passing an array
- *  is refused by the schema rather than silently matching nothing. */
+/** `filter` is the domain schema, imported and not restated. It is `.strict()`: a key it does not
+ *  know is refused rather than silently matching nothing. Each person/type/state/priority slot has a
+ *  SINGLE key (`assigneeId`) and a PLURAL one (`assigneeIds`, 1–20 values — "Asha or Ravi"), mutually
+ *  exclusive, and `"me"` in an assignee or collaborator slot is resolved to the caller by the server
+ *  (MCP CRUD plan M5/M6). Importing the schema is what makes the plural keys and the refusal of a
+ *  singular+plural pair arrive here without a second spelling. */
 const filterArg = filterSpecSchema.optional();
+
+/** The server answers a refused filter with `400 { error: 'invalid_filter' }` and deliberately names
+ *  nothing (it would mirror the refused value). On its own that reaches an assistant as "answered
+ *  400"; this says what can be wrong with a filter so it can retry. */
+const INVALID_FILTER_SENTENCE =
+  'invalid_filter: the filter was refused. Each filter slot takes a single value OR its list form ' +
+  '(assigneeId or assigneeIds, never both), lists hold 1–20 values, "me" stands for you in the ' +
+  'assignee and collaborator slots, and priorities are P1, P2 or P3.';
+
+const NO_SCOPE =
+  'list_tickets needs a scope: pass projectId (the tickets of one project) or workspaceId (every ' +
+  'project you can see in that workspace).';
+const TWO_SCOPES =
+  'list_tickets takes one scope, not both: pass projectId (the tickets of one project) OR ' +
+  'workspaceId (every project you can see in that workspace).';
+
+/** What `/members` and `/actor-names` carry, narrowed to what this tool reads. */
+type RosterRow = { userId: string; displayName: string; role?: string; email?: string; removed?: true };
 
 export function readTools(session: Session): ToolDefinition[] {
   return [
-    {
-      name: 'list_workspaces',
-      description:
-        'List the gisik-nokma workspaces you belong to, with your role in each and the projects ' +
-        'you can see inside them. The project list is deliberately partial: a project you are not ' +
-        'a member of is absent rather than named.',
-      inputSchema: {},
-      handler: async () => session.get('/v1/me/workspaces'),
-    },
-    {
-      name: 'list_projects',
-      description:
-        'List the projects you can see inside one workspace. Reads the same workspace directory as ' +
-        'list_workspaces — the server has no separate projects route — and returns an empty list for ' +
-        'a workspace you cannot see.',
-      inputSchema: { workspaceId: z.string().min(1) },
-      handler: async (args) => {
-        const workspaceId = z.string().min(1).parse(args['workspaceId']);
-        const body = (await session.get('/v1/me/workspaces')) as {
-          workspaces: { workspaceId: string; projects: { projectId: string; name: string }[] }[];
-        };
-        const match = body.workspaces.find((w) => w.workspaceId === workspaceId);
-        return { workspaceId, projects: match?.projects ?? [] };
-      },
-    },
     {
       name: 'search_tickets',
       description:
@@ -73,11 +70,18 @@ export function readTools(session: Session): ToolDefinition[] {
     {
       name: 'list_tickets',
       description:
-        'List tickets in one project, optionally grouped and filtered. `parentId` accepts the literal ' +
-        'value "root" to mean top-level tickets only. Pages with `cursor`; the response carries ' +
-        '`nextCursor` (null on the last page).',
+        'List tickets, optionally grouped and filtered. Pass exactly one of `projectId` (the tickets of one ' +
+        'project) or `workspaceId` (every project you can see in that workspace, archived projects ' +
+        'excluded) — never both, never neither. In `filter`, `assigneeId` and `collaboratorId` accept ' +
+        '"me" for yourself ("my open tickets everywhere" is `workspaceId` + `filter: { assigneeId: "me", ' +
+        'closed: false }`), and assignee, collaborator, type, state, state category and priority also ' +
+        'take a list under `assigneeIds`, `collaboratorIds`, `typeIds`, `stateIds`, `stateCategories`, ' +
+        '`priorities` (P1–P3) — "assigned to Asha or Ravi" — instead of, never beside, the single key. ' +
+        'Use list_members to find a person\'s userId. `parentId` accepts the literal value "root" to mean ' +
+        'top-level tickets only. Pages with `cursor`; the response carries `nextCursor` (null on the last page).',
       inputSchema: {
-        projectId: z.string().min(1),
+        projectId: z.string().min(1).optional(),
+        workspaceId: z.string().min(1).optional(),
         groupBy: z.enum(['epic', 'status', 'assignee', 'type', 'flat']).optional(),
         filter: filterArg,
         parentId: z.string().min(1).optional(),
@@ -87,7 +91,8 @@ export function readTools(session: Session): ToolDefinition[] {
       handler: async (args) => {
         const parsed = z
           .object({
-            projectId: z.string().min(1),
+            projectId: z.string().min(1).optional(),
+            workspaceId: z.string().min(1).optional(),
             groupBy: z.enum(['epic', 'status', 'assignee', 'type', 'flat']).optional(),
             filter: filterArg,
             parentId: z.string().min(1).optional(),
@@ -95,6 +100,9 @@ export function readTools(session: Session): ToolDefinition[] {
             limit: z.number().int().min(1).max(200).optional(),
           })
           .parse(args);
+        // EXACTLY ONE scope, decided before anything is sent: a call naming both would silently pick one.
+        if (parsed.projectId === undefined && parsed.workspaceId === undefined) throw new Error(NO_SCOPE);
+        if (parsed.projectId !== undefined && parsed.workspaceId !== undefined) throw new Error(TWO_SCOPES);
         const search = new URLSearchParams();
         if (parsed.groupBy !== undefined) search.set('groupBy', parsed.groupBy);
         if (parsed.parentId !== undefined) search.set('parentId', parsed.parentId);
@@ -102,7 +110,21 @@ export function readTools(session: Session): ToolDefinition[] {
         if (parsed.limit !== undefined) search.set('limit', String(parsed.limit));
         if (parsed.filter !== undefined) search.set('filter', JSON.stringify(parsed.filter));
         const query = search.toString();
-        return session.get(`/v1/projects/${encodeURIComponent(parsed.projectId)}/tickets${query === '' ? '' : `?${query}`}`);
+        // `/ticket-list`, not `/tickets`: `GET /v1/workspaces/:id/tickets` is Plan 4's visibility list (a
+        // different shape, `200 []` for an outsider). The workspace scope answers the project route's
+        // `ListResponse` with `projectId: null`.
+        const path =
+          parsed.projectId !== undefined
+            ? `/v1/projects/${encodeURIComponent(parsed.projectId)}/tickets`
+            : `/v1/workspaces/${encodeURIComponent(parsed.workspaceId ?? '')}/ticket-list`;
+        try {
+          return await session.get(`${path}${query === '' ? '' : `?${query}`}`);
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 400 && isInvalidFilter(error.body)) {
+            throw new Error(INVALID_FILTER_SENTENCE, { cause: error });
+          }
+          throw error;
+        }
       },
     },
     {
@@ -119,5 +141,52 @@ export function readTools(session: Session): ToolDefinition[] {
         );
       },
     },
+    {
+      name: 'list_members',
+      description:
+        'The people in a workspace, so you can find someone\'s userId (for assignee filters or assigning). ' +
+        'Owners, admins and members get the roster with each person\'s role and, where they have a real ' +
+        'one, their email. A guest gets only the names of the people on tickets shared with them — no ' +
+        'roster, no roles, no emails. Use "me" in filters for yourself.',
+      inputSchema: { workspaceId: z.string().min(1) },
+      handler: async (args) => {
+        const workspaceId = z.string().min(1).parse(args['workspaceId']);
+        const base = `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
+        try {
+          const roster = (await session.get(`${base}/members`)) as { members: RosterRow[] };
+          return {
+            workspaceId,
+            members: roster.members.map((m) => ({
+              userId: m.userId,
+              name: m.displayName,
+              ...(m.email === undefined ? {} : { email: m.email }),
+              ...(m.role === undefined ? {} : { role: m.role }),
+            })),
+          };
+        } catch (error) {
+          // A 404 here is how the server tells a GUEST (or a stranger) that the roster is not theirs
+          // (`/members` is `no-guests`). ONLY a 404 falls back: anything else is a failure, not a visibility ruling.
+          if (!(error instanceof HttpError && error.status === 404)) throw error;
+        }
+        try {
+          const names = (await session.get(`${base}/actor-names`)) as { names: RosterRow[] };
+          return {
+            workspaceId,
+            members: names.names.map((n) => ({
+              userId: n.userId,
+              name: n.displayName,
+              ...(n.removed === true ? { removed: true } : {}),
+            })),
+          };
+        } catch (error) {
+          if (error instanceof HttpError && error.status === 404) throw new Error('workspace not found or not visible to you');
+          throw error;
+        }
+      },
+    },
   ];
+}
+
+function isInvalidFilter(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && (body as { error?: unknown }).error === 'invalid_filter';
 }

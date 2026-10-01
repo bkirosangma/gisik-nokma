@@ -1,17 +1,21 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { LazySession } from '../lazy-session.js';
 import type { Session } from '../session.js';
+import { projectTools } from './project-tools.js';
 import { readTools, type ToolDefinition } from './read-tools.js';
+import { workspaceTools } from './workspace-tools.js';
 import { writeTools } from './write-tools.js';
 
 /**
- * The nine tools, in one order, from one place. A tool dropped from either
- * half disappears from the assistant's world silently — there is no error, the
- * capability simply stops existing — so the order and the count are pinned by
- * a test rather than left to whoever edits the two factories next.
+ * Every tool, in one order, from one place: the reads, the ticket writes, the
+ * workspace tools, then the project tools. A tool dropped from any factory disappears from the
+ * assistant's world silently — there is no error, the capability simply stops
+ * existing — so the order and the count are pinned by a test rather than left
+ * to whoever edits the factories next. Both doors (stdio and the hosted `/mcp`)
+ * register through this function, so a tool added here exists in both.
  */
 export function allTools(session: Session): ToolDefinition[] {
-  return [...readTools(session), ...writeTools(session)];
+  return [...readTools(session), ...writeTools(session), ...workspaceTools(session), ...projectTools(session)];
 }
 
 /** What the hosted door may observe about a call: which tool, how it ended, how long. Nothing else. */

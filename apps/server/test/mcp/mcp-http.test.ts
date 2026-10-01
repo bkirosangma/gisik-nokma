@@ -10,7 +10,7 @@ import { buildOAuthApp, hostedToken, PUBLIC_URL } from '../helpers/oauth.js';
 
 /**
  * Hosted MCP plan, Task 7. Cases 14.260–14.269. Nothing is stubbed: the real
- * `buildApp`, the real OAuth token exchange, the real nine tools running over
+ * `buildApp`, the real OAuth token exchange, the real tools running over
  * the API's own routes.
  */
 let db: TestDatabase;
@@ -150,7 +150,7 @@ describe('POST /mcp — the door', () => {
 });
 
 describe('POST /mcp — the tools', () => {
-  it('14.262 initialize then tools/list: nine tools, JSON, no session id', async () => {
+  it('14.262 initialize then tools/list: every tool, JSON, no session id', async () => {
     const { app, otp } = buildOAuthApp(db);
     const user = await signInWithPhone(app, otp, '+911100002262');
     const token = await hostedToken(app, db.pool, user.userId);
@@ -162,21 +162,36 @@ describe('POST /mcp — the tools', () => {
     expect(list.headers['mcp-session-id']).toBeUndefined();
     const tools = list.json().result.tools as { name: string; description: string }[];
     expect(tools.map((t) => t.name)).toEqual([
-      'list_workspaces',
-      'list_projects',
       'search_tickets',
       'list_tickets',
       'get_ticket',
+      'list_members',
       'create_ticket',
       'transition_ticket',
       'add_comment',
       'assign_ticket',
+      'list_workspaces',
+      'get_workspace',
+      'create_workspace',
+      'rename_workspace',
+      'archive_workspace',
+      'restore_workspace',
+      'delete_workspace',
+      'undelete_workspace',
+      'list_projects',
+      'get_project',
+      'create_project',
+      'update_project',
+      'archive_project',
+      'restore_project',
+      'delete_project',
+      'undelete_project',
     ]);
     expect(tools.every((t) => t.description.length > 0)).toBe(true); // CONTROL: described, not bare names
     await app.close();
   });
 
-  it('14.263 list_workspaces is the REST body, per caller', async () => {
+  it('14.263 list_workspaces is the caller\'s live workspaces — the REST body when none is archived — per caller', async () => {
     const { app, otp } = buildOAuthApp(db);
     const a = await signInWithPhone(app, otp, '+911100002263');
     const b = await signInWithPhone(app, otp, '+911100002264');

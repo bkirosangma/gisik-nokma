@@ -226,6 +226,17 @@ You can rename a workspace and the new name appears in everybody's list.
 > limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
 > rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
 
+### Edit a project
+
+If you own a workspace or are an admin of it, a project's card on the workspace's page has an **Edit**
+button beside **Archive**, and the project's own page has the same **Edit** next to its name. It opens a
+small form with the project's **Name** and **Description**; press **Save** to keep your changes, or
+**Cancel** (or Escape) to leave things as they were. A project needs a name — leave it blank and the form
+says so. The new name shows up for everybody in the workspace.
+
+The project's short prefix, the letters at the start of every job's number, is chosen when the project is
+started and cannot be edited. Members who are not owners or admins do not see **Edit**.
+
 ### Deleted items, and getting things back
 
 Everything deleted that you may bring back is listed under **Deleted items** on your Account page: the
@@ -1789,11 +1800,35 @@ assistant, sign in the way you always do, and press **Allow**.
 Three things are worth knowing before you press it:
 
 - **It can do what you can do — all of it.** It can see and change everything you can, in every workspace
-  you belong to: read jobs, create them, move them through their stages, comment and assign. There is no
+  you belong to: read jobs, create them, move them through their stages, comment and assign, and create,
+  rename, archive or delete workspaces and projects — see **What your assistant can do** below. There is no
   read-only choice and no picking one workspace.
 - **It can never do more than you can.** A job you cannot see, it cannot see. A move your role does not
   allow is refused for the assistant in the same words it would be refused for you.
 - **Every change it makes is recorded under your name**, like any other change in the job's history.
+
+### What your assistant can do
+
+Ask in ordinary words; it uses the same permissions you have, so each of these works only where you could
+do it yourself.
+
+- **Workspaces.** See the workspaces you belong to, start a new one (you become its owner), rename one,
+  archive or restore one, and delete one or bring it back.
+- **Projects.** See a workspace's projects, start one, change its name or description, archive or restore
+  it, and delete one or bring it back. A project's short prefix is fixed when it is started and cannot be
+  changed afterwards.
+- **People.** See who is in a workspace. If you are a guest, you are shown only the people on the jobs
+  shared with you — never the full list, and never anyone's email address.
+- **Jobs.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
+  me* works — and add, move, comment on and assign them.
+
+**Deleting is never final here.** When your assistant deletes a workspace or a project it goes to **Deleted
+items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased.
+
+**Archiving and deleting need the exact name.** The assistant must give the workspace's or project's name
+exactly as it is written now — same capitals, same spaces — or nothing happens and it is told what the name
+is. That is so a misheard instruction cannot hit the wrong thing. Renaming something changes the name it
+must give.
 
 ### The address to paste
 
