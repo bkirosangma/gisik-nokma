@@ -10,7 +10,8 @@ import { NavBrand } from "./nav-brand.js";
 import { NotesNavLink } from "./notes-nav-link.js";
 import { BottomBar } from "./bottom-bar.js";
 import { PhoneSwitcher } from "./phone-switcher.js";
-import { useCurrentUser } from "./providers.js";
+import { useSessionStatus } from "./providers.js";
+import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
@@ -197,10 +198,17 @@ function projectIdOf(pathname: string): string | undefined {
 export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const pathname = usePathname();
   // The sign-out CALL moved into `AccountMenu` with the control that used it
-  // (Round 24). `useCurrentUser` stayed, for two branches: whether this bar
+  // (Round 24). The session read stayed, for two branches: whether this bar
   // shows the menu or the signed-out Help/Account fallback below, and which
   // user the remembered workspace must belong to.
-  const user = useCurrentUser();
+  // The session through `useSessionStatus`, the one reading every page's
+  // "Sign in to …" fallback uses (SYS-01): `useCurrentUser` answered null for
+  // loading, error AND signed-out alike, and this bar swapped to "Sign in" on
+  // all three. Now only a genuine `signed-out` draws the door; a failed read
+  // keeps the last known user's chrome and `SessionNotice` says what happened.
+  const session = useSessionStatus();
+  const user = session.kind === "signed-in" ? session.user : null;
+  const signedOut = session.kind === "signed-out";
   const isPhone = useIsPhone();
   const remembered = useLastWorkspace(workspaceId, user?.id ?? null);
 
@@ -414,7 +422,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             This is a real branch, not defensive padding: `/help` renders for a
             signed-out reader by design, and it is the route most likely to be
             wanted by someone who cannot get in. */}
-        {user === null ? (
+        {signedOut ? (
           <>
             <Link href="/help" aria-current={current("/help")}>
               Help
@@ -532,6 +540,8 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
       ) : null}
       </div>
     </nav>
+    {/* The ONE shell notice for a failed session read (SYS-01) — renders nothing while the read is healthy. */}
+    <SessionNotice />
     {/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.020–21.032). Rendered only at phone
         width, by script (`useIsPhone`), and INSTEAD of the corner's Notes and Inbox links above — a
         second set of the same links would be a second unread poller and a duplicate for anything that

@@ -13,7 +13,7 @@ import { AttentionStrip } from '../../src/views/attention-strip.js';
  * `Exclude<AttentionKind, (typeof KINDS)[number]>` would DISTRIBUTE over the union and
  * could be satisfied for the wrong reason.
  */
-const KINDS = ['blocked', 'stale', 'due-soon', 'contested'] as const;
+const KINDS = ['overdue', 'blocked', 'stale', 'due-soon', 'contested'] as const;
 type _Exhaustive = [Exclude<AttentionKind, (typeof KINDS)[number]>] extends [never] ? true : false;
 const _check: _Exhaustive = true;
 void _check;

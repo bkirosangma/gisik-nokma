@@ -1641,7 +1641,7 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
             serverTime: '2026-08-20T04:00:01.000Z',
           },
           windowDays: 7,
-          reason: 'Needed by 2026-08-25 — due within 7 days.',
+          reason: 'due 25 Aug (in 5 days)',
         },
       ],
     };
@@ -1672,6 +1672,35 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
         { contests: [] },
         new Map(),
       ),
+    ).toThrow(MappingError);
+  });
+
+  /**
+   * 21.242 — the `overdue` arm (NP-06) maps like `due-soon`: it is about the DUE DATE, so the
+   * claim is the due claim (not the state's), and the server's reason travels verbatim.
+   */
+  it('21.242 mapAttention maps an overdue arm carrying the DUE claim and the server reason; CONTROL: an unknown arm is still refused', () => {
+    const BHUPEN = '01J9GUSB000000000000000000';
+    const due = {
+      date: '2026-08-17',
+      actorId: BHUPEN,
+      clientTime: '2026-08-10T04:00:00.000Z',
+      serverTime: '2026-08-10T04:00:01.000Z',
+    };
+    const card = serverCard({ dueDate: { state: 'claimed', claim: due } });
+    const body: AttentionResponse = {
+      workspaceId: 'w',
+      generatedAt: '2026-10-01T10:00:00.000Z',
+      settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
+      items: [{ kind: 'overdue', card, due, daysOverdue: 45, reason: 'was due 17 Aug (45 days ago)' }],
+    };
+    const items = mapAttention(body, { contests: [] }, new Map());
+    expect(items.map((item) => item.kind)).toEqual(['overdue']);
+    expect(items[0]?.reason).toBe('was due 17 Aug (45 days ago)');
+    expect(items[0]?.claim?.actorId).toBe(BHUPEN);
+    expect(items[0]?.claim?.actorId).not.toBe(ANSELMA);
+    expect(() =>
+      mapAttention({ ...body, items: [{ ...body.items[0], kind: 'invented' }] }, { contests: [] }, new Map()),
     ).toThrow(MappingError);
   });
 

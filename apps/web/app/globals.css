@@ -2277,6 +2277,35 @@ input, textarea, select { font-family: inherit; }
    below paints it. `AppNav` also renders it only at phone width (`use-is-phone.ts`), so this is the
    belt for the first frame before that effect has run. */
 .gn-bottom-bar { display: none; }
+/* THE SHELL'S SESSION NOTICE (SYS-01, cases 21.239–21.241): shown by `SessionNotice` only while the
+   session read is failing. Wording is the signal, not the tint — the left rule is `--gn-warning`
+   (the `.gn-shell__expired` shape), the sentence says what happened, and Try again is a real
+   button at the 44px floor on every width (so no phone arm is needed). It wraps rather than
+   scrolls: the button drops under the sentence on a narrow screen. */
+.gn-session-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--gn-radius-control);
+  color: var(--gn-text);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-warning);
+}
+.gn-session-notice__retry {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid var(--gn-border, currentColor);
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 @media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
      promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
