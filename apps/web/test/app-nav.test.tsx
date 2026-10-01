@@ -1578,7 +1578,8 @@ describe('the nav brand group', () => {
 });
 
 /**
- * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings (audit SYS-20, NP-26, WS-08).
+ * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings, My Work and Members (audit SYS-20, NP-26, WS-08);
+ * this block pins Settings, `bottom-bar.test.tsx` pins My Work and Members against the bar's own light.
  * The workspace link stays exact (`/w/<id>` is not "inside" `/w/<id>/members`, case 13.393).
  */
 describe('23.044 Settings lights on every route under it', () => {

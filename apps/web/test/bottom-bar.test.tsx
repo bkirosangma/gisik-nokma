@@ -443,10 +443,77 @@ describe('23.044 the bar lights a destination on the same segment-bounded prefix
     await waitFor(() => expect(items()).toContain('My work'));
     expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBe('page');
 
-    // CONTROL (same `it`): a lookalike segment is not current, and `/w/<id>` lights nothing in the bar.
+    // CONTROL (same `it`): a lookalike segment is not current (`/w/<id>` lighting nothing in the bar is asserted in the next block).
     cleanup();
     render(bar({ pathname: `/w/${WS}/my-workshop` }));
     await waitFor(() => expect(items()).toContain('My work'));
     expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBeNull();
   });
 });
+
+describe('23.044 the top nav and the bar light My work and Members the same way', () => {
+  function services() {
+    return stubServices(
+      {
+        getMyWorkspaces: async () => [
+          { id: WS, name: 'Convenience Corner', prefix: 'CC', role: 'owner', archived: false, memberCount: 3, nameRestrictedProjectCount: 0, projects: [] } satisfies WorkspaceRef,
+        ],
+      },
+      { notifications: { unreadCount: async () => 0 } },
+    );
+  }
+  /** `AppNav` on a phone viewport mounts the top nav's links AND the bar, both from the one pathname. */
+  async function renderBoth(path: string): Promise<void> {
+    currentPath = path;
+    stubPhoneViewport(true);
+    render(
+      <Providers services={services()}>
+        <AppNav workspaceId={WS} />
+      </Providers>,
+    );
+    await waitFor(() => expect(items()).toContain('My work'));
+  }
+  const lit = (el: HTMLElement): boolean => el.getAttribute('aria-current') === 'page';
+  const topLink = (name: string): HTMLElement =>
+    screen.getAllByRole('link', { name }).find((a) => !phoneNav().contains(a)) as HTMLElement;
+
+  it('23.044 /w/<id>/my-work/x lights My work in BOTH, /w/<id>/members/x lights Members in the top nav; a lookalike lights neither; /w/<id> lights nothing in the bar', async () => {
+    await renderBoth(`/w/${WS}/my-work/x`);
+    expect(lit(topLink('My Work'))).toBe(true);
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(true);
+    expect(lit(topLink('Members'))).toBe(false);
+
+    cleanup();
+    await renderBoth(`/w/${WS}/members/x`);
+    expect(lit(topLink('Members'))).toBe(true);
+    expect(lit(topLink('My Work'))).toBe(false);
+
+    // CONTROL (same `it`): a lookalike segment lights neither surface …
+    cleanup();
+    await renderBoth(`/w/${WS}/my-workshop`);
+    expect(lit(topLink('My Work'))).toBe(false);
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(false);
+    cleanup();
+    await renderBoth(`/w/${WS}/membersx`);
+    expect(lit(topLink('Members'))).toBe(false);
+
+    // … and on the workspace page itself the bar lights NOTHING (the top nav lights the workspace link, exact: 13.393).
+    cleanup();
+    await renderBoth(`/w/${WS}`);
+    for (const link of within(phoneNav()).getAllByRole('link')) {
+      expect(lit(link), link.getAttribute('aria-label') ?? link.textContent ?? '').toBe(false);
+    }
+    expect(lit(topLink('Convenience Corner'))).toBe(true);
+  });
+
+  it('23.044 the bar lights Notes on /notes and under it, not on a lookalike (the bar half of 18.182)', async () => {
+    render(bar({ pathname: '/notes/n_1' }));
+    await waitFor(() => expect(items()).toContain('Notes'));
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'Notes' }))).toBe(true);
+    cleanup();
+    render(bar({ pathname: '/notesx' }));
+    await waitFor(() => expect(items()).toContain('Notes'));
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'Notes' }))).toBe(false);
+  });
+});
+

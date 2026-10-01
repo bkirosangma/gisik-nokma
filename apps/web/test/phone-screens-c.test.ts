@@ -156,7 +156,7 @@ describe('21.153 Help, Privacy and Terms on a phone', () => {
   it('21.153 the legal pages read at full width inside the shell 24px gutter, headings wrap and prose breaks anywhere', () => {
     const column = ruleExactly(css, '.gn-legal__column', PHONE);
     expect(valueOf(column, 'max-width')).toBe('none');
-    // 0.75rem of shell inset (`.gn-shell` at ≤60rem) + 0.25rem here = the 1rem gutter. Never the
+    // 24px of shell inset (`--gn-space-3`, `.gn-shell` at ≤60rem) + 0.25rem here = a 28px gutter. Never the
     // `padding` shorthand on a `.gn-shell` selector: the bottom bar's `:has()` padding lives there.
     expect(valueOf(column, 'padding-inline')).toBe('0.25rem');
     expect(valueOf(ruleExactly(css, '.gn-legal__title', PHONE), 'overflow-wrap')).toBe('anywhere');

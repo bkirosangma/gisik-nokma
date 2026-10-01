@@ -83,9 +83,11 @@ describe('23.041 one 24px gutter at every width (audit SYS-14, WS-05, SET-19)', 
     expect(valueOf(ruleExactly(css, '.gn-shell'), 'padding')).toBe(`0 ${GUTTER} var(--gn-shell-pad-bottom)`);
     expect(valueOf(ruleExactly(css, '.gn-shell', '@media (max-width: 60rem)'), 'padding')).toBe(`0 ${GUTTER} 2rem`);
     expect(valueOf(ruleExactly(css, '.gn-nav__inner'), 'padding')).toBe(`0.8rem ${GUTTER}`);
-    // No narrower arm re-inserts a smaller side padding on the bar.
+    // No narrower arm re-inserts a smaller side padding on the bar: NO `.gn-nav__inner` rule inside an at-rule declares
+    // `padding` (the shorthand carries the sides) or `padding-inline` — only the base rule owns the gutter.
     for (const rule of rulesNaming(css, '.gn-nav__inner')) {
       expect(valueOf(rule.body, 'padding-inline'), rule.atRule ?? 'base').toBeNull();
+      if (rule.atRule !== null) expect(valueOf(rule.body, 'padding'), rule.atRule).toBeNull();
     }
     expect(valueOf(ruleExactly(css, '.gn-shell--centred', '@media (max-width: 40rem)'), 'padding-inline')).toBe(GUTTER);
     // CONTROL — the non-wide shell keeps its 80rem cap, and the bar mirrors it.
@@ -98,6 +100,7 @@ describe('23.043 prose has a measure (audit SYS-16, ENT-17, NP-11, NP-23, SET-23
   const PROSE_IN_GLOBALS = [
     '.gn-legal__column',
     '.gn-workspace-home__empty',
+    '.gn-workspace-home__stranger',
     '.gn-members__empty',
     '.gn-mcp-tokens__empty',
     '.gn-mcp-tokens__what',
@@ -117,10 +120,17 @@ describe('23.043 prose has a measure (audit SYS-16, ENT-17, NP-11, NP-23, SET-23
     }
     expect(valueOf(ruleExactly(ui, '.gn-help__column'), 'max-width')).toBe('var(--gn-measure)');
 
-    // CONTROL (same `it`): tables, the board and the notes document are NOT capped by the measure.
-    for (const selector of ['.gn-board', '.gn-table', '.gn-notes', '.gn-notes__document', '.gn-list', '.gn-calendar', '.gn-timeline']) {
+    // The measure group is pinned EXACTLY: the one rule whose whole body is `max-width: var(--gn-measure)` lists
+    // these seven classes (in any order) — so a work surface added to it, or a class dropped from it, is red.
+    const group = parseRules(css).filter((rule) => rule.atRule === null && /^\s*max-width:\s*var\(--gn-measure\);?\s*$/.test(rule.body));
+    expect(group, 'exactly one bare max-width: var(--gn-measure) rule').toHaveLength(1);
+    expect([...(group[0]?.selectors ?? [])].sort()).toEqual(PROSE_IN_GLOBALS.filter((s) => s !== '.gn-legal__column').sort());
+
+    // CONTROL (same `it`): tables, the board and the notes document are NOT capped by the measure — in ANY rule that
+    // names them, however many other selectors share it (a grouped rule is how one would sneak in).
+    for (const selector of ['.gn-board', '.gn-table', '.gn-notes', '.gn-notes__document', '.gn-list', '.gn-list__table', '.gn-calendar', '.gn-timeline']) {
       for (const rule of [...rulesNaming(css, selector), ...rulesNaming(ui, selector)]) {
-        if (rule.selectors.length === 1) expect(rule.body, selector).not.toMatch(/--gn-measure/);
+        expect(rule.body, `${selector} in ${rule.selectors.join(', ')}`).not.toMatch(/--gn-measure/);
       }
     }
   });

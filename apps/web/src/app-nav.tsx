@@ -253,10 +253,12 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
     pathname === target ? "page" : undefined;
   /**
    * "Where am I" for a SECTION (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): lit on the route itself and on
-   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Only Settings uses it: its
-   * link points at `/settings?workspaceId=…` but the workflow and ticket-type editors live at
-   * `/w/<id>/settings/…`, so an exact match left the bar dark on the very pages that are Settings. The workspace link and
-   * the rest stay exact (`current`): `/w/<id>` is not "inside" `/w/<id>/members` (case 13.393).
+   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Settings, My Work and
+   * Members use it — the same rule the phone bottom bar applies to its workspace destinations, so the two surfaces
+   * light the same item on the same page. Settings needs it most: its link points at `/settings?workspaceId=…` but the
+   * workflow and ticket-type editors live at `/w/<id>/settings/…`, so an exact match left the bar dark on the very
+   * pages that are Settings. The workspace link stays exact (`current`): `/w/<id>` is not "inside"
+   * `/w/<id>/members` (case 13.393).
    */
   const currentSection = (...roots: string[]): "page" | undefined =>
     roots.some((root) => isWithin(pathname, root)) ? "page" : undefined;
@@ -376,7 +378,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/w/${effectiveWorkspaceId}/my-work`}
-            aria-current={current(`/w/${effectiveWorkspaceId}/my-work`)}
+            aria-current={currentSection(`/w/${effectiveWorkspaceId}/my-work`)}
           >
             My Work
           </Link>
@@ -384,7 +386,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/w/${effectiveWorkspaceId}/members`}
-            aria-current={current(`/w/${effectiveWorkspaceId}/members`)}
+            aria-current={currentSection(`/w/${effectiveWorkspaceId}/members`)}
           >
             Members
           </Link>
@@ -533,10 +535,10 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
-          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings joined it in UX fixes Task 3).
-              Most items are measured by `current()` above, which is exact
-              equality — and that is right for them: `/w/<id>` is not "inside"
-              `/w/<id>/members`. (Settings is the other section: `currentSection()`.) A note is different in kind. `/notes/<id>` is
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings, My Work and Members joined it in UX fixes Task 3).
+              The workspace link is measured by `current()` above, which is exact
+              equality — and that is right for it: `/w/<id>` is not "inside"
+              `/w/<id>/members`. (The sections are `currentSection()`.) A note is different in kind. `/notes/<id>` is
               the SAME view as `/notes`, with a note open, so exact equality
               would leave the link dark on the page the reader is actually on.
               Case 18.182 walks both spellings and the control. */}
