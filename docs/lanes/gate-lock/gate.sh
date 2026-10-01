@@ -15,7 +15,7 @@
 #          before a merge to main) and the safety net that makes `cached` acceptable
 #          below it. Unset GATE_MODE means fresh, so a hand-run of this file can
 #          never silently pick the weaker mode.
-#   cached — turbo's cache ON (no --force) and `--concurrency=2`: a task whose
+#   cached — turbo's cache ON (no --force) and `--concurrency=1`: a task whose
 #          inputs are unchanged replays its green log. This is a TASK LANDING
 #          (`ctl gate <sha> --base release/<x>`). It is only as sound as turbo.json's
 #          `inputs`; the cross-package readers are audited there, and
@@ -23,15 +23,18 @@
 #
 # fresh keeps --concurrency=1 per the cross-lane protocol fix of 2026-09-06: five
 # lanes on one 16 GB box drove free memory to ~66 MB and swap to 65%. The gate is
-# slower and it finishes. cached runs two at a time because most of its tasks are
-# cache hits; the machine lock below still admits ONE gate at a time.
+# slower and it finishes. cached keeps --concurrency=1 too. It was first built at 2 (the brief), and 2 of 3 realistic
+# runs with several test suites MISSING together failed with 5 s vitest timeouts in app-core's jsdom
+# component tests (2026-10-02, 7.4 s and 5.3 s; the same tests pass alone in <1 s): two heavy vitest
+# pools at once oversubscribe this box. The saving comes from the cache, not from parallelism.
+# The machine lock below still admits ONE gate at a time.
 set -u
 OUT="${1:?usage: GATE_MODE=fresh|cached gate.sh <logfile>}"
 # Unset means fresh; set-but-empty is NOT unset (`-`, not `:-`) and falls to the refusal below.
 MODE="${GATE_MODE-fresh}"
 case "$MODE" in
   fresh)  TURBO_FLAGS=(--force --concurrency=1) ;;
-  cached) TURBO_FLAGS=(--concurrency=2) ;;
+  cached) TURBO_FLAGS=(--concurrency=1) ;;
   *) echo "FATAL: GATE_MODE='$MODE' is not fresh|cached — refusing rather than guessing a mode." >&2; exit 2 ;;
 esac
 HERE="$(cd "$(dirname "$0")" && pwd)"

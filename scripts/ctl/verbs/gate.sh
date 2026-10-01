@@ -2,7 +2,7 @@
 # ctl gate <sha> [--base <branch>] — the gate at HEAD=<sha> through the gate-lock reference scripts; writes .git/ctl/gate-<sha> only when green.
 # --base (default main; main or release/<name> only) is the branch HEAD must already contain; a release base writes gate.release+<name>-<sha>.
 # TWO KINDS (owner, 2026-10-02). main-kind (no --base, or --base main) is the release gate: GATE_MODE=fresh, `--force --concurrency=1`, every task
-# re-run. release-kind (--base release/<x>) is a task landing: GATE_MODE=cached, turbo cache ON, `--concurrency=2`. The cache is only sound because
+# re-run. release-kind (--base release/<x>) is a task landing: GATE_MODE=cached, turbo cache ON, `--concurrency=1`. The cache is only sound because
 # turbo.json declares every cross-package reader's inputs (scripts/ctl/test/gate-cache.test.sh proves a changed input misses), and the fresh main-kind
 # gate sits above it as the net: nothing reaches main on a replay.
 set -u

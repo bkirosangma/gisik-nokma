@@ -132,7 +132,7 @@ sha=$(cd "$br" && $G rev-parse HEAD); mk="$br/.git/ctl"
 check "13.1503 base gate: a real --base release/x run is green and writes the release-kind marker, NOT the main one" 'gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate.release+x-$sha" ] && [ ! -f "$mk/gate-$sha" ]'
 check "13.1503 base gate: REGRESSION — a default real run writes gate-<sha>, the marker land has always read" 'gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate-$sha" ]'
 # Gate modes (13.1700-13.1705, test-cases/13-deploy-and-ops.md): main-kind is fresh (`--force --concurrency=1`), a release base is
-# cached (cache on, `--concurrency=2`). The OK line names the mode that RAN, read from gate.sh's console, not the one asked for.
+# cached (cache on, `--concurrency=1`). The OK line names the mode that RAN, read from gate.sh's console, not the one asked for.
 # 13.1700: the REAL docs/lanes/gate-lock/gate.sh, beside a stub locked-test.sh and a stub pnpm that record argv.
 gm=$(mktemp -d); mkdir -p "$gm/bin" "$gm/repo/.git"; cp "$HERE/../../docs/lanes/gate-lock/gate.sh" "$gm/gate.sh"
 printf '%s\n' '#!/bin/bash' 'shift; "$@"' > "$gm/locked-test.sh"
@@ -140,8 +140,8 @@ printf '%s\n' '#!/bin/bash' 'echo "$*" >> "$STUB_ARGV"' > "$gm/bin/pnpm"; chmod 
 gm_run() { rm -f "$gm/argv"; ( cd "$gm/repo" && env "$@" PATH="$gm/bin:$PATH" STUB_ARGV="$gm/argv" GATE_REPO="$gm/repo" bash "$gm/gate.sh" "$gm/log" 2>&1 ); }
 check "13.1700 gate modes: GATE_MODE=fresh runs turbo --force --concurrency=1" 'gm_run GATE_MODE=fresh >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --force --concurrency=1" ]'
 check "13.1700 gate modes: GATE_MODE unset is fresh — a hand-run of gate.sh never picks the weaker mode" 'gm_run X=1 >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --force --concurrency=1" ]'
-check "13.1700 gate modes: GATE_MODE=cached runs turbo with --concurrency=2 and NO --force" 'gm_run GATE_MODE=cached >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --concurrency=2" ] && ! grep -q -- --force "$gm/argv"'
-check "13.1700 gate modes: the console states the mode that runs (the verb reads it)" 'gm_run GATE_MODE=cached | grep -q "^GATE_MODE=cached TURBO_FLAGS=--concurrency=2$" && gm_run GATE_MODE=fresh | grep -q "^GATE_MODE=fresh TURBO_FLAGS=--force --concurrency=1$"'
+check "13.1700 gate modes: GATE_MODE=cached runs turbo with --concurrency=1 and NO --force" 'gm_run GATE_MODE=cached >/dev/null; [ "$(cat "$gm/argv")" = "turbo run build test typecheck --concurrency=1" ] && ! grep -q -- --force "$gm/argv"'
+check "13.1700 gate modes: the console states the mode that runs (the verb reads it)" 'gm_run GATE_MODE=cached | grep -q "^GATE_MODE=cached TURBO_FLAGS=--concurrency=1$" && gm_run GATE_MODE=fresh | grep -q "^GATE_MODE=fresh TURBO_FLAGS=--force --concurrency=1$"'
 check "13.1701 gate modes: CONTROL — an unknown mode refuses (exit 2, names the value) and turbo is never invoked" 'out=$(gm_run GATE_MODE=fast); rc=$?; [ "$rc" -eq 2 ] && printf "%s" "$out" | grep -q "GATE_MODE=.fast. is not fresh|cached" && [ ! -e "$gm/argv" ]'
 check "13.1701 gate modes: CONTROL — an empty mode is not fresh by accident of spelling, it is the default only when UNSET" 'out=$(gm_run GATE_MODE=); [ $? -eq 2 ] && [ ! -e "$gm/argv" ]'
 rm -rf "$gm"
