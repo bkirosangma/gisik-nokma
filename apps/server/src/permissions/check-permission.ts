@@ -6,6 +6,8 @@ import {
   noteCreatedPayload,
   noteDetachedPayload,
   projectCreatedPayload,
+  projectUpdatedPayload,
+  istDayOf,
   ticketAssignedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
@@ -16,7 +18,7 @@ import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
-import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
+import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkLifecycle } from './check-lifecycle.js';
@@ -64,6 +66,15 @@ export const PROJECT_UNKNOWN_RULE = 'project.unknown';
  * project, and is being asked to choose a different half of its key.
  */
 export const PROJECT_PREFIX_TAKEN_RULE = 'project.prefix-taken';
+
+/**
+ * A project claiming a prefix ANOTHER project has moved off (spec §3.1,
+ * 2026-10-02). The old ticket keys (`SO-3`) still resolve to the project that
+ * held it, so handing the prefix on would make one key name two tickets. Its own
+ * id, apart from `project.prefix-taken`, because the remedy differs: a taken
+ * prefix may be freed by the other project moving, a reserved one never is.
+ */
+export const PROJECT_PREFIX_RESERVED_RULE = 'project.prefix-reserved';
 
 /**
  * The envelope-origin refusal's rule and reason, character for character.
@@ -349,6 +360,9 @@ function refuseWith(rule: string, reason: string): Refusal {
  */
 const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   'workflow.defined',
+  // Prefixes/groups Task 3. A workspace's prefix is the first half of every
+  // ticket key in it, so moving it is a workspace-administration act.
+  'workspace.prefix_changed',
   'ticket-type.defined',
   'project.created',
   'ticket.workflow_rebound',
@@ -1012,7 +1026,7 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
 }
 
 /**
- * May this project be founded under the prefix it names?
+ * May this project be founded under, or move to, the prefix it names?
  *
  * ## The owner's ruling, and why it is a door and not a display rule
  *
@@ -1051,46 +1065,97 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
  * being handed a sentence about a prefix — and, like `checkProjectExists`, it
  * runs strictly after `checkRolePermission` so a non-member cannot use it to
  * enumerate the workspace's prefixes.
+ *
+ * ## Prefixes/groups Task 3: `project.updated` too, and RESERVED prefixes
+ *
+ * The same question is now asked of a `project.updated` that carries a
+ * `prefix`, and the answer has two refusals, in this order:
+ *
+ *  1. `project.prefix-taken` — another project's CURRENT prefix (above).
+ *  2. `project.prefix-reserved` — a prefix another project has moved OFF, from
+ *     `projectPrefixHistory`. Its old ticket keys still point at that project,
+ *     so the prefix cannot be reused. The text names the holder's CURRENT name
+ *     and the day it moved off (IST, `d MMM`).
+ *
+ * **"Another" is by project id on BOTH, never by value.** A project may take
+ * back a prefix it once held (SO → SH → SO), and a retry of an earlier event of
+ * its own — `SO → SH` re-delivered after `SH → SO` — must reach the ledger's
+ * `duplicate-event-id` rather than be refused here for a prefix that is its own
+ * former one. A workspace's own former prefixes carry no reservation (spec
+ * §3.1), so `workspace.prefix_changed` has no check here.
  */
-export async function checkProjectPrefixUnique(
+export async function checkPrefixReservation(
   db: Queryable,
   env: EventEnvelope,
 ): Promise<Refusal | null> {
-  if (env.type !== 'project.created') {
+  let prefix: string | undefined;
+  if (env.type === 'project.created') {
+    prefix = projectCreatedPayload.parse(env.payload).prefix;
+  } else if (env.type === 'project.updated') {
+    prefix = projectUpdatedPayload.parse(env.payload).prefix;
+  } else {
     return null;
   }
-  const parsed = projectCreatedPayload.parse(env.payload);
-  if (parsed.prefix === undefined) {
+  if (prefix === undefined) {
     return null;
   }
-  const resolved = await projectPrefixesInWorkspace(db, env.workspaceId);
+  const history = await projectPrefixHistory(db, env.workspaceId);
   // ⚠ "ANOTHER project", and the distinction is a defect fix rather than a
-  // nicety. `projectPrefixesInWorkspace` resolves EVERY project in the
-  // workspace, including the one this event names — whose `proj_projects` row
-  // already exists, because the first delivery wrote it. So asking the set
-  // whether it holds this prefix answered YES for the project's own
-  // `project.created` re-delivered, and that retry was refused with
-  // `project.prefix-taken` instead of the `duplicate-event-id` the ledger
-  // answers. Reachable from `POST /v1/events` and `POST /v1/sync`, where a
-  // retry is the ordinary way a client recovers from a lost response; no test
-  // covered it, because every case in `project-prefix-unique.test.ts` uses a
-  // FRESH project id.
+  // nicety. The history covers EVERY project in the workspace, including the one
+  // this event names — whose `proj_projects` row already exists, because the
+  // first delivery wrote it. So asking whether the set holds this prefix
+  // answered YES for the project's own `project.created` re-delivered, and that
+  // retry was refused with `project.prefix-taken` instead of the
+  // `duplicate-event-id` the ledger answers. Reachable from `POST /v1/events`
+  // and `POST /v1/sync`, where a retry is the ordinary way a client recovers
+  // from a lost response; no test covered it, because every case in
+  // `project-prefix-unique.test.ts` uses a FRESH project id.
   //
   // Filtered by project ID and not by value: the resolution guarantees one
   // project per prefix, so filtering by value would also be correct today — and
   // would stop being correct the moment that guarantee moved.
-  const taken = new Set(
-    [...resolved.entries()]
-      .filter(([projectId]) => projectId !== env.entity.id)
-      .map(([, prefix]) => prefix),
-  );
-  if (!taken.has(parsed.prefix)) {
-    return null;
+  const others = [...history].filter(([projectId]) => projectId !== env.entity.id);
+  if (others.some(([, held]) => held.current === prefix)) {
+    return refuseWith(
+      PROJECT_PREFIX_TAKEN_RULE,
+      `Another project in this workspace already uses the prefix ${prefix}. A prefix identifies a project's tickets — ${prefix}-1, ${prefix}-2 — so two projects cannot share one. Choose a different prefix.`,
+    );
   }
-  return refuseWith(
-    PROJECT_PREFIX_TAKEN_RULE,
-    `Another project in this workspace already uses the prefix ${parsed.prefix}. A prefix identifies a project's tickets — ${parsed.prefix}-1, ${parsed.prefix}-2 — so two projects cannot share one. Choose a different prefix.`,
+  for (const [projectId, held] of others) {
+    // The LATEST move off, should a prefix have been left more than once.
+    const left = held.former.filter((former) => former.prefix === prefix).at(-1);
+    if (left === undefined) {
+      continue;
+    }
+    const holder = await currentProjectName(db, env.workspaceId, projectId);
+    return refuseWith(
+      PROJECT_PREFIX_RESERVED_RULE,
+      `${prefix} was ${possessive(holder)} prefix until ${dayMonthIst(left.until)}. Its old ticket keys still point there, so it can't be reused.`,
+    );
+  }
+  return null;
+}
+
+/** The project's CURRENT name (a rename moves it; the founding name does not). */
+async function currentProjectName(db: Queryable, workspaceId: string, projectId: string): Promise<string> {
+  const { rows } = await db.query<{ name: string }>(
+    'SELECT name FROM proj_projects WHERE workspace_id = $1 AND project_id = $2',
+    [workspaceId, projectId],
   );
+  return rows[0]?.name ?? 'another project';
+}
+
+/** `Shop operations'`, `Store's` — a name ending in `s` takes a bare apostrophe. */
+function possessive(name: string): string {
+  return name.endsWith('s') ? `${name}'` : `${name}'s`;
+}
+
+const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `1 Oct` — the IST day of an instant, spelled out so it never depends on the host's ICU. */
+function dayMonthIst(instant: string): string {
+  const [, month, day] = istDayOf(instant).split('-').map(Number) as [number, number, number];
+  return `${day} ${MONTH_ABBREVIATIONS[month - 1]}`;
 }
 
 /**
@@ -1727,12 +1792,13 @@ export async function checkPermission(
   if (projectRefusal !== null) {
     return projectRefusal;
   }
-  // FIFTH — the prefix a project is founded under must be free in its
-  // workspace (owner ruling 2026-09-20). Grouped with the project-shaped
+  // FIFTH — the prefix a project is founded under, or moves to, must be free in
+  // its workspace and not reserved to another project (owner ruling 2026-09-20;
+  // reservation: prefixes/groups Task 3). Grouped with the project-shaped
   // questions above and, like them, strictly downstream of the role gates: a
   // caller with no standing to found a project is told that, and never gets a
   // sentence about which prefixes are in use.
-  const prefixRefusal = await checkProjectPrefixUnique(ctx.db, env);
+  const prefixRefusal = await checkPrefixReservation(ctx.db, env);
   if (prefixRefusal !== null) {
     return prefixRefusal;
   }
