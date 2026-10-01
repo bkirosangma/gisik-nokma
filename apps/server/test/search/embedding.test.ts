@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from '../helpers/db.js';
 
 /**
@@ -32,7 +32,7 @@ import type { TestDatabase } from '../helpers/db.js';
 
 const embedding = await import('../../src/search/embedding.js');
 const { CURRENT_MODEL, EMBEDDING_DIM, embedTexts, embedQuery, queryCacheSize } = embedding;
-const { searchPreflight } = await import('../../src/tools/search-preflight.js');
+const { measureEmbeddingRss, searchPreflight } = await import('../../src/tools/search-preflight.js');
 const { createTestDatabase } = await import('../helpers/db.js');
 
 let db: TestDatabase;
@@ -139,13 +139,24 @@ describe('18.126–18.129 the embedding backend', () => {
   });
 
   /**
-   * 18.129 — the pre-flight's RSS measurement, and the number it produces on
-   * this machine, recorded in the failure message.
+   * 18.129 — the pre-flight's RSS measurement: it EXISTS, it is CONSISTENT, and the delta is inside the 400 MB
+   * budget. The numbers it produced on this machine are in the failure message.
    *
-   * The warm-up is the real `embedQuery`, and it runs against a string no other
-   * case used, so the cache cannot make the delta look like zero.
+   * What this case is meant to prove is exactly those three things. It is NOT meant to prove that resident
+   * memory only grows, and an earlier version asserted that (`afterMb >= beforeMb`): the gate of `314c6207`
+   * failed on it with "expected 317 to be greater than or equal to 318.4" and the same sha passed a re-gate.
+   * RSS is not monotonic — under memory pressure macOS compresses or pages out resident memory, so a process
+   * can measure LOWER after a warm-up than before it. `measureEmbeddingRss` does not clamp: it reports
+   * `round(after - before)`, negative included, and that is the honest number, so the product is unchanged and
+   * the test asserts what is actually true: both readings are positive, `deltaMb` is the rounded difference of
+   * the two readings, and it is under 400. (A negative delta passes the budget; the second `it` pins that the
+   * measurement reports one rather than clamping or throwing.)
    *
-   * Mutation: — (a measurement, not a behaviour).
+   * The warm-up is the real `embedQuery`, and it runs against a string no other case used, so the cache cannot
+   * make the delta look like zero.
+   *
+   * Mutations: report `afterMb` as 0 (red: positivity and consistency); report a delta of 500 (red: the budget
+   * and consistency).
    */
   it('18.129 — the pre-flight reports RSS before and after a warm-up embedding', async () => {
     const report = await searchPreflight(db.pool, {
@@ -157,8 +168,24 @@ describe('18.126–18.129 the embedding backend', () => {
     expect(measurement && 'error' in measurement, 'the warm-up succeeded').toBe(false);
 
     const { beforeMb, afterMb, deltaMb } = measurement as { beforeMb: number; afterMb: number; deltaMb: number };
-    expect(beforeMb).toBeGreaterThan(0);
-    expect(afterMb).toBeGreaterThanOrEqual(beforeMb);
-    expect(deltaMb, `RSS went ${String(beforeMb)} MB → ${String(afterMb)} MB (Δ ${String(deltaMb)} MB)`).toBeLessThan(400);
+    const said = `RSS went ${String(beforeMb)} MB → ${String(afterMb)} MB (Δ ${String(deltaMb)} MB)`;
+    expect(beforeMb, said).toBeGreaterThan(0);
+    expect(afterMb, said).toBeGreaterThan(0);
+    // The delta is the difference of the two readings (each is rounded to 0.1 MB, the difference to 0.1 again).
+    expect(Math.abs(deltaMb - (afterMb - beforeMb)), said).toBeLessThanOrEqual(0.11);
+    expect(deltaMb, said).toBeLessThan(400);
+  });
+
+  it('18.129 — a warm-up that LOWERS RSS is reported as a negative delta, not clamped and not thrown', async () => {
+    // Deterministic stand-in for macOS compressing resident memory during the warm-up: 318.4 MiB, then 317.0 MiB.
+    const readings = [318.4, 317.0].map((mb) => ({ rss: mb * 1024 * 1024 }));
+    const spy = vi.spyOn(process, 'memoryUsage').mockImplementation((() => readings.shift() ?? { rss: 0 }) as never);
+    try {
+      expect(await measureEmbeddingRss(async () => undefined)).toEqual({ beforeMb: 318.4, afterMb: 317, deltaMb: -1.4 });
+    } finally {
+      spy.mockRestore();
+    }
+    // CONTROL, same `it`: with the spy gone the real reading is a positive number again.
+    expect(await measureEmbeddingRss(async () => undefined)).toMatchObject({ beforeMb: expect.any(Number) });
   });
 });
