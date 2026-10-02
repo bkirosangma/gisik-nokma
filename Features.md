@@ -3697,6 +3697,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
 - ✅ **Notification switches sit at the row's end whatever the label's length** (smoothness add-on G-4, owner 2026-10-02; cases 25.360–25.362) — on `/account`'s Notifications card a label that wrapped to two lines used to drop its switch below the text; the row no longer wraps, the label takes the column and wraps inside it, and every switch's right edge is the row's right edge. The shared `Switch` is unchanged, so Settings → Workspace's switch still sits beside its own label. `apps/web/app/globals.css` (`.gn-account__notification-row`).
+- ✅ **Ticket-sheet lighter field rows are one continuous rounded band on a phone** (smoothness add-on G-5, owner 2026-10-02; cases 25.370–25.373) — the tinted Assignee/Due rows used to stack into a label strip square on its right and a control block square on its left, with the control flush to the band's edge; on a phone the row itself now paints the fill and the full radius, its cells paint nothing and the control takes the label's inset. The full-screen sheet no longer draws a focus outline down the screen edges. Desktop keeps its two-cell band. `packages/ui/src/ui.css` (`.gn-ticket-sheet__field--tinted` phone arm, `.gn-sheet:focus-visible`).
 
 ## 23. Comment edit and delete, Markdown bodies
 
