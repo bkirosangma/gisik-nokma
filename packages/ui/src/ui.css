@@ -3886,6 +3886,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: 8px;
   padding: 0.5rem 0.75rem;
   min-width: 170px;
+  /* F-5 (N3): the reason line wrapped nowhere and widened To do over the edge to Doing; 13rem (208px) is under a 260px column. */
+  max-width: 13rem;
 }
 .gn-state-node--open { border-left: 6px solid var(--gn-category-open); }
 .gn-state-node--active { border-left: 6px solid var(--gn-category-active); }
