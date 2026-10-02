@@ -111,10 +111,33 @@ describe('the read tools', () => {
       title: 'A ticket', stateProvenance: null, parent: null, rollup: null,
     };
     const { session, paths } = sessionRecording(body);
-    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual(body);
+    // T9 adds ONE key (`description`, as Markdown); everything else is the server's, untouched.
+    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] } });
     expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1']);
     // The mixed casing is the SERVER's contract. Normalising it here would be
     // this package inventing a shape, which is exactly what the spec forbids.
+  });
+
+  it('14.456 get_ticket answers the description as { markdown, lossy } and no raw document', async () => {
+    const doc = { type: 'doc', content: [{ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Steps' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'Call.' }] }] };
+    const body = {
+      key: 'CCSO-4', title: 'Chiller', rollup: null,
+      ticketState: { kind: 'ticket', id: 't1', assigneeId: 'u1', fields: { description: { value: doc }, priority: { value: 'P2' } } },
+    };
+    const { session } = sessionRecording(body);
+    const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & {
+      ticketState: { fields: Record<string, unknown>; assigneeId: string };
+    };
+    expect(out['description']).toEqual({ markdown: '## Steps\n\nCall.', lossy: [] });
+    expect(out.ticketState.fields, 'no raw description document; the other fields are unchanged').toEqual({ priority: { value: 'P2' } });
+    expect(out.ticketState.assigneeId).toBe('u1');
+    expect(out['key']).toBe('CCSO-4');
+    expect(JSON.stringify(out)).not.toContain('"type":"doc"');
+  });
+
+  it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {
+    const session = { ...sessionRecording({}).session, get: async () => { throw new HttpError(404, { error: 'not_found' }); } };
+    await expect(tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow('ticket not found or not visible to you');
   });
 });
 
