@@ -23,7 +23,7 @@
 - positions stay session-only (case 10.53 stays 🚫);
 - no change to the workflow model (states, transitions, rules, publish).
 
-## 1. Root cause (read in the library source; proven by case 25.440 before any fix)
+## 1. Root cause (read in the library source; proven by case 25.500 before any fix)
 
 - **How the canvas is built:** `packages/app-core/src/workflow-builder/ui/workflow-canvas.tsx` renders `<ReactFlow nodes={nodes} …>`, with `nodes` recomputed from the draft (`useMemo(() => toFlowGraph(draft, summaryCtx), …)`, `:41`).
 - **What it listens to:** only `onNodeDragStop` (`:51-57`) → `store.actions.moveState`. There is no `onNodesChange` and no `defaultNodes`.
@@ -153,9 +153,9 @@ Unchanged, except that the header gains Full screen, Tidy and Add transition.
 ## 5. Testing and proof
 
 ### 5.1 Case block
-Cases **25.440–25.499** (G-9), in `test-cases/25-smoothness.md`. 25.439 is the highest id on any live tip (grepped across every `origin/*smoothness*`, `sm-*` and `release/*` ref on 2026-10-03). Each case's test carries its id.
+Cases **25.500–25.559** (G-9), in `test-cases/25-smoothness.md`. 25.500–25.559: G-7 (task/smoothness-g7-phone-editors, FIX 1 5d8907dd) took 25.440–25.442, so G-9 shifted +60 on the orchestrator's grep of every origin task/release/docs branch (25.500–25.599 free, 2026-10-03 01:36). Each case's test carries its id.
 
-### 5.2 RED first: 25.440
+### 5.2 RED first: 25.500
 - **Suite:** a Playwright spec in `apps/web/e2e` (mock-only, Chromium), `workflow-canvas-drag.spec.ts`.
 - **Steps:** press on a state, move 200 px in 10 steps, and **before release** assert:
   - the node's bounding box moved 200 ± 4 px;
@@ -190,7 +190,7 @@ Same suite; desktop, and a phone viewport with `hasTouch`:
 ### 5.5 On the gate
 - The canvas specs (`apps/web/e2e/workflow-canvas-*.spec.ts`, Chromium) become a turbo task (`@gisik-nokma/web#test:e2e:canvas`), added to the local `ctl gate` set (owner: "Yes, on the gate"). Estimated cost: +~1 min and ~300 MB per gate.
 - They also run in CI on the release PR.
-- Each case gets a named post-commit mutation (e.g. remove `onNodesChange` → 25.440 red; drop the gap → the gap case red; skip Alt → the Alt case red).
+- Each case gets a named post-commit mutation (e.g. remove `onNodesChange` → 25.500 red; drop the gap → the gap case red; skip Alt → the Alt case red).
 
 ### 5.6 Catalogue, review and docs
 - **Features.md §22** gets bullets for live drag and its feedback, collision and snapping, keyboard nudge, Tidy, full-screen editing, and Add transition.

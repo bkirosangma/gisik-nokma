@@ -18,7 +18,7 @@
 
 **Release and identity**
 - **Release:** `release/smoothness`. Every task branch is cut from `origin/release/smoothness`, and its PR is based on it. Never `main`.
-- **Case ids:** `25.440`–`25.499` only, in `test-cases/25-smoothness.md` § "25.39". Each task owns a sub-block (listed per task). Test names or comments carry the id.
+- **Case ids:** `25.500`–`25.559` only, in `test-cases/25-smoothness.md` § "25.39". Each task owns a sub-block (listed per task). Test names or comments carry the id.
 
 **Numbers, copied verbatim from the spec**
 - `NODE_GAP = 8` (flow px).
@@ -47,16 +47,16 @@
 
 ## Review Focus
 
-1. **A draft change mid-drag**, for example the Publish refusal resetting `selection`, or a sessionStorage re-hydrate. The dragged node must keep its live position and must not snap back. Pinned by 25.443 (Task 1).
-2. **A state dragged while the canvas is zoomed out to 0.25.** Guides must still trigger at 6 *screen* px, and the dashed outline must sit under the pointer. Pinned by 25.452 (Task 2) and 25.463 (Task 3).
-3. **A drag that starts on a control inside the node** (the Category select, the checkboxes, which carry `nodrag`). It must not move the node, and the control must still work. Pinned by 25.444 (Task 1).
-4. **Escape pressed while the floating panel holds a focused rule editor's open menu.** Only the menu closes. Neither the panel nor full screen closes. Pinned by 25.488 (Task 5).
+1. **A draft change mid-drag**, for example the Publish refusal resetting `selection`, or a sessionStorage re-hydrate. The dragged node must keep its live position and must not snap back. Pinned by 25.503 (Task 1).
+2. **A state dragged while the canvas is zoomed out to 0.25.** Guides must still trigger at 6 *screen* px, and the dashed outline must sit under the pointer. Pinned by 25.512 (Task 2) and 25.523 (Task 3).
+3. **A drag that starts on a control inside the node** (the Category select, the checkboxes, which carry `nodrag`). It must not move the node, and the control must still work. Pinned by 25.504 (Task 1).
+4. **Escape pressed while the floating panel holds a focused rule editor's open menu.** Only the menu closes. Neither the panel nor full screen closes. Pinned by 25.548 (Task 5).
 5. **A read-only viewer (`canAuthor` false):**
    - may drag (layout is personal and session-only, as today);
    - sees no Add state, Add transition or Tidy in either toolbar;
    - can still enter full screen.
 
-   Pinned by 25.478 (Task 4) and 25.492 (Task 5).
+   Pinned by 25.538 (Task 4) and 25.552 (Task 5).
 
 ---
 
@@ -89,7 +89,7 @@
 
 ---
 
-### Task 1: The browser harness on the gate, and live drag (cases 25.440–25.444)
+### Task 1: The browser harness on the gate, and live drag (cases 25.500–25.504)
 
 **Files:**
 - Create:
@@ -111,7 +111,7 @@
   - `scripts/ctl/verbs/gate.sh`: the `'34 successful, 34 total'` line
   - `scripts/ctl/test/lib.test.sh` and `docs/lanes/gate-lock/README.md`: every `34` that means the gate's task count
   - `.github/workflows/ci.yml`: before `pnpm turbo run test --filter='!@gisik-nokma/server'` (`:543`), add a Chromium install for the new package
-  - `test-cases/25-smoothness.md` (new section `## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)` + 25.440–25.444)
+  - `test-cases/25-smoothness.md` (new section `## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)` + 25.500–25.504)
   - `Features.md` §22 (one bullet)
 
 **Interfaces:**
@@ -207,7 +207,7 @@
 
   Commit.
 
-- [ ] **Step 3: Write the RED browser test 25.440 + its control**
+- [ ] **Step 3: Write the RED browser test 25.500 + its control**
 
   `tests/helpers.ts`:
   ```ts
@@ -237,7 +237,7 @@
   import { expect, test } from '@playwright/test';
   import { dragBy, edgePath, node, nodeBox, openHarness, readDraftPositions } from './helpers';
 
-  test('25.440 a dragged state moves live under the pointer and its arrow follows, before release', async ({ page }) => {
+  test('25.500 a dragged state moves live under the pointer and its arrow follows, before release', async ({ page }) => {
     await openHarness(page);
     const name = await page.locator('.gn-state-node__name').first().innerText();
     const before = await nodeBox(page, name);
@@ -252,7 +252,7 @@
     expect(Object.keys(positions).length).toBeGreaterThan(0);
   });
 
-  test('25.441 control: a press-release without movement selects and does not move', async ({ page }) => {
+  test('25.501 control: a press-release without movement selects and does not move', async ({ page }) => {
     await openHarness(page);
     const name = await page.locator('.gn-state-node__name').first().innerText();
     const before = await nodeBox(page, name);
@@ -264,18 +264,18 @@
   ```
   Edge 0 must touch the dragged state. Pick the first edge whose source or target is that node; read `toFlowGraph`'s edge ids (`t:<index>`).
 
-- [ ] **Step 4: Run the browser suite. It must FAIL on 25.440 (the proof of the cause)**
+- [ ] **Step 4: Run the browser suite. It must FAIL on 25.500 (the proof of the cause)**
 
   Run: `pnpm --filter @gisik-nokma/workflow-canvas-browser test > /tmp/g9-t1-red.log 2>&1; tail -30 /tmp/g9-t1-red.log`
   Expected:
-  - 25.440 FAILS at `during.x - before.x`: a delta of ~0, because the node does not move before release;
-  - 25.441 PASSES.
+  - 25.500 FAILS at `during.x - before.x`: a delta of ~0, because the node does not move before release;
+  - 25.501 PASSES.
 
   Quote both in the step's commit message.
 
   Commit the spec + helpers (RED).
 
-- [ ] **Step 5: Write the failing unit test for the working-copy reducer (25.442, 25.443)**
+- [ ] **Step 5: Write the failing unit test for the working-copy reducer (25.502, 25.503)**
 
   `packages/app-core/test/workflow-builder/working-nodes.test.ts` tests a pure function, which `use-working-nodes.ts` will export alongside the hook:
   ```ts
@@ -283,12 +283,12 @@
   import { mergeDraftNodes } from '../../src/workflow-builder/ui/use-working-nodes.js';
   const n = (id: string, x: number, y = 0) => ({ id, type: 'state', position: { x, y }, data: {} });
 
-  describe('25.442 the working copy follows the draft', () => {
+  describe('25.502 the working copy follows the draft', () => {
     it('re-derives positions and membership from the draft when no drag is in flight', () => {
       expect(mergeDraftNodes([n('a', 0), n('b', 10)], [n('a', 5)], null).map((m) => [m.id, m.position.x])).toEqual([['a', 0], ['b', 10]]);
     });
   });
-  describe('25.443 a draft change mid-drag keeps the dragged node where the pointer has it', () => {
+  describe('25.503 a draft change mid-drag keeps the dragged node where the pointer has it', () => {
     it('keeps the in-flight position for the dragged id and still adds a state created meanwhile', () => {
       const merged = mergeDraftNodes([n('a', 0), n('c', 50)], [n('a', 120), n('b', 10)], 'a');
       expect(merged.map((m) => [m.id, m.position.x])).toEqual([['a', 120], ['c', 50]]);
@@ -336,7 +336,7 @@
     return { nodes, onNodesChange, beginDrag, cancelDrag, endDrag, draggingId: () => dragging.current?.id ?? null };
   }
   ```
-  Run the unit test. Expected: PASS (25.442, 25.443).
+  Run the unit test. Expected: PASS (25.502, 25.503).
 
   Commit.
 
@@ -371,11 +371,11 @@
 
   React Flow sets the `dragging` class on the node wrapper; confirm it in the node_modules source at `@xyflow/react` (`'dragging'` in the NodeWrapper class list).
 
-- [ ] **Step 9: Add 25.444 and run the browser suite GREEN**
+- [ ] **Step 9: Add 25.504 and run the browser suite GREEN**
 
   Append to `drag.spec.ts`:
   ```ts
-  test('25.444 a drag that starts on a nodrag control (the Category select) does not move the state; the control still opens', async ({ page }) => {
+  test('25.504 a drag that starts on a nodrag control (the Category select) does not move the state; the control still opens', async ({ page }) => {
     await openHarness(page);
     const name = await page.locator('.gn-state-node__name').first().innerText();
     const before = await nodeBox(page, name);
@@ -385,7 +385,7 @@
     expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
   });
   ```
-  Also add an Escape case to 25.440's file as **25.457** (borrowed from T2's reserved tail; suffixed ids are not policed by `check-case-ids`, so none are used):
+  Also add an Escape case to 25.500's file as **25.517** (borrowed from T2's reserved tail; suffixed ids are not policed by `check-case-ids`, so none are used):
   - drag 150 px without releasing, press `Escape`, release;
   - the node's box is back at `before` (±1 px), and `readDraftPositions` is unchanged.
 
@@ -412,15 +412,15 @@
 
 - [ ] **Step 11: Catalogue + mutation pass + DONE**
 
-  Under `<!-- G-9 T1 -->` in `test-cases/25-smoothness.md`, write ✅ lines for 25.440, 25.457, 25.441, 25.442, 25.443 and 25.444, each with its test file and its named mutation:
+  Under `<!-- G-9 T1 -->` in `test-cases/25-smoothness.md`, write ✅ lines for 25.500, 25.517, 25.501, 25.502, 25.503 and 25.504, each with its test file and its named mutation:
 
   | Case | Mutation | Expected |
   |---|---|---|
-  | 25.440 | remove `onNodesChange` | red |
-  | 25.457 | remove the Escape listener | red |
-  | 25.442 | `mergeDraftNodes` returns `working` | red |
-  | 25.443 | ignore `draggingId` | red |
-  | 25.444 | remove `nodrag` from the Category wrapper | red |
+  | 25.500 | remove `onNodesChange` | red |
+  | 25.517 | remove the Escape listener | red |
+  | 25.502 | `mergeDraftNodes` returns `working` | red |
+  | 25.503 | ignore `draggingId` | red |
+  | 25.504 | remove `nodrag` from the Category wrapper | red |
 
   - Run each mutation once (revert after each), and quote it in DONE.
   - Replace `<!-- G-9 bullet -->` in Features §22 with a ✅ bullet for live drag and the browser suite on the gate, keeping the anchor line below it for later tasks.
@@ -430,7 +430,7 @@
 
 ---
 
-### Task 2: Collision and snapping, as pure modules (cases 25.445–25.459)
+### Task 2: Collision and snapping, as pure modules (cases 25.505–25.519)
 
 **Files:**
 - Create:
@@ -462,33 +462,33 @@
   const size = { width: 100, height: 60 };
   const ob = { x: 200, y: 0, width: 100, height: 60 };
   describe('collision (spec §3.1)', () => {
-    it('25.445 a free target is returned unchanged', () => {
+    it('25.505 a free target is returned unchanged', () => {
       expect(clampToAvoidOverlap({ x: 0, y: 200 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 0, y: 200 });
     });
-    it('25.446 overlap honours the gap: touching within 8 px counts, 9 px apart does not', () => {
+    it('25.506 overlap honours the gap: touching within 8 px counts, 9 px apart does not', () => {
       expect(rectsOverlap({ x: 0, y: 0, ...size }, { ...ob, x: 107 }, NODE_GAP)).toBe(true);
       expect(rectsOverlap({ x: 0, y: 0, ...size }, { ...ob, x: 109 }, NODE_GAP)).toBe(false);
     });
-    it('25.447 dragging into an obstacle from the left stops at its left edge minus the gap (slides, does not jump past)', () => {
+    it('25.507 dragging into an obstacle from the left stops at its left edge minus the gap (slides, does not jump past)', () => {
       expect(clampToAvoidOverlap({ x: 150, y: 0 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 92, y: 0 });
     });
-    it('25.448 the nearest valid candidate wins: approaching from above stops above it', () => {
+    it('25.508 the nearest valid candidate wins: approaching from above stops above it', () => {
       expect(clampToAvoidOverlap({ x: 200, y: -20 }, size, [ob], { x: 200, y: -200 })).toEqual({ x: 200, y: -68 });
     });
-    it('25.449 a corner between two obstacles picks the closest free spot', () => {
+    it('25.509 a corner between two obstacles picks the closest free spot', () => {
       const ob2 = { x: 200, y: 68, width: 100, height: 60 };
       const out = clampToAvoidOverlap({ x: 150, y: 40 }, size, [ob, ob2], { x: 0, y: 40 });
       for (const o of [ob, ob2]) expect(rectsOverlap({ ...out, ...size }, o, NODE_GAP)).toBe(false);
       expect(out.x).toBe(92);
     });
-    it('25.450 a target inside a stack of obstacles still lands on a free spot', () => {
+    it('25.510 a target inside a stack of obstacles still lands on a free spot', () => {
       const ring = [ob, { x: 200, y: 68, width: 100, height: 60 }, { x: 200, y: -68, width: 100, height: 60 }];
       const out = clampToAvoidOverlap({ x: 210, y: 0 }, size, ring, { x: 0, y: 0 });
       for (const o of ring) expect(rectsOverlap({ ...out, ...size }, o, NODE_GAP)).toBe(false);
     });
   });
   ```
-  The arithmetic was checked by hand (planner, 2026-10-03): left edge 200 − gap 8 − width 100 = 92; top 0 − gap 8 − height 60 = −68; 25.449's nearest free candidate is (92, 40). The binary-search fallback is defence in depth, ported for parity: with edge candidates, a free combination exists in every layout these tests build. Do not write a test claiming to reach it unless you construct a layout that does, and prove it reaches it with a counter.
+  The arithmetic was checked by hand (planner, 2026-10-03): left edge 200 − gap 8 − width 100 = 92; top 0 − gap 8 − height 60 = −68; 25.509's nearest free candidate is (92, 40). The binary-search fallback is defence in depth, ported for parity: with edge candidates, a free combination exists in every layout these tests build. Do not write a test claiming to reach it unless you construct a layout that does, and prove it reaches it with a counter.
 
   Run: `pnpm --filter @gisik-nokma/app-core exec vitest run test/workflow-builder/collision.test.ts --maxWorkers=2 > /tmp/g9-col.log 2>&1; tail -15 /tmp/g9-col.log`
   Expected: FAIL (module missing).
@@ -528,7 +528,7 @@
     return at(lo);
   }
   ```
-  Run. Expected: PASS 25.445–25.450.
+  Run. Expected: PASS 25.505–25.510.
 
   Commit.
 
@@ -542,21 +542,21 @@
   const other = { x: 400, y: 160, width: 100, height: 60 };
   const base = { zoom: 1, alt: false, lastValid: { x: 0, y: 0 } };
   describe('snapping (spec §3.2)', () => {
-    it('25.451 off-guide positions snap to the 16 px grid', () => {
+    it('25.511 off-guide positions snap to the 16 px grid', () => {
       expect(snapPosition({ x: 37, y: 9 }, size, [other], base).position).toEqual({ x: 32, y: 16 });
     });
-    it('25.452 a centre within 6 SCREEN px of another centre snaps to it and reports a guide; at zoom 0.25 the flow threshold is 24', () => {
+    it('25.512 a centre within 6 SCREEN px of another centre snaps to it and reports a guide; at zoom 0.25 the flow threshold is 24', () => {
       const r = snapPosition({ x: 37, y: 163 }, size, [other], base);
       expect(r.position.y).toBe(160); expect(r.guides).toContainEqual({ axis: 'y', at: 190 });
       const z = snapPosition({ x: 37, y: 180 }, size, [other], { ...base, zoom: 0.25 });
       expect(z.position.y).toBe(160);
       expect(snapPosition({ x: 37, y: 180 }, size, [other], base).position.y).toBe(176); // control: at zoom 1, 20 px is beyond the guide → grid
     });
-    it('25.453 a guide beats the grid on its axis only', () => {
+    it('25.513 a guide beats the grid on its axis only', () => {
       const r = snapPosition({ x: 37, y: 163 }, size, [other], base);
       expect(r.position.x % GRID).toBe(0);
     });
-    it('25.454 the collision clamp runs last and hides a guide it moved off (the other axis keeps its guide)', () => {
+    it('25.514 the collision clamp runs last and hides a guide it moved off (the other axis keeps its guide)', () => {
       const aligner = { x: 300, y: 400, width: 100, height: 60 }; // raw x 297 is within 6 px of an x guide (other's left edge via right↔left, d = 3)
       const r = snapPosition({ x: 297, y: 163 }, size, [other, aligner], { ...base, lastValid: { x: 0, y: 163 } });
       expect(r.target).toEqual({ x: 300, y: 160 });             // an x guide + the y guide (centre↔centre)
@@ -564,10 +564,10 @@
       expect(r.guides.find((g) => g.axis === 'x')).toBeUndefined();
       expect(r.guides).toContainEqual({ axis: 'y', at: 190 });
     });
-    it('25.455 Alt skips guides and grid (the clamp still applies)', () => {
+    it('25.515 Alt skips guides and grid (the clamp still applies)', () => {
       expect(snapPosition({ x: 37, y: 163 }, size, [other], { ...base, alt: true }).position).toEqual({ x: 37, y: 163 });
     });
-    it('25.456 target reports the snapped pre-clamp point (for the dashed outline); unblocked → target equals position', () => {
+    it('25.516 target reports the snapped pre-clamp point (for the dashed outline); unblocked → target equals position', () => {
       const r = snapPosition({ x: 330, y: 163 }, size, [other], { ...base, lastValid: { x: 0, y: 163 } });
       expect(r.target).toEqual({ x: 336, y: 160 }); expect(r.position).toEqual({ x: 292, y: 160 });
       const free = snapPosition({ x: 37, y: 9 }, size, [other], base);
@@ -618,35 +618,35 @@
     return { position, guides: kept, blocked: position.x !== target.x || position.y !== target.y, target };
   }
   ```
-  The pairing rule is the explicit `PAIRS` list. The test in 25.452 is centre↔centre.
+  The pairing rule is the explicit `PAIRS` list. The test in 25.512 is centre↔centre.
 
-  Run. Expected: PASS 25.451–25.456.
+  Run. Expected: PASS 25.511–25.516.
 
   Commit.
 
 - [ ] **Step 5: Exports, catalogue, mutations, DONE**
 
   - Add `export * from './collision.js'; export * from './snap.js';` to `workflow-builder/index.ts`.
-  - Under `<!-- G-9 T2 -->`, write ✅ lines for 25.445–25.456 with these mutations:
+  - Under `<!-- G-9 T2 -->`, write ✅ lines for 25.505–25.516 with these mutations:
 
     | Case | Mutation |
     |---|---|
-    | 25.446 | gap ignored |
-    | 25.447 | the fast path returns `target` always |
-    | 25.449 | `best` chosen by first, not nearest |
-    | 25.450 | the `free(p)` check removed from the candidate loop (returns an overlapping spot) |
-    | 25.452 | threshold not divided by zoom |
-    | 25.454 | guide filtering removed |
-    | 25.455 | `alt` ignored |
+    | 25.506 | gap ignored |
+    | 25.507 | the fast path returns `target` always |
+    | 25.509 | `best` chosen by first, not nearest |
+    | 25.510 | the `free(p)` check removed from the candidate loop (returns an overlapping spot) |
+    | 25.512 | threshold not divided by zoom |
+    | 25.514 | guide filtering removed |
+    | 25.515 | `alt` ignored |
 
-  - 25.457 is used by Task 1 (the Escape case). 25.458–25.459 are reserved and unused. Leave the numbers unused; do not renumber.
+  - 25.517 is used by Task 1 (the Escape case). 25.518–25.519 are reserved and unused. Leave the numbers unused; do not renumber.
   - Run the mutations, the sweeps (app-core WHOLE) and the checks.
 
   Push. DONE + REVIEW.
 
 ---
 
-### Task 3: Collision and snapping on the canvas, guides, outline, nudge, free placement (cases 25.460–25.474)
+### Task 3: Collision and snapping on the canvas, guides, outline, nudge, free placement (cases 25.520–25.534)
 
 **Files:**
 - Create:
@@ -666,18 +666,18 @@
   - `CanvasOverlays` props `{ guides: Guide[]; outline: { x: number; y: number; width: number; height: number } | null }`.
 
 - [ ] **Step 1: Failing browser tests** (`collision.spec.ts`)
-  - **25.460:** drag state A into state B. Before release, A's box is ≥ 8 px from B's box on the approach side, and an element `.gn-canvas-outline` is visible. After release, the outline is gone and the draft position equals the clamped spot.
-  - **25.461:** control. Dragging A to a free spot shows no outline.
-  - **25.462:** drag so A's centre-y passes within 4 screen px of B's. `.gn-canvas-guide[data-axis="y"]` is visible, and A's centre-y equals B's exactly.
-  - **25.463:** at zoom 0.25 (click zoom-out until the React Flow viewport transform's scale ≤ 0.26), the same guide still appears within 6 screen px.
-  - **25.464:** hold Alt (`page.keyboard.down('Alt')`) and drag 37 px. The final x delta is 37 ± 1 in flow units (not a multiple of 16).
-  - **25.465:** focus state A (Tab until `.react-flow__node:focus`), press ArrowRight. The draft x increases by exactly 16. Press Alt+ArrowRight: +1.
-  - **25.466:** place A one grid step left of B's gap. ArrowRight is blocked: the position is unchanged, and the live region `[aria-live="polite"]` reads `Blocked by <B's name>`.
+  - **25.520:** drag state A into state B. Before release, A's box is ≥ 8 px from B's box on the approach side, and an element `.gn-canvas-outline` is visible. After release, the outline is gone and the draft position equals the clamped spot.
+  - **25.521:** control. Dragging A to a free spot shows no outline.
+  - **25.522:** drag so A's centre-y passes within 4 screen px of B's. `.gn-canvas-guide[data-axis="y"]` is visible, and A's centre-y equals B's exactly.
+  - **25.523:** at zoom 0.25 (click zoom-out until the React Flow viewport transform's scale ≤ 0.26), the same guide still appears within 6 screen px.
+  - **25.524:** hold Alt (`page.keyboard.down('Alt')`) and drag 37 px. The final x delta is 37 ± 1 in flow units (not a multiple of 16).
+  - **25.525:** focus state A (Tab until `.react-flow__node:focus`), press ArrowRight. The draft x increases by exactly 16. Press Alt+ArrowRight: +1.
+  - **25.526:** place A one grid step left of B's gap. ArrowRight is blocked: the position is unchanged, and the live region `[aria-live="polite"]` reads `Blocked by <B's name>`.
 
   The overlay classes must not collide with existing ones. Grep `ui.css` for `gn-canvas-` first, and record that no hit was found.
 
   Run: `pnpm --filter @gisik-nokma/workflow-canvas-browser test > /tmp/g9-t3-red.log 2>&1; tail -30 /tmp/g9-t3-red.log`
-  Expected: 25.460, 25.462, 25.463, 25.464, 25.465 and 25.466 FAIL; 25.461 PASSES.
+  Expected: 25.520, 25.522, 25.523, 25.524, 25.525 and 25.526 FAIL; 25.521 PASSES.
 
   Commit (RED).
 
@@ -725,7 +725,7 @@
   ```
   Grep `tokens.ts` for the accent and radius token names, and use the real ones.
 
-  Run the T3 browser suite. Expected: 25.460, 25.461, 25.462, 25.463 and 25.464 PASS.
+  Run the T3 browser suite. Expected: 25.520, 25.521, 25.522, 25.523 and 25.524 PASS.
 
   Commit.
 
@@ -745,15 +745,15 @@
 
   If React Flow's keyboard step is not 1 unit per press, compute the direction only from the sign, as above.
 
-  Run. Expected: 25.465 and 25.466 PASS.
+  Run. Expected: 25.525 and 25.526 PASS.
 
   Commit.
 
-- [ ] **Step 5: Free placement for Add state (25.467–25.468, unit)**
+- [ ] **Step 5: Free placement for Add state (25.527–25.528, unit)**
 
   `add-state-placement.test.ts`:
-  - **25.467:** a draft whose positions fill (0,0)…(16·k) around `near = {x: 0, y: 0}`; `addState({ near: {x: 0, y: 0}, sizes })` puts the new state at a grid point that overlaps no existing rect (with the gap), nearest to `near`.
-  - **25.468:** control. `addState()` with no `near` keeps the old `nextFreePosition` result.
+  - **25.527:** a draft whose positions fill (0,0)…(16·k) around `near = {x: 0, y: 0}`; `addState({ near: {x: 0, y: 0}, sizes })` puts the new state at a grid point that overlaps no existing rect (with the gap), nearest to `near`.
+  - **25.528:** control. `addState()` with no `near` keeps the old `nextFreePosition` result.
 
   Implementation in `draft-store.ts` `addState`:
   - when `input.near` is given, search grid points in rings of radius r = 0, 1, 2, …, up to 40 around `near` (snapped to `GRID`);
@@ -766,26 +766,26 @@
 
 - [ ] **Step 6: Catalogue, mutations, DONE**
 
-  Write ✅ lines 25.460–25.468 with these mutations:
+  Write ✅ lines 25.520–25.528 with these mutations:
 
   | Case | Mutation |
   |---|---|
-  | 25.460 | `snapPosition` bypassed in `onNodesChange` |
-  | 25.462 | guides not rendered |
-  | 25.463 | zoom fixed at 1 |
-  | 25.464 | Alt ref never set |
-  | 25.465 | nudge step 5 |
-  | 25.466 | the clamp skipped on nudge |
-  | 25.467 | the ring search returns `near` |
+  | 25.520 | `snapPosition` bypassed in `onNodesChange` |
+  | 25.522 | guides not rendered |
+  | 25.523 | zoom fixed at 1 |
+  | 25.524 | Alt ref never set |
+  | 25.525 | nudge step 5 |
+  | 25.526 | the clamp skipped on nudge |
+  | 25.527 | the ring search returns `near` |
 
-  - 25.469–25.474 are reserved and unused.
+  - 25.529–25.534 are reserved and unused.
   - Sweeps: ui + app-core + web WHOLE (`ui.css`); checks.
 
   Push. DONE + REVIEW (`NEEDS: browser`).
 
 ---
 
-### Task 4: Tidy and Undo tidy, Add transition, header buttons (cases 25.475–25.484)
+### Task 4: Tidy and Undo tidy, Add transition, header buttons (cases 25.535–25.544)
 
 **Files:**
 - Create:
@@ -809,20 +809,20 @@
 - **Consumes:** `layoutDraft`, `clampToAvoidOverlap`, `NODE_GAP`, `UNMEASURED_NODE`.
 
 - [ ] **Step 1: Failing unit tests**
-  - **25.475:** `setPositions` replaces all positions in one notify. Subscribe and count the listener calls: exactly 1.
-  - **25.476:** Tidy:
+  - **25.535:** `setPositions` replaces all positions in one notify. Subscribe and count the listener calls: exactly 1.
+  - **25.536:** Tidy:
     - **sets** `positions` to `layoutDraft(def)`, each passed through `clampToAvoidOverlap` against the already placed ones (no two rects overlap with the gap);
     - **shows** "Undo tidy";
     - **"Undo tidy"** restores the exact previous object (`toEqual`).
-  - **25.477:**
+  - **25.537:**
     - **after 10 s** (`vi.useFakeTimers()`, advance by 10_000), "Undo tidy" is gone;
     - **control:** at 9_999 it is still there;
     - **a `moveState`** after Tidy also removes it.
-  - **25.478:** with `canAuthor` false, no Tidy, no Add transition and no Add state are rendered.
+  - **25.538:** with `canAuthor` false, no Tidy, no Add transition and no Add state are rendered.
 
     Read `BuilderProvider`'s env in `builder-context.tsx` for how the existing tests set `canAuthor`. Mirror `canvas.test.tsx`'s render helper.
-  - **25.479:** `AddTransitionForm` lists every state plus "Any state" under From, and every state (no "Any state") under To. Add calls `addTransition(from, to)` and selects the new transition (`selection = { kind: 'transition', index: transitions.length - 1 }`).
-  - **25.480:** Add is disabled, with an inline reason, when the pair exists (`transitionExists`) or when From === To. The reasons are `That transition already exists` and `Pick two different states`.
+  - **25.539:** `AddTransitionForm` lists every state plus "Any state" under From, and every state (no "Any state") under To. Add calls `addTransition(from, to)` and selects the new transition (`selection = { kind: 'transition', index: transitions.length - 1 }`).
+  - **25.540:** Add is disabled, with an inline reason, when the pair exists (`transitionExists`) or when From === To. The reasons are `That transition already exists` and `Pick two different states`.
 
     Before fixing the From === To rule, read `validateWorkflowDef`'s codes (`packages/domain/src/validate-workflow.ts`). Self-loops have no issue code there; the form refuses them for clarity. Record that in DONE.
 
@@ -843,10 +843,10 @@
   Commit.
 
 - [ ] **Step 3: Browser cases** (`tidy-transition.spec.ts`)
-  - **25.481:** drag two states to overlap-adjacent spots, click Tidy. No two `.react-flow__node` boxes overlap. Click Undo tidy, and every box returns (±1 px).
-  - **25.482:** Add transition from "Any state" to a state. A new edge appears from the any-state node.
-  - **25.483:** the duplicate pair shows the reason and a disabled Add.
-  - **25.484:** phone viewport. Tidy and Add transition are reachable (Add transition in the header; Tidy in the canvas corner).
+  - **25.541:** drag two states to overlap-adjacent spots, click Tidy. No two `.react-flow__node` boxes overlap. Click Undo tidy, and every box returns (±1 px).
+  - **25.542:** Add transition from "Any state" to a state. A new edge appears from the any-state node.
+  - **25.543:** the duplicate pair shows the reason and a disabled Add.
+  - **25.544:** phone viewport. Tidy and Add transition are reachable (Add transition in the header; Tidy in the canvas corner).
 
   Run. Expected: PASS.
 
@@ -854,21 +854,21 @@
 
 - [ ] **Step 4: Catalogue, mutations, DONE**
 
-  Write ✅ lines 25.475–25.484 with these mutations:
+  Write ✅ lines 25.535–25.544 with these mutations:
 
   | Case | Mutation |
   |---|---|
-  | 25.475 | `setPositions` calls `moveState` per id |
-  | 25.476 | undo restores `layoutDraft` instead |
-  | 25.477 | timer 1 s |
-  | 25.478 | the `canAuthor` guard removed |
-  | 25.480 | `transitionExists` returns false |
+  | 25.535 | `setPositions` calls `moveState` per id |
+  | 25.536 | undo restores `layoutDraft` instead |
+  | 25.537 | timer 1 s |
+  | 25.538 | the `canAuthor` guard removed |
+  | 25.540 | `transitionExists` returns false |
 
   Sweeps and checks. Push. DONE + REVIEW (`NEEDS: browser`).
 
 ---
 
-### Task 5: Full-screen editing, the floating panel, the Escape ladder, phone sheet, help (cases 25.485–25.499)
+### Task 5: Full-screen editing, the floating panel, the Escape ladder, phone sheet, help (cases 25.545–25.559)
 
 **Files:**
 - Create:
@@ -891,17 +891,17 @@
 - **Consumes:** `TidyControl`, `AddTransitionForm`, the existing panels; `cancelDrag` from Task 1 (the drag layer pushes itself onto the ladder on drag start).
 
 - [ ] **Step 1: Failing unit tests** (`fullscreen.test.tsx`, jsdom, which is fine for state, focus and the DOM)
-  - **25.485:** clicking "Full screen" sets `data-fullscreen="true"` on `.workflow-builder-screen`, and focus moves to the toolbar's first control (the name field). "Exit full screen" clears it, and focus returns to the "Full screen" button.
-  - **25.486:** the choice persists in `sessionStorage` under `<draftStorageKey>:fullscreen`. Remounting restores it. Control: a different draft key does not.
-  - **25.487:** the toolbar contains, in order: the name, Add state, Add transition, a zoom group, Tidy, Issues (with the error count from `validateWorkflowDef`), Publish, Exit full screen. A narrow width (mock `matchMedia('(max-width: 720px)')` true) moves zoom and Tidy into a "More" menu.
-  - **25.488:** the Escape ladder.
+  - **25.545:** clicking "Full screen" sets `data-fullscreen="true"` on `.workflow-builder-screen`, and focus moves to the toolbar's first control (the name field). "Exit full screen" clears it, and focus returns to the "Full screen" button.
+  - **25.546:** the choice persists in `sessionStorage` under `<draftStorageKey>:fullscreen`. Remounting restores it. Control: a different draft key does not.
+  - **25.547:** the toolbar contains, in order: the name, Add state, Add transition, a zoom group, Tidy, Issues (with the error count from `validateWorkflowDef`), Publish, Exit full screen. A narrow width (mock `matchMedia('(max-width: 720px)')` true) moves zoom and Tidy into a "More" menu.
+  - **25.548:** the Escape ladder.
     - **Order:** with a rule editor's menu open inside the panel, in full screen: one Escape closes only the menu, the next closes the panel, the next exits full screen.
     - **Control:** with nothing open, a single Escape exits full screen.
-  - **25.489:**
+  - **25.549:**
     - **opens on selection:** selecting a state opens the panel on the Selection tab with `StateInspector`; selecting a transition shows `TransitionInspector` (rules);
     - **the Issues badge** opens the Issues tab;
     - **× closes it.**
-  - **25.490:** the panel is a `role="region"` labelled `Workflow panel`, not `dialog`. While it is open, the canvas section stays in the tab order (no `inert` / `aria-hidden` on it).
+  - **25.550:** the panel is a `role="region"` labelled `Workflow panel`, not `dialog`. While it is open, the canvas section stays in the tab order (no `inert` / `aria-hidden` on it).
 
   Run. Expected: FAIL.
 
@@ -938,12 +938,12 @@
   - **`phone` true:** the same content in a bottom sheet (fixed bottom, max-height 70vh, rounded top). Reuse the existing phone-drawer open-on-selection subscription in the screen, by moving it into `FloatingPanel`'s parent logic; do not duplicate it.
   - **The rule:** in full screen the floating panel replaces the drawer. Outside full screen the existing drawer stays exactly as it is.
 
-  Run the unit tests. Expected: PASS 25.485–25.490.
+  Run the unit tests. Expected: PASS 25.545–25.550.
 
   Commit.
 
 - [ ] **Step 4: Browser cases** (`fullscreen.spec.ts`)
-  - **25.491:** desktop.
+  - **25.551:** desktop.
     - **Covers the window:** enter full screen; the screen's bounding box equals the viewport (0, 0, w, h).
     - **Every toolbar control works:**
       - rename via the name field;
@@ -954,14 +954,14 @@
       - the Issues badge opens the Issues tab;
       - Publish opens its flow (the fake gateway accepts);
       - Exit restores the normal layout.
-  - **25.492:** read-only (`?role=member` or whatever role `canAuthorRole` refuses; read it). Full screen is available, and there is no Add state, Add transition or Tidy.
-  - **25.493:** a drag inside full screen works live (25.440's assertion, re-run in full screen).
-  - **25.494:** phone 390×844 with `hasTouch`.
+  - **25.552:** read-only (`?role=member` or whatever role `canAuthorRole` refuses; read it). Full screen is available, and there is no Add state, Add transition or Tidy.
+  - **25.553:** a drag inside full screen works live (25.500's assertion, re-run in full screen).
+  - **25.554:** phone 390×844 with `hasTouch`.
     - **Toolbar:** it shows name, Add state, Add transition, Publish, More and Exit.
     - **Bottom sheet:** a tap on a state opens it with the Selection tab.
     - **Touch drag:** a touch drag (`page.touchscreen` cannot drag; use `page.dispatchEvent` pointer events with `pointerType: 'touch'`, or `locator.dispatchEvent('pointerdown'…)` sequences, checking React Flow's handler first) moves the state live.
-  - **25.495:** the Escape ladder in the real browser: open the More menu, press Escape (only the menu closes), Escape (the panel closes), Escape (full screen exits).
-  - **25.496:** a reload in the same tab keeps full screen on (sessionStorage).
+  - **25.555:** the Escape ladder in the real browser: open the More menu, press Escape (only the menu closes), Escape (the panel closes), Escape (full screen exits).
+  - **25.556:** a reload in the same tab keeps full screen on (sessionStorage).
 
   Run. Expected: PASS.
 
@@ -970,18 +970,18 @@
 - [ ] **Step 5: Help, catalogue, mutations, DONE**
   - **`docs/manual.md`:** in the workflow-builder section, add "Full screen" and "Add transition" paragraphs in the manual's voice (read the neighbouring paragraphs). Run `pnpm check:help`.
   - **Features §22:** replace `<!-- G-9 bullet -->` with the final ✅ bullet naming every G-9 behaviour and file.
-  - **Catalogue:** ✅ lines for 25.485–25.496, with these mutations:
+  - **Catalogue:** ✅ lines for 25.545–25.556, with these mutations:
 
     | Case | Mutation |
     |---|---|
-    | 25.485 | focus not moved |
-    | 25.486 | storage key not read |
-    | 25.488 | ladder pops the bottom instead of the top |
-    | 25.490 | `role="dialog"` |
-    | 25.492 | the `canAuthor` guard removed from the toolbar |
-    | 25.494 | phone sheet replaced by the desktop aside |
+    | 25.545 | focus not moved |
+    | 25.546 | storage key not read |
+    | 25.548 | ladder pops the bottom instead of the top |
+    | 25.550 | `role="dialog"` |
+    | 25.552 | the `canAuthor` guard removed from the toolbar |
+    | 25.554 | phone sheet replaced by the desktop aside |
 
-  - 25.497–25.499 are reserved and unused.
+  - 25.557–25.559 are reserved and unused.
   - Sweeps (`ui.css` ⇒ ui + app-core + web WHOLE), checks, the browser suite.
 
   Push. DONE + REVIEW (`NEEDS: browser`, desktop + 390 px).
@@ -1030,7 +1030,7 @@ No gaps.
 - `UNMEASURED_NODE` (exported from `flow-graph.ts` in T3);
 - `setPositions`, `transitionExists`, `useEscapeLadder`.
 
-**4. Review focus:** each of the five lines has its case in the owning task: 25.443 (T1), 25.452/25.463 (T2/T3), 25.444 (T1), 25.488 (T5), 25.478/25.492 (T4/T5).
+**4. Review focus:** each of the five lines has its case in the owning task: 25.503 (T1), 25.512/25.523 (T2/T3), 25.504 (T1), 25.548 (T5), 25.538/25.552 (T4/T5).
 
 ## Execution handoff
 
