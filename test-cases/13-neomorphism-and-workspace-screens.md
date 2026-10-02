@@ -118,7 +118,7 @@ card-scale) and is recorded here only for completeness, not as a call.
   `<select>` remains in scope is untouched, since a segmented picker is not a native select — this
   control simply stopped being a `Select` call site.) `StyleToggle` renders one labelled control —
   a `role="tablist"` named `Style` holding 3 `role="tab"` entries, **`Apple HIG`/`Minimal`/
-  `Neomorphic`** (the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
+  `Neumorphic`** (spelling corrected from `Neomorphic`, owner 2026-10-02; the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
   `data-style` landing on `document.documentElement` when a choice is made, and a line beneath the
   control naming the selected style. That description line has its own case: it must TRACK the
   selection, asserted by switching and reading again, because fixed copy would satisfy any
@@ -126,7 +126,7 @@ card-scale) and is recorded here only for completeness, not as a call.
   name); hard-code the description → RED on the second read. —
   (`apps/web/test/style-toggle.test.tsx`)
 - **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed as
-  `aria-selected="true"` on the `Neomorphic` tab (retitled 2026-09-15 with the return to
+  `aria-selected="true"` on the `Neumorphic` tab (retitled 2026-09-15; spelling corrected 2026-10-02 with the return to
   `SegmentedControl`; previously the `Select` trigger's own visible label text, and before that a
   native `<select>`'s `value`). *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
@@ -1175,7 +1175,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   card is the remaining divergence from §7 and is not done here. **(f) The APPEARANCE card is rebuilt
   to its own owner reference image** (2026-09-15) — the one card with no prototype counterpart, since
   it is this page's own section per spec §4 — as two labelled `SegmentedControl`s in place of a
-  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neomorphic`) with a
+  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neumorphic`) with a
   description line that must TRACK the selection, Theme (`System`/`Light`/`Dark`), and a closing
   footnote. Cases 13.344-13.346 and 3.83 are retitled for the new control shapes rather than
   renumbered, and both component suites were rewritten to assert the SAME properties through the new

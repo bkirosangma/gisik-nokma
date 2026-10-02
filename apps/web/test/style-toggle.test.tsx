@@ -54,7 +54,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
    * 13.344, restated for the new shape: all three styles are visible at once
    * under one labelled control, and picking one stamps `data-style` on the
    * theme element. The LABELS are pinned too — the reference names them
-   * "Apple HIG", "Minimal" and "Neomorphic", not the old abbreviations
+   * "Apple HIG", "Minimal" and "Neumorphic", not the old abbreviations
    * ("HIG"/"Neu"). Mutation: drop the control's `aria-label` → RED (the
    * `tablist` lookup is by that name).
    */
@@ -65,7 +65,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
     const names = within(tablist())
       .getAllByRole('tab')
       .map((tab) => tab.textContent);
-    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neomorphic']);
+    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neumorphic']);
 
     await user.click(segment('Apple HIG'));
     expect(document.documentElement.dataset['style']).toBe('hig');
@@ -78,7 +78,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
    */
   it('defaults to neo when nothing is stored', () => {
     render(<StyleToggle />);
-    expect(segment('Neomorphic')).toHaveAttribute('aria-selected', 'true');
+    expect(segment('Neumorphic')).toHaveAttribute('aria-selected', 'true');
   });
 
   /**
@@ -110,11 +110,11 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
   it('describes the selected style, and the description follows the selection', async () => {
     const user = userEvent.setup();
     render(<StyleToggle />);
-    expect(screen.getByText(/^Neomorphic:/)).toBeInTheDocument();
+    expect(screen.getByText(/^Neumorphic:/)).toBeInTheDocument();
 
     await user.click(segment('Minimal'));
     expect(screen.getByText(/^Minimal:/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Neomorphic:/)).toBeNull();
+    expect(screen.queryByText(/^Neumorphic:/)).toBeNull();
   });
 });
 
