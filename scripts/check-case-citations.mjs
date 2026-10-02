@@ -166,6 +166,8 @@ function isTestPath(relPath) {
   // narrower *.spec.ts-only rule silently excluded its own helpers
   // (apps/web/e2e-stack/helpers/*.ts, global-setup.ts).
   if (/^apps\/web\/e2e[^/]*\//.test(relPath)) return true;
+  // G-9 T1: the canvas browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
+  if (/^packages\/workflow-canvas-browser\/tests\//.test(relPath)) return true;
   return false;
 }
 
