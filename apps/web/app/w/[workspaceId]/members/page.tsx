@@ -13,6 +13,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
+import { OverflowMenu } from '../../../../src/overflow-menu.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
@@ -618,15 +619,16 @@ export default function MembersPage() {
                         <span className="gn-chip gn-members__role">{member.role}</span>
                       )}
                       {canRemove(member) ? (
-                        // Named by its visible text (a speech user says what they
-                        // read); WHICH person is the description, so a screen reader
-                        // hears "Remove from workspace…, Anselma Marak".
-                        <Button
-                          aria-describedby={`gn-members-name-${member.id}`}
-                          onClick={() => setRemoving({ member, label })}
-                        >
-                          {REMOVE_FROM_WORKSPACE}
-                        </Button>
+                        // UX fixes T2 (SYS-12, SET-04, case 23.023): a REPEATED destructive row action is not a
+                        // button on every row, it is one quiet overflow whose menu holds it. The item keeps its
+                        // visible text, and the trigger names WHICH person ("More actions for Anselma Marak"), so
+                        // a screen reader hears who the menu is for before it hears what is in it.
+                        <OverflowMenu
+                          className="gn-card-menu--inline gn-members__more"
+                          triggerLabel={`More actions for ${label}`}
+                          menuLabel={`Actions for ${label}`}
+                          items={[{ label: REMOVE_FROM_WORKSPACE, onSelect: () => setRemoving({ member, label }) }]}
+                        />
                       ) : null}
                     </div>
                   </td>

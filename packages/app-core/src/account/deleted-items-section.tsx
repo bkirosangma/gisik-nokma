@@ -193,7 +193,7 @@ export function DeletedItemsSection({
                     </Button>
                     {!marked ? (
                       <Button
-                        variant="danger"
+                        variant="danger-quiet"
                         aria-label={markItemName(label)}
                         disabled={busy}
                         onClick={() => void act(item, markSeeds(target))}

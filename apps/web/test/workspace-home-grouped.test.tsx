@@ -110,13 +110,12 @@ beforeEach(() => {
 });
 
 describe('22.121 the Projects heading row', () => {
-  it('22.121 holds, in order, the heading, the archived toggle, the Grouped/Plain control and the create slot', async () => {
+  it('22.121 holds, in order, the heading, the archived toggle, the Grouped/Plain control and the Create project button', async () => {
     mount(workspaceAs('owner'));
     const heading = await screen.findByRole('heading', { name: 'Projects' });
     const archived = screen.getByRole('button', { name: 'Show archived projects in Convenience Corner' });
     const control = screen.getByRole('tablist', { name: 'Show projects' });
-    const slot = document.querySelector('[data-slot="create-project"]');
-    expect(slot).not.toBeNull();
+    const slot = screen.getByRole('button', { name: 'Create project' }); // Task 8 (22.152) filled the slot this case once found by attribute
     const rowOf = heading.parentElement!;
     expect(rowOf).toHaveClass('gn-workspace-home__projects-heading');
     const inOrder = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -128,11 +127,11 @@ describe('22.121 the Projects heading row', () => {
     expect(plainTab()).toHaveAttribute('aria-selected', 'true'); // the default
   });
 
-  it('22.121 CONTROL: a member has the control but no create slot; a guest has neither (the groups door is closed to them)', async () => {
+  it('22.121 CONTROL: a member has the control but no Create project button; a guest has neither (the groups door is closed to them)', async () => {
     mount(workspaceAs('member'));
     await screen.findByRole('heading', { name: 'Projects' });
     expect(screen.getByRole('tablist', { name: 'Show projects' })).toBeInTheDocument();
-    expect(document.querySelector('[data-slot="create-project"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create project' })).toBeNull();
     cleanup();
     mount(workspaceAs('guest'));
     await screen.findByRole('heading', { name: 'Projects' });

@@ -172,6 +172,8 @@ function EditorHeader(props: {
   canAuthor: boolean;
   cancel?: ReactNode;
   saveDisabled: boolean;
+  /** The form is exactly what was loaded: Save stays quiet (UX fixes T6, 23.094, audit TT-08). */
+  saveQuiet: boolean;
   onSave(): void;
 }) {
   const Heading = props.heading;
@@ -192,10 +194,14 @@ function EditorHeader(props: {
             component does not supply); the paint is `gn-button--primary`'s. */}
         {props.canAuthor ? (
           <Button
-            variant="primary"
+            variant={props.saveQuiet ? 'ghost' : 'primary'}
             className="ticket-type-editor__save"
             disabled={props.saveDisabled}
-            onClick={props.onSave}
+            // QUIET, not `disabled` (UX fixes T6, 23.094): an unchanged form has nothing to save, so the button stops being
+            // the page's one primary and says so (`aria-disabled`), but stays focusable and announced where `disabled`
+            // would drop it from the tab order; the click is inert.
+            aria-disabled={props.saveQuiet ? true : undefined}
+            onClick={props.saveQuiet ? undefined : props.onSave}
           >
             Save ticket type
           </Button>
@@ -308,6 +314,8 @@ export function TicketTypeEditorScreen(props: {
   const heading = props.heading ?? 'h2';
   const untitledLabel = props.untitledLabel ?? 'Untitled type';
   const saveDisabled = !parsed.success || save.phase === 'saving';
+  // An existing type exactly as loaded has nothing to save; a NEW type (no `initialDef`) has no saved state to equal.
+  const saveQuiet = props.initialDef !== null && JSON.stringify(def) === JSON.stringify(props.initialDef);
   const header = (
     <EditorHeader
       name={def.name}
@@ -316,6 +324,7 @@ export function TicketTypeEditorScreen(props: {
       canAuthor={canAuthor}
       cancel={props.cancel}
       saveDisabled={saveDisabled}
+      saveQuiet={saveQuiet}
       onSave={() => void onSave()}
     />
   );
@@ -730,7 +739,7 @@ export function TicketTypeEditorScreen(props: {
               data-testid="rank-implications-list"
             >
               <li>
-                {'Two pickers will re-order: the board’s New ticket menu and MCP’s '}
+                {'Two pickers will re-order: the board’s Create ticket menu and MCP’s '}
                 <code className="ticket-type-editor__code">create_ticket</code>.
               </li>
               <li data-testid="rank-implications">{rankImplicationsCopy(implications)}</li>

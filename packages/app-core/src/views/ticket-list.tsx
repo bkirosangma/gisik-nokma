@@ -1,5 +1,5 @@
 import { useMemo, useState, type HTMLAttributes, type ReactNode } from 'react';
-import { Avatar, Chip, Select, Table, type TableColumn } from '@gisik-nokma/ui';
+import { Avatar, Chip, Select, Table, useScrollEdges, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import {
@@ -968,6 +968,7 @@ function ListTable({
   /** See `TicketListProps.actorLabelOf`. */
   actorLabelOf: (userId: string) => string;
 }) {
+  const wrapEdgesRef = useScrollEdges<HTMLDivElement>('x');
   const tableColumns: TableColumn<ListRowNode>[] = [
     // Second wave Task 11 (spec §8.3, the List bullet) — the LEADING checkbox
     // column, present only when a caller supplies `selection`.
@@ -1140,7 +1141,7 @@ function ListTable({
         ]),
   ];
   return (
-    <div className="gn-list__table-wrap">
+    <div className="gn-list__table-wrap gn-scroll-fade" ref={wrapEdgesRef}>
       <Table
         columns={tableColumns}
         rows={nodes}
@@ -1285,7 +1286,7 @@ export type TicketListState = {
    * Whether the list has EVER answered, over this hook's whole lifetime.
    *
    * `rows === null` is the right test for "do I have rows to render". It is the
-   * wrong test for "does the New ticket control exist", because a filter change
+   * wrong test for "does the Create ticket control exist", because a filter change
    * re-keys the query and nulls `rows` on every toggle — which retracted the
    * button and flickered the project header. Gate controls on this instead.
    */

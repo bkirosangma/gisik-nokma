@@ -17,7 +17,7 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon, useScrollEdges } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -88,7 +88,7 @@ export type BoardProps = {
    * `selection` is OPTIONAL on every call (starting-status design, 2026-09-23):
    * the whole-board button (`emptyBanner`) and the empty-board banner call it
    * with none, exactly as before this parameter existed. A creatable
-   * empty-COLUMN's own "Add a ticket" calls it WITH one — `{workflowId,
+   * empty-COLUMN's own "Create ticket" calls it WITH one — `{workflowId,
    * stateId}`, that column's own identity — so the shell can pre-fill the
    * New-ticket dialog's type and status. Widening an existing required-arity
    * callback rather than adding a second prop: every call site already reads
@@ -631,7 +631,7 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
    * collapsed only where there is another workflow to distinguish it from: the
    * owner's answer on 2026-09-23 was *"single workflow → UNCOLLAPSED, including
    * when it is empty"*, because a lone empty workflow collapsed would be a board
-   * showing a heading and nothing else, hiding the per-column `Add a ticket`
+   * showing a heading and nothing else, hiding the per-column `Create ticket`
    * buttons that are the only thing to act on there. A LONE group is therefore
    * never collapsed by default — and note that this is about the DEFAULT only:
    * a person may collapse a lone workflow by hand, and case `13.1413` holds both
@@ -887,7 +887,7 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
             className="gn-board__empty-create"
             onClick={() => onCreateTicket()}
           >
-            Create a ticket
+            Create ticket
           </button>
         ) : null}
       </>
@@ -1138,6 +1138,8 @@ function BoardGroupSection({
     railLeft: number;
   } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
+  // The rail scrolls sideways: `.gn-scroll-fade` reads these two attributes so a column running off an edge shows it.
+  const railEdgesRef = useScrollEdges<HTMLDivElement>('x', railRef);
   // Mobile plan FD8: on a phone the rail shows one column at a time (CSS scroll-snap) with a picker above it, and
   // the column collapse is not applied — a collapsed column renders a strip INSTEAD of its cards, so only the
   // DOM can expand it. The person's stored choices are left alone: the same memory collapses the column again
@@ -1294,7 +1296,7 @@ function BoardGroupSection({
         Collapsed hides the RAIL, which is the whole point of the control: the
         request was to reclaim the row, so a state that hid the cards and left
         four empty columns standing would not answer it. Hiding the rail takes
-        the columns, their per-column empty copy and their `Add a ticket` with
+        the columns, their per-column empty copy and their `Create ticket` with
         it (`13.1409`).
       */}
       {phone && expanded && activeStateId !== null ? (
@@ -1306,9 +1308,9 @@ function BoardGroupSection({
         />
       ) : null}
       <div
-        className="gn-board__rail"
+        className="gn-board__rail gn-scroll-fade"
         id={railId}
-        ref={railRef}
+        ref={railEdgesRef}
         hidden={!expanded}
         // A card's `dragend` bubbles here from its slot: that covers Esc and a
         // drop outside every column, neither of which fires `drop`.
@@ -1447,7 +1449,7 @@ function BoardGroupSection({
             ) : (
               <>
             <header className="gn-board__column-header">
-              <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
+              <Chip tone={column.blocked ? 'waiting' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
               {/*
                * `Close all (N)` — spec §8.3's Board bullet: "A TERMINAL
@@ -1521,12 +1523,14 @@ function BoardGroupSection({
              * that scoping it was "outside this task" is what this task closes):
              * `{workflowId: group.workflowId, stateId: column.stateId}`, this
              * column's own identity, so the shell can pre-fill the New-ticket
-             * dialog's type and status. Labelled "Add a ticket" rather than
-             * repeating `emptyBanner`'s "Create a ticket" for two reasons: it
-             * matches the prototype's own per-column copy, and a board can
-             * render both an `emptyBanner` button and one of these per empty
-             * column at once (R6) — an identical accessible name on every one
-             * of them would be indistinguishable by role and name alike.
+             * dialog's type and status. Its VISIBLE text is "Create ticket" like every
+             * other entry point (BRD-19, 22.155: one action, one name), and its
+             * ACCESSIBLE name adds the column — "Create ticket in <column>" — because
+             * a board can render both an `emptyBanner` button and one of these per
+             * empty column at once (R6), and an identical accessible name on every
+             * one of them would be indistinguishable by role and name alike. The
+             * visible text is contained in the name, so a voice-control user who
+             * says what they see still reaches it.
              *
              * GATED ON `column.creatable`, not merely on `onCreateTicket` being
              * passed (starting-status design): a state a workflow forbids
@@ -1564,11 +1568,12 @@ function BoardGroupSection({
                 </p>
                 {onCreateTicket !== undefined && column.creatable ? (
                   <Button
+                    aria-label={`Create ticket in ${column.name}`}
                     onClick={() =>
                       onCreateTicket({ workflowId: group.workflowId, stateId: column.stateId })
                     }
                   >
-                    Add a ticket
+                    Create ticket
                   </Button>
                 ) : null}
               </div>
@@ -2198,6 +2203,10 @@ function BoardCardView({
              markup's text is unchanged and the `·` stays `aria-hidden`. */
           <span className="gn-board-card__due-unit">
             <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
+            {/* Colour is never the only signal (UX fixes T6, 23.093): a past date SAYS "Overdue" as well as turning red. */}
+            <span className={late ? 'gn-board-card__due-label gn-board-card__due-label--late' : 'gn-board-card__due-label'}>
+              {late ? 'Overdue' : 'Due'}
+            </span>{' '}
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
               title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}

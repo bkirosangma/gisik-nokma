@@ -1,6 +1,6 @@
 /**
  * Where a new ticket starts, remembered for the person who chose it — the
- * answer to the New ticket dialog's "Starts in the backlog?" switch.
+ * answer to the Create ticket dialog's "Starts in the backlog?" switch.
  *
  * ## This is `apps/web/src/use-last-workspace.ts`'s pattern, one question over
  *
@@ -30,7 +30,7 @@
  * **It is a synchronous pair, not a hook.** The workspace and project hooks are
  * hooks because they feed a nav that renders before storage is read, and they
  * need a third `unknown` state to avoid flashing a false sentence during that
- * window. Nothing here renders before it is read: the New ticket dialog reads
+ * window. Nothing here renders before it is read: the Create ticket dialog reads
  * this exactly ONCE per open, inside the effect that already resets the dialog's
  * draft (`NewTicketDialog`'s "empty on OPEN"), which runs on the client, after a
  * user action, and never during the server render. There is no window to name and
