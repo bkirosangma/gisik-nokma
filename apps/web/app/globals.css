@@ -5684,3 +5684,36 @@ input, textarea, select { font-family: inherit; }
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
 }
+
+/* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
+   The room comes from `--gn-shadow-reach` (`tokens.ts`; neo only) — see the block at the foot of `packages/ui/src/ui.css` for the why.
+   Each scroller below is padded by the reach and handed the same box back with the equal negative margin, so its neighbours do not
+   move. All under `[data-style="neo"]`: hig and minimal are byte-identical. */
+[data-style="neo"] .gn-groups__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The tree's padded top edge reaches back over the toolbar's bottom (the 0.75rem gap is smaller than the reach); a positioned toolbar
+   paints, and takes the pointer, above that transparent strip, so the Add group button stays whole. */
+[data-style="neo"] .gn-groups__toolbar {
+  position: relative;
+}
+/* The same, for the bar above the notes body: "Create note" and the drawer toggle lost their bottom edge to the padded tree below. Above
+   60rem the tree is itself positioned (and later in the DOM), so a bare `position: relative` ties and loses: the bar takes `z-index: 1`. */
+[data-style="neo"] .gn-notes__bar {
+  position: relative;
+  z-index: 1;
+}
+/* The notes tree scrolls only above 60rem (the drawer arm hides it below); its Restore buttons sat flush with the right edge. */
+[data-style="neo"] .gn-notes__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The phone chip row: the unscoped rule above gave it 0.25rem, which is less than a chip's lift. In neo the padding is the reach and
+   the negative margin returns the row to where it sat (its 1.4rem top margin is kept, the sides and foot are handed back). */
+@media (max-width: 40rem) {
+  [data-style="neo"] .gn-workspace-home__links {
+    padding: var(--gn-shadow-reach);
+    margin: calc(1.4rem - var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach));
+  }
+}

@@ -1951,12 +1951,71 @@ export const SHADOW_ROLES: readonly ShadowRole[] = [
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 const HALO_STEPS: readonly HaloStep[] = ['lg', 'card', 'compact'];
 
+/**
+ * **Smoothness G-2 (2026-10-02, cases 25.321–25.325): how far a resting raised shadow reaches past its element, and the roles it is NOT
+ * measured over.** Owner: *"many examples in both desktop and mobile, where due to containers, the lights and shadows are getting cut
+ * off in the UI."* A container with `overflow: hidden | auto | scroll | clip` paints nothing outside its padding box, so a raised child
+ * flush against that edge loses the part of its shadow that crosses it (neo's lit half falls up-left, its dark half down-right).
+ *
+ * The reach is `max(|x|, |y|) + blur + spread` of the largest OUTER (non-inset) layer — the extent the CSS shadow paints beyond the
+ * border box on its widest side — taken over BOTH themes of the style, so it is one number per style and a theme switch never moves a
+ * layout. It is DERIVED from `SHADOWS`, never typed in: change a neo shadow and `--gn-shadow-reach` moves with it (25.321's control).
+ *
+ * **Roles left out, each for the same reason — their consumers are not inside a clipping container's flow:** `overlay`, `sheet`, `drop`
+ * and `drop-side` float over the page (portalled dialogs, popovers, the sticky bar's scrim drop); `near-lg` and `raised-lg` are the
+ * large-surface pair those same panels wear; `lift-drag` is a card in flight, painted in the drag image. Left in: every role a
+ * component wears at rest or on hover INSIDE a container, so the largest is the hover lift (`near`, 6 + 14 = 20 px in neo) and not the
+ * 14 px a card rests in. `inset` layers paint inside the border box and cannot cross an edge.
+ *
+ * Emitted for `neo` ONLY (`declarationsFor`): hig and minimal carry no `--gn-shadow-reach` at all, so their stylesheet is byte-identical
+ * (24.002 / 24.009), and every consumer is scoped under `[data-style="neo"]`.
+ */
+const REACH_EXCLUDED: ReadonlySet<ShadowRole> = new Set<ShadowRole>([
+  'overlay',
+  'sheet',
+  'drop',
+  'drop-side',
+  'near-lg',
+  'raised-lg',
+  'lift-drag',
+]);
+
+/** The widest outer extent, in px, of a set of layers: `max(|x|, |y|) + blur + spread` of the largest non-inset one (0 for none). */
+export function reachOfLayers(layers: readonly { x: number; y: number; blur: number; spread?: number; inset?: boolean }[]): number {
+  let reach = 0;
+  for (const layer of layers) {
+    if (layer.inset === true) continue;
+    reach = Math.max(reach, Math.max(Math.abs(layer.x), Math.abs(layer.y)) + layer.blur + (layer.spread ?? 0));
+  }
+  return reach;
+}
+
+/** The reach, in px, of `style`'s resting-and-hover raised shadows (see `REACH_EXCLUDED` above). */
+export function shadowReachOf(style: StyleName): number {
+  let reach = 0;
+  for (const theme of ['light', 'dark'] as const) {
+    for (const role of SHADOW_ROLES) {
+      if (REACH_EXCLUDED.has(role)) continue;
+      reach = Math.max(reach, reachOfLayers(SHADOWS[style][theme][role]));
+    }
+  }
+  return reach;
+}
+
+/** The roles `shadowReachOf` does not read, for the test that proves the exclusion does work. */
+export const SHADOW_REACH_EXCLUDED_ROLES: readonly ShadowRole[] = [...REACH_EXCLUDED];
+
+/** `--gn-shadow-reach`: the one custom property the clip-room rules read. Not a role, so it is not in `SHADOW_ROLES`. */
+export const SHADOW_REACH_VARIABLE = '--gn-shadow-reach';
+
 function declarationsFor(style: StyleName, theme: ThemeName): string {
   const colours = TOKEN_ROLES.map((role) => `${cssVariableName(role)}: ${colorOf(theme, role, style)};`);
   const radiusDecls = RADIUS_ROLES.map((role) => `${radiusVariableName(role)}: ${radiusOf(style, role)};`);
   const haloDecls = HALO_STEPS.map((step) => `${haloVariableName(step)}: ${halo[style][step]};`);
   const shadowDecls = SHADOW_ROLES.map((role) => `${shadowVariableName(role)}: ${shadowValueOf(style, theme, role)};`);
-  return [...colours, ...radiusDecls, ...haloDecls, ...shadowDecls].join(' ');
+  // Neo only: hig and minimal emit nothing new (24.002), and every reader of the property sits under `[data-style="neo"]`.
+  const reachDecls = style === 'neo' ? [`${SHADOW_REACH_VARIABLE}: ${shadowReachOf(style)}px;`] : [];
+  return [...colours, ...radiusDecls, ...haloDecls, ...shadowDecls, ...reachDecls].join(' ');
 }
 
 /**
