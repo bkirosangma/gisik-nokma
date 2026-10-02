@@ -21,13 +21,13 @@
 
 ## 24.2 Press inversion and the filled-fill rule (T2)
 
-- ❌ **24.020 — the primary is a filled surface: one dark fall, a longer one on hover, a self-coloured inset on press (N8).**
-- ❌ **24.021 — the confirm button takes the danger roles: a self-coloured red inset on press (N8).**
-- ❌ **24.022 — a disabled filled button paints no shadow ("no depth" = "not interactive", U7 extended).**
-- ❌ **24.023 — the button focus ring sits 3px out, so the accent edge and the ring read as one ring with a gap (Review Focus 3).**
-- ❌ **24.024 — the on-switch knob carries one dark fall and no highlight (N8).**
-- ❌ **24.025 — cards, doors and board cards press into the surface (N1): every `:active` site reads `lift-press`, which neo renders inset.**
-- ❌ **24.026 — the drag clone keeps its lift while the source card presses (Review Focus 4).**
+- ✅ **24.020 — the primary is a filled surface: one dark fall, a longer one on hover, a self-coloured inset on press (N8).**
+- ✅ **24.021 — the confirm button takes the danger roles: a self-coloured red inset on press (N8).**
+- ✅ **24.022 — a disabled filled button paints no shadow ("no depth" = "not interactive", U7 extended).**
+- ✅ **24.023 — the button focus ring sits 3px out, so the accent edge and the ring read as one ring with a gap (Review Focus 3).**
+- ✅ **24.024 — the on-switch knob carries one dark fall and no highlight (N8).**
+- ✅ **24.025 — cards, doors and board cards press into the surface (N1): every `:active` site reads `lift-press`, which neo renders inset.**
+- ✅ **24.026 — the drag clone keeps its lift while the source card presses (Review Focus 4).**
 
 ## 24.3 The sunken family and the rim-less neo field (T3)
 
