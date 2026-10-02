@@ -7,6 +7,7 @@ import { makeSubmittedFactory } from '@gisik-nokma/app-core';
 import { newUlid } from '@gisik-nokma/domain';
 import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from './project-edit-form.js';
 import { useWorkspaceGroups } from './use-workspace-groups.js';
+import { useOptimisticName } from './use-optimistic-name.js';
 import { updateSeeds } from './project-update-seeds.js';
 import { bumpProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
@@ -69,6 +70,13 @@ export function ProjectTitle({
 
   const { groups, reread } = useWorkspaceGroups(workspaceId, row !== null && mayAdminister(row.role) && editing);
   const trigger = useRef<HTMLButtonElement>(null);
+  /**
+   * The name the `<h1>` draws (smoothness T7, spec S5). The form stays open for the write — it carries four fields, a
+   * re-key confirmation and field-level refusals that need it — so the gap this closes is the one AFTER the commit:
+   * the form leaves, and until the re-read lands the heading would show the OLD name. The typed name is held from Save,
+   * drawn from the commit until a read carries it, and dropped on any refusal.
+   */
+  const shownName = useOptimisticName(projectName);
 
   const save = useCallback(
     (values: ProjectEditValues): void => {
@@ -89,11 +97,13 @@ export function ProjectTitle({
         return;
       }
       const make = makeSubmittedFactory({ actorId: userId, origin: 'web' });
+      if (values.name.trim() !== projectName) shownName.begin(values.name.trim());
       setBusy(true);
       void dataSource.ingest(seeds.map(make)).then(
         (results: IngestResult[]) => {
           setBusy(false);
           if (results.length !== seeds.length) {
+            shownName.drop();
             setRefusal(
               `The server answered ${results.length} of ${seeds.length} claims, so what happened is not known.`,
             );
@@ -102,6 +112,7 @@ export function ProjectTitle({
           }
           const bad = results.find((result) => result.status !== 'committed');
           if (bad === undefined) {
+            shownName.settle();
             setEditing(false);
           } else if (bad.status === 'refused' && refusalField(bad.rule) !== null) {
             setFieldRefusal({ rule: bad.rule, reason: bad.reason });
@@ -112,16 +123,18 @@ export function ProjectTitle({
               bad.status === 'refused' ? `${bad.rule}: ${bad.reason}` : `${bad.code}: ${bad.message}`,
             );
           }
+          if (bad !== undefined) shownName.drop();
           // Re-read on a refusal too, for the reason the workspace home gives.
           bumpProjectsVersion();
         },
         (cause: unknown) => {
           setBusy(false);
+          shownName.drop();
           setRefusal(cause instanceof Error ? cause.message : String(cause));
         },
       );
     },
-    [dataSource, groups, projectId, projectName, reread, row, userId, workspaceId],
+    [dataSource, groups, projectId, projectName, reread, row, shownName, userId, workspaceId],
   );
 
   const canEdit = row !== null && mayAdminister(row.role);
@@ -146,13 +159,13 @@ export function ProjectTitle({
         />
       ) : (
         <div className="gn-project__title-row">
-          <h1 className="gn-project__title">{projectName}</h1>
+          <h1 className="gn-project__title">{shownName.name}</h1>
           {canEdit ? (
             <Button
               ref={trigger}
               type="button"
               className="gn-project__edit"
-              aria-label={`Edit ${projectName}`}
+              aria-label={`Edit ${shownName.name}`}
               onClick={() => setEditing(true)}
             >
               {/* Neo follow-up F-2 (case 23.331): on a phone the word gives way to the glyph so Edit stays on the title's row

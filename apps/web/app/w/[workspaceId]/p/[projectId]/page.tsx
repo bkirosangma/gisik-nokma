@@ -29,6 +29,7 @@ import {
   memberLabel,
   sortByRank,
   useBoard,
+  usePendingCreates,
   useActorNames,
   useLiveQuery,
   useTicketList,
@@ -48,7 +49,7 @@ import {
   writeFailureCopy,
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
-import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
+import { TicketEditorSlot, prefetchEditor, uploadAttachmentHttp } from '../../../../../src/editor-slot.js';
 import {
   Avatar,
   Button,
@@ -66,6 +67,7 @@ import {
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import { useOptimisticStarts } from '../../../../../src/use-optimistic-starts.js';
 import { NewTicketDescriptionSlot } from '../../../../../src/new-ticket-description-slot.js';
 import { BacklogRankControls, submitRank } from '../../../../../src/backlog-rank-controls.js';
 import {
@@ -103,6 +105,7 @@ import { useCanModerateComments } from '../../../../../src/use-can-moderate-comm
 import { useMyWorkspaces } from '../../../../../src/use-my-workspaces.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
+import { ticketSheetHint } from '../../../../../src/ticket-sheet-hint.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -503,6 +506,8 @@ function ProjectBoard() {
   );
 
   const board = useBoard(dataSource, workspaceId, projectId);
+  // Tickets whose create is in flight, drawn on the board as ghost cards (smoothness T7, spec S5).
+  const pendingCreates = usePendingCreates(board.data);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
 
   /**
@@ -1249,6 +1254,12 @@ function ProjectBoard() {
    * resolve. The scope note beside the switch names the Backlog now too; it
    * had named three tabs of five.
    */
+  /** The rows a read still holds in the backlog: what retires a committed Start's optimistic hide. */
+  const rowsInBacklog = useMemo(
+    () => (list.rows === null ? null : new Set(list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).map((row) => row.ticketId))),
+    [list.rows],
+  );
+  const starts = useOptimisticStarts(rowsInBacklog);
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
     /**
@@ -1282,14 +1293,16 @@ function ProjectBoard() {
    */
   const backlogRows = useMemo(() => {
     if (backlogNarrowing === null) return [];
+    // A row whose Start is open (or committed and not yet read back) is off the tab already (smoothness T7, spec S5).
+    const standing = starts.hidden.size === 0 ? backlogNarrowing.rows : backlogNarrowing.rows.filter((row) => !starts.hidden.has(row.ticketId));
     const withOverrides =
       rankOverrides.size === 0
-        ? backlogNarrowing.rows
-        : backlogNarrowing.rows.map((row) =>
+        ? standing
+        : standing.map((row) =>
             rankOverrides.has(row.ticketId) ? { ...row, rank: rankOverrides.get(row.ticketId) ?? null } : row,
           );
     return sortByRank(withOverrides);
-  }, [backlogNarrowing, rankOverrides]);
+  }, [backlogNarrowing, rankOverrides, starts.hidden]);
 
   /**
    * A DRAG'S MOVE — the same `submitRank` the two buttons call.
@@ -1428,6 +1441,8 @@ function ProjectBoard() {
    * than showing the previous ticket's files under the new one's heading — the
    * failure `useLiveQuery`'s `queryKey` exists to prevent (ruling P17).
    */
+  // The board card's workflow starts the sheet's workflow read before the ticket read lands (T7 F3).
+  const sheetHint = openTicketId === null ? undefined : ticketSheetHint(board.data, openTicketId);
   const openTicketAttachments = useLiveQuery(
     dataSource,
     workspaceId,
@@ -1446,8 +1461,11 @@ function ProjectBoard() {
     top. it should not scroll"*). `openParentTicket` below is the one door this
     does NOT blanket — see its own note.
   */
-  const openTicket = (ticketId: string) =>
+  const openTicket = (ticketId: string) => {
+    // The editor is its own chunk (smoothness T10): start fetching it as the sheet opens, not when the sheet first renders it.
+    prefetchEditor();
     router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`, { scroll: false });
+  };
   const closeTicket = () =>
     router.push(`/w/${workspaceId}/p/${projectId}`, { scroll: false });
   /**
@@ -2326,7 +2344,14 @@ function ProjectBoard() {
           {...(membersRefusal === null ? {} : { assigneeCandidatesUnavailable: membersRefusal })}
           workflowStates={workflowStatesFor}
           {...(createSelection === null ? {} : { initialSelection: createSelection })}
-          onCreated={openTicket}
+          onPending={pendingCreates.add}
+          onRefused={pendingCreates.remove}
+          onCreated={(ticketId) => {
+            // The server committed: the ghost stays until the read shows the id, so ask for the read now.
+            pendingCreates.settle(ticketId);
+            board.reload();
+            openTicket(ticketId);
+          }}
         />
         {ticketTypes.data === null ? (
           <p role="status" className="gn-new-ticket__fallback">
@@ -3215,6 +3240,7 @@ function ProjectBoard() {
                 // one" for both — see `Board`'s own `isNarrowed` docblock.
                 <Board
                   board={boardNarrowing.view}
+                  pendingCreates={pendingCreates.creates}
                   onOpenTicket={openTicket}
                   /*
                     WHO the board remembers its collapse choices for. The
@@ -3424,6 +3450,10 @@ function ProjectBoard() {
                                 workspaceId={workspaceId}
                                 currentUserId={currentUserId}
                                 onStarted={list.reload}
+                                onBegin={starts.begin}
+                                onSettled={starts.settle}
+                                onFailed={starts.fail}
+                                {...(starts.refusals[row.ticketId] !== undefined ? { initialRefusal: starts.refusals[row.ticketId]! } : {})}
                               />
                               {/*
                                 The rank controls sit in the SAME row action as
@@ -3676,6 +3706,7 @@ function ProjectBoard() {
           cache={cache}
           workspaceId={workspaceId}
           ticketId={openTicketId}
+          {...(sheetHint !== undefined ? { hint: sheetHint } : {})}
           currentUserId={currentUserId}
           canModerateComments={canModerateComments}
           /*

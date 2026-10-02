@@ -5377,7 +5377,20 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
    */
   it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
     const user = userEvent.setup();
-    const source = renderSheet(ticketRead());
+    // T7: a committed Move now SHOWS the ticket in its new state at once (the overlay), so Done is no longer
+    // a destination on the second Move — the way back (`done → doing`) is the next one, and it asks for a
+    // comment too, so the stale-comment hazard is witnessed on the same box.
+    const read = ticketRead();
+    const wired = sheetSource(read);
+    Object.assign(wired.query, {
+      getWorkflowDef: async () => ({
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((t) =>
+          t.from === 'done' && t.to === 'doing' ? { ...t, rules: [{ kind: 'require-comment' as const }] } : t,
+        ),
+      }),
+    });
+    const source = renderSheet(read, wired);
     await settled();
 
     // ARM ONE — pick Done, write the comment, commit.
@@ -5396,10 +5409,10 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
       comment: { text: 'shipped on the morning van' },
     });
 
-    // ARM TWO — reopen and pick the SAME destination again.
+    // ARM TWO — reopen and pick the way back (the box belongs to a NEW move).
     await user.click(screen.getByRole('button', { name: 'Move…' }));
     await user.click(screen.getByRole('button', { name: /Move to/ }));
-    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
 
     expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
   });

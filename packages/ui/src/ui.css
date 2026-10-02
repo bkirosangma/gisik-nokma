@@ -1945,6 +1945,12 @@ a.gn-ticket-sheet__crumb--link {
   opacity: 0.6;
   pointer-events: none;
 }
+/* A ticket being created (smoothness T7, spec S5): the ghost card is the card's OWN container, drawn dimmed while
+   the server has not answered. A card being CLOSED (F2) is the same dim, in place: ONE opacity rule for both. No
+   fill of its own — dimming is `opacity` on the card, never a wash and never the well (Amendment S-R1) — and
+   nothing else about its box changes, so the real card replaces it without a jump. */
+.gn-board__card-slot--creating > .gn-board-card,
+.gn-board__card-slot--closing > .gn-board-card { opacity: 0.65; }
 /* THE DROP TARGET (plan D25, SUPERSEDED by owner feedback 2026-09-30: D25
    assumed the landing slot was unknowable; it is not — a column is ordered by
    ticket id, see `landingIndex` in board.tsx). A column under a drag is still
