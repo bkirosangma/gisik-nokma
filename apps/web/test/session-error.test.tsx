@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSyncExternalStore } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -161,8 +161,33 @@ describe('21.239 a session error keeps the signed-in chrome', () => {
     setSession(tooMany());
     expect(screen.getByTestId('page').textContent).toBe('status:error');
     expect(screen.queryByRole('link', { name: 'Workspaces' })).toBeNull();
-    expect(screen.queryByRole('navigation', { name: 'Phone' })).toBeNull();
+    // AMENDED 2026-10-02 (F-6, 23.285): a failed read with no user is NOT signed out, so the phone bar stays — it was
+    // `toBeNull()` here, which pinned the very hole F-6 closes (a first-request failure left a phone with no way to navigate).
+    expect(screen.getByRole('navigation', { name: 'Phone' })).toBeTruthy();
     expect(container.textContent ?? '').not.toMatch(/Sign in/);
+  });
+});
+
+describe('23.285 the phone bottom bar when the session never loads (F-6, owner follow-up 2026-10-02)', () => {
+  it('23.285 a first request that FAILS (an `error` status, no last-known user) still shows the bar, with the default slots; CONTROL: a genuine signed-out answer shows none, and a read still pending shows none', () => {
+    current = tooMany();
+    render(shell());
+    expect(screen.getByTestId('page').textContent).toBe('status:error');
+    const phone = screen.getByRole('navigation', { name: 'Phone' });
+    // The default bar (Board · My work · Notes · Inbox) is not rendered without a workspace; what resolves is Notes, Inbox and More.
+    expect(within(phone).getByRole('link', { name: 'Notes' })).toBeTruthy();
+    expect(within(phone).getByRole('link', { name: 'Inbox' })).toBeTruthy();
+    expect(within(phone).getByRole('button', { name: 'More' })).toBeTruthy();
+    // and nothing was remembered under a made-up id
+    expect(window.localStorage.length).toBe(0);
+
+    // CONTROL — the server ANSWERED that nobody is signed in: no bar.
+    setSession(SIGNED_OUT);
+    expect(screen.getByTestId('page').textContent).toBe('Sign in to open settings');
+    expect(screen.queryByRole('navigation', { name: 'Phone' })).toBeNull();
+    // CONTROL — still loading: no bar yet (nothing is known, and the signed-in markup hydrates later).
+    setSession(PENDING);
+    expect(screen.queryByRole('navigation', { name: 'Phone' })).toBeNull();
   });
 });
 

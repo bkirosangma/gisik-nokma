@@ -545,11 +545,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         `nav` is a landmark inside a landmark, and the bar's own sticky stacking context is not the
         place for a `position: fixed` thing. The workspace is the EFFECTIVE one (`undefined` while
         `noWorkspace`), so a remembered id that never resolves gets no scoped slot (plan FD5). */}
-    {user !== null && hasBottomBar ? (
+    {/* F-6 (23.285): a FAILED session read with no user ever seen is `error`, not signed out, and a phone with no bar has no way
+        to navigate. So the bar shows for `error` too, with `userId=""` — `readBottomBar("")` is the default and every remember is
+        a no-op for it. Signed out keeps no bar (21.027), and so does a read still loading (nothing known yet). */}
+    {(user !== null || session.kind === "error") && hasBottomBar ? (
       <BottomBar
         workspaceId={noWorkspace ? undefined : effectiveWorkspaceId}
         projectId={projectIdOf(pathname)}
-        userId={user.id}
+        userId={user?.id ?? ""}
         pathname={pathname}
       />
     ) : null}

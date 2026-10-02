@@ -509,16 +509,36 @@ describe('13.671 the column chips keep a keyboard focus ring, and it is drawn wh
   });
 });
 
+/**
+ * The `[attribute]` names a `.gn-list*` selector line keys on. A LEADING `[data-style="…"]` root scope (the house idiom for a
+ * style arm, e.g. `[data-style="neo"] .gn-list__column-box`) is stripped first: `data-style` is written on `<html>` by the theme
+ * shell, never by the List, so it is not an attribute the List owes. Only a leading scope followed by a descendant combinator
+ * goes (neo T5 FIX 1); `.gn-list__x[data-style="neo"]` or `.x [data-style="neo"] .gn-list__y` still key on it.
+ */
+function keyedAttributes(css: string): string[] {
+  const lines = [...stripComments(css).matchAll(/^[^{}\n]*\.gn-list[^{}\n]*\{/gm)];
+  return lines
+    .flatMap((hit) => (hit[0] ?? '').split(','))
+    .map((selector) => selector.replace(/^\s*\[data-style="[a-z]+"\]\s+/, ''))
+    .flatMap((selector) => [...selector.matchAll(/\[([a-z-]+)/g)].flatMap((m) => m[1] ?? []));
+}
+
 describe('13.671 the attributes the gn-list selectors key on are attributes the component writes', () => {
   it('every `[attribute]` in a gn-list selector is on an element the List renders', async () => {
     // The other half of the binding, and the one a class check cannot see: a
     // selector `.gn-list__columns-tray[hidden]` is dead weight if the component
     // spells the attribute differently, and renaming it in the stylesheet leaves
     // every class in it still matching.
-    const styled = [
-      ...stripComments(CSS).matchAll(/^[^{}\n]*\.gn-list[^{}\n]*\{/gm),
-    ].flatMap((hit) => [...(hit[0] ?? '').matchAll(/\[([a-z-]+)/g)].flatMap((m) => m[1] ?? []));
+    const styled = keyedAttributes(CSS);
     expect([...new Set(styled)].sort()).toEqual(['aria-expanded', 'hidden', 'type']);
+
+    // CONTROLs (neo T5 FIX 1), planted strings through the SAME function: the scope strip is narrow.
+    // On a List element itself the attribute is the List's to write, so it still reds:
+    expect(keyedAttributes('.gn-list__column-box[data-style="neo"] {}')).toEqual(['data-style']);
+    // the strip does not swallow what follows the scope:
+    expect(keyedAttributes('[data-style="neo"] .gn-list__columns-tray[hidden] {}')).toEqual(['hidden']);
+    // a scope that is not leading is not the root's:
+    expect(keyedAttributes('.x [data-style="neo"] .gn-list__y {}')).toEqual(['data-style']);
 
     const user = userEvent.setup();
     const { container } = render(listOf({}));
