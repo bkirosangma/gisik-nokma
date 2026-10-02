@@ -36,8 +36,8 @@ export type ReopenDialogProps = {
  * under one neutral sentence would present a local guess as though the
  * authority had spoken, which spec §5's honesty contract forbids as squarely as
  * the reverse would be. So the origin is a required prop, the two spellings are
- * the ones Task 12's `TransitionDialog` already uses — `instant check — ` and
- * `Refused by the server — ` — and they differ in class as well as in words.
+ * the ones Task 12's `TransitionDialog` already uses — `instant check: ` and
+ * `Refused by the server: ` — and they differ in class as well as in words.
  *
  * ## Why the state list is a list and not a decision
  *

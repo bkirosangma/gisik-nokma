@@ -796,7 +796,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "italic",
-                "text": "\"No workspace selected — pick one to reach its board, members and settings.\""
+                "text": "\"No workspace selected. Pick one to reach its board, members and settings.\""
               },
               {
                 "kind": "text",
@@ -2561,7 +2561,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "italic",
-                      "text": "\"Copy it now — it is not stored and cannot be shown again.\""
+                      "text": "\"Copy it now: it is not stored and cannot be shown again.\""
                     }
                   ]
                 ]
@@ -4999,7 +4999,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"instant check — \""
+                    "text": "\"instant check: \""
                   },
                   {
                     "kind": "text",
@@ -5007,7 +5007,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Refused by the server — \""
+                    "text": "\"Refused by the server: \""
                   },
                   {
                     "kind": "text",
@@ -5996,7 +5996,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress. Not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
                   }
                 ]
               },
@@ -7054,7 +7054,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
+                    "text": "\"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
                   },
                   {
                     "kind": "text",
@@ -7191,7 +7191,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Visible to: these people — and the workspace owner, always.\""
+                    "text": "\"Visible to: these people, and the workspace owner, always.\""
                   }
                 ]
               },
@@ -7287,7 +7287,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "italic",
-                    "text": "\"You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.\""
+                    "text": "\"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it.\""
                   }
                 ]
               },
@@ -7557,7 +7557,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "To do, doing, done. No rules — anything moves along the arrows. "
+                        "text": "To do, doing, done. No rules: anything moves along the arrows. "
                       },
                       {
                         "kind": "bold",
@@ -7575,7 +7575,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off."
+                        "text": "Draft, submit, approve, with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off."
                       }
                     ]
                   ],
@@ -12321,7 +12321,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "copy-it-now-it-is-not-stored-and-cannot-be-shown-again-does-",
-            "title": "\"Copy it now — it is not stored and cannot be shown again.\" Does it mean that?",
+            "title": "\"Copy it now: it is not stored and cannot be shown again.\" Does it mean that?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13450,7 +13450,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "One starts \"instant check — \" and one starts \"Refused by the server — \". The first is your own computer having a quick guess from what it has locally; the second is the actual answer. When they disagree, "
+                    "text": "One starts \"instant check: \" and one starts \"Refused by the server: \". The first is your own computer having a quick guess from what it has locally; the second is the actual answer. When they disagree, "
                   },
                   {
                     "kind": "bold",
@@ -15405,7 +15405,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "italic",
-                    "text": "\"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
+                    "text": "\"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
                   },
                   {
                     "kind": "text",
@@ -15473,7 +15473,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Visible to: these people — and the workspace owner, always.\""
+                    "text": "\"Visible to: these people, and the workspace owner, always.\""
                   },
                   {
                     "kind": "text",
@@ -15511,7 +15511,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.\""
+                    "text": "\"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it.\""
                   },
                   {
                     "kind": "text",

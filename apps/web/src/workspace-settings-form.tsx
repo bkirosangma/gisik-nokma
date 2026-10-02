@@ -121,7 +121,7 @@ type Knob = 'staleDays' | 'dueSoonDays' | 'autoCloseAfterDays';
  *
  * ## The refusal split is Ruling 27's, unchanged
  *
- * A server refusal (`gn-refusal--server`, `Refused by the server — <rule>:
+ * A server refusal (`gn-refusal--server`, `Refused by the server: <rule>:
  * <reason>`), silence, and a transport failure are three different facts and
  * get three different sentences, exactly as `BacklogStartButton` and
  * `board.tsx` do it. Reading them as one — "could not save" — would tell a user

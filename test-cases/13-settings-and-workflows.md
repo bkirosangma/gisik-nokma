@@ -1460,8 +1460,7 @@ present **and** the loading sentence is absent. Either alone passes over a scree
 and a reader cannot tell those two states apart — which is the whole defect, so a case that could not
 tell them apart would not be a case.
 
-- **13.1110** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types —
-  reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
+- **13.1110** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types. Reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
   read replaced by a rejection, so the assertion is over the arm and not over a hand-built screen. —
   (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 - **13.1111** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its

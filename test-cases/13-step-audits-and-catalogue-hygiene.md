@@ -434,7 +434,7 @@ cites, and the first draft cited a line it had not read.*
   assumed:** `You have not been told this project’s name.` appears in exactly ONE SOURCE file repo-wide —
   every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`.
   **A SECOND withheld-name treatment does exist, and it is on TWO of the three surfaces, not three:**
-  `nameRestrictedProjectCount` and its `N projects · name restricted` line, consumed in exactly two files
+  `nameRestrictedProjectCount` and its `N projects, name restricted` line, consumed in exactly two files
   (`apps/web/app/workspaces/page.tsx:250`, `apps/web/app/w/[workspaceId]/page.tsx:628`), and IS asserted
   (`apps/web/test/workspaces-cards.test.tsx:257`, `:363`). **The members page carries NO withheld-name
   treatment at all** — it names no `nameRestrictedProjectCount`, draws no restricted line, and its only

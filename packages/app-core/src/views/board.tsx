@@ -2560,7 +2560,7 @@ function MoveArrows({
         // quite true. REDUNDANT on this component specifically (`13.590a`'s
         // own docblock measures it): `attemptMove`, this function's one call
         // site, already clears `serverRefusal` unconditionally before every
-        // new attempt, so a stale "Refused by the server — …" notice
+        // new attempt, so a stale "Refused by the server: …" notice
         // surviving into a later silent answer is not reachable through the
         // arrows today either way. Kept for agreement with `closeCard` (which
         // has no such wrapper and DOES rely on this line) and as a second
@@ -2665,7 +2665,7 @@ function MoveArrows({
         // Ruling 27/34: silence, not a refusal — `transportError`, and
         // `serverRefusal` cleared alongside it (Ruling 34's own pairing,
         // case `13.588c`): a REFUSED click followed by a SILENT one must not
-        // leave the earlier "Refused by the server — …" notice standing
+        // leave the earlier "Refused by the server: …" notice standing
         // beside the new one, describing an answer that no longer holds.
         setServerRefusal(null);
         setTransportError('The server did not answer this close.');

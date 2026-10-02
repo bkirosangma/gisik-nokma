@@ -2458,7 +2458,7 @@ above for where the allocation is recorded). `13.1159` is minted here.
 
 **The defect.** Signed out on `/help` — the route `app-nav.tsx`'s own docblock calls *"the route most
 likely to be wanted by someone who cannot get in"* — the bar painted `Workspaces`, `Help`, `Account`, an
-unlabelled inbox icon and the scope note *"No workspace selected — pick one to reach its board, members
+unlabelled inbox icon and the scope note *"No workspace selected. Pick one to reach its board, members
 and settings."* — **and no Sign in.** Pressing Workspaces signed out landed on `/sign-in` by a 401 bounce
 with no `next=`, so the destination was thrown away; pressing Account repainted the page E5-13's second
 reproduction describes; the inbox icon pointed at a session-gated route; and the note instructed a person

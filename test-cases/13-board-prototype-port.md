@@ -2357,7 +2357,7 @@ Owner: *"check this input: gn-new-project-name. description, and comment text ar
 same style."* That input is `.gn-field__input`. The parity chrome had put the ground and shadow on the
 `.editor-slot` WRAPPER, so the typing area itself wore no field treatment — no border under `hig`/`minimal`
 — and the Tiptap placeholder had no rule in any stylesheet (zero hits for `data-placeholder` /
-`is-editor-empty` in `ui.css`, `editor.css`, `globals.css`), so "No description yet" and "Add a comment — @
+`is-editor-empty` in `ui.css`, `editor.css`, `globals.css`), so "No description yet" and "Add a comment, or type @
 to mention someone" were configured and never painted. The content node now wears `gn-field__input` beside
 its own class, the wrapper is transparent, and the placeholder is drawn in the input's muted ink.
 `packages/editor/src/components/TicketEditor.tsx`, `packages/editor/src/styles/editor.css`.

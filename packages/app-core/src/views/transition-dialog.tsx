@@ -172,7 +172,7 @@ export type TransitionDialogProps = {
    * exactly this reason: "a consumer outside this package has no business
    * minting a `Refusal`"), but arriving at the identical forbidden result
    * through a different door: a plain client-built object, shaped like a
-   * refusal, rendered through the identical "Refused by the server — …"
+   * refusal, rendered through the identical "Refused by the server: …"
    * sentence a REAL refusal uses. A reader could not tell "the server said no"
    * from "we never heard back", and the two call for opposite next actions —
    * fix the thing the server objected to, versus retry.

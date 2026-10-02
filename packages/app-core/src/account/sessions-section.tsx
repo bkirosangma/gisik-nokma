@@ -43,14 +43,14 @@ const titleOf = (d: DeviceSummary): string =>
  * with 409 besides, so a stale page cannot sign the person out. The per-row action is the quiet ghost button;
  * the prototype's tinted-danger button cannot be built at accessible contrast from this palette (see the
  * `/account` block in `globals.css`), and a column of solid red buttons would break the one-loud-element rule.
- * The accessible name carries the row ("Sign out this device — Chrome on Mac · Q2ZA") so repeated buttons stay
+ * The accessible name carries the row ("Sign out this device: Chrome on Mac (Q2ZA)") so repeated buttons stay
  * addressable, and two rows with the SAME title are told apart by their last activity and first sign-in (`signOutLabels`).
  *
  * The hedged empty state is on purpose: `/account`'s own effect collapses a FAILED read to `[]`, so an empty
  * list is either "no devices" or "the read did not answer" and this component cannot tell which.
  */
 /**
- * The accessible name of each row's sign-out button, unique per row (case 6.348). The base is "Sign out this device — <title>";
+ * The accessible name of each row's sign-out button, unique per row (case 6.348). The base is "Sign out this device: <title>";
  * two rows can share a title (two legacy "Older sign-in · Chrome on Mac" groups carry no tag), and identical names would leave a
  * screen-reader user unable to say which one they mean. Only a row whose base collides gains what differs, widest-first: its
  * last activity ("last active 3 hours ago" / "never active"), then "first signed in <date>"; rows that are STILL

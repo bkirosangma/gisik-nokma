@@ -746,7 +746,7 @@ export function TicketSheet({
    * apart: `serverRefusal` carries only what the engine actually adjudicated
    * — a real `{rule, reason}` pair the door or the rule engine wrote — and a
    * silence or a dropped connection is not that, however much it might read
-   * the same wrapped in the "Refused by the server — …" sentence. Filed here
+   * the same wrapped in the "Refused by the server: …" sentence. Filed here
    * (fix round 1) as `serverRefusal` under a synthetic `ingest-rejected` rule
    * name until this ruling gave it a proper slot.
    */
@@ -1801,7 +1801,7 @@ export function TicketSheet({
         // slot is cleared here too, the same pairing the `catch` branch below
         // already does: without it, a REFUSED answer followed by a SILENT one
         // (two separate clicks, two separate ingests) would leave the old
-        // "Refused by the server — …" notice on screen alongside the new
+        // "Refused by the server: …" notice on screen alongside the new
         // transport one — two notices for one click's outcome, the earlier one
         // describing an answer that is no longer what happened.
         clearBoth();

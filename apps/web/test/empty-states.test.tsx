@@ -32,6 +32,7 @@ const HELP_HREF = '/help#manual-16-connecting-claude-or-chatgpt';
 
 beforeEach(() => {
   search.value = '';
+  window.localStorage.clear();
 });
 afterEach(() => {
   cleanup();
@@ -47,18 +48,35 @@ function stubFetch(answers: Record<string, { status: number; body: unknown }>): 
 }
 
 describe('23.195 empty states point to a next step (web)', () => {
-  it('the empty inbox links to My work or to the workspace list, never to nothing', async () => {
-    render(
-      <Providers services={stubServices({}, { notifications: { list: async () => ({ notifications: [], nextCursor: null }) } })}>
-        <InboxPage />
-      </Providers>,
-    );
+  /** A workspace already remembered for the seeded user, as Round 25 stores it (`app-nav.test.tsx`). */
+  function rememberWorkspace(workspaceId: string, userId = 'u_kiro'): void {
+    window.localStorage.setItem('gn-last-workspace', JSON.stringify({ userId, workspaceId }));
+  }
+  const emptyInbox = (): React.JSX.Element => (
+    <Providers services={stubServices({}, { notifications: { list: async () => ({ notifications: [], nextCursor: null }) } })}>
+      <InboxPage />
+    </Providers>
+  );
+
+  it('the empty inbox of a person with a remembered workspace links to exactly "Open My work" in it', async () => {
+    rememberWorkspace('ws_7');
+    render(emptyInbox());
     await screen.findByText(/^Nothing in your inbox\./);
-    const next = await screen.findByRole('link', { name: /^(Open My work|Choose a workspace)$/ });
-    const href = next.getAttribute('href')!;
-    expect(href === '/workspaces' || /^\/w\/[^/]+\/my-work$/.test(href)).toBe(true);
-    // CONTROL, same it(): a non-empty inbox does not show the empty-state step.
-    cleanup();
+    const next = await screen.findByRole('link', { name: 'Open My work' });
+    expect(next.getAttribute('href')).toBe('/w/ws_7/my-work');
+    expect(screen.queryByRole('link', { name: 'Choose a workspace' })).toBeNull();
+  });
+
+  it('the empty inbox of a person with nothing remembered links to exactly "Choose a workspace"', async () => {
+    render(emptyInbox());
+    await screen.findByText(/^Nothing in your inbox\./);
+    const next = await screen.findByRole('link', { name: 'Choose a workspace' });
+    expect(next.getAttribute('href')).toBe('/workspaces');
+    expect(screen.queryByRole('link', { name: 'Open My work' })).toBeNull();
+  });
+
+  it('CONTROL: a non-empty inbox shows neither empty-state step, even with a workspace remembered', async () => {
+    rememberWorkspace('ws_7');
     const row = {
       id: 'n1', userId: 'u_kiro', workspaceId: 'ws_1', kind: 'assignment', dedupeKey: 'a:1', read: false,
       createdAt: '2026-08-20T10:00:00.000Z',
@@ -70,7 +88,8 @@ describe('23.195 empty states point to a next step (web)', () => {
       </Providers>,
     );
     await screen.findByText(/Restock/);
-    expect(screen.queryByRole('link', { name: /^(Open My work|Choose a workspace)$/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Open My work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Choose a workspace' })).toBeNull();
   });
 
   it('the connect page with no request says so and links to the how-to, apart from the real expiry', async () => {

@@ -100,7 +100,7 @@ labels absent, the dialog on "Choose a state" with three options). Node v22.23.2
   the comment box already on screen, Move disabled until it is filled; filling and pressing Move hands
   back `{ toStateId: 'done', comment: 'shipped', fieldValues: {} }`. M5 (`useState('')`) → fails.
 - **13.528b** ✅ The control: neither prop → placeholder and all three options, exactly as before.
-- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state —
+- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state:
   Waiting on counterparty or Done"; the click opens the dialog on "Choose a state"; the select lists
   exactly `[Waiting on counterparty, Done]` and NOT `To do`; picking the rules-free one and pressing Move
   ingests ONE `ticket.transitioned` with the shipped `{ to: 'waiting' }` and calls `onMoved`. M4 → fails
@@ -477,8 +477,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   is not, reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a misfiled entity kind is
   refused `malformed-payload` naming the kind, not silently accepted, mirroring 13.568's mutation —
   (`packages/rule-engine/test/close.test.ts`)
-- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed —
-  reopen it first.") before any edge is looked at — proven not merely against a legal destination but
+- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed. Reopen it first.") before any edge is looked at — proven not merely against a legal destination but
   against `move('nowhere')`, a destination that is not even a real state, which still answers
   `closed-ticket` rather than `unknown-state` (fix round 1, review, Minor 3: the earlier case proved the
   closed check beats one legal move, not that it runs before the workflow is consulted at all); after a
@@ -2290,8 +2289,7 @@ so one sentence for both would be false of one of them. **Every case below there
   narrowings and their clause is **conditional** — which is what lets a fourth cause ride along without
   claiming this month has one. Witnessed by `claim-labels.test.ts` 11.1 (the exact sentence) plus the model
   suites. The same treatment reaches the two shipped help documents (see below).
-- **13.1046** ✅ CLOSED — a board COLUMN whose only ticket is an epic says *"No tickets in this column —
-  epics appear in the List."* (`EMPTY_COLUMN_EPICS_COPY`); a genuinely empty column keeps
+- **13.1046** ✅ CLOSED — a board COLUMN whose only ticket is an epic says *"No tickets in this column. Epics appear in the List."* (`EMPTY_COLUMN_EPICS_COPY`); a genuinely empty column keeps
   `EMPTY_COLUMN_COPY`. ⚠ **Stricter than the board's gate on purpose**: the column takes the new sentence
   only when NOTHING ELSE was removed from it, because a column can also be emptied by the card filter, which
   this view cannot disclose — and *"an epic is why this is empty"* would be a half-truth there.

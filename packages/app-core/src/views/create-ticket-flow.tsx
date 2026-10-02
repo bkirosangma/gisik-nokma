@@ -123,7 +123,7 @@ type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigi
  *    paraphrase of the authority.
  *  - A local refusal is not dressed as the server's word. On the instant path
  *    NOTHING is submitted, and the reopen offer carries `refusalOrigin:
- *    'instant'`, which `ReopenDialog` renders as "instant check — " under the
+ *    'instant'`, which `ReopenDialog` renders as "instant check: " under the
  *    preview class. Only an answer that came back through `DataSource.ingest`
  *    is ever labelled "Refused by the server".
  *

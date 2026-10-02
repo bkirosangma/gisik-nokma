@@ -161,7 +161,7 @@ bottom** instead, with **More** at its right-hand end holding the rest, plus **S
 **Does the invitation get sent for me?**
 **By email, yes.** Pick **email** and the product sends it, and the screen tells you whether it went. **Phone (SMS)** is not sent for you: copy the link and send it yourself.
 
-**"Copy it now — it is not stored and cannot be shown again." Does it mean that?**
+**"Copy it now: it is not stored and cannot be shown again." Does it mean that?**
 Absolutely. That link appears once, on that screen, at that moment. It is not in the pending list. It
 is nowhere else. Close the tab and you have to withdraw the invitation and start over. **Paste it into
 your email before you do anything else.**
@@ -413,7 +413,7 @@ correctly who did what under the old arrangement. And if it genuinely cannot rea
 refuses the move rather than waving it through, telling you to ask an admin about the state history.
 
 **Two refusal messages appeared and they disagree.**
-One starts "instant check — " and one starts "Refused by the server — ". The first is your own computer
+One starts "instant check: " and one starts "Refused by the server: ". The first is your own computer
 having a quick guess from what it has locally; the second is the actual answer. When they disagree,
 **both stay on screen** rather than one being tidied away.
 
@@ -860,7 +860,7 @@ them the screen says nobody set them rather than pretending seven was a choice. 
 by either number: blocked is blocked.
 
 **I clicked an Inbox message and the ticket wouldn't open.**
-*"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you.
+*"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you.
 The message itself is yours and stays."* That last part matters — the message does not disappear just
 because you lost access to what it was about. It was sent to you, so it is yours. The notice clears
 itself next time something opens successfully.
@@ -879,8 +879,7 @@ Yes. Every ticket has a "Who can see this" setting with four options: everyone i
 on the project, only the people you name, or inherited from the parent.
 
 **Does the owner see everything, even the private ones?**
-Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people —
-and the workspace owner, always."* It shows that line even when you have picked "everyone in the
+Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people, and the workspace owner, always."* It shows that line even when you have picked "everyone in the
 workspace" and even to somebody who cannot change the setting. Showing it only on the private option
 would let people assume the other options exclude the owner.
 
@@ -891,8 +890,7 @@ along with everything under it. Move it to the top and it falls back to the proj
 back to inheriting and it and everything below re-attach.
 
 **What if I accidentally leave myself off the list?**
-You get a warning: *"You are about to lose access to this ticket. A project admin — or the workspace
-owner, who always sees — can restore it."* **And then it does exactly what you told it to.** It does
+You get a warning: *"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it."* **And then it does exactly what you told it to.** It does
 not quietly add you back behind the warning — silently adding you would file a claim in your name that
 you never made. So read the warning. You cannot apply an empty list; the button stays off.
 

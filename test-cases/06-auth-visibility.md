@@ -597,7 +597,7 @@ Six real survivors of the controller's 85 mutations. Covering tests: `apps/serve
 
 ### Controller browser pass of devices-2 (6.348)
 
-- ✅ **6.348 — every row's "Sign out this device" button has its own accessible name:** two rows with the same title (two legacy "Older sign-in (Chrome on Mac)" groups, which carry no tag) gain what differs — "last active <relative>" / "never active", then "first signed in <date>" if still equal, then an ordinal ("2 of 2") for rows identical in every shown respect — and the second is clicked by its own name; control: a row whose title is already unique keeps the plain "Sign out this device — <title>". Covering test: `packages/app-core/test/account/sessions-section.test.tsx`. Mutations: the original plain name, no first-signed-in step, activity appended to every row (also red: 6.333), no ordinal (red: 6.348).
+- ✅ **6.348 — every row's "Sign out this device" button has its own accessible name:** two rows with the same title (two legacy "Older sign-in (Chrome on Mac)" groups, which carry no tag) gain what differs — "last active <relative>" / "never active", then "first signed in <date>" if still equal, then an ordinal ("2 of 2") for rows identical in every shown respect — and the second is clicked by its own name; control: a row whose title is already unique keeps the plain "Sign out this device: <title>". Covering test: `packages/app-core/test/account/sessions-section.test.tsx`. Mutations: the original plain name, no first-signed-in step, activity appended to every row (also red: 6.333), no ordinal (red: 6.348).
 
 ### Controller round 2 — the daemon's own job wiring (6.349, 6.350)
 

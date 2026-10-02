@@ -146,7 +146,7 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 
 **My work, Members and Settings appear only once a workspace is open**, and the workspace's name and its
 last project appear only once that name has arrived. With no workspace open the bar says so — *"No
-workspace selected — pick one to reach its board, members and settings."* **Signed out there is no
+workspace selected. Pick one to reach its board, members and settings."* **Signed out there is no
 avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
 
 ### On a phone or a narrow window
@@ -399,8 +399,7 @@ If the list cannot be read, the section says so, rather than showing an empty li
 4. Press **Send invitation** (for Phone (SMS) the button reads **Create invite link**). For email, the
    product sends the invitation to that address, and the next screen says it was emailed. If the email
    could not be sent, the screen says so, and you send the link yourself.
-5. **The next screen shows you a link, once.** It says: *"Copy it now — it is not stored and cannot be
-   shown again."*
+5. **The next screen shows you a link, once.** It says: *"Copy it now: it is not stored and cannot be shown again."*
 
 > ## Copy that link before you do anything else.
 >
@@ -871,8 +870,8 @@ that move on this ticket, there is nobody to compare against and it does not blo
 
 ### Two refusal messages at once
 
-Sometimes you will see two messages on screen, and they may disagree. One starts **"instant check — "**
-and one starts **"Refused by the server — "**.
+Sometimes you will see two messages on screen, and they may disagree. One starts **"instant check: "**
+and one starts **"Refused by the server: "**.
 
 - **"instant check"** is your own computer having a quick guess from what it has locally.
 - **"Refused by the server"** is the actual answer.
@@ -1065,7 +1064,7 @@ In the controls row above the tabs, beside the **Filters** button, there is a si
 **"Only tickets in progress"**.
 
 Turn it on and you get a note: *"The list, calendar, timeline and backlog are asking only for tickets in
-progress — not started and done are both excluded, and the backlog is emptied. The board is not
+progress. Not started and done are both excluded, and the backlog is emptied. The board is not
 narrowed."*
 
 That line is always there, sitting between the project's title and the tab strip; with the switch off it
@@ -1244,8 +1243,7 @@ mentions you, contests a claim, or a claimed day comes near."*
 pages get added below rather than replacing what you were reading, and if loading fails your existing
 rows stay put and you get a retry.
 
-**If you click a message and the ticket will not open:** *"That ticket cannot be opened from here — it may
-have been removed, or it is no longer visible to you. The message itself is yours and stays."* That
+**If you click a message and the ticket will not open:** *"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays."* That
 last part matters — the message does not disappear just because you lost access to what it was about.
 The notice clears itself next time something opens successfully.
 
@@ -1278,8 +1276,7 @@ Pick one and press **Apply**. The menu closes once the change lands; if it does 
 refused it, or the server could not be reached — the menu stays open with the reason shown beside the
 button, so you can try again without losing what you picked.
 
-Under every one of those choices, all the time, there is a line: *"Visible to: these people — and the
-workspace owner, always."*
+Under every one of those choices, all the time, there is a line: *"Visible to: these people, and the workspace owner, always."*
 
 That line is a fact, not a caution. **The workspace owner can always see every ticket, whatever you set
 here.** It is shown on every option — not only the private one — because showing it only there would
@@ -1305,8 +1302,8 @@ everything below re-attach.
 
 If you pick "only the people I name" and leave yourself off the list, you get a warning:
 
-> *"You are about to lose access to this ticket. A project admin — or the workspace owner, who always
-> sees — can restore it."*
+> *"You are about to lose access to this ticket. A project admin, or the workspace owner, who always
+> sees it, can restore it."*
 
 **And then it does exactly what you told it to.** It does not quietly add you back behind the warning.
 That is the right choice — silently adding you would file a claim in your name that you never made —
@@ -1383,8 +1380,8 @@ You do not have to draw one from scratch. There are three templates plus a blank
 
 | Template | What it is |
 |---|---|
-| **Simple kanban** | To do, doing, done. No rules — anything moves along the arrows. **Start here.** |
-| **Approval chain** | Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off. |
+| **Simple kanban** | To do, doing, done. No rules: anything moves along the arrows. **Start here.** |
+| **Approval chain** | Draft, submit, approve, with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off. |
 | **Errand with waits** | Has a "Waiting" state marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods. |
 | **Start from a blank workflow** | An empty canvas with one starting state called "New". |
 
