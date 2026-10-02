@@ -374,7 +374,7 @@ describe('tap-target density — case 13.991', () => {
 });
 
 /**
- * Case `13.1141` — E4-3 — the board card's `who · when` disclosure is declared
+ * Case `13.1141` — E4-3 — the board card's provenance disclosure (then `who · when`, now "Moved to … by … on …") is declared
  * at the 24-px in-list floor, and the table that classifies it says so.
  *
  * Every board card carried `button.gn-board-card__provenance` at **66×21** with
