@@ -101,6 +101,7 @@ function mountHome(
   route.path = `/w/${WORKSPACE}`;
   const services = stubServices({
     getMyWorkspaces: async () => [workspaceAs(role, projects)],
+    getGroups: async () => [],
   });
   services.dataSource.ingest = async (events) => events.map(ingest);
   render(
@@ -225,8 +226,8 @@ describe('22.152 the workspace home: Create project is a primary icon button in 
     expect(within(dialog).getByPlaceholderText('e.g. Phase 2 rollout')).toBeInTheDocument();
     expect(within(dialog).getByPlaceholderText('e.g. Sprint work for the rollout')).toBeInTheDocument();
     expect(within(dialog).getByPlaceholderText('e.g. SO')).toBeInTheDocument();
-    // Task 9 fills this slot; until then it is an empty marker.
-    expect(dialog.querySelector('[data-slot="group-picker"]')).not.toBeNull();
+    // The group slot is filled by the picker (P-T13, 22.240), not an empty marker.
+    expect(await within(dialog).findByLabelText('Level 1 group')).toBeInTheDocument();
   });
 
   it('a non-admin sees no button, and the refusal line reads "Only an owner or admin can create a project."', async () => {
