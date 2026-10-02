@@ -154,7 +154,7 @@ export function extractCheckedIds(text) {
 // fixture comment, not only inside the `it(...)` that uses it), any
 // `*.test.ts`/`*.test.tsx` file wherever it lives (five apps/mobile and
 // apps/desktop tests are co-located under `src/`, not under `test/`), and
-// the e2e specs under `apps/web/e2e*/`.
+// the e2e specs under `apps/web/e2e*/`, and the canvas browser suite's `packages/workflow-canvas-browser/tests/` (G-9 T1).
 function isTestPath(relPath) {
   if (relPath.includes('/node_modules/')) return false;
   if (/(^|\/)test\//.test(relPath)) return true;

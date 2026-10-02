@@ -15,12 +15,13 @@ test('25.500/25.501 a dragged state moves live under the pointer and its arrow f
   // pointer by that first distance (6 px at 2 px per move) and by nothing after it.
   await dragBy(page, name, 200, 0, { steps: 100, release: false });
   const during = await nodeBox(page, name);
-  await expect(node(page, name)).toHaveClass(/\bdragging\b/); // the lifted look's hook (ui.css `.react-flow__node.dragging`)
-  const lifted = node(page, name).locator('.gn-state-node');
-  await expect(lifted).toHaveCSS('transform', /^matrix\(1\.02,/); // lifted scale 1.02
-  await expect(lifted).not.toHaveCSS('box-shadow', 'none'); // on the drag-image shadow (neo, the harness's style)
   expect(during.x - before.x).toBeGreaterThan(192);
   expect(during.x - before.x).toBeLessThan(204);
+  // the lifted look while held: the wrapper's `dragging` class (ui.css `.react-flow__node.dragging`), the 1.02 scale, the drag-image shadow
+  await expect(node(page, name)).toHaveClass(/\bdragging\b/);
+  const lifted = node(page, name).locator('.gn-state-node');
+  await expect(lifted).toHaveCSS('transform', /^matrix\(1\.02,/);
+  await expect(lifted).not.toHaveCSS('box-shadow', 'none'); // neo, the harness's style
   expect(await edgePath(page, 0)).not.toBe(pathBefore);
   await page.mouse.up();
   const positions = await readDraftPositions(page);
