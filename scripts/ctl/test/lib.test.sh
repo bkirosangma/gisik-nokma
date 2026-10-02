@@ -156,6 +156,14 @@ check "13.1703 gate modes: --dry-run names the mode it would pass, per base" 'gb
 check "13.1704 gate modes: a gate.sh that ran fresh when cached was asked for FAILS the verb, naming both" 'out=$(gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*asked for cached, gate.sh ran fresh"'
 check "13.1704 gate modes: CONTROL — the same stale gate.sh is correct for main-kind, which asked for fresh" 'gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh"'
 ( cd "$br" && $G reset -q --hard HEAD~1 )
+# 13.1716: a short run fails the verb. Without the Tasks pin a task dropped from the graph (or a missing build:webview) would read
+# green. The fixture prints GATE_MODE=<what it was asked for> and a Tasks line from $FIXTURE_OK (successful) and $FIXTURE_TASKS (total), both defaulting to 34.
+( cd "$br" && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    ${FIXTURE_OK:-${FIXTURE_TASKS:-34}} successful, ${FIXTURE_TASKS:-34} total\nCached:    0 cached, ${FIXTURE_TASKS:-34} total\n" > "$1"' 'echo "GATE_MODE=${GATE_MODE:-unset}"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && $G commit -q -am "short-run fixture" )
+check "13.1716 task count: a cached run of 33/33 FAILS the verb, naming the Tasks line" 'out=$(FIXTURE_TASKS=33 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 33 total"'
+check "13.1716 task count: a fresh (main-kind) run of 33/33 FAILS too" 'out=$(FIXTURE_TASKS=33 gbr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 33 total"'
+check "13.1716 task count: a run that is 33 of 34 (a task failed) FAILS" 'out=$(FIXTURE_OK=33 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 34 total"'
+check "13.1716 task count: CONTROL — the same fixture at 34/34 passes, so the 33 arms fail on the count and nothing else" 'FIXTURE_TASKS=34 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +34 successful, 34 total"'
+( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
 #!/usr/bin/env bash

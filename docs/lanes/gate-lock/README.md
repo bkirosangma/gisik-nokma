@@ -148,13 +148,15 @@ Cached: 26 cached, 34 total …`); a `gate.sh` that ran a different mode than as
 
 **The cache is only as sound as `turbo.json`'s `inputs`.** `scripts/ctl/test/gate-cache.test.sh` (a `ctl selftest` step) proves a
 changed cross-package reader changes the task hash (`ui#test` after an `apps/web/src` edit; `mobile#test` after a
-`packages/editor` CSS edit) and that an unrelated file does not; `--real` shows it through turbo's own cache (warm → HIT → change →
+`packages/editor` CSS edit; and one row for every other declared non-dependency input, cases 13.1712–13.1715, each shown red when its
+`turbo.json` entry is removed) and that an unrelated file does not; `ctl gate` itself fails any run that is not 34/34 (13.1716); `--real` shows it through turbo's own cache (warm → HIT → change →
 MISS), run 2026-10-02: `warm=miss rerun=hit unrelated-change=hit reader-change=miss` for both. The audit found, and `turbo.json`
 now declares: ui (client source roots + `apps/*/test`, `packages/*/test`, the `package.json` globs), app-core (the help suite walks
 `apps/**` and `packages/**`, minus build output — the `!` negations are mandatory: a glob input walks the DISK and ignores
 `.gitignore`, and without them 3431 build outputs were hashed — plus `docs/manual.md`, `docs/faq.md`, `scripts/help-content.mjs`),
-server (`.env.example`, `deploy/**`, compose files, Dockerfiles, `reference/**`), editor (app-core views, server attachments, mobile
-editor), mobile (`packages/editor` webview bundle) and `tsconfig.base.json` as a global dependency. **Stale-build root cause:**
+server (`.env.example`, `deploy/**`, compose files, Dockerfiles, `reference/**`, `apps/web/e2e-stack/**` and `apps/web/next.config.ts` —
+read by `e2e-teardown.test.ts` and `security-middleware.test.ts`, though `web` is not a dependency of `server`), editor (app-core views,
+server attachments, mobile editor, and `packages/ui/test/helpers/**` — `colour-scan.ts` and `css-rules.ts`, imported by four editor tests), mobile (`packages/editor` webview bundle) and `tsconfig.base.json` as a global dependency. **Stale-build root cause:**
 `mobile#test` reads the editor's built webview bundle but nothing built it first; `build:webview` is now a task and `mobile#test`
 depends on it. The first real gate with that ordering failed `mobile#test` — the checked-in `editor-html.generated.ts` WAS stale
 against the release (a domain change reaches the bundle) — and was regenerated.

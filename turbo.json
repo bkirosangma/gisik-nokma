@@ -185,6 +185,10 @@
     // either test, which is the same class of hole the comment below records for
     // the server suite. Found while adding the second reader, and it is the
     // FIRST reader that was already exposed.
+    // (Reviewed 2026-10-02: `ui` is a declared dependency of `web`, and `ui#build`'s
+    // hash already covers its `src/`, so the `packages/ui/src/**` entry is redundant
+    // today — an equivalent mutant. Kept: it states the reader, and it keeps the hole
+    // closed if the dependency is ever dropped.)
     "@gisik-nokma/web#test": {
       "dependsOn": ["^build"],
       "inputs": [
@@ -210,6 +214,9 @@
     //   `apps/*/package.json`,    `check-runbook-commands.mjs` reads every workspace manifest,
     //   `packages/*/package.json` including the ones `server` does not depend on
     //   `reference/**`            the seed suites read the frozen convenience-corner board
+    //   `apps/web/e2e-stack/**`   e2e-teardown.test.ts imports `helpers/teardown.ts` from there
+    //   `apps/web/next.config.ts` security-middleware.test.ts reads the web shell's headers
+    // (`web` is not a dependency of `server`, so the last two are invisible to `^build`.)
     // `packages/app-core/src` (client-contract.test.ts) and `packages/domain/src` are
     // also read, but both are declared dependencies of `server`, so turbo already folds
     // their hash in through `^build`.
@@ -229,7 +236,9 @@
         "$TURBO_ROOT$/apps/*/Dockerfile*",
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/packages/*/package.json",
-        "$TURBO_ROOT$/reference/**"
+        "$TURBO_ROOT$/reference/**",
+        "$TURBO_ROOT$/apps/web/e2e-stack/**",
+        "$TURBO_ROOT$/apps/web/next.config.ts"
       ]
     },
     // `ticket-editor-slot.test.tsx` and `toolbar-icons-phone.test.tsx` read source in
@@ -238,13 +247,21 @@
     // of them is a declared dependency of `editor` (it depends only on `domain`), so
     // the hash could not see them. Declared as directories, not the four files
     // measured: the next test to read a sibling should not be the one that finds out.
+    //
+    // The ui test helpers are read too, from a package `editor` does not depend on:
+    // `editor-css-binding.test.ts`, `toolbar-icons-phone.test.tsx`,
+    // `drive-never-inline.test.ts` and `ticket-image.test.ts` import `colour-scan.ts`
+    // and `css-rules.ts` from `packages/ui/test/helpers/`. Without that directory a
+    // change to `css-rules.ts` replays the CSS-binding suite green. (There is no
+    // `packages/ui/test/tsconfig.json` in the tree, so none is declared.)
     "@gisik-nokma/editor#test": {
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/app-core/src/views/**",
         "$TURBO_ROOT$/apps/server/src/attachments/**",
-        "$TURBO_ROOT$/apps/mobile/src/editor/**"
+        "$TURBO_ROOT$/apps/mobile/src/editor/**",
+        "$TURBO_ROOT$/packages/ui/test/helpers/**"
       ]
     },
     "typecheck": {
