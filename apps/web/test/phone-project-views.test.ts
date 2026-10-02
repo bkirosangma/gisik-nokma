@@ -108,6 +108,22 @@ describe('21.110 the project header: tabs scroll in their own track, search and 
   });
 });
 
+describe('23.345 the phone view rail: tighter tabs so all five fit at 430 and Timeline peeks past the fade at 390 (audit PV-04, neo follow-up F-3)', () => {
+  it('23.345 at ≤40rem each rail tab drops its inline padding from 1rem to 0.625rem; the shared control and the desktop rail keep theirs', () => {
+    const item = ruleExactly(globals, '.gn-project__rail .gn-segmented__item', PHONE);
+    expect(valueOf(item, 'padding-inline')).toBe('0.625rem');
+    // The tap floor is the shared rule's 2.75rem min-height, which the arm must not touch.
+    expect(valueOf(item, 'min-height')).toBeNull();
+    after(globals, ['.gn-project__rail .gn-segmented__item']);
+
+    // CONTROL — the shared control keeps its prototype 1rem, so /sign-in and /inbox are unchanged, and the
+    // desktop/tablet rail rule sets no padding at all.
+    expect(valueOf(ruleExactly(ui, '.gn-segmented__item'), 'padding')).toBe('0 1rem');
+    expect(valueOf(ruleExactly(globals, '.gn-project__rail .gn-segmented__item'), 'padding-inline')).toBeNull();
+    expect(valueOf(ruleExactly(globals, '.gn-project__rail .gn-segmented__item'), 'padding')).toBeNull();
+  });
+});
+
 describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close bar is full width (at ≤64rem since 2026-10-02, case 23.052; was ≤40rem)', () => {
   it('21.111 the table, its body and each row stack as blocks: title line first, key · state · assignee · due as meta; the header row is visually hidden', () => {
     expect(valueOf(ruleExactly(ui, '.gn-list__table', BAND), 'display')).toBe('block');

@@ -3276,7 +3276,10 @@ input, textarea, select { font-family: inherit; }
     scroll-snap-type: x proximity;
     overscroll-behavior-x: contain;
   }
-  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; }
+  /* Neo follow-up F-3 (audit PV-04, case 23.258): the five tabs were 425px of 1rem-padded pills in a 342px column (and 382px
+     at 430), so the 24px scroll fade swallowed the ~17px peek of Timeline. 0.625rem a side is 365px: all five fit at 430, and at
+     390 Timeline starts at ~285px so 33px of it sits clear of the fade at full opacity. The shared control keeps its 1rem. */
+  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; padding-inline: 0.625rem; }
 }
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
