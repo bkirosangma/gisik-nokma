@@ -2941,7 +2941,11 @@ input, textarea, select { font-family: inherit; }
    Styling refresh Plan B (Task B4 follow-up): the `button` twin is listed too.
    The base current-item rule above raises `a` AND `button`, so a neo rule for
    `a` alone left a current `<button>` (the account menu's items) raised while
-   its `<a>` peers were pressed in. */
+   its `<a>` peers were pressed in.
+
+   **AMENDED 2026-10-02 (neo refresh N9, case 24.041): the rule now reads `--gn-shadow-recess`, the box-sized control inset, not
+   `--gn-shadow-sunken`.** The paragraph above ("let `--gn-shadow-sunken` do the work", the 4px/-4px geometry) is the history of
+   what the rule used to read; `sunken` is kept for wells and tracks. The ground is still `--gn-surface-sunken`. */
 [data-style="neo"] .gn-nav a[aria-current='page'],
 [data-style="neo"] .gn-nav button[aria-current='page'] {
   background: var(--gn-surface-sunken);
@@ -4885,10 +4889,12 @@ input, textarea, select { font-family: inherit; }
    1rem box (inset 4px) and the row's 0.5rem gap follows it (text at 32px). The posted row had the
    box at 0px and text at 23.2px (`ui.css`'s 0.45rem gap), so a list shifted sideways when sent.
    inset = (1.5 - 1) / 2 = 0.25rem; gap = 1.5 + 0.5 - 0.25 - 1 = 0.75rem (case 9.482). */
-/* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
-   the unchecked box takes the same coat, the checked one stays a flat accent.
-   The coat alone is NOT an edge: neo's sunken surface IS its surface (`#1b2340`
-   both in dark) and the inset shadow is 5% white, so the box vanished. It keeps
+/* `neo` fields are sunken and, since N10 (2026-10-02, 24.040), rim-less: they read `--gn-shadow-field`
+   (`[data-style="neo"] .gn-field__input`). The unchecked box does NOT take that coat: it takes the sunken
+   GROUND (`--gn-surface-sunken`, the well since N2) with its own chip-sized inset, `--gn-shadow-sunken-compact`
+   (N9, 24.042), because a field-sized recess is wrong for a ~1rem box. The checked one stays a flat accent.
+   (History, 2026-09-29: the then coat alone was NOT an edge, because neo's sunken surface WAS its surface, `#1b2340`
+   in dark, and the inset shadow was 5% white, so the box vanished; N2 and N9 changed both, and the border below stays.) It keeps
    `--gn-border-strong` (5.37:1 dark, 4.39:1 light on the neo surface; WCAG 1.4.11
    asks 3:1, case 9.481). */
 [data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
