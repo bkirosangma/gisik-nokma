@@ -5458,6 +5458,25 @@ input, textarea, select { font-family: inherit; }
 .gn-project-edit__hint { margin: 0; font-size: 0.8125rem; color: var(--gn-danger); }
 .gn-project-edit__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
 
+/* `.gn-workspace-prefix-edit` — the workspace header's Edit prefix (prefixes and groups plan Task 10): the
+   trigger button, and the inline form (label, a short field, Save prefix + Cancel, then any hint or the
+   door's reason on its own line). The trigger sits under the title and does not stretch across the
+   column; the field is only as wide as three capitals need. `.gn-prefix-confirm__*` is the body and the
+   actions row of `PrefixChangeConfirm` (a shared `Dialog`). */
+.gn-workspace-prefix-edit__trigger { align-self: flex-start; }
+.gn-workspace-prefix-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.gn-workspace-prefix-edit .gn-field__input { width: 6rem; }
+.gn-workspace-prefix-edit .gn-refusal,
+.gn-workspace-prefix-edit .gn-project-edit__hint { flex-basis: 100%; margin: 0; }
+.gn-prefix-confirm__body { margin: 0 0 1rem; }
+.gn-prefix-confirm__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+
 /* `.gn-group-picker` — the four-level group type-ahead (prefixes and groups plan Task 9).
    One labelled combobox per level, stacked, with the visible `.gn-field__label` look. The
    input floors at 2.75rem (44 px, WCAG 2.5.5: the viewport suite's tap-target ratchet, case
