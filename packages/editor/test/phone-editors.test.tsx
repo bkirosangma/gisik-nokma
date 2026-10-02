@@ -596,25 +596,45 @@ describe('G-7 1 + 2: unboxed long text and slimmer comment boxes', () => {
   });
 });
 
-describe('G-7 5 × G-6: the sheet inside a comment editor', () => {
-  it('25.418 Escape inside the More sheet closes ONLY the sheet: the comment Format strip stays open (the sheet is a portal, but React events bubble through it), and the Format button keeps its state', async () => {
+describe('G-7 5: the sheet keeps its Escape and its clicks from the host around the editor', () => {
+  it('25.418 an Escape inside the More sheet and a tap on its scrim or panel never reach the editor\'s React ancestors (a dialog around it would close, the note page would refocus), and a comment\'s Format strip stays open', async () => {
     window.localStorage.clear();
     stubPhone(true);
-    const view = render(<TicketEditorSlot {...slotProps({ mode: 'comment' })} />);
+    const keys = vi.fn();
+    const clicks = vi.fn();
+    const view = render(
+      <div onKeyDown={(event) => keys(event.key)} onClick={() => clicks()}>
+        <TicketEditorSlot {...slotProps({ mode: 'comment' })} />
+      </div>,
+    );
     await vi.waitFor(() => expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull());
     const user = userEvent.setup();
     const format = view.container.querySelector('.editor-slot__format') as HTMLButtonElement;
     await user.click(format);
+    await user.click(tool(view, 'More tools'));
+    expect(sheet()).not.toBeNull();
+    clicks.mockClear();
+    keys.mockClear();
+
+    await user.click(sheet() as HTMLElement);
+    expect(clicks, 'a tap on the panel stays inside the sheet').not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(sheet(), 'Escape closes the sheet').toBeNull();
+    expect(keys, 'the ancestor never saw the Escape').not.toHaveBeenCalledWith('Escape');
+    // The strip is untouched: it is a sibling of the portal, not a parent of it.
     expect(format).toHaveAttribute('aria-expanded', 'true');
     expect(view.container.querySelector('[role="toolbar"]')).not.toBeNull();
 
     await user.click(tool(view, 'More tools'));
-    expect(sheet()).not.toBeNull();
-    await user.keyboard('{Escape}');
-    expect(sheet(), 'Escape closes the sheet').toBeNull();
-    // CONTROL (same it): the strip is still open, and a second Escape (no sheet now) is what closes it.
-    expect(format).toHaveAttribute('aria-expanded', 'true');
-    expect(view.container.querySelector('[role="toolbar"]')).not.toBeNull();
+    clicks.mockClear();
+    await user.click(document.body.querySelector('.ticket-editor__sheet-scrim') as HTMLElement);
+    expect(sheet(), 'a backdrop tap closes').toBeNull();
+    expect(clicks, 'a tap on the scrim stays inside the sheet').not.toHaveBeenCalled();
+
+    // CONTROL (same it): a plain Escape on the editor's own bar DOES reach the ancestor, so the spy can fire.
+    const control = view.container.querySelector('.ProseMirror') as HTMLElement;
+    fireEvent.keyDown(control, { key: 'Escape' });
+    expect(keys).toHaveBeenCalledWith('Escape');
     view.unmount();
     window.localStorage.clear();
   });

@@ -601,9 +601,10 @@ function HeadingSelect({ editor }: { editor: Editor }): React.JSX.Element {
  * already handled keeps it: the table grid's own), focus moves in on open — and not the component: this package cannot
  * import `ui` (the dependency runs the other way, and the mobile webview bundles this package alone), and `Sheet` is the
  * ticket sheet's RIGHT-hand panel. Portalled to <body>, so the composer's `overflow: hidden` cannot clip it; React
- * events still bubble through the portal, so the scrim and the panel stop `click` and Escape here — a press in the sheet
- * must not reach the host's own handlers (the note page focuses its editor on a click, a comment's Format strip closes on
- * an Escape).
+ * events still bubble through the portal to the sheet's React ANCESTORS, so the scrim and the panel stop `click` and Escape
+ * here — a press in the sheet must not reach the host's own handlers (the note page focuses its editor on a click; a
+ * dialog or sheet around the editor closes on an Escape). The comment Format strip is NOT such a handler: it sits on the
+ * toolbar element, and the portal is a sibling of that element, not a child (25.418).
  */
 function MoreSheet({
   id,
