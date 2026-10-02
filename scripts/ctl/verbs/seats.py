@@ -169,7 +169,7 @@ def text_line(s):
     else:
         git = "no-worktree"
     if s["last"]:
-        l = s["last"]; shown = re.sub(r"\b([0-9a-f]{7})[0-9a-f]{33}\b", r"\1", l["text"])
+        l = s["last"]; shown = re.sub(r"\b([0-9a-f]{7})[0-9a-f]{33}\b", r"\1", l["text"])[:90]
         last = f"last: {shown if l['kind'] != 'needs-fresh' else 'needs-fresh at step ' + shown.rsplit(' ', 1)[1]} ({fmt_age(l['age_s'])} ago)"
     else:
         last = "last: none"
