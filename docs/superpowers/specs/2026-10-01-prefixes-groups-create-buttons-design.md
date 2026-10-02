@@ -89,7 +89,7 @@ Everything is a ledger event (the product's one source of truth; projections are
   - the original holder may take its prefix back;
   - a derived prefix skips a reserved one.
 - Old-key resolution: search, link and ticket-ref each find a ticket by a former key, and the ticket's current key is shown.
-- Group tree invariants: level = parent + 1; siblings unique ignoring case; delete refused while used; inline create is atomic.
+- Group tree invariants: level = parent + 1; siblings unique ignoring case; delete refused while used; inline create commits per event; the dialog guarantees one project (the server ingests a batch event by event, each committing or being refused on its own and the batch going on: `apps/server/src/ingest/ingest-service.ts:432-446`).
 - Projections: `verify-projections` stays green after prefix and group events.
 - UI cases for each screen in all three styles. A browser pass covers the tree page, the grouped home and the three Create buttons.
 - `Features.md` and `test-cases/` are updated in the same change sets.
