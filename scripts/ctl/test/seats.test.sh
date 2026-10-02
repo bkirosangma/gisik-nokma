@@ -90,8 +90,8 @@ check "13.1806 last: the LAST of several signal lines wins (DONE after CHECKPOIN
 d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ needs fresh session at step 3\n')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
 J=$(run "$d" --json)
 check "13.1807 needs-fresh: \"needs fresh session at step 3\" is a signal of kind needs-fresh" '[ "$(jv "$J" 2 "d[\"last\"][\"kind\"]")" = needs-fresh ]'
-d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ Rules: end each step with `CHECKPOINT task/<branch> <sha40> step <n>/<N>`; if Ctx > 20%% say "needs fresh session at step <n+1>"\n⏺ read the brief')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
-check "13.1807 CONTROL: the brief template text (<branch> <sha40>, <n+1>) is not a signal" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"]")" = None ]'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ read the brief\nCHECKPOINT task/<branch> <sha40> step <n>/<N>\n"needs fresh session at step <n+1>"')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
+check "13.1807 CONTROL: a line that STARTS with the brief template text (CHECKPOINT task/<branch> <sha40>; \"needs fresh session at step <n+1>\") is not a signal" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"]")" = None ]'
 d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ Monitor event: QUEUE-dispatch +1 lines: DONE task/ctl-seats %s' "$sha")" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
 check "13.1807 CONTROL: a DONE quoted inside a monitor event line (not at the start of the line) is not the seat's own signal" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"]")" = None ]'
 d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ CHECKPOINT task/ctl-seats 0123456789abcdef0123456789abcdef01234567 step 1/3\n✻ Sautéed for 1s · done 1:53 AM\n⏺ next')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
