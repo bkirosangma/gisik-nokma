@@ -106,9 +106,11 @@ describe('21.151 Settings on a phone', () => {
     const items = ruleExactly(css, ['.gn-settings__sidebar a', '.gn-settings__sidebar-item--disabled'], PHONE);
     expect(valueOf(items, 'flex')).toBe('none');
     expect(valueOf(items, 'white-space')).toBe('nowrap');
-    // Never colour alone: the current section keeps the base rule's FILLED pill (accent background), the targets
-    // stay the base rule's 44px, and this arm adds NO `aria-current` rule (13.910 allows exactly one in `.gn-settings`).
-    expect(valueOf(ruleExactly(css, ".gn-settings__sidebar a[aria-current='page']"), 'background')).toBe('var(--gn-accent)');
+    // Never colour alone: the current section keeps the base rule's TRACK pill and its 600 weight (AMENDED 2026-10-02,
+    // UX fixes T2 / 23.020: it was the accent fill), the targets stay the base rule's 44px, and this arm adds NO
+    // `aria-current` rule (13.910 allows exactly one in `.gn-settings`).
+    expect(valueOf(ruleExactly(css, ".gn-settings__sidebar a[aria-current='page']"), 'background')).toBe('var(--gn-surface-track)');
+    expect(valueOf(ruleExactly(css, ".gn-settings__sidebar a[aria-current='page']"), 'font-weight')).toBe('600');
     expect(rules.filter((r) => r.atRule === PHONE && r.selectors.some((s) => s.includes('gn-settings') && s.includes('aria-current')))).toEqual([]);
     expect(valueOf(ruleExactly(css, ['.gn-settings__sidebar a', '.gn-settings__sidebar-item--disabled']), 'min-height')).toBe('2.75rem');
 

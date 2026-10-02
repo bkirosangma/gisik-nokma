@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { label, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
@@ -47,11 +47,11 @@ describe('13.1444 the birth start/due date reach ticket.created as {date} object
   it('a filled Start date wraps as {date}; an empty Due date carries no key at all', async () => {
     const source = createFakeDataSource();
     renderFlow(source);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'New ticket' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
     fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-30' } });
     // Due date left empty.
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     expect(source.ingested).toHaveLength(1);
     const payload = ticketCreatedPayload(source);
@@ -62,11 +62,11 @@ describe('13.1444 the birth start/due date reach ticket.created as {date} object
   it('both filled travel as two independent {date} objects', async () => {
     const source = createFakeDataSource();
     renderFlow(source);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'New ticket' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
     fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-30' } });
     fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2026-10-15' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     const payload = ticketCreatedPayload(source);
     expect(payload['startDate']).toEqual({ date: '2026-09-30' });
@@ -76,9 +76,9 @@ describe('13.1444 the birth start/due date reach ticket.created as {date} object
   it('neither filled: the payload carries no startDate and no dueDate key at all', async () => {
     const source = createFakeDataSource();
     renderFlow(source);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'New ticket' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     const payload = ticketCreatedPayload(source);
     expect(payload).not.toHaveProperty('startDate');
@@ -153,13 +153,13 @@ describe('13.1441a the inline stateRefusal precheck — a cache that disagrees w
         onCreated={() => undefined}
       />,
     );
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
     // Backlog defaults to ON, which disables the select — OFF it first.
     await user.click(screen.getByRole('checkbox', { name: 'Starts in the backlog?' }));
     await user.click(screen.getByRole('button', { name: /Starting status/ }));
     await user.click(await screen.findByRole('option', { name: 'Locked' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     // The SAME sentence `checks/hierarchy.ts` would refuse with, rendered
     // INSIDE the dialog, under the select — not the flow's own below-dialog
@@ -168,7 +168,7 @@ describe('13.1441a the inline stateRefusal precheck — a cache that disagrees w
     // decided before either assertion below is checked.
     const reason = workflowStateNotCreatableRefusal(label(def, 'locked'));
     expect(await screen.findByText(reason)).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'New ticket' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Create ticket' })).toBeInTheDocument();
 
     // NOTHING submitted — the refusal was caught before `submitChildEvent`
     // was ever reached. Checked AFTER the reason renders, not before: by this

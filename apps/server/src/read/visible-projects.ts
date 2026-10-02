@@ -39,6 +39,8 @@ export type VisibleProject = {
    * the half must be unique within one — see the call below.
    */
   prefix: string;
+  /** The group this project is filed under, `null` when ungrouped (prefixes and groups Task 6). */
+  groupId: string | null;
 };
 
 /**
@@ -126,14 +128,59 @@ export async function projectPrefixesInWorkspace(
   const rows = await projectPrefixRows(db, workspaceId);
   const resolved = resolveProjectPrefixes(
     rows.map((row) => ({ name: row.foundingName, prefix: row.prefix })),
+    await reservedPrefixes(db, workspaceId),
   );
   // A MAP keyed by project id, not a Set of values, and the caller needs the
   // key: a project re-delivering its OWN `project.created` must not be refused
   // by a prefix it already holds. A Set cannot answer "is this value held by
   // somebody else", and asking it the wrong question made an idempotent retry
   // fail with `project.prefix-taken` instead of the `duplicate-event-id` the
-  // ledger answers — see `checkProjectPrefixUnique`.
+  // ledger answers — see `checkPrefixReservation`.
   return new Map(rows.map((row, index) => [row.project_id, resolved[index]!]));
+}
+
+/**
+ * The workspace's RESERVED prefixes: every prefix any of its projects used to
+ * hold (`proj_project_prefixes`, prefixes and groups plan Task 2). A derived
+ * prefix flees them; an entered one does not (`resolveProjectPrefixes`).
+ * Both prefix readers load the same set, so the door and a reader never answer
+ * differently for one workspace.
+ */
+async function reservedPrefixes(db: Queryable, workspaceId: string): Promise<Set<string>> {
+  const { rows } = await db.query<{ prefix: string }>(
+    'SELECT prefix FROM proj_project_prefixes WHERE workspace_id = $1',
+    [workspaceId],
+  );
+  return new Set(rows.map((row) => row.prefix));
+}
+
+/**
+ * Every project's current prefix and its former ones, with the instant each
+ * stopped being its prefix (`until`, an ISO-8601 string — the `serverTime` of
+ * the `project.updated` that moved it), oldest first. Role-free, like
+ * `projectPrefixesInWorkspace`, whose answer `current` is.
+ */
+export async function projectPrefixHistory(
+  db: Queryable,
+  workspaceId: string,
+): Promise<Map<string, { current: string; former: Array<{ prefix: string; until: string }> }>> {
+  const current = await projectPrefixesInWorkspace(db, workspaceId);
+  const { rows } = await db.query<{ project_id: string; prefix: string; until_time: Date }>(
+    `SELECT project_id, prefix, until_time FROM proj_project_prefixes
+      WHERE workspace_id = $1
+      ORDER BY until_time, prefix`,
+    [workspaceId],
+  );
+  const history = new Map(
+    [...current].map(([projectId, prefix]) => [
+      projectId,
+      { current: prefix, former: [] as Array<{ prefix: string; until: string }> },
+    ]),
+  );
+  for (const row of rows) {
+    history.get(row.project_id)?.former.push({ prefix: row.prefix, until: row.until_time.toISOString() });
+  }
+  return history;
 }
 
 /** The workspace's projects in the order the prefix rule is defined over them. */
@@ -142,7 +189,8 @@ async function projectPrefixRows(
   workspaceId: string,
 ): Promise<Array<{ project_id: string; foundingName: string; prefix: string | null }>> {
   // `founding_name`, NOT `name`: the key an un-entered prefix derives from is
-  // frozen at founding, so a rename (`project.updated`) cannot re-key a project.
+  // frozen at founding, so a rename (`project.updated`) cannot re-key a project
+  // (only an explicit `prefix` does, and then it is the entered column).
   const { rows } = await db.query<{
     project_id: string;
     founding_name: string;
@@ -173,9 +221,10 @@ export async function visibleProjects(
     archived: boolean;
     description: string | null;
     prefix: string | null;
+    group_id: string | null;
     deleted_at: Date | null;
   }>(
-    `SELECT project_id, name, founding_name, archived, description, prefix, deleted_at FROM proj_projects
+    `SELECT project_id, name, founding_name, archived, description, prefix, group_id, deleted_at FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
@@ -202,6 +251,10 @@ export async function visibleProjects(
   // could shift a neighbour's derived prefix when two bases collide.
   const resolved = resolveProjectPrefixes(
     rows.map((row) => ({ name: row.founding_name, prefix: row.prefix })),
+    // The same reserved set `projectPrefixesInWorkspace` loads: a reader that
+    // resolved without it would hand a derived project the prefix the door
+    // reserved for a project that once held it.
+    await reservedPrefixes(db, workspaceId),
   );
   // The workspace predicate is in the SQL and the ROLE decision is not: this
   // function restates nothing about who may see what, it asks `eff` — which is
@@ -221,6 +274,7 @@ export async function visibleProjects(
       // render.
       description: row.description,
       prefix: resolved[index]!,
+      groupId: row.group_id,
     });
   }
   if (eff.workspaceRole === 'owner') return visible;

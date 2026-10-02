@@ -5,6 +5,7 @@ import {
   projectUpdatedPayload,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import type { Projection } from './registry.js';
 
 /**
@@ -72,23 +73,25 @@ import type { Projection } from './registry.js';
  * workspace — but a projection is the last place to leave a tenancy clause off
  * on the grounds that another invariant currently covers it.
  *
- * ## `project.updated` is last-writer-wins on `name` and `description` alone
+ * ## `project.updated` is last-writer-wins on `name`, `description` and `prefix`
  *
  * MCP CRUD plan Task 1 (owner ruling M1, 2026-10-01) added the rename this
  * docblock used to promise. It folds onto the row `project.created` made, keyed
  * on `(project_id, workspace_id)`, and touches only the columns its payload
  * names: an absent `name`/`description` leaves the column alone and
  * `description: null` clears it. **A rename never moves a ticket key, entered
- * or derived.** The payload's `prefix` is not applied by this branch yet (prefix
- * history is the prefixes and groups plan Task 2), and `founding_name`, the name an UN-entered prefix is
- * derived from, is written by `project.created` and never by this branch. Until
+ * or derived.** Only the payload's `prefix` moves it (prefixes and groups plan
+ * Task 2): the prefix the project answers to now — entered or derived — is filed
+ * in `proj_project_prefixes` as a FORMER one (reserved), and the column takes
+ * the new value. `founding_name`, the name an UN-entered prefix is derived from,
+ * is written by `project.created` and never by this branch. Until
  * 2026-10-01 the reader derived from `name`, so a rename re-keyed every ticket
  * of a project with no entered prefix (and could shift a neighbour's); the
  * reader now derives from `founding_name` (`read/visible-projects.ts`).
  */
 export const projProjects: Projection = {
   name: 'proj_projects',
-  tables: ['proj_projects'],
+  tables: ['proj_projects', 'proj_project_prefixes'],
 
   async apply(event, tx) {
     if (event.type === 'project.archived' || event.type === 'project.restored') {
@@ -108,12 +111,38 @@ export const projProjects: Projection = {
     }
     if (event.type === 'project.updated') {
       const payload = projectUpdatedPayload.parse(event.payload);
+      // A NEW PREFIX (prefixes and groups plan Task 2). The prefix the project
+      // answers to NOW — entered, or DERIVED from `founding_name` — becomes a
+      // FORMER one, reserved from `event.serverTime` on, and the row's entered
+      // prefix becomes the new value. Read through `projectPrefixesInWorkspace`
+      // so a derived project records the derivation at THIS moment; that reads
+      // only `proj_projects` and `proj_project_prefixes` as earlier events left
+      // them, so a replay computes the same answer. An unknown project (no row)
+      // records nothing, exactly as the UPDATE below touches nothing.
+      if (payload.prefix !== undefined) {
+        const current = (await projectPrefixesInWorkspace(tx, event.workspaceId)).get(event.entity.id);
+        if (current !== undefined && current !== payload.prefix) {
+          await tx.query(
+            `INSERT INTO proj_project_prefixes (project_id, workspace_id, prefix, until_time)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (project_id, prefix) DO UPDATE SET until_time = EXCLUDED.until_time`,
+            [event.entity.id, event.workspaceId, current, event.serverTime],
+          );
+        }
+        // Going BACK to a former prefix makes it current again: no longer former.
+        await tx.query(
+          'DELETE FROM proj_project_prefixes WHERE project_id = $1 AND prefix = $2',
+          [event.entity.id, payload.prefix],
+        );
+      }
       // COALESCE keeps an absent `name` as it was; `description` uses a separate
       // flag because `null` is a real value (clear) and must not COALESCE away.
       await tx.query(
         `UPDATE proj_projects
             SET name = COALESCE($3, name),
-                description = CASE WHEN $4::boolean THEN $5 ELSE description END
+                description = CASE WHEN $4::boolean THEN $5 ELSE description END,
+                prefix = COALESCE($6, prefix),
+                group_id = CASE WHEN $7::boolean THEN $8 ELSE group_id END
           WHERE project_id = $1 AND workspace_id = $2`,
         [
           event.entity.id,
@@ -121,6 +150,11 @@ export const projProjects: Projection = {
           payload.name ?? null,
           payload.description !== undefined,
           payload.description ?? null,
+          payload.prefix ?? null,
+          // `groupId` follows `description`'s rule: `null` is a real value (UNGROUP)
+          // and must not COALESCE away, so presence is its own flag. Task 6.
+          payload.groupId !== undefined,
+          payload.groupId ?? null,
         ],
       );
       return;
@@ -175,6 +209,7 @@ export const projProjects: Projection = {
 
   async reset(tx) {
     await tx.query('DELETE FROM proj_projects');
+    await tx.query('DELETE FROM proj_project_prefixes');
   },
 };
 

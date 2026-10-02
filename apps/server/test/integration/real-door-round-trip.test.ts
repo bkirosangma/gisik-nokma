@@ -505,6 +505,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
               // The second half, likewise derived from a name that crossed the
               // wire in this same run.
               prefix: 'SF',
+              groupId: null,
               archived: false,
               description: 'Sprint work for the rollout',
               ticketCount: 2,

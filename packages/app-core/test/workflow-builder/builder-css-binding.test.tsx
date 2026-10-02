@@ -508,13 +508,14 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
 
   /**
    * 13.775 — THE INSPECTORS' ACTIONS ARE THE SHARED BUTTON, AND THE DESTRUCTIVE
-   * TWO ARE THE SHARED DANGER VARIANT.
+   * TWO ARE THE SHARED QUIET DANGER VARIANT.
    *
    * Same structural blindness as 13.774: `.gn-button` and `.gn-button--danger`
    * are outside every harvested prefix, so the four controls that moved off bare
    * `<button>`s onto the component could revert to user-agent defaults with
-   * every other test in this repo green. Precedent for the variant is
-   * `fields-editor.tsx:151`.
+   * every other test in this repo green. The variant is `danger-quiet` (UX fixes
+   * T2, case 23.022), the one `fields-editor.tsx:151` wears; the filled `danger`
+   * is the confirm dialog's and none of these wear it.
    */
   it('13.775 the inspector actions are the shared Button, danger-styled where they destroy', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
@@ -526,18 +527,20 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
     ]);
     expect(buttonClasses.length).toBe(2);
     for (const classes of buttonClasses) expect(classes).toContain('gn-button');
-    // Exactly one is danger, and it is the one that deletes.
-    const danger = [...container.querySelectorAll('.state-inspector .gn-button--danger')];
+    // Exactly one is danger, and it is the one that deletes; it is the OUTLINED variant, never the filled one.
+    const danger = [...container.querySelectorAll('.state-inspector .gn-button--danger-quiet')];
     expect(danger).toHaveLength(1);
     expect(danger[0]?.textContent).toBe('Delete state');
+    expect(container.querySelectorAll('.state-inspector .gn-button--danger')).toHaveLength(0);
     cleanup();
 
     const transitionStore = createDraftStore(draftFromTemplate(kanban));
     transitionStore.actions.addRule(2, { kind: 'require-evidence' });
     transitionStore.actions.select({ kind: 'transition', index: 2 });
     const second = renderPanel(transitionStore).container;
-    // Remove rule, Delete transition — both destructive, both danger.
-    expect([...second.querySelectorAll('.transition-inspector .gn-button--danger')]).toHaveLength(2);
+    // Remove rule, Delete transition — both destructive, both the quiet danger variant (never the filled one).
+    expect([...second.querySelectorAll('.transition-inspector .gn-button--danger-quiet')]).toHaveLength(2);
+    expect(second.querySelectorAll('.transition-inspector .gn-button--danger')).toHaveLength(0);
     cleanup();
   });
 });

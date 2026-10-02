@@ -212,7 +212,8 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
       }),
     ).toBeInTheDocument();
 
-    screen.getByRole('heading', { name: 'New workspace' });
+    // …and the way to found a workspace is still there (the header's Create workspace, 22.151).
+    screen.getByRole('button', { name: 'Create workspace' });
 
     // ── THE EMPTY HALF, which is the same claim from the other side ──────────
     // Without it, a banner that rendered its heading unconditionally would pass
@@ -236,7 +237,7 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     // the thing waited ON, because it renders unconditionally: once it is there,
     // the page has settled and a missing banner is a decision rather than a
     // pending promise.
-    expect(await screen.findByRole('heading', { name: 'New workspace' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
     expect(screen.queryByText(/invitation is waiting/)).toBeNull();
     expect(screen.queryByText(/invitations are waiting/)).toBeNull();
   });
@@ -305,7 +306,7 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     expect(
       await screen.findByText('Your invitations could not be loaded: the invitations read broke'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
     // NOT a refusal panel: this page's `<ShellRefusal>` is reserved for the read
     // the page exists to serve, and there is exactly one live region here.
     expect(screen.queryAllByRole('status')).toHaveLength(0);
@@ -406,8 +407,8 @@ describe('20.331 one loud element on /workspaces', () => {
       expect(button).toHaveClass('gn-button--ghost');
       expect(button).not.toHaveClass('gn-button--primary');
     }
-    // The page's one primary is the founding form's Create workspace
-    // (`workspaces/page.tsx`, rendered unconditionally).
+    // The page's one primary is the header's Create workspace
+    // (`workspaces/page.tsx`, rendered unconditionally; its form is a dialog since 22.151).
     const primaries = [...document.querySelectorAll('.gn-button--primary')];
     expect(primaries).toHaveLength(1);
     expect(primaries[0]).toHaveTextContent('Create workspace');

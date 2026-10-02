@@ -56,6 +56,10 @@ card-scale) and is recorded here only for completeness, not as a call.
   knowingly, not hidden.** A positive control guards `rule()`'s substring matching: the neo selector and
   the base selector must read back DIFFERENT bodies. *Mutation-witnessed: giving the neo override a
   border reddens this case alone (227/228 pass). Restored, checksum-verified.* — (`packages/ui/test/components.test.tsx`)
+  **AMENDED 2026-10-02 (UX fixes T1, U5–U8, owner: "borders on buttons AND text fields"; cases 23.002, 23.004):
+  the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
+  (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
+  their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
 - **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
   (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
   makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
@@ -264,7 +268,8 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   route "is among the five routes this sweep visits"). The sweep still cannot compute a `box-shadow`'s
   contrast ratio (`sweepBorders` composites `border-{side}-*` only, by design), so this does not become a
   fifth measured route in the ordinary sense: a live DOM check on each route confirms the field genuinely
-  has `border: none` and a non-`none` `box-shadow` (grounding the waiver's premise against THIS tree
+  has `border: none` and a non-`none` `box-shadow` — **AMENDED 2026-10-02 (UX fixes T1, U5): the neo field now
+  has a 1px solid ring, so the e2e DOM check expects `solid` and the waiver is superseded** (grounding the waiver's premise against THIS tree
   rather than trusting Task 13's report unverified), and Task 13's own measured numbers (1.24 light / 1.16
   dark) are then recorded as a SANCTIONED entry in the persisted roster — appended after `below` is
   computed, so it can never trip the zero-below-3 assertion, since that assertion is about what this
@@ -992,7 +997,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   the screen; the pairing's own measured margin (4.539, `packages/ui/src/tokens.ts`'s `textAccentLight`
   docblock) already covers it in every style and theme. —
   (`app-nav.test.tsx`)
-- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column,
+- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column, **AMENDED 2026-10-02 (prefixes/groups Task 8): `.gn-project-founding` is deleted; the workspace-home half now reads "the New-project form is the Create-project dialog's `.gn-project-create` form" and the `/workspaces` half "`.gn-workspace-founding` is the dialog's form column, mounted only while open". Both ride the new buttons (22.151, 22.152).**
   max-width 420px, no card) for `/workspaces`' "New workspace" block, and `.gn-project-founding` (a
   raised card, an inline field+button row) for the home's "New project" row. Both asserted by className
   on the real `<form>` element, positively (carries its own class) and negatively (does not carry the
@@ -2356,7 +2361,7 @@ the route's half; `13.983` witnesses the mapper's.
 - **13.983** ✅ The mapper **refuses** a project row that omits the key, naming its path *and* the guard's own sentence.
 - **13.984** ✅ The project card draws the description **inside its own door**.
 - **13.985** ✅ A project nobody described draws **no element at all** — not an empty one.
-- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused).
+- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused). **AMENDED 2026-10-02 (prefixes/groups Task 8): the form is the Create-project dialog (22.152); the description is still sent as typed and omitted when untouched.**
 - **13.987** ✅ End to end through the REAL door: a description authored over the wire reaches the exact served body — the full `project.created` → projection → read → route path in one assertion.
 
 **Mutation witnesses, run and recorded rather than predicted.** `13.978` — changing the projection's
@@ -2597,7 +2602,7 @@ a member only the projects they may see (`visible-projects.ts`), so "outside eve
 workspace" and "a workspace with none" both reach this arm as `projects: []`; the count cannot separate
 them and the ROLE can.
 
-- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and
+- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and **AMENDED 2026-10-02 (prefixes/groups Task 8): the sentence is now "No projects yet. Create the first one." — "below" is gone because the button is in the heading row (22.153).**
   not the member's sentence, and the form the sentence names really is on screen); a member with the
   SAME empty list keeps the member's sentence. —
   (`apps/web/test/workspace-home.test.tsx`)

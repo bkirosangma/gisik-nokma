@@ -222,7 +222,8 @@ export function registerWorkspaceRoutes(
       // inline in the object below so the two cannot be read from different
       // ends of the workspace's naming history by accident. The name is the
       // LAST thing anyone said the workspace is called; the prefix is the
-      // FIRST claim that carried one, because it is immutable.
+      // LAST `workspace.prefix_changed`, or the FIRST claim that carried one
+      // when it never changed (`workspace-name.ts`).
       const identity = await workspaceIdentityFromLedger(deps.pool, row.workspace_id);
       workspaces.push({
         workspaceId: row.workspace_id,
@@ -278,6 +279,10 @@ export function registerWorkspaceRoutes(
             // stored-or-derived fork into one value, so a render site has
             // nothing to decide; see `read/visible-projects.ts`.
             prefix: project.prefix,
+            // The group this project is filed under — ALWAYS PRESENT, `null` when ungrouped
+            // (prefixes and groups Task 6). A null is an answer, not a withholding, so the
+            // key is never omitted: the mapper refuses a row without it.
+            groupId: project.groupId,
             // `counts === null` is the WITHHOLDING, decided once in
             // `visibleProjectCounts` and never re-asked here. Inside a served
             // map, a project with no row is an honest 0 — the aggregation
