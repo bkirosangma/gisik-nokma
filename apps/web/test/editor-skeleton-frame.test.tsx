@@ -106,6 +106,11 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
   const tools = (root: Element) => root.querySelectorAll('.ticket-editor__tool').length;
   const itemOrder = (group: Element, tool: string, select: string) =>
     [...group.querySelectorAll(`${tool}, ${select}`)].map((item) => (item.matches(select) ? 's' : 't')).join('');
+  // The scroller's edge state as first drawn (G-7: `data-at-start` / `data-at-end`; `editor.css` fades the row's edge when either is 'false'), or null when there is no scroller.
+  const edgeAttrs = (root: Element) => {
+    const scroll = root.querySelector('.ticket-editor__scroll');
+    return scroll === null ? null : [scroll.getAttribute('data-at-start'), scroll.getAttribute('data-at-end')];
+  };
   const skeletonSet = (which: 'desktop' | 'phone') => {
     const view = render(<EditorSkeleton mode="description" />);
     const set = view.container.querySelector(`.gn-editor-skeleton__set--${which}`)!;
@@ -117,6 +122,7 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
       order: [...set.querySelectorAll('.ticket-editor__tool-group')].map((group) => itemOrder(group, '.gn-editor-skeleton__tool', '.gn-editor-skeleton__select')),
       scrolled: set.querySelectorAll('.ticket-editor__scroll > .ticket-editor__tool-group').length,
       pinned: set.querySelectorAll('.ticket-editor__tool-group.ticket-editor__more').length,
+      edges: edgeAttrs(set),
     };
     view.unmount();
     return result;
@@ -136,6 +142,7 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
         order: [...bar.querySelectorAll('.ticket-editor__tool-group')].map((group) => itemOrder(group, '.ticket-editor__tool', '.ticket-editor__heading-select')),
         scrolled: bar.querySelectorAll('.ticket-editor__scroll > .ticket-editor__tool-group').length,
         pinned: bar.querySelectorAll('.ticket-editor__tool-group.ticket-editor__more').length,
+        edges: edgeAttrs(bar),
       };
       view.unmount();
       return result;
@@ -160,6 +167,10 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
     expect(phone.scrolled).toBe(1);
     expect(phone.pinned).toBe(1);
     expect(desktop.scrolled + desktop.pinned).toBe(0);
+    // The scroller's FIRST edge state is the real bar's (`useState({ start: true, end: true })`), so the skeleton paints no fade the bar lacks on its first frame
+    // (`editor.css` masks the row when either attribute is 'false'). `toEqual` above compares it; the control is that the real values are present and both 'true'.
+    expect(phone.edges).toEqual(['true', 'true']);
+    expect(desktop.edges).toBeNull();
     const phoneRules = parseRules(readEditorCss()).filter((rule) => rule.atRule === PHONE);
     expect(phoneRules.find((rule) => rule.selectors.join(',') === '.ticket-editor__toolbar' && /height:\s*var\(--ticket-editor-bar-h\)/.test(rule.body)), 'the real one-row bar height rule').toBeDefined();
     expect(phoneRules.find((rule) => rule.selectors.join(',') === '.ticket-editor' && /--ticket-editor-bar-h:\s*calc\(2\.75rem \+ 2 \* max\(0\.375rem, var\(--ticket-editor-reach\)\)\)/.test(rule.body)), 'the 56px / 84px (neo) bar height').toBeDefined();
