@@ -52,3 +52,6 @@ gate*.log
 # tracked). Explicit here so a lane's evidence screenshots don't read as an
 # uncommitted-work dirty tree to `ctl pr open`'s own check.
 gisik-nokma-lanes/
+
+# Claude Code agent worktrees (a committed gitlink here broke CI checkout post-job: no .gitmodules entry)
+.claude/worktrees/

@@ -250,9 +250,11 @@ re-run by anything since, automated or otherwise.)*
   `minio ... (healthy)` on a live stack; the chain is self-witnessing beyond that, because `minio-init`
   is gated on `condition: service_healthy` and `server` on `minio-init`'s
   `condition: service_completed_successfully`, so a healthcheck that never went healthy could not have
-  produced a healthy `server`. `curl` is confirmed present in the pinned image
-  (`docker run --rm --entrypoint sh minio/minio:RELEASE.2024-11-07T00-52-20Z -c 'command -v curl'` →
-  `/usr/bin/curl`), so the check is not silently a no-op. Still `🧪` and not `✅`: nothing in the gate
+  produced a healthy `server`. **Superseded 2026-10-02 (CI repair):** `minio/minio` left Docker Hub, the image is now
+  `ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z`, which has no `curl`, so the check became
+  `mc alias set h … && mc ready h` — confirmed on `linux/amd64` against a running container
+  (`The cluster 'h' is ready`), so the check is not silently a no-op. (The earlier reading: `curl` was
+  present in `minio/minio:RELEASE.2024-11-07T00-52-20Z`.) Still `🧪` and not `✅`: nothing in the gate
   runs it
 - 13.167 🧪 **TASK 6'S ACCEPTANCE, RUN.** A request through the WEB container's proxy is answered by the
   SERVER. `docker compose -f docker-compose.dev.yml up -d --build` reached a healthy server, then
