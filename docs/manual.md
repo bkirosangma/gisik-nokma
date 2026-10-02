@@ -16,9 +16,9 @@ Read these five. They are the ones that catch everybody.
 1. **Sign in with the email link.** It is what the screen opens on, and on this deployment it is the
    way in. A **Phone** tab appears only where SMS delivery is configured, and it is not configured
    here — so the screen does not offer it. (§1)
-2. **You cannot create a project unless you are an owner or an admin.** Those two roles get a **New
-   project** form on the workspace page; a member or a guest is told why it is not there instead of
-   being shown a button that fails. If you are neither an owner nor an admin and your workspace has no
+2. **You cannot create a project unless you are an owner or an admin.** Those two roles get a
+   **Create project** button on the workspace page; a member or a guest is told why it is not there
+   instead of being shown a button that fails. If you are neither an owner nor an admin and your workspace has no
    projects, there is nowhere to put work, and one of them will have to add one for you. (§3)
 3. **You can put a job on a person only on the website.** The website's job panel has an "Assignee"
    picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a
@@ -135,10 +135,15 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Workspaces** — the list of every workspace you are in.
 - **My Work** — the jobs assigned to you.
 - **Members** — the people in this workspace, and what they are.
-- **Settings** — this workspace's own screens: its ticket types, its workflows, and the workspace
-  itself (§11 and §12).
+- **Settings** — this workspace's own screens: its ticket types, its workflows, its project groups,
+  and the workspace itself (§11 and §12).
 - The **workspace's name**, linking to its home page, with the project you were last in beside it —
-  that one opens a menu of the workspace's other projects.
+  set apart by a thin divider and labelled **Last project:**. Point at either, or move the keyboard cursor
+  onto it, and it opens a list: your other workspaces under the workspace's name (with only one workspace
+  it stays a plain link), the workspace's other projects under **Last project:**. The list stays open while
+  the pointer moves down onto it and closes a fifth of a second after the pointer leaves. It shows eight
+  rows and scrolls past that. With the keyboard, the up and down arrows move through the rows and Escape
+  closes the list and leaves the cursor on the name.
 - **Inbox** — a small icon at the right-hand end, with a dot on it when you have unread messages.
 - **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
   and **Sign out**.
@@ -147,6 +152,42 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 last project appear only once that name has arrived. With no workspace open the bar says so — *"No
 workspace selected — pick one to reach its board, members and settings."* **Signed out there is no
 avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
+
+### On a phone or a narrow window
+
+On a phone, and on a tablet or any window up to about 1024 pixels wide, the links leave the top of the
+screen and become a **bar along the bottom**: the places you use most, then **More**. **More** opens a
+sheet with everything the bar does not carry — including the workspace's last project, set apart with its
+**Last project:** label — and **Settings**, **Account** and **Help**.
+
+The bar is yours to arrange. Press **Edit bottom bar**, the last row of **More**, to choose which places
+the bar carries and in what order; **Reset to default** puts it back. The product remembers your choice.
+
+On a tall phone the rows in **More** sit at the bottom of the sheet, just above **Edit bottom bar**,
+where your thumb is, and the space above them is left empty. On a short screen the sheet scrolls
+instead, and nothing is cut off.
+
+### The Help page
+
+**Help** is in the avatar menu (or a plain link in the bar when you are signed out). It holds this manual
+and the FAQ, each as one long page that reads straight down. There is no Next button: pick a topic from
+the contents list to jump to it, or just keep scrolling.
+
+- **On a computer** the contents list sits on the left and stays in view as you scroll. At the top of it
+  are the search box and the **Manual** / **FAQ** switch, so you can search or change document from
+  anywhere on the page; only the list of topics below them scrolls. The topic you are reading is
+  marked. Press **/** anywhere on the page (except while you are typing in a box) and the cursor jumps
+  to the search box; press Escape in it to clear it and go back to where you were.
+- **On a phone** the contents list and search are behind a round button at the bottom right of the screen,
+  named **Contents and search**. It opens a panel with the search box first, then the **Manual** /
+  **FAQ** switch, then the topics, each group with its count. The topic you are reading is marked and
+  scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the
+  button was, the Escape key (it clears anything typed in the search box first), or a tap outside it closes the panel
+  too, without moving you.
+- **Searching** looks through both documents. Type in the box (**Search help**) and the matches replace
+  the page until you clear the box, which puts you back at the place you were reading. On a phone the
+  matches appear inside the panel; picking one closes it and takes you to that entry, wherever you were
+  on the page.
 
 ### Light or dark
 
@@ -167,11 +208,15 @@ forgets your choice and follows your device, including its automatic day/night s
 ### Making a workspace
 
 1. Go to the **Workspaces** page.
-2. Below the list of workspaces there is a heading, **New workspace**, with one box labelled **Name**.
-3. Type your business name into it. **Type it exactly as you want it** — the product does not trim off
-   extra spaces. If you type spaces at the front, that is what gets saved.
-4. Press **Create workspace**.
-5. If it works, you are taken into the new workspace. If it fails, you are told the real reason in
+2. Press **Create workspace**, the button at the top of the page. A window opens with a box labelled
+   **Name** and one labelled **Prefix (optional)**.
+3. Type your business name into **Name**. **Type it exactly as you want it** — the product does not trim
+   off extra spaces. If you type spaces at the front, that is what gets saved.
+4. If you like, type a **Prefix**: one to three letters, which become the front of every job's number in
+   this workspace (the **CC** in **CCSO-1183**). Leave it empty and the product makes one up from the
+   name. You can change it later (§3, under Change a prefix).
+5. Press **Create workspace** in the window. **Cancel** closes it and creates nothing.
+6. If it works, you are taken into the new workspace. If it fails, you are told the real reason in
    plain words. A name of nothing but spaces is refused with "A workspace needs a name."
 
 ### What you get
@@ -185,9 +230,9 @@ You become the **owner** of that workspace. It also sets you up with:
 ### The project problem
 
 **A brand-new workspace has no projects.** Whether you can make one depends on your role. An **owner or
-admin** gets a **New project** form inside the workspace, and that is the only control that creates
-one. Everybody else gets a sentence saying so instead of a button that fails: *"Only an owner or an
-admin can create a project in this workspace."* For a member the
+admin** gets a **Create project** button on the workspace's own page, in the **Projects** heading row,
+and that is the only control that creates one. Everybody else gets a sentence saying so instead of a
+button that fails: *"Only an owner or admin can create a project."* For a member the
 control is not hidden; it is not offered.
 Nowhere else offers it: not the Workspaces page, not a settings screen, not the top bar.
 
@@ -222,20 +267,108 @@ it. **That is deliberate, not broken** — you are being shown your share.
 
 You can rename a workspace and the new name appears in everybody's list.
 
-> **Worth knowing:** at the moment *anyone* inside a workspace can rename it — including the most
-> limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
-> rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
+Only an owner or admin can. On the workspace's home page they see a pencil button, **Rename** plus the
+workspace's name, beside the heading; pressing the name itself does the same. Either one turns the
+heading into a box. A member or a guest is shown neither, and a rename that reached the product from
+somebody else is refused: *"Only a workspace owner or admin can rename a workspace."*
 
 ### Edit a project
 
 If you own a workspace or are an admin of it, a project's card on the workspace's page has an **Edit**
 button beside **Archive**, and the project's own page has the same **Edit** next to its name. It opens a
-small form with the project's **Name** and **Description**; press **Save** to keep your changes, or
-**Cancel** (or Escape) to leave things as they were. A project needs a name — leave it blank and the form
-says so. The new name shows up for everybody in the workspace.
+small form with the project's **Name**, **Description**, **Prefix** and **Group (optional)**; press
+**Save** to keep your changes, or **Cancel** (or Escape) to leave things as they were. A project needs a
+name — leave it blank and the form says so. The new name shows up for everybody in the workspace.
 
-The project's short prefix, the letters at the start of every job's number, is chosen when the project is
-started and cannot be edited. Members who are not owners or admins do not see **Edit**.
+The prefix and the group have their own sections just below. Members who are not owners or admins do
+not see **Edit**.
+
+### The three Create buttons
+
+Making something new always starts from a button that says **Create**. The ones in the page headers —
+**Create workspace**, **Create project** and the **Create ticket** by the view tabs — are the bright
+button with a small plus sign on it. Each one opens a window; nothing is made until you press the button
+inside the window.
+
+- **Create workspace** — at the top of the **Workspaces** page. The window asks for a name and, if you
+  want one, a prefix.
+- **Create project** — on a workspace's page, in the **Projects** heading row.
+  Owners and admins only; everybody else is told so (§3, under The project problem). The window asks
+  for a name, an optional description, an optional prefix and an optional **Group**: the same four boxes
+  as in **Edit** (see Group your projects, below), including making a new group on the spot. One press of
+  **Create** never makes more than one project. If the group's name is refused, or the prefix is, that press
+  makes no project: the window says why and keeps what you typed. Pressing **Create** again then makes the
+  one project, never a second one and never a second group.
+- **Create ticket** — in a project, near the top by the view tabs, and on a project's empty Board, where the
+  banner's **Create ticket** carries the plus sign too, and inside an empty stage on the Board (that one is
+  a plainer button under a plus sign, and says **Create ticket** too; its full name for a screen
+  reader adds the stage). The window is described in §5.
+
+If the door refuses what you asked for — a prefix someone already uses, say — the reason is written
+inside the window and the window stays open, so nothing you typed is lost.
+
+### Change a prefix
+
+A job's number has two halves. The **workspace's prefix** comes first and the **project's prefix**
+second, then a dash and a count: in **CCSO-1183**, **CC** is the workspace and **SO** is the project.
+You can change either half after the fact.
+
+- **A project's prefix:** an owner or admin presses **Edit** on the project's card or page, types the new
+  letters into **Prefix** (one to three letters; it turns your typing into capitals), and presses
+  **Save**.
+- **The workspace's prefix:** an owner or admin presses **Edit prefix**, under the workspace's name on
+  its page, types the new letters into **Workspace prefix**, and presses **Save prefix**.
+
+If the box does not hold one to three letters the form says *"A prefix is 1 to 3 letters."* and **Save**
+stays switched off.
+
+**You are asked first.** When the prefix really changes, a window called **Change prefix** tells you what
+will happen — every job's number is rewritten with the new letters, and the old ones still work. It has
+two buttons: **Change prefix**, and **Keep** followed by the old letters. The cursor starts on **Keep**, so
+pressing Enter the moment it opens changes nothing. Typing the same prefix back, or changing only the
+group, asks nothing.
+
+What changes and what does not:
+
+- **Every job's number is rewritten at once**, everywhere it is shown. A job that was **CCSO-12** reads **CCSH-12** after the project moves from
+  **SO** to **SH**. The count does not change.
+- **Old numbers still find the job.** Where you search for a job by its number — the picker that links a
+  job into a note (§15), and your assistant's search (§16) — typing **CCSO-12** finds it and lists it
+  first, wearing its new number. Search only shows what you are allowed to see, the same as always.
+- **Notes keep the key they were written with.** A note that mentions **CCSO-12** goes on saying
+  **CCSO-12**, and the mention still opens the job.
+- **A retired prefix cannot be taken by another project.** Once a project has moved off **SO**, no other
+  project in the workspace can start using it, because the old numbers still point to the first project.
+  If you try, you are told so in words such as *"Its old ticket keys still point there, so it can't be
+  reused."* The project that gave it up may take it back. A prefix another project uses right now is
+  refused too.
+- **The workspace's prefix works the same way**, for every project at once. A workspace may take back one
+  of its own old prefixes.
+
+Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and
+search by them, but it cannot change a prefix.
+
+### Group your projects
+
+A workspace with many projects can file them into **groups**, to read them in one tidy tree. Groups have
+**four levels**: a level-1 group can hold level-2 groups, which hold level-3 groups, which hold level-4
+groups. A project sits directly under one group, or under none.
+
+- **Filing a project.** Owners and admins use **Group (optional)** in **Create project**, or open **Edit**
+  on the project (card or page) later. It is four boxes, **Level 1 group** to **Level 4 group**. Each box lists only the groups
+  under the one above it, and the next box wakes up once the one above has a value. Pick from the list,
+  or type: an exact name picks the group that already exists, and any other name offers **Create “…”** to
+  make a new group on the spot. Clearing a box clears the ones below it. If somebody made the same group
+  a moment before you, the form says *"Using the existing"* followed by the group's name, and files the project there. Leave the
+  boxes empty to take a project out of its group.
+- **Seeing them.** On a workspace's page, **Show projects** has two choices, **Grouped** and **Plain**.
+  **Grouped** draws the groups as nested sections, level 1 down to level 4, each with a coloured strip
+  naming its level, with each project under its own group; groups with nothing in them are left out, and
+  projects with no group sit last under **Ungrouped**. **Plain** is the flat grid you had before. The
+  page remembers your choice, for you, in each workspace. Guests are not offered it. If the groups cannot
+  be read, the page keeps the plain list and tells you so.
+- **The Groups page.** Owners and admins build and tidy the tree itself under **Settings → Groups**. See
+  The Groups page in §11.
 
 ### Deleted items, and getting things back
 
@@ -330,6 +463,10 @@ If somebody tells you their link does not work, the message they see is: *"This 
 not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
 one."*
 
+That message sits under a heading, **This invitation can't be used**, with a **Go to sign in** button
+beneath it so the page is never a dead end. If the person is already signed in it also offers **See your
+workspaces**, where an invitation waiting for them is listed.
+
 **That is genuinely all anyone can find out.** The product deliberately refuses to say which of those
 four it was, so that nobody can go fishing with random links. Do not waste time diagnosing it —
 withdraw it and send a fresh one.
@@ -369,7 +506,7 @@ settings are kept for about a month in case they come back.
 ### Adding a job
 
 1. Open the project you want the job in.
-2. Find the **New ticket** button, near the top by the view tabs — or click **Add a ticket** in an
+2. Find the **Create ticket** button, near the top by the view tabs — or press **Create ticket** in an
    empty stage on the Board, which starts the job in THAT stage instead (see "Starting status" below).
 3. A small window opens with these things:
    - **Title** — what the job is. "Fix Mrs. Patel's leaking pipe."
@@ -386,12 +523,13 @@ settings are kept for about a month in case they come back.
    - **Parent** — which bigger job this sits under. It defaults to **None (project root)**. Leave it
      alone unless this job is part of a bigger one (§6).
    - **Assignee** — who the job is on, or leave it unassigned.
-4. Press **Create**.
+4. Press **Create ticket**. On a phone the button stays at the bottom of the window while you scroll the
+   form, and under it a short line says what is still missing (for example, that the job needs a title).
 
 **On the title:** a blank title, or one that is only spaces, is refused. But extra spaces around real
 words are kept exactly as you typed them, so check what you typed if you are fussy about tidiness.
 
-**If the New ticket button is not there:** see §8 on the 2,000-job ceiling.
+**If the Create ticket button is not there:** see §8 on the 2,000-job ceiling.
 
 ### What you can change afterwards
 
@@ -407,6 +545,10 @@ On the Details tab you can do **five things**:
 4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every job has one; new jobs start at
    P2. A job cannot be left without one, so there is nothing to clear. (§5)
 5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
+
+**On a phone** the panel opens on the things you change most — State, Assignee and Priority — and the
+description is folded behind **Add a description** (**Edit description** once it has one) so the fields
+are in the first screen.
 
 Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
@@ -779,8 +921,10 @@ project and opens there.
 ### Backlog
 
 The first tab, and where a new job starts its life. It lists the jobs that have not begun, in an order
-you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Each row also has a
-**Start** button that moves that job into its workflow.
+you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Those buttons move a
+job in the order of the whole backlog, not only within the group it is listed under, and they stay
+visible when the backlog is grouped; hover one and it says so. Each row also has a **Start** button that
+moves that job into its workflow.
 
 It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says
 so: *"Nothing in the backlog — new tickets land here."* — or, when the only thing it would have listed
@@ -801,8 +945,9 @@ collapsed column for a moment and it opens; move away and it closes again; drop 
 stays open.
 
 A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
-that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
-tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
+that carry it to the stages it may move to, and a one-line note of what happened last: *"Moved to Doing by
+Anselma Marak on 19 Aug"*. Press that line and it adds the year; press it again and it folds back. A move
+from an earlier year always shows its year.
 
 Three more badges, when they apply: an **epic chip** on the card's own top line, above the title, when
 the job belongs to one — press it to open that epic. A **parent-key badge** beside the job's own key,
@@ -810,13 +955,20 @@ when it sits under a job that is not already named by the epic chip — press it
 every card carries its **priority badge** — a coloured icon and P1/P2/P3, tinting the whole card: red
 fire for P1, green leaf for P2, frozen-blue snowflake for P3.
 
+**One column at a time on a phone.** Above the board is a row of buttons, one per column, each with the
+number of cards in it; the one you press is the column you see, and the others are out of the way (there
+is no sideways swiping). The ‹ and › arrows on a card still move it. If a move needs a comment, or is
+refused, the board shows the column the card is in until you close the box, so the box and the message
+are in front of you, and then goes back to the column you were on. **Create ticket** stays at the
+bottom of its window, so you can always reach it.
+
 Columns are grouped by which set of stages they belong to, so if two job types use different
 arrangements you get two clearly separated groups rather than one confusing mess.
 
-**An empty column's own Add button starts the job there.** Press **Add a ticket** in an empty column
-and the New ticket window opens with that column's status already chosen, the backlog switch off, and
+**An empty column's own Create ticket button starts the job there.** Press **Create ticket** in an empty column
+and the Create ticket window opens with that column's status already chosen, the backlog switch off, and
 a job type from that workflow pre-picked. A column whose stage does not allow a job to start there —
-your admin can turn this off per stage (§11) — shows no Add button at all, even empty.
+your admin can turn this off per stage (§11) — shows no Create ticket button at all, even empty.
 
 **"Blocked" is a property of the column, not of one job.** Whoever built your workflow can mark a stage
 as a waiting or blocked one — "Waiting on parts", "Waiting on customer". Every job in that column is
@@ -865,6 +1017,10 @@ A month grid, drawn **only from days somebody actually claimed**. Nothing is est
   rather than quietly fixing it. That is your cue to go and fix the dates.
 - No dates at all → not on the calendar.
 
+A marker reads the job's key and title — so you can tell which job it is without opening it — and the
+claim behind it (who said the date, and which one) is in its hover text. On a phone a marker is one line,
+cut with an ellipsis if the title is long.
+
 Custom date fields your business set up appear here too, on the same terms, labelled with the field's
 own name.
 
@@ -898,9 +1054,14 @@ the legend switches, because those live only in this view.
 ### Timeline
 
 The same idea stretched sideways over weeks, moving four weeks at a time with **Earlier** and
-**Later**. A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a
-contradiction goes into a side list beside the chart, with a heading saying which of five reasons it
-is there for.
+**Later**. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by
+rather than at the end of its week. A thin line marks today in every row.
+
+Anything with only one date, no dates, or a contradiction goes into a list beside the chart headed
+*"Not on the timeline yet"*, with a count. The sentence under the heading says what to do: *"These
+tickets have no dates yet."* when none of them has a date, or *"Add a start and a due date to place a
+ticket on the timeline."* when some have one. Each entry says what is missing, and its **Add dates**
+button opens the job so you can set them.
 
 **Closed jobs are hidden here too, on the same terms as the Calendar** — the two ways back, and the
 chip it is easy to mistake, are described in that section above.
@@ -995,7 +1156,7 @@ you, rather than quietly ignoring what you asked for.
 ### Very large projects
 
 There is a ceiling of **2,000 jobs in a project**. Past it, the **Backlog, List, Calendar and Timeline
-all refuse** rather than showing you part of a project pretending to be the whole one. **The "New ticket"
+all refuse** rather than showing you part of a project pretending to be the whole one. **The "Create ticket"
 button disappears too**, because it reads from the same place — so a project that grows past the
 ceiling becomes one you cannot add to.
 
@@ -1020,12 +1181,17 @@ person. Past that you are told you have too many, and closing one frees a slot s
 
 ### The "Needs your attention" strip
 
-A row at the top of My Work, headed *"Needs your attention"*, with four kinds of thing, in this order:
+A row at the top of My Work, headed *"Needs your attention"*, with five kinds of thing, in this order:
 
-1. **Blocked** — sitting in a stage somebody flagged as blocked.
-2. **Stale** — has been sitting in the same stage too long.
-3. **Due soon** — a claimed deadline coming up.
-4. **Contested** — a claim somebody disputed; its sentence is the rule's own reason for refusing it.
+1. **Overdue** — a claimed deadline that has passed.
+2. **Blocked** — sitting in a stage somebody flagged as blocked.
+3. **Stale** — has been sitting in the same stage too long.
+4. **Due soon** — a claimed deadline coming up.
+5. **Contested** — a claim somebody disputed; its sentence is the rule's own reason for refusing it.
+
+**Each job appears once**, with its strongest reason — a job that is both overdue and blocked is one
+Overdue row. The strip shows the first five; if there are more, **Show all** and a number opens the
+rest, and **Show fewer** folds it back.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
 since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-08-30 — due within 7
@@ -1204,7 +1370,8 @@ before anything else.
 ### Getting to the screen
 
 **The app links to it.** There is a **Settings** link in the top bar; it appears once a workspace is
-open, and it opens that workspace's settings, where the stage builder and the job-type editor live.
+open, and it opens that workspace's settings, where the stage builder, the job-type editor and the project-group
+tree live.
 
 Nothing to bookmark. One wrinkle worth knowing: the bare address `/settings` with no workspace on it
 offers nothing usable, because the shell remembers no "current workspace" outside a route or a query
@@ -1245,13 +1412,18 @@ It is a drawing canvas. Each stage is a box. **Add state** makes a new one. Each
 - **A blocked tick box** — for stages that mean "we are stuck waiting on someone".
 - **A start marker** — which stage new jobs begin in.
 - **A "Tickets can start here" tick box** — on by default; untick it to stop a job being born straight
-  into that stage (the Starting status picker on the New ticket window will not offer it, §5). Greyed
+  into that stage (the Starting status picker on the Create ticket window will not offer it, §5). Greyed
   out and stuck on for the stage your start marker points to, with the note *"The start state always
   allows new tickets"*, and for a finished stage, with the note *"A done state can't be a starting
   status"*.
 
 **To connect two stages, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a job can go this way".
+
+**The canvas opens showing the whole drawing**, zoomed out as far as it needs to be to fit (never past a
+quarter size). After you have panned or zoomed, the **Fit to screen** button at the bottom left brings
+the whole drawing back. The tick boxes on a stage are big enough to tap, and when one is stuck on, the
+reason is written under it rather than hidden in a hover.
 
 **The left-hand column lists everything, and each row opens in place.** Above the system rules you will
 find a **States** list and a **Transitions** list, each with a count. Press a row and it opens right there
@@ -1275,6 +1447,30 @@ Boxes and arrows are not hard. It is the vocabulary around them that trips peopl
 > **Your layout is not saved.** The positions you drag the boxes into are for this session only. Come
 > back tomorrow and it will have laid itself out again. Known, deliberate for now — do not spend
 > twenty minutes tidying.
+
+### The Groups page
+
+**Settings → Groups** (the tab sits between **Workflows** and **Workspace**) draws the workspace's project
+groups (§3, under Group your projects) as a tree, left to right: one column per level, with a coloured strip
+on each box naming its level; the boxes inside one group hang from a single vertical line. On a phone the same tree is an indented list. Everybody who is a member of
+the workspace can read it; a guest is told *"Groups are shown to workspace members."*; a workspace with
+no groups says so.
+
+Owners and admins can change it:
+
+- **Add group** adds a top-level group. You type its name into the field that opens and press Enter.
+- The **+** on any box below level 4 adds a group inside it. A level-4 group cannot hold another.
+- **Click a name to rename it.** Enter saves; Escape cancels. Either way the cursor comes back to that
+  group's name, so the next key press carries on from there.
+- **Drag a box up or down among its neighbours** to reorder them. Without a mouse, put the cursor on the
+  name and press **Alt** with the up or down arrow. There is no drag on a touch screen.
+- **Delete** asks you to confirm, and is offered only on a group that holds no project and no
+  sub-group. Move the projects out (**Edit** on each) and delete the sub-groups first. When you confirm, the cursor moves to the group below it, else the one above it, else
+  the parent, else **Add group**; if you cancel it goes back to that group's **Delete**.
+
+Each change is saved as soon as you make it, one at a time. If the product refuses — two groups with the
+same name side by side, or a group still in use — it says why in its own words and the tree stays as it
+was.
 
 ### Rules you can put on an arrow
 
@@ -1345,6 +1541,11 @@ affect you: **a parent cannot be finished while any of its children is still goi
 
 There is a separate screen for these. It lists your types with their rank, how many custom fields each
 has, and a **Built-in** badge on the four that came with the workspace.
+
+Each type you made yourself has a **Reorder** button opening a small menu — **Move up**, **Move down**
+and **Move to top** (the top of your own types). An item that cannot apply is greyed out and says why in
+words. The four built-in types have no Reorder button: they keep their rank, and your own types are
+ordered among themselves.
 
 ### Making a new type
 
@@ -1611,7 +1812,7 @@ you are at `/notes`, which lists every workspace and project you belong to and t
 
 ### Making a note
 
-Press **New note**. A window opens with three things:
+Press **Create note**. A window, titled **New note**, opens with three things:
 
 - **Title** — what the note is about.
 - **Home** — the workspace, or one of its projects, the note is filed in. A note lives in exactly one
@@ -1705,7 +1906,9 @@ animating if your device is set to reduce motion.
 ### Finding a note
 
 The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title
-filter that narrows every group as you type.
+filter that narrows every group as you type. It opens on that list when no note is open. On a narrow
+screen the list is a drawer: the **Notes** button beside **Create note** opens and closes it, and
+**Create note** is on screen whether the drawer is open or shut.
 
 There is also a search box. Type into it and two things happen: spelling matches — the words you typed,
 allowing for a near miss — appear almost immediately, and matches **by meaning** are added a little
@@ -1815,8 +2018,8 @@ do it yourself.
 - **Workspaces.** See the workspaces you belong to, start a new one (you become its owner), rename one,
   archive or restore one, and delete one or bring it back.
 - **Projects.** See a workspace's projects, start one, change its name or description, archive or restore
-  it, and delete one or bring it back. A project's short prefix is fixed when it is started and cannot be
-  changed afterwards.
+  it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts
+  one, but it cannot change a prefix afterwards; do that yourself (§3).
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the jobs
   shared with you — never the full list, and never anyone's email address.
 - **Jobs.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
@@ -1890,7 +2093,11 @@ website address it came from, when it was connected and when it was last used. P
 row and that assistant loses access at once — its next request is refused.
 
 The same list also shows anything you approved from a computer with the older, installed way of connecting
-an assistant. Each has its own **Revoke** or **Disconnect** button.
+an assistant. Each row says when it was created and when it was last used (or that it was never used),
+and has its own button: **Revoke this token** for an installed one, or **Disconnect** and the
+assistant's name for one connected through Claude or ChatGPT, whose row shows the app's name with its web
+address beside it. A token nobody has named reads **Assistant connected with a token**; its **Add a
+name** button lets you say which assistant it is (the button reads **Rename** once it has a name).
 
 Removing the connector inside Claude or ChatGPT stops that app asking; **Disconnect** here is the one that
 cuts the access off from our side, so use it if you are not sure.
