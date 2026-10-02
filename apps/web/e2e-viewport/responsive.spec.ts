@@ -1,3 +1,4 @@
+// 13.1726 — expectations re-pinned to the ruled gutter/title/track values (U2, case 23.040); see test-cases/13-deploy-and-ops.md.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { fontStackOf } from '@gisik-nokma/ui/tokens';
 import { measureTapTargets, readTapBaseline, recordTapBaseline } from './tap-targets.js';
@@ -842,15 +843,19 @@ for (const route of UNAUTHED_ROUTES) {
         `(grepped), so a null here means the page did not render, not that the rule is absent.`,
     ).not.toBeNull();
 
-    // globals.css:15 vs globals.css:17-19 — the only discriminator present on
-    // all five routes, and the one that separates 768 from 1512.
+    // UX fixes Task 3 (owner ruling U2, case 23.040; spec §3.1 "a 24px page gutter at every
+    // width"): `.gn-shell` pads 0 var(--gn-space-3) = 24px at EVERY width, so this is no longer
+    // a discriminator between 768 and 1512 (it was 12px at <=60rem / 20px above, until the
+    // gutter ruling; the CI repair of 2026-10-02 re-pinned it). It is still worth asserting:
+    // the value is a ruled invariant, and the 404 title below (40rem) plus the content-box
+    // width test are what now tell the widths apart.
     expect
       .soft(
         sig.shellPaddingLeft,
-        `.gn-shell padding-left at ${spec.width}px: (max-width:60rem)=${String(spec.narrow60rem)} ` +
-          `implies ${spec.narrow60rem ? 12 : 20}px (globals.css:15 / :17-19)`,
+        `.gn-shell padding-left at ${spec.width}px should be the ruled 24px gutter at every width ` +
+          `(UX fixes U2 / case 23.040; globals.css .gn-shell)`,
       )
-      .toBe(spec.narrow60rem ? 12 : 20);
+      .toBe(24);
 
     if (sig.titleFontSize !== null) {
       // globals.css (34px, the export's scale) vs the (max-width: 40rem)
@@ -866,9 +871,10 @@ for (const route of UNAUTHED_ROUTES) {
         .soft(
           sig.titleFontSize,
           `title font-size at ${spec.width}px: (max-width:40rem)=${String(spec.narrow40rem)} ` +
-            `implies ${spec.narrow40rem ? 21.6 : 34}px (globals.css 34px / its 40rem override)`,
+            `implies ${spec.narrow40rem ? 22 : 34}px (globals.css 34px / the phone title step, ` +
+            `--gn-title-page-phone, UX fixes Task 5 type scale; was 21.6px = 1.35rem before it)`,
         )
-        .toBeCloseTo(spec.narrow40rem ? 21.6 : 34, 1);
+        .toBeCloseTo(spec.narrow40rem ? 22 : 34, 1);
     }
     if (sig.helpH2FontSize !== null) {
       // ui.css `.gn-help__h2` (1.375rem) vs its (max-width: 40rem) override (1.15rem)
@@ -1701,19 +1707,14 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
     `[cross-width] readings: ${JSON.stringify({ phone, tablet, desktop }, null, 2)}`,
   );
 
-  // 60rem separates {390, 768} from {1512}: shell padding.
+  // The 60rem shell-padding discriminator is gone: since UX fixes Task 3 (U2, case 23.040) the
+  // gutter is 24px at every width, so the three widths must now AGREE on it. Asserting
+  // equality keeps the reading honest (a width that came up 12px or 20px is a regression of the
+  // ruling); the inequality work moves to the 40rem title below and the content-box test.
   expect(
-    phone.sig.shellPaddingLeft,
-    `.gn-shell padding-left is IDENTICAL at 390px and 1512px ` +
-      `(${String(phone.sig.shellPaddingLeft)}px both). The (max-width: 60rem) query at ` +
-      `globals.css:17 did not apply. This is what "the viewport reported success and ` +
-      `changed nothing" looks like from the layout side.`,
-  ).not.toBe(desktop.sig.shellPaddingLeft);
-  expect(tablet.sig.shellPaddingLeft).not.toBe(desktop.sig.shellPaddingLeft);
-  expect(
-    tablet.sig.shellPaddingLeft,
-    '768 and 390 are both inside (max-width: 60rem) and must agree on shell padding',
-  ).toBe(phone.sig.shellPaddingLeft);
+    [phone.sig.shellPaddingLeft, tablet.sig.shellPaddingLeft, desktop.sig.shellPaddingLeft],
+    '.gn-shell padding-left must be the ruled 24px gutter at 390, 768 and 1512 (UX fixes U2)',
+  ).toEqual([24, 24, 24]);
 
   // 40rem separates {390} from {768, 1512}: title size and stacked actions.
   expect(
@@ -2175,13 +2176,20 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
     'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
   ).toBe('#f1eae3');
 
-  // ── And the track really carries no fill of its own, which is the owner's
-  // change rather than an absence that was always there.
+  // ── The track. Owner 2026-09-15 removed its fill; the styling refresh then ruled it back as a
+  // recessed pill track (Plan B Task B2, case 20.211/20.213; ux-fixes U5-U9 name the well step
+  // `#e6dcd2`), so the CI repair of 2026-10-02 re-pinned this from "no background" to the
+  // neo-light track colour. CONTROL, same `it`: the page's own `--gn-surface-track` resolves to
+  // that same `#e6dcd2`, so the rgb below is the token and not merely whatever painted.
+  const surfaceTrack = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-track').trim().toLowerCase(),
+  );
+  expect(surfaceTrack, 'neo light --gn-surface-track').toBe('#e6dcd2');
   const trackBackground = await tablist.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(
     trackBackground,
-    `the tablist track should paint no background of its own; got ${trackBackground}`,
-  ).toBe('rgba(0, 0, 0, 0)');
+    `the tablist track should paint the neo track colour (#e6dcd2); got ${trackBackground}`,
+  ).toBe('rgb(230, 220, 210)');
 
   // ── RENDERED value, on the actual selected tab element, not just the root
   // custom property — the same "declared vs. witnessed" gap 13.347's own
