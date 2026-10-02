@@ -1,5 +1,5 @@
 {
-  ".gn-nav": "margin-inline: calc(50% - 50vw); position: sticky; top: 0; z-index: 20; background: var(--gn-surface); box-shadow: var(--gn-shadow-lift);",
+  ".gn-nav": "margin-inline: calc(50% - 50vw); position: sticky; top: 0; z-index: 20; background: var(--gn-surface); box-shadow: var(--gn-shadow-raised-lg);",
   ".gn-nav__inner": "display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 0.8rem var(--gn-space-3); max-width: 80rem; margin-inline: auto;",
   ".gn-nav__links": "display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0;",
   ".gn-nav__spacer": "flex: 1;",
@@ -14,7 +14,7 @@
   ".gn-nav__avatar-button": "border-radius: 999px; padding: 0; background: transparent; border: none; cursor: pointer;",
   ".gn-nav__inbox": "position: relative;",
   ".gn-nav__inbox-dot": "position: absolute; top: 0.55rem; right: 0.55rem; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--gn-success); box-shadow: 0 0 0 0.125rem var(--gn-surface);",
-  ".gn-nav__menu": "position: absolute; inset-inline-end: 0; top: calc(100% + 0.5rem); min-width: 14rem; display: flex; flex-direction: column; padding: 0.375rem; background: var(--gn-surface-raised); border-radius: var(--gn-radius-card); box-shadow: var(--gn-shadow-lift-near); z-index: 50;",
+  ".gn-nav__menu": "position: absolute; inset-inline-end: 0; top: calc(100% + 0.5rem); min-width: 14rem; display: flex; flex-direction: column; padding: 0.375rem; background: var(--gn-surface-raised); border-radius: var(--gn-radius-card); box-shadow: var(--gn-shadow-near-lg); z-index: 50;",
   ".gn-nav__menu-header": "display: flex; flex-direction: column; gap: 0.125rem; padding: 0.5rem 0.625rem 0.625rem;",
   ".gn-nav__menu-name": "font-weight: 600;",
   ".gn-nav__menu-email": "font-size: 0.8125rem; color: var(--gn-text-muted); overflow-wrap: anywhere;",
@@ -24,14 +24,14 @@
   ".gn-nav__menu .gn-nav__menu-refusal": "margin: 0.375rem 0 0; font-size: 0.8125rem;",
   ".gn-nav a, .gn-nav button": "display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 2.75rem; min-width: 2.75rem;",
   ".gn-nav a[aria-current='page'], .gn-nav button[aria-current='page']": "background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); color: var(--gn-text); font-weight: 600; border-radius: 0.75rem;",
-  "[data-style=\"neo\"] .gn-nav a[aria-current='page'], [data-style=\"neo\"] .gn-nav button[aria-current='page']": "background: var(--gn-surface-sunken); box-shadow: var(--gn-shadow-sunken);",
+  "[data-style=\"neo\"] .gn-nav a[aria-current='page'], [data-style=\"neo\"] .gn-nav button[aria-current='page']": "background: var(--gn-surface-sunken); box-shadow: var(--gn-shadow-recess);",
   ".gn-nav a[aria-current='page']:not([role='menuitem'])": "position: relative;",
   ".gn-nav a[aria-current='page']:not([role='menuitem'])::after": "content: \"\"; position: absolute; inset-inline: 0.75rem; bottom: 0.1875rem; height: 0.1875rem; border-radius: 0.1875rem; background: var(--gn-nav-indicator);",
   ".gn-nav__scope": "font-size: 0.85rem; color: var(--gn-text-muted);",
-  ".gn-nav a": "border-radius: 0.75rem; padding-inline: 0.875rem; font-weight: 500; letter-spacing: -0.1px; color: var(--gn-text-muted); text-decoration: none; transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out; background: transparent; border: none; cursor: pointer;",
+  ".gn-nav a": "border-radius: 0.75rem; padding-inline: 0.875rem; font-weight: 500; letter-spacing: -0.1px; color: var(--gn-text-muted); text-decoration: none; transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out, box-shadow var(--gn-motion-move) var(--gn-motion-ease-out); background: transparent; border: none; cursor: pointer;",
   ".gn-nav a:hover, .gn-nav a:focus-visible": "background: var(--gn-fill-quaternary); color: var(--gn-text);",
   ".gn-nav__workspace-group": "position: relative; display: inline-flex; align-items: center;",
   ".gn-nav__menu--hover": "top: 100%; padding: 0.5rem 0 0; background: transparent; border-radius: 0; box-shadow: none; max-height: min(23.25rem, calc(100dvh - var(--app-nav-offset, 0px) - 1rem));",
-  ".gn-nav__menu-panel": "display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 0.375rem; background: var(--gn-surface-raised); border-radius: var(--gn-radius-card); box-shadow: var(--gn-shadow-lift-near); overflow-y: auto; overscroll-behavior: contain;",
+  ".gn-nav__menu-panel": "display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding: 0.375rem; background: var(--gn-surface-raised); border-radius: var(--gn-radius-card); box-shadow: var(--gn-shadow-near-lg); overflow-y: auto; overscroll-behavior: contain;",
   ".gn-nav__menu-panel > *": "flex: none;"
 }

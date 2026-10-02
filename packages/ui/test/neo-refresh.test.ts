@@ -3,12 +3,14 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import { contrastRatio, over } from './helpers/contrast.js';
-import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 import { readGlobalsCss } from './helpers/style-patterns.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
   colorOf,
+  halo,
+  haloVariableName,
   primitives,
   shadowValueOf,
   themeStylesheet,
@@ -335,5 +337,186 @@ describe('24.026 the drag clone keeps its lift while the source card presses', (
   it('24.026 .gn-board-drag-image > .gn-board-card reads lift-drag, not lift-press', () => {
     expect(valueOf(ruleExactly(t2Ui, '.gn-board-drag-image > .gn-board-card'), 'box-shadow')).toBe('var(--gn-shadow-lift-drag)');
     expect(shadowValueOf('neo', 'light', 'lift-drag').startsWith('inset')).toBe(false);
+  });
+});
+
+// ---- T3 — the sunken family and the rim-less neo field (N2, N9, N10; cases 24.040–24.044)
+const t3Ui = readUiCss();
+const t3Globals = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
+
+describe('24.040 a neo text field has no rim; its recess edge is the boundary (N10; hig/minimal keep the ring)', () => {
+  const NEO_FIELDS = [
+    '[data-style="neo"] .gn-field__input',
+    '[data-style="neo"] .gn-help__search-input',
+    '[data-style="neo"] .gn-project__search',
+    '[data-style="neo"] .workflow-builder-screen__name',
+  ];
+  it('24.040 every neo field arm is border: 1px solid transparent, background surface-sunken, box-shadow field; the base rule keeps --gn-border', () => {
+    for (const sel of NEO_FIELDS) {
+      const body = ruleExactly(t3Ui, sel);
+      expect(valueOf(body, 'border'), sel).toBe('1px solid transparent');
+      expect(valueOf(body, 'box-shadow'), sel).toBe('var(--gn-shadow-field)');
+      expect(valueOf(body, 'background'), sel).toBe('var(--gn-surface-sunken)');
+    }
+    // CONTROL (the style scoping): the unscoped field keeps its 1px ring; hig/minimal render the ring and no field shadow.
+    expect(valueOf(ruleExactly(t3Ui, '.gn-field__input'), 'border')).toBe('1px solid var(--gn-border)');
+    expect(shadowValueOf('hig', 'light', 'field')).toBe('none');
+    expect(shadowValueOf('minimal', 'light', 'field')).toBe('none');
+    // and the disabled neo field stays flat (U7): transparent border, no shadow, textSubtle
+    const dis = ruleExactly(t3Ui, ['[data-style="neo"] .gn-field__input:disabled', '[data-style="neo"] .gn-select__trigger:disabled']);
+    expect(valueOf(dis, 'box-shadow')).toBe('none');
+    expect(valueOf(dis, 'color')).toBe('var(--gn-text-subtle)');
+  });
+});
+
+describe('24.041 the control recesses read recess; wells keep sunken (N9)', () => {
+  it('24.041 segmented track, current nav item and the pressed segment read recess on the track fill; board columns and trays read track/sunken', () => {
+    expect(valueOf(ruleExactly(t3Ui, '[data-style="neo"] .gn-segmented'), 'box-shadow')).toBe('var(--gn-shadow-recess)');
+    const on = ruleExactly(t3Ui, '[data-style="neo"] .gn-segmented__item--on');
+    expect(valueOf(on, 'box-shadow')).toBe('var(--gn-shadow-selected)'); // selected = recess in neo (24.004)
+    expect(valueOf(on, 'background')).toBe('var(--gn-surface-track)'); // N2: never lighter than its track
+    const nav = ruleExactly(t3Globals, ['[data-style="neo"] .gn-nav a[aria-current=\'page\']', '[data-style="neo"] .gn-nav button[aria-current=\'page\']']);
+    expect(valueOf(nav, 'box-shadow')).toBe('var(--gn-shadow-recess)');
+    // CONTROL: wells did not move to the control inset.
+    expect(valueOf(ruleExactly(t3Ui, '.gn-board__column'), 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-ticket-sheet__fields'), 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented'), 'box-shadow')).toBe('var(--gn-shadow-track)'); // hig keeps its lit-from-above track
+  });
+});
+
+describe('24.042 the task checkbox takes the chip-sized inset and keeps its strong border', () => {
+  it('24.042 the neo unchecked task box reads sunken-compact on surface-sunken with border-strong', () => {
+    const box = ruleExactly(t3Globals, [
+      "[data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked)",
+      "[data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked)",
+    ]);
+    expect(valueOf(box, 'box-shadow')).toBe('var(--gn-shadow-sunken-compact)');
+    expect(valueOf(box, 'border-color')).toBe('var(--gn-border-strong)');
+  });
+});
+
+describe('24.043 hover lifts, press recesses: the neo help toggle no longer presses on hover (hig/minimal untouched)', () => {
+  it('24.043 a [data-style="neo"] .gn-help__toggle:hover arm reads raised-compact; the unscoped rule keeps sunken; the segmented item and nav links transition box-shadow', () => {
+    expect(valueOf(ruleExactly(t3Ui, '[data-style="neo"] .gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-sunken)'); // CONTROL: none in hig/minimal, as today
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item'), 'transition')).toContain('box-shadow'); // CONTROL: the base item eases box-shadow
+    // FIX 1 (reviewer A on a21d6f71): the reduced-motion arm turns that ease off — the press still lands, instantly (delete the arm → red)
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item', '@media (prefers-reduced-motion: reduce)'), 'transition')).toBe('none');
+    expect(valueOf(ruleExactly(t3Globals, '.gn-nav a'), 'transition')).toContain('box-shadow');
+  });
+});
+
+describe('24.044 a neo field inside a dark well still has a visible edge (Review Focus 2)', () => {
+  it('24.044 the dark line clears 3.0 against the well AND the fill; the light line clears 3.0 against the well, paper and the raised card', () => {
+    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceWell', 'neo'))).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceSunken', 'neo'))).toBeGreaterThanOrEqual(3.0);
+    for (const bg of ['surfaceWell', 'surface', 'surfaceRaised'] as const) {
+      expect(contrastRatio('#897362', colorOf('light', bg, 'neo')), bg).toBeGreaterThanOrEqual(3.0);
+    }
+    // CONTROL: the soft edge is NOT claimed — the light lip and the dark band are under 3:1 and the test says so.
+    expect(contrastRatio(over('#fffaf4cc', '#e6dcd2'), '#e6dcd2')).toBeLessThan(3.0);
+    expect(contrastRatio(over('#000000bf', '#141a33'), '#141a33')).toBeLessThan(3.0);
+  });
+});
+
+// ---- T6 — halo clearance, sized pairs on large surfaces and the 14px board (N7; cases 24.080–24.083)
+const t6Ui = readUiCss();
+const t6Globals = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
+
+describe('24.080 the halo tokens: offset + blur of each raised pair, per style (spec §3.4; N7)', () => {
+  it('24.080 neo 23/14/6, hig and minimal 8/8/3, emitted under every style selector', () => {
+    expect(halo.neo).toEqual({ lg: '23px', card: '14px', compact: '6px' });
+    expect(halo.hig).toEqual({ lg: '8px', card: '8px', compact: '3px' }); // kept by choice: today's spacing, not derived
+    expect(halo.minimal).toEqual({ lg: '8px', card: '8px', compact: '3px' }); // same: zero drift (spec §7)
+    expect(haloVariableName('card')).toBe('--gn-halo');
+    expect(haloVariableName('lg')).toBe('--gn-halo-lg');
+    expect(haloVariableName('compact')).toBe('--gn-halo-compact');
+    const sheet = themeStylesheet();
+    expect(sheet).toContain('[data-style="neo"] {');
+    expect(sheet.match(/--gn-halo: 14px;/g)?.length).toBe(3); // neo light, OS-dark arm, data-theme dark
+    expect(sheet.match(/--gn-halo: 8px;/g)?.length).toBe(6); // hig and minimal
+    // CONTROL: the other two steps ride the same emitter.
+    expect(sheet.match(/--gn-halo-lg: 23px;/g)?.length).toBe(3);
+    expect(sheet.match(/--gn-halo-compact: 6px;/g)?.length).toBe(3);
+  });
+});
+
+describe('24.081 the board clears the card halo: 14px in neo, 8px in hig and minimal, through one token (N7; rule 02 amended)', () => {
+  it('24.081 column gap, cards gap and the column-header bottom padding read var(--gn-halo)', () => {
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column'), 'gap')).toBe('var(--gn-halo)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__cards'), 'gap')).toBe('var(--gn-halo)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column-header'), 'padding')).toBe('0.5rem 0.5rem var(--gn-halo)');
+    // CONTROL: the column's own padding (the card-to-track inset, not text) stays 8px.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column'), 'padding')).toBe('0.5rem');
+  });
+});
+
+describe("24.082 the listed crowding sites clear their neighbour's halo (N7)", () => {
+  it('24.082 account sections 14px, the shell heading 23px under the nav; the workspace grid (18px) and settings gap (20px) already clear 14px', () => {
+    expect(valueOf(ruleExactly(t6Globals, '.gn-account__section'), 'gap')).toBe('max(0.75rem, var(--gn-halo))');
+    expect(valueOf(ruleExactly(t6Globals, '.gn-shell__main'), 'margin-top')).toBe('max(1.25rem, var(--gn-halo-lg))');
+    // CONTROL: these two already clear 14px and are left alone.
+    expect(valueOf(ruleExactly(t6Globals, '.gn-workspace-list'), 'gap')).toBe('1.125rem');
+    expect(valueOf(ruleExactly(t6Globals, '.gn-settings'), 'gap')).toBe('1.25rem');
+  });
+});
+
+describe('24.083 large surfaces wear the large pair; floating panels the near-lg; the two generic drops are gone (N7)', () => {
+  it('24.083 nav, sheet, dialog, popovers, menus, infotip read raised-lg/near-lg/sheet; the two generic drops read drop/drop-side; the toc button and the help sidebar are excluded on purpose', () => {
+    expect(valueOf(ruleExactly(t6Globals, '.gn-nav'), 'box-shadow')).toBe('var(--gn-shadow-raised-lg)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-sheet'), 'box-shadow')).toBe('var(--gn-shadow-sheet)');
+    for (const sel of ['.gn-dialog', '.gn-select__panel', '.gn-popover', '.gn-infotip__panel']) {
+      expect(valueOf(ruleExactly(t6Ui, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
+    }
+    expect(valueOf(ruleExactly(t6Ui, '.workflow-rebind-dialog'), 'box-shadow')).toBe('var(--gn-shadow-drop)');
+    for (const sel of ['.gn-nav__menu', '.gn-nav__menu-panel', '.gn-card-menu__list', '.gn-skip', '.gn-toc-launcher__panel', '.wikilink-preview', '.table-toolbar']) {
+      expect(valueOf(ruleExactly(t6Globals, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
+    }
+    expect(valueOf(ruleExactly(t6Globals, ['.mention-popup', '.wikilink-popup', '.ticketref-popup']), 'box-shadow')).toBe('var(--gn-shadow-near-lg)'); // a group of 3
+    expect(valueOf(ruleExactly(t6Ui, '.gn-filters__panel'), 'box-shadow')).toBe('var(--gn-shadow-drop-side)');
+    expect(t6Ui).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
+    expect(t6Globals).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
+    // CONTROL: cards keep the card pair.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-card'), 'box-shadow')).toBe('var(--gn-shadow-lift)');
+    // EXCLUSIONS (reviewer A N2, 2026-10-02): a button and a docked sidebar are not floating panels; each keeps lift-near and says why in a comment.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-toc-launcher__button'), 'box-shadow')).toBe('var(--gn-shadow-lift-near)');
+    const sidebar = parseRules(t6Ui).filter((r) => r.selectors.includes('.gn-help__sidebar') && /box-shadow:\s*var\(--gn-shadow-/.test(r.body));
+    expect(sidebar.length).toBeGreaterThan(0);
+    for (const r of sidebar) expect(r.body).toContain('var(--gn-shadow-lift-near)');
+    expect(t6Ui).toMatch(/N7[^*]*24\.083[^*]*\*\/\s*\.gn-toc-launcher__button \{/);
+    expect(t6Ui).toMatch(/N7[^*]*24\.083[^*]*\*\/\s*box-shadow: var\(--gn-shadow-lift-near\);\s*transform-origin/);
+  });
+});
+
+// ---- T7 — the dark-theme sweep (N4 = B; case 24.100)
+describe('24.100 neo dark as a set (N4 = B): same-hex extrusion, one lamp, every text tier readable on every ground a field or card paints', () => {
+  it('24.100 raised = surface = #1b2340; the dark block draws its falls from #0000008c and #000000bf only; the highlight ladder is 16/12/8 %; text floors hold on surface, sunken and well', () => {
+    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe(colorOf('dark', 'surface', 'neo'));
+    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe('#1b2340');
+    const sheet = themeStylesheet();
+    const darkBlock = sheet.split('[data-style="neo"][data-theme="dark"] {')[1]?.split('}')[0] ?? '';
+    expect(darkBlock, 'the neo-dark block was found').not.toBe('');
+    // ONLY the shadow-role declarations: the block also carries `--gn-surface-overlay: #00000099` (overlayNavyNeo) and
+    // `--gn-shadow: #000000a6` (scrimDark), which are not layers (reviewer A, FIX 1).
+    const shadowDecls = [...darkBlock.matchAll(/--gn-shadow-[a-z-]+:\s*([^;]+);/g)].map((m) => m[1] ?? '');
+    expect(shadowDecls.length, 'the harvest reached the shadow declarations').toBeGreaterThan(30);
+    const layerColours = shadowDecls.flatMap((v) => [...v.matchAll(/#[0-9a-f]{8}/g)].map((m) => m[0]));
+    const falls = layerColours.filter((c) => c.startsWith('#000000'));
+    // the fall and the band, nothing else (neo's drop roles alias near-lg/raised-lg, so no scrim layer reaches this harvest)
+    expect(new Set(falls)).toEqual(new Set(['#0000008c', '#000000bf']));
+    expect(layerColours).toContain('#f2e9e129');
+    expect(layerColours).toContain('#f2e9e11f');
+    expect(layerColours).toContain('#f2e9e114');
+    expect(layerColours).not.toContain('#060a169e');
+    expect(layerColours).not.toContain('#ffffff0d');
+    for (const bg of ['surface', 'surfaceRaised', 'surfaceSunken', 'surfaceWell'] as const) {
+      for (const fg of ['text', 'textMuted', 'textSubtle', 'textAccent'] as const) {
+        expect(contrastRatio(colorOf('dark', fg, 'neo'), colorOf('dark', bg, 'neo')), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // the raised highlight is what lifts a dark card now: visibly above the fall
+    expect(contrastRatio(over('#f2e9e129', '#1b2340'), '#1b2340')).toBeGreaterThan(1.5);
+    // CONTROL: hig dark still separates by fill (13.341's rule (c)).
+    expect(colorOf('dark', 'surfaceRaised', 'hig')).not.toBe(colorOf('dark', 'surface', 'hig'));
   });
 });

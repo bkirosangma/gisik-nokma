@@ -18,9 +18,10 @@ describe('20.031 Card rests on the lift shadow', () => {
 describe('20.032 Dialog floats near', () => {
   it('20.032 lift-near shadow and track radius on the dialog panel', () => {
     const dialog = ruleExactly(CSS, '.gn-dialog');
-    expect(valueOf(dialog, 'box-shadow')).toBe('var(--gn-shadow-lift-near)');
+    // N7 (2026-10-02, 24.083): a floating panel rests on `near-lg` (hig/minimal: = `lift-near`).
+    expect(valueOf(dialog, 'box-shadow')).toBe('var(--gn-shadow-near-lg)');
     expect(valueOf(dialog, 'border-radius')).toBe('var(--gn-radius-track)');
     // CONTROL — the sheet's lone rule does not carry this task's shadow.
-    expect(valueOf(ruleExactly(CSS, '.gn-sheet'), 'box-shadow')).not.toBe('var(--gn-shadow-lift-near)');
+    expect(valueOf(ruleExactly(CSS, '.gn-sheet'), 'box-shadow')).not.toBe('var(--gn-shadow-near-lg)');
   });
 });
