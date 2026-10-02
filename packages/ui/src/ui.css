@@ -3916,6 +3916,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   max-width: 13rem;
 }
 /* G-9: T1 dragging */
+/* The state under the pointer lifts: above its neighbours, a touch larger, on the board's drag-image shadow (nodes rest flat). */
+.react-flow__node-state, .react-flow__node-anyState { cursor: grab; }
+.react-flow__node.dragging { z-index: 1000 !important; cursor: grabbing; }
+.react-flow__node.dragging .gn-state-node,
+.react-flow__node.dragging .gn-any-state-node { transform: scale(1.02); box-shadow: var(--gn-shadow-lift-drag); }
 
 /* G-9: T3 guides+outline */
 
