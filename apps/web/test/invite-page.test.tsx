@@ -144,7 +144,7 @@ describe('17.061 the invite page — a link that could not be CHECKED (V9)', () 
    * rejection arm set `invite = null` for ANY failure, so a dropped connection, a
    * 500 or an unparseable body were all drawn as
    * *"This invitation link does not open anything. It may have been used,
-   * withdrawn, or lapsed — ask whoever invited you for a new one."*
+   * withdrawn, or lapsed. Ask whoever invited you for a new one."*
    *
    * That sentence has a COST the transport failure does not: it sends the person
    * to ask for a replacement for a link that was never tried. `3.121` keeps the
@@ -217,7 +217,7 @@ describe('17.061 the invite page — a link that could not be CHECKED (V9)', () 
 describe('3.122 the invite page — a refused acceptance', () => {
   it('renders the server’s own words, unparaphrased, and does not route anywhere', async () => {
     const message =
-      'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.';
+      'This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.';
     mount({
       getInvite: async () => SUMMARY,
       acceptInvite: async () => Promise.reject(new InviteAcceptanceError(404, message)),

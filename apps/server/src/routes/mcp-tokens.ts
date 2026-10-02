@@ -22,7 +22,7 @@ export const mcpTokenNameSchema = z
   .string()
   .min(1)
   .max(60)
-  .refine((value) => value.trim() !== '', 'must not be blank — a name of only spaces names nothing');
+  .refine((value) => value.trim() !== '', 'must not be blank: a name of only spaces names nothing');
 
 /** The one body a malformed name draws. Fixed text, so a caller cannot learn from the shape of a refusal. */
 export const INVALID_TOKEN_NAME_BODY = {

@@ -396,7 +396,7 @@ test('a dead invite link says so, and offers no join', async ({ page }) => {
       json: {
         error: 'not_found',
         message:
-          'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.',
+          'This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.',
       },
     }),
   );
