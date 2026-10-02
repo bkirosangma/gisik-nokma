@@ -6,7 +6,7 @@ import { CalendarView, PHONE_MAX_MARKS } from '../../src/calendar/calendar-view.
 import { PHONE_BOARD_QUERY } from '../../src/views/use-phone-board.js';
 
 /**
- * UX fixes follow-up F-4 (neo-refresh, owner 2026-10-02, audit PV-05 + N1) — cases 23.260–23.265: the calendar on a
+ * UX fixes follow-up F-4 (neo-refresh, owner 2026-10-02, audit PV-05 + N1) — cases 23.260–23.264 and 23.269: the calendar on a
  * PHONE draws its items as MARKS (a dot for a single day, a thin line across a span, never text) and lists the
  * selected day's items in a full-width AGENDA under the grid.
  *
