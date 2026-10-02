@@ -243,7 +243,9 @@ describe('18.205-18.209 useNoteAutosave', () => {
 
     // A NEWER draft queues while the old one is still in flight.
     act(() => hook.result.current.onDraft(doc('newer draft')));
-    expect(window.localStorage.getItem(draftKey(USER, NOTE))).toContain('newer draft');
+    // (Amended by smoothness T9, 25.161: the draft is written when a save is SENT, not per keystroke, so the newer draft is
+    // not on the device yet — what this test pins is that the old commit neither drops it nor reports it saved.)
+    expect(window.localStorage.getItem(draftKey(USER, NOTE))).not.toContain('newer draft');
 
     // The OLD ingest now settles as committed.
     await act(async () => {
@@ -254,9 +256,14 @@ describe('18.205-18.209 useNoteAutosave', () => {
       await Promise.resolve();
     });
 
-    // The newer draft's key survives, and the state is not falsely "saved".
-    expect(window.localStorage.getItem(draftKey(USER, NOTE))).toContain('newer draft');
+    // The newer draft is still pending (not falsely "saved") and its own flush still sends it.
     expect(hook.result.current.saveState).not.toBe('saved');
+    expect(ingest).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect((ingest.mock.calls[1]![0] as SubmittedEvent[])[0]!.payload).toEqual({ body: doc('newer draft') });
   });
 
   /**

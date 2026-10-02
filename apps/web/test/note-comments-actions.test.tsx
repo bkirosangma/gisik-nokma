@@ -134,6 +134,8 @@ describe('26.113–26.115 note comments: edit and delete', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: "More actions for Anselma Marak's comment" }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    // The composer is a button until reached for (smoothness T9, 25.153): open it so its slot exists to compare.
+    await user.click(await screen.findByRole('button', { name: /Add a comment/ }));
     const KEYS = ['queryUsers', 'queryNotes', 'queryTickets', 'resolveTicketHref'] as const;
     const composer = capturedSlotProps.filter((p) => p['placeholder'] === 'Add a comment').at(-1)!;
     const edit = capturedSlotProps.filter((p) => p['submitLabel'] === 'Save').at(-1)!;

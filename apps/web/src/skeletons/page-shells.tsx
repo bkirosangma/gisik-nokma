@@ -109,7 +109,7 @@ export function NotesPageShell() {
             </nav>
             <section className="gn-notes__document">
               <Skeleton width="60%" height="var(--gn-title-page-size)" />
-              <Skeleton shape="block" height="40dvh" />
+              <Skeleton shape="block" height="var(--gn-notes-editor-min)" />
             </section>
           </div>
         </div>

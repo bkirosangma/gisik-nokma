@@ -1,5 +1,5 @@
 import { searchTermSchema } from '@gisik-nokma/domain';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, NoteComment, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
@@ -75,6 +75,12 @@ function committedIngest(ingested: SubmittedEvent[]): (events: SubmittedEvent[])
   };
 }
 
+/** The composer is a button until it is reached for (smoothness T9, 25.153); the click mounts the editor slot. */
+async function openComposer(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: /Add a comment/ }));
+  await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+}
+
 function slotProps(): Record<string, unknown> {
   const last = capturedSlotProps[capturedSlotProps.length - 1];
   if (last === undefined) throw new Error('the slot was never rendered');
@@ -138,7 +144,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     await waitFor(() => expect(getNoteComments).toHaveBeenCalledTimes(1));
 
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
@@ -178,7 +184,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
 
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
     const body = {
@@ -218,7 +224,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
     let accepted = false;
     await act(async () => {
@@ -287,7 +293,7 @@ describe('18.213-18.215 NoteComments', () => {
     expect(link).toHaveAttribute('href', `/w/${WS}/p/p1?ticket=t1`);
 
     // 18.273 — the composer's own two callbacks.
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryTickets = slotProps().queryTickets as (
       q: string,
     ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
@@ -347,7 +353,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryTickets = slotProps().queryTickets as (
       q: string,
     ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
@@ -391,7 +397,7 @@ describe('18.213-18.215 NoteComments', () => {
         />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryNotes = slotProps().queryNotes as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
     expect(queryNotes).toBeDefined();
     expect(await queryNotes('compr')).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);

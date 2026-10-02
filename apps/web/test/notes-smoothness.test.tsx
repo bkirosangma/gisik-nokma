@@ -273,7 +273,7 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     expect(within(region).getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/sign-in?next=%2Fnotes%2Fn1');
   });
 
-  it('25.155 one workspace whose read fails does not sink the resolve: the workspace that holds the note still opens it; CONTROL: every workspace failing says the note is not shared', async () => {
+  it('25.155 one workspace whose read fails does not sink the resolve: the workspace that holds the note still opens it; CONTROL: when nobody has it and a read failed, the page says it could not load, not that the note is no longer shared', async () => {
     const getNote = vi.fn(async (workspaceId: string, id: string) => {
       if (workspaceId === 'ws1') throw new Error('boom');
       return workspaceId === 'ws2' && id === 'n1' ? noteDetail() : null;
@@ -288,7 +288,8 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
       throw new Error('boom');
     });
     render(page(world({ getNote: failing }), 'b', 'n1'));
-    expect(await screen.findByText('That note is no longer shared with you.')).toBeInTheDocument();
+    expect(await screen.findByText('This note could not be loaded. Reload to try again.')).toBeInTheDocument();
+    expect(screen.queryByText('That note is no longer shared with you.')).toBeNull();
   });
 
   it('25.156 the editor band is ONE number: the field floor and the page shell\'s document skeleton both read --gn-notes-editor-min, declared once', () => {

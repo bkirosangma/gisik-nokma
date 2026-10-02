@@ -1,4 +1,5 @@
 import { clearLiveQueryCache } from '@gisik-nokma/app-core';
+import { clearNoteHomes } from './notes/note-homes.js';
 import { clearMyWorkspacesCache } from './use-my-workspaces.js';
 
 /**
@@ -15,4 +16,6 @@ export function clearReadCaches(): void {
   clearLiveQueryCache();
   // The one workspaces read the nav, the project list and the project title share (smoothness T4, FD5).
   clearMyWorkspacesCache();
+  // Which workspace holds which note (smoothness T9): another person's note ids are not this device's business.
+  clearNoteHomes();
 }

@@ -34,6 +34,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { ShellRefusal } from '../shell-refusal.js';
 import { peopleProps } from '../people-props.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { DraftRestoreBanner } from './draft-restore-banner.js';
@@ -41,6 +42,8 @@ import { HistoryPanel } from './history-panel.js';
 import { writeLastNote } from './last-note.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
+import { forgetNoteHome, rememberNoteHome, rememberedNoteHome } from './note-homes.js';
+import { NoteDocumentSkeleton, NoteEditorBand } from './note-skeletons.js';
 import { ticketChipClickHandler } from './ticket-chip-click.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
@@ -146,13 +149,20 @@ function NoteDocumentBody({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
+  // The workspace that holds this note. A note opened before on this device starts from the one that answered (`note-homes.ts`),
+  // so a remount knows its cache key on the first render and paints the cached note at once; otherwise every workspace is asked.
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(() => rememberedNoteHome(noteId));
+  const [fanOut, setFanOut] = useState(() => rememberedNoteHome(noteId) === null);
   const [searched, setSearched] = useState(false);
+  // The search could not tell "not found" from "could not ask": at least one workspace's read failed and none had the note.
+  const [searchFailure, setSearchFailure] = useState<string | null>(null);
   // The note the search below FOUND, keyed by the live query it belongs to. The
   // search used to discard it, and the key change it caused reset the document
   // to null for one round trip — "That note is no longer shared with you." on
-  // EVERY open (R7, case 18.460). Handed to `useLiveQuery` as its initial answer.
+  // EVERY open (R7, case 18.460). Handed to `useLiveQuery` as its initial answer,
+  // and — since smoothness T9 (25.151) — as the answer to the live query's FIRST read, so the found note is read once.
   const [found, setFound] = useState<{ key: string; data: NoteDetail } | null>(null);
+  const seedRef = useRef<{ key: string; data: NoteDetail } | null>(null);
 
   const workspaceKey = workspaces.map((workspace) => workspace.id).join(',');
   // The IDS, held in a ref, are what the effect walks — NOT the `workspaces`
@@ -165,45 +175,74 @@ function NoteDocumentBody({
   const workspacesRef = useRef(workspaces);
   workspacesRef.current = workspaces;
   useEffect(() => {
+    if (!fanOut) return;
     let cancelled = false;
     setSearched(false);
+    setSearchFailure(null);
     void (async () => {
-      for (const workspace of workspacesRef.current) {
-        const hit = await dataSource.query.getNote(workspace.id, noteId);
-        if (cancelled) return;
-        if (hit !== null) {
-          setFound({ key: `note:${workspace.id}:${noteId}`, data: hit });
-          setResolvedWorkspaceId(workspace.id);
-          setSearched(true);
-          return;
-        }
-      }
+      // EVERY workspace is asked at once (25.151); the first non-null in the person's own order wins. A workspace whose read
+      // fails answers "not here" for this purpose, and is remembered: if nobody has the note, a failure means "could not ask",
+      // which is not the sentence "no longer shared with you".
+      const hits = await Promise.all(
+        workspacesRef.current.map(async (workspace) => {
+          try {
+            return { workspace, hit: await dataSource.query.getNote(workspace.id, noteId), failure: null };
+          } catch (cause: unknown) {
+            return { workspace, hit: null, failure: cause instanceof Error ? cause.message : String(cause) };
+          }
+        }),
+      );
       if (cancelled) return;
+      const first = hits.find(({ hit }) => hit !== null);
+      if (first !== undefined && first.hit !== null) {
+        const seed = { key: `note:${first.workspace.id}:${noteId}`, data: first.hit };
+        seedRef.current = seed;
+        rememberNoteHome(noteId, first.workspace.id);
+        setFound(seed);
+        setResolvedWorkspaceId(first.workspace.id);
+        setSearched(true);
+        return;
+      }
+      setSearchFailure(hits.find(({ failure }) => failure !== null)?.failure ?? null);
       setResolvedWorkspaceId(null);
       setSearched(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [dataSource, noteId, workspaceKey]);
+  }, [dataSource, noteId, workspaceKey, fanOut]);
 
+  const readWorkspaceId = resolvedWorkspaceId ?? workspaces[0]?.id ?? '';
+  const liveKey = `note:${resolvedWorkspaceId ?? ''}:${noteId}`;
   const live = useLiveQuery(
     dataSource,
-    resolvedWorkspaceId ?? workspaces[0]?.id ?? '',
+    readWorkspaceId,
     // THE KEY CARRIES THE RESOLVED WORKSPACE, and it is not decoration.
     // `useLiveQuery` reloads on a KEY change and on stream frames, not on a
     // changed closure — so a key of `note:<id>` alone would run `load` once,
     // while the workspace was still unresolved, get `null`, and never ask
     // again: the document would sit on "no longer shared" for a note it had
     // just found. Measured, not reasoned about.
-    `note:${resolvedWorkspaceId ?? ''}:${noteId}`,
-    () =>
-      resolvedWorkspaceId === null
-        ? Promise.resolve<NoteDetail | null>(null)
-        : dataSource.query.getNote(resolvedWorkspaceId, noteId),
-    undefined,
-    found ?? undefined,
+    liveKey,
+    () => {
+      if (resolvedWorkspaceId === null) return Promise.resolve<NoteDetail | null>(null);
+      // The search's own answer is this key's first read (25.151); every later load (a stream frame, a write) asks.
+      const seed = seedRef.current;
+      if (seed !== null && seed.key === liveKey) {
+        seedRef.current = null;
+        return Promise.resolve<NoteDetail | null>(seed.data);
+      }
+      return dataSource.query.getNote(resolvedWorkspaceId, noteId);
+    },
+    { ...(found === null ? {} : { initial: found }), ...(resolvedWorkspaceId === null ? {} : { cacheKey: `note:${noteId}` }) },
   );
+  // A workspace that was remembered and now answers nothing is not yet "no longer shared": the note may have another home. Ask all.
+  useEffect(() => {
+    if (fanOut || !live.settled || live.data !== null || live.error !== null) return;
+    forgetNoteHome(noteId);
+    setResolvedWorkspaceId(null);
+    setFanOut(true);
+  }, [fanOut, live.settled, live.data, live.error, noteId]);
 
   const note = live.data;
   const workspace = workspaces.find((candidate) => candidate.id === note?.workspaceId) ?? null;
@@ -348,22 +387,17 @@ function NoteDocumentBody({
     onLostAccess?.();
   }, [note, live.settled, onLostAccess]);
 
-  const [members, setMembers] = useState<RosterMember[]>([]);
-  useEffect(() => {
-    if (note === null) return;
-    let cancelled = false;
-    dataSource.query.getMembers(note.workspaceId).then(
-      (rows) => {
-        if (!cancelled) setMembers(rows);
-      },
-      () => {
-        if (!cancelled) setMembers([]);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, note?.workspaceId]);
+  // The roster, the names-only read and the note list ride the read cache, so a remount paints them at once (25.152). Held
+  // by the workspace the note resolved to; with none yet they ask nothing.
+  const NONE: never[] = [];
+  const membersRead = useLiveQuery<RosterMember[]>(
+    dataSource,
+    readWorkspaceId,
+    `note-members:${resolvedWorkspaceId ?? ''}`,
+    async () => (resolvedWorkspaceId === null ? [] : dataSource.query.getMembers(resolvedWorkspaceId).catch(() => [])),
+    resolvedWorkspaceId === null ? {} : { cacheKey: 'note-members' },
+  );
+  const members: RosterMember[] = membersRead.data ?? NONE;
 
   /**
    * The names-only read, for the people the roster omits — a guest author, for a
@@ -371,22 +405,14 @@ function NoteDocumentBody({
    * scope picker and the mention list, which must not offer a guest; this feeds
    * labels only (`actorLabelFrom`). A refusal is an empty list.
    */
-  const [actorNames, setActorNames] = useState<Actor[]>([]);
-  useEffect(() => {
-    if (note === null) return;
-    let cancelled = false;
-    dataSource.query.getActorNames(note.workspaceId).then(
-      (rows) => {
-        if (!cancelled) setActorNames(rows);
-      },
-      () => {
-        if (!cancelled) setActorNames([]);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, note?.workspaceId]);
+  const actorNamesRead = useLiveQuery<Actor[]>(
+    dataSource,
+    readWorkspaceId,
+    `note-actor-names:${resolvedWorkspaceId ?? ''}`,
+    async () => (resolvedWorkspaceId === null ? [] : dataSource.query.getActorNames(resolvedWorkspaceId).catch(() => [])),
+    resolvedWorkspaceId === null ? {} : { cacheKey: 'note-actor-names' },
+  );
+  const actorNames: Actor[] = actorNamesRead.data ?? NONE;
 
   /**
    * The document as the editor last reported it. `onDraft` fires on every
@@ -394,7 +420,10 @@ function NoteDocumentBody({
    * time read — WITHOUT it they would serialise the body the note was LOADED
    * with, which is the note as it was, not as it is.
    */
-  const [draft, setDraft] = useState<unknown>(null);
+  // A REF, not state (smoothness T9, 25.160): every keystroke reports a draft, and a state write here re-rendered the byline,
+  // the comments and the History panel for a value only a click reads (Copy as Markdown). The reading time and the
+  // headings follow the DOM through the observer below, so no draft state is needed to refresh them either.
+  const draftRef = useRef<unknown>(null);
   const ownEditorRoot = useRef<HTMLDivElement | null>(null);
   const editorRoot = editorRootRef ?? ownEditorRoot;
   const [wordCount, setWordCount] = useState(0);
@@ -411,7 +440,7 @@ function NoteDocumentBody({
 
   // The reading time AND the TOC's headings come off the RENDERED node
   // (`extractReadingMeta` reads a DOM element), so both are recomputed after
-  // each paint that a draft changed. The headings are reported UP to
+  // each paint that changed it (the observer below). The headings are reported UP to
   // `NotesPage` — its `<aside>` column is a sibling of this component, not a
   // descendant, so it cannot read this ref itself.
   //
@@ -441,7 +470,7 @@ function NoteDocumentBody({
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
-  }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
+  }, [note?.noteId, editorRoot, onHeadingsChange]);
 
   // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
   // typed by hand) arrives at a page whose headings do not exist yet: the note
@@ -487,23 +516,15 @@ function NoteDocumentBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note?.noteId, editorRoot]);
 
-  /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
-  const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
-  useEffect(() => {
-    if (note === null) return;
-    let cancelled = false;
-    dataSource.query.getNotes(note.workspaceId).then(
-      (rows) => {
-        if (!cancelled) setTreeNotes(rows);
-      },
-      () => {
-        if (!cancelled) setTreeNotes([]);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, note?.workspaceId]);
+  /** The loaded list for `queryNotes` and `resolveNoteTitle`: the tree's own read and cache key, so a remount shares it. */
+  const treeNotesRead = useLiveQuery<NoteSummary[]>(
+    dataSource,
+    readWorkspaceId,
+    `note-tree:${resolvedWorkspaceId ?? ''}`,
+    async () => (resolvedWorkspaceId === null ? [] : dataSource.query.getNotes(resolvedWorkspaceId).catch(() => [])),
+    resolvedWorkspaceId === null ? {} : { cacheKey: 'notes' },
+  );
+  const treeNotes: NoteSummary[] = treeNotesRead.data ?? NONE;
 
   const canEdit =
     note !== null &&
@@ -637,9 +658,13 @@ function NoteDocumentBody({
   }, [rememberUserId, rememberWorkspaceId, rememberNoteId, rememberDeleted]);
 
   if (note === null) {
+    if (searched && searchFailure !== null) return <ShellRefusal what="This note" message={searchFailure} />;
+    if (!searched && live.error !== null) return <ShellRefusal what="This note" message={live.error} />;
+    // The wait is the document's own box (25.152), not a sentence: the editor's band is reserved from the first frame.
+    if (!searched) return <NoteDocumentSkeleton />;
     return (
       <p className="gn-notes__hint" data-testid="note-document-missing">
-        {searched ? 'That note is no longer shared with you.' : 'Loading…'}
+        That note is no longer shared with you.
       </p>
     );
   }
@@ -724,7 +749,7 @@ function NoteDocumentBody({
         readingLabel={readingLabel(wordCount)}
         onCopyMarkdown={() => {
           void navigator.clipboard.writeText(
-            exportMarkdown(draft ?? note.body),
+            exportMarkdown(draftRef.current ?? note.body),
           );
         }}
         onOpenHistory={() => setHistoryOpen(true)}
@@ -768,20 +793,29 @@ function NoteDocumentBody({
           editorInstanceRef.current?.commands.focus('end');
         }}
       >
-        <NoteEditorPane
-          key={`${note.noteId}:${editorGeneration}:${editing ? 'edit' : 'read'}`}
-          note={note}
-          treeNotes={treeNotes}
-          canEdit={canEditNow}
-          editing={editing}
-          dataSource={dataSource}
-          userId={user?.id ?? ''}
-          onDraftChange={setDraft}
-          onNavigateNote={(id) => router.push(`/notes/${id}`)}
-          editorRef={editorInstanceRef}
-          members={members}
-          onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
-        />
+        {/* The editor reads its body ONCE, at mount (`TicketEditor`, `useNoteAutosave`), so it must not mount over the
+            CACHED note (25.152, 25.162): the byline, title and breadcrumb paint from the cache at once, and the editor's band is
+            held until this mount's own read has answered, so the body it opens with is not a minute-old one. */}
+        {live.hasAnswered ? (
+          <NoteEditorPane
+            key={`${note.noteId}:${editorGeneration}:${editing ? 'edit' : 'read'}`}
+            note={note}
+            treeNotes={treeNotes}
+            canEdit={canEditNow}
+            editing={editing}
+            dataSource={dataSource}
+            userId={user?.id ?? ''}
+            onDraftChange={(doc) => {
+              draftRef.current = doc;
+            }}
+            onNavigateNote={(id) => router.push(`/notes/${id}`)}
+            editorRef={editorInstanceRef}
+            members={members}
+            onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
+          />
+        ) : (
+          <NoteEditorBand label="Loading the editor" />
+        )}
       </div>
 
       <NoteComments
@@ -1037,7 +1071,11 @@ function NoteEditorPane({
         resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
         isPurged={purged.isPurged}
       />
-      ) : null}
+      ) : (
+        // Held open while the purged-chip read is out: the editor mounts on `ready`, and a bare nothing here collapsed the
+        // band to its siblings and pushed it back out when the editor arrived (25.165).
+        <NoteEditorBand label="Loading the editor" />
+      )}
     </>
   );
 }
