@@ -199,7 +199,7 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
     witness: '.gn-board__card-slot',
     declaredAt: '.gn-board-card__provenance',
     why:
-      'The `who · when` disclosure on every board card, 66x21 with no min size before E4-3 gave it ' +
+      'The "Moved to … by … on …" provenance disclosure on every board card (the `who · when` button of the time), 66x21 with no min size before E4-3 gave it ' +
       'the floor. A bare text control on the card’s meta line beside the progress count, so its rule ' +
       'reaches the same call `.gn-attention__title` does — 44 would turn each meta row into a slab. ' +
       'It is NOT the card’s open control (`.gn-board__card-slot` is), so it has no larger equivalent. ' +

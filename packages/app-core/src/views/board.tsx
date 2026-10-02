@@ -22,7 +22,7 @@ import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
-import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
+import { actorLabel, formatCardProvenance, formatDate } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
   BoardCard as BoardCardData,
@@ -31,7 +31,7 @@ import type {
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { allBoardTargets, arrowTargets } from './board-arrows.js';
-import { BoardPhonePicker, useActiveRailColumn } from './board-phone-picker.js';
+import { BoardPhonePicker, useActiveColumn, useFollowOpenMove } from './board-phone-picker.js';
 import { usePhoneBoard } from './use-phone-board.js';
 import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
@@ -1145,11 +1145,22 @@ function BoardGroupSection({
   // DOM can expand it. The person's stored choices are left alone: the same memory collapses the column again
   // the moment the screen is wide enough.
   const phone = usePhoneBoard();
-  const { activeStateId, pick: pickColumn } = useActiveRailColumn(
+  const { activeStateId, pick: pickColumn } = useActiveColumn(
     railRef,
     group.columns.map((column) => column.stateId),
-    phone && expanded,
   );
+  // U-T7 fix 1 (23.126): the column that holds a card with an open Move dialog or a notice is the one shown, so
+  // neither is ever in a `hidden`, `inert` column. `Dialog` does not portal and the card is drawn in its landing column.
+  const sessions = useContext(MoveStateContext)?.sessions;
+  const heldIn = !phone || sessions === undefined
+    ? null
+    : (group.columns.find((column) =>
+        column.cards.some((card) => {
+          const held = sessions[card.ticketId];
+          return held !== undefined && (held.dialog !== null || held.refusal !== null || held.serverRefusal !== null || held.transportError !== null);
+        }),
+      )?.stateId ?? null);
+  useFollowOpenMove(heldIn, activeStateId, pickColumn);
   useHydrationLayoutEffect(() => {
     const pending = pendingFocusRef.current;
     if (pending === null) return;
@@ -1302,7 +1313,6 @@ function BoardGroupSection({
       {phone && expanded && activeStateId !== null ? (
         <BoardPhonePicker
           columns={group.columns.map((column) => ({ stateId: column.stateId, name: column.name, count: column.cards.length }))}
-          railRef={railRef}
           activeStateId={activeStateId}
           onPick={pickColumn}
         />
@@ -1361,6 +1371,12 @@ function BoardGroupSection({
             aria-label={column.name}
             data-testid={`board-column-${column.stateId}`}
             data-state-id={column.stateId}
+            // UX fixes T7 (BRD-01): on a phone only the column the picker chose is in the page. `inert` takes the
+            // others out of the tab order and the accessibility tree; `hidden` (with `.gn-board__column[hidden]`
+            // in `ui.css`) takes them out of the layout, so the rail is as tall as the shown column. `tabIndex`
+            // lets the picker land focus on an EMPTY column, which has no card to receive it.
+            {...(phone && column.stateId !== activeStateId ? { inert: true, hidden: true } : {})}
+            tabIndex={phone ? -1 : undefined}
             className={
               (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
               (collapsed ? ' gn-board__column--collapsed' : '') +
@@ -2018,11 +2034,11 @@ function BoardCardSlot({
 }
 
 /**
- * A card never renders a state as a standing fact. The state is folded behind
- * "who · when" and unfolds to the whole claim — WHO marked it and WHEN —
- * through `formatStateProvenance`, which is the module that knows a nameless
- * claim still names its actor by id and that every instant this product shows
- * goes through the domain's one `formatIstInstant`. Inlining either half here
+ * A card never renders a state as a standing fact. It says what happened — "Moved to
+ * Doing by Anselma Marak on 19 Aug" (UX fixes T7, audit BRD-03; it was a "who · when" placeholder) — through
+ * `formatCardProvenance`, which is the module that knows a nameless claim still names its actor
+ * and that every instant this product shows goes through the domain's one `formatIstInstant`.
+ * Pressing the line unfolds it to the same sentence with the year. Inlining either half here
  * would give the board a second clock and a second idea of anonymity.
  *
  * `pending` is a CLIENT-SIDE view flag on `BoardCard` — true only between
@@ -2216,7 +2232,7 @@ function BoardCardView({
           </span>
         ) : null}
       </p>
-      {/* The card's FOOTER (styling refresh Plan A Task 6): "who · when" and
+      {/* The card's FOOTER (styling refresh Plan A Task 6): the provenance line and
           the move arrows share one row that reaches into the card's padding,
           so 44px targets do not grow the card. Layout only — both children
           are exactly what they were. */}
@@ -2227,7 +2243,7 @@ function BoardCardView({
           aria-expanded={unfolded}
           onClick={() => setUnfolded((value) => !value)}
         >
-          {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
+          {formatCardProvenance(stateName, card.stateProvenance, today, unfolded)}
         </button>
         {arrows}
       </div>

@@ -19,6 +19,13 @@ export type DialogProps = {
   role?: 'dialog' | 'alertdialog';
   /** An element id inside the dialog, announced as its description (19.203). */
   describedBy?: string;
+  /**
+   * The dialog's actions (UX fixes T7, FD7, audit BRD-09), rendered AFTER the scrolling body as the panel's own
+   * last child: the panel is a flex column capped at the viewport and only `.gn-dialog__body` scrolls, so a form
+   * taller than the screen keeps its Create button in view. Absent, nothing is rendered and the dialog is what it
+   * always was.
+   */
+  footer?: ReactNode;
 };
 
 /**
@@ -58,7 +65,7 @@ export type DialogProps = {
  * the panel keeps its place as the scrim's own child and nothing here changes
  * layout.
  */
-export function Dialog({ open, title, onClose, children, initialFocusRef, role = 'dialog', describedBy }: DialogProps) {
+export function Dialog({ open, title, onClose, children, initialFocusRef, role = 'dialog', describedBy, footer }: DialogProps) {
   const panelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -164,6 +171,7 @@ export function Dialog({ open, title, onClose, children, initialFocusRef, role =
           </button>
         </header>
         <div className="gn-dialog__body">{children}</div>
+        {footer === undefined ? null : <div className="gn-dialog__footer">{footer}</div>}
       </section>
       </FocusScope>
     </div>
