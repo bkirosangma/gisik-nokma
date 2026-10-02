@@ -117,7 +117,7 @@ component's other mode, which the web does not use.
 | 20 | 133 | Session hygiene | Covered | P§1 — signing out really ends it on the next action, and signing in never adopts something already sitting on the machine |
 | 21 | 137 | Ingest enforces visibility: nobody may act on a ticket they cannot see | Covered | P§10, R§5 |
 | 22 | 138 | Who may retarget a ticket's audience, and who may create one | Covered | P§10 (a project admin of *that* job's project, or whoever created it), R§5 |
-| 23 | 141 | A founded workspace arrives usable | Covered | P§2 — you become owner, you get a simple to-do/doing/done arrangement and four built-in job types. **Note:** the bullet's own phrase "found, create a project" describes an intention; the **New project** form on the workspace page is what reaches it, and only an owner or admin is offered that form (`apps/web/app/w/[workspaceId]/page.tsx:948-954`) |
+| 23 | 141 | A founded workspace arrives usable | Covered | P§2 — you become owner, you get a simple to-do/doing/done arrangement and four built-in job types. **Note:** the bullet's own phrase "found, create a project" describes an intention; the **Create project** button on the workspace page is what reaches it, and only an owner or admin is offered that button (`apps/web/app/w/[workspaceId]/page.tsx:1082`, the `isAdmin` gate) |
 | 24 | 142 | Founding cannot be used to seize an existing workspace | No user-observable surface | Attack-path guard |
 | 25 | 143 | Event submission requires a session | Covered *(thin)* | P§1 — signed out, the next thing you try is refused straight away |
 | 26 | 149 | Reads enforce visibility, and an invisible ticket is indistinguishable from one that never existed | Covered | P§10, R§5 — both explain that "not found" is deliberately the same answer for both cases, and why |
@@ -230,9 +230,9 @@ absences that no `✅` bullet claims. Where a path does have the capability, the
 rather than denying it:
 
 1. **No way for a member or a guest to create a project.** The underlying record and its rules are
-   reached from any screen by exactly one control — the **New project** form on the workspace page —
-   and only an owner or admin is offered it (`apps/web/app/w/[workspaceId]/page.tsx:948-954`); a member
-   or guest gets the refusal sentence at `:952` instead. (The seed CLIs write `project.created` too,
+   reached from any screen by exactly one control — the **Create project** button on the workspace page —
+   and only an owner or admin is offered it (`apps/web/app/w/[workspaceId]/page.tsx:1082`, the `isAdmin` gate); a member
+   or guest gets the refusal sentence at `:1157-1161` instead. (The seed CLIs write `project.created` too,
    through the ungated internal door — a different vocabulary from a screen.) A workspace whose owner
    and admins have not used it therefore has nowhere to put work.
 2. **No way to assign work on the phone or desktop apps.** On the **website** the job sheet's

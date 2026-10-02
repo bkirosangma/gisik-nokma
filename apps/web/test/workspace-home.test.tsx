@@ -145,6 +145,21 @@ function mount(
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
 
+/**
+ * Prefixes/groups Task 8 (22.152): the new-project form is the body of the Create
+ * project DIALOG. A case that drives it opens it from the Projects heading row's
+ * primary, then presses the dialog's own submit (the same words as the opener, so it
+ * is scoped to the dialog rather than found by name across the page).
+ */
+const openCreateProject = async (): Promise<void> => {
+  await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+  await screen.findByRole('dialog', { name: 'Create project' });
+};
+const createProjectSubmit = (): HTMLElement =>
+  within(screen.getByRole('dialog', { name: 'Create project' })).getByRole('button', {
+    name: 'Create project',
+  });
+
 beforeEach(() => vi.clearAllMocks());
 
 /**
@@ -794,18 +809,24 @@ describe('13.397 no archived projects means no archived control, on the home too
 });
 
 /**
- * 13.394 (home half) — the "New project" form is `.gn-project-founding`, a
- * raised card with an inline row, NOT `.gn-workspace-founding` (the bare
- * column `/workspaces`' "New workspace" form uses, per `founding.test.tsx`).
- * Two class families for two different reference layouts.
+ * 13.394 (home half), AMENDED by Task 8 (22.152) — the "New project" row
+ * (`.gn-project-founding`, a raised card with an inline field+button row) is gone:
+ * the form is the body of the Create project dialog, a `.gn-project-create` column.
+ * What stays true is the contrast with `/workspaces`' founding column: the home's
+ * form is its own class family, and it is mounted only while the dialog is open.
  */
-describe('13.394 the home\'s new-project form is a raised card, not the workspace list\'s bare column', () => {
-  it('carries .gn-project-founding, and not .gn-workspace-founding', async () => {
+describe('13.394 the home\'s project form is the Create project dialog\'s own column', () => {
+  it('is .gn-project-create, absent until opened, and carries neither retired founding class', async () => {
     mount([[workspaceAs('admin')]]);
-    const field = await screen.findByPlaceholderText('e.g. Phase 2 rollout');
-    const form = field.closest('form');
+    await screen.findByRole('button', { name: 'Create project' });
+    // CONTROL: no form (and no retired card) before the press.
+    expect(screen.queryByPlaceholderText('e.g. Phase 2 rollout')).toBeNull();
+    expect(document.querySelector('.gn-project-founding')).toBeNull();
+    await openCreateProject();
+    const form = screen.getByPlaceholderText('e.g. Phase 2 rollout').closest('form');
     expect(form).not.toBeNull();
-    expect(form).toHaveClass('gn-project-founding');
+    expect(form).toHaveClass('gn-project-create');
+    expect(form).not.toHaveClass('gn-project-founding');
     expect(form).not.toHaveClass('gn-workspace-founding');
   });
 });
@@ -905,12 +926,13 @@ describe('13.986 the new-project form authors an optional description', () => {
     const events: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
 
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Delivery');
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Delivery');
     await userEvent.type(
       screen.getByPlaceholderText('e.g. Sprint work for the rollout'),
       'Sprint work for the rollout',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     expect(created(events).payload).toEqual({
@@ -918,11 +940,12 @@ describe('13.986 the new-project form authors an optional description', () => {
       description: 'Sprint work for the rollout',
     });
 
-    // SECOND SUBMISSION — the description box left untouched. The form clears
-    // both fields on success, so only the name is typed this time.
+    // SECOND SUBMISSION — the description box left untouched. The dialog closes on
+    // success and mounts empty when opened again, so only the name is typed this time.
     events.length = 0;
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     const payload = created(events).payload as Record<string, unknown>;
@@ -941,25 +964,27 @@ describe('13.986 the new-project form authors an optional description', () => {
     const events: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
 
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Shop operations');
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Shop operations');
     // LOWER CASE TYPED ON PURPOSE. `prefixSchema` REFUSES lower case rather than
     // normalising it, so a form that passed the keystrokes through would earn a
     // refusal whose remedy is "type it again in capitals". The upper-casing is
     // the form's job, and this line is what holds it there — remove it from the
     // `onChange` and this case fails on `so` rather than passing on `SO`.
     await userEvent.type(screen.getByPlaceholderText('e.g. SO'), 'so');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     expect(created(events).payload).toEqual({ name: 'Shop operations', prefix: 'SO' });
 
-    // SECOND SUBMISSION — the prefix box left untouched. The form clears every
-    // field on success, and an untouched optional box makes NO CLAIM: the key
+    // SECOND SUBMISSION — the prefix box left untouched. The dialog closes on
+    // success and mounts empty again, and an untouched optional box makes NO CLAIM: the key
     // must be absent, so that the half is derived from the name rather than the
     // project being founded with an empty prefix.
     events.length = 0;
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     const payload = created(events).payload as Record<string, unknown>;
@@ -1236,8 +1261,8 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
  * workspace."* **Correct for that member.** An owner who founded the workspace
  * seconds ago has an empty live list for the other reason — the workspace has
  * none — and the sentence they read says the opposite: *"you can open"*
- * presupposes projects they cannot, and it sits directly above the New-project
- * form that would fix it.
+ * presupposes projects they cannot, and it sits beside the Create project button
+ * that would fix it.
  *
  * Two different facts reach ONE arm, and `shown.length === 0` cannot separate
  * them on its own. `isAdmin` plus the SERVED project count can.
@@ -1247,13 +1272,13 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
     mount([[workspaceAs('owner', { projects: [] })]]);
 
     expect(
-      await screen.findByText('No projects yet — create the first one below.'),
+      await screen.findByText('No projects yet. Create the first one.'),
     ).toBeInTheDocument();
     // And NOT the member's sentence, which is the claim the ruling is about —
     // asserted as an absence, because a page drawing both would satisfy the
     // assertion above on its own.
     expect(screen.queryByText(/No projects you can open/)).toBeNull();
-    // The form the sentence points at really is on screen: a sentence naming a
+    // The button the sentence points at really is on screen: a sentence naming a
     // control that is not rendered is the same defect one line over.
     expect(screen.getByRole('button', { name: 'Create project' })).toBeInTheDocument();
   });
@@ -1269,7 +1294,7 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
     expect(
       await screen.findByText('No projects you can open are active here.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/create the first one below/)).toBeNull();
+    expect(screen.queryByText(/Create the first one/)).toBeNull();
   });
 });
 

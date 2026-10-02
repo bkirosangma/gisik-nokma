@@ -2201,7 +2201,7 @@ naming: each was a case that PASSED while the property it was named for was fals
 - **13.1030 — the ENTRY half was unreachable.** The spec says the prefix is *entered at creation*, and
   neither founding form had a box: `FoundingGateway` posted `{ name }` only and `foundingSeeds` built
   `project.created` with no prefix. Both forms now carry an optional `Prefix` input.
-- **13.1031** ✅ The **new-project form** authors the prefix: typing `so` produces
+- **13.1031** ✅ The **new-project form** authors the prefix: typing `so` produces **AMENDED 2026-10-02 (prefixes/groups Task 8): the prefix box lives in the Create-project dialog (22.152); the behaviour is unchanged.**
   `project.created` with `prefix: 'SO'` — upper-cased at the keyboard, because `prefixSchema`
   REFUSES lower case rather than normalising it. A second submission with the box left untouched sends
   NO `prefix` key at all.

@@ -568,7 +568,7 @@ describe('13.517 (flipped 2026-09-17) an assignee picked in the Filters sheet na
     // pick is real and the list rows (one of which IS Uma's) are what the picker reads.
     await screen.findByText('0 of 3 shown');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'New ticket' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Create ticket' }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Parent' }));
     const options = within(await screen.findByRole('listbox')).getAllByRole('option').map((o) => o.textContent);
     expect(options).toContain('A ticket nobody owns');
