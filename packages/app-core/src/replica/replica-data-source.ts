@@ -353,6 +353,20 @@ const NO_WORKSPACE_TABLE: ReplicaAbsence = {
 const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
 
 /**
+ * Prefixes and groups Task 7. The group tree has no local fold: `group.*` events are withheld from replica
+ * visibility on purpose (`visible-events-for.ts`), so this device never receives them and a `[]` here would
+ * say "this workspace has no groups" for a workspace that has forty.
+ */
+const GROUPS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'GroupRow[] (the workspace group tree)',
+    because:
+      'the local replica holds no group rows — group events are withheld from replica streams until a later task adds a fold — so any answer would be a tree nobody authored, and an empty one would claim the workspace has no groups',
+    owner: 'Prefixes and groups plan — the replica fold for group events, not a /v1 route',
+  },
+];
+
+/**
  * Trash series Plan 3 (D9) NARROWED this entry rather than deleting it: the
  * replica now serves the last ONLINE answer (as `DeletedItemsFromCache`), but a
  * device that has never read the list online since then still has nothing it
@@ -646,6 +660,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
+  getGroups: GROUPS_ABSENCES,
   getDeletedItems: DELETED_ITEMS_NOT_CACHED,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
@@ -1196,6 +1211,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
+    getGroups: () => Promise.reject(new ReplicaGapError('getGroups', GROUPS_ABSENCES)),
     getDeletedItems: async () => {
       let body: unknown;
       try {
