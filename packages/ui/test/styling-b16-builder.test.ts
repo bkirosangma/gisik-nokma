@@ -212,29 +212,33 @@ describe('10.159 the destructive buttons inside the well are quiet danger button
   const css = cssOf('ui');
   const QUIET = '.gn-button.builder-quiet-danger';
 
-  it('10.159 transparent at rest, danger ink, no shadow; the hover is a ring on the same ground, not a fill; 44px kept', () => {
-    // CONTROL — the filled variant this overrides still exists and still fills, so "transparent" below is an override, not an absence.
+  it('10.159 the builder class carries METRICS only (44px, no paint, no hover or press arm); the paint is the danger-quiet variant', () => {
+    // CONTROL — the filled variant still fills, and the one quiet treatment still outlines, so "no paint here" below means
+    // the builder rule defers to a real variant rather than that nothing paints.
     expect(valueOf(ruleExactly(css, '.gn-button--danger'), 'background')).toBe('var(--gn-danger)');
+    const variant = ruleExactly(css, '.gn-button--danger-quiet');
+    expect(valueOf(variant, 'background')).toBe('transparent');
+    expect(valueOf(variant, 'border')).toBe('1px solid var(--gn-danger)');
     const rest = ruleExactly(css, QUIET);
-    expect(valueOf(rest, 'background')).toBe('transparent');
-    expect(valueOf(rest, 'color')).toBe('var(--gn-danger)');
-    expect(valueOf(rest, 'box-shadow')).toBe('none');
     expect(valueOf(rest, 'min-height')).toBe('2.75rem');
-    const hover = ruleExactly(css, `${QUIET}:hover:not(:disabled)`);
-    // The hover keeps the ground (a wash would put danger ink under 4.5 — `tokens.test.ts` 10.160) and draws a danger ring instead.
-    expect(valueOf(hover, 'background')).toBe('transparent');
-    expect(valueOf(hover, 'box-shadow')).toBe('inset 0 0 0 1px var(--gn-danger)');
-    // The filled variant's lift and scale do not come back on hover or press.
-    expect(valueOf(hover, 'transform')).toBe('none');
-    const press = ruleExactly(css, `${QUIET}:active:not(:disabled)`);
-    expect(valueOf(press, 'box-shadow')).toBe('none');
-    expect(valueOf(press, 'transform')).toBe('none');
+    expect(valueOf(rest, 'padding')).toBe('0 1rem');
+    expect(valueOf(rest, 'font-size')).toBe('inherit');
+    // A paint declaration here would re-fork the destructive treatment (case 23.022).
+    for (const property of ['background', 'color', 'box-shadow', 'border']) {
+      expect(valueOf(rest, property), `${QUIET} declares ${property}`).toBeNull();
+    }
   });
 
-  it('10.159 no rule in the family fills with danger (the overriding rule is the only thing that names the quiet class)', () => {
+  it('10.159 no rule naming the builder class has a :hover or :active arm, and none fills with danger', () => {
     const naming = parseRules(css).filter((rule) => rule.selectors.some((selector) => selector.includes('builder-quiet-danger')));
-    expect(naming.length).toBeGreaterThanOrEqual(3);
-    for (const rule of naming) expect(valueOf(rule.body, 'background'), rule.selectors.join(', ')).not.toBe('var(--gn-danger)');
+    expect(naming.length).toBeGreaterThanOrEqual(1);
+    for (const rule of naming) {
+      for (const selector of rule.selectors) expect(selector, 'a state arm re-forks the variant\'s hover').not.toMatch(/:(hover|active)/);
+      expect(valueOf(rule.body, 'background'), rule.selectors.join(', ')).not.toBe('var(--gn-danger)');
+    }
+    // CONTROL — the variant it defers to DOES own the hover and press arms, so the absence above is a hand-off.
+    expect(valueOf(ruleExactly(css, '.gn-button--danger-quiet:hover:not(:disabled)'), 'box-shadow')).toBe('inset 0 0 0 1px var(--gn-danger)');
+    expect(valueOf(ruleExactly(css, '.gn-button--danger-quiet:active:not(:disabled)'), 'box-shadow')).toBe('none');
   });
 });
 

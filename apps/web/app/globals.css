@@ -1398,6 +1398,10 @@ input, textarea, select { font-family: inherit; }
       `font-weight: 700` that used to sit on this rule went with it, because
       `:3145`'s active state is its base style plus exactly those two
       declarations — that emphasis was ours as well.
+      **SUPERSEDED 2026-10-02 (UX fixes T2, owner U1, case 23.020):** the accent
+      is for the action only, so the current item is now the quiet track
+      (`--gn-surface-track`), the main text colour and `font-weight: 600`;
+      everything above is the history of how the accent pair got here.
 
    **THE ITEM'S OTHER METRICS AT `:3145` ARE NOW PORTED (E4-25, 2026-09-21)** —
    `min-height:44px`, `padding:0 14px`, `font-size:15px`, `font-weight:500`.
@@ -1416,10 +1420,10 @@ input, textarea, select { font-family: inherit; }
    which is why both halves are ported together — porting either alone leaves
    the row able to drift off 44 again the moment the font does.
 
-   `.gn-help__nav-link[aria-current='location']` (`packages/ui/src/ui.css:3633`)
-   is this rule's nearest neighbour — the same accent pair, with a
-   `font-weight:600` that this one does not carry, because `:3145`'s active
-   state has none and now neither does its base. */
+   `.gn-help__nav-link[aria-current='location']` (`packages/ui/src/ui.css`)
+   is this rule's nearest neighbour. Both were the accent pair; UX fixes T2 (U1,
+   case 23.020) moved both to the quiet track + `font-weight: 600` + the main text
+   colour, because the accent is for the action only. */
 .gn-settings { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.8rem; align-items: flex-start; }
 .gn-settings__sidebar {
   display: flex;
@@ -1447,8 +1451,9 @@ input, textarea, select { font-family: inherit; }
 .gn-settings__sidebar a:hover,
 .gn-settings__sidebar a:focus-visible { background: var(--gn-fill-quaternary); }
 .gn-settings__sidebar a[aria-current='page'] {
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-surface-track);
+  color: var(--gn-text);
+  font-weight: 600;
 }
 .gn-settings__sidebar-item--disabled { color: var(--gn-text-muted); }
 .gn-settings__content { flex: 1 1 20rem; min-width: 0; }
@@ -1457,9 +1462,12 @@ input, textarea, select { font-family: inherit; }
    never does — `min-width: 0` lets the flex item shrink below its content). CSS-only, so it is the
    scrolling-track form the plan allows rather than a `Select`. Flipping `.gn-settings` to a column
    turns the base `flex` basis (15.5rem / 20rem) into a HEIGHT, so both are restated. The current
-   section keeps the base rule's FILLED pill (a shape, not text colour alone); this arm adds no
+   section keeps the base rule's TRACK pill (a shape, not text colour alone); this arm adds no
    `aria-current` rule of its own — case 13.910 allows exactly one in `.gn-settings`. Targets stay
-   the base rule's 2.75rem. */
+   the base rule's 2.75rem.
+   UX fixes T2 (U1, case 23.020): the current section is the quiet TRACK with a 600 label in the main text colour, not
+   the accent fill. The accent is for the action; the weight and the track carry "you are here" (a shape, still not
+   text colour alone). */
 @media (max-width: 40rem) {
   .gn-settings { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0.75rem; }
   .gn-settings__sidebar {
@@ -1846,6 +1854,7 @@ input, textarea, select { font-family: inherit; }
   .gn-members__cell + .gn-members__cell { padding-top: 0.25rem; padding-bottom: 0.75rem; }
   .gn-members__role-cell { flex-direction: column; align-items: stretch; }
   .gn-members__role { align-self: flex-start; }
+  .gn-members__more { align-self: flex-end; }
 }
 /* The confirm dialog reuses the delete dialog's layout, declaration for declaration. */
 .gn-members__remove-dialog { display: flex; flex-direction: column; gap: 1rem; max-width: 32rem; }
@@ -5168,6 +5177,10 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-lift-near);
 }
+/* UX fixes T2 (case 23.023): the row's overflow ("More actions for <name>") sits beside the role control. `.gn-members`
+   is `overflow: auto` (the phone's sideways scroll), so a menu opening BELOW the last row's trigger would add a scroll
+   inside the card; it opens to the trigger's LEFT, centred on it, where the cell has room. */
+.gn-members__more .gn-card-menu__list { top: 50%; right: calc(100% + 0.25rem); transform: translateY(-50%); }
 /* Items in plain text ink, deliberately NOT `--gn-danger` for Delete…: danger text
    on a raised surface measured 4.29:1 (`sessions-section.tsx`'s own record),
    under the 4.5 body text owes. The destructive colour lives on the dialog's
