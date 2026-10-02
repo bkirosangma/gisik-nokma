@@ -5346,6 +5346,68 @@ input, textarea, select { font-family: inherit; }
 .gn-project-edit__field { min-width: 0; }
 .gn-project-edit__hint { margin: 0; font-size: 0.8125rem; color: var(--gn-danger); }
 .gn-project-edit__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+
+/* `.gn-group-picker` — the four-level group type-ahead (prefixes and groups plan Task 9).
+   One labelled combobox per level, stacked, with the visible `.gn-field__label` look. The
+   input floors at 2.75rem (44 px, WCAG 2.5.5: the viewport suite's tap-target ratchet, case
+   22.166 reads this rule); the listbox floats under it and each option is as tall. The
+   "New" tag marks a group that does not exist yet; the notice says an existing one was
+   used instead. */
+.gn-group-picker { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+.gn-group-picker__level { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.gn-group-picker__label {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+.gn-group-picker__control { position: relative; display: flex; align-items: center; min-width: 0; }
+.gn-group-picker__input {
+  width: 100%;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+}
+.gn-group-picker__input:disabled { cursor: not-allowed; opacity: var(--gn-disabled-opacity); }
+.gn-group-picker__tag {
+  position: absolute;
+  right: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-quaternary);
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  pointer-events: none;
+}
+.gn-group-picker__list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+}
+.gn-group-picker__list[hidden] { display: none; }
+.gn-group-picker__option {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border-radius: var(--gn-radius-control);
+  cursor: pointer;
+}
+.gn-group-picker__option:hover,
+.gn-group-picker__option--active { background: var(--gn-fill-quaternary); }
+.gn-group-picker__option--active { outline: 2px solid var(--gn-text-accent); outline-offset: -2px; }
+.gn-group-picker__option--create { font-style: italic; }
+.gn-group-picker__notice { margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
 /* The header's title and its Edit sit on one line; the heading keeps its own metrics. */
 .gn-project__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 
