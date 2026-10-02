@@ -1035,6 +1035,10 @@ a.gn-ticket-sheet__crumb--link {
     box-shadow: none;
     background: var(--gn-surface);
   }
+  /* G-5 (25.372): the panel is a tabindex=-1 focus container (Sheet focuses it on open), not a control. Full-screen, the UA
+     `:focus-visible` outline ran down both screen edges beside the body (the sticky header covers it above), read as a
+     dark strip. The close button and the fields keep their own rings. */
+  .gn-sheet:focus-visible { outline: none; }
   /* The header stays put while the body scrolls under it. */
   .gn-sheet__header {
     position: sticky;
@@ -3345,6 +3349,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-ticket-sheet__field { grid-template-columns: 1fr; }
   .gn-ticket-sheet__field dd { min-width: 0; align-items: flex-start; text-align: left; }
   .gn-ticket-sheet__field dt { padding: 0.5rem 0.75rem 0 0.75rem; }
+  /* G-5 (2026-10-02, 25.370/25.371): stacked, the two desktop cells were two boxes with mismatched edges (label square on its
+     right, control square on its left, control flush to the band edge). On a phone the ROW is the band: it paints the fill
+     and the full radius, its cells paint nothing, and the control takes the label's inset. */
+  .gn-ticket-sheet__field--tinted { background: var(--gn-fill-quaternary); border-radius: calc(var(--gn-radius-card) - 0.5rem); }
+  .gn-ticket-sheet__field--tinted dt, .gn-ticket-sheet__field--tinted dd { background: transparent; border-radius: 0; }
+  .gn-ticket-sheet__field--tinted dd { padding-left: 0.75rem; }
   .gn-sheet__full { display: none; }
 }
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }

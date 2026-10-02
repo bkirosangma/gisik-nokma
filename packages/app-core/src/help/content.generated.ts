@@ -9902,6 +9902,39 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
+                    "text": "A note opens for reading: the page shows the finished text, with no toolbar and nowhere to type. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at the top right of the note to write in it, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Done"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to go back to reading. A note you have just created opens ready to write. If you cannot edit a note, there is no "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
                     "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: "
                   },
                   {
@@ -10221,7 +10254,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type. It opens on that list when no note is open. On a narrow screen the list is a drawer: the "
+                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type. It opens on that list when no note is open, and when you come back to Notes it opens the note you last had open on this device. On a tablet-width screen the list is a drawer: the "
                   },
                   {
                     "kind": "bold",
@@ -10237,7 +10270,31 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " opens and closes it, and "
+                    "text": " opens and closes it. On a phone the list and the search box are in a panel behind the round button at the bottom right, with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " / "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Contents"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch once a note is open: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Contents"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " lists that note's headings. "
                   },
                   {
                     "kind": "bold",
@@ -10245,7 +10302,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is on screen whether the drawer is open or shut."
+                    "text": " is on screen either way."
                   }
                 ]
               },
