@@ -39,6 +39,7 @@ export {
   liveQueryStoreKey,
   recallLiveQuery,
   rememberLiveQuery,
+  staleWorkspaces,
 } from './views/live-query-cache.js';
 export { scheduleReload, subscribeReloads } from './views/reload-scheduler.js';
 export { withInflightDedupe } from './inflight-dedupe.js';
