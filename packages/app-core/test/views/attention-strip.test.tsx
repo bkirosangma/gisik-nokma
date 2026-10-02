@@ -28,7 +28,7 @@ import { WS, claim } from '../helpers/seed.js';
  * Note what the due-soon reason names: `30 Aug`, the product's day format, not the
  * raw `2026-08-30`. That is the server's spelling and it is rendered as sent.
  */
-const BLOCKED_REASON = 'In "Waiting on counterparty" — a blocked state.';
+const BLOCKED_REASON = 'In the blocked state "Waiting on counterparty".';
 const STALE_REASON = 'In an active state since 10 Jul, past the 7-day staleness threshold.';
 const DUE_SOON_REASON = 'due 30 Aug (in 4 days)';
 const CONTESTED_REASON = 'Refused on sync: restrict-to — only the assignee may close this';
