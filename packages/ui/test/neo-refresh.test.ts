@@ -359,7 +359,7 @@ describe('24.081 the board clears the card halo: 14px in neo, 8px in hig and min
 });
 
 describe("24.082 the listed crowding sites clear their neighbour's halo (N7)", () => {
-  it('24.082 account sections 14px, the shell heading 24px under the nav; the workspace grid (18px) and settings gap (20px) already clear 14px', () => {
+  it('24.082 account sections 14px, the shell heading 23px under the nav; the workspace grid (18px) and settings gap (20px) already clear 14px', () => {
     expect(valueOf(ruleExactly(t6Globals, '.gn-account__section'), 'gap')).toBe('max(0.75rem, var(--gn-halo))');
     expect(valueOf(ruleExactly(t6Globals, '.gn-shell__main'), 'margin-top')).toBe('max(1.25rem, var(--gn-halo-lg))');
     // CONTROL: these two already clear 14px and are left alone.

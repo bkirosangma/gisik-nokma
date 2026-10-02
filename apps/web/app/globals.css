@@ -166,7 +166,7 @@ input, textarea, select { font-family: inherit; }
 /* The page gutter is ONE 24px (`--gn-space-3`) at every width (UX fixes Task 3, case 23.041, audit SYS-14, WS-05,
    SET-19; it was 20px, and 12px at ≤60rem). `.gn-nav__inner` and the sign-in phone arm read the same token. */
 .gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 var(--gn-space-3) var(--gn-shell-pad-bottom); }
-/* N7 (2026-10-02, 24.082): the heading clears the nav's large halo — 24px in neo, 20px (today) in hig and minimal. */
+/* N7 (2026-10-02, 24.082): the heading clears the nav's large halo — 23px in neo, 20px (today) in hig and minimal. */
 .gn-shell__main { margin-top: max(1.25rem, var(--gn-halo-lg)); display: flex; flex-direction: column; gap: 1.1rem; }
 @media (max-width: 60rem) {
   .gn-shell { padding: 0 var(--gn-space-3) 2rem; }
