@@ -3916,30 +3916,9 @@ input, textarea, select { font-family: inherit; }
   z-index: 30;
 }
 
-/* The button: a 2.75rem (44px, the WCAG 2.5.5 tap-target floor
-   `.gn-skip`'s own docblock already names) round control — neutral chrome,
-   not the brand hue: `--gn-brand` is reserved for the identity mark
-   (sign-in tile, nav tile, favicon), and this is a functional control. Same
-   surface/shadow pair `.gn-nav__menu` uses for its own floating panel.
-   Styling refresh Plan B (Task B3): the round launcher floats above the page, so it rests on `lift-near`. */
-.gn-toc-launcher__button {
-  position: relative;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: none;
-  border-radius: 999px;
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
-  box-shadow: var(--gn-shadow-lift-near);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.gn-toc-launcher__button:focus-visible {
-  outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 2px;
-}
+/* The button itself (`.gn-toc-launcher__button`) lives in `packages/ui/src/ui.css` since U-T13: the Help page's
+   floating menu draws the same round control, and Help is shared with `apps/desktop`, which loads only that
+   sheet. */
 
 /* Opens UPWARD from the button, since the button itself sits at the
    viewport's bottom edge — `.gn-nav__menu`'s own floating-panel geometry

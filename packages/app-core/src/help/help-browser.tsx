@@ -772,7 +772,7 @@ function Launcher({
     <button
       ref={buttonRef}
       type="button"
-      className="gn-help__launcher"
+      className="gn-toc-launcher__button gn-help__launcher"
       aria-label="Contents and search"
       aria-expanded={open}
       aria-controls="gn-help-panel"
@@ -860,7 +860,14 @@ export function HelpBrowser() {
       const target = event.target as Node | null;
       if (target === null) return;
       if (asideRef.current?.contains(target) || launcherRef.current?.contains(target)) return;
-      closePanel();
+      // The browser's own mousedown focus change runs AFTER this handler, so focusing the button now would be
+      // undone. Close now; give focus back one task later, and only if the tap left it nowhere (a tap on another
+      // control keeps the focus it just took).
+      setPanelOpen(false);
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active === null || active === document.body) launcherRef.current?.focus({ preventScroll: true });
+      }, 0);
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onPointer);
