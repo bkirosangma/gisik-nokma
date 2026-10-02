@@ -74,7 +74,7 @@ describe('23.321 the footer controls are one group, and the notice is not in it'
     const { controls } = await renderCard('todo');
     const previous = controls.querySelector('.gn-board-card__move') as HTMLButtonElement;
     expect(previous).toBeDisabled();
-    expect(previous).toHaveAttribute('aria-label', expect.stringMatching(/^Previous/));
+    expect(previous).toHaveAttribute('aria-label', expect.stringMatching(/previous state: unavailable/));
     // CONTROL — the next arrow of the same card is live, and a non-terminal card has no Close.
     expect(controls.querySelectorAll('.gn-board-card__move')[1]).toBeEnabled();
     expect(controls.querySelector('.gn-board-card__close')).toBeNull();

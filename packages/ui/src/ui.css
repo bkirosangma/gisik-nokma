@@ -1861,8 +1861,11 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__priority--p2 { color: var(--gn-text-muted); }
 .gn-board-card__priority--p3 { color: var(--gn-text-subtle); }
 /* The card's FOOTER: the provenance line left, the arrows (and Close) right, ONE row (D14; UX fixes T7, case 23.122,
-   audit BRD-02). It never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance` below),
-   and a pressed line wraps inside its own button. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
+   audit BRD-02). Up to 1024px it never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance`
+   below), and a pressed line wraps inside its own button. ABOVE 1024px it is TWO rows (neo follow-up F-1, 2026-10-02,
+   cases 23.320–23.322, audit BRD-02/BRD-03): the arrows, "Move to…" and Close need up to 246px of a 256px footer, so
+   beside a truncating line they wrapped into two rows around it; the arm after `.gn-board-card__notice` below gives
+   the line its own full-width row and the controls theirs. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
    card's 8px gap makes the 16 between groups; the negative sides and bottom let the 44px targets reach 8px into
    the card's 16px padding, so the card does not grow (the mockup, `Main.dc.html:109`). */
 .gn-board-card__footer {
@@ -1883,7 +1886,8 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   font: inherit;
   font-size: 0.75rem;
-  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). */
+  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). Above 1024px the line wraps instead
+     of truncating (F-1, 23.320). */
   line-height: 2.75rem;
   white-space: nowrap;
   overflow: hidden;
@@ -2158,6 +2162,35 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__notice { display: contents; }
 /* A move refusal takes its own line under the arrows rather than squeezing beside them in the footer row. */
 .gn-board-card__notice > .gn-refusal { flex-basis: 100%; }
+/* The controls group (neo follow-up F-1, 2026-10-02, cases 23.320–23.322): ‹, ›, "Move to…" and Close are ONE item. Up to
+   1024px it is `display: contents`, so they are the flex items of `.gn-board-card__moves` exactly as before and the
+   phone and tablet footers are untouched. Above 1024px (the shell's desktop band, 23.042) the footer is two rows: the
+   provenance line full-width and READABLE on one line — it may wrap to a second rather than truncate, which is what
+   "Moved to To do by…" at 133px was (BRD-03) — and the controls one right-aligned row that never wraps (`flex: none`,
+   `flex-wrap: nowrap`; the pre-F-1 `flex-wrap: wrap` is what split them across two 44px rows). `.gn-board-card__moves`
+   keeps its own wrap so a refusal, which takes `flex-basis: 100%` above, still lands on a line of its own beneath the
+   controls. The disabled ‹ and › stay rendered (disabled, never absent) at the one disabled token's opacity. The
+   provenance's 44px floor is kept by the 12px padding either side of a 20px line. */
+.gn-board-card__controls { display: contents; }
+@media (min-width: 64.0625rem) {
+  .gn-board-card__footer { flex-wrap: wrap; }
+  .gn-board-card__provenance {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.25rem;
+    padding-block: 0.75rem;
+  }
+  .gn-board-card__moves { flex: 1 1 100%; }
+  .gn-board-card__controls {
+    display: flex;
+    flex: none;
+    flex-wrap: nowrap;
+    align-items: center;
+    margin-left: auto;
+  }
+}
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 /* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
    align-items:center;flex-wrap:wrap`. */
