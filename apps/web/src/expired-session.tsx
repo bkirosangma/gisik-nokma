@@ -64,6 +64,10 @@ export function isExpiredSession(message: string | null): boolean {
  * whether that happened so the caller can suppress the refusal it would
  * otherwise render.
  *
+ * It also empties the read caches as it redirects (`clearReadCaches`, smoothness
+ * T3, case 25.028): the session ended, and the next person on this device must not
+ * be served what this one read.
+ *
  * The return value is the half that keeps the two claims from disagreeing. A
  * hook that only pushed would leave the page rendering *"cannot be shown yet"*
  * for the frame or two before the router moves — and under `next/navigation`'s
@@ -149,8 +153,10 @@ export function ExpiredSessionNotice() {
  * added tomorrow would otherwise need a tenth copy of this, and the site that
  * forgot would be silent in the direction nobody audits.
  *
- * The failure is RE-THROWN unchanged. This wrapper's only job is the redirect;
- * the sentence is the view's, and swallowing the throw here would leave a view
+ * The failure is RE-THROWN unchanged. This wrapper's jobs are the redirect and,
+ * just before it, emptying the read caches (`clearReadCaches`: a session that
+ * ended is a person who may be replaced, smoothness T3, case 25.028); the
+ * sentence is the view's, and swallowing the throw here would leave a view
  * rendering a success it never had.
  */
 /**

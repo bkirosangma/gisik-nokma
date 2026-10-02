@@ -164,7 +164,7 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     a.unmount();
   });
 
-  it('25.027 a refused read evicts its entry: the next mount does not resurrect an answer the person may no longer read', async () => {
+  it('25.027 a refused read evicts its entry and withdraws the stale answer it was serving: no board painted over its own refusal, and the next mount does not resurrect it', async () => {
     const { source } = drivable();
     rememberLiveQuery(key('board:prj'), { groups: ['was readable'] });
     const refused = renderHook(() =>
@@ -172,10 +172,28 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     );
     expect(refused.result.current.data).toEqual({ groups: ['was readable'] }); // stale, served at once
     await waitFor(() => expect(refused.result.current.error).toMatch(/HTTP 404/));
+    expect(refused.result.current.data).toBeNull(); // a view that checks `data` first cannot draw the board over the refusal
     expect(recallLiveQuery(key('board:prj'))).toBeUndefined();
     refused.unmount();
     const next = renderHook(() => useLiveQuery(source, 'ws', 'prj', NEVER, { cacheKey: 'board:prj' }));
     expect(next.result.current.data).toBeNull();
+  });
+
+  it('25.027 a reload that fails AFTER the key had a real answer keeps that answer (F6 unchanged), but still evicts the cache entry', async () => {
+    const d = drivable();
+    let calls = 0;
+    const hook = renderHook(() =>
+      useLiveQuery(d.source, 'ws', 'prj', async () => {
+        calls += 1;
+        if (calls === 1) return { groups: ['answer'] };
+        throw new Error('HTTP 503 for /v1/projects/prj/board');
+      }, { cacheKey: 'board:prj', debounceMs: 20 }),
+    );
+    await waitFor(() => expect(hook.result.current.data).toEqual({ groups: ['answer'] }));
+    act(() => d.fire(FRAME));
+    await waitFor(() => expect(hook.result.current.error).toMatch(/HTTP 503/));
+    expect(hook.result.current.data).toEqual({ groups: ['answer'] });
+    expect(recallLiveQuery(key('board:prj'))).toBeUndefined();
   });
 
   it('25.028 sign-out empties the cache: a fresh mount after clearLiveQueryCache serves null, never the first person\'s board', async () => {

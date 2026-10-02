@@ -120,11 +120,11 @@ describe('25.028 the read cache is emptied at every door the signed-in person ch
     expect(planted()).toBe(false);
   });
 
-  it('25.028 door 4: the session resolving to somebody else, or to nobody, empties the cache; the first resolve and a re-render of the same person do not', () => {
+  it('25.028 door 4: the session resolving to somebody else, or to nobody, empties the cache; the same person again, and a person arriving after nobody, do not', () => {
     plant();
     const hook = renderHook(() => useCurrentUser());
     expect(hook.result.current?.id).toBe('u_kiro');
-    expect(planted()).toBe(true); // control: the first resolve is not a change
+    expect(planted()).toBe(true); // control: the person this tab already knew, resolving again
 
     hook.rerender();
     expect(planted()).toBe(true); // control: the same person again
@@ -139,6 +139,12 @@ describe('25.028 the read cache is emptied at every door the signed-in person ch
     hook.rerender();
     expect(hook.result.current).toBeNull();
     expect(planted()).toBe(false);
+
+    plant();
+    sessionUser = { id: 'u_third', name: 'Third', email: 'third@example.com' };
+    hook.rerender();
+    expect(hook.result.current?.id).toBe('u_third');
+    expect(planted()).toBe(true); // control: nobody to somebody is not a change; the cache was emptied when the last person left
   });
 
   it("25.028 door 5: the shell's data source does not share an identical read in flight across a sign-out", async () => {

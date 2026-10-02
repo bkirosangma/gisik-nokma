@@ -27,7 +27,8 @@ export type LiveQueryResult<T> = {
    * current key (owner, 2026-09-23).
    *
    * `settled` and `data !== null` both go false/null on every key change and
-   * every stream-driven refetch, which is correct for rendering the ANSWER and
+   * every stream-driven refetch (with a `cacheKey`, smoothness T3, `data` serves the
+   * cached answer for the new key instead of going null, and `settled` still goes false), which is correct for rendering the ANSWER and
    * wrong for deciding whether a control exists. A caller that withholds a
    * control while `data === null` retracts it on every reload, and the measured
    * cost of that was a visible flicker: toggling *Only tickets in progress*
@@ -81,7 +82,9 @@ export type LiveQueryResult<T> = {
  * With one, the first render and every key change serve the cache's last answer
  * for THAT key (never another's, `null` when it has none) while `settled` stays
  * false until the fresh read lands, and a resolved load writes it. A read the
- * server refuses evicts it, and a read that was in flight when the cache was
+ * server refuses evicts it and withdraws a stale answer it was serving (`data`
+ * goes `null` beside `error`; an answer this key's own read produced is kept,
+ * F6), and a read that was in flight when the cache was
  * cleared (sign-out) does not write back. `options` is the debounce in
  * milliseconds, as before, or an options object; the sixth argument stays the
  * `initial` seed for callers that pass a number.
@@ -143,6 +146,9 @@ export function useLiveQuery<T>(
    * so the stale answer stays on screen for as long as the workspace is quiet.
    */
   const issuedRef = useRef(0);
+  // Has the CURRENT key's load ever answered with data? Reset with the key. It is what lets
+  // a refusal withdraw a STALE cached answer (never one a real read of this key produced).
+  const keyAnsweredRef = useRef(false);
 
   const reload = useCallback(() => {
     // An answer is only an answer to the question that was asked. If the key
@@ -167,6 +173,7 @@ export function useLiveQuery<T>(
         // Only while the epoch still reads as it did when the read was issued: a
         // sign-out in between means this answer belongs to the person who left.
         if (askedStore !== undefined && readEpoch() === askedEpoch) rememberLiveQuery(askedStore, value);
+        keyAnsweredRef.current = true;
         setData(value);
         setError(null);
         setSettled(true);
@@ -177,6 +184,10 @@ export function useLiveQuery<T>(
         if (!isCurrent()) return;
         // A refusal (a 404 for access lost, a 401) ends what the cache may serve for this key.
         if (askedStore !== undefined) forgetLiveQuery(askedStore);
+        // A stale answer served from the cache is not an answer to a question the server has now
+        // refused: withdraw it, so a view that checks `data` before `error` cannot draw the board
+        // over its own refusal. An answer this key's own read produced is kept (F6, above).
+        if (!keyAnsweredRef.current) setData(null);
         setError(cause instanceof Error ? cause.message : String(cause));
         setSettled(true);
         // An ERROR is an answer for this purpose: the question reached the
@@ -195,6 +206,7 @@ export function useLiveQuery<T>(
     // exception is the cache holding THIS question's last answer: it is served
     // stale and replaced when the read lands (S4).
     setData(storeKey === undefined ? null : (recallLiveQuery<T>(storeKey) ?? null));
+    keyAnsweredRef.current = false;
     setError(null);
     setSettled(false);
     reload();
