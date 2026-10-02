@@ -401,10 +401,11 @@ describe('24.100 neo dark as a set (N4 = B): same-hex extrusion, one lamp, every
     expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe(colorOf('dark', 'surface', 'neo'));
     expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe('#1b2340');
     const sheet = themeStylesheet();
-    const darkBlock = sheet.split('[data-style="neo"][data-theme="dark"] {')[1].split('}')[0];
+    const darkBlock = sheet.split('[data-style="neo"][data-theme="dark"] {')[1]?.split('}')[0] ?? '';
+    expect(darkBlock, 'the neo-dark block was found').not.toBe('');
     // ONLY the shadow-role declarations: the block also carries `--gn-surface-overlay: #00000099` (overlayNavyNeo) and
     // `--gn-shadow: #000000a6` (scrimDark), which are not layers (reviewer A, FIX 1).
-    const shadowDecls = [...darkBlock.matchAll(/--gn-shadow-[a-z-]+:\s*([^;]+);/g)].map((m) => m[1]);
+    const shadowDecls = [...darkBlock.matchAll(/--gn-shadow-[a-z-]+:\s*([^;]+);/g)].map((m) => m[1] ?? '');
     expect(shadowDecls.length, 'the harvest reached the shadow declarations').toBeGreaterThan(30);
     const layerColours = shadowDecls.flatMap((v) => [...v.matchAll(/#[0-9a-f]{8}/g)].map((m) => m[0]));
     const falls = layerColours.filter((c) => c.startsWith('#000000'));

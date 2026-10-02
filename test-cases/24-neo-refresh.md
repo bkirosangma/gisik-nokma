@@ -57,7 +57,7 @@
 
 ## 24.7 The dark-theme sweep (T7)
 
-- ❌ **24.100 — neo dark as a set (N4 = B): same-hex extrusion, one lamp, every text tier readable on every ground a field or card paints.**
+- ✅ **24.100 — neo dark as a set (N4 = B): same-hex extrusion, one lamp, every text tier readable on every ground a field or card paints.** `surfaceRaised` = `surface` = `#1b2340`; the neo-dark block's `--gn-shadow-*` declarations (and only those: the overlay and scrim variables in that block are not layers) draw their falls from `#0000008c` and `#000000bf` alone, carry the 16/12/8 % highlight ladder (`#f2e9e129`/`1f`/`14`) and none of the retired `#060a169e` / `#ffffff0d`; `text`, `textMuted`, `textSubtle` and `textAccent` clear 4.5 on `surface`, `surfaceRaised`, `surfaceSunken` and `surfaceWell`; the 16 % highlight over the page measures above 1.5. Control: hig dark still separates `surfaceRaised` from `surface` by fill. **Green at T1** (a sweep, not a change; recorded at RED time): the T7 deliverables are the docblocks in `tokens.ts` and the appended section of `docs/neo-token-report.md`. Mutations: neo-dark `surfaceRaised` back to `neoNavyRaised` → red (24.007 and 24.100); `shadowNeoDarkDark` set to `#060a169e` → red (24.001, 24.003, 24.004, 24.006 and 24.100).
 
 ## 24.8 Browser verification, LOCAL (T8)
 

@@ -370,10 +370,15 @@ export const primitives = {
   /**
    * Shadow LAYER COLOURS only — never a full `box-shadow` value, which is
    * geometry (unitless numbers, not a colour the token-discipline scanner
-   * polices) plus one of these. `neo`'s raised and sunken treatments use
-   * different alpha colours even within one theme (see `themeStylesheet`'s
-   * `shadows` table), so each layer gets its own named primitive rather than
-   * one shared "shadow" colour standing in for all four.
+   * polices) plus one of these. Each layer colour gets its own named primitive
+   * rather than one shared "shadow" colour, because the alphas differ per layer.
+   *
+   * **AMENDED 2026-10-02 (neo refresh N4–N10; case 24.001): the `shadowNeo*` family is the neo LAMP, not a transcription.**
+   * `neoShadows(L)` (below `higRefresh`) builds every neo role from the `NeoLamp` slots (`d`, `ds`, `band`, `h`, `hc`, `hs`,
+   * `lip`, `line`, `accentPress`, `dangerPress`), one lamp per theme (`NEO_LIGHT`, `NEO_DARK`), so the two themes cannot drift
+   * apart. The roles' geometry lives in the `SHADOWS` table (`SHADOWS.neo`), not in `themeStylesheet`. The `shadowNeo*`
+   * primitives marked RETIRED below are mapped by no role (nothing in this file reads them) and stay as the record of
+   * what the neo table used to say.
    */
   shadowHigLight: '#273a6329',
   shadowHigDark: '#060a16a8',
@@ -1062,8 +1067,11 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
  * would be wrong by eleven.
  *
  * **UX fixes T1 (2026-10-02): both arms gain `fieldRim` (the neo ring), and `surfaceTrack`/`surfaceWell` step to
- * `neoWellLight`/`neoWellDark`; the dark arm's `surfaceRaised` (`neoNavyRaised`) is now `#232c50`, not `neoNavy`, and
- * its `textSubtle` is `neoTextSubtleDark` so a placeholder still clears 4.5 composited on it.**
+ * `neoWellLight`/`neoWellDark`; the dark arm's `surfaceRaised` (`neoNavyRaised`) was then `#232c50`, not `neoNavy`, and
+ * its `textSubtle` is `neoTextSubtleDark` so a placeholder still clears 4.5 composited on it.
+ * AMENDED 2026-10-02 (neo refresh N4 = B; cases 24.007, 24.100): the `surfaceRaised` step is undone (next paragraph); the arm's
+ * `textSubtle` mapping is unchanged. The `fieldRim` role is still mapped in both arms, but no CSS rule reads `--gn-field-rim`
+ * any more (N10, 24.040).**
  *
  * **Neo refresh T1 (2026-10-02; N2, N4 = B): both arms' `surfaceSunken` step to the well (`neoWellLight`/`neoWellDark`) — a pressed fill
  * is never lighter than its ground — and the dark arm's `surfaceRaised` returns to `neoNavy` (`neoNavyRaised`'s U8 step is retired).
@@ -1334,6 +1342,10 @@ export function motionVariableName(key: MotionKey): string {
  * `shadowNeoSunkenHighlightDark` (neo dark, the same pair `sunken-compact`
  * already uses). No new primitive was needed for this role.
  *
+ * **AMENDED 2026-10-02 (neo refresh N9, N4–N10): the neo half of the paragraph above is history.** Neo's `selected` is now `recess`
+ * (`neoShadows`), built from the lamp slots, and the neo primitives it names (`shadowNeoRaisedDarkLight`, `shadowNeoSunkenCompactDarkDark`,
+ * `shadowNeoSunkenHighlightDark`) are RETIRED: nothing in this file reads them. The hig half still holds.
+ *
  * **One reused primitive crosses categories, and that is worth flagging
  * explicitly.** hig light's second layer (`rgba(39,58,99,0.06)`,
  * alpha byte round(0.06×255)=15=`0x0f`) is byte-identical to
@@ -1526,25 +1538,22 @@ function neoShadows(L: NeoLamp): Record<ShadowRole, readonly ShadowLayer[]> {
 }
 
 /**
- * Every style×theme's raised/sunken/sunken-compact elevation, transcribed
- * from the export (`design-system/neo-tokens.json` for raised/sunken,
- * `design-system/interactive/desktop.dc.html`'s `--chipShadow` for
- * sunken-compact — see that role's own docblock above). `overlay` is
- * DERIVED, not measured — ruling item 6: neither exported file defines a
- * dedicated overlay shadow, so it reuses that style×theme's `raised`
- * treatment (a sheet or modal floating above the scrim reads as "raised" the
- * same way a card does). `minimal` has no shadow in either theme — its
- * cards/fields are flat by design (rule (b) keeps its controls identifiable
- * by fill/label instead). `hig` and `minimal` are both `[]` for
- * `sunken-compact`, exactly as they are for `sunken` — the prototype's `hig`
- * (`minimal` inherits) gives `--chipShadow:none` (`desktop.dc.html:24`).
+ * Every style×theme's shadow layers, per `ShadowRole`.
  *
- * `selected` (owner round 5, 2026-09-16) is transcribed from the export's
- * `--segOnShadow` — see `ShadowRole`'s own docblock above for the per-line
- * citations and the primitive-reuse arithmetic. Unlike every other role
- * here, `hig`'s two themes are NOT symmetric: light carries two layers,
- * dark only one — the export's dark block simply never declares a second
- * `--segOnShadow` layer, so this is not an omission.
+ * **AMENDED 2026-10-02 (neo refresh; case 24.001): neo's table is DERIVED, not transcribed.** `neo: { light: neoShadows(NEO_LIGHT),
+ * dark: neoShadows(NEO_DARK) }` (the last entry below) builds every neo role from one lamp per theme, so the old per-role
+ * transcription of the export's `--fieldShadow` / `--chipShadow` / `--segOnShadow` is history for neo (those docblocks stay on
+ * `ShadowRole` as the record). In `neoShadows`, `overlay` and `sheet` read `raised-lg`, `selected` and `lift-press` read `recess`,
+ * `track` reads `sunken`, and `sunken-compact` is its own `compact` inset.
+ *
+ * `hig` is still transcribed: its layers cite the mockups' own lines (`Main.dc.html`, `Sheet.dc.html`, `desktop.dc.html`) beside each
+ * role, its `overlay` is the same single layer as its `raised`, and its two themes are NOT symmetric for `selected` (light carries
+ * two layers, dark one — the export's dark block never declares a second `--segOnShadow` layer, so that is not an omission).
+ * `higRefresh` adds the refresh roles as aliases of the roles hig already had, so hig stays byte-identical (24.002).
+ *
+ * `minimal` has no shadow in either theme — its cards/fields are flat by design (rule (b) keeps its controls identifiable by
+ * fill/label instead): every role is `[]`, except `drop` and `drop-side`, the two scrim drops minimal already painted. `hig` and
+ * `minimal` are both `[]` for `sunken` and `sunken-compact`.
  */
 const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
   hig: {
