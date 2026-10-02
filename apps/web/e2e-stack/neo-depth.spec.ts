@@ -102,8 +102,9 @@ async function applyStyle(page: Page, style: 'hig' | 'minimal' | 'neo', theme: T
 
 const boxShadow = (loc: Locator): Promise<string> => loc.evaluate((el) => getComputedStyle(el).boxShadow);
 
-async function shot(page: Page, name: string): Promise<void> {
-  await page.screenshot({ path: resolve(SHOTS, `${name}.png`), fullPage: true });
+/** `/help` is one 47,000px page of manual text: its frame is the viewport, the nav and the segmented track, not the whole document. */
+async function shot(page: Page, name: string, fullPage = true): Promise<void> {
+  await page.screenshot({ path: resolve(SHOTS, `${name}.png`), fullPage });
 }
 
 async function openSeededBoardPage(page: Page): Promise<void> {
@@ -162,7 +163,7 @@ for (const theme of THEMES) {
     expect(hasRecessBand(track), `the track paints the recess band (inset 3px 3px 5px); got ${JSON.stringify(track)}`).toBe(true);
     const current = layers(await boxShadow(page.locator(".gn-nav a[aria-current='page']").first()));
     expect(hasRecessBand(current), `the current nav item paints the recess band; got ${JSON.stringify(current)}`).toBe(true);
-    await shot(page, `help-neo-${theme}`);
+    await shot(page, `help-neo-${theme}`, false);
 
     // The ghost button is not on /help (signed out there is no `gn-button--ghost`): the sign-in passkey control is the one that is.
     await page.goto('/sign-in', { waitUntil: 'networkidle' });
@@ -242,8 +243,23 @@ for (const style of ['hig', 'minimal'] as const) {
     const fieldBorder = await page.locator('.gn-field__input').first().evaluate((el) => getComputedStyle(el).borderStyle);
     expect(fieldBorder).toBe('solid'); // the rim stays outside neo
 
-    const card = await read('.gn-card');
-    const ghost = await read('.gn-button--ghost');
+    // The page LOADS in neo and `applyStyle` flips it, so the buttons' and cards' `box-shadow` transitions are still running from the
+    // neo value for a moment (first run: the ghost read `1.33585px` offsets, a frame of the neo pair on its way to `none`). Poll until
+    // the value stops changing, then assert it. Production, which predates the refresh, measures `none` for the ghost in hig and minimal.
+    const settled = async (sel: string): Promise<Layer[]> => {
+      let previous = '';
+      await expect
+        .poll(async () => {
+          const now = await boxShadow(page.locator(sel).first());
+          const stable = now === previous;
+          previous = now;
+          return stable;
+        }, { message: `${sel}: box-shadow settles after the style flip` })
+        .toBe(true);
+      return read(sel);
+    };
+    const card = await settled('.gn-card');
+    const ghost = await settled('.gn-button--ghost');
     expect(ghost, `${style}: the ghost draws no depth`).toEqual([]);
     if (style === 'hig') {
       // hig `lift`: a lit inset edge plus two falls, the first being shadowFallLight1 (#273a631f).
