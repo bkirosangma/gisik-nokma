@@ -5876,3 +5876,8 @@ input, textarea, select { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .gn-nav__pending[data-pending="true"] { animation: none; opacity: 0.8; }
 }
+
+/* ── THE PROJECT PAGE'S TAB ARMS (smoothness T6, S1). `ProjectTabSkeleton` names the wait and holds the board / list shape, but adds no
+   box of its own: the shape inside it is the real view's container (`.gn-board__rail`, `.gn-list`), and a wrapper that took a box of its
+   own would move it relative to the page's other children. Layout only. */
+.gn-project__tab-skeleton, .gn-project__tab-skeleton-body { display: contents; }
