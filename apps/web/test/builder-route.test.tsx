@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildPublishPayload,
@@ -346,5 +346,29 @@ describe('13.1156 the builder page has one main and a shrinkable name field', ()
     expect(body?.[1]).toMatch(/width:\s*100%/);
     expect(body?.[1]).toMatch(/min-width:\s*0/);
     expect(body?.[1]).toMatch(/box-sizing:\s*border-box/);
+  });
+});
+
+/**
+ * 23.071 — THE EDITOR ROUTE HAS A LEVEL-1 HEADING (UX fixes Task 5, audit WF-07).
+ *
+ * The page's title is the NAME FIELD (an `<input>`), so the route had no heading at all: the route
+ * announcer and a heading-navigating screen reader found nothing to land on. The route now renders one
+ * visually hidden `<h1>` above the load states, beside the crumb, so it is there on every arm.
+ */
+describe('23.071 the builder route has exactly one h1, on every arm', () => {
+  it('23.071 loaded: one level-1 heading "Edit workflow"; CONTROL: the not-found arm has the same one', async () => {
+    renderWithAuthoring({});
+    expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toBeInTheDocument();
+    const loaded = screen.getAllByRole('heading', { level: 1 });
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]).toHaveTextContent('Edit workflow');
+    // The name field is NOT the heading (it is a textbox), which is why the h1 had to be added.
+    expect(loaded[0]).not.toBe(screen.getByRole('textbox', { name: 'Workflow name' }));
+    cleanup();
+
+    renderWithAuthoring({ getWorkflow: async () => null });
+    expect(await screen.findByText(/No published workflow has this id/)).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 });

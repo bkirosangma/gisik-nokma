@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Sheet } from '@gisik-nokma/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { isWithin } from './path-within.js';
 import {
   BAR_DESTINATIONS,
   DEFAULT_BAR,
@@ -131,11 +132,11 @@ export function BottomBar({
     const d = DESTINATIONS[id];
     if (d.scope === 'global') {
       const path = id === 'notes' ? '/notes' : '/inbox';
-      return { href: path, current: id === 'notes' ? pathname === path || pathname.startsWith(`${path}/`) : pathname === path };
+      return { href: path, current: id === 'notes' ? isWithin(pathname, path) : pathname === path };
     }
     if (d.scope === 'workspace') {
       const href = `/w/${workspaceId}/${id}`;
-      return { href, current: pathname === href };
+      return { href, current: isWithin(pathname, href) };
     }
     const tab = d.tab as ProjectTab;
     if (targetProject === undefined) return { href: `/w/${workspaceId}`, current: false };

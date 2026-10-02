@@ -131,7 +131,7 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  */
 export default function ProjectPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
+    <Suspense fallback={<main className="gn-shell gn-shell--wide" />}>
       <ProjectBoard />
     </Suspense>
   );
@@ -2284,7 +2284,7 @@ function ProjectBoard() {
   const canCreate = session.kind === 'signed-in' && ticketTypes.error === null;
 
   return (
-    <main id="gn-main" className="gn-shell">
+    <main id="gn-main" className="gn-shell gn-shell--wide">
       {/* The route's title. `projectName` is `null` until the read answers, and
           a null name is not a title — the generic `Board` stands in until it
           arrives, and the effect re-runs with the name when it does. exec1 P12. */}

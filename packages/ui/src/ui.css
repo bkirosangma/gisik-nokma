@@ -492,7 +492,8 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 1.5rem;
+  /* + the bottom bar's height while one shows: `--gn-bar-lift` is declared by `globals.css` at ≤64rem (UX fixes Task 4 fix 2, case 23.056). */
+  bottom: calc(1.5rem + var(--gn-bar-lift, 0px));
   z-index: 60;
   display: flex;
   justify-content: center;
@@ -1003,12 +1004,11 @@ a.gn-ticket-sheet__crumb--link {
    `display: none` wins over `.gn-button`'s `inline-flex`. */
 .gn-sheet__move { display: none; }
 
-/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
-   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
-   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
-   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). */
-@media (max-width: 40rem) {
-  /* The ticket sheet fills the screen: the `.gn-sheet--full` form, forced (21.070). */
+/* The ticket sheet through the tablet band (UX fixes Task 4, owner ruling U3, case 23.053; it was inside the phone arm below,
+   case 21.070). At ≤64rem the sheet is the whole screen: the `.gn-sheet--full` form, forced, with its header sticky, so a
+   700px tablet no longer gets a floating panel with a scrim sliver either side. AFTER the base rules it overrides (equal
+   specificity: source order decides). The dialogs' bottom-sheet rules and the Move shortcut stay in the 40rem arm. */
+@media (max-width: 64rem) {
   .gn-sheet {
     width: 100%;
     max-width: none;
@@ -1016,13 +1016,25 @@ a.gn-ticket-sheet__crumb--link {
     box-shadow: none;
     background: var(--gn-surface);
   }
-  /* The header stays put while the body scrolls under it, and carries the Move shortcut (21.071). */
+  /* The header stays put while the body scrolls under it. */
   .gn-sheet__header {
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--gn-surface);
   }
+  /* `Full screen` goes with it: the pill expands the sheet to the viewport, which the sheet already fills here, so the
+     control would have no effect to offer. (Below 40rem the ticket sheet's own arm hides it too, case 13.1057.) */
+  .gn-sheet__full { display: none; }
+}
+
+/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
+   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
+   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
+   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). The sheet's own full-width rules moved
+   to the 64rem arm above (23.053); what stays is phone-only: the Move shortcut and the dialogs as bottom sheets. */
+@media (max-width: 40rem) {
+  /* The ticket sheet's header carries the Move shortcut (21.071). */
   .gn-sheet__move { display: inline-flex; }
   /* Dialogs become bottom sheets (21.072): pinned to the bottom edge, full width, rounded on top only. */
   .gn-dialog__scrim { align-items: flex-end; }
@@ -2459,8 +2471,8 @@ a.gn-ticket-sheet__crumb--link {
      field; a heading is not a trough, so it takes the quaternary fill and no inset shadow. */
   background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-card);
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
+  font-size: var(--gn-title-section);
+  line-height: 1.5625rem;
   font-weight: 600;
   color: var(--gn-text);
 }
@@ -2740,10 +2752,14 @@ a.gn-ticket-sheet__crumb--link {
    serves both. At <=40rem the table stops being a table: it, its body and each row become blocks/flex lines,
    the column-header row is clipped (visually hidden, not removed), the title cell takes the first line and the
    key · state · assignee · due cells wrap beneath it as small meta. The bulk-select checkbox is lifted to its
-   own 44px square at the row's start (the row reserves room with `:has`). The bulk-close bar's slot takes a
-   full row and the Confirm close button fills it, the cancel ✕ beside it. Inside the one 40rem arm and AFTER
-   every base rule it overrides. */
-@media (max-width: 40rem) {
+   own 44px square at the row's start (the row reserves room with `:has`). (The bulk-close bar's slot took a
+   full row here until UX fixes Task 5, case 23.073: it now sits in the toolbar row at its own width.) Inside the one arm and AFTER
+   every base rule it overrides.
+
+   THE ARM IS 64rem, NOT 40rem (UX fixes Task 4, owner ruling U3, case 23.052; it was 40rem when written, case 21.111): the
+   table's 51.25rem floor overflows the narrower tablets, so the stacked rows serve the whole tablet band, and a
+   1025px+ desktop keeps the table. */
+@media (max-width: 64rem) {
   .gn-list__table { display: block; min-width: 0; }
   .gn-list__table tbody { display: block; }
   .gn-list__table thead {
@@ -2777,9 +2793,6 @@ a.gn-ticket-sheet__crumb--link {
   }
   .gn-list__table-cell--title { order: -1; flex: 1 0 100%; min-width: 0; padding: 0; }
   .gn-list__table-cell--data { padding: 0; font-size: 0.8125rem; line-height: 1.125rem; white-space: normal; }
-  .gn-list__controls-end { flex: 1 1 100%; margin-left: 0; display: flex; }
-  .gn-list__bulk { flex: 1 1 100%; display: flex; }
-  .gn-list__bulk-close { flex: 1 1 auto; }
 }
 /* The attention strip is the prototype's tinted card, adopted WHOLE (owner
    ruling, 2026-09-18): `--tintWarning` fill, `--cardR` radius, `18px 20px`
@@ -2886,7 +2899,7 @@ a.gn-ticket-sheet__crumb--link {
 .gn-attention__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
 
 .gn-my-work { display: flex; flex-direction: column; gap: 1.2rem; }
-.gn-my-work__heading { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--gn-text-muted); }
+.gn-my-work__heading { margin: 0 0 0.5rem; font-size: var(--gn-title-section); line-height: 1.5625rem; color: var(--gn-text-muted); }
 .gn-my-work__empty { color: var(--gn-text-muted); margin: 0; }
 .gn-my-work__item,
 .gn-my-work__contested { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
@@ -4292,7 +4305,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    blob `6d7b67c0a52c`), carried as rem at the 16px root this product sets. Was
    `1rem` with no line-height of its own, so it inherited the UA's normal
    leading and sat visibly lighter and smaller than the drawing. */
-.ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+.ticket-type-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 /* The web app on phones — New ticket type is the list's one primary on its own full row (Plan Task 11, case 21.173).
    Inside the one 40rem arm, AFTER `.ticket-type-list__header`. */
@@ -4486,10 +4499,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    radius, beside a shared `Button` that is 44px, border-less and
    control-radiused, against a prototype that draws 44. */
 .ticket-type-editor__save { align-self: flex-start; }
-/* The web app on phones — the ticket type editor's Save takes its own full row (Plan Task 11, case 21.173). */
-@media (max-width: 40rem) {
-  .ticket-type-editor__save { flex: 1 1 100%; }
-}
+/* The web app on phones — the ticket type editor's Save keeps its own width beside Cancel (UX fixes Task 5, case 23.074;
+   it took a full row under case 21.173). */
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
@@ -4778,7 +4789,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
@@ -4895,7 +4906,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
     min-height: 28rem;
   }
   .workflow-builder-screen__title-row { flex-direction: column; align-items: stretch; }
-  .workflow-builder-screen__name { min-height: 2.75rem; font-size: 1.5rem; line-height: 2rem; }
+  .workflow-builder-screen__name { min-height: 2.75rem; font-size: var(--gn-title-page-phone); line-height: 2rem; }
   .workflow-builder-screen__actions { width: 100%; }
   .workflow-builder-screen__add-state,
   .workflow-builder-screen__panels { flex: 1 1 0; min-height: 2.75rem; }
@@ -6075,9 +6086,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    stylesheet both of those apps already load, rather than in either app. Two
    copies of this block would be two help screens that drift apart. */
 
-/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the 72ch reading
+/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the reading
    column; it is now the two-column shell, and `.gn-help__column` inside it
-   carries the 72ch. Recorded because the old name did not change: a reader of
+   carries the measure (72ch then; `var(--gn-measure)`, 70ch, since UX fixes Task 3). Recorded because the old name did not change: a reader of
    a diff elsewhere in the tree would otherwise assume it still centres text.
 
    The reference's own shape (`Gisik Nokma Desktop`, the Help screen): an
@@ -6162,7 +6173,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    no section-to-section gap to copy. */
 .gn-help__column {
   width: 100%;
-  max-width: 72ch;
+  max-width: var(--gn-measure);
   padding-top: 1.75rem;
   display: flex;
   flex-direction: column;
@@ -6191,7 +6202,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* The 14px that used to live here is now `.gn-help__intro`'s `gap` — same
      distance, but it survives the column becoming a flex container. */
   margin: 0;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
@@ -6764,7 +6775,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.0625rem; line-height: 1.375rem; }
 /* `text-wrap: pretty` is the reference's own, on every paragraph. It costs
    nothing where unsupported and stops the short last line — this column is
-   72ch of prose, which is exactly where a one-word orphan shows. */
+   70ch of prose, which is exactly where a one-word orphan shows. */
 .gn-help__p { margin: 0 0 0.875rem; font-size: 1.0625rem; line-height: 1.375rem; text-wrap: pretty; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.0625rem; line-height: 1.375rem; }
 /* A flat tinted card, not a ruled aside — the reference drew a quote as its tray box (UX fixes T6 flattened it, see the fill
@@ -7260,7 +7271,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-page-header__title {
   margin: 0;
-  font-size: 2.1rem;
+  font-size: var(--gn-title-page);
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -7323,7 +7334,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Styling refresh Plan B (Task B5): 16px between the header's groups (rule 02). */
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
-.gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+.gn-project__title { font-size: var(--gn-title-page); line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
 /* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
    OWN page. It sits under the title as its own line rather than inside the
    heading, so a screen reader hears the project's name as the heading and the
@@ -7568,18 +7579,30 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline-offset: 1px;
 }
 
-/* The web app on phones — the project header (Plan Task 8, case 21.110). At <=40rem the controls row takes the
-   whole width of the head: the search fills the first row with Filters beside it (`order` lifts them above
-   the workflow picker and the active-only switch, which keep their DOM order after them), and Create ticket —
-   the header's one primary button, a direct child — takes a full row of its own. Inside the one 40rem arm and
-   AFTER `.gn-project__header` and `.gn-project__search`, so source order decides. `.gn-project__filters` is a
-   hook the page puts on the Filters button; nothing paints it above 40rem. The view tabs' scroller lives
-   with `.gn-project__rail` in `globals.css`. */
-@media (max-width: 40rem) {
-  .gn-project__header { flex: 1 1 100%; }
-  .gn-project__search { order: -2; flex: 1 1 0; min-width: 0; }
-  .gn-project__filters { order: -1; flex: none; }
-  .gn-project__header > .gn-button--primary { flex: 1 1 100%; }
+/* The project header through the tablet band and on phones (UX fixes Task 4, owner ruling U3, case 23.054; it was a phone-only
+   arm at <=40rem, Plan Task 8, case 21.110, which stretched Create ticket across a row of its own).
+
+   At <=64rem the toolbar is TWO rows: row one is the identity (crumb over title) at the left and Create ticket — the
+   header's one primary, a direct child — at the right; row two is the search with Filters beside it, then the workflow
+   picker and the active-only switch. Create ticket is never full width: it is an icon button with a word, and a full-width
+   one was the loudest thing on the page (the prototype's one loud element is the page's action, not a banner).
+
+   HOW. `.gn-project__header` is `display: contents`, so its children are flex items of `.gn-project__head` beside the
+   identity and `order` can lay them out across both: identity 0 (the default), the primary 1, then a LINE BREAK — the
+   head's `::after`, a 100%-wide zero-height item ordered 2 — then the controls 3 and 4. A wrapping flex row cannot be
+   told "break here" any other way without a second wrapper in `page.tsx`. The `::after` costs one extra row-gap, so
+   `row-gap` is half what a gap between the rows should be. `.gn-project__filters` is a hook the page puts on the Filters
+   button; nothing paints it above 64rem. The view tabs' scroller lives with `.gn-project__rail` in `globals.css`.
+   AFTER `.gn-project__header`, `.gn-project__search` and `.gn-project__identity`: source order decides. */
+@media (max-width: 64rem) {
+  .gn-project__head { row-gap: 0.5rem; }
+  .gn-project__head::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+  .gn-project__header { display: contents; }
+  .gn-project__identity { flex: 1 1 0; min-width: 0; }
+  .gn-project__header > * { order: 4; }
+  .gn-project__search { order: 3; flex: 1 1 0; }
+  .gn-project__filters { order: 3; flex: none; }
+  .gn-project__header > .gn-button--primary { order: 1; margin-left: auto; }
 }
 
 /* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
@@ -7829,7 +7852,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__load-error { margin: 0; color: var(--gn-text); }
 .workflow-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .workflow-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-list__title { margin: 0; font-size: 1rem; }
+.workflow-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
 /* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
@@ -7919,7 +7942,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.75rem;
 }
 .workflow-history__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-history__title { margin: 0; font-size: 1rem; }
+.workflow-history__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-history__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-history__versions {
   display: flex;
@@ -8791,6 +8814,29 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-note-badge--project { background: var(--gn-tint-warning); }
 .gn-note-badge--inherit { background: var(--gn-fill-secondary); }
 .gn-note-badge--explicit { background: var(--gn-fill-quaternary); }
+
+/* ── The type scale on a phone (UX fixes Task 5, cases 23.070 / 23.072; audit SYS-02, WF-05, WF-06, SET-17, NP-15) ────
+   Every page title reads `--gn-title-page` (34px) and, here, `--gn-title-page-phone` (22px); every section head reads
+   `--gn-title-section` (20px) and `--gn-title-section-phone` (18px). The tokens are emitted once by `themeStylesheet()`
+   (`tokens.ts`), so no rule spells a size. The workflow editor's name field takes its phone size in its own arm above
+   (`.workflow-builder-screen__name`); the project title stays ONE line and ellipsises, as a header row should. */
+@media (max-width: 40rem) {
+  .gn-help__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-page-header__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-project__title {
+    font-size: var(--gn-title-page-phone);
+    line-height: 1.75rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gn-list__section-title,
+  .gn-my-work__heading,
+  .workflow-list__title,
+  .workflow-history__title,
+  .ticket-type-list__title { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
+}
 
 /* HIT AREAS (UX fixes T6, 23.090, audit SYS-10, PV-09, PV-18, ENT-13, SET-13): the controls below draw a box under 44px on
    purpose (an inline link-button in a dense card, a 24px caret, a 24px ×, the (i) trigger). Their DRAWN box stays; a

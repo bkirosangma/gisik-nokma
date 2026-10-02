@@ -10,9 +10,16 @@ import { describe, expect, it } from 'vitest';
  * it the first card sat 1105 px down — **no ticket was on screen when the board
  * opened**.
  *
- * The fix puts the workspace-scoped links behind one disclosure below 70rem
+ * The fix put the workspace-scoped links behind one disclosure below 70rem
  * (it was 40rem until 2026-09-29, when a 1024 and a 768 bar were measured at two
- * and four rows — see the 70rem block's own docblock in `globals.css`).
+ * and four rows).
+ *
+ * **AMENDED 2026-10-02 (UX fixes Task 4, owner ruling U3, case 23.042): THE DISCLOSURE IS GONE.** From 64rem down the
+ * bottom bar is the navigation (`bottom-bar.tsx`), so the `Menu` toggle, its `data-open` state and the 70rem arm were
+ * retired; the wrapper is simply not painted at ≤64rem. What survives of this file is what is still true of the wrapper:
+ * it is `display: contents` above the breakpoint (the desktop bar unchanged), `display: none` at or below it, and that
+ * is read from the WINNING declaration, not the rule's text — the lesson the toggle cost. The toggle's own cases
+ * (13.1138's button wiring, 13.1218's toggle reading) are retired with it, their ids left unused.
  * That is a PAINT decision, and the gate has no browser (`apps/web/e2e-*` is
  * Playwright, not in `pnpm test`), so this is a SOURCE scan — the shape
  * `neo-card-radius.test.ts` uses next door, and for the same reason: the thing
@@ -80,9 +87,10 @@ function mediaBlocks(source: string, query: string): string[] {
 }
 
 /**
- * The block for `query` that CONTAINS `needle`. `globals.css` holds FOUR
- * `@media (max-width: 70rem)` blocks, so "the 70rem block" is not a thing that
- * exists — asking for the first one answers about `.gn-workspace-list`.
+ * The block for `query` that CONTAINS `needle`. `globals.css` holds several
+ * `@media (max-width: 64rem)` blocks (the bottom bar's, the wrapper's, the tablet
+ * band's other arms), so "the 64rem block" is not a thing that exists — asking for
+ * the first one answers about something else.
  */
 function blockContaining(source: string, query: string, needle: string): string | undefined {
   return mediaBlocks(source, query).find((block) => block.includes(needle));
@@ -130,7 +138,7 @@ function rule(block: string, selector: string): string | undefined {
  * code path as the assertion rather than a hand-assembled equivalent.
  */
 function phoneHidesTheWrapper(source: string): boolean {
-  const phone = blockContaining(source, '(max-width: 70rem)', '.gn-nav__more');
+  const phone = blockContaining(source, '(max-width: 64rem)', '.gn-nav__more');
   if (phone === undefined) return false;
   return (rule(phone, '.gn-nav__more') ?? '').includes('display: none');
 }
@@ -156,14 +164,14 @@ function phoneHidesTheWrapper(source: string): boolean {
  */
 type ElementModel = { path: { tag: string; classes: string[] }[] };
 
-/** The `<button class="gn-nav__more-toggle">` as the browser sees its ancestry. */
-const TOGGLE: ElementModel = {
+/** The `<div class="gn-nav__more">` as the browser sees its ancestry. */
+const MORE: ElementModel = {
   path: [
     { tag: 'main', classes: [] },
     { tag: 'nav', classes: ['gn-nav'] },
     { tag: 'div', classes: ['gn-nav__inner'] },
     { tag: 'div', classes: ['gn-nav__links'] },
-    { tag: 'button', classes: ['gn-nav__more-toggle'] },
+    { tag: 'div', classes: ['gn-nav__more'] },
   ],
 };
 
@@ -248,7 +256,7 @@ function declarationRules(source: string): { selector: string; body: string }[] 
  * code path for both widths, so the phone reading is the same instrument as the
  * desktop one rather than a hand-assembled equivalent.
  *
- * `phone` is the 70rem block, APPENDED: that is where the file puts it relative
+ * `phone` is the 64rem block, APPENDED: that is where the file puts it relative
  * to the rules it competes with at equal specificity, and a specificity-decided
  * pair cannot be moved by the concatenation either way.
  */
@@ -273,7 +281,7 @@ function winner(source: string, model: ElementModel, property: string): string |
 
 /**
  * The cascade a browser applies at 390 px: everything unconditional, then the
- * 70rem block's CONTENTS.
+ * 64rem block's CONTENTS.
  *
  * **The `@media … {` wrapper is stripped before appending, and that is not
  * tidiness.** The splitter below is deliberately naive — it takes the first `}`
@@ -285,7 +293,7 @@ function winner(source: string, model: ElementModel, property: string): string |
  * exactly what the first version of this function produced.
  */
 function phoneContext(source: string): string {
-  const block = blockContaining(source, '(max-width: 70rem)', '.gn-nav__more') ?? '';
+  const block = blockContaining(source, '(max-width: 64rem)', '.gn-nav__more') ?? '';
   const open = block.indexOf('{');
   return withoutMediaBlocks(source) + (open === -1 ? '' : block.slice(open + 1, -1));
 }
@@ -311,79 +319,51 @@ describe('E4-11 — the phone breakpoint collapses the workspace links into one 
   });
 
   /**
-   * **THE ASSERTION THIS FILE GOT WRONG, kept as a case rather than replaced.**
+   * **THE ASSERTION THIS FILE GOT WRONG, kept as a case rather than replaced** (13.1218; amended 2026-10-02 for the
+   * toggle's retirement).
    *
-   * The first version asked only whether the toggle's own rule SAYS `display:
-   * none`. It did, and the owner photographed the button on a desktop bar
-   * anyway, because `.gn-nav a, .gn-nav button` (0,1,1) outranks the bare class
-   * (0,1,0) — source order is not what decides that. So the case now reads the
-   * WINNING value on both sides of the breakpoint.
+   * The first version asked only whether the toggle's own rule SAYS `display: none`. It did, and the owner photographed
+   * the button on a desktop bar anyway, because `.gn-nav a, .gn-nav button` (0,1,1) outranks the bare class (0,1,0).
+   * So the case reads the WINNING value on both sides of the breakpoint — now for the wrapper that replaced the toggle
+   * as the only thing hidden by it, and with the toggle's own absence asserted.
    */
-  it('13.1218 the toggle LOSES the cascade above 70rem and WINS it below', () => {
-    // The declaration half is still pinned, now as a precondition rather than as
-    // the property: a rule that is not there cannot win, and this names which
-    // rule the reading below is about.
-    expect(
-      rule(withoutMediaBlocks(css), '.gn-nav .gn-nav__more-toggle'),
-      'no unconditional .gn-nav .gn-nav__more-toggle rule',
-    ).toContain('display: none');
-
-    expect(winner(withoutMediaBlocks(css), TOGGLE, 'display')).toBe('none');
-    expect(winner(phoneContext(css), TOGGLE, 'display')).toBe('inline-flex');
+  it('13.1218 the wrapper is painted (display: contents) above 64rem and hidden (display: none) at or below it — the WINNING value, and no toggle is left', () => {
+    expect(winner(withoutMediaBlocks(css), MORE, 'display')).toBe('contents');
+    expect(winner(phoneContext(css), MORE, 'display')).toBe('none');
+    expect(css, 'the retired Menu toggle has a rule again').not.toContain('gn-nav__more-toggle');
   });
 
-  it('13.1218 CONTROL — the competitor really is in the reading, and the plant flips it', () => {
-    // THE COMPETITOR, witnessed on its own: the generic rule that beat the bare
-    // class is still in the stylesheet and still says `inline-flex`. Without
-    // this, a tree that had dropped `.gn-nav button` entirely would satisfy the
-    // assertion above for the wrong reason.
-    expect(rule(withoutMediaBlocks(css), '.gn-nav button')).toContain('display: inline-flex');
-
-    // MUTATION WITNESS — the PRE-FIX selector, planted, in the same path the
-    // assertion runs. Reverting BOTH rules to the bare class is the exact tree
-    // the owner photographed; the desktop reading must flip, and the phone one
-    // must NOT (which is why the defect was invisible at 390: the phone arm is
-    // later and wins its tie even when it is too weak to beat `.gn-nav button`
-    // on its own — the button looked right at phone by luck, and wrong here).
-    const mutant = css
-      .split('.gn-nav .gn-nav__more-toggle')
-      .join('.gn-nav__more-toggle');
+  it('13.1218 CONTROL — the reading can flip: the 64rem arm planted as `display: contents` is read as painted', () => {
+    const mutant = css.replace('.gn-nav__more { display: none; }', '.gn-nav__more { display: contents; }');
     expect(mutant, 'the plant matched nothing — the witness is inert').not.toBe(css);
-    expect(winner(withoutMediaBlocks(mutant), TOGGLE, 'display')).toBe('inline-flex');
-    expect(winner(phoneContext(mutant), TOGGLE, 'display')).toBe('inline-flex');
+    expect(winner(phoneContext(mutant), MORE, 'display')).toBe('contents');
+    // …and a plant on the unconditional rule flips the wide reading, so the first assertion is not constant either.
+    const wide = css.replace('.gn-nav__more { display: contents; }', '.gn-nav__more { display: none; }');
+    expect(wide, 'the plant matched nothing — the witness is inert').not.toBe(css);
+    expect(winner(withoutMediaBlocks(wide), MORE, 'display')).toBe('none');
   });
 
-  it('the 70rem block that carries the disclosure exists, and is the one read below', () => {
+  it('the 64rem block that hides the wrapper exists, and is the one read below', () => {
     // POSITIVE CONTROL for every assertion under it: if this is undefined they
     // fail for the wrong reason, and `rule()` of a missing block throws rather
     // than reddening on the declaration.
     expect(
-      blockContaining(css, '(max-width: 70rem)', '.gn-nav__more'),
-      'no 70rem block names .gn-nav__more',
+      blockContaining(css, '(max-width: 64rem)', '.gn-nav__more'),
+      'no 64rem block names .gn-nav__more',
     ).toBeDefined();
   });
 
-  it('below 70rem the wrapper is hidden and the toggle is shown', () => {
-    const phone = blockContaining(css, '(max-width: 70rem)', '.gn-nav__more') as string;
-    expect(rule(phone, '.gn-nav__more-toggle')).toContain('display: inline-flex');
+  it('at or below 64rem the wrapper is hidden, and nothing in that arm re-opens it', () => {
+    const phone = blockContaining(css, '(max-width: 64rem)', '.gn-nav__more') as string;
     expect(rule(phone, '.gn-nav__more')).toContain('display: none');
-  });
-
-  it('below 70rem the OPEN wrapper takes a line of its own', () => {
-    const phone = blockContaining(css, '(max-width: 70rem)', '.gn-nav__more') as string;
-    const open = rule(phone, '.gn-nav__more[data-open="true"]');
-    expect(open, 'no [data-open="true"] arm').toBeDefined();
-    expect(open).toContain('display: flex');
-    // Without this the panel would share row 1 with the toggle and re-wrap the
-    // bar into the multi-row shape the finding measured.
-    expect(open).toContain('flex-basis: 100%');
+    expect(phone).not.toContain('data-open');
   });
 
   it('the mechanism, and a planted regression in the SAME path', () => {
-    expect(phoneHidesTheWrapper(css), 'the phone arm does not hide the wrapper').toBe(true);
+    expect(phoneHidesTheWrapper(css), 'the 64rem arm does not hide the wrapper').toBe(true);
 
     // MUTATION WITNESS. Planting the regression this case exists to catch —
-    // the phone arm reverted to the wide arm's `display: contents` — must flip
+    // the narrow arm reverted to the wide arm's `display: contents` — must flip
     // the function above. Asserting the replace MATCHED is part of the witness:
     // a plant that silently matched nothing leaves both readings true and reads
     // as a survivor.

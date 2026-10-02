@@ -210,7 +210,7 @@ the port part only, on `exec2/settings-wf-t7-t8` from `origin/main` = `99884bc9`
 shas are the commit and the blob of the same file and both are cited across the docs, which is worth
 knowing before concluding one of them is stale.
 
-- ✅ **13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible.** Two
+- ✅ **13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible.** Two AMENDED 2026-10-02 (UX fixes Task 5, case 23.072): the list heading reads `var(--gn-title-section)` (1.25rem, the same 20px) so it matches every other section head.
   halves, split the way every styling case in this repo splits: `packages/app-core/test/ticket-types/ticket-types.test.tsx`
   proves the COMPONENT renders the ported strings and the DOM the parity depends on, and
   `packages/ui/test/tokens.test.ts` measures the `ui.css` rule.

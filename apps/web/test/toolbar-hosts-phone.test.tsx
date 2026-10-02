@@ -239,7 +239,7 @@ const ui = readUiCss();
  * Each host's editor CONTENT width at a phone viewport, read from the rules that make it. Sheet and dialog both
  * fill the viewport at ≤40rem and carry the same 1.5rem side padding on their body, so the slot is the viewport
  * less 2 × 1.5rem; the toolbar fills the slot (`.editor-slot` has no border or side padding).
- *   - sheet:  `.gn-sheet { width: 100%; max-width: none }` in the phone arm (`ui.css:962`) and
+ *   - sheet:  `.gn-sheet { width: 100%; max-width: none }` in the ≤64rem arm (`ui.css`, 23.053) and
  *             `.gn-sheet__body { padding: 0 1.5rem 1.5rem }` (`ui.css:949`) — the description is a `section` in the body.
  *   - dialog: `.gn-dialog { width: 100% }` in the phone arm (`ui.css:979`) and `.gn-dialog__body` (`ui.css:948`, the same rule).
  */
@@ -264,7 +264,8 @@ function sideSpace(body: string): number {
 }
 function hostWidths(): { sheetSide: number; dialogSide: number } {
   const side = (selector: string): number => px((valueOf(bodyRule(selector), 'padding') ?? '').split(/\s+/)[1] ?? null, 0);
-  expect(valueOf(ruleExactly(ui, '.gn-sheet', PHONE), 'width')).toBe('100%');
+  // The sheet's full-width rule is the 64rem tablet arm's since UX fixes Task 4 (case 23.053), which covers every phone width too.
+  expect(valueOf(ruleExactly(ui, '.gn-sheet', '@media (max-width: 64rem)'), 'width')).toBe('100%');
   expect(valueOf(ruleExactly(ui, '.gn-dialog', PHONE), 'width')).toBe('100%');
   // The model's 24px is only true while NOTHING between the viewport and the toolbar adds side space: no phone arm
   // re-pads either body, and no rule on the wrappers (scrims, the panel, the description section, the dialog's field,
