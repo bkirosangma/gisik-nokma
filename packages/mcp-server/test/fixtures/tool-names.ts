@@ -7,7 +7,7 @@
 export const TOOL_NAMES_BY_MODULE = {
   read: [
     // read begin
-    'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
+    'search', 'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
     // read end
   ],
   write: ['create_ticket', 'transition_ticket', 'add_comment', 'assign_ticket'],
@@ -55,6 +55,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   trash: [
     // trash begin (T13)
+    'list_deleted',
     // trash end
   ],
 } satisfies Record<string, string[]>;
