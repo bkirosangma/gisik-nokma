@@ -26,7 +26,7 @@ const rows = (container: HTMLElement): string[] =>
   [...container.querySelectorAll('.gn-attention__item')].map((li) => li.textContent ?? '');
 
 describe('21.242 overdue is its own label and leads the strip', () => {
-  it('21.242 an overdue item reads "Overdue" + "was due 17 Aug (45 days ago)" in the danger tone and is sorted FIRST; CONTROL: a due-soon item still reads "Due soon" + "due 5 Oct (in 4 days)" and keeps its place after it', () => {
+  it('21.242 an overdue item reads "Overdue" + "was due 17 Aug (45 days ago)" in the danger tone and is sorted FIRST; CONTROL: a due-soon item still reads "Due soon" + "due 5 Oct (in 4 days)" and follows it (severity order since 23.163: after the blocked row too)', () => {
     const { container } = render(
       <AttentionStrip
         items={[
@@ -44,17 +44,17 @@ describe('21.242 overdue is its own label and leads the strip', () => {
     expect(lines[0]).toContain(OVERDUE);
     expect(lines[0]).not.toContain('Due soon');
     expect(container.querySelector('.gn-attention__item')?.querySelector('.gn-chip')?.className).toContain('gn-chip--blocked');
-    // the others keep their relative order after it
-    expect(lines[1]).toContain('Due soon');
-    expect(lines[1]).toContain(SOON);
-    expect(lines[1]).not.toContain('Overdue');
-    expect(lines[2]).toContain('Blocked');
+    // the others follow in severity order (23.163): blocked, then due soon
+    expect(lines[1]).toContain('Blocked');
+    expect(lines[2]).toContain('Due soon');
+    expect(lines[2]).toContain(SOON);
+    expect(lines[2]).not.toContain('Overdue');
     expect(screen.queryByText(/due within 7 days/)).toBeNull();
   });
 });
 
 describe('21.244 a ticket that is overdue and stale is ONE row, the overdue one', () => {
-  it('21.244 the same ticket as stale and overdue appears once with the Overdue reason; CONTROLS: a stale-only ticket still shows, and a ticket that is overdue and BLOCKED keeps both rows (only the stale pair collapses)', () => {
+  it('21.244 the same ticket as stale and overdue appears once with the Overdue reason; CONTROLS: a stale-only ticket still shows, and a ticket that is overdue and BLOCKED is ONE Overdue row too (AMENDED by 23.163: one row per ticket, strongest reason)', () => {
     const { container } = render(
       <AttentionStrip
         items={[
@@ -74,10 +74,12 @@ describe('21.244 a ticket that is overdue and stale is ONE row, the overdue one'
     expect(lateAndStale?.textContent).not.toContain('Stale');
     // control: not dropped wholesale
     expect(screen.getAllByText('Only stale')).toHaveLength(1);
-    expect(screen.getAllByText('Late and blocked')).toHaveLength(2);
-    expect(rows(container)).toHaveLength(4);
+    expect(screen.getAllByText('Late and blocked')).toHaveLength(1); // AMENDED (23.163): was 2, one row per ticket now
+    expect(within(screen.getByText('Late and blocked').closest('li') as HTMLElement).getByText('Overdue')).toBeTruthy();
+    expect(rows(container)).toHaveLength(3);
     // and the overdue rows lead
     expect(rows(container)[0]).toContain('Overdue');
     expect(rows(container)[1]).toContain('Overdue');
+    expect(rows(container)[2]).toContain('Stale');
   });
 });

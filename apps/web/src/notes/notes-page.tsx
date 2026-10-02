@@ -151,8 +151,15 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   useEffect(() => (treeRef.current === null ? undefined : carryTreeScroll(treeRef.current)), []);
   const [headings, setHeadings] = useState<ReadingMeta['headings']>([]);
 
-  /** The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css). */
-  const [treeOpen, setTreeOpen] = useState(false);
+  /**
+   * The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css).
+   * It lives in `.gn-notes__bar` beside "Create note", outside the drawer it opens.
+   * With NO note open the list IS the page, so it starts expanded (UX fixes T9, 23.161, audit NP-02): a phone
+   * landing on `/notes` used to show filters for a list it hid, and an instruction to "create one" pointing at
+   * nothing. With a note open the document is the page and the list starts closed. Above 60rem the attribute
+   * is inert (the tree is always drawn).
+   */
+  const [treeOpen, setTreeOpen] = useState(noteId === undefined);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -205,7 +212,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
       <div className="gn-notes" data-testid="notes-page">
         <div className="gn-notes__header">
           <h1 className="gn-page-title">Notes</h1>
-          {/* Same gate as the tree head below: a search box with nothing to
+          {/* Same gate as the tree head's filter below: a search box with nothing to
               search — no workspace, no member roster to filter by — is a
               control that does nothing, which this repo refuses to draw. */}
           {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
@@ -220,20 +227,35 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             />
           ) : null}
         </div>
-        <div className="gn-notes__body">
-          {/* Below 60rem (globals.css): a `<details>`-style drawer. Always in
-              the DOM — CSS alone decides whether it is painted, `aria-expanded`
-              is the observable a test (or a screen reader) can see regardless
-              of viewport, and `aria-controls` names the tree it opens. */}
-          <button
-            type="button"
+        {/* The BAR — the drawer toggle and the Create button, OUTSIDE both the drawer and the grid (UX fixes
+            T9, 23.161, audit NP-02). The Create button used to sit inside `<nav id="gn-notes-tree">`, which
+            globals.css hides while the drawer is closed, so a phone with a note open had no create control at all.
+            Here it is painted at every width and is the page's ONE "Create note". Above 60rem the toggle is
+            `display: none` and the bar is a row of its own over the unchanged two-column grid.
+            The bar is drawn once the workspaces READ has ANSWERED, which is what makes the empty-list arm in the
+            tree carry the Create button too (spec §9.7's "No notes yet" AND the button; 18.184). It is absent
+            while loading and after a refusal: a Create over a spinner or a refusal panel is a control whose effect
+            nobody can see. */}
+        <div className="gn-notes__bar">
+          {/* Below 60rem (globals.css): a `<details>`-style drawer. Always in the DOM — CSS alone decides whether
+              it is painted, `aria-expanded` is the observable a test (or a screen reader) can see regardless of
+              viewport, and `aria-controls` names the tree it opens. A ghost `Button` (UX fixes T9, 23.160, audit
+              NP-01): the bare `<button>` it was drew the browser's grey slab, the one square object on a neo
+              screen. `.gn-button` brings the fill, pill radius, font and the 44px floor;
+              `.gn-notes__tree-toggle` still decides WHEN it is drawn. */}
+          <Button
             className="gn-notes__tree-toggle"
             aria-expanded={treeOpen}
             aria-controls="gn-notes-tree"
             onClick={() => setTreeOpen((open) => !open)}
           >
-            Notes list
-          </button>
+            Notes
+          </Button>
+          {signedIn && refusal === null && workspaces !== null ? (
+            <Button onClick={() => setCreateOpen(true)}>Create note</Button>
+          ) : null}
+        </div>
+        <div className="gn-notes__body">
           <nav
             ref={treeRef}
             aria-label="Notes"
@@ -241,30 +263,19 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             className="gn-notes__tree gn-notes__tree--drawer"
             data-open={treeOpen ? 'true' : 'false'}
           >
-            {/* The tree head — the Create button, and the title filter beside
-                it.
-                The head is drawn once the workspaces READ has ANSWERED, which
-                is what makes the empty-list arm below carry the Create button
-                too (spec §9.7's "No notes yet" AND the button; 18.184). It is
-                absent while loading and after a refusal: a Create over a
-                spinner or a refusal panel is a control whose effect nobody can
-                see.
-                The FILTER is narrower still — only once there are rows for it to
-                narrow — because filtering an empty tree can only ever produce
-                the same empty tree. */}
-            {signedIn && refusal === null && workspaces !== null ? (
+            {/* The tree head — the title filter (the Create button is in the bar above, outside the drawer).
+                The FILTER is drawn only once there are rows for it to narrow — filtering an empty tree can only
+                ever produce the same empty tree. */}
+            {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
               <div className="gn-notes__tree-head">
-                <Button onClick={() => setCreateOpen(true)}>New note</Button>
-                {workspaces.length > 0 ? (
-                  <input
-                    type="text"
-                    className="gn-notes__filter"
-                    aria-label="Filter by title"
-                    placeholder="Filter by title"
-                    value={titleFilter}
-                    onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
-                  />
-                ) : null}
+                <input
+                  type="text"
+                  className="gn-notes__filter"
+                  aria-label="Filter by title"
+                  placeholder="Filter by title"
+                  value={titleFilter}
+                  onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
+                />
               </div>
             ) : null}
             {!signedIn ? (

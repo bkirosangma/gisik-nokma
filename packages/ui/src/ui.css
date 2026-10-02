@@ -2799,6 +2799,8 @@ a.gn-ticket-sheet__crumb--link {
    same WCAG 2.5.8 floor `.gn-attention__title`'s note below holds, now met by
    the row that contains the button as well as by the button. */
 .gn-attention__items { list-style: none; margin: 0.625rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+/* NP-05 (UX fixes T9, 23.163): the "Show all N" disclosure under the capped list; a `Button`, so the 44px floor and the pill are the button's own. */
+.gn-attention__more { margin-top: 0.5rem; }
 .gn-attention__item { position: relative; display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; min-height: 1.5rem; padding: 0.4375rem 0; cursor: pointer; }
 /* 24px — WCAG 2.5.8's floor, not 2.5.5's 44. Measured on the signed-in shell at
    390px before this: `249x23`, `266x23`, `305x23`, `270x23` for the attention
