@@ -230,3 +230,30 @@ describe('23.054 the project toolbar is two rows through the tablet band', () =>
     expect(rulesNaming(ui, '.gn-project__head::after').filter((r) => r.atRule === null)).toEqual([]);
   });
 });
+
+describe('23.056 the fixed layers clear the bottom bar (UX fixes Task 4 fix 2; the notes TOC launcher and the toast layer)', () => {
+  const WHILE_BAR = 'body:has(.gn-bottom-bar:not([data-keyboard="open"]))';
+  it('23.056 at ≤64rem (1024, 800 and 390px) one rule declares the lift as the bar\'s own height and both layers add it to their old offsets, so neither overlaps the bar; above 64rem (1121px) the lift is undeclared and both keep the old offsets', () => {
+    // The bar's own height is the calc the lift reads: one source of truth, taken from the bar's own rule.
+    const bar = valueOf(ruleExactly(globals, '.gn-bottom-bar', TABLET), 'height');
+    expect(bar).toBe('calc(var(--gn-phone-bar-height) + env(safe-area-inset-bottom))');
+    // ONE declaration, inside the single 64rem arm (it covers 1024, 800 and the ≤40rem phone alike), keyed on a rendered, not-hidden bar.
+    expect(valueOf(ruleExactly(globals, WHILE_BAR, TABLET), '--gn-bar-lift')).toBe(bar);
+    expect(rulesNaming(globals, WHILE_BAR).map((r) => r.atRule)).toEqual([TABLET]);
+    // Both layers sit at their old offset PLUS the lift (the lift is the whole bar), so their bottom edge starts above the bar's top.
+    expect(valueOf(ruleExactly(globals, '.gn-notes__toc'), 'bottom')).toMatch(
+      /^calc\(max\(1rem, env\(safe-area-inset-bottom, 0px\)\) \+ var\(--gn-bar-lift, 0px\)\)/,
+    );
+    expect(valueOf(ruleExactly(ui, '.gn-toast-layer'), 'bottom')).toBe('calc(1.5rem + var(--gn-bar-lift, 0px))');
+
+    // CONTROL — above 64rem (1121px) the lift is declared nowhere at the top level, so `var(--gn-bar-lift, 0px)` is 0px and the old
+    // offsets (1rem-or-inset, 1.5rem) are what paint; and no 64rem rule restates either layer's `bottom`.
+    for (const sheet of [globals, ui]) {
+      expect(parseRules(sheet).filter((r) => r.atRule === null && valueOf(r.body, '--gn-bar-lift') !== null)).toEqual([]);
+    }
+    for (const selector of ['.gn-notes__toc', '.gn-toast-layer']) {
+      expect(rulesNaming(globals, selector).filter((r) => r.atRule !== null)).toEqual([]);
+      expect(rulesNaming(ui, selector).filter((r) => r.atRule !== null)).toEqual([]);
+    }
+  });
+});

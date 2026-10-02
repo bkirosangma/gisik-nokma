@@ -2351,6 +2351,12 @@ input, textarea, select { font-family: inherit; }
      render no bar and must not carry a 5rem gap. Nested calc so the bar's own height stays one
      expression the 21.028 case can read. */
   .gn-shell:has(.gn-bottom-bar) { padding-bottom: calc(calc(var(--gn-phone-bar-height) + env(safe-area-inset-bottom)) + 2rem); }
+  /* The two fixed layers that used to sit over the bar (UX fixes Task 4 fix 2, case 23.056): the notes TOC launcher (`bottom: 1rem`)
+     and the toast layer (`bottom: 1.5rem`) clear it by the bar's whole height — the same calc as above, so the inset is counted
+     once — PLUS their own offset. The arm only DECLARES the lift, `--gn-bar-lift`, on `body` while a bar is rendered (and not stepped
+     aside for the keyboard), so it is lifted exactly when a bar is there; the two base rules add `var(--gn-bar-lift, 0px)` to their
+     own offset, which is `0px` above 64rem, where no arm declares it. Declared once, so neither layer names a width or the bar. */
+  body:has(.gn-bottom-bar:not([data-keyboard="open"])) { --gn-bar-lift: calc(var(--gn-phone-bar-height) + env(safe-area-inset-bottom)); }
   /* `.gn-bottom-bar__item` is a link or a button; one class so both get the same box. 44px is the
      floor both ways; five items share the width, so at 360px each is 72px. Three text tiers + one
      accent: muted at rest, the accent for the current one. */
@@ -3889,7 +3895,7 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__toc {
   position: fixed;
   left: max(1rem, env(safe-area-inset-left, 0px));
-  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  bottom: calc(max(1rem, env(safe-area-inset-bottom, 0px)) + var(--gn-bar-lift, 0px)); /* the bar's height while one shows (23.056) */
   z-index: 30;
 }
 

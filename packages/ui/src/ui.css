@@ -492,7 +492,8 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 1.5rem;
+  /* + the bottom bar's height while one shows: `--gn-bar-lift` is declared by `globals.css` at ≤64rem (UX fixes Task 4 fix 2, case 23.056). */
+  bottom: calc(1.5rem + var(--gn-bar-lift, 0px));
   z-index: 60;
   display: flex;
   justify-content: center;
