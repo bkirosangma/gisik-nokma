@@ -120,6 +120,8 @@ export {
   type ReopenOutcome,
   type ReopenPlan,
 } from './flows/guarded-child-event.js';
+// MCP-everything T5 — the two comment seeds, shared by the ticket sheet and the web's note comments.
+export { commentDeletedSeed, commentEditedSeed, type CommentParent } from './flows/comment-edits.js';
 export { ReopenDialog, type ReopenDialogProps, type RefusalOrigin } from './views/reopen-dialog.js';
 // Second wave Task 9 — the shared bulk-close confirm. Its two consumers
 // (Task 10's board column action, Task 11's list selection) live in this
@@ -172,6 +174,7 @@ export { PeoplePicker } from './views/people-picker.js';
 // names an attachment through a comment today).
 export {
   CommentsThread,
+  type CommentActions,
   type CommentsThreadProps,
   type TicketComment,
   type TicketCommentFile,

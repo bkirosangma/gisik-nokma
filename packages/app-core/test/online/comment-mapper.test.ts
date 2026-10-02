@@ -41,9 +41,12 @@ const COMMENT = {
   files: [{ attachmentId: '01PROOF', filename: 'gst-receipt.png', mime: 'image/png' }],
 };
 
+// What the mapper makes of a row an older server sent: the two stamps (26.116) read as `null`.
+const MAPPED = { ...COMMENT, editedAt: null, deletedAt: null };
+
 describe('mapTicketComments', () => {
   it('maps a served thread, keeping every field it read', () => {
-    expect(mapTicketComments({ comments: [COMMENT] })).toEqual([COMMENT]);
+    expect(mapTicketComments({ comments: [COMMENT] })).toEqual([MAPPED]);
   });
 
   it('maps an ANSWERED empty thread to an empty list', () => {
@@ -57,7 +60,7 @@ describe('mapTicketComments', () => {
       ...COMMENT,
       files: [{ attachmentId: '01NOATTACHMENTROW', filename: '01NOATTACHMENTROW', mime: null }],
     };
-    expect(mapTicketComments({ comments: [unresolved] })).toEqual([unresolved]);
+    expect(mapTicketComments({ comments: [unresolved] })).toEqual([{ ...unresolved, editedAt: null, deletedAt: null }]);
   });
 
   it('refuses a file entry whose mime is neither a string nor null', () => {

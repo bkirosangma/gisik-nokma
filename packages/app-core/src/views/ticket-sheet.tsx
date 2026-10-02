@@ -31,7 +31,8 @@ import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
-import { CommentsThread, type TicketComment } from './comments-thread.js';
+import { CommentsThread, type CommentActions, type TicketComment } from './comments-thread.js';
+import { commentDeletedSeed, commentEditedSeed } from '../flows/comment-edits.js';
 import { ASSIGNEE_OUTSIDE_ROSTER, ASSIGN_OUTSIDER_OPTION } from '../people/copy.js';
 import { outsiderIngest } from '../people/outsider-ingest.js';
 import type { AssignOutsider, LookupPerson } from '../people/types.js';
@@ -195,6 +196,12 @@ export type TicketSheetProps = {
   workspaceId: string;
   ticketId: string;
   currentUserId: string;
+  /**
+   * The viewer is a workspace owner or admin (MCP-everything T5): they may DELETE anyone's comment, never edit
+   * it. Absent = false, so a host that cannot resolve the viewer's role still shows the writer their own
+   * controls — the permission gate decides what commits.
+   */
+  canModerateComments?: boolean;
   onClose: () => void;
   editorSlot?: EditorSlotComponent;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
@@ -682,6 +689,7 @@ export function TicketSheet({
   workspaceId,
   ticketId,
   currentUserId,
+  canModerateComments,
   onClose,
   editorSlot,
   uploadEvidence,
@@ -1562,6 +1570,61 @@ export function TicketSheet({
     // `refused`, by an `invalid`, and by any status this build does not name.
     return false;
   };
+
+  /**
+   * Edit and delete on the ticket's own comments (MCP-everything T5). Both leave through `dataSource.ingest` — the
+   * one write door the offline outbox sits behind — so offline they queue like any change. The thread draws the
+   * controls from these facts; the permission gate (T2) decides what commits, and a refusal is shown in its words.
+   * Absent with no editor mounted: the read-only fallback cannot compose, so it cannot edit either.
+   */
+  const commentActions: CommentActions | undefined =
+    editorSlot === undefined
+      ? undefined
+      : {
+          currentUserId,
+          canModerate: canModerateComments === true,
+          renderEditor: (comment, done) => (
+            <EditorSlot
+              mode="comment"
+              doc={comment.body}
+              readOnly={false}
+              workspaceId={workspaceId}
+              ticketId={ticketId}
+              submitLabel="Save"
+              footerNote="Saving records an edit citing you."
+              submit={async (submission) => {
+                if (submission.type !== 'comment.added') return false;
+                const [result] = await dataSource.ingest([
+                  make(commentEditedSeed(workspaceId, { kind: 'ticket', id: ticketId }, comment.commentId, submission.payload.body)),
+                ]);
+                if (result?.status === 'committed') {
+                  setServerRefusal(null);
+                  setTransportError(null);
+                  comments.reload();
+                  history.reload();
+                  done();
+                  return true;
+                }
+                if (result === undefined) {
+                  setServerRefusal(null);
+                  setTransportError('The server did not answer this change.');
+                } else if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+                else setServerRefusal({ rule: result.code, reason: result.message });
+                return false;
+              }}
+            />
+          ),
+          deleteComment: async (comment) => {
+            const [result] = await dataSource.ingest([make(commentDeletedSeed(workspaceId, { kind: 'ticket', id: ticketId }, comment.commentId))]);
+            if (result?.status === 'committed') {
+              comments.reload();
+              history.reload();
+              return null;
+            }
+            if (result === undefined) return 'The server did not answer this change.';
+            return result.status === 'refused' ? result.reason : result.message;
+          },
+        };
 
   /**
    * The `attachment.added` claim that follows an upload and PRECEDES the image
@@ -4162,6 +4225,7 @@ export function TicketSheet({
             nameOf={nameOf}
             {...(resolveTicketHref === undefined ? {} : { ticketHref: resolveTicketHref })}
             isPurged={purgedComments.isPurged}
+            {...(commentActions === undefined ? {} : { actions: commentActions })}
             composer={
               editorSlot === undefined ? undefined : (
                 <EditorSlot

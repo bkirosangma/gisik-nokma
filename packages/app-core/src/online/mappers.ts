@@ -854,6 +854,13 @@ export function mapTicketAttachments(raw: unknown): AttachmentListEntry[] {
   });
 }
 
+/** An optional ISO instant: absent or `null` is `null` (an older server sends neither); anything else must be a string. */
+function optionalInstant(value: unknown, at: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new MappingError(at, 'an ISO instant or null');
+  return value;
+}
+
 /**
  * `GET /v1/workspaces/:ws/tickets/:id/comments` → the thread.
  *
@@ -904,6 +911,9 @@ export function mapTicketComments(raw: unknown): TicketComment[] {
       // The envelope's `serverTime`, ISO 8601 — the server serializes it so,
       // and `formatDateTime` is the one renderer for it.
       recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
+      // MCP-everything T5: the edit and deletion stamps. `body` is `null` on a deleted comment, and `body` stays unchecked.
+      editedAt: optionalInstant(row['editedAt'], `${path}.editedAt`),
+      deletedAt: optionalInstant(row['deletedAt'], `${path}.deletedAt`),
       files,
     };
   });
@@ -2857,9 +2867,9 @@ export function mapNoteComments(raw: unknown): NoteComment[] {
       authorId: asString(row['authorId'], `${path}.authorId`),
       body: row['body'],
       recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
-      // MCP-everything T2: edit and deletion stamps. The comment UI that shows them is T5's; the mapper only carries them.
-      editedAt: row['editedAt'] === null ? null : asString(row['editedAt'], `${path}.editedAt`),
-      deletedAt: row['deletedAt'] === null ? null : asString(row['deletedAt'], `${path}.deletedAt`),
+      // MCP-everything T2/T5: edit and deletion stamps; an older server sends neither, which reads as `null`.
+      editedAt: optionalInstant(row['editedAt'], `${path}.editedAt`),
+      deletedAt: optionalInstant(row['deletedAt'], `${path}.deletedAt`),
     };
   });
 }

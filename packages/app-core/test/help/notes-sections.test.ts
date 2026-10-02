@@ -29,13 +29,14 @@ const MANUAL_NOTES_SUBSECTIONS = [
   'Finding a note',
   "A ticket's own notes",
   'Mentioning somebody in a note',
+  'Editing or deleting a comment on a note',
   'Linking to a ticket or another note',
   'Deleting a note, and getting it back',
   'What notes cannot do yet',
 ];
 
 describe('15.36 the generated corpus carries the notes release sections', () => {
-  it('15.36 the manual has a "§15 — Notes" section, between §14 and §16, with its ten subsections', () => {
+  it('15.36 the manual has a "§15 — Notes" section, between §14 and §16, with its eleven subsections', () => {
     const manual = document('manual');
     const notes = manual.sections.find((section) => section.id === '15-notes');
     expect(notes).toBeDefined();
@@ -87,3 +88,21 @@ describe('15.36 the generated corpus carries the notes release sections', () => 
     expect(manual.sections.filter((section) => section.id === '15-notes')).toHaveLength(1);
   });
 });
+
+describe('26.119 the manual says how to edit and delete a comment', () => {
+  const textOf = (entry: { blocks: ReadonlyArray<unknown> }): string => JSON.stringify(entry.blocks);
+
+  it('26.119 the notes section and the ticket comments entry both carry the edit/delete rules', () => {
+    const manual = document('manual');
+    const noteEntry = manual.sections
+      .find((section) => section.id === '15-notes')
+      ?.entries.find((entry) => entry.title === 'Editing or deleting a comment on a note');
+    expect(noteEntry).toBeDefined();
+    for (const phrase of ['Only the person who wrote a comment can edit it', 'Comment deleted', 'workspace owner or admin']) {
+      expect(textOf(noteEntry!), phrase).toContain(phrase);
+    }
+    // The ticket side is a bullet in the "what changed" list, so it is read off the whole document.
+    expect(JSON.stringify(manual.sections)).toContain('You can edit or delete your own comments.');
+  });
+});
+
