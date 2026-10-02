@@ -6,6 +6,9 @@ import { allTools, registerTools } from '../src/tools/register.js';
 import { lazySession, type LazySession } from '../src/lazy-session.js';
 import { createLoginPrompt, stderrLoginPrompt } from '../src/login-prompt.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
+import { TOOL_NAMES } from './fixtures/tool-names.js';
+import { SWEEP } from './fixtures/tool-sweep.js';
 
 /**
  * Plan: MCP server, Task 10. Cases 14.80–14.88.
@@ -17,39 +20,6 @@ import type { Session } from '../src/session.js';
  * a network nor a child process is involved: the session is a fake and the
  * transport is a linked pair of in-memory queues.
  */
-
-/**
- * Every tool, in the order `allTools` composes them: the four reads that remain in
- * `read-tools.ts` (`list_members` is MCP CRUD plan Task 8), the four ticket writes, the workspace tools
- * (Task 6 — `list_workspaces` moved there and gained `include`), then the project tools (Task 7 —
- * `list_projects` moved there and gained `include`).
- */
-const TOOL_NAMES = [
-  'search_tickets',
-  'list_tickets',
-  'get_ticket',
-  'list_members',
-  'create_ticket',
-  'transition_ticket',
-  'add_comment',
-  'assign_ticket',
-  'list_workspaces',
-  'get_workspace',
-  'create_workspace',
-  'rename_workspace',
-  'archive_workspace',
-  'restore_workspace',
-  'delete_workspace',
-  'undelete_workspace',
-  'list_projects',
-  'get_project',
-  'create_project',
-  'update_project',
-  'archive_project',
-  'restore_project',
-  'delete_project',
-  'undelete_project',
-];
 
 const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-09-08T00:00:00.000Z' }] };
 
@@ -68,37 +38,10 @@ function fakeSession(over: Partial<Session> = {}): Session {
     post: async () => ({}),
     // One committed result per event sent: `create_project` sends a pair, and a short answer is refused.
     postEvents: async (events) => ({ results: events.map(() => COMMITTED.results[0]) }),
+    ...NO_TRANSFER,
     ...over,
   };
 }
-
-/** Every tool's arguments, valid, so a sweep can drive every handler. */
-const ARGS: Record<string, Record<string, unknown>> = {
-  list_workspaces: {},
-  list_projects: { workspaceId: 'w' },
-  search_tickets: { workspaceId: 'w', query: 'q' },
-  list_tickets: { projectId: 'p' },
-  get_ticket: { workspaceId: 'w', ticketId: 't' },
-  list_members: { workspaceId: 'w' },
-  create_ticket: { workspaceId: 'w', projectId: 'p', typeId: 'ty', title: 'A ticket' },
-  transition_ticket: { workspaceId: 'w', ticketId: 't', to: 'done' },
-  add_comment: { workspaceId: 'w', ticketId: 't', text: 'hello' },
-  assign_ticket: { workspaceId: 'w', ticketId: 't', assigneeId: null },
-  get_workspace: { workspaceId: 'w' },
-  create_workspace: { name: 'X' },
-  rename_workspace: { workspaceId: 'w', name: 'Y' },
-  archive_workspace: { workspaceId: 'w', confirm_name: 'W' },
-  restore_workspace: { workspaceId: 'w' },
-  delete_workspace: { workspaceId: 'w', confirm_name: 'W' },
-  undelete_workspace: { workspaceId: 'w' },
-  get_project: { projectId: 'p' },
-  create_project: { workspaceId: 'w', name: 'X' },
-  update_project: { projectId: 'p', name: 'Y' },
-  archive_project: { projectId: 'p', confirm_name: 'P' },
-  restore_project: { projectId: 'p' },
-  delete_project: { projectId: 'p', confirm_name: 'P' },
-  undelete_project: { projectId: 'p' },
-};
 
 async function connected(session: LazySession): Promise<Client> {
   const server = new McpServer({ name: 'gisik-nokma', version: '0.1.0' });
@@ -299,8 +242,14 @@ describe('the tools, registered', () => {
 
     try {
       registerTools(server, session);
-      for (const tool of allTools(session)) {
-        await tool.handler(ARGS[tool.name] ?? {});
+      for (const name of TOOL_NAMES) {
+        const entry = SWEEP[name];
+        if (entry === undefined) throw new Error(`no sweep entry for ${name} — add one in test/fixtures/tool-sweep.ts`);
+        const s = lazySession(async () => ({ ...fakeSession(), ...entry.session }));
+        await s.ready();
+        const tool = allTools(s).find((t) => t.name === name);
+        if (tool === undefined) throw new Error(`${name} is pinned but not registered`);
+        await tool.handler(entry.args);
       }
       // The prompt `main.ts` installs, called through the same binding it uses
       // there — so this covers the wiring, not a re-creation of it.

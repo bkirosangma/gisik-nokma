@@ -1,21 +1,44 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { LazySession } from '../lazy-session.js';
 import type { Session } from '../session.js';
+import { attachmentTools } from './attachment-tools.js';
+import { commentTools } from './comment-tools.js';
+import { definitionAdminTools } from './definition-admin-tools.js';
+import { discoveryTools } from './discovery-tools.js';
+import { memberAdminTools } from './member-admin-tools.js';
+import { noteTools } from './note-tools.js';
 import { projectTools } from './project-tools.js';
 import { readTools, type ToolDefinition } from './read-tools.js';
+import { ToolReply } from './reply.js';
+import { ticketTools } from './ticket-tools.js';
+import { trashTools } from './trash-tools.js';
 import { workspaceTools } from './workspace-tools.js';
 import { writeTools } from './write-tools.js';
 
 /**
  * Every tool, in one order, from one place: the reads, the ticket writes, the
- * workspace tools, then the project tools. A tool dropped from any factory disappears from the
+ * workspace tools, the project tools, then one module per MCP-everything lane (comments, notes,
+ * attachments, tickets, discovery, member admin, definition admin, trash). A tool dropped from any factory disappears from the
  * assistant's world silently — there is no error, the capability simply stops
  * existing — so the order and the count are pinned by a test rather than left
  * to whoever edits the factories next. Both doors (stdio and the hosted `/mcp`)
  * register through this function, so a tool added here exists in both.
  */
 export function allTools(session: Session): ToolDefinition[] {
-  return [...readTools(session), ...writeTools(session), ...workspaceTools(session), ...projectTools(session)];
+  return [
+    ...readTools(session),
+    ...writeTools(session),
+    ...workspaceTools(session),
+    ...projectTools(session),
+    ...commentTools(session),
+    ...noteTools(session),
+    ...attachmentTools(session),
+    ...ticketTools(session),
+    ...discoveryTools(session),
+    ...memberAdminTools(session),
+    ...definitionAdminTools(session),
+    ...trashTools(session),
+  ];
 }
 
 /** What the hosted door may observe about a call: which tool, how it ended, how long. Nothing else. */
@@ -52,7 +75,17 @@ export type RegisterHooks = { onCall?(event: ToolCallEvent): void };
  * its access rules. The stdio entry point passes no hooks and is unchanged.
  */
 export function registerTools(server: McpServer, session: LazySession, hooks: RegisterHooks = {}): void {
-  for (const tool of allTools(session)) {
+  registerToolDefinitions(server, session, allTools(session), hooks);
+}
+
+/** The registration loop itself (the docblock above moves here unchanged), so a test can push a fake `ToolDefinition` through it. */
+export function registerToolDefinitions(
+  server: McpServer,
+  session: LazySession,
+  tools: ToolDefinition[],
+  hooks: RegisterHooks = {},
+): void {
+  for (const tool of tools) {
     server.registerTool(
       tool.name,
       { description: tool.description, inputSchema: tool.inputSchema },
@@ -64,6 +97,8 @@ export function registerTools(server: McpServer, session: LazySession, hooks: Re
           await session.ready();
           const result = await tool.handler(args);
           observe('ok');
+          // An image (or any non-JSON answer) passes through as its own blocks; everything else is ONE JSON text block.
+          if (result instanceof ToolReply) return { content: result.content };
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (error) {
           observe('error');

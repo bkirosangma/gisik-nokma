@@ -7,6 +7,17 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { seedMember } from '../helpers/seed.js';
 import { buildOAuthApp, hostedToken, PUBLIC_URL } from '../helpers/oauth.js';
+import { allTools, type Session } from '@gisik-nokma/mcp-server';
+
+// A session that is never called: `allTools` only needs one to build the definitions it lists.
+const STUB_SESSION: Session = {
+  userId: () => 'u',
+  get: async () => ({}),
+  post: async () => ({}),
+  postEvents: async () => ({}),
+  getBytes: async () => { throw new Error('unused'); },
+  postMultipart: async () => { throw new Error('unused'); },
+};
 
 /**
  * Hosted MCP plan, Task 7. Cases 14.260–14.269. Nothing is stubbed: the real
@@ -161,32 +172,9 @@ describe('POST /mcp — the tools', () => {
     const list = await post(app, token, rpc('tools/list', {}, 2));
     expect(list.headers['mcp-session-id']).toBeUndefined();
     const tools = list.json().result.tools as { name: string; description: string }[];
-    expect(tools.map((t) => t.name)).toEqual([
-      'search_tickets',
-      'list_tickets',
-      'get_ticket',
-      'list_members',
-      'create_ticket',
-      'transition_ticket',
-      'add_comment',
-      'assign_ticket',
-      'list_workspaces',
-      'get_workspace',
-      'create_workspace',
-      'rename_workspace',
-      'archive_workspace',
-      'restore_workspace',
-      'delete_workspace',
-      'undelete_workspace',
-      'list_projects',
-      'get_project',
-      'create_project',
-      'update_project',
-      'archive_project',
-      'restore_project',
-      'delete_project',
-      'undelete_project',
-    ]);
+    // The hosted door lists EXACTLY what `allTools` lists, in order; the package's own fixture pins the literal (14.366).
+    expect(tools.map((t) => t.name)).toEqual(allTools(STUB_SESSION).map((t) => t.name));
+    expect(tools.length).toBeGreaterThanOrEqual(24); // CONTROL: not an empty registry agreeing with itself
     expect(tools.every((t) => t.description.length > 0)).toBe(true); // CONTROL: described, not bare names
     await app.close();
   });

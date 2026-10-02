@@ -3,6 +3,7 @@ import { domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { HttpError } from '../src/http-client.js';
 import { workspaceTools } from '../src/tools/workspace-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * MCP CRUD plan, Task 6. Cases 14.304–14.312.
@@ -46,6 +47,7 @@ function fake(dir: Dir[] = [{ name: 'Convenience Corner' }], deleted: unknown[] 
       posts.push([path, body]);
       return state.post(path, body);
     },
+    ...NO_TRANSFER,
     postEvents: async (events) => {
       sent.push(events);
       return answer;
