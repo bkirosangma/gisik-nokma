@@ -29,6 +29,10 @@ export const ENTITY_KINDS = [
   // schema twice. `'notebook'` is deliberately NOT a member: the case that
   // proves the closed set is closed (18.001) asserts it is absent.
   'note',
+  // Project groups (prefixes and groups plan Task 6): four `group.*` types are
+  // registered against it in `vocabulary.ts`. A group is a workspace-level folder
+  // projects are filed under, with its own stream like any other entity.
+  'group',
 ] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 
