@@ -4060,7 +4060,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    into, had no visible focus indicator at all (WCAG 2.2 §2.4.7 *Focus Visible*,
    Level AA). The ring goes on the WRAPPER, keyed on `:focus-within`, because the
    wrapper div carries no `tabIndex` of its own — the inner input is what takes
-   focus — and `outline-offset: 1px` is `.gn-field__input`'s own value, so the
+   focus — and `outline-offset: 3px` is `.gn-field__input`'s own value (U9, 2026-10-02; it was 1px), so the
    searchable and non-searchable branches of this control look identical while
    focused. The rule's own selector text is deliberately NOT written out in this
    comment: `rule()` in `components.test.tsx` does a raw brace-matching scan with
@@ -4069,7 +4069,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `.gn-select__trigger--multiple` below already warns about, for the same helper. */
 .gn-select__trigger--searchable:focus-within {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  outline-offset: 3px;
 }
 
 /* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
@@ -4685,16 +4685,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-weight: 700;
   letter-spacing: -0.0118em;
 }
-.workflow-builder-screen__name:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+.workflow-builder-screen__name:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 3px; }
 .workflow-builder-screen__name:disabled {
   background: var(--gn-surface-sunken);
   color: var(--gn-text-muted);
   cursor: not-allowed;
 }
 [data-style="neo"] .workflow-builder-screen__name {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
+}
+/* U7: flat when disabled, AFTER the neo rule above (case 23.004). The ring and the inset go; the 1px stays transparent. */
+[data-style="neo"] .workflow-builder-screen__name:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-text-subtle);
 }
 
 /* Two columns since 2026-09-30 (W1): the right rail is gone — its inspectors
@@ -6130,7 +6137,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: var(--gn-radius-control);
 }
 [data-style="neo"] .gn-help__search-input {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }
@@ -6836,6 +6843,22 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      selected tab would lift instead of press (B-D3, 10.80). */
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-selected);
+  /* U6 (owner, 2026-10-02; case 23.003): the pressed segment also reads in WEIGHT and a BAR, not by its inset alone
+     (the inset measured as invisible: audit SYS-06, SET-08, NP-17). The label is semibold and a 2px bar in the main
+     TEXT colour, not the accent (U1), sits under it. */
+  position: relative;
+  font-weight: 600;
+}
+[data-style="neo"] .gn-segmented__item--on::after {
+  content: "";
+  position: absolute;
+  bottom: 0.375rem;
+  left: 50%;
+  width: 1rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gn-text);
+  transform: translateX(-50%);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -6919,7 +6942,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  /* U9 (owner, 2026-10-02; case 23.005): 3px, not 1px, so the ring clears the sunken shadow and the neo rim. */
+  outline-offset: 3px;
 }
 /* Had no rule at all before this: a disabled `.gn-field__input` (a built-in
    ticket type's locked rank, a read-only field row) fell back to nothing but
@@ -6932,19 +6956,41 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   cursor: not-allowed;
 }
-/* ── OWNER RULING 2026-09-09 (Task 14 AMENDMENT rule (a)): under `neo` the
-   empty input takes the PURE NEO look — sunken, no border — even though the
-   shadow edge measures below 3:1 (1.24 light / 1.16 dark, both themes, Task
-   13's measurement). The cost was flagged (13.284/13.291's own reasoning: an
-   empty field then carries no ≥3:1 boundary to identify it) and the owner
-   reaffirmed "pure neo look." Case 13.339 pins this and quotes the waived
-   number; `hig`/`minimal` are UNTOUCHED by this rule and keep 13.291's
-   bordered look. Radius is inherited from the base rule above — only the
-   boundary treatment changes here. */
+/* ── OWNER RULING 2026-10-02 (U5, UX fixes T1; case 23.002): under `neo` a text field is sunken AND ringed.
+
+   History, kept because it is the reason this rule is shaped as it is. On 2026-09-09 (Task 14 AMENDMENT rule (a))
+   the owner ruled the empty neo input "pure neo look": sunken, `border: none`, even though its shadow edge measured
+   1.24 light / 1.16 dark, below the 3:1 a non-text boundary owes (case 13.339 pinned it and quoted the waiver).
+   The 2026-10-01 audit then found people could not locate empty fields in neo (SYS-05, WS-04, NP-25, TT-14), and
+   the owner reversed the waiver for TEXT FIELDS: **"borders on buttons only" became "borders on buttons and text
+   fields".** It stays in full for cards, wells, notices and rows, which keep their shadow-only edge.
+
+   The ring is a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
+   raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
+   `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
+   to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
+   also removes the 1px that a neo field lost to its missing border compared with a hig one. */
 [data-style="neo"] .gn-field__input {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
+}
+/* U7 (owner, 2026-10-02; cases 23.004, 23.009): a DISABLED neo field is flat: no ring, no inset, muted text on
+   whatever ground it sits on. "No depth" reads as "not interactive". The border keeps its 1px (`transparent`, not
+   `none`) so a disabled field does not change size next to an enabled one. The text is `--gn-text-subtle`, which
+   clears 4.5:1 on both neo wells (4.77 light, 6.82 dark), so it stays readable inside a sunken well.
+
+   SOURCE ORDER: this sits AFTER the neo field rule above and is asserted to (23.004). The base
+   `.gn-field__input:disabled` is declared BEFORE that rule and is `(0,2,0)`, the same as the neo rule, so it
+   loses the cascade by order; this arm is `(0,3,0)` and wins either way, and the order is kept as the mutation
+   that proves the rule is read. A `Select` trigger is a `.gn-field__input` too, so its disabled form is covered
+   by the second selector. */
+[data-style="neo"] .gn-field__input:disabled,
+[data-style="neo"] .gn-select__trigger:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-text-subtle);
 }
 
 /* ── The raised trigger coat (`Select`'s `appearance="raised"`; case 13.1344).
@@ -7256,6 +7302,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text);
   font: inherit;
   font-size: 1.0625rem;
+}
+/* U5 (case 23.002): the project search is a text field, so under `neo` it wears the ring too. It had no neo arm and no
+   border at all (`border: none` above, the sunken shadow alone), which measured 1.18 in light. */
+[data-style="neo"] .gn-project__search {
+  border: 1px solid var(--gn-field-rim);
 }
 .gn-project__filter-chip {
   display: inline-flex;
