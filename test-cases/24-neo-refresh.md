@@ -31,11 +31,11 @@
 
 ## 24.3 The sunken family and the rim-less neo field (T3)
 
-- ❌ **24.040 — a neo text field has no rim; its recess edge is the boundary (N10; hig/minimal keep the ring).**
-- ❌ **24.041 — the control recesses read `recess`; wells keep `sunken` (N9).**
-- ❌ **24.042 — the task checkbox takes the chip-sized inset and keeps its strong border.**
-- ❌ **24.043 — hover lifts, press recesses: the help toggle no longer presses on hover.**
-- ❌ **24.044 — a neo field inside a dark well still has a visible edge (Review Focus 2).**
+- ✅ **24.040 — a neo text field has no rim; its recess edge is the boundary (N10; hig/minimal keep the ring).**
+- ✅ **24.041 — the control recesses read `recess`; wells keep `sunken` (N9).**
+- ✅ **24.042 — the task checkbox takes the chip-sized inset and keeps its strong border.**
+- ✅ **24.043 — hover lifts, press recesses: the help toggle no longer presses on hover.**
+- ✅ **24.044 — a neo field inside a dark well still has a visible edge (Review Focus 2).**
 
 ## 24.4 Depth on ghost and icon buttons (T4)
 

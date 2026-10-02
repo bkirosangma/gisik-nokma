@@ -2892,7 +2892,8 @@ input, textarea, select { font-family: inherit; }
   letter-spacing: -0.1px;
   color: var(--gn-text-muted);
   text-decoration: none;
-  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out,
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -2942,7 +2943,7 @@ input, textarea, select { font-family: inherit; }
 [data-style="neo"] .gn-nav a[aria-current='page'],
 [data-style="neo"] .gn-nav button[aria-current='page'] {
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-recess); /* N9 (case 24.041): a control inset, box-sized */
 }
 /* The lit link also draws a 3px bar under its label, in the SAME `--gn-nav-indicator` the bottom bar's indicator uses
    (UX fixes Task 3, case 23.044, audit SYS-20): the current page reads in the top nav exactly as it does in the bar,
@@ -4892,7 +4893,7 @@ input, textarea, select { font-family: inherit; }
 [data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked) {
   border-color: var(--gn-border-strong);
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact); /* N9 (case 24.042): chip-sized inset for a ~1rem box */
 }
 
 /* The fenced code block. `.editor-codeblock`'s own `position: relative` is

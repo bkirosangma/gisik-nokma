@@ -244,3 +244,80 @@ describe('24.010 the tinted ticket-sheet label stays legible in neo (FIX 1 item 
     expect(contrastRatio(colorOf('light', 'textSubtle', 'neo'), ground)).toBeLessThan(4.5);
   });
 });
+
+// ---- T3 — the sunken family and the rim-less neo field (N2, N9, N10; cases 24.040–24.044)
+const t3Ui = readUiCss();
+const t3Globals = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
+
+describe('24.040 a neo text field has no rim; its recess edge is the boundary (N10; hig/minimal keep the ring)', () => {
+  const NEO_FIELDS = [
+    '[data-style="neo"] .gn-field__input',
+    '[data-style="neo"] .gn-help__search-input',
+    '[data-style="neo"] .gn-project__search',
+    '[data-style="neo"] .workflow-builder-screen__name',
+  ];
+  it('24.040 every neo field arm is border: 1px solid transparent, background surface-sunken, box-shadow field; the base rule keeps --gn-border', () => {
+    for (const sel of NEO_FIELDS) {
+      const body = ruleExactly(t3Ui, sel);
+      expect(valueOf(body, 'border'), sel).toBe('1px solid transparent');
+      expect(valueOf(body, 'box-shadow'), sel).toBe('var(--gn-shadow-field)');
+      expect(valueOf(body, 'background'), sel).toBe('var(--gn-surface-sunken)');
+    }
+    // CONTROL (the style scoping): the unscoped field keeps its 1px ring; hig/minimal render the ring and no field shadow.
+    expect(valueOf(ruleExactly(t3Ui, '.gn-field__input'), 'border')).toBe('1px solid var(--gn-border)');
+    expect(shadowValueOf('hig', 'light', 'field')).toBe('none');
+    expect(shadowValueOf('minimal', 'light', 'field')).toBe('none');
+    // and the disabled neo field stays flat (U7): transparent border, no shadow, textSubtle
+    const dis = ruleExactly(t3Ui, ['[data-style="neo"] .gn-field__input:disabled', '[data-style="neo"] .gn-select__trigger:disabled']);
+    expect(valueOf(dis, 'box-shadow')).toBe('none');
+    expect(valueOf(dis, 'color')).toBe('var(--gn-text-subtle)');
+  });
+});
+
+describe('24.041 the control recesses read recess; wells keep sunken (N9)', () => {
+  it('24.041 segmented track, current nav item and the pressed segment read recess on the track fill; board columns and trays read track/sunken', () => {
+    expect(valueOf(ruleExactly(t3Ui, '[data-style="neo"] .gn-segmented'), 'box-shadow')).toBe('var(--gn-shadow-recess)');
+    const on = ruleExactly(t3Ui, '[data-style="neo"] .gn-segmented__item--on');
+    expect(valueOf(on, 'box-shadow')).toBe('var(--gn-shadow-selected)'); // selected = recess in neo (24.004)
+    expect(valueOf(on, 'background')).toBe('var(--gn-surface-track)'); // N2: never lighter than its track
+    const nav = ruleExactly(t3Globals, ['[data-style="neo"] .gn-nav a[aria-current=\'page\']', '[data-style="neo"] .gn-nav button[aria-current=\'page\']']);
+    expect(valueOf(nav, 'box-shadow')).toBe('var(--gn-shadow-recess)');
+    // CONTROL: wells did not move to the control inset.
+    expect(valueOf(ruleExactly(t3Ui, '.gn-board__column'), 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-ticket-sheet__fields'), 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented'), 'box-shadow')).toBe('var(--gn-shadow-track)'); // hig keeps its lit-from-above track
+  });
+});
+
+describe('24.042 the task checkbox takes the chip-sized inset and keeps its strong border', () => {
+  it('24.042 the neo unchecked task box reads sunken-compact on surface-sunken with border-strong', () => {
+    const box = ruleExactly(t3Globals, [
+      "[data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked)",
+      "[data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked)",
+    ]);
+    expect(valueOf(box, 'box-shadow')).toBe('var(--gn-shadow-sunken-compact)');
+    expect(valueOf(box, 'border-color')).toBe('var(--gn-border-strong)');
+  });
+});
+
+describe('24.043 hover lifts, press recesses: the neo help toggle no longer presses on hover (hig/minimal untouched)', () => {
+  it('24.043 a [data-style="neo"] .gn-help__toggle:hover arm reads raised-compact; the unscoped rule keeps sunken; the segmented item and nav links transition box-shadow', () => {
+    expect(valueOf(ruleExactly(t3Ui, '[data-style="neo"] .gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-sunken)'); // CONTROL: none in hig/minimal, as today
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item'), 'transition')).toContain('box-shadow');
+    expect(valueOf(ruleExactly(t3Globals, '.gn-nav a'), 'transition')).toContain('box-shadow');
+  });
+});
+
+describe('24.044 a neo field inside a dark well still has a visible edge (Review Focus 2)', () => {
+  it('24.044 the dark line clears 3.0 against the well AND the fill; the light line clears 3.0 against the well, paper and the raised card', () => {
+    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceWell', 'neo'))).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceSunken', 'neo'))).toBeGreaterThanOrEqual(3.0);
+    for (const bg of ['surfaceWell', 'surface', 'surfaceRaised'] as const) {
+      expect(contrastRatio('#897362', colorOf('light', bg, 'neo')), bg).toBeGreaterThanOrEqual(3.0);
+    }
+    // CONTROL: the soft edge is NOT claimed — the light lip and the dark band are under 3:1 and the test says so.
+    expect(contrastRatio(over('#fffaf4cc', '#e6dcd2'), '#e6dcd2')).toBeLessThan(3.0);
+    expect(contrastRatio(over('#000000bf', '#141a33'), '#141a33')).toBeLessThan(3.0);
+  });
+});

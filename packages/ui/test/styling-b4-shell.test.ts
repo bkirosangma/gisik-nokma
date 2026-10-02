@@ -17,7 +17,9 @@ const ROWS: RosterRow[] = [
     selectors: ['.gn-nav a'], // amended 2026-10-02: the retired `Menu` toggle (`.gn-nav__more-toggle`) left this selector list (UX fixes Task 4, case 23.042)
     declarations: {
       'border-radius': '0.75rem',
-      transition: 'background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out',
+      // amended 2026-10-02 by N9 (case 24.043): the nav link also eases its `box-shadow` (the neo current-item inset).
+      transition:
+        'background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out, box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)',
       color: 'var(--gn-text-muted)',
     },
   },
@@ -107,6 +109,7 @@ describe('20.233 under neo a current button is pressed in like a current link', 
     expect(winnerFor(css, 'a', true, 'background')).toBe('var(--gn-surface-sunken)');
     // the cascade winner for a current <button> under neo
     expect(winnerFor(css, 'button', true, 'background')).toBe('var(--gn-surface-sunken)');
-    expect(winnerFor(css, 'button', true, 'box-shadow')).toBe('var(--gn-shadow-sunken)');
+    // amended 2026-10-02 by N9 (case 24.041): the neo current item is a control inset, `recess`.
+    expect(winnerFor(css, 'button', true, 'box-shadow')).toBe('var(--gn-shadow-recess)');
   });
 });

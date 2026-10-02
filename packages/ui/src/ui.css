@@ -4801,9 +4801,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: not-allowed;
 }
 [data-style="neo"] .workflow-builder-screen__name {
-  border: 1px solid var(--gn-field-rim);
+  border: 1px solid transparent;
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-field);
 }
 /* U7: flat when disabled, AFTER the neo rule above (case 23.004). The ring and the inset go; the 1px stays transparent. */
 [data-style="neo"] .workflow-builder-screen__name:disabled {
@@ -6285,9 +6285,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: var(--gn-radius-control);
 }
 [data-style="neo"] .gn-help__search-input {
-  border: 1px solid var(--gn-field-rim);
+  border: 1px solid transparent;
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-field);
 }
 .gn-help__search-input:focus-visible,
 .gn-help__toggle:focus-visible,
@@ -6424,6 +6424,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    this is a genuine background change everywhere; the sunken shadow layers on
    top where the style has a real one (neo). */
 .gn-help__toggle:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
+/* N9 (case 24.043): in neo hover LIFTS and press recesses, so the hover arm is the compact raise. hig/minimal keep the rule above. */
+[data-style="neo"] .gn-help__toggle:hover { box-shadow: var(--gn-shadow-raised-compact); }
 
 /* ── The topic sidebar ────────────────────────────────────────────────────────
    REPLACES `.gn-help__toc`, a wrapped row of every section link that stood
@@ -6932,6 +6934,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-surface-track);
   box-shadow: var(--gn-shadow-track);
 }
+/* N9 (case 24.041): under neo the track is a CONTROL recess, box-sized (`recess`), not a well (`track`). hig/minimal keep the lit-from-above track above. */
+[data-style="neo"] .gn-segmented {
+  box-shadow: var(--gn-shadow-recess);
+}
 /* 2.75rem, NOT the 2.5rem this rule shipped with in #360. That was 40px against
    the 44px floor this repo's own tap-target ratchet enforces (WCAG 2.5.5, and
    the same 2.75rem every other control here uses), and it was invisible for one
@@ -6968,6 +6974,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
+  /* N9 (case 24.043): the pressed segment's inset eases in rather than snapping. */
+  transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-segmented__item { transition: none; }
 }
 /* Styling refresh Plan B (Task B2): pill tabs, tier-2 ink at rest; the selected
    one is raised on the track with the lit-edge `lift` shadow, in `text`. That
@@ -7040,8 +7051,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      The base rule now reads `--gn-shadow-lift` (hig/minimal's lit-edge raise),
      and neo's `lift` is its OUTSET raised pair — so without this line neo's
      selected tab would lift instead of press (B-D3, 10.80). */
-  background: var(--gn-surface-sunken);
+  background: var(--gn-surface-track);
   box-shadow: var(--gn-shadow-selected);
+  /* N2 (case 24.041): the pressed segment sits on the TRACK fill, never lighter than the track it is cut into. */
   /* U6 (owner, 2026-10-02; case 23.003): the pressed segment also reads in WEIGHT and a BAR, not by its inset alone
      (the inset measured as invisible: audit SYS-06, SET-08, NP-17). The label is semibold and a 2px bar in the main
      TEXT colour, not the accent (U1), sits under it. */
@@ -7168,11 +7180,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
    `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
    to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
-   also removes the 1px that a neo field lost to its missing border compared with a hig one. */
+   also removes the 1px that a neo field lost to its missing border compared with a hig one.
+
+   OWNER RULING N10 (2026-10-02, "go with B in neumorphic"; case 24.040): a neo text field has NO uniform rim. Its boundary is the
+   recess edge — a crisp 1px line at >= 3:1 on one side, as WCAG 1.4.11's partial-edge example allows (light: the dark line
+   top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 4.38 against the page).
+   The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the U5 ring through the base rule above;
+   `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
 [data-style="neo"] .gn-field__input {
-  border: 1px solid var(--gn-field-rim);
+  border: 1px solid transparent;
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-field);
 }
 /* U7 (owner, 2026-10-02; cases 23.004, 23.009): a DISABLED neo field is flat: no ring, no inset, muted text on
    whatever ground it sits on. "No depth" reads as "not interactive". The border keeps its 1px (`transparent`, not
@@ -7529,7 +7547,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* U5 (case 23.002): the project search is a text field, so under `neo` it wears the ring too. It had no neo arm and no
    border at all (`border: none` above, the sunken shadow alone), which measured 1.18 in light. */
 [data-style="neo"] .gn-project__search {
-  border: 1px solid var(--gn-field-rim);
+  /* N10 (case 24.040) supersedes the ring: the same rim-less field the other three neo arms wear. */
+  border: 1px solid transparent;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-field);
 }
 .gn-project__filter-chip {
   display: inline-flex;
