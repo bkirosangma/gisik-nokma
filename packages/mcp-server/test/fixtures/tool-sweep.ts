@@ -43,6 +43,14 @@ export const SWEEP: Record<string, SweepEntry> = {
   // ticket begin (T9)
   // ticket end
   // discovery begin (T10)
+  list_ticket_types: { args: { workspaceId: 'w' }, session: { get: async () => ({ ticketTypes: [] }) } },
+  list_workflows: { args: { workspaceId: 'w' }, session: { get: async () => ({ workflows: [] }) } },
+  my_work: { args: { workspaceId: 'w' } },
+  get_attention: { args: { workspaceId: 'w' } },
+  list_notifications: { args: {}, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  mark_notifications_read: { args: { all: true }, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  list_my_invitations: { args: {}, session: { get: async () => ({ invitations: [] }) } },
+  respond_to_invitation: { args: { inviteId: 'i', answer: 'accept' } },
   // discovery end
   // member-admin begin (T11)
   // member-admin end
