@@ -8,6 +8,25 @@
 
 - ❌ **25.001 — the bucket is registered in `test-cases/README.md` and the citations baseline, and `pnpm check:citations` passes with it empty (audit: none, the bucket's own registration).** Control: a case id cited by no test reddens the check.
 
+## 25.2 Loading primitives (T2)
+
+Amendment S-R1 (2026-10-02, spec "Amendment S-R1"): the skeleton fill is the new `surfacePlaceholder` role, and `Skeleton`'s shapes are the PARTS a screen's structural skeleton is built from. Tests: `packages/ui/test/{announce,use-wait,skeleton,skeleton-css,skeleton-role}.test.*`.
+
+- ✅ **25.010 — a message reaches the ONE polite `role="status"` region; the same message twice is announced twice (cleared, then re-set across a frame); nothing is assertive; a second region renders nothing (audit SM-09: the silent loading arms).** Control: the second mount. Mutation: the clear removed → red.
+- ✅ **25.011 — a read that resolves in 10 ms never shows a placeholder; one open at 150 ms does (audit SM-02).** Control: the same hook at 149 and 150 ms. Mutation: the 150 ms wait set to 0 → red.
+- ✅ **25.012 — once shown, a placeholder stays for the 350 ms hold even when the read resolves 10 ms later (audit SM-02).** Mutation: the hold removed → red.
+- ✅ **25.012b — going pending again inside the hold does not restart it: the placeholder clears at the original hold end (audit SM-02).** Mutation: the `shownAt` guard removed → red.
+- ✅ **25.013 — `immediate`: a region that never had content shows its placeholder on the first render (audit SM-02).** Control: without the option the first render is bare.
+- ✅ **25.014 — a `Skeleton` is `aria-hidden`, carries its shape class and size variables, repeats `rows` inside one wrapper; `line`, `block` and `circle` each render their own shape (the S-R1 parts) (audit SM-09).** Control: a single line has no wrapper. Mutation: the rows wrapper dropped → red.
+- ✅ **25.015 — a `SkeletonRegion` is `aria-busy` and names what is loading once, visually hidden, with nothing focusable inside (audit SM-09).**
+- ✅ **25.016 — `Pending` sets `aria-busy` at once, adds the dim class (`gn-pending`) only after the wait and keeps it for the hold after the write resolves, and holds its `label` ("Saving the title") in a visually hidden element while pending and not after; a busy `Button` is disabled, `aria-busy` and reads its busy label (audit SM-11, SM-03).** Controls: at t=0 busy but not dimmed; a `Pending` with no label adds no hidden text; the idle button. Mutations: the dim class never applied, the label never rendered, busy stays enabled → red.
+- ✅ **25.017 — the skeleton fill is `var(--gn-surface-placeholder)` (never the track, the well or the plain surface), the shape is radius tokens, and the pulse is one named keyframe on opacity only (audit SM-09).** Control: not `--gn-surface`. Mutation: fill from the track → red.
+- ✅ **25.017b — every selector with an animation declaration in `ui.css` has a `prefers-reduced-motion: reduce` arm naming it (audit SM-14: the missing reduced-motion belt).** Control: a planted ungated animation is caught. Mutation: the reduced arm removed → red.
+- ✅ **25.017c — `surfacePlaceholder` maps, in hig and minimal and both themes, to the primitive `surfaceTrack` uses and equals the value the 24.009 fixture recorded for the track, so their look does not change (S-R1 rule 3).** Control: in neo it is not the track. Mutation: hig light moved off the track primitive → red.
+- ✅ **25.017d — in neo the role is a FLAT step one notch off `surface` toward the ink (light `#eae1d8`, dark `#2a314b`), never the well and never `surfaceTrack`/`surfaceWell`/`surfaceSunken`; no `CONTRAST_PAIRS` row names it (S-R1 rule 3).** Control: the well fails its own ordering. Mutation: neo light mapped to the well → red.
+- ✅ **25.018 — reduced motion stops the pulse and leaves a static block (`opacity: 0.8`); the placeholder block names no style attribute (audit SM-14, SM-09).** Mutation: a `[data-style="neo"]` rule in the block, or the arm's `animation: none` removed → red.
+- ✅ **25.019 — the placeholder block is appended after every earlier rule, and holds only `.gn-skeleton*`, `.gn-pending` and `.gn-skeleton-region` rules, so no earlier line range moves (audit SM-09).** Control: another family's selector fails the same pattern. Mutation: a `.gn-board-card` rule in the block → red.
+
 ## 25.2 The read cache, dedupe and one reload wave (T3)
 
 - ✅ **25.020 — a number as `useLiveQuery`'s fifth argument still means `debounceMs`, and the sixth argument is still the 18.461 `initial` seed; a hook with no `cacheKey` reads and writes no cache (audit SM-01).** Control: the same remount without a `cacheKey` starts from `null`.
