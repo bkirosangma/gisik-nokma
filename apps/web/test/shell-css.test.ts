@@ -26,6 +26,8 @@ describe('shell CSS for placeholders (spec S1, P10)', () => {
       for (const property of ['background', 'background-color', 'border', 'box-shadow', 'color']) expect(valueOf(rule.body, property), `${rule.selectors} ${property}`).toBeNull();
       expect(rule.selectors.join(','), 'style attribute').not.toContain('data-style');
     }
+    // The loading-sentence wrapper adds no box: the region is `display: contents` inside a shell.
+    expect(valueOf(ruleExactly(css, '.gn-shell--skeleton .gn-skeleton-region'), 'display')).toBe('contents');
     // Control: a rule that does animate (the hint) is not one of them, and the height it reserves is the bar's own token, which is
     // declared (4.35rem, measured 69.6px at 1440) and re-pointed on the phone (52px measured at 390), so the skeleton tracks the real bar.
     expect(valueOf(ruleExactly(css, '.gn-nav__pending[data-pending="true"]'), 'animation')).not.toBeNull();

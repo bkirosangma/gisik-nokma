@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { AnnounceRegion } from '../src/announce-region.js';
 import { AppNavSkeleton } from '../src/skeletons/app-nav-skeleton.js';
 import { FormPageShell, ListPageShell, NotesPageShell, ProjectPageSkeleton } from '../src/skeletons/page-shells.js';
 import ProjectLoading from '../app/w/[workspaceId]/p/[projectId]/loading.js';
@@ -16,6 +17,16 @@ const ROUTES_WITH_SHELLS = ['workspaces', 'w/[workspaceId]', 'w/[workspaceId]/p/
 const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8');
 
 describe('route shells (spec D5, S1; audit SM-02)', () => {
+  it("25.060 the notes shell's tree is the real CLOSED drawer (`nav.gn-notes__tree.gn-notes__tree--drawer`, data-open=false), so the <=60rem arm hides it as it hides the real one and the document does not jump", () => {
+    const tree = render(<NotesPageShell />).container.querySelector('.gn-notes__body > .gn-notes__tree')!;
+    expect(tree.tagName).toBe('NAV');
+    expect(tree.getAttribute('data-open')).toBe('false');
+    // CONTROL: the class list equals the real page's own tree, read from its source.
+    const real = read(SRC, 'notes/notes-page.tsx').match(/<nav[^>]*id="gn-notes-tree"[^>]*className="([^"]+)"/)?.[1];
+    expect(real, 'the real tree element was found').toBe('gn-notes__tree gn-notes__tree--drawer');
+    expect(tree.className).toBe(real);
+  });
+
   it('25.051 every signed-in route segment has a loading.tsx; the sign-in and legal routes do not', () => {
     for (const route of ROUTES_WITH_SHELLS) expect(existsSync(join(APP, route, 'loading.tsx')), route).toBe(true);
     for (const route of ['sign-in', 'privacy', 'terms', 'invite/[token]']) expect(existsSync(join(APP, route, 'loading.tsx')), route).toBe(false);
@@ -27,7 +38,8 @@ describe('route shells (spec D5, S1; audit SM-02)', () => {
     expect(main.className).toContain('gn-shell gn-shell--wide');
     expect(main).toHaveAttribute('aria-busy', 'true');
     expect(main.querySelectorAll('a, button, input')).toHaveLength(0);
-    expect(main.querySelectorAll('.gn-skeleton--block').length).toBeGreaterThanOrEqual(8);
+    // EXACT: five tab blocks + the toolbar block + the list tab's eight rows (a 7-row list must fail, not just a 2-row one).
+    expect(main.querySelectorAll('.gn-skeleton--block')).toHaveLength(5 + 1 + 8);
     expect(main.querySelectorAll('.gn-board__column')).toHaveLength(0);
     // Control: the board tab draws three real columns of three real cards (S-R1 rule 1: the frame is the real element),
     // and no stand-in `card` shape.
@@ -73,13 +85,18 @@ describe('route shells (spec D5, S1; audit SM-02)', () => {
     const desktop = read(__dirname, '..', '..', 'desktop', 'src', 'main.tsx');
     expect(desktop.match(/<AnnounceRegion/g)).toHaveLength(1);
     expect(desktop.indexOf('<AnnounceRegion')).toBeLessThan(desktop.indexOf('<App'));
+    // The web layout mounts the CLIENT WRAPPER, so render it: exactly one polite status region (a wrapper that returns null leaves the layout's source sweep green).
+    const { container } = render(<AnnounceRegion />);
+    expect(container.querySelectorAll('[aria-live="polite"]')).toHaveLength(1);
+    expect(layout).toContain("from '../src/announce-region.js'");
   });
 
-  it('25.058 every nav link wraps its label in <NavPending>: the bar, the hover menus (workspace and last project), the notes and inbox links and the bottom-bar slots', () => {
+  it('25.058 every nav link wraps its label in <NavPending>: per file the <Link count EQUALS the <NavPending> count (the bar, both hover menus, the notes and inbox links, the bottom-bar slots and the More-sheet rows)', () => {
     for (const file of ['app-nav.tsx', 'nav-hover-menu.tsx', 'bottom-bar.tsx', 'notes-nav-link.tsx', 'inbox-nav-link.tsx']) {
       const source = read(SRC, file);
-      expect(source.match(/<Link\b/g)?.length ?? 0, `${file} has links`).toBeGreaterThan(0);
-      expect(source.match(/<NavPending>/g)?.length ?? 0, `${file} wraps labels`).toBeGreaterThan(0);
+      const links = source.match(/<Link\b/g)?.length ?? 0;
+      expect(links, `${file} has links`).toBeGreaterThan(0);
+      expect(source.match(/<NavPending>/g)?.length ?? 0, `${file}: every <Link wraps its label`).toBe(links);
     }
     // Control: the skeleton never draws a link.
     expect(read(SRC, 'skeletons/app-nav-skeleton.tsx')).not.toContain('next/link');

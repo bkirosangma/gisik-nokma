@@ -102,9 +102,11 @@ export function NotesPageShell() {
             <Skeleton className="gn-page-title" width="8rem" height="var(--gn-title-page-size)" />
           </div>
           <div className="gn-notes__body">
-            <aside className="gn-notes__tree">
+            {/* The real CLOSED drawer (notes-page.tsx): at <=60rem the `--drawer` rule hides it and the body is one column, so the
+                document does not jump when the page arrives; above 60rem it is the same 18rem column. */}
+            <nav aria-label="Notes, loading" className="gn-notes__tree gn-notes__tree--drawer" data-open="false">
               <Skeleton height="1.25rem" rows={8} />
-            </aside>
+            </nav>
             <section className="gn-notes__document">
               <Skeleton width="60%" height="var(--gn-title-page-size)" />
               <Skeleton shape="block" height="40dvh" />
