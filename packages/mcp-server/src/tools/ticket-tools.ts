@@ -37,21 +37,30 @@ const updateShape = {
   workflow: z.object({ toWorkflowId: id, toStateId: id }).optional(),
 };
 
-/** A history line without any document in it (owner question Q4): the ledger's facts, never a body. */
-function historyLine(e: { id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string }) {
-  let payload: Record<string, unknown> = e.payload;
-  if (e.type === 'comment.added') payload = { commentId: e.id };
-  else if (e.type === 'comment.edited' || e.type === 'comment.deleted') payload = { commentId: e.payload['commentId'] };
-  else if (e.type === 'ticket.field_set' && e.payload['fieldId'] === 'description') payload = { fieldId: 'description' };
-  else if (e.type === 'ticket.transitioned' && 'comment' in e.payload) {
+/** A payload without any document in it (owner question Q4): the ledger's facts, never a body. One rule for a line and for a contested claim's original. */
+function redactedPayload(type: string, eventId: string, payload: Record<string, unknown>): Record<string, unknown> {
+  if (type === 'comment.added') return { commentId: eventId };
+  if (type === 'comment.edited' || type === 'comment.deleted') return { commentId: payload['commentId'] };
+  if (type === 'ticket.field_set' && payload['fieldId'] === 'description') return { fieldId: 'description' };
+  if (type === 'ticket.transitioned' && 'comment' in payload) {
     // A transition's own comment is a comment body (`{ text }`): the move is the fact, the words are list_comments'.
-    const { comment: _omit, ...rest } = e.payload;
-    payload = rest;
-  } else if (e.type === 'ticket.created' && 'description' in e.payload) {
-    const { description: _omit, ...rest } = e.payload;
-    payload = rest;
+    const { comment: _omit, ...rest } = payload;
+    return rest;
   }
-  return { eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload };
+  if (type === 'ticket.created' && 'description' in payload) {
+    const { description: _omit, ...rest } = payload;
+    return rest;
+  }
+  if (type === 'claim.contested' && typeof payload['originalEvent'] === 'object' && payload['originalEvent'] !== null) {
+    // The refused claim rides along WHOLE: keep what was refused (its type and id), drop its text.
+    const original = payload['originalEvent'] as { id: string; type: string; payload: Record<string, unknown> };
+    return { rule: payload['rule'], reason: payload['reason'], originalEvent: { id: original.id, type: original.type, payload: redactedPayload(original.type, original.id, original.payload ?? {}) } };
+  }
+  return payload;
+}
+
+function historyLine(e: { id: string; type: string; payload: Record<string, unknown>; actorId: string; origin: string; serverTime: string }) {
+  return { eventId: e.id, type: e.type, actorId: e.actorId, origin: e.origin, serverTime: e.serverTime, payload: redactedPayload(e.type, e.id, e.payload) };
 }
 
 export function ticketTools(session: Session): ToolDefinition[] {
