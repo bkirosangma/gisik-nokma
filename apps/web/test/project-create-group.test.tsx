@@ -206,6 +206,26 @@ describe('22.241 an inline-created group in the Create project dialog', () => {
     expect(sent[1]!.find((event) => event.type === 'project.updated')!.payload).toEqual({ groupId: 'g9' });
   });
 
+  it('22.241 a refusal of the founding call\'s group update lands under the picker, once, and the dialog stays open', async () => {
+    const gone = 'That group no longer exists.';
+    // The group was deleted between the two calls: `group.created` committed, then the update filing under it is refused.
+    const model = serverModel([], (event) =>
+      event.type === 'project.updated' ? refuse(event, 'group.unknown', gone) : null,
+    );
+    const { sent } = mountWith(model.answer, model.groups);
+    const dialog = await openDialog('Cold chain');
+    await userEvent.type(await within(dialog).findByLabelText('Level 1 group'), 'Wholesale{Enter}');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(sent).toHaveLength(2)); // the group call, then the founding call
+
+    expect(await within(dialog).findByText(gone, { exact: true })).toBeInTheDocument(); // under the picker
+    expect(document.getElementById('gn-new-project-group-refusal')).toHaveTextContent(gone);
+    expect(screen.queryAllByRole('alert')).toHaveLength(1); // the field's, not the page's as well
+    // CONTROL — the page's own refusal line does not repeat the reason (it is claimed by the field).
+    expect(screen.getAllByText(gone, { exact: false })).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: 'Create project' })).toBeInTheDocument(); // stays open
+  });
+
   it('22.241 control: a refusal that is not about a field does not re-read the groups and shows once, on the dialog', async () => {
     const { sent, groupAsks } = mount((event) => refuse(event, 'permission.role', 'Only an admin can do that.'));
     const dialog = await openDialog('Cold chain');
@@ -254,6 +274,8 @@ describe('22.246 / 22.247 a refused submit never leaves a duplicate project or a
     // The picker holds it as an EXISTING group, not a pending one.
     expect(within(dialog).getByLabelText('Level 1 group')).toHaveValue('Wholesale');
     expect(within(dialog).queryByText('New')).toBeNull();
+    // Held as the person's OWN pick, not re-adopted from the re-read: no "Using the existing …" about a group THEY just made.
+    expect(within(dialog).queryByText(/Using the existing/)).toBeNull();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create project' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create project' })).toBeNull());
