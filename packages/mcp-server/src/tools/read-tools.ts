@@ -19,6 +19,7 @@ export type ToolDefinition = {
  *  (MCP CRUD plan M5/M6). Importing the schema is what makes the plural keys and the refusal of a
  *  singular+plural pair arrive here without a second spelling. */
 const filterArg = filterSpecSchema.optional();
+const searchShape = { workspaceId: z.string().min(1), query: z.string().min(1).max(500), filter: filterArg };
 
 /** The server answers a refused filter with `400 { error: 'invalid_filter' }` and deliberately names
  *  nothing (it would mirror the refused value). On its own that reaches an assistant as "answered
@@ -39,36 +40,51 @@ const TWO_SCOPES =
 type RosterRow = { userId: string; displayName: string; role?: string; email?: string; removed?: true };
 
 export function readTools(session: Session): ToolDefinition[] {
+  const runSearch = async (
+    tool: string,
+    parsed: { workspaceId: string; query: string; filter?: z.infer<typeof filterSpecSchema>; kinds?: string[]; mode?: string },
+  ) => {
+    if (parsed.filter?.text !== undefined) {
+      // Refused here rather than at the server, which answers a bare
+      // `invalid_filter` that does not say which of the two text terms is
+      // the problem.
+      throw new Error(
+        `${tool} takes the search text as \`query\`; a \`text\` key inside \`filter\` is refused ` +
+          'by the server. Pass one or the other, not both.',
+      );
+    }
+    const search = new URLSearchParams({ workspaceId: parsed.workspaceId, q: parsed.query });
+    if (parsed.kinds !== undefined) search.set('kinds', parsed.kinds.join(','));
+    if (parsed.mode !== undefined) search.set('mode', parsed.mode);
+    if (parsed.filter !== undefined) search.set('filter', JSON.stringify(parsed.filter));
+    return session.get(`/v1/search?${search.toString()}`);
+  };
   return [
+    {
+      name: 'search',
+      description:
+        'Full-text search across the tickets and notes you can see in one workspace. Returns at most 50 hits ' +
+        'and has no pages — narrow the query, `kinds` or the filter rather than expecting a next page. ' +
+        '`kinds` limits it to tickets, notes, or both (the default is both); `mode: "meaning"` ranks notes by ' +
+        'what they say rather than the words they use and answers notes only. ' +
+        'A ticket key such as "CCSO-12" (any case) returns that ticket first, also by a key it held before a ' +
+        'prefix change. Use list_tickets when you need to enumerate.',
+      inputSchema: { ...searchShape, kinds: z.array(z.enum(['ticket', 'note'])).min(1).optional(), mode: z.enum(['lexical', 'meaning']).optional() },
+      handler: async (args) => {
+        const parsed = z.object({ ...searchShape, kinds: z.array(z.enum(['ticket', 'note'])).min(1).optional(), mode: z.enum(['lexical', 'meaning']).optional() }).parse(args);
+        return runSearch('search', parsed);
+      },
+    },
     {
       name: 'search_tickets',
       description:
+        'Kept for one release as the old name of `search`; it answers exactly what it always did (tickets, and notes too). Prefer `search`. ' +
         'Full-text search across the tickets you can see in one workspace. Returns at most 50 hits ' +
         'and has no pagination — narrow the query or the filter rather than expecting a next page. ' +
         'A ticket key such as "CCSO-12" (any case) returns that ticket first, also by a key it held before a ' +
         'prefix change. Use list_tickets when you need to enumerate.',
-      inputSchema: {
-        workspaceId: z.string().min(1),
-        query: z.string().min(1).max(500),
-        filter: filterArg,
-      },
-      handler: async (args) => {
-        const parsed = z
-          .object({ workspaceId: z.string().min(1), query: z.string().min(1).max(500), filter: filterArg })
-          .parse(args);
-        if (parsed.filter?.text !== undefined) {
-          // Refused here rather than at the server, which answers a bare
-          // `invalid_filter` that does not say which of the two text terms is
-          // the problem.
-          throw new Error(
-            'search_tickets takes the search text as `query`; a `text` key inside `filter` is refused ' +
-              'by the server. Pass one or the other, not both.',
-          );
-        }
-        const search = new URLSearchParams({ workspaceId: parsed.workspaceId, q: parsed.query });
-        if (parsed.filter !== undefined) search.set('filter', JSON.stringify(parsed.filter));
-        return session.get(`/v1/search?${search.toString()}`);
-      },
+      inputSchema: searchShape,
+      handler: async (args) => runSearch('search_tickets', z.object(searchShape).parse(args)),
     },
     {
       name: 'list_tickets',
