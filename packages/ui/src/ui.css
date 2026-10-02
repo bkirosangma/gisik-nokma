@@ -1104,7 +1104,19 @@ a.gn-ticket-sheet__crumb--link {
     box-sizing: border-box;
     padding: 0;
     height: calc((var(--gh-h0) + (var(--gh-h1) - var(--gh-h0)) * var(--p, 0)) * 1px);
-    border-bottom: 1px solid color-mix(in srgb, var(--gn-border) calc(var(--p, 0) * 100%), transparent);
+  }
+  /* The hairline under the compact header is drawn by a pseudo-element whose opacity follows `--p`, so the header's box
+     (and everything in the flow) is the same size at every scroll position. */
+  .gn-sheet[data-compact] .gn-sheet__header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--gn-border);
+    opacity: var(--p, 0);
+    pointer-events: none;
   }
   /* The heading's box goes away: its children are placed against the header. */
   .gn-sheet[data-compact] .gn-sheet__heading { display: contents; }
@@ -1126,7 +1138,6 @@ a.gn-ticket-sheet__crumb--link {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    will-change: transform;
     width: calc((var(--gw0) + (var(--gw1) - var(--gw0)) * var(--p, 0)) * 1px);
     opacity: calc(1 - var(--gfade, 0) * var(--p, 0) * 2);
     transform: translate(
@@ -1150,7 +1161,6 @@ a.gn-ticket-sheet__crumb--link {
     left: 0;
     top: 0;
     transform-origin: 0 0;
-    will-change: transform;
     width: calc((var(--gtw0) + (var(--gtw1) - var(--gtw0)) * var(--p, 0)) / var(--gs) * 1px);
     max-height: calc((var(--gth0) + (var(--gth1) - var(--gth0)) * var(--p, 0)) * 1px);
     transform: translate(
@@ -1166,7 +1176,6 @@ a.gn-ticket-sheet__crumb--link {
     left: 0;
     top: 0;
     z-index: 1;
-    will-change: transform;
     transform: translate(
         calc((var(--gcx0) + (var(--gcx1) - var(--gcx0)) * var(--p, 0)) * 1px),
         calc((var(--gcy0) + (var(--gcy1) - var(--gcy0)) * var(--p, 0)) * 1px)
@@ -1185,7 +1194,6 @@ a.gn-ticket-sheet__crumb--link {
     position: absolute;
     left: 0;
     top: 0;
-    will-change: transform, opacity;
     transform: translate(
         calc((var(--gmx0) + (var(--gmx1) - var(--gmx0)) * var(--p, 0)) * 1px),
         calc((var(--gmy0) + (var(--gmy1) - var(--gmy0)) * var(--p, 0)) * 1px)
