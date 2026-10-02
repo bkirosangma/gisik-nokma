@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TicketTypeListScreen, WorkflowListScreen, useLiveQuery } from '@gisik-nokma/app-core';
+import { useScrollEdges } from '@gisik-nokma/ui';
 import { AppNav } from '../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
 import { useAppServices } from '../../src/providers.js';
@@ -167,6 +168,8 @@ function SettingsContent() {
   // why the sidebar links must never carry this forward.
   const typeId = tab === 'ticket-types' ? searchParams.get('typeId') : null;
   const workspaceName = useWorkspaceName(workspaceId ?? undefined);
+  // The phone arm lays the sidebar out as a sideways track: the fade shows the tab that runs off an edge.
+  const sidebarEdgesRef = useScrollEdges<HTMLElement>('x');
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -179,7 +182,7 @@ function SettingsContent() {
         <p className="gn-workspace-list__role gn-workspace-list__role--pinned">{workspaceName}</p>
       ) : null}
       <div className="gn-settings">
-        <nav className="gn-settings__sidebar" aria-label="Settings sections">
+        <nav className="gn-settings__sidebar gn-scroll-fade" aria-label="Settings sections" ref={sidebarEdgesRef}>
           {workspaceId !== null ? (
             <Link
               href={tabHref(workspaceId, 'ticket-types')}
