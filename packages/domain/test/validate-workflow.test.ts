@@ -373,6 +373,7 @@ describe('validateWorkflowDef — the reserved backlog id', () => {
     const d = def({ states: [...def({}).states, { id: 'backlog', name: 'Mine', category: 'open' }] });
     expect(validateWorkflowDef(d)).toContainEqual({
       code: 'reserved-state-id',
+      // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
       message: '`backlog` is reserved: every workflow has it without declaring it.',
     });
   });

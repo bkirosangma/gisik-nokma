@@ -39,6 +39,7 @@ describe('parseEvent', () => {
     expect(result).toEqual({
       ok: false,
       code: 'unknown-event-type',
+      // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
       message: "unknown event type 'shop.opened': the ledger accepts only what it can later replay",
       eventId: raw['id'],
     });
@@ -247,6 +248,7 @@ describe('parseEvent — a membership event must be filed at its own (workspace,
     expect(result).toEqual({
       ok: false,
       code: 'malformed-envelope',
+      // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
       message: `This membership event is filed at entity '${entityId}' but its payload names no user: a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
       eventId: raw['id'],
     });

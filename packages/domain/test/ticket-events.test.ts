@@ -222,6 +222,7 @@ describe('ticket event vocabulary', () => {
         'invalid-payload',
       );
       expect(refusalMessage('ticket.created', { ...BASE, start: 'backlog', stateId: 'doing' })).toContain(
+        // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
         'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
       );
     });

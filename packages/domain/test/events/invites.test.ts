@@ -108,6 +108,7 @@ describe('inviteSentPayload', () => {
     for (const role of ['owner', 'superuser']) {
       expect(rejectionIssues(inviteSentPayload.safeParse(sent({ role })))).toContainEqual({
         path: ['role'],
+        // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
         message: "requires role 'admin'|'member'|'guest': an invite cannot confer ownership",
       });
     }
