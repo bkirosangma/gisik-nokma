@@ -201,7 +201,7 @@ interface for one route was out of this row's scope.
 - **16.8** ✅ Naming your own token names no other person's.
 - **16.9** ✅ A named token still never returns the credential — a write path is a new chance for it to leak.
 - **16.10** ✅ The row draws the name when there is one.
-- **16.11** ✅ A connection nobody named draws NO name element at all — not an empty one — and its control says `Name`.
+- **16.11** ✅ A connection nobody named draws NO name element at all — not an empty one — and its control says `Name`. **AMENDED 2026-10-02 (23.170):** the control says `Add a name` (accessible name `Add a name to the connection created <date>`), never the bare `Name`.
 - **16.12** ✅ The control sends the draft AS TYPED, addressed to that row's id, and the list is re-read.
 - **16.13** ✅ A refused name keeps the editor OPEN and shows the server's own sentence, so a fixable refusal does not discard the draft.
 - **16.14** ✅ Cancel closes the editor and sends the server NOTHING — not merely "the editor closed".

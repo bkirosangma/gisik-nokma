@@ -317,8 +317,15 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     );
   }
 
+  /** UX fixes T10 (23.171): a custom row's one door is "Reorder <name>"; the moves live in its menu. */
+  async function openReorder(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+    await user.click(screen.getByRole('button', { name: `Reorder ${name}` }));
+  }
+  const menuItem = (label: 'Move up' | 'Move down' | 'Move to top') => screen.getByRole('button', { name: label });
+
   /**
-   * 13.928 — every row carries both controls, and each is a SIBLING of the row
+   * 13.928 — every CUSTOM row carries the Reorder control (amended 2026-10-02, 23.171: was ↑ and ↓ on every
+   * row), and it is a SIBLING of the row
    * door rather than a child of it.
    *
    * The row is one `<button aria-label="Edit …">` (`:392-421` — and the verb BRANCHES
@@ -327,21 +334,19 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * jsdom will happily render, which is exactly why this is asserted on the
    * DOM containment rather than on the fact that a control exists.
    */
-  it('13.928 every row carries ↑ and ↓ controls, and they are siblings of the row door, not inside it', async () => {
+  it('13.928 every custom row carries a Reorder control, a sibling of the row door, not inside it', async () => {
     const { container } = renderReorderableList();
     await screen.findByText('Invoice');
 
     const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
     expect(rows).toHaveLength(6);
 
-    const up = screen.getByRole('button', { name: 'Move Invoice up' });
-    const down = screen.getByRole('button', { name: 'Move Invoice down' });
-    expect(up.tagName).toBe('BUTTON');
-    expect(down.tagName).toBe('BUTTON');
+    const reorder = screen.getByRole('button', { name: 'Reorder Invoice' });
+    expect(reorder.tagName).toBe('BUTTON');
+    expect(screen.getByRole('button', { name: 'Reorder Errand' }).tagName).toBe('BUTTON');
 
     const door = screen.getByRole('button', { name: 'Edit Invoice' });
-    expect(door).not.toContainElement(up);
-    expect(door).not.toContainElement(down);
+    expect(door).not.toContainElement(reorder);
     // …and the door is still the door: the control did not replace it.
     expect(door).toContainElement(screen.getByText('Invoice'));
   });
@@ -354,21 +359,23 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * would satisfy the first half perfectly, so the pair is what makes this
    * falsifiable — the shape this repo catalogues as a check that cannot fail.
    */
-  it('13.929 the ends are disabled and a movable control is not — asserted on the rendered controls', async () => {
+  it('13.929 the ends are disabled and a movable control is not — asserted on the rendered menu items', async () => {
+    const user = userEvent.setup();
     renderReorderableList();
     await screen.findByText('Invoice');
 
-    // First row: nowhere above it to go.
-    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} up` })).toBeDisabled();
     // Last row: nowhere below it to go.
-    expect(screen.getByRole('button', { name: 'Move Errand down' })).toBeDisabled();
+    await openReorder(user, 'Errand');
+    expect(menuItem('Move down')).toBeDisabled();
+    await user.keyboard('{Escape}');
 
     // The control: Invoice sits between a built-in and Errand, so it can move
     // down. Without this line, "everything is disabled" passes this test.
-    expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeEnabled();
-    // And the first row's ↓ is NOT the disabled one — ends are the assertion,
-    // not the whole control set.
-    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} down` })).toBeDisabled();
+    await openReorder(user, 'Invoice');
+    expect(menuItem('Move down')).toBeEnabled();
+    // The first row is a built-in, which now carries no control at all (23.171) — an absent control, not a
+    // permanently disabled one.
+    expect(screen.queryByRole('button', { name: `Reorder ${builtins[0]!.name}` })).toBeNull();
   });
 
   /**
@@ -385,7 +392,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     const { gateway } = renderReorderableList();
     await screen.findByText('Invoice');
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     expect(gateway.submitted).toHaveLength(2);
     const payloads = gateway.submitted.map(
@@ -417,13 +425,16 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * exists to prevent. The control therefore ANTICIPATES the refusal rather
    * than discovering it: the arrow pointing at a built-in is disabled.
    */
-  it('13.931 the arrow that would move a built-in is disabled, on both sides of a built-in', async () => {
+  it('13.931 the move that would displace a built-in is disabled, and a built-in has no control', async () => {
+    const user = userEvent.setup();
     renderReorderableList();
     await screen.findByText('Invoice');
 
-    // Invoice's ↑ would swap it with the built-in directly above it.
-    const up = screen.getByRole('button', { name: 'Move Invoice up' });
+    // Invoice's Move up would swap it with the built-in directly above it.
+    await openReorder(user, 'Invoice');
+    const up = menuItem('Move up');
     expect(up).toBeDisabled();
+    expect(menuItem('Move to top')).toBeDisabled();
     // And the reason is ATTACHED to it, not only hoverable: a disabled button is
     // out of the focus order, so its `title` reaches a mouse user and nobody
     // else. `aria-describedby` must resolve to a node carrying the sentence.
@@ -431,12 +442,13 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     expect(describedBy).not.toBeNull();
     expect(document.getElementById(describedBy!)?.textContent).toBe('Built-in types keep their rank.');
 
-    // The same rule read from the other side: the bottom built-in's ↓ would
-    // move it, so it is disabled — while its ↑, pointing at another built-in,
-    // is also disabled.
-    const lastBuiltin = builtins[builtins.length - 1]!;
-    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} down` })).toBeDisabled();
-    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} up` })).toBeDisabled();
+    // The same rule read from the other side: a built-in is rank-locked, so it carries no Reorder control and
+    // no arrow of either direction (23.171).
+    for (const builtin of builtins) {
+      expect(screen.queryByRole('button', { name: `Reorder ${builtin.name}` })).toBeNull();
+      expect(screen.queryByRole('button', { name: `Move ${builtin.name} up` })).toBeNull();
+      expect(screen.queryByRole('button', { name: `Move ${builtin.name} down` })).toBeNull();
+    }
   });
 
   /**
@@ -458,7 +470,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
     const before = renderedOrder(container);
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     // The server's own words reach the reader…
     expect(await screen.findByText(/built-in ranks are fixed/)).toBeInTheDocument();
@@ -488,8 +501,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     expect(screen.queryByRole('button', { name: 'New type' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move Invoice down' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move Invoice up' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reorder Invoice' })).toBeNull();
     // The control on that assertion: the same query on an AUTHOR finds it, so
     // the nulls above are the gate and not a misspelt name. The author here is
     // an OWNER, not an admin, on purpose — `canAuthorRole` is `owner || admin`,
@@ -503,7 +515,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
         onOpen={() => {}}
         onNew={() => {}}
       />);
-    expect(await screen.findAllByRole('button', { name: 'Move Invoice down' })).not.toHaveLength(0);
+    expect(await screen.findAllByRole('button', { name: 'Reorder Invoice' })).not.toHaveLength(0);
   });
 
   it('E4-34 a non-author is offered a door that says Open, not Edit', async () => {
@@ -565,10 +577,10 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * exists to prevent — while the screen rendered `rank 5` for a type it had
    * submitted as 6. Against the real door the window is a whole round-trip.
    *
-   * The guard is asserted AS the guard: while a swap is in flight, every arrow
-   * is disabled and a second click submits nothing.
+   * The guard is asserted AS the guard: while a swap is in flight, every Reorder
+   * menu item is disabled and a second click submits nothing.
    */
-  it('13.935 every arrow is disabled while a swap is in flight, and a second click submits nothing', async () => {
+  it('13.935 every Reorder menu item is disabled while a swap is in flight, and a second click submits nothing', async () => {
     const user = userEvent.setup();
     const base = createFakeGateway({
       workflows: [kanbanPublished],
@@ -597,24 +609,24 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     );
     await screen.findByText('Invoice');
 
-    const click = user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
-    // In flight: nothing else may be started. `waitFor` rather than a bare
-    // assertion because the click is deliberately NOT awaited — awaiting it would
-    // wait for the door to close, which is the window under test.
-    //
-    // The condition waited on is `Move Invoice down` ON PURPOSE. An earlier draft
-    // waited on `Move Invoice up`, which is disabled in EVERY state (a built-in
-    // sits above it), so it returned instantly and asserted nothing — this repo's
-    // "check that cannot fail" shape, in the test that exists to catch a
-    // concurrency bug. `Invoice down` is enabled before the click and disabled
-    // only while a swap is in flight, so it discriminates.
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeDisabled();
-    });
-    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Move Errand up' })).toBeDisabled();
+    await openReorder(user, 'Invoice');
+    // CONTROL: before the swap, Invoice's Move down is enabled — so the disabled state below is the guard.
+    expect(menuItem('Move down')).toBeEnabled();
+    const click = user.click(menuItem('Move down'));
+    // In flight: nothing else may be started. The Reorder menu is opened ONCE, outside `waitFor`: a click on the
+    // trigger inside a retry loop would toggle the popover shut on every second attempt. Only the assertion waits,
+    // because the Move down click is deliberately NOT awaited — awaiting it would wait for the door to close,
+    // which is the window under test.
+    await openReorder(user, 'Errand');
+    // The condition waited on is Errand's `Move up`: ON PURPOSE it is enabled before the click (Invoice, a
+    // custom type, sits above it) and disabled only while a swap is in flight, so it discriminates. Invoice's
+    // own `Move up` is disabled in EVERY state (a built-in sits above it) and would return instantly.
+    await waitFor(() => expect(menuItem('Move up')).toBeDisabled());
+    expect(menuItem('Move to top')).toBeDisabled();
+    expect(document.body).toHaveTextContent('A reorder is already in flight.');
+    // The SECOND click, while the first is still in flight: it lands on a disabled item and starts nothing.
+    await user.click(menuItem('Move up'));
 
-    await user.click(screen.getByRole('button', { name: 'Move Errand up' }));
     release!();
     await click;
     // Exactly ONE swap reached the door — the second click submitted nothing.
@@ -635,9 +647,43 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
     expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     expect(renderedOrder(container).slice(4)).toEqual(['Errand', 'Invoice']);
+  });
+
+  /**
+   * 23.171 (SET-03) — ordering is by a "Reorder" menu on CUSTOM types only: Move up / Move down / Move to top.
+   * A built-in's row shows no move arrows at all. CONTROL in the same `it`: a custom type CAN still be moved —
+   * Move to top re-deals the two custom types' ranks through the same `ticket-type.defined` door.
+   */
+  it('23.171 built-in rows carry no arrows; a custom row offers Move up / Move down / Move to top and Move to top moves it', async () => {
+    const user = userEvent.setup();
+    const { gateway, container } = renderReorderableList();
+    await screen.findByText('Invoice');
+
+    // No built-in row carries a move control of any kind, and no row carries an arrow glyph.
+    const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
+    for (const row of rows.slice(0, builtins.length)) {
+      expect(row.querySelector('.ticket-type-list__move')).toBeNull();
+    }
+    expect(container.textContent).not.toMatch(/[↑↓]/);
+    expect(screen.queryAllByRole('button', { name: /^Move .* (up|down)$/ })).toHaveLength(0);
+
+    await openReorder(user, 'Errand');
+    expect(menuItem('Move up')).toBeEnabled();
+    expect(menuItem('Move down')).toBeDisabled();
+    expect(menuItem('Move to top')).toBeEnabled();
+
+    // CONTROL — a custom type can still be moved: to the top of the custom run (below the built-ins).
+    await user.click(menuItem('Move to top'));
+    expect(gateway.submitted).toHaveLength(2);
+    const byName = new Map(gateway.submitted.map((event) => [(event.payload as TicketTypeDef).name, event.payload as TicketTypeDef]));
+    expect(byName.get('Errand')?.rank).toBe(5);
+    expect(byName.get('Invoice')?.rank).toBe(6);
+    expect(renderedOrder(container).slice(0, builtins.length)).toEqual(builtins.map((b) => b.name));
+    expect(renderedOrder(container).slice(builtins.length)).toEqual(['Errand', 'Invoice']);
   });
 });
 

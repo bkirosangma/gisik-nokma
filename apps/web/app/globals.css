@@ -699,6 +699,28 @@ input, textarea, select { font-family: inherit; }
   outline-offset: 2px;
 }
 .gn-workspace-home__rename-trigger:disabled { cursor: default; }
+/* The visible Rename cue (UX fixes Task 10, case 23.177): P-GHOST, icon only, 44x44, beside the heading
+   (a sibling of the `h1`, so the heading never names an action). `.gn-workspace-home__title-row` keeps
+   the name and the cue on one line and lets a long name wrap rather than push the cue off the screen. */
+.gn-workspace-home__title-row { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
+.gn-workspace-home__title-row .gn-page-title { min-width: 0; }
+.gn-workspace-home__rename-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-workspace-home__rename-icon:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text-accent); }
+.gn-workspace-home__rename-icon:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-workspace-home__rename-icon:disabled { cursor: default; }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen
@@ -1718,6 +1740,8 @@ input, textarea, select { font-family: inherit; }
 .gn-invitations__failure { margin: 1.1rem 0 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 
 .gn-invite__dead { color: var(--gn-text-muted); }
+/* UX fixes T10 (ENT-04): the dead link's headline — the card's own h1, at the heading size the other cards' titles use. */
+.gn-invite__dead-title { margin: 0; font-size: 1.5rem; font-weight: 700; }
 /* The invite accept card on a phone (mobile-web plan Task 12, case 21.191): the card already fills the
    shell's width, so what changes is the action — "Join <workspace>" (and the unreachable state's
    Retry) is a full-width 3rem target. The variant stays the page's: `primary`. */
@@ -2925,6 +2949,10 @@ input, textarea, select { font-family: inherit; }
 .gn-sign-in__method { display: flex; flex-direction: column; gap: 0.6rem; }
 
 .gn-sign-in__alternatives { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.9rem; }
+/* UX fixes T10 (ENT-01, 23.172): the "Send magic link" primary is full width at EVERY width, the base rule — it sits in a
+   bare <form>, so as an inline-flex it shrank to its label while the passkey button below it (a flex-column child, stretched)
+   ran the card's width. Same width as the passkey button, so the primary is never the narrower of the two. */
+.gn-sign-in__method-form .gn-button { display: flex; width: 100%; justify-content: center; }
 
 /* ── The vendor marks. Icon-only controls, and the size is not decorative. ──
 
@@ -3690,7 +3718,10 @@ input, textarea, select { font-family: inherit; }
    bold name, then the token's own facts in muted text beneath it. It inherits
    `__when`'s column and gap, so a named row gains one line and an unnamed one
    gains none — no empty span, per the render's own comment. */
-.gn-mcp-tokens__name { font-weight: 600; }
+/* UX fixes T10 (23.170): an unnamed token's first line (`__generic`) carries the same weight, so a row never
+   leads with its date. */
+.gn-mcp-tokens__name,
+.gn-mcp-tokens__generic { font-weight: 600; }
 /* The inline naming form, drawn in the row's action slot while one row is being
    renamed. `flex-wrap` and `align-items: flex-end` are the pair the home's old
    project row used, for the same reason: the input and its buttons are a single row at

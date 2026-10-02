@@ -3771,6 +3771,21 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    layout depends on, and the grid track resolves against it. The pair is the
    fix; either half alone restores the bug. */
 .gn-workflow-canvas { display: grid; width: 100%; height: 100%; min-height: 480px; }
+/* UX fixes T10 (WF-02, 23.175): the "Fit to screen" control — a 44px target, a quiet raised chip in the canvas corner. */
+.gn-workflow-canvas__fit {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  color: var(--gn-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-workflow-canvas__fit:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* E4-16: React Flow's own vendor stylesheet paints its required attribution
    link at 10px with a fixed grey (`node_modules/@xyflow/react/dist/style.css`
@@ -3807,8 +3822,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    composition the renamed `CONTRAST_PAIRS` rows guarantee. */
 .gn-state-node__initial-badge { color: var(--gn-text-accent); font-size: 0.75rem; font-weight: 600; }
 .gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
-.gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
-.gn-state-node__creatable { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
+/* UX fixes T10 (WF-03, 23.176): each option row is a 44px target and the WHOLE row is the <label>, so a tap anywhere across
+   it toggles the checkbox; the reason a row is locked is visible text beneath it. */
+.gn-state-node__blocked,
+.gn-state-node__creatable { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; margin-top: 0.1rem; font-size: 0.8rem; cursor: pointer; }
+.gn-state-node__reason { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
 
 .gn-any-state-node {
   background: var(--gn-surface-raised);
@@ -6655,6 +6673,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    right edge to the bottom one because it is now a divider between rows, and
    the sticky behaviour is dropped: a full-width sticky block would cover the
    document it is meant to navigate. */
+/* UX fixes T10 (23.174): the "Contents" disclosure exists only where the sidebar is stacked above the article. */
+.gn-help__contents-toggle { display: none; }
 @media (max-width: 47.9375rem) {
   .gn-help__sidebar {
     flex-basis: 100%;
@@ -6674,6 +6694,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      own behaviour for a window that narrow. */
   .gn-help__main { flex-basis: 100%; padding: 0 0 2rem; }
   .gn-help__column { padding-top: 1.25rem; }
+  /* The topic tree is behind "Contents" (a disclosure) so the article starts within the first screen; opening
+     it shows the tree in place. 44px target, a hairline, the quiet look of the group toggles below. */
+  .gn-help__contents-toggle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 2.75rem;
+    margin-top: 0.75rem;
+    padding: 0 0.75rem;
+    border: none;
+    border-radius: var(--gn-radius-control);
+    background: var(--gn-fill-tertiary);
+    color: var(--gn-text);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .gn-help__contents-toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+  .gn-help__sidebar[data-contents-open='false'] .gn-help__nav { display: none; }
 }
 
 /* ── EVERY ANCHOR IN THIS DOCUMENT LANDS CLEAR OF THE APP BAR.
@@ -8393,7 +8433,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    So the `<li>` becomes the flex row the comment describes, and `__reorder` a
    flex pair so the two arrows read as one unit at `.gn-board-card__moves`'s own
-   `0.5rem` gap. **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
+   `0.5rem` gap. (AMENDED 2026-10-02, 23.171: there is ONE Reorder button now, so the pair is a single item and the gap
+   separates nothing visible; the wrapper keeps the declaration.) **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
    its base is the full line and it shrinks against the pair** — asserted by
    measurement below rather than by reading the spec, and deliberately NOT
    rewritten, because `.ticket-type-list__row`'s body is pinned by 10.80
@@ -8431,11 +8472,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: transparent;
   color: var(--gn-text-subtle);
   font: inherit;
+  padding-inline: 0.75rem; /* UX fixes T10: the trigger is the word "Reorder", not an arrow */
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
 }
-/* Styling refresh Plan B (Task B16): P-GHOST icon — the reorder arrows are text controls with no edge; hover or focus washes them. */
+/* Styling refresh Plan B (Task B16): P-GHOST — the reorder trigger (the "Reorder" word since 23.171; the arrows before) is a text control with no edge; hover or focus washes it. */
 .ticket-type-list__move:hover:not(:disabled),
 .ticket-type-list__move:focus-visible {
   background: var(--gn-fill-tertiary);
@@ -8446,6 +8488,31 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline-offset: 0;
 }
 .ticket-type-list__move:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
+
+/* UX fixes T10 (SET-03, 23.171): the row's Reorder menu. (The trigger is a word, not an arrow, so `.ticket-type-list__move`
+   above carries inline padding beside its 44px floor.) Each menu item is a 44px target. */
+.ticket-type-list__menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+}
+.ticket-type-list__menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ticket-type-list__menu-item:hover:not(:disabled),
+.ticket-type-list__menu-item:focus-visible { background: var(--gn-fill-tertiary); }
+.ticket-type-list__menu-item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.ticket-type-list__menu-item:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 
 /* --- The comment thread and its box (executor 2's comment-thread dispatch) ---
    Prototype: `design-system/interactive/desktop.dc.html:1268-1330` — the block
