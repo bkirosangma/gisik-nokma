@@ -53,17 +53,31 @@ describe('23.357 the roster is written only under UPDATE_ROSTER=1', () => {
 });
 
 describe('23.358 without the flag the run compares, and a difference fails with the way out', () => {
-  it('control: the else-branch is the one that reads the file; the failure names the flag and says what differs', () => {
+  it('control: the else-branch is the one that reads the file; the failure names the flag and says what differs; UPDATE_ROSTER writes the whole measurement', () => {
     expect(SPEC).toContain("readFileSync(rosterUrl, 'utf8')");
     expect(SPEC).toContain('roster differs, ');
     expect(SPEC).toContain('re-run with UPDATE_ROSTER=1 on a clean tree and COMMIT the file');
-    // The compared keys are the measurement, never the stamp that differs on every run.
+    // `measured` is what UPDATE_ROSTER=1 writes: every key, never the stamp that differs on every run.
     const from = SPEC.indexOf('const measured = {');
     const compared = SPEC.slice(from, SPEC.indexOf('\n  };', from));
     for (const key of ['belowCount', 'exemptions', 'totalClasses', 'examined', 'highestReading', 'routes', 'roster', 'sanctionedWaivers']) {
       expect(compared).toContain(key);
     }
     for (const stamp of ['headSha', 'producedAt', 'treeWasClean']) expect(compared).not.toContain(stamp);
+  });
+
+  it('only the data-independent VERDICT keys can fail the compare; examined, totalClasses and the full roster cannot (F-11 FIX 1)', () => {
+    // Control: the slice is the real `verdictOf` body, so a key named in it is a key compared.
+    const from = SPEC.indexOf('const verdictOf = (');
+    expect(from).toBeGreaterThan(0);
+    const verdict = SPEC.slice(from, SPEC.indexOf('\n    });', from));
+    expect(verdict).toContain('belowCount: m.belowCount');
+    for (const key of ['belowCount', 'below:', 'exemptions', 'routes', 'sanctionedWaivers']) expect(verdict).toContain(key);
+    // The below-3:1 entries come from the roster by a filter; the whole roster is not a key.
+    expect(verdict).toContain('m.roster.filter((r) => r.ratio < 3)');
+    for (const key of ['examined', 'totalClasses', 'highestReading', 'roster:']) expect(verdict).not.toContain(key);
+    // Their drift is reported, not failed.
+    expect(SPEC).toContain("type: 'roster-drift'");
   });
 });
 
