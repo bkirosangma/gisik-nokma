@@ -52,8 +52,9 @@ async function realShape(mode: (typeof MODES)[number]) {
       uploadAttachment={async () => ({ attachmentId: 'a', url: '/a', name: 'a', mime: 'image/png', size: 1 }) as never}
     />,
   );
-  await waitFor(() => expect(view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull());
-  const result = shape(view.container.querySelector('.editor-slot')!);
+  await waitFor(() => expect(view.container.querySelector('.ticket-editor__content .ProseMirror')).not.toBeNull());
+  const root = view.container.querySelector('.editor-slot')!;
+  const result = { ...shape(root), formatButton: root.querySelector('.editor-slot__format') !== null };
   view.unmount();
   return result;
 }
@@ -65,7 +66,8 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
       const real = await realShape(mode);
       const view = render(<EditorSkeleton mode={mode} attach />);
       const skeleton = view.container.querySelector('.editor-slot')!;
-      expect(shape(skeleton), mode).toEqual(real);
+      const { formatButton, ...realStructure } = real;
+      expect(shape(skeleton), mode).toEqual(realStructure);
       // No size of its own: the stylesheet sizes the content host by class, per mode.
       const content = skeleton.querySelector('.ticket-editor__content') as HTMLElement;
       expect(content.style.minHeight, mode).toBe('');
@@ -73,9 +75,14 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
       // The fill is the placeholder surface, never the well.
       expect(view.container.innerHTML, mode).not.toMatch(/well/i);
       // Control, in the same it(): the real slot's structure is not degenerate. It has all four pieces and its root differs per mode.
-      expect(real.host, mode).toHaveLength(2);
+      // The strip is drawn by description and note; a comment slot keeps it behind its Format button (G-6), so it has the content host only.
+      expect(real.host, mode).toHaveLength(mode === 'comment' ? 1 : 2);
       expect(real.footerLead, mode).toHaveLength(2);
       expect(real.rootChildren, mode).toEqual(['ticket-editor', 'editor-slot__footer']);
+      // G-6's other half: where the strip is hidden the footer leads with the Format button, and the skeleton leads with its pill.
+      const footerLead = skeleton.querySelector('.editor-slot__footer')!.firstElementChild!;
+      expect(footerLead.classList.contains('gn-skeleton'), mode).toBe(mode === 'comment');
+      expect(formatButton, mode).toBe(mode === 'comment');
       seenRoots.add(real.root);
       view.unmount();
     }
@@ -83,11 +90,11 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
   });
 
   it('draws no Attach pill without an uploader, and no strip when read-only (the real slot draws none either)', () => {
-    const view = render(<EditorSkeleton mode="comment" readOnly />);
+    const view = render(<EditorSkeleton mode="description" readOnly />);
     expect(view.container.querySelector('.editor-slot__attach-wrap')).toBeNull();
     expect(view.container.querySelector('.ticket-editor__toolbar')).toBeNull();
     // Control: with both on, both are there.
-    view.rerender(<EditorSkeleton mode="comment" attach />);
+    view.rerender(<EditorSkeleton mode="description" attach />);
     expect(view.container.querySelector('.editor-slot__attach-wrap')).not.toBeNull();
     expect(view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
   });

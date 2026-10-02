@@ -5,7 +5,7 @@ export type EditorSkeletonProps = {
   mode?: 'description' | 'comment' | 'note';
   /** True where the slot draws its Attach button (it has an uploader). */
   attach?: boolean;
-  /** True for a read-only slot, which draws no formatting strip. */
+  /** True for a read-only slot, which draws no formatting strip and no Format button. */
   readOnly?: boolean;
 };
 
@@ -21,10 +21,13 @@ export type EditorSkeletonProps = {
  * Parts only inside (lines, blocks); their fill is the placeholder surface. Decoration: the region is named once for assistive tech.
  */
 export function EditorSkeleton({ mode = 'description', attach = false, readOnly = false }: EditorSkeletonProps) {
+  // G-6: an editable COMMENT slot keeps its strip behind a Format button in the footer (the stored choice is per device, and the
+  // default is hidden), so its skeleton draws that button's pill and no strip; description and note draw the strip, a read-only slot neither.
+  const collapsible = mode === 'comment' && !readOnly;
   return (
     <SkeletonRegion label="Loading editor" className={`editor-slot editor-slot--${mode}`}>
       <div className="ticket-editor">
-        {readOnly ? null : (
+        {readOnly || collapsible ? null : (
           <div className="ticket-editor__toolbar">
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <Skeleton key={index} shape="block" width="2.125rem" height="2rem" />
@@ -36,6 +39,7 @@ export function EditorSkeleton({ mode = 'description', attach = false, readOnly 
         </div>
       </div>
       <div className="editor-slot__footer">
+        {collapsible ? <Skeleton shape="block" width="2.125rem" height="2rem" /> : null}
         {attach ? (
           <span className="editor-slot__attach-wrap">
             <Skeleton shape="block" width="5.5rem" height="2.5rem" />
