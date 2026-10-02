@@ -10,6 +10,8 @@ import {
   useLiveQuery,
   writeFailureCopy,
 } from '@gisik-nokma/app-core';
+import { HttpError } from '@gisik-nokma/app-core/online';
+import type { GroupRow } from '@gisik-nokma/domain';
 import { useScrollEdges } from '@gisik-nokma/ui';
 import { AppNav } from '../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
@@ -272,9 +274,17 @@ function SettingsContent() {
 function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
   const { dataSource } = useAppServices();
   const wiring = useBuilderWiring(workspaceId);
-  const groups = useLiveQuery(dataSource, workspaceId, `groups:${workspaceId}`, () =>
-    dataSource.query.getGroups(workspaceId),
-  );
+  // A 404 is the door telling this caller (a guest, or a stranger) the groups are not theirs to read: answered as a
+  // plain sentence, never as a transport error. Any other failure is still an error. `'hidden'` is the one
+  // value that is not a list of groups, so a real empty list stays an empty tree.
+  const groups = useLiveQuery<readonly GroupRow[] | 'hidden'>(dataSource, workspaceId, `groups:${workspaceId}`, async () => {
+    try {
+      return await dataSource.query.getGroups(workspaceId);
+    } catch (cause) {
+      if (cause instanceof HttpError && cause.status === 404) return 'hidden';
+      throw cause;
+    }
+  });
 
   if (wiring.kind !== 'ready') return <WiringNotReady wiring={wiring} />;
   if (groups.error !== null) {
@@ -285,6 +295,7 @@ function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
     );
   }
   if (groups.data === null) return <p>Loading groups…</p>;
+  if (groups.data === 'hidden') return <p className="gn-groups__empty">Groups are shown to workspace members.</p>;
 
   const make = makeSubmittedFactory({ actorId: wiring.session.userId, origin: 'web' });
   const onSubmit = async (action: GroupAction): Promise<GroupActionResult> => {

@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rankBetween, type GroupRow, type SubmittedEvent } from '@gisik-nokma/domain';
-import type { WorkspaceMember } from '@gisik-nokma/app-core';
+import type { DataSource, WorkspaceMember } from '@gisik-nokma/app-core';
+import { HttpError } from '@gisik-nokma/app-core/online';
 import { ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 import { cssOf } from '../../../packages/ui/test/helpers/style-patterns.js';
 import { Providers } from '../src/providers.js';
@@ -10,10 +11,10 @@ import { GroupsTree, type GroupAction, type GroupActionResult } from '../src/set
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * Settings → Groups, the tree page (prefixes and groups plan Task 11, cases 22.200–22.209).
+ * Settings → Groups, the tree page (prefixes and groups plan Task 11, cases 22.200–22.215).
  *
  * The component cases render `GroupsTree` with a spy `onSubmit` and read what it was asked to do; the page cases
- * (22.200) render `/settings?tab=groups` and read the ONE claim the page ingests. The server's door (sibling
+ * (22.200, 22.213–22.215) render `/settings?tab=groups` and read the ONE claim the page ingests. The server's door (sibling
  * names, in-use deletes) is Task 6's: here a refusal is a string the tree must show, not a rule it re-decides.
  */
 
@@ -103,9 +104,16 @@ function rosterWhereIAm(role: WorkspaceMember['role']): WorkspaceMember[] {
   return [{ userId: ME, displayName: 'Anselma Marak', role }];
 }
 
-function renderPage(role: WorkspaceMember['role'], captured: SubmittedEvent[][]): void {
+type IngestAnswer = (event: SubmittedEvent) => Awaited<ReturnType<DataSource['ingest']>>[number];
+
+/** Renders `/settings?tab=groups` as `role`; `getGroups` answers `groups` (a function, to answer differently per call). */
+function renderPage(
+  role: WorkspaceMember['role'],
+  captured: SubmittedEvent[][],
+  options: { groups?: () => Promise<GroupRow[]>; answer?: IngestAnswer } = {},
+): void {
   const services = stubServices(
-    { getGroups: async () => GROUPS },
+    { getGroups: options.groups ?? (async () => GROUPS) },
     {
       authoring: {
         listMembers: async () => rosterWhereIAm(role),
@@ -114,16 +122,17 @@ function renderPage(role: WorkspaceMember['role'], captured: SubmittedEvent[][])
       },
     },
   );
+  const committed: IngestAnswer = (event) => ({
+    status: 'committed' as const,
+    eventId: event.id,
+    seq: 1,
+    serverTime: '2026-10-02T04:00:02.000Z',
+  });
   const dataSource = {
     ...services.dataSource,
     ingest: async (events: SubmittedEvent[]) => {
       captured.push(events);
-      return events.map((event) => ({
-        status: 'committed' as const,
-        eventId: event.id,
-        seq: 1,
-        serverTime: '2026-10-02T04:00:02.000Z',
-      }));
+      return events.map(options.answer ?? committed);
     },
   };
   query.current = new URLSearchParams({ workspaceId: WORKSPACE, tab: 'groups' });
@@ -169,8 +178,10 @@ describe('22.200 Settings has a Groups tab', () => {
 });
 
 describe('22.201 the tree is a real tree, one column per level', () => {
-  it('22.201 role=tree / treeitem with aria-level, nested by parent; each box has a named level strip and the columns are drawn by CSS connectors', () => {
-    renderTree();
+  it('22.201 role=tree / treeitem with aria-level, nested by parent and ordered by rank however the wire served them; each box has a named level strip', () => {
+    // The rows are served OUT of rank order (Support before Delivery, Chi before Beta before Alpha, children before
+    // their parents): the tree's order is a function of the ranks, not of the wire.
+    renderTree({ groups: [...GROUPS].reverse() });
     expect(screen.getByRole('tree')).toBeInTheDocument();
     const levels: Array<[string, number]> = [
       ['Delivery', 1],
@@ -190,11 +201,13 @@ describe('22.201 the tree is a real tree, one column per level', () => {
     expect(within(item('Alpha')).getByRole('treeitem', { name: 'Gamma' })).toBeInTheDocument();
     expect(within(item('Delivery')).getByRole('treeitem', { name: 'Alpha' })).toBeInTheDocument();
     expect(within(item('Delivery')).queryByRole('treeitem', { name: 'Support' })).toBeNull();
-    // Siblings are in rank order whatever order the wire served them.
+    // Siblings are in rank order whatever order the wire served them — roots, and a parent's children.
     const roots = screen.getByRole('tree').querySelectorAll(':scope > .gn-groups__node');
     expect([...roots].map((node) => node.getAttribute('data-group-id'))).toEqual(['g-delivery', 'g-support']);
-    // CONTROL (same it) — the left-to-right layout and its joining line are real rules, not a bare list: a node
-    // is a row (box, then its children column) and the children column draws the spine that joins them.
+    const kids = item('Delivery').querySelectorAll(':scope > .gn-groups__children > .gn-groups__node');
+    expect([...kids].map((node) => node.getAttribute('data-group-id'))).toEqual(['g-alpha', 'g-beta', 'g-chi']);
+    // CONTROL (same it) — the left-to-right layout is a real rule, not a bare list: a node is a row (box, then
+    // its children column) and the children column draws the spine that joins them (22.210 pins the connectors).
     const css = cssOf('globals');
     expect(valueOf(ruleExactly(css, '.gn-groups__node'), 'display')).toBe('flex');
     expect(valueOf(ruleExactly(css, '.gn-groups__children'), 'border-left')).toMatch(/^2px solid /);
@@ -266,6 +279,22 @@ describe('22.204 a name is renamed in place', () => {
     await user.type(screen.getByRole('textbox', { name: 'Rename Beta' }), 'x{Escape}');
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Beta' })).toBeInTheDocument();
+  });
+
+  it('22.204 Enter on an unchanged name files nothing and closes the field; while the field is open the item keeps its name', async () => {
+    const onSubmit = renderTree();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alpha' }));
+    // The treeitem is still named for its group while the name is a text field.
+    expect(screen.getByRole('treeitem', { name: /Alpha/ })).toHaveAttribute('aria-level', '2');
+    await user.type(screen.getByRole('textbox', { name: 'Rename Alpha' }), '{Enter}');
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: 'Rename Alpha' })).toBeNull();
+    // CONTROL — a changed name does file.
+    await user.click(screen.getByRole('button', { name: 'Alpha' }));
+    await user.type(screen.getByRole('textbox', { name: 'Rename Alpha' }), '2{Enter}');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0]![0]).toEqual({ type: 'group.renamed', id: 'g-alpha', payload: { name: 'Alpha2' } });
   });
 
   it('22.204 a refused rename shows the server\'s reason and keeps the field open', async () => {
@@ -345,9 +374,17 @@ describe('22.206 Delete shows only on an unused group, and confirms', () => {
 });
 
 describe('22.207 a non-admin sees the tree read-only', () => {
-  it('22.207 no Add, ⊕, rename, drag or Delete for a member; CONTROL: the same tree is fully drawn', () => {
+  it('22.207 no Add, ⊕, rename, drag or Delete for a member; CONTROL: the same tree as an admin has all of them', () => {
+    // CONTROL (first, same it) — the SAME rows as an admin carry every control the member must not see.
+    renderTree({ canEdit: true });
+    expect(screen.getByRole('button', { name: 'Add group' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a group under Alpha' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete Beta' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
+    expect(box('Alpha')).toHaveAttribute('draggable', 'true');
+    cleanup();
     renderTree({ canEdit: false });
-    // CONTROL — the tree is there, with its levels and names.
+    // The tree is still there, with its levels and names.
     expect(screen.getAllByRole('treeitem')).toHaveLength(GROUPS.length);
     expect(box('Alpha').querySelector('.gn-groups__strip')).toHaveAttribute('data-level', '2');
     expect(screen.queryByRole('button', { name: 'Add group' })).toBeNull();
@@ -364,7 +401,7 @@ describe('22.208 at 40rem the tree is an indented list', () => {
   const css = cssOf('globals');
   const PHONE = '@media (max-width: 40rem)';
 
-  it('22.208 above 40rem a node is a row (columns); at ≤40rem it stacks and each level indents 1rem, strip kept', () => {
+  it('22.208 above 40rem a node is a row (columns); at ≤40rem it stacks, each level indents 1rem, the connectors are off and the strip is kept', () => {
     // CONTROL — the base arm is the columns.
     expect(valueOf(ruleExactly(css, '.gn-groups__node'), 'display')).toBe('flex');
     expect(valueOf(ruleExactly(css, '.gn-groups__children'), 'display')).toBe('flex');
@@ -373,6 +410,9 @@ describe('22.208 at 40rem the tree is an indented list', () => {
     const children = ruleExactly(css, '.gn-groups__children', PHONE);
     expect(valueOf(children, 'margin-left')).toBe('1rem');
     expect(valueOf(children, 'border-left')).toBe('0');
+    // The connectors are a column-form device: the list form draws none (the indent is the structure).
+    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before', PHONE), 'display')).toBe('none');
+    expect(valueOf(ruleExactly(css, '.gn-groups__children::before', PHONE), 'display')).toBe('none');
     // The strip is NOT hidden by the phone arm: depth stays visible (and named) in the list form.
     expect(() => ruleExactly(css, '.gn-groups__strip', PHONE)).toThrow();
     expect(valueOf(ruleExactly(css, '.gn-groups__strip[data-level="1"]'), 'background')).toBe('var(--gn-level-1)');
@@ -393,5 +433,134 @@ describe('22.209 an empty workspace', () => {
     cleanup();
     renderTree();
     expect(screen.queryByText(/No groups yet/)).toBeNull();
+  });
+});
+
+describe('22.210 real level columns joined by real connectors', () => {
+  it('22.210 every box has a FIXED width (one x per level) and a connector leaves the spine to each child and the parent to the spine', () => {
+    const css = cssOf('globals');
+    const boxRule = ruleExactly(css, '.gn-groups__box');
+    // CONTROL — the box is a fixed width, not a minimum a long name can outgrow.
+    expect(valueOf(boxRule, 'width')).toMatch(/^\d+(\.\d+)?rem$/);
+    expect(valueOf(boxRule, 'min-width')).toBeNull();
+    expect(valueOf(ruleExactly(css, '.gn-groups__name'), 'overflow-wrap')).toBe('anywhere');
+    // The connector: a real pseudo-element with content and a non-zero line, on each child and on the column.
+    for (const selector of ['.gn-groups__children > .gn-groups__node::before', '.gn-groups__children::before']) {
+      const rule = ruleExactly(css, selector);
+      expect(valueOf(rule, 'content'), selector).not.toBeNull();
+      expect(valueOf(rule, 'border-top'), selector).toMatch(/^[1-9]\d*px solid /);
+    }
+  });
+});
+
+describe('22.211 one change at a time', () => {
+  it('22.211 a second action while the first is unanswered files nothing; once it answers, the next files', async () => {
+    let answer: (result: GroupActionResult) => void = () => {};
+    const onSubmit = vi.fn(
+      (_action: GroupAction) => new Promise<GroupActionResult>((resolve) => (answer = resolve)),
+    );
+    render(<GroupsTree workspaceId={WORKSPACE} canEdit groups={GROUPS} onSubmit={onSubmit} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Add group' }));
+    await user.type(screen.getByRole('textbox', { name: 'Group name' }), 'Platform{Enter}');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    // The first is still pending: a move is ignored.
+    screen.getByRole('button', { name: 'Beta' }).focus();
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    // CONTROL — answered, the next action files.
+    await act(async () => answer({ ok: true }));
+    await user.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit.mock.calls[1]![0].type).toBe('group.reordered');
+  });
+});
+
+describe('22.212 dragover allows a drop only on a sibling', () => {
+  it('22.212 over a sibling the default is prevented (a drop is allowed); over another parent\'s box it is not', () => {
+    renderTree();
+    fireEvent.dragStart(box('Chi'));
+    // `fireEvent` returns false when the default was prevented — which is what lets the browser fire `drop`.
+    expect(fireEvent.dragOver(box('Beta'))).toBe(false);
+    // CONTROL — a box of a different parent is not a place: the default stands, the browser shows no drop.
+    expect(fireEvent.dragOver(box('Support'))).toBe(true);
+  });
+});
+
+describe('22.213 the page gives the tree its controls by role', () => {
+  it('22.213 an owner and an admin each get Add group; a member gets the tree read-only', async () => {
+    for (const role of ['owner', 'admin'] as const) {
+      renderPage(role, []);
+      expect(await screen.findByRole('tree'), role).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add group' }), role).toBeInTheDocument();
+      cleanup();
+    }
+    // CONTROL — the same page, as a member: every group drawn, no control.
+    renderPage('member', []);
+    expect(await screen.findByRole('tree')).toBeInTheDocument();
+    expect(screen.getAllByRole('treeitem')).toHaveLength(GROUPS.length);
+    expect(screen.queryByRole('button', { name: 'Add group' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add a group under / })).toBeNull();
+  });
+});
+
+describe('22.214 a guest is told, not shown an error', () => {
+  it('22.214 a 404 from the groups read is a plain sentence, not an alert; a 500 is still an alert', async () => {
+    renderPage('guest', [], {
+      groups: async () => {
+        throw new HttpError(404, `/v1/workspaces/${WORKSPACE}/groups`);
+      },
+    });
+    expect(await screen.findByText('Groups are shown to workspace members.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('tree')).toBeNull();
+    cleanup();
+    // CONTROL — a server failure is not a role: it is still reported.
+    renderPage('admin', [], {
+      groups: async () => {
+        throw new HttpError(500, `/v1/workspaces/${WORKSPACE}/groups`);
+      },
+    });
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Groups are shown to workspace members.')).toBeNull();
+  });
+});
+
+describe('22.215 the page reports what the server said', () => {
+  it('22.215 a refused claim shows the rule and reason in the alert; a committed one re-reads the groups and draws the new one', async () => {
+    const user = userEvent.setup();
+    // Refused: the door's own words, shown as given.
+    renderPage('admin', [], {
+      answer: (event) => ({
+        status: 'refused' as const,
+        eventId: event.id,
+        rule: 'group.name-taken',
+        reason: 'A group named "Platform" already exists here.',
+      }),
+    });
+    await screen.findByRole('tree');
+    await user.click(screen.getByRole('button', { name: 'Add group' }));
+    await user.type(screen.getByRole('textbox', { name: 'Group name' }), 'Platform{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Refused by the server — group.name-taken: A group named "Platform" already exists here.',
+    );
+    // The refused field stays open and nothing was drawn.
+    expect(screen.queryByRole('treeitem', { name: 'Platform' })).toBeNull();
+    cleanup();
+    // CONTROL — committed: `getGroups` is asked a second time and the answer's new group is drawn.
+    const calls = vi.fn();
+    renderPage('admin', [], {
+      groups: async () => {
+        calls();
+        return calls.mock.calls.length === 1 ? GROUPS : [...GROUPS, group('g-platform', null, 1, 'Platform', rankBetween(R2, null))];
+      },
+    });
+    await screen.findByRole('tree');
+    expect(screen.queryByRole('treeitem', { name: 'Platform' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Add group' }));
+    await user.type(screen.getByRole('textbox', { name: 'Group name' }), 'Platform{Enter}');
+    expect(await screen.findByRole('treeitem', { name: 'Platform' })).toBeInTheDocument();
+    expect(calls.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

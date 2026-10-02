@@ -1497,8 +1497,8 @@ input, textarea, select { font-family: inherit; }
   .gn-settings__content { flex: 1 1 auto; }
 }
 
-/* ── Settings → Groups, the tree page (prefixes/groups Task 11, cases 22.200–22.209). One COLUMN per level: a node
-   is a row of its box and its children, and the children column carries the line that joins it to the box. The
+/* ── Settings → Groups, the tree page (prefixes/groups Task 11, cases 22.200–22.215). One COLUMN per level: a node
+   is a row of its box and its children, every box a fixed width so a level shares one x, and the connectors join them. The
    level strip is the level's colour (one token per LEVEL, never per group) and is named in the DOM, so colour is
    not the only signal. Every control is 2.75rem (44px) square or tall; focus is the shared ring. At 40rem or less
    the same markup is an indented list (the arm below). */
@@ -1510,19 +1510,39 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__children { list-style: none; margin: 0; padding: 0; }
 .gn-groups__tree { display: flex; flex-direction: column; gap: 0.5rem; overflow-x: auto; }
 .gn-groups__node { display: flex; align-items: flex-start; gap: 1rem; }
+/* The joining lines. The children column's left edge is the SPINE; a short horizontal line leaves the parent's box
+   to the spine (`::before` of the column) and another runs from the spine to each child's box (`::before` of the
+   child). 1.375rem is the middle of a 2.75rem box. */
 .gn-groups__children {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding-left: 1rem;
   border-left: 2px solid var(--gn-border);
 }
+.gn-groups__children::before {
+  content: '';
+  position: absolute;
+  top: 1.375rem;
+  left: -1rem;
+  width: 1rem;
+  border-top: 2px solid var(--gn-border);
+}
+.gn-groups__children > .gn-groups__node { gap: 0; }
+.gn-groups__children > .gn-groups__node::before {
+  content: '';
+  flex: 0 0 1rem;
+  margin-top: 1.375rem;
+  border-top: 2px solid var(--gn-border);
+}
+/* A FIXED width, so every box of one level shares one x whatever its name's length: a long name wraps (the name
+   is `overflow-wrap: anywhere`) instead of pushing its subtree's next column out of line. */
 .gn-groups__box {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex: 0 0 auto;
-  min-width: 15rem;
+  width: 15rem;
   min-height: 2.75rem;
   padding: 0.25rem 0.5rem 0.25rem 0;
   background: var(--gn-surface-raised);
@@ -1577,7 +1597,9 @@ input, textarea, select { font-family: inherit; }
 @media (max-width: 40rem) {
   .gn-groups__node { display: block; }
   .gn-groups__children { margin-left: 1rem; border-left: 0; padding-left: 0; margin-top: 0.5rem; }
-  .gn-groups__box { min-width: 0; }
+  .gn-groups__children::before { display: none; }
+  .gn-groups__children > .gn-groups__node::before { display: none; }
+  .gn-groups__box { width: auto; }
 }
 
 /* ── The Create workspace dialog's form (prefixes/groups Task 8, case 22.151). ───

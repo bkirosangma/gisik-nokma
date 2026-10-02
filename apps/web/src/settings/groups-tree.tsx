@@ -116,11 +116,12 @@ function NameField({
 }
 
 /**
- * Settings → Groups (prefixes and groups plan Task 11, cases 22.200–22.209): the workspace's project-group tree.
+ * Settings → Groups (prefixes and groups plan Task 11, cases 22.200–22.215): the workspace's project-group tree.
  *
  * A real tree for assistive technology (`role="tree"` > `treeitem` with `aria-level`, a nested `role="group"` per
- * parent) and, in CSS, one column per level: a node is a row of its box and its children column, the children
- * column carries the line that joins them. The level strip is the level's colour (`--gn-level-N`, one per level,
+ * parent) and, in CSS, one column per level: a node is a row of its box and its children column, every box a fixed
+ * width (so a level shares one x), with connectors from the parent to the children column's spine and from the spine
+ * to each child. The level strip is the level's colour (`--gn-level-N`, one per level,
  * never per group) and is also NAMED (`Level N group: <name>`) so colour is never the only signal. At 40rem or
  * less the same markup is an indented list.
  *
@@ -242,7 +243,10 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
         key={group.id}
         role="treeitem"
         aria-level={group.level}
-        aria-labelledby={nameId}
+        // While the name is a text field there is no element carrying `nameId`, so the item is labelled by the
+        // group's name directly: a screen reader never loses what the item is.
+        aria-labelledby={renaming === group.id ? undefined : nameId}
+        aria-label={renaming === group.id ? group.name : undefined}
         aria-selected={false}
         className="gn-groups__node"
         data-group-id={group.id}
