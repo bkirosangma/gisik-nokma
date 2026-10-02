@@ -237,7 +237,7 @@ function MoreBody({
   // Exactly what the bar does not carry — and, like the bar, nothing that cannot resolve.
   const rest = BAR_DESTINATIONS.filter((id) => !slots.includes(id) && resolvable(id));
   return (
-    <nav className="gn-bar-sheet" aria-label="More destinations">
+    <nav className="gn-bar-sheet gn-bar-sheet--more" aria-label="More destinations">
       <ul className="gn-bar-sheet__list">
         {rest.map((id) => {
           const { href, current, onClick } = resolve(id);

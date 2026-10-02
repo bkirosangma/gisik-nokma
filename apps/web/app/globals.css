@@ -2445,6 +2445,23 @@ input, textarea, select { font-family: inherit; }
 .gn-bar-sheet__heading { margin: 0 0 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--gn-text-muted); }
 .gn-bar-sheet__note { margin: 0 0 0.5rem; color: var(--gn-text-muted); font-size: 0.9rem; }
 .gn-bar-sheet__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+/* UX fixes T13 (case 23.238): the More sheet's rows sit at the BOTTOM, so "Edit bottom bar" is always at the foot of the
+   screen and the reach is the thumb's (owner: "its okay if the top of the screen is empty on longer screens"). The sheet
+   is a flex column (header, then `.gn-sheet__body`); the body becomes a column that fills what the header leaves, the
+   nav fills the body, and `margin-top: auto` on the list takes ALL the free space above it. Not `justify-content:
+   flex-end`: on a scroll container that strands overflowing rows above the scroll start, out of reach; with the auto
+   margin, taller content has no free space, the margin is 0 and the body scrolls from its top as it always did. The
+   body's bottom padding adds the home-indicator inset, so the button clears it. Scoped by `:has(> .gn-bar-sheet--more)`
+   so the Edit sheet and every other `Sheet` keep their layout. */
+.gn-sheet__body:has(> .gn-bar-sheet--more) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+.gn-bar-sheet--more { flex: 1 1 auto; }
+.gn-bar-sheet--more > .gn-bar-sheet__list { margin-top: auto; }
 .gn-bar-sheet__row {
   display: flex;
   align-items: center;

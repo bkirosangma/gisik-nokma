@@ -15,6 +15,7 @@ import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import { PHONE_QUERY } from '../src/use-is-phone.js';
 import { TABLET_BAR_QUERY } from '../src/use-tablet-bar.js';
 import { stubServices } from './helpers/stub-services.js';
+import { parseRules, ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 
 /**
  * The web app on phones, Plan Task 3 — the component half of the customizable bottom bar
@@ -525,3 +526,43 @@ describe('23.044 the top nav and the bar light My work and Members the same way'
   });
 });
 
+
+describe('23.238 the More sheet\'s rows sit at the bottom (UX fixes T13)', () => {
+  it('23.238 the body is a column that fills the sheet, the list takes the free space above it (an auto margin, never flex-end), and Edit bottom bar is last', async () => {
+    const user = userEvent.setup();
+    render(bar());
+    await user.click(within(phoneNav()).getByRole('button', { name: 'More' }));
+    const more = await screen.findByRole('dialog', { name: 'More' });
+    const nav = within(more).getByRole('navigation', { name: 'More destinations' });
+    expect(nav).toHaveClass('gn-bar-sheet--more');
+    // The scoping hook: the nav is the body's direct child, and the header is outside the body (it stays on top).
+    expect(nav.parentElement).toHaveClass('gn-sheet__body');
+    expect(nav.parentElement?.previousElementSibling?.tagName).toBe('HEADER');
+    // Row order and labels are exactly 21.026's: the list, then the Edit button as the LAST child.
+    expect(nav.lastElementChild?.textContent).toBe('Edit bottom bar');
+    expect(nav.firstElementChild?.tagName).toBe('UL');
+
+    const css = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
+    const body = ruleExactly(css, '.gn-sheet__body:has(> .gn-bar-sheet--more)');
+    expect(valueOf(body, 'display')).toBe('flex');
+    expect(valueOf(body, 'flex-direction')).toBe('column');
+    expect(valueOf(body, 'flex')).toBe('1 1 auto');
+    expect(valueOf(body, 'min-height')).toBe('0');
+    expect(valueOf(body, 'padding-bottom')).toBe('calc(1.5rem + env(safe-area-inset-bottom, 0px))');
+    expect(valueOf(ruleExactly(css, '.gn-bar-sheet--more'), 'flex')).toBe('1 1 auto');
+    expect(valueOf(ruleExactly(css, '.gn-bar-sheet--more > .gn-bar-sheet__list'), 'margin-top')).toBe('auto');
+    // CONTROL — `flex-end` on a scroll container strands overflowing rows above the scroll start; nothing here uses it.
+    const mine = parseRules(css).filter((r) => r.selectors.some((x) => x.includes('gn-bar-sheet--more')));
+    expect(mine.length).toBeGreaterThanOrEqual(3);
+    for (const rule of mine) expect(valueOf(rule.body, 'justify-content')).toBeNull();
+  });
+
+  it('23.238 CONTROL — the Edit bottom bar sheet keeps its own layout (no bottom-aligned body)', async () => {
+    const user = userEvent.setup();
+    render(bar());
+    await user.click(within(phoneNav()).getByRole('button', { name: 'More' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'More' })).getByRole('button', { name: 'Edit bottom bar' }));
+    const edit = await screen.findByRole('dialog', { name: 'Edit bottom bar' });
+    expect(edit.querySelector('.gn-bar-sheet--more')).toBeNull();
+  });
+});
