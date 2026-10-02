@@ -25,7 +25,7 @@ const resolve: RefResolver = {
 const blocks = (md: string): DocNode[] => {
   const { doc, problems } = markdownToDoc(md, resolve);
   expect(problems).toEqual([]);
-  return (doc as { content: DocNode[] }).content;
+  return (doc as unknown as { content: DocNode[] }).content;
 };
 const types = (nodes: DocNode[] | undefined): string[] => (nodes ?? []).map((n) => n.type);
 const inline = (md: string): DocNode[] => blocks(md)[0]?.content ?? [];

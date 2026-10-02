@@ -1,16 +1,8 @@
-import MarkdownIt from 'markdown-it';
+import MarkdownItCtor, { type MarkdownIt, type StateBlock, type StateCore, type Token } from 'markdown-it';
 import { MarkdownParser } from 'prosemirror-markdown';
 import { emptyDoc, type DocJson } from '../doc.js';
 import { INLINE_REF, TICKET_KEY_PATTERN, ULID_PATTERN, type RefResolver } from './refs.js';
 import { markdownSchema } from './schema.js';
-
-// markdown-it's own types are reached through its rulers so this file does not
-// depend on which `@types/markdown-it` subpath exports them.
-type CoreRule = Parameters<MarkdownIt['core']['ruler']['push']>[1];
-type StateCore = Parameters<CoreRule>[0];
-type Token = StateCore['tokens'][number];
-type BlockRule = Parameters<MarkdownIt['block']['ruler']['before']>[2];
-type StateBlock = Parameters<BlockRule>[0];
 
 export type ParseEnv = { resolve: RefResolver; problems: string[] };
 
@@ -90,7 +82,7 @@ function liftImages(state: StateCore): void {
       const meaningful = (body.children ?? []).filter((c) => !(c.type === 'text' && c.content.trim() === '') && c.type !== 'softbreak');
       if (meaningful.length === 1 && meaningful[0]!.type === 'image') {
         const image = meaningful[0]!;
-        const src = image.attrGet('src') ?? '';
+        const src = String(image.attrGet('src') ?? '');
         const id = src.startsWith('attachment:') ? src.slice('attachment:'.length) : '';
         if (!ULID_PATTERN.test(id)) env.problems.push(IMAGE_EXTERNAL);
         const block = new state.Token('gn_image', 'img', 0);
@@ -109,7 +101,7 @@ function liftImages(state: StateCore): void {
     if (tok.type !== 'inline') continue;
     tok.children = (tok.children ?? []).map((c) => {
       if (c.type !== 'image') return c;
-      env.problems.push((c.attrGet('src') ?? '').startsWith('attachment:') ? IMAGE_ALONE : IMAGE_EXTERNAL);
+      env.problems.push(String(c.attrGet('src') ?? '').startsWith('attachment:') ? IMAGE_ALONE : IMAGE_EXTERNAL);
       return textToken(state, c.content);
     });
   }
@@ -192,7 +184,7 @@ function detailsBlock(state: StateBlock, startLine: number, endLine: number, sil
 function markdownIt(): MarkdownIt {
   // `html: false`: Claude must not be able to store raw HTML (case 26.008). `linkify: false`: a bare
   // URL is text, as the editor's own `autolink: false` keeps it (`schema/extensions.ts`).
-  const md = new MarkdownIt('default', { html: false, linkify: false, typographer: false });
+  const md = new MarkdownItCtor('default', { html: false, linkify: false, typographer: false });
   md.validateLink = (url: string): boolean => /^(https?:|mailto:)/i.test(url) || /^[/#]/.test(url) || url.startsWith('attachment:');
   md.block.ruler.before('table', 'gn_details', detailsBlock, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
   md.core.ruler.before('inline', 'gn_task_lists', taskLists);
@@ -207,7 +199,9 @@ function markdownIt(): MarkdownIt {
 let parser: MarkdownParser | null = null;
 
 function markdownParser(): MarkdownParser {
-  parser ??= new MarkdownParser(markdownSchema(), markdownIt(), {
+  // markdown-it 15 ships its own types while prosemirror-markdown's are written against `@types/markdown-it` 14:
+  // the two token shapes differ only in attribute value types, so the instance crosses that seam by cast.
+  parser ??= new MarkdownParser(markdownSchema(), markdownIt() as unknown as ConstructorParameters<typeof MarkdownParser>[1], {
     blockquote: { block: 'blockquote' },
     paragraph: { block: 'paragraph' },
     list_item: { block: 'listItem' },
