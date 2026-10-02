@@ -173,3 +173,14 @@ describe('ticketKey', () => {
     expect(ticketKey('CC', 'SO', 1)).toBe('CCSO-1');
   });
 });
+
+describe('22.024 resolveProjectPrefixes skips reserved prefixes', () => {
+  it('22.024 — a derived prefix flees a reserved one to the next candidate; control: without `reserved` it keeps the base', () => {
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }])).toEqual(['SO']); // control
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }], new Set(['SO']))).toEqual(['SO2']);
+    // An ENTERED prefix is not moved by `reserved`: the door checked it, pass 1 is unchanged.
+    expect(resolveProjectPrefixes([{ name: 'Shop ops', prefix: 'SO' }], new Set(['SO']))).toEqual(['SO']);
+    // Reserved values are taken in order: SO and SO2 both reserved -> SO3.
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }], new Set(['SO', 'SO2']))).toEqual(['SO3']);
+  });
+});

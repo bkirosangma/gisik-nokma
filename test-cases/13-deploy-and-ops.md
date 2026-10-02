@@ -476,6 +476,20 @@ planted in `rebuild.sh` (2), a `docker system prune` planted in the dry-run (3).
   ls` identical before and after (13 volumes); server healthy. The case is left 🧪 only because it is a hand-run
   against the real Docker (the arms above are automatic).
 
+## `ctl dispatch`: a ghost suggestion is not input; `--submit-pending` (`task/ctl-dispatch-ghost-pending`, orchestrator 2026-10-02)
+Why: at 04:38 on 2026-10-02 the dispatcher could not reach two lanes. gisik:1 showed only Claude Code's dim prompt
+suggestion (`^[[2mRead the WHOLE file …`, no closing reset), which `ctl_box_text` read as real text; gisik:3 held a real
+message pasted at 04:22 but never submitted, and no verb could send it. Block `13.1640`–`13.1642`, 🧪 for the same reason
+as `13.1501`–`13.1512` (arms in `scripts/ctl/test/lib.test.sh` under `pnpm check:ctl`; the citation scanner reads only
+`apps/` and `packages/`). Red proof (LOCAL, 2026-10-02): with the old regex 13.1640 (both arms) and 13.1642 fail.
+
+- 13.1640 🧪 `ctl_box_text` drops a dim span that runs to the end of the line with no reset (the real gisik:1 capture),
+  and — the control — still reads real text that sits between a closed dim span and an unclosed one.
+- 13.1641 🧪 `ctl dispatch <window> --submit-pending` on a box holding a real multi-line message presses real Enters
+  until it empties (×2 for the multi-line shape), says so in its OK line, and never pastes.
+- 13.1642 🧪 `ctl dispatch <window> --submit-pending` on a box holding only a ghost suggestion is refused ("holds no
+  real text") and sends no key at all.
+
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 
 Ids minted from the §13 tip: `13.1495` was the highest id on any remote branch (measured with `check-case-ids.mjs`'s own

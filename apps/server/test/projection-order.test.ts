@@ -177,7 +177,11 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_entity_heads', ['proj_entity_heads']],
       ['proj_workflows', ['proj_workflows']],
       ['proj_ticket_types', ['proj_ticket_types']],
-      ['proj_projects', ['proj_projects']],
+      // TWO tables (prefixes and groups plan Task 2). `proj_project_prefixes` — the
+      // former prefixes — is written in the same `apply` as the row; undeclared,
+      // the verifier's shadow replay would resolve it to the LIVE table, empty it and
+      // rebuild it in place, and diff nothing (22.025).
+      ['proj_projects', ['proj_projects', 'proj_project_prefixes']],
       ['proj_groups', ['proj_groups']],
       ['proj_tickets', ['proj_tickets']],
       ['proj_rollups', ['proj_rollups']],
