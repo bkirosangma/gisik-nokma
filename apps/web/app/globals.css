@@ -694,6 +694,28 @@ input, textarea, select { font-family: inherit; }
   outline-offset: 2px;
 }
 .gn-workspace-home__rename-trigger:disabled { cursor: default; }
+/* The visible Rename cue (UX fixes Task 10, case 23.177): P-GHOST, icon only, 44x44, beside the heading
+   (a sibling of the `h1`, so the heading never names an action). `.gn-workspace-home__title-row` keeps
+   the name and the cue on one line and lets a long name wrap rather than push the cue off the screen. */
+.gn-workspace-home__title-row { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
+.gn-workspace-home__title-row .gn-page-title { min-width: 0; }
+.gn-workspace-home__rename-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--gn-radius-track);
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-workspace-home__rename-icon:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text-accent); }
+.gn-workspace-home__rename-icon:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+.gn-workspace-home__rename-icon:disabled { cursor: default; }
 .gn-account ul { margin: 0.4rem 0 1rem; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem; }
 
 /* ── `/account` — ported from the DESKTOP prototype's `isAccount` screen

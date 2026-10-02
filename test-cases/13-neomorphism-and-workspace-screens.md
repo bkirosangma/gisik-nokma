@@ -2241,7 +2241,7 @@ arms that discriminate:
 
 1. **the visible text IS the name** — a control labelled `Rename` passes all four and fails this;
 2. **it is focusable** — `.focus()` and `document.activeElement`, which an `h1` with an `onClick` fails;
-3. **exactly ONE rename control exists**, and no bare `Rename` survives — the old shape had two.
+3. **exactly ONE rename control exists**, and no bare `Rename` survives — the old shape had two. **AMENDED 2026-10-02 (23.177):** exactly one lives INSIDE the heading (the arm counts within the `h1`); an admin now also has a pencil icon button beside it, outside the `h1`, with the same accessible name.
 
 plus **Escape cancels**, which nothing above covered (13.963 covers commit, 13.964 the blank guard).
 

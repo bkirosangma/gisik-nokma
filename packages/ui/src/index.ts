@@ -71,3 +71,5 @@ export { FireIcon, LeafIcon, SnowflakeIcon, FlagIcon } from './icons/priority-ic
 // two pages), none of which can reach into `icons/`; one glyph, exported on the same
 // terms as the icons above.
 export { PlusIcon } from './icons/plus-icon.js';
+// The workspace home's Rename cue (UX fixes Task 10, 23.177): one glyph, same terms as `PlusIcon`.
+export { PencilIcon } from './icons/pencil-icon.js';

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { newUlid, type GroupRow, type IngestResult } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, Dialog, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, Dialog, PencilIcon, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
 import {
   ARCHIVE_LABEL,
   DELETE_TRIGGER_LABEL,
@@ -1070,11 +1070,34 @@ function WorkspaceHome({
               </Button>
             </form>
           ) : (
-            <h1 className="gn-page-title" aria-labelledby={isAdmin ? RENAME_NAME_ID : undefined}>
+            /* THE VISIBLE RENAME CUE (UX fixes Task 10, case 23.177, audit WS-13). The name above stays the
+               rename's control (13.969); a name that does the job but looks like plain text is not
+               discoverable, so an admin also gets a pencil button BESIDE the heading — a sibling, never inside
+               the `h1`, or the page's level-1 heading would announce itself as an action (13.995). Both open
+               the same in-place field, and both are named `Rename <workspace>`. Non-admins get neither. */
+            <div className="gn-workspace-home__title-row">
+              <h1 className="gn-page-title" aria-labelledby={isAdmin ? RENAME_NAME_ID : undefined}>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    className="gn-workspace-home__rename-trigger"
+                    aria-label={`Rename ${workspace.name}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setNameDraft(workspace.name);
+                      setRenaming(true);
+                    }}
+                  >
+                    <span id={RENAME_NAME_ID}>{workspace.name}</span>
+                  </button>
+                ) : (
+                  workspace.name
+                )}
+              </h1>
               {isAdmin ? (
                 <button
                   type="button"
-                  className="gn-workspace-home__rename-trigger"
+                  className="gn-workspace-home__rename-icon"
                   aria-label={`Rename ${workspace.name}`}
                   disabled={busy}
                   onClick={() => {
@@ -1082,12 +1105,10 @@ function WorkspaceHome({
                     setRenaming(true);
                   }}
                 >
-                  <span id={RENAME_NAME_ID}>{workspace.name}</span>
+                  <PencilIcon />
                 </button>
-              ) : (
-                workspace.name
-              )}
-            </h1>
+              ) : null}
+            </div>
           )}
           {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
               a dedicated class, not a structural selector — see that class's
@@ -1122,7 +1143,15 @@ function WorkspaceHome({
             longer a second control in this header at all**, because the name
             does the job. What the sentence above used to say — *"the header is
             now the monogram and the titles, nothing else"* — stays amended
-            rather than deleted: it remains true of the two buttons it removed. */}
+            rather than deleted: it remains true of the two buttons it removed.
+
+            **AMENDED 2026-10-02 (UX fixes Task 10, case 23.177, audit WS-13).**
+            "No second control in this header" is no longer true for an ADMIN: the
+            name is still the rename's control, but a name that does the job and
+            looks like plain text is not discoverable, so a pencil icon button
+            (`Rename <workspace>`) now sits beside the heading, outside the `h1`.
+            It is still a workspace ACT with no other route, not a navigation
+            affordance, so it does not bring back Members/Settings. */}
       </div>
 
       {/* THE SECTION ROW IS ON TOP (prefixes and groups Task 7, case 22.120): Round 20 had moved it below the
