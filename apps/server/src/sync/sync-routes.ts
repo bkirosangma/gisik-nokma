@@ -30,12 +30,17 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole
  * `entityKind: 'ticket'` set**, or "snapshot + tail ≡ full replay" is false for
  * any ticket whose stream carries the missing type below its snapshot seq. The
- * registry binds EIGHTEEN types to that kind (`vocabulary.ts`);
- * `TICKET_EVENT_TYPES` is fifteen of them, and the three it omits —
- * `visibility.set`, `claim.contested`, `claim.contested_resolved` — are exactly
- * the three below that are not also folded. `comment.added` and
- * `attachment.added` appear in both lists on purpose: they fold into state AND
- * are content a replica needs verbatim.
+ * registry binds TWENTY types to that kind (`vocabulary.ts`; eighteen until
+ * MCP-everything T2 registered `comment.edited` and `comment.deleted` against
+ * both ticket and note);
+ * `TICKET_EVENT_TYPES` is fifteen of them, and the five it omits —
+ * `visibility.set`, `claim.contested`, `claim.contested_resolved`,
+ * `comment.edited`, `comment.deleted` — are exactly the five below that are not
+ * also folded. `comment.added` and `attachment.added` appear in both lists on
+ * purpose: they fold into state AND are content a replica needs verbatim. The
+ * comment edit and deletion carry content beyond the fold the way
+ * `comment.added` does (a replica's thread must show the edited text and the
+ * deletion), so they travel in full below the cut too (case 26.057).
  *
  * **The pair has moved three times, and BOTH numbers moved together each time**,
  * which is why the arithmetic is restated here rather than left to be
@@ -44,7 +49,7 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * recalled: thirteen and ten before `253436d0`; fifteen and twelve at `253436d0`
  * (Task 2, the closed flag); sixteen and thirteen at `b26d9cd6` (Task 1,
  * `ticket.ranked`); **eighteen and fifteen at `18d7e391`** (the deleted/restored
- * pair), which is still the pair at HEAD. The numbers in the paragraph above are
+ * pair); **twenty and fifteen with MCP-everything T2** (the two comment events), which is the pair at HEAD. The numbers in the paragraph above are
  * that last pair, and they stood stale from `18d7e391` until this sentence was
  * corrected. Re-derive them by parsing `vocabulary.ts`'s
  * `domainRegistry.register` blocks for `entityKind: 'ticket'` and by reading
@@ -88,6 +93,8 @@ import { registerReconcileRoute } from './reconcile-route.js';
  */
 export const BOOTSTRAP_BACKFILL_TYPES = [
   'comment.added',
+  'comment.edited',
+  'comment.deleted',
   'attachment.added',
   'visibility.set',
   'claim.contested',

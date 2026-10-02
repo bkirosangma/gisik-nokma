@@ -258,6 +258,8 @@ beforeAll(async () => {
   // left Features.md's transport bullet asserting a deleted `pong`.) The three non-folded types are the point: the snapshot writer
   // skips them while still advancing `seq` past them, so they exist ONLY in the
   // backfill or nowhere.
+  const auditComment = ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.added', { body: { type: 'doc', content: [] } });
+  const auditSecondComment = ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.added', { body: { type: 'doc', content: [] } });
   const ws3Ticket = await ingest.ingestBatch([
     ws3Submit({ kind: 'ticket', id: AUDIT }, 'ticket.created', {
       typeId: WS3_TYPE_KEY,
@@ -273,7 +275,13 @@ beforeAll(async () => {
       ticketId: AUDIT,
       mode: 'workspace',
     }),
-    ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.added', { body: { type: 'doc', content: [] } }),
+    auditComment,
+    // For 26.057 (MCP-everything T2): a second comment, an edit of the first and the deletion of the
+    // second, all filed BELOW the snapshot cut like the comment above. The reducer folds none of the
+    // three, so they reach a replica only if `BOOTSTRAP_BACKFILL_TYPES` names them.
+    auditSecondComment,
+    ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.edited', { commentId: auditComment.id, body: { type: 'doc', content: [{ type: 'paragraph' }] } }),
+    ws3Submit({ kind: 'ticket', id: AUDIT }, 'comment.deleted', { commentId: auditSecondComment.id }),
     // For 12.363. Seeded here with the comment and the `visibility.set`, so it
     // lands BELOW the snapshot cut the 22 field_sets push up — the only
     // position from which the backfill clause is what carries it. The reducer
@@ -352,7 +360,7 @@ beforeAll(async () => {
   // Sorted by entity id rather than compared in pass order: `runSnapshotPass`
   // sweeps every workspace, so WS3's AUDIT is due in the same pass and the due
   // query's ordering is not this test's business. The seqs stay exact —
-  // AUDIT's 28 is what places its `visibility.set` (seq 2), comment (3),
+  // AUDIT's 31 (28 until 26.057 seeded three comment events) is what places its `visibility.set` (seq 2), comment (3),
   // attachment (4), contest (5) and resolution (6) BELOW the snapshot, which
   // is the whole premise of 12.115, 12.116 and 12.363.
   //
@@ -367,7 +375,7 @@ beforeAll(async () => {
   expect([...written].sort((a, b) => a.entityId.localeCompare(b.entityId))).toEqual(
     [
       { entityId: VISIBLE, seq: 24 },
-      { entityId: AUDIT, seq: 28 },
+      { entityId: AUDIT, seq: 31 },
     ].sort((a, b) => a.entityId.localeCompare(b.entityId)),
   );
 
@@ -426,15 +434,17 @@ describe('GET /v1/sync/bootstrap', () => {
     expect(visible.snapshot.state.stateId).toBe('todo');
     // the comment predates the snapshot but still travels — content is not state
     expect(visible.events.some((e: { type: string }) => e.type === 'comment.added')).toBe(true);
-    // and nothing in the tail predates the snapshot except the five backfill
+    // and nothing in the tail predates the snapshot except the seven backfill
     // types — hardcoded here (not imported from `BOOTSTRAP_BACKFILL_TYPES`) so
     // that shrinking the constant would shrink both sides of the check and
     // leave this green for the wrong reason. This ticket's stream carries only
-    // one of the five, so this loop is a boundary check, not a backfill check:
+    // one of the seven, so this loop is a boundary check, not a backfill check:
     // 12.115 and 12.116 are where each type is made to travel.
     for (const e of visible.events) {
       const isBackfill = [
         'comment.added',
+        'comment.edited',
+        'comment.deleted',
         'attachment.added',
         'visibility.set',
         'claim.contested',
@@ -566,7 +576,7 @@ describe('GET /v1/sync/bootstrap', () => {
     tickets: {
       ticketId: string;
       snapshot: { seq: number } | null;
-      events: { type: string; seq: number; payload: Record<string, unknown> }[];
+      events: { id: string; type: string; seq: number; payload: Record<string, unknown> }[];
     }[];
   }> {
     const res = await app.inject({
@@ -608,6 +618,26 @@ describe('GET /v1/sync/bootstrap', () => {
     // Whole, not merely present: a replica reapplying an audience change needs
     // the mode it names.
     expect(visibilitySet?.payload).toMatchObject({ ticketId: AUDIT, mode: 'workspace' });
+  });
+
+  it('26.057 `comment.edited` and `comment.deleted` filed BELOW a ticket\'s snapshot seq travel in a bootstrap', async () => {
+    const body = await bootstrapWs3();
+    const audit = body.tickets.find((t) => t.ticketId === AUDIT);
+    const snapSeq = audit?.snapshot?.seq;
+    expect(typeof snapSeq).toBe('number');
+    expect(snapSeq).toBeGreaterThan(0);
+    // control: the comment itself (a long-standing backfill type) is below the cut and present
+    const added = audit?.events.filter((e) => e.type === 'comment.added') ?? [];
+    expect(added).toHaveLength(2);
+    expect(Math.max(...added.map((e) => e.seq))).toBeLessThan(snapSeq ?? 0);
+    const edited = audit?.events.filter((e) => e.type === 'comment.edited') ?? [];
+    const deleted = audit?.events.filter((e) => e.type === 'comment.deleted') ?? [];
+    expect(edited).toHaveLength(1);
+    expect(deleted).toHaveLength(1);
+    expect(edited[0]?.seq).toBeLessThan(snapSeq ?? 0);
+    expect(deleted[0]?.seq).toBeLessThan(snapSeq ?? 0);
+    expect(edited[0]?.payload.commentId).toBe(added[0]?.id);
+    expect(deleted[0]?.payload.commentId).toBe(added[1]?.id);
   });
 
   it('12.116 a `claim.contested` and its resolution filed BELOW the snapshot seq travel in full — the case that makes the two contest entries in BOOTSTRAP_BACKFILL_TYPES load-bearing', async () => {

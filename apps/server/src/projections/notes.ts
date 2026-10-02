@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import {
   applyNoteEvent,
+  isCommentEvent,
   NOTE_EVENT_TYPES,
   type LedgerEvent,
   type NoteScope,
@@ -263,10 +264,10 @@ export const notesProjection: Projection = {
     // refuse it and abort the whole replay.
     if (event.entity.kind !== 'note' || !(NOTE_EVENT_TYPES as readonly string[]).includes(event.type)) return;
     // `proj_note_comments` belongs to the comments projection, not this one, and
-    // the reducer folds `comment.added` to no change — so without this line the
+    // the reducer folds the comment events to no change — so without this line the
     // event would still cause a pointless full-row write, and `applyNoteEvent`
     // would be asked about a note the comments table already covers.
-    if (event.type === 'comment.added') return;
+    if (isCommentEvent(event.type)) return;
     const stored = await getNoteStateFromDb(tx, event.entity.id);
     const purgedAttached = stored === null ? [] : await purgedAttachmentsOf(tx, event);
     const current =

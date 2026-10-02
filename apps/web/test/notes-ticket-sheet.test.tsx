@@ -443,6 +443,8 @@ function commentWithChip(): NoteComment {
     authorId: 'u_kiro',
     body: docWithChip(),
     recordedAt: '2026-09-24T08:00:00.000Z',
+    editedAt: null,
+    deletedAt: null,
   };
 }
 
