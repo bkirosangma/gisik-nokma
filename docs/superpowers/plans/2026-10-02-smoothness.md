@@ -72,6 +72,8 @@ The lines each task needs are inlined in its **Files** block; the audit (`AUDIT.
 
 ### Task 1: Catalogue and docs land first
 
+> **Note (2026-10-02, reviewer A's T1 note N2): the `?` bullets were not used.** The Interfaces line below says the Features section holds "one line per task, each `?` until its task flips it". The branch instead carries one marker comment in `Features.md` §22 (`<!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->`), and each task adds its own bullet, written ✅ or ⚙️, in its own change set. Reason: the workspace rule "never leave a `?` you introduced". The plan text and the branch differ here on purpose.
+
 **Files:**
 - Create: `test-cases/25-smoothness.md`
 - Modify: `Features.md` (append `## 22. Smoothness: loading, optimism and placeholders` after §21 if the neo bucket has landed, else after §20; the section number is 22 either way), `test-cases/README.md` (the bucket list), `scripts/fixtures/check-case-citations-baseline.json` (add `"25-smoothness.md": 0`)
@@ -108,6 +110,15 @@ git commit -m "Smoothness T1: bucket 25, Features §22, spec and plan land"
 ---
 
 ### Task 2: Loading primitives in `packages/ui` (`Skeleton`, `Pending`, `useWait`, `Button busy`)
+
+> **Amendment S-R1 (2026-10-02): T2 also adds the `surfacePlaceholder` token role and builds `Skeleton` as the PARTS of structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins.
+> - **Role.** A new `surfacePlaceholder` role in `packages/ui/src/tokens.ts`, used by the skeleton fill in place of `var(--gn-surface-track)` (the body's Fill line and every case that asserts `--gn-surface-track` change to `--gn-surface-placeholder`). Decoration only, so no `CONTRAST_PAIRS` row.
+> - **hig and minimal (light and dark)** map it to the SAME primitive `surfaceTrack` maps to today, so their look does not change and guard 24.009 (hig/minimal byte-identical) stays green. T2 asserts that equality per theme as a case.
+> - **neo (light and dark)** maps it to a FLAT surface step, one notch off `surface` toward ink, **never the well** (`neoWellLight` / `neoWellDark`) and never a field look. T2 picks the step and quotes its hex in DONE; a case asserts the neo value is not the well primitive.
+> - **The token report** (`docs/neo-token-report.md`) gains the role, per the amendment.
+> - **Parts.** `line`, `block` and `circle` stay as the PARTS; `card` stays only as a fallback for a region with no real component. T2 does not build any screen's skeleton. T5–T9 and T13 each build theirs from the real component's container plus these parts.
+> - **Unchanged:** motion, copy, accessibility, budgets, `WAIT_BEFORE_MS` / `WAIT_HOLD_MS`, and §4.3's style-neutral test (no skeleton rule names a style attribute).
+> - **Resolves** the OPEN item at the end of "Re-anchored citations" (S94 vs neo's `surfaceTrack` well).
 
 **Parallel-safe with neo: yes** (CSS appended after `ui.css`'s last rule, line 8904 at `4f86b959`; `index.ts` gains three export lines; `tokens.ts` untouched).
 
@@ -1150,6 +1161,8 @@ git commit -m "Smoothness T4: one workspaces read, gn-last-user-id, refetch on f
 
 ### Task 5: Route shells (`loading.tsx`), the nav skeleton and link pending hints
 
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: the route shells' skeletons and the nav skeleton (`AppNavSkeleton`) render the real shell and nav container classes, with parts for the labels and links. **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
+
 **Parallel-safe with neo: yes** (`globals.css` appended after its last rule, line 5657 at `4f86b959`).
 
 **Files:**
@@ -1403,6 +1416,8 @@ git commit -m "Smoothness T5: loading.tsx shells, AppNavSkeleton, NavPending (ca
 
 ### Task 6: The project page — skeleton arms, the tab before first paint, transitions, the Create button
 
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: `ProjectPageSkeleton` and the project page's loading arms render the board card (`.gn-board-card`), the list row and the ticket-sheet header's own containers, with parts for the key, title, state, due, chips and avatar. **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
+
 **Parallel-safe with neo: yes.**
 
 **Files:**
@@ -1531,6 +1546,8 @@ git commit -m "Smoothness T6: project page skeleton arms, tab before first paint
 ---
 
 ### Task 7: Optimistic writes — the sheet's fields, the ghost card, Close, Start, the renames
+
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: the ghost card (and any placeholder the optimistic writes show) renders `.gn-board-card`'s own container with parts inside; no invented container style. **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
 
 **Parallel-safe with neo: yes.**
 
@@ -1733,6 +1750,8 @@ git commit -m "Smoothness T7: optimistic sheet fields, ghost create card, Close,
 
 ### Task 8: Secondary screens, the entry pages and the phone shell
 
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: each secondary screen's skeleton (workspace card, member row, inbox and my-work items, account and settings sections) renders that component's own container, with parts for its text, avatar and chips. **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
+
 **Parallel-safe with neo: yes** (`globals.css` appended; `app-nav.tsx`, `use-tablet-bar.ts`, `bottom-bar.tsx` are not neo's).
 
 **Files:**
@@ -1875,6 +1894,8 @@ git commit -m "Smoothness T8: screen skeletons, busy entry buttons, phone shell 
 ---
 
 ### Task 9: Notes — cheap remount, parallel resolve, the editor's reserved band, a quiet keystroke
+
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: the notes list item and the editor's reserved band render the real notes-list item container and the editor slot's own box (`EditorSkeleton`'s toolbar line and block are parts inside it). **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
 
 **Parallel-safe with neo: yes** (`globals.css:4520` is outside neo's lines).
 
@@ -2285,6 +2306,8 @@ git commit -m "Smoothness T12: memoised card slots, containment, deferred search
 
 ### Task 13: Desktop and mobile loading states
 
+> **Amendment S-R1 (2026-10-02): structural skeletons.** Owner ruling 2026-10-02 ~21:00: *"can the skeleton take at least the shape of what the actual element would look like?"*, then **"Yes, structural skeletons."** Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md` § "Amendment S-R1" (rules 1–5). The task body below is NOT rewritten; where it says a generic shape, a `card`, or `var(--gn-surface-track)`, this note wins. For this task: the desktop and mobile loading states render the same real component containers as their web counterparts, with parts inside. **Tests** assert (a) the skeleton uses the component's own container class and (b) no skeleton fill is the well (`neoWellLight` / `neoWellDark`; the role is `surfacePlaceholder`, from T2). The skeleton copies the content's box by being that box (S1); it names no container style of its own, and §4.3's style-neutral test stands.
+
 **Parallel-safe with neo: yes.**
 
 **Files:**
@@ -2515,15 +2538,15 @@ Plan complete and saved beside the spec at `gisik-nokma-lanes/smoothness-2026-10
 | `packages/app-core/src/views/ticket-sheet.tsx:940-951` (P1539) | `packages/app-core/src/views/ticket-sheet.tsx:948-959` | unchanged lines, moved +8 |
 | `views/board.tsx:515` (P1539) | `packages/app-core/src/views/board.tsx:515` | unchanged lines, moved 0 (same numbers) |
 | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2258-2264` (P1539) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2270-2276` | unchanged lines, moved +12 |
-| `apps/web/src/project-title.tsx:160-176` (P1539) | `apps/web/src/project-title.tsx:160-177` | unchanged lines, moved 0 (same numbers); range grew 17 → 18 lines (an edit inside it) |
+| `apps/web/src/project-title.tsx:160-176` (P1539) | `apps/web/src/project-title.tsx:160-177` | lines at the range start unchanged; **1 line ADDED inside it** (`className="gn-project__edit"`), range 17 → 18 lines (reviewer A's N1 relabel). |
 | `board.tsx:515` (P1716) | `packages/app-core/src/views/board.tsx:515` | unchanged lines, moved 0 (same numbers) |
 | `app/w/[workspaceId]/my-work/page.tsx:334-350` (P1739) | `apps/web/app/w/[workspaceId]/my-work/page.tsx:337-353` | unchanged lines, moved +3 |
-| `apps/web/src/app-nav.tsx:528-555` (P1739) | `apps/web/src/app-nav.tsx:528-558` | unchanged lines, moved 0 (same numbers); range grew 28 → 31 lines (an edit inside it) |
-| `apps/web/src/bottom-bar.tsx:114-118` (P1739) | `apps/web/src/bottom-bar.tsx:114-121` | unchanged lines, moved 0 (same numbers); range grew 5 → 8 lines (an edit inside it) |
+| `apps/web/src/app-nav.tsx:528-555` (P1739) | `apps/web/src/app-nav.tsx:528-558` | **NOT unchanged: 2 lines REPLACED, the code changed meaning** (reviewer A's N1): F-6 (case 23.285), a failed session read now shows the bottom bar, so `{user !== null && hasBottomBar ? (` is `{(user !== null || session.kind === "error") && hasBottomBar ? (` and `userId={user.id}` is `userId={user?.id ?? ""}`, under a 3-line F-6 comment; range 28 → 31 lines. **T8 edits this region** (phone shell, P1739): read the condition as it is now. |
+| `apps/web/src/bottom-bar.tsx:114-118` (P1739) | `apps/web/src/bottom-bar.tsx:114-121` | lines at the range start unchanged; **3 lines ADDED inside it** (F-6, 23.285: `const knownUser = userId === '' ? null : userId;` and its 2-line comment), range 5 → 8 lines. `userId=""` is a session that never loaded. **T8 edits this region** (reviewer A's N1). |
 | `comments-thread.tsx:251` (P1739) | `packages/app-core/src/views/comments-thread.tsx:453` | unchanged lines, moved +202 |
 | `use-is-phone.ts:26-35` (P1859) | `apps/web/src/use-is-phone.ts:29-38` | unchanged lines, moved +3 |
 | `app-nav.tsx:528-533` (P1859) | `apps/web/src/app-nav.tsx:528-533` | unchanged lines, moved 0 (same numbers) |
-| `bottom-bar.tsx:114-118` (P1859) | `apps/web/src/bottom-bar.tsx:114-121` | unchanged lines, moved 0 (same numbers); range grew 5 → 8 lines (an edit inside it) |
+| `bottom-bar.tsx:114-118` (P1859) | `apps/web/src/bottom-bar.tsx:114-121` | lines at the range start unchanged; **3 lines ADDED inside it** (F-6, 23.285: `const knownUser = userId === '' ? null : userId;` and its 2-line comment), range 5 → 8 lines. `userId=""` is a session that never loaded. **T8 edits this region** (reviewer A's N1). |
 | `globals.css:4520` (P1879) | `apps/web/app/globals.css:4536` | unchanged lines, moved +16 |
 | `apps/web/src/notes/note-document.tsx:155-200` (P1882) | `apps/web/src/notes/note-document.tsx:155-200` | unchanged lines, moved 0 (same numbers) |
 | `apps/web/src/notes/note-comments.tsx:128` (P1882) | `apps/web/src/notes/note-comments.tsx:202` | unchanged lines, moved +74 |
@@ -2610,3 +2633,8 @@ Plan complete and saved beside the spec at `gisik-nokma-lanes/smoothness-2026-10
 - **Features and the catalogue.** §22 sits between §21 (neo) and §23 (MCP everything); bucket 25 sits between 24 (neo) and 26 (MCP). Neither is renumbered. Plan line 20 ("Bucket 24 / Features §21 belong to the neo refresh") is still true; add "bucket 26 / §23 belong to MCP everything".
 
 **OPEN, for the planner before T2 (found while re-anchoring; not decided here).** Spec §4.3 (S94) says the skeleton fill is `var(--gn-surface-track)` and that "in neo this is the flat surface, which U7 defines as not interactive". After neo, `surfaceTrack` in the neo arms maps to the well step (`neoWellLight` / `neoWellDark`, `packages/ui/src/tokens.ts:1104`, `:1121`), the recess fill that the neo segmented track and nav use. The skeleton would paint in the recess colour. The spec anticipated a re-value ("the skeleton follows the token"), but the "flat, not interactive" rationale no longer holds. T2's fill cases (25.01x) need a ruling: keep `surfaceTrack`, or a flat role.
+
+**RESOLVED (2026-10-02, owner, Amendment S-R1).** The skeleton fill is a new role, `surfacePlaceholder`: hig/minimal map to the same primitive as `surfaceTrack` (24.009 stays green), neo maps to a flat surface step and never the well. See the T2 note and the spec's "Amendment S-R1" section.
+
+**Spec line numbers after S-R1 (2026-10-02).** The S-R1 fold added two pointer lines to the spec (after the `### 4.1` heading, 2 lines; after the `### 4.3` heading, 1 line) and appended the amendment at its end. Spec line cites (`S<n>`) therefore move +2 for lines after the §4.1 heading, +3 for lines after the §4.3 heading; lines 1–87 are as cited.
+

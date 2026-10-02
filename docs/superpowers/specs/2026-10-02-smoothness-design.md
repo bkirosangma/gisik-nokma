@@ -85,12 +85,15 @@ Each is numbered, with the recommendation the plan was written against. A differ
 ## 4. The placeholder design
 
 ### 4.1 Shapes
+*(Superseded in part by Amendment S-R1, appended at the end of this spec: the frame is the real component's own container and `Skeleton`'s shapes are its parts.)*
+
 `Skeleton` renders a `<span class="gn-skeleton gn-skeleton--<shape>" aria-hidden="true">` with inline `--gn-skeleton-w`/`-h` from props. Shapes: `line` (height `1em`, radius `--gn-radius-control`, default width 60%), `block` (any size, radius `--gn-radius-card`), `circle` (avatar), `card` (a card's padding with two lines and a chip row, matching `.gn-board__card`'s padding and minimum height). `rows={n}` repeats with the list's own gap. A skeleton region is a container with `aria-busy="true"` and a visually hidden "Loading <what>" sentence rendered once, not per block (Nord's pattern, RESEARCH §5).
 
 ### 4.2 Motion
 One keyframe, `gnPulse` (`opacity: 1 → 0.6 → 1`, 1,600 ms, `--gn-motion-ease-out`, infinite), with its own `prefers-reduced-motion: reduce` arm setting `animation: none` and a static `opacity: 0.8`. Content replaces a skeleton in place with no entrance; a region that arrives late (a strip, a banner) fades in over `--gn-motion-feedback` only when it replaces its reserved band (never when it inserts). Pending controls dim to `--gn-disabled-opacity` after the wait, with no transition.
 
 ### 4.3 Across the styles and themes (hig / minimal / neo × light / dark), and beside the neo refresh
+*(The Fill line is superseded by Amendment S-R1: the fill is the new `surfacePlaceholder` role, never the neo well; the rest of this section stands.)*
 - Fill: `var(--gn-surface-track)` in every combination (the quiet track, already contrast-paired for text in UX fixes T1); no border, no shadow, no gradient. In neo this is the flat surface, which U7 defines as "not interactive"; in hig/minimal it is the existing track grey. Dark themes use the same role (the neo refresh may re-value `surfaceTrack`; the skeleton follows the token and needs no change).
 - Nothing new in `tokens.ts`: the wait durations are two exported constants in `packages/ui/src/use-wait.ts` (`WAIT_BEFORE_MS = 150`, `WAIT_HOLD_MS = 350`), one place, pinned by fake-timer tests; CSS needs no delay of its own (plan FD1).
 - All skeleton CSS is one contiguous block appended after `ui.css`'s last rule (line 8904 at `4f86b959`), with its keyframe beside it (one consumer, the header's own rule for keyframes), so no line the neo refresh edits (96–99, 1168–1178, 7176–7180, 7252–7258, 8097–8153) moves. `globals.css` gains only the `loading.tsx` shells' rules, appended likewise (neo edits 169 and 2942–2945).
@@ -134,3 +137,28 @@ Request counts: a board paint ≤ 6 requests after the session (board, list page
 - Virtualization (D12) and any change to drag-and-drop behaviour.
 - The replica's IPC costs and the mobile WebView reuse (D11).
 - Any change to tokens, surfaces or shadows (the neo refresh's), any copy rename that the manual quotes, new features, MCP tools.
+
+## Amendment S-R1: structural skeletons (2026-10-02)
+
+**Owner, verbatim:** "can the skeleton take at least the shape of what the actual element would look like?" Then, on the planner's proposal: **"Yes, structural skeletons."**
+
+**Supersedes:** §4.1 (generic shapes as the primary pattern) and §4.3's "Fill: var(--gn-surface-track) in every combination". It resolves the S94 OPEN, where neo N2 made `surfaceTrack` the sunken well. Effort: about +1–2 h across the release (owner informed).
+
+1. **The frame is the real element.** A screen's skeleton renders the component's OWN container classes:
+   - the board card (`.gn-board-card`), list row, ticket-sheet header, workspace card, notes list item, and so on;
+   - with the same box, radius, padding and border, and in neo its raised surface and halo.
+   - The skeleton copies the content's box (S1, no layout shift) by BEING that box.
+   - It must not invent a container style. A skeleton rule that names a style attribute is still forbidden (§4.3's style-neutral test stays).
+2. **Only the contents are placeholders:**
+   - text becomes `Skeleton line` bar(s) at the text's line height and typical width;
+   - the avatar becomes `circle` at its real size;
+   - the key, state, due and chips become small pill bars at their real sizes and positions.
+3. **The placeholder fill is a NEW token role `surfacePlaceholder`:**
+   - hig and minimal (light and dark): it maps to the SAME primitive `surfaceTrack` uses today, so their look does not change;
+   - neo (light and dark): a FLAT surface step, NEVER the well (`neoWellLight`/`neoWellDark`) and never a field look. Pick the neo surface step one notch off `surface` toward ink, and quote it;
+   - decoration only (no text), so no contrast pair is needed;
+   - guard 24.009 (hig/minimal byte-identical) must stay green, which the same-primitive mapping guarantees. Add the role to the token report.
+4. **`Skeleton` keeps its generic shapes** (`line`, `block`, `circle`) as the PARTS. `card` stays only as a fallback for a region with no real component. The plan's per-screen tasks (T5–T9, T13) build each screen's skeleton from its real component plus parts.
+5. **Unchanged:** motion (§4.2), copy (§4.4), accessibility (§5), budgets (§6), WAIT_BEFORE/HOLD.
+
+**Where it lands:** the plan's T2 note (the role and the parts) and the notes on T5, T6, T7, T8, T9 and T13 (each screen's skeleton is its real component's container plus parts; tests assert the container class and that no skeleton fill is the well). Planner's full text: `gisik-nokma-lanes/AMENDMENT-smoothness-S-R1-structural-skeletons.md`.
