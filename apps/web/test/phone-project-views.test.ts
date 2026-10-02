@@ -200,13 +200,22 @@ describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close 
   });
 });
 
-describe('21.112 Calendar: the month grid is a deliberate horizontal scroller with 3rem day cells', () => {
-  it('21.112 the grid scrolls sideways, each week row is at least 22rem, every day track is minmax(3rem, 1fr), and the toolbar wraps', () => {
-    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overflow-x')).toBe('auto');
-    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overscroll-behavior-x')).toBe('contain');
+describe('21.112 Calendar: on a phone the month grid FITS the card (F-4, 2026-10-02: it was a deliberate scroller with 3rem day cells)', () => {
+  it('21.112 every day track is minmax(0, 1fr), no week row has a 22rem floor, the grid does not scroll, and the toolbar wraps', () => {
+    // AMENDED 2026-10-02 (neo-refresh F-4, audit PV-05 + N1): the grid used to scroll sideways (`overflow-x: auto`, a 22rem
+    // floor, `minmax(3rem, 1fr)`), wider than the 342px and 312px grids with no fade. It now fits; the items are dots and
+    // lines (23.260) and the agenda lists them (23.261).
     const tracks = ruleExactly(ui, ['.gn-calendar__weekday-head', '.gn-calendar__days', '.gn-calendar__items'], PHONE);
-    expect(valueOf(tracks, 'grid-template-columns')).toBe('repeat(7, minmax(3rem, 1fr))');
-    expect(valueOf(ruleExactly(ui, ['.gn-calendar__weekday-head', '.gn-calendar__week'], PHONE), 'min-width')).toBe('22rem');
+    expect(valueOf(tracks, 'grid-template-columns')).toBe('repeat(7, minmax(0, 1fr))');
+    const grid = ruleExactly(ui, '.gn-calendar__grid', PHONE);
+    expect(valueOf(grid, 'overflow-x')).toBeNull();
+    expect(valueOf(grid, 'overscroll-behavior-x')).toBeNull();
+    for (const rule of rulesNaming(ui, '.gn-calendar__week').filter((r) => r.atRule === PHONE)) {
+      expect(valueOf(rule.body, 'min-width'), 'no floor on a week row').toBeNull();
+    }
+    for (const rule of rulesNaming(ui, '.gn-calendar__weekday-head').filter((r) => r.atRule === PHONE)) {
+      expect(valueOf(rule.body, 'min-width'), 'no floor on the weekday head').toBeNull();
+    }
     expect(valueOf(ruleExactly(ui, '.gn-calendar__header', PHONE), 'flex-wrap')).toBe('wrap');
     after(ui, ['.gn-calendar__grid']);
     after(ui, ['.gn-calendar__header']);
@@ -215,13 +224,12 @@ describe('21.112 Calendar: the month grid is a deliberate horizontal scroller wi
       ['.gn-calendar__days'],
       ['.gn-calendar__items'],
     ]);
-    after(ui, ['.gn-calendar__weekday-head', '.gn-calendar__week'], [['.gn-calendar__weekday-head']]);
 
-    // CONTROL — the PAGE does not overflow: the scroller is the grid, the calendar is bounded to its column.
+    // CONTROL — the PAGE does not overflow: the calendar is bounded to its column.
     const calendar = ruleExactly(ui, '.gn-calendar', PHONE);
     expect(valueOf(calendar, 'min-width')).toBe('0');
     expect(valueOf(calendar, 'max-width')).toBe('100%');
-    // …and above 40rem the grid is the plain 7×1fr it was: no scroller, no 3rem floor, no wrapping toolbar.
+    // …and above 40rem the grid is the plain 7×1fr it was: no scroller, no wrapping toolbar.
     expect(valueOf(ruleExactly(ui, '.gn-calendar__grid'), 'overflow-x')).toBeNull();
     expect(valueOf(ruleExactly(ui, '.gn-calendar__days'), 'grid-template-columns')).toBe('repeat(7, 1fr)');
     expect(valueOf(ruleExactly(ui, '.gn-calendar__header'), 'flex-wrap')).toBeNull();
@@ -269,8 +277,9 @@ describe('21.115 the Calendar grid contains its own absolutely placed descendant
    */
   it('21.115 the phone grid is `position: relative` (the scroller is the containing block), after nothing that would undo it', () => {
     expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'position')).toBe('relative');
-    // The arm still scrolls sideways, as 21.112 says.
-    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overflow-x')).toBe('auto');
+    // AMENDED 2026-10-02 (F-4): the arm no longer scrolls sideways (21.112) — the grid fits, so the page's width is the
+    // grid's width and `position: relative` only guards the one frame in which chips are still drawn.
+    expect(valueOf(ruleExactly(ui, '.gn-calendar__grid', PHONE), 'overflow-x')).toBeNull();
     // CONTROL — above 40rem the grid is not positioned (the plain 7x1fr it was): nothing about the desktop calendar changes.
     expect(valueOf(ruleExactly(ui, '.gn-calendar__grid'), 'position')).toBeNull();
   });
