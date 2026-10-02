@@ -3505,7 +3505,7 @@ class Component extends DCLogic {
 
       isAccount: on("account"),
       acctStyles: [
-        { k: "hig", l: "Apple HIG" }, { k: "minimal", l: "Minimal" }, { k: "neo", l: "Neomorphic" }
+        { k: "hig", l: "Apple HIG" }, { k: "minimal", l: "Minimal" }, { k: "neo", l: "Neumorphic" }
       ].map((o) => ({
         label: o.l,
         style: "flex:1;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 12px;border-radius:7px;font-size:15px;cursor:pointer;" +
@@ -3513,7 +3513,7 @@ class Component extends DCLogic {
         set: () => { document.body.dataset.style = o.k; self.setState({ style: o.k }); }
       })),
       acctStyleNote: s.style === "neo"
-        ? "Neomorphic: soft raised surfaces, no borders. Heavier on the eye, lighter on lines."
+        ? "Neumorphic: soft raised surfaces, no borders. Heavier on the eye, lighter on lines."
         : (s.style === "minimal"
           ? "Minimal: no shadows or fills \u2014 hierarchy carried by type and space alone."
           : "Apple HIG: system type, subtle elevation, standard control heights."),

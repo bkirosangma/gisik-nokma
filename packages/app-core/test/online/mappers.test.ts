@@ -1623,14 +1623,14 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
       generatedAt: '2026-09-02T10:00:00.000Z',
       settings: { staleDays: 7, dueSoonDays: 7, autoCloseAfterDays: null, provenance: null },
       items: [
-        { kind: 'blocked', card, stateName: 'Waiting', reason: 'In "Waiting" — a blocked state.' },
+        { kind: 'blocked', card, stateName: 'Waiting', reason: 'In the blocked state "Waiting".' },
         {
           kind: 'stale',
           card,
           enteredStateAt: '2026-08-19T10:00:00.000Z',
           daysInFlight: 14,
           thresholdDays: 7,
-          reason: 'In an active state since 2026-08-19 — past the 7-day staleness threshold.',
+          reason: 'In an active state since 19 Aug, past the 7-day staleness threshold.',
         },
         {
           kind: 'due-soon',
@@ -1656,7 +1656,7 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
     ]);
     // The route's own sentence, verbatim — this client does not paraphrase a
     // reason composed from workspace settings it does not hold.
-    expect(items[0]?.reason).toBe('In "Waiting" — a blocked state.');
+    expect(items[0]?.reason).toBe('In the blocked state "Waiting".');
     // The claim per kind. blocked/stale are about the STATE...
     expect(items[0]?.claim?.actorId).toBe(ANSELMA);
     expect(items[1]?.claim?.actorId).toBe(ANSELMA);
@@ -1725,7 +1725,7 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
           kind: 'blocked',
           card: serverCard(),
           stateName: 'Waiting',
-          reason: 'In "Waiting" — a blocked state.',
+          reason: 'In the blocked state "Waiting".',
         },
       ],
     };

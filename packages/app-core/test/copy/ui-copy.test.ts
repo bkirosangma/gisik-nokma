@@ -127,6 +127,42 @@ describe('23.191 no " · " and no " — " in the strings a person reads', () => 
 });
 
 // ---------------------------------------------------------------------------------------------
+// 23.301 — the strip's server-composed reasons (UX fixes F-8)
+// ---------------------------------------------------------------------------------------------
+
+/** The route whose reason strings the strip prints verbatim. Its other server strings are not read as UI copy here. */
+const ATTENTION_ROUTE = 'apps/server/src/routes/attention.ts';
+
+/** Reason strings that still hold " — ". Each carries its reason. Empty since F-11: the blocked reason was the last. */
+const SERVER_REASON_ALLOWED: readonly AllowEntry[] = [];
+
+describe('23.301 and 23.356 the attention route composes no " — " in a reason a person reads', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds the old stale template)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
+
+    // Control: the scan reads the route's template chunks, so the old stale template is found.
+    const old = 'const reason = `In an active state since ${day} — past the ${n}-day staleness threshold.`;';
+    expect(hitsOf(ATTENTION_ROUTE, old).map((hit) => hit.text)).toEqual([' — past the ']);
+
+    // Control (F-11, 23.356): the BLOCKED template, as it stood at attention.ts:221, is found too. It once passed
+    // because an allow-list entry named it, not because the scan could not see a template tail after a `${}`.
+    const blocked = 'const item = { reason: `In "${stateName}" — a blocked state.` };';
+    expect(hitsOf(ATTENTION_ROUTE, blocked).map((hit) => hit.text)).toEqual(['" — a blocked state.']);
+    expect(withoutAllowed(hitsOf(ATTENTION_ROUTE, blocked).map((hit) => ({ ...hit, file: ATTENTION_ROUTE })), SERVER_REASON_ALLOWED)).toHaveLength(1);
+
+    const serverHits = hitsOf(ATTENTION_ROUTE, readFileSync(resolve(REPO_ROOT, ATTENTION_ROUTE), 'utf8'));
+    expect(withoutAllowed(serverHits, SERVER_REASON_ALLOWED).map(describeHit)).toEqual([]);
+
+    // The allow-list is not stale: every entry still matches a string in the route, and says why.
+    for (const entry of SERVER_REASON_ALLOWED) {
+      expect(serverHits.some((hit) => hit.text.includes(entry.contains))).toBe(true);
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // 23.192 — no all-caps text
 // ---------------------------------------------------------------------------------------------
 

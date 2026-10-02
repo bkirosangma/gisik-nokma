@@ -1972,7 +1972,7 @@ file rather than shifted by a delta.
   `.gn-list*` selector checked against the attributes the component writes. **Four mutation witnesses:**
   renaming the `[hidden]` selector reddens (a)+(b), changing the spacer width reddens (c), renaming the
   focus rule reddens (a)+(d), and renaming a class in `ticket-list.tsx` reddens (a) — with `ui.css`
-  restored to its pre-mutation SHA-256 after each. **The residual gap is named, not papered over:** this
+  restored to its pre-mutation SHA-256 after each. **AMENDED 2026-10-02 (neo T5):** a LEADING `[data-style="…"]` root scope is not a List attribute (the theme shell writes `data-style` on `<html>`), so arm (e) strips it before collecting `[attr]` (`keyedAttributes`); three CONTROLs in the same `it` keep the strip narrow: `.gn-list__column-box[data-style="neo"]` still yields `data-style`, `[data-style="neo"] .gn-list__columns-tray[hidden]` still yields `hidden`, and `.x [data-style="neo"] .gn-list__y` (a non-leading scope) still yields `data-style`. **The residual gap is named, not papered over:** this
   is declaration-level, so nothing here measures a COMPUTED result for this tab in a browser — there is no
   viewport sweep, no screenshot diff, and a declaration that is present and then overridden is invisible
   to every suite in the repo.
@@ -2917,6 +2917,7 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   (Post-commit mutation: dropping `min-height` from the new rule reddens it.) —
   (`apps/web/test/project-page-head.test.tsx`)
 - **13.1383** 🧪 **THE PAINT: THE CONTROLS ROW NEVER MOVES; THE RAIL MOVES ONLY WHERE THE SENTENCE WRAPS.**
+  **AMENDED 2026-10-02:** phones collapse the empty band (owner 2026-10-02) — at ≤40rem `.gn-project__scope-row:empty` is `display: none` (case 23.332), so the band is reserved only above 40rem; the measurement below is a desktop/tablet one.
   ⚠ This opening asserted "nothing moves … at **1000 px and 1280 px** … the note row is **18 px** tall in
   both states" before anyone measured it, and the measurement below falsifies the 1000 px half. It is
   rewritten rather than left standing with a correction bolted underneath, because the first sentence is

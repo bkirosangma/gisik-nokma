@@ -154,7 +154,8 @@ describe('23.250 the list is reachable: the gap is part of the item (owner bug 2
     expect(valueOf(hover, 'box-shadow')).toBe('none');
     const panel = ruleExactly(css, '.gn-nav__menu-panel');
     expect(valueOf(panel, 'background')).toBe('var(--gn-surface-raised)');
-    expect(valueOf(panel, 'box-shadow')).toBe('var(--gn-shadow-lift-near)');
+    // N7 (2026-10-02, 24.083): a floating panel reads `near-lg` (hig/minimal: = `lift-near`).
+    expect(valueOf(panel, 'box-shadow')).toBe('var(--gn-shadow-near-lg)');
 
     // CONTROL (same `it`): the account menu keeps the shared rule — same offset, same card — and is still click-only.
     cleanup();

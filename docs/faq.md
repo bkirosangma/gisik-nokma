@@ -745,7 +745,7 @@ If it is in the "Recently assigned" strip at the top, it also appears in its nor
 down. That is on purpose.
 
 **Do lists load everything at once?**
-They come in pages of fifty with a "load more" that picks up exactly where the last one stopped — no
+They come in pages of fifty with a "Load more" that picks up exactly where the last one stopped — no
 repeats, no gaps.
 
 **What happens on a really big project?**
