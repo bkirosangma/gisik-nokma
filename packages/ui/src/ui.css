@@ -9245,6 +9245,39 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transform: translate(-50%, -50%);
 }
 
+/* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
+   Owner, 2026-10-02: "many examples in both desktop and mobile, where due to containers, the lights and shadows are getting cut off
+   in the UI." A scroller paints nothing outside its padding box, so a raised card flush against its edge lost the 14 px halo that
+   crosses it. `--gn-shadow-reach` (`tokens.ts`, `shadowReachOf`: DERIVED from the shadow table, emitted for neo only) is the room
+   a raised child needs; the padding makes it and the equal negative margin hands the same box back to the layout, so nothing
+   around the scroller moves. EVERY rule here sits under `[data-style="neo"]`, so hig and minimal are byte-identical (24.002).
+   `scroll-padding-inline` keeps the snap and scroll-into-view stop on the padded content edge rather than the clipped one.
+   The bottom edge is not padded: `.gn-board__rail`'s own `padding-bottom` (1.5rem) already exceeds the reach. */
+[data-style="neo"] .gn-board__rail {
+  padding-top: var(--gn-shadow-reach);
+  padding-inline: var(--gn-shadow-reach);
+  margin-top: calc(-1 * var(--gn-shadow-reach));
+  margin-inline: calc(-1 * var(--gn-shadow-reach));
+  scroll-padding-inline: var(--gn-shadow-reach);
+}
+/* The composer's slot is the CLIP on purpose (it owns the corners), so the room is made INSIDE it: the strip and the footer hold the
+   raised tools and the Attach/Submit buttons at least one card halo (`--gn-halo`, the `raised` role's own reach) from the slot's
+   edge, and the shadow lands on the tray instead of on the clip. `max()` keeps the editor's own padding where it is already larger. */
+[data-style="neo"] .editor-slot .ticket-editor__toolbar {
+  padding: max(0.375rem, var(--gn-halo)) max(0.5rem, var(--gn-halo));
+}
+[data-style="neo"] .editor-slot__footer {
+  padding: max(0.5rem, var(--gn-halo)) max(0.625rem, var(--gn-halo));
+}
+/* The padded rail's top strip reaches back over what sits above it, and a scroller paints and takes the pointer over an earlier,
+   non-positioned sibling: on a phone the column picker above the rail lost its bottom edge to it (measured with `elementFromPoint`,
+   25.320). A positioned picker paints and takes the pointer above that transparent strip; `z-index: 1` because the rail's scroll-fade
+   mask makes it a stacking context later in the DOM, which a bare `position: relative` ties with and loses to. */
+[data-style="neo"] .gn-board-phone-picker {
+  position: relative;
+  z-index: 1;
+}
+
 /* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
    Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
    The keyframe lives beside its ONE consumer (the header's rule for keyframes).

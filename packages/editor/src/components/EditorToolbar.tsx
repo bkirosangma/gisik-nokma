@@ -585,9 +585,16 @@ export type EditorToolbarProps = {
    * `navigator.platform` to vary (advisor rule, ADDENDUM 3).
    */
   platform?: 'mac' | 'other';
+  /** The strip's `id`, so a control elsewhere can name it in `aria-controls` (the comment editors' Format button, G-6). */
+  id?: string;
+  /**
+   * Set by a host that lets the reader hide the strip (G-6): Escape inside the strip that nothing else claimed (the
+   * tooltip, the More tray and the link field each take their own first) calls it. Absent, Escape does nothing here.
+   */
+  onClose?: () => void;
 };
 
-export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps): React.JSX.Element | null {
+export function EditorToolbar({ editor, editable, platform, id, onClose }: EditorToolbarProps): React.JSX.Element | null {
   /**
    * The URL field's own state. `null` = closed, which is the ordinary case and
    * what Escape returns to. It is deliberately NOT cleared on a successful
@@ -904,7 +911,22 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
   );
 
   return (
-    <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting" ref={toolbarRef}>
+    <div
+      className="ticket-editor__toolbar"
+      role="toolbar"
+      aria-label="Formatting"
+      ref={toolbarRef}
+      {...(id === undefined ? {} : { id })}
+      {...(onClose === undefined
+        ? {}
+        : {
+            onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>): void => {
+              if (event.key !== 'Escape' || event.defaultPrevented) return;
+              event.preventDefault();
+              onClose();
+            },
+          })}
+    >
       {groups.map((group, index) => (
         <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
           {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
