@@ -178,7 +178,8 @@ the contents list to jump to it, or just keep scrolling.
   named **Contents and search**. It opens a panel with the search box first, then the **Manual** /
   **FAQ** switch, then the topics, each group with its count. The topic you are reading is marked and
   scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the
-  button was, the Escape key, or a tap outside it closes the panel too, without moving you.
+  button was, the Escape key (it clears anything typed in the search box first), or a tap outside it closes the panel
+  too, without moving you.
 - **Searching** looks through both documents. Type in the box (**Search help**) and the matches replace
   the page until you clear the box, which puts you back at the place you were reading. On a phone the
   matches appear inside the panel; picking one closes it and takes you to that entry, wherever you were
@@ -280,18 +281,20 @@ not see **Edit**.
 
 ### The three Create buttons
 
-Making something new always starts from a button that says **Create**, with a small plus sign on it, in
-the same bright colour wherever you meet it. Each one opens a window; nothing is made until you press the
-button inside the window.
+Making something new always starts from a button that says **Create**. The ones in the page headers —
+**Create workspace**, **Create project** and the **Create ticket** by the view tabs — are the bright
+button with a small plus sign on it. Each one opens a window; nothing is made until you press the button
+inside the window.
 
 - **Create workspace** — at the top of the **Workspaces** page. The window asks for a name and, if you
   want one, a prefix.
-- **Create project** — on a workspace's page, in the **Projects** heading row beside the archived
-  switch. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks
+- **Create project** — on a workspace's page, in the **Projects** heading row.
+  Owners and admins only; everybody else is told so (§3, under The project problem). The window asks
   for a name, an optional description and an optional prefix. A new project starts without a group; file
   it under one with **Edit** afterwards.
 - **Create ticket** — in a project, near the top by the view tabs, and inside an empty stage on the
-  Board (that one says **Create ticket** too; its full name for a screen reader adds the stage). The
+  Board (that one is a plainer button without the plus sign, and says **Create ticket** too; its full
+  name for a screen reader adds the stage). The
   window is described in §5.
 
 If the door refuses what you asked for — a prefix someone already uses, say — the reason is written

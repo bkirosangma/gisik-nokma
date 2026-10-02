@@ -83,7 +83,7 @@ An owner or admin creates one, with the **Create project** button on the workspa
 already there when you arrived were put there when the system was set up.
 
 **Where do I create a workspace, a project or a job?**
-Each has a button that says **Create**, with a plus sign, in the same bright colour. **Create workspace**
+Each has a button that says **Create**; the ones in the page headers are bright, with a plus sign. **Create workspace**
 is at the top of the Workspaces page. **Create project** is on a workspace's page, in the Projects
 heading row — owners and admins only. **Create ticket** is in a project, near the top by the view tabs,
 and inside an empty stage on the Board. Each opens a window; nothing is made until you press the button
@@ -957,7 +957,8 @@ Notes have a separate search again, on the Notes page: its own engine, and it on
 Type in the search box at the top of the Help page's contents list (it says **Search help**); matches
 from the manual and the FAQ replace the page until you clear the box, and you go back to where you were.
 Press **/** anywhere on the page, except while typing in a box, to jump to it. On a phone the search is
-behind the round **Contents and search** button at the bottom right, inside the panel it opens; picking a
+behind the round **Contents and search** button at the bottom right, inside the panel it opens (Escape
+clears what you typed first, and closes the panel on the next press); picking a
 match closes the panel and takes you to the entry. The page has no Next button — it reads straight down.
 
 **If I use the deep search through the `:ticket` picker, what would catch me out?**

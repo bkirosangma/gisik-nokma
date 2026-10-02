@@ -1045,7 +1045,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " switch, then the topics, each group with its count. The topic you are reading is marked and scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the button was, the Escape key, or a tap outside it closes the panel too, without moving you."
+                      "text": " switch, then the topics, each group with its count. The topic you are reading is marked and scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the button was, the Escape key (it clears anything typed in the search box first), or a tap outside it closes the panel too, without moving you."
                     }
                   ],
                   [
@@ -1729,7 +1729,31 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", with a small plus sign on it, in the same bright colour wherever you meet it. Each one opens a window; nothing is made until you press the button inside the window."
+                    "text": ". The ones in the page headers — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " by the view tabs — are the bright button with a small plus sign on it. Each one opens a window; nothing is made until you press the button inside the window."
                   }
                 ]
               },
@@ -1770,7 +1794,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " heading row beside the archived switch. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks for a name, an optional description and an optional prefix. A new project starts without a group; file it under one with "
+                      "text": " heading row. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks for a name, an optional description and an optional prefix. A new project starts without a group; file it under one with "
                     },
                     {
                       "kind": "bold",
@@ -1788,7 +1812,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — in a project, near the top by the view tabs, and inside an empty stage on the Board (that one says "
+                      "text": " — in a project, near the top by the view tabs, and inside an empty stage on the Board (that one is a plainer button without the plus sign, and says "
                     },
                     {
                       "kind": "bold",
@@ -11701,7 +11725,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", with a plus sign, in the same bright colour. "
+                    "text": "; the ones in the page headers are bright, with a plus sign. "
                   },
                   {
                     "kind": "bold",
@@ -15790,7 +15814,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button at the bottom right, inside the panel it opens; picking a match closes the panel and takes you to the entry. The page has no Next button — it reads straight down."
+                    "text": " button at the bottom right, inside the panel it opens (Escape clears what you typed first, and closes the panel on the next press); picking a match closes the panel and takes you to the entry. The page has no Next button — it reads straight down."
                   }
                 ]
               }

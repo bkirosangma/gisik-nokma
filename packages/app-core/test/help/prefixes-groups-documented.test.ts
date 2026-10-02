@@ -41,6 +41,8 @@ describe('22.227 the manual and FAQ describe prefixes, groups, the Create button
     ['docs/manual.md', 'The Help page'],
     ['docs/manual.md', 'Contents and search'],
     ['docs/manual.md', 'Search help'],
+    ['docs/manual.md', 'a plainer button without the plus sign'],
+    ['docs/manual.md', 'clears anything typed in the search box first'],
     ['docs/manual.md', 'One column at a time'],
     ['docs/manual.md', 'Not on the timeline yet'],
     ['docs/manual.md', 'Add dates'],
