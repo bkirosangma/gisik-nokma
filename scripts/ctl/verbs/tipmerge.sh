@@ -26,7 +26,6 @@ done
 if ctl_base_valid "$branch" || [ "$branch" = HEAD ] || [[ "$branch" == refs/* ]] || [[ "$branch" == -* ]] || ! /usr/bin/git check-ref-format --branch "$branch" >/dev/null 2>&1; then
   ctl_fail tipmerge "'$branch' is not a task branch — main, release/<name>, HEAD and invalid ref names are refused (a push there is a release, not a tip merge)"
 fi
-[ "$branch" != "$CTL_BASE" ] || ctl_fail tipmerge "the branch and --base are the same ($branch)"
 cd "$CTL_REPO" || exit 1
 # Fresh refs or nothing: a merge computed against a stale ref would be pushed as if it were current, so a failed fetch FAILS here (gate only warns).
 /usr/bin/git fetch -q origin "+refs/heads/$CTL_BASE:refs/remotes/origin/$CTL_BASE" "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null \

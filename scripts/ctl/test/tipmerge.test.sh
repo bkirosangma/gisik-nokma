@@ -11,7 +11,7 @@ BASE=release/2026-10-99
 unset CTL_DRY_RUN
 
 cfg() { $G -C "$1" config user.name fixture; $G -C "$1" config user.email fixture@example.invalid; $G -C "$1" config commit.gpgsign false; }
-tip() { $G -C "$bare" rev-parse "refs/heads/$1" 2>/dev/null; }
+tip() { $G -C "$bare" rev-parse -q --verify "refs/heads/$1^{commit}" 2>/dev/null; }
 commit_in() { # commit_in CLONE BRANCH FILE SEDEXPR MSG — edit FILE on BRANCH (checked out in CLONE), commit, push
   $G -C "$1" checkout -q "$2" && ( cd "$1" && sed -i.bak "$4" "$3" && rm -f "$3.bak" ) && $G -C "$1" commit -q -am "$5" && $G -C "$1" push -q origin "$2" 2>/dev/null
 }
@@ -68,7 +68,6 @@ argfail() { local m="$1"; shift; out=$("$HERE/ctl" tipmerge "$@" --repo "$w" 2>&
 check "13.1776 --base is required, and must be main or release/<name>" 'mk clean; argfail "--base is required" task/x --expect "$exp" && argfail "main or release/" task/x --base feat/y --expect "$exp" && argfail "needs a value" task/x --base "" --expect "$exp" && out=$("$HERE/ctl" tipmerge task/x --base feat/y --expect "$exp" --repo "$w" 2>&1); printf "%s\n" "$out" | grep -q "main or release/"'
 check "13.1776 --expect is required, and must be 7-40 hex characters" 'mk clean; argfail "needs the READY sha" task/x --base "$BASE" && argfail "needs the READY sha" task/x --base "$BASE" --expect zzzzzzz && argfail "needs the READY sha" task/x --base "$BASE" --expect abc12 && argfail "needs the READY sha" task/x --base "$BASE" --expect ""'
 check "13.1776 no branch, an extra positional and an unknown flag all refuse" 'mk clean; argfail "usage" --base "$BASE" --expect "$exp" && argfail "unexpected argument" task/x extra --base "$BASE" --expect "$exp" && argfail "unknown arg" task/x --base "$BASE" --expect "$exp" --force'
-check "13.1776 the branch may not be the base" 'mk clean; argfail "same" "$BASE" --base "$BASE" --expect "$(tip "$BASE")"'
 
 # --- 13.1777: a clean merge ------------------------------------------------------------------------------------------------
 check "13.1777 clean (disjoint files): exit 0, the printed sha IS origin/branch, OK line last" 'mk clean; run; [ $rc -eq 0 ] && printf "%s\n" "$last" | grep -qE "^OK tipmerge task/x [0-9a-f]{40} " && [ "$(okline_sha)" = "$(tip task/x)" ] && [ "$(tip task/x)" != "$exp" ]'
