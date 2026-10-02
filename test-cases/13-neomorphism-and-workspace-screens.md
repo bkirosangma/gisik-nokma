@@ -126,8 +126,8 @@ card-scale) and is recorded here only for completeness, not as a call.
   name); hard-code the description → RED on the second read. —
   (`apps/web/test/style-toggle.test.tsx`)
 - **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed as
-  `aria-selected="true"` on the `Neumorphic` tab (retitled 2026-09-15; spelling corrected 2026-10-02 with the return to
-  `SegmentedControl`; previously the `Select` trigger's own visible label text, and before that a
+  `aria-selected="true"` on the `Neumorphic` tab (retitled 2026-09-15 with the return to
+  `SegmentedControl`, and the tab's spelling corrected from `Neomorphic` 2026-10-02 (23.310); previously the `Select` trigger's own visible label text, and before that a
   native `<select>`'s `value`). *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
   check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
