@@ -113,7 +113,8 @@ const selectedTab = () => within(picker()).getAllByRole('tab').filter((tab) => t
 async function showColumn(name: RegExp): Promise<void> {
   await userEvent.setup().click(within(picker()).getByRole('tab', { name }));
 }
-const moveButtonIn = (ticketId: string) => within(slotOf(ticketId)).getByRole('button', { name: 'Move to another state' });
+/** `hidden: true` — a card that has just moved lands in a column the phone does not show (23.120), and its controls are still the subject. */
+const moveButtonIn = (ticketId: string) => within(slotOf(ticketId)).getByRole('button', { name: 'Move to another state', hidden: true });
 
 /** Open the Move dialog's destination list and return the option names. */
 async function offered(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement, slotId: string): Promise<string[]> {
@@ -394,8 +395,10 @@ describe('21.049 a Move submits through the same optimistic path as the arrows',
     await user.click(within(dialog).getByRole('button', { name: 'Move' }));
 
     // The card changed column when the move was laid, so the dialog is the one inside its new slot: ask afresh.
+    // That column is not the one the phone shows (23.120), hence `hidden: true`; whether a refusal should bring the
+    // person to it is a finding for the owner, not something this task decides.
     await waitFor(() => expect(screen.getByText(/Refused by the server — some-rule: Not allowed right now\./)).toBeInTheDocument());
-    await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket', hidden: true })).getByRole('button', { name: 'Cancel', hidden: true }));
     await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
     expect(idsIn('waiting')).toEqual([]);
   });
