@@ -1,7 +1,22 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearLiveQueryCache, liveQueryStoreKey, rememberLiveQuery, subscribeReloads } from '@gisik-nokma/app-core';
 import { STALE_AFTER_MS, useFreshness } from '../src/freshness.js';
+import { Providers } from '../src/providers.js';
+import { stubServices } from './helpers/stub-services.js';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useParams: () => ({}),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
+vi.mock('../src/auth-client.js', () => ({
+  authClient: {
+    useSession: () => ({ data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } }, isPending: false }),
+    signOut: async () => ({ data: {}, error: null }),
+  },
+}));
 
 const hiddenOrShown = (state: 'hidden' | 'visible') =>
   Object.defineProperty(document, 'visibilityState', { value: state, configurable: true });
@@ -65,6 +80,28 @@ describe('useFreshness — stale entries refetch on focus and on reconnect (spec
     });
     vi.runOnlyPendingTimers();
     expect(stale).toHaveBeenCalledTimes(1);
+    stops.forEach((stop) => stop());
+  });
+
+  it('25.045 the app root wires it: under <Providers>, focus reloads a stale workspace and leaves a young one alone', () => {
+    const stale = vi.fn();
+    const young = vi.fn();
+    const stops = [subscribeReloads('stale-ws', stale), subscribeReloads('young-ws', young)];
+    rememberLiveQuery(liveQueryStoreKey('stale-ws', 'board:prj'), {}, Date.now());
+    vi.advanceTimersByTime(STALE_AFTER_MS + 1);
+    rememberLiveQuery(liveQueryStoreKey('young-ws', 'board:prj'), {}, Date.now());
+    const view = render(
+      <Providers services={stubServices({}, { notifications: { unreadCount: async () => 0 } })}>
+        <div />
+      </Providers>,
+    );
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    vi.runOnlyPendingTimers();
+    expect(stale).toHaveBeenCalledTimes(1);
+    expect(young).not.toHaveBeenCalled(); // control: a young answer is left alone
+    view.unmount();
     stops.forEach((stop) => stop());
   });
 });

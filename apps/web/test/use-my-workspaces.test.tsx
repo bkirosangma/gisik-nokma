@@ -1,11 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { Providers, resetLastKnownUser } from '../src/providers.js';
 import { bumpProjectsVersion } from '../src/projects-version.js';
 import { stubServices } from './helpers/stub-services.js';
-import { clearMyWorkspacesCache, useMyWorkspaces } from '../src/use-my-workspaces.js';
+import { MY_WORKSPACES_STALE_MS, clearMyWorkspacesCache, useMyWorkspaces } from '../src/use-my-workspaces.js';
 
 let mockUser: { id: string; name: string } | null = { id: 'u_kiro', name: 'Kiro' };
 vi.mock('../src/auth-client.js', () => ({
@@ -42,6 +42,33 @@ describe('useMyWorkspaces: ONE read per person per page (audit SM-05; spec §3.2
     clearMyWorkspacesCache();
     resetLastKnownUser();
     mockUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('25.040 a settled read is kept for 30 s: a remount at 29 s asks nothing; one at 31 s asks once, paints the old rows first and then the new', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // only the clock: the read and `waitFor` run on real timers
+    vi.setSystemTime(new Date('2026-10-02T10:00:00.000Z'));
+    let served = [ROW('Before')];
+    const getMyWorkspaces = vi.fn(async () => served);
+    const wrapper = wrapperFor(getMyWorkspaces);
+    const first = renderHook(() => useMyWorkspaces(), { wrapper });
+    await waitFor(() => expect(first.result.current.rows?.[0]?.name).toBe('Before'));
+    first.unmount();
+    expect(MY_WORKSPACES_STALE_MS).toBe(30_000);
+
+    vi.setSystemTime(new Date('2026-10-02T10:00:29.000Z'));
+    served = [ROW('After')];
+    const young = renderHook(() => useMyWorkspaces(), { wrapper });
+    expect(young.result.current.rows?.[0]?.name).toBe('Before');
+    await act(async () => { await Promise.resolve(); });
+    expect(getMyWorkspaces).toHaveBeenCalledTimes(1); // control: 29 s is still fresh
+    young.unmount();
+
+    vi.setSystemTime(new Date('2026-10-02T10:00:31.000Z'));
+    const stale = renderHook(() => useMyWorkspaces(), { wrapper });
+    expect(stale.result.current.rows?.[0]?.name).toBe('Before'); // stale-while-revalidate: the old rows are on the first frame
+    await waitFor(() => expect(stale.result.current.rows?.[0]?.name).toBe('After'));
+    expect(getMyWorkspaces).toHaveBeenCalledTimes(2);
   });
 
   it('25.041 three consumers mounted together make one getMyWorkspaces call and all see the rows', async () => {
