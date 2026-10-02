@@ -237,7 +237,7 @@ describe('13.1409 collapsed hides the COLUMNS, not merely the cards', () => {
 
     // The control, FIRST and through the same path as the measurement below:
     // expanded, this group's columns and their per-column affordances ARE
-    // reachable. `Add a ticket` is the load-bearing one — it lives INSIDE a
+    // reachable. `Create ticket` is the load-bearing one — it lives INSIDE a
     // column and is not a card, so losing it proves the column went, not just
     // the cards.
     //
@@ -247,19 +247,19 @@ describe('13.1409 collapsed hides the COLUMNS, not merely the cards', () => {
     // page-wide `toBeNull()` would have been a claim about the sibling's too.
     await user.click(toggleFor('Onboarding'));
     expect(screen.queryByRole('region', { name: 'Intake' })).not.toBeNull();
-    // ⚠ `Add a ticket` is the probe and `EMPTY_COLUMN_COPY` deliberately is NOT
+    // ⚠ `Create ticket` is the probe and `EMPTY_COLUMN_COPY` deliberately is NOT
     // one: this environment measures `getAllByText` as still finding text inside
     // a `hidden` subtree, so a case that counted the copy would pass over a
     // collapsed group. The copy is here to be LOST in the measurement below; the
     // button count is what can see that happen.
-    expect(screen.getAllByRole('button', { name: 'Add a ticket' })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /^Create ticket in / })).toHaveLength(3);
 
     await user.click(toggleFor('Onboarding'));
     expect(railOf(container, 'Onboarding').hasAttribute('hidden')).toBe(true);
     expect(screen.queryByRole('region', { name: 'Intake' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Review' })).toBeNull();
     // Three became one, and the survivor belongs to the group that did not collapse.
-    const survivors = screen.getAllByRole('button', { name: 'Add a ticket' });
+    const survivors = screen.getAllByRole('button', { name: /^Create ticket in / });
     expect(survivors).toHaveLength(1);
     expect(railOf(container, 'Errand').contains(survivors[0] ?? null)).toBe(true);
     // And the sibling group is untouched by the other group's collapse.
@@ -350,15 +350,15 @@ describe('13.1413 a lone workflow with no tickets still shows something to act o
     // THE TRAP THE OWNER'S RULING NAMES, closed from two sides at once. An empty
     // workflow read literally as "the workflow has no tickets → collapsed by
     // default" would hide the only thing on this page behind a heading: the
-    // per-column `Add a ticket` buttons that are the only act available here.
+    // per-column `Create ticket` buttons that are the only act available here.
     // The lone-group DEFAULT is expanded (13.1420 measures that as a default),
     // and what that leaves on screen is this — the columns, their action, and
     // the board's own sentence, which is a THIRD way out.
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Intake' })).not.toBeNull();
     expect(screen.queryByRole('region', { name: 'Review' })).not.toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Add a ticket' })).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Create a ticket' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Create ticket in / })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeInTheDocument();
   });
 
   it('and the person may still collapse it by hand — the DEFAULT is what was pinned, not the control', async () => {

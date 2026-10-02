@@ -348,8 +348,9 @@ test('the workspace list RENDERS what it is served, and the founding door is sti
   await expect(page.getByTestId(`workspace-card-${WS}`)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible();
   await expect(page.getByText('No workspaces yet.')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'New workspace' })).toBeVisible();
+  // The founding door is the header's Create workspace button; the form is behind it (22.151).
   await expect(page.getByRole('button', { name: 'Create workspace' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('the board renders a card, its restricted-count line, and its attributed provenance', async ({

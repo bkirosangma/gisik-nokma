@@ -38,37 +38,33 @@ function phoneBodies(css: string, selector: string): string {
 }
 
 describe('21.090 /workspaces on a phone', () => {
-  it('21.090 the workspace cards are one column and the New workspace form is full width, each AFTER its base rule; tablet keeps two columns', () => {
+  it('21.090 the workspace cards are one column and the header Create workspace drops under the title at full width, each AFTER its base rule; tablet keeps two columns', () => {
     expect(valueOf(ruleExactly(globals, '.gn-workspace-list', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
     // The phone arm follows the tablet arm it overrides (both are `(0,1,0)`).
     expect(position(globals, '.gn-workspace-list', TABLET)).toBeLessThan(position(globals, '.gn-workspace-list', PHONE));
-    // The form: the 420px cap goes and the submit takes the line.
-    const form = ruleExactly(globals, '.gn-workspace-founding', PHONE);
-    expect(valueOf(form, 'max-width')).toBe('none');
-    expect(valueOf(ruleExactly(globals, '.gn-workspace-founding__submit', PHONE), 'align-self')).toBe('stretch');
-    expect(after(globals, '.gn-workspace-founding', null)).toBe(true);
-    expect(after(globals, '.gn-workspace-founding__submit', null)).toBe(true);
+    // The header (prefixes/groups Task 8, 22.151): the title+summary column and the one primary share a row on
+    // desktop; on a phone the grid is one column, so the button takes its own line under the title.
+    expect(valueOf(ruleExactly(globals, '.gn-workspaces__head', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
+    expect(valueOf(ruleExactly(globals, '.gn-workspaces__head > .gn-button', PHONE), 'grid-column')).toBe('1');
+    expect(after(globals, '.gn-workspaces__head', null)).toBe(true);
+    expect(after(globals, '.gn-workspaces__head > .gn-button', null)).toBe(true);
 
-    // CONTROL — tablet still draws two columns, and desktop keeps the 420px form with a start-aligned button.
+    // CONTROL — tablet still draws two columns, and desktop keeps the title and the button on one row.
     expect(valueOf(ruleExactly(globals, '.gn-workspace-list', TABLET), 'grid-template-columns')).toBe('repeat(2, minmax(0, 1fr))');
-    expect(valueOf(ruleExactly(globals, '.gn-workspace-founding'), 'max-width')).toBe('26.25rem');
-    expect(valueOf(ruleExactly(globals, '.gn-workspace-founding__submit'), 'align-self')).toBe('flex-start');
+    expect(valueOf(ruleExactly(globals, '.gn-workspaces__head'), 'grid-template-columns')).toBe('minmax(0, 1fr) auto');
+    expect(valueOf(ruleExactly(globals, '.gn-workspaces__head > .gn-button'), 'grid-column')).toBe('2');
   });
 });
 
 describe('21.091 the workspace home on a phone', () => {
-  it('21.091 project cards and section cards are one column, the New project form is stacked and full width; the door-card hover rule (B13) is unchanged', () => {
+  it('21.091 project cards and section cards are one column; the door-card hover rule (B13) is unchanged', () => {
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__projects', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
     expect(position(globals, '.gn-workspace-home__projects', TABLET)).toBeLessThan(position(globals, '.gn-workspace-home__projects', PHONE));
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__links', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
     expect(after(globals, '.gn-workspace-home__links', null)).toBe(true);
-    // The New project row: a column whose children stretch, and the field drops its 220px floor.
-    const form = ruleExactly(globals, '.gn-project-founding', PHONE);
-    expect(valueOf(form, 'flex-direction')).toBe('column');
-    expect(valueOf(form, 'align-items')).toBe('stretch');
-    expect(valueOf(ruleExactly(globals, '.gn-project-founding__field', PHONE), 'min-width')).toBe('0');
-    expect(after(globals, '.gn-project-founding', null)).toBe(true);
-    expect(after(globals, '.gn-project-founding__field', null)).toBe(true);
+    // The inline "New project" row and its phone arm are gone (prefixes/groups Task 8, 22.152): the form is a
+    // dialog now, which is its own full-width surface, so no phone rule is left to assert for it.
+    expect(globals).not.toMatch(/\.gn-project-founding/);
 
     // CONTROL — the door cards' hover and press rules are what B13 wrote (shadow only), and no phone rule touches them.
     const hover = ruleExactly(globals, ['.gn-card:has(> .gn-workspace-card__door:hover)', '.gn-card:has(> .gn-project-card__door:hover)']);
@@ -77,10 +73,8 @@ describe('21.091 the workspace home on a phone', () => {
     for (const rule of parseRules(globals).filter((r) => r.atRule === PHONE)) {
       expect(rule.selectors.join(', '), 'a phone rule on a door card').not.toMatch(/__door/);
     }
-    // CONTROL — desktop keeps three project columns and the inline project form.
+    // CONTROL — desktop keeps three project columns.
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__projects'), 'grid-template-columns')).toBe('repeat(3, minmax(0, 1fr))');
-    expect(valueOf(ruleExactly(globals, '.gn-project-founding'), 'flex-wrap')).toBe('wrap');
-    expect(valueOf(ruleExactly(globals, '.gn-project-founding__field'), 'min-width')).toBe('13.75rem');
   });
 });
 

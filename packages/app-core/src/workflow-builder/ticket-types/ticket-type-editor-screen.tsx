@@ -730,7 +730,7 @@ export function TicketTypeEditorScreen(props: {
               data-testid="rank-implications-list"
             >
               <li>
-                {'Two pickers will re-order: the board’s New ticket menu and MCP’s '}
+                {'Two pickers will re-order: the board’s Create ticket menu and MCP’s '}
                 <code className="ticket-type-editor__code">create_ticket</code>.
               </li>
               <li data-testid="rank-implications">{rankImplicationsCopy(implications)}</li>

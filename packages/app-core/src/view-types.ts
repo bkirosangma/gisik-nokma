@@ -354,7 +354,7 @@ export type BoardColumn = {
    * 2026-09-23) — `isCreatableState(def, stateId)`, carried down from the
    * server's `BoardColumn` (`packages/domain/src/read-models.ts`) exactly as
    * `blocked` already is. `board.tsx`'s empty-column card reads this to decide
-   * whether "Add a ticket" renders at all.
+   * whether "Create ticket" renders at all.
    */
   creatable: boolean;
   cards: BoardCard[];
