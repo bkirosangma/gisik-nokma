@@ -2389,7 +2389,7 @@ a.gn-ticket-sheet__crumb--link {
   padding: 0 0.75rem;
   border-radius: 999px;
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift);
+  box-shadow: var(--gn-shadow-raised-compact); /* Neo refresh N6 (24.071): a 44px control takes the compact pair; hig maps `raised-compact` to `lift`, so hig/minimal are unchanged. */
   color: var(--gn-text);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -2461,6 +2461,18 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
   color: var(--gn-text-inverted);
+}
+/* Neo refresh N6 (24.071): the box is a chip-sized recess when off; checked stays the flat accent (the tick is the cue). */
+[data-style="neo"] .gn-list__column-box {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact);
+  border: 1px solid var(--gn-border);
+  box-sizing: border-box; /* the 1px stays inside the 18px box; the BASE rule is untouched, so hig/minimal keep 18px content-box */
+}
+[data-style="neo"] .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box {
+  background: var(--gn-accent);
+  box-shadow: none;
+  border-color: transparent;
 }
 /* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair `.gn-timeline__weeks` uses
    (`--gn-surface-sunken`/`--gn-shadow-sunken`); UX fixes T6 (23.095) flattened it to a quaternary tint, so the heading
@@ -8158,6 +8170,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-switch:disabled { cursor: not-allowed; }
 .gn-switch:disabled:not(:checked) { background: var(--gn-surface-sunken); }
 .gn-switch:disabled::after { border-color: var(--gn-border); }
+/* Neo refresh N6 (2026-10-02; 24.070): the switch gets a neo arm. The OFF track is a recess on the well colour, the knob is
+   raised on the compact pair and keeps its border-strong ring (the 2.95 debt recorded above is untouched); the ON track
+   stays the flat accent (FD2: a switch's on-state is its value), its knob carries one fall (`knob-on`, T2). Disabled is flat. */
+/* CASCADE (reviewer A, FIX 1): an unscoped `[data-style="neo"] .gn-switch` (0,2,0) would come AFTER `.gn-switch:checked`
+   (0,2,0) and paint the well over the accent. So the OFF arms are scoped `:not(:checked)` AND the ON arms restate the accent
+   and `knob-on` at (0,3,0)/(0,3,1), after them. The arms set no `transition`: at (0,3,0) they would out-cascade the
+   reduced-motion `.gn-switch { transition: none }` below; the base `background` transition still runs. */
+/* Reviewer A, N1: `[data-style="neo"] .gn-switch:not(:checked)` (0,3,0) comes after `.gn-switch:disabled:not(:checked)` (0,3,0),
+   so in neo a disabled OFF switch paints `surface-well`, not `surface-sunken`. The same colour after T1 (24.007: both are
+   `neoWell*`), so nothing differs; no rule change. */
+[data-style="neo"] .gn-switch:not(:checked) {
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-recess);
+}
+[data-style="neo"] .gn-switch:not(:checked)::after { box-shadow: var(--gn-shadow-raised-compact); }
+[data-style="neo"] .gn-switch:checked { background: var(--gn-accent); box-shadow: none; }
+[data-style="neo"] .gn-switch:checked::after { box-shadow: var(--gn-shadow-knob-on); }
+[data-style="neo"] .gn-switch:disabled,
+[data-style="neo"] .gn-switch:disabled::after { box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gn-switch,

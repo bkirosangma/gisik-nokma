@@ -45,8 +45,8 @@
 
 ## 24.5 Switch and checkbox neo arms (T5)
 
-- ❌ **24.070 — the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2).**
-- ❌ **24.071 — the neo column checkbox: a recessed box when off, a flat accent when on (N6).**
+- ✅ **24.070 — the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2).**
+- ✅ **24.071 — the neo column checkbox: a recessed box when off, a flat accent when on (N6).**
 
 ## 24.6 Halo clearance (T6)
 

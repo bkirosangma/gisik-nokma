@@ -337,3 +337,58 @@ describe('24.026 the drag clone keeps its lift while the source card presses', (
     expect(shadowValueOf('neo', 'light', 'lift-drag').startsWith('inset')).toBe(false);
   });
 });
+
+// ---- T5 switch and checkbox neo arms (24.070-24.071; N6) ----
+// Read once under a T5-only name: the other neo lanes append to this file and declare their own.
+const t5Ui = readUiCss();
+
+describe('24.070 the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2)', () => {
+  it('24.070 the neo switch arm reads well + recess; the knob reads raised-compact and keeps its border-strong ring; disabled is flat', () => {
+    // the OFF arms are scoped :not(:checked), so the base `.gn-switch:checked` (0,2,0) is never out-cascaded
+    const track = ruleExactly(t5Ui, '[data-style="neo"] .gn-switch:not(:checked)');
+    expect(valueOf(track, 'background')).toBe('var(--gn-surface-well)');
+    expect(valueOf(track, 'box-shadow')).toBe('var(--gn-shadow-recess)');
+    // no transition here: this arm is (0,3,0) and would out-cascade the reduced-motion `.gn-switch { transition: none }` (0,1,0)
+    expect(valueOf(track, 'transition')).toBeNull();
+    const knob = ruleExactly(t5Ui, '[data-style="neo"] .gn-switch:not(:checked)::after');
+    expect(valueOf(knob, 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    // the ON arms restate the accent and the knob fall AFTER the off arms, at (0,3,0)/(0,3,1), so they win in neo
+    const on = ruleExactly(t5Ui, '[data-style="neo"] .gn-switch:checked');
+    expect(valueOf(on, 'background')).toBe('var(--gn-accent)');
+    expect(valueOf(on, 'box-shadow')).toBe('none');
+    expect(valueOf(ruleExactly(t5Ui, '[data-style="neo"] .gn-switch:checked::after'), 'box-shadow')).toBe('var(--gn-shadow-knob-on)');
+    expect(valueOf(ruleExactly(t5Ui, '.gn-switch::after'), 'border')).toBe('1px solid var(--gn-border-strong)');
+    expect(
+      valueOf(ruleExactly(t5Ui, ['[data-style="neo"] .gn-switch:disabled', '[data-style="neo"] .gn-switch:disabled::after']), 'box-shadow'),
+    ).toBe('none');
+    // the cascade is read for real in T8 (24.115: computed background and knob shadow, checked and unchecked)
+    // CONTROL: the base (hig/minimal) switch is unchanged — fill-secondary track, no shadow.
+    const base = ruleExactly(t5Ui, '.gn-switch');
+    expect(valueOf(base, 'background')).toBe('var(--gn-fill-secondary)');
+    expect(valueOf(base, 'box-shadow')).toBeNull();
+    expect(valueOf(ruleExactly(t5Ui, '.gn-switch:checked'), 'background')).toBe('var(--gn-accent)');
+  });
+});
+
+describe('24.071 the neo column checkbox: a recessed box when off, a flat accent when on (N6)', () => {
+  it('24.071 the neo box reads sunken-compact on surface-sunken with a --gn-border edge; checked stays accent with no shadow', () => {
+    const box = ruleExactly(t5Ui, '[data-style="neo"] .gn-list__column-box');
+    expect(valueOf(box, 'background')).toBe('var(--gn-surface-sunken)');
+    expect(valueOf(box, 'box-shadow')).toBe('var(--gn-shadow-sunken-compact)');
+    expect(valueOf(box, 'border')).toBe('1px solid var(--gn-border)');
+    expect(valueOf(box, 'box-sizing')).toBe('border-box'); // the 1px stays inside the 18px box; hig/minimal (content-box, no border) are untouched
+    expect(valueOf(ruleExactly(t5Ui, '.gn-list__column-box'), 'border')).toBeNull();
+    const on = ruleExactly(
+      t5Ui,
+      "[data-style=\"neo\"] .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box",
+    );
+    expect(valueOf(on, 'box-shadow')).toBe('none');
+    expect(valueOf(on, 'border-color')).toBe('transparent');
+    // the pill around it is a 44px control: raised-compact, not the card pair
+    expect(valueOf(ruleExactly(t5Ui, '.gn-list__column-option'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    // CONTROL: the base box is the flat fill hig/minimal keep (fill-tertiary), and its width stays 18px content-box.
+    const base = ruleExactly(t5Ui, '.gn-list__column-box');
+    expect(valueOf(base, 'background')).toBe('var(--gn-fill-tertiary)');
+    expect(valueOf(base, 'box-sizing')).toBeNull();
+  });
+});
