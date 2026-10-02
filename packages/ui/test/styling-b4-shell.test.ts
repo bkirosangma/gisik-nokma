@@ -11,7 +11,7 @@ function stillDeclared(list: string): boolean {
 
 const CURRENT = [".gn-nav a[aria-current='page']", ".gn-nav button[aria-current='page']"];
 const ROWS: RosterRow[] = [
-  { sheet: 'globals', selectors: '.gn-nav', declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } },
+  { sheet: 'globals', selectors: '.gn-nav', declarations: { 'box-shadow': 'var(--gn-shadow-raised-lg)' } }, // N7 (2026-10-02, 24.083): the nav wears the large pair (hig: = lift, 24.009)
   {
     sheet: 'globals',
     selectors: ['.gn-nav a'], // amended 2026-10-02: the retired `Menu` toggle (`.gn-nav__more-toggle`) left this selector list (UX fixes Task 4, case 23.042)
@@ -35,7 +35,7 @@ const ROWS: RosterRow[] = [
     },
   },
   { sheet: 'globals', selectors: '.gn-theme-toggle', declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } },
-  { sheet: 'globals', selectors: '.gn-skip', declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)' } },
+  { sheet: 'globals', selectors: '.gn-skip', declarations: { 'box-shadow': 'var(--gn-shadow-near-lg)' } }, // N7 (2026-10-02, 24.083): floating, so `near-lg`
   {
     sheet: 'globals',
     selectors: '.gn-nav__menu .gn-nav__menu-item--signout',

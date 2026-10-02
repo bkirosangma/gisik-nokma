@@ -1127,6 +1127,19 @@ export const radii: Record<StyleName, Record<RadiusRole, string>> = {
   neo: { card: '20px', control: '14px', track: '28px' },
 };
 
+/** Halo clearance (neo refresh N7, 2026-10-02): in neo, offset + blur of each raised pair. Readable text outside a raised element sits at least this far from its edge; where a layout cannot open up, lift the text (`position: relative; z-index: 1`) — never clip the highlight. `hig` and `minimal` carry TODAY's spacing (8px board gap), kept by choice and NOT derived (hig `raised` would give 4, `lift` 24): the token exists for them only so the shared rules render exactly as today (spec §7). Lengths, like the radii: no colour discipline. */
+export type HaloStep = 'lg' | 'card' | 'compact';
+export const halo: Record<StyleName, Record<HaloStep, string>> = {
+  hig: { lg: '8px', card: '8px', compact: '3px' },
+  minimal: { lg: '8px', card: '8px', compact: '3px' },
+  neo: { lg: '23px', card: '14px', compact: '6px' },
+};
+
+/** `card` → `--gn-halo`; `lg` → `--gn-halo-lg`; `compact` → `--gn-halo-compact`. */
+export function haloVariableName(step: HaloStep): string {
+  return step === 'card' ? '--gn-halo' : `--gn-halo-${step}`;
+}
+
 export function radiusOf(style: StyleName, role: RadiusRole): string {
   return radii[style][role];
 }
@@ -1955,12 +1968,14 @@ export const SHADOW_ROLES: readonly ShadowRole[] = [
   'drop-side',
 ];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
+const HALO_STEPS: readonly HaloStep[] = ['lg', 'card', 'compact'];
 
 function declarationsFor(style: StyleName, theme: ThemeName): string {
   const colours = TOKEN_ROLES.map((role) => `${cssVariableName(role)}: ${colorOf(theme, role, style)};`);
   const radiusDecls = RADIUS_ROLES.map((role) => `${radiusVariableName(role)}: ${radiusOf(style, role)};`);
+  const haloDecls = HALO_STEPS.map((step) => `${haloVariableName(step)}: ${halo[style][step]};`);
   const shadowDecls = SHADOW_ROLES.map((role) => `${shadowVariableName(role)}: ${shadowValueOf(style, theme, role)};`);
-  return [...colours, ...radiusDecls, ...shadowDecls].join(' ');
+  return [...colours, ...radiusDecls, ...haloDecls, ...shadowDecls].join(' ');
 }
 
 /**

@@ -3,11 +3,13 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import { contrastRatio, over } from './helpers/contrast.js';
-import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
   colorOf,
+  halo,
+  haloVariableName,
   primitives,
   shadowValueOf,
   themeStylesheet,
@@ -197,7 +199,7 @@ describe('24.009 the consumer door: every selector the plan switches renders in 
   const SWITCHES: ReadonlyArray<[string, ShadowRole, ShadowRole]> = [
     ['.gn-nav', 'lift', 'raised-lg'],
     ['.gn-dialog', 'lift-near', 'near-lg'], ['.gn-select__panel', 'lift-near', 'near-lg'], ['.gn-popover', 'lift-near', 'near-lg'],
-    ['.gn-infotip__panel', 'lift-near', 'near-lg'], ['.gn-nav__menu', 'lift-near', 'near-lg'], ['.gn-card-menu__list', 'lift-near', 'near-lg'],
+    ['.gn-infotip__panel', 'lift-near', 'near-lg'], ['.gn-nav__menu', 'lift-near', 'near-lg'], ['.gn-nav__menu-panel', 'lift-near', 'near-lg'], ['.gn-card-menu__list', 'lift-near', 'near-lg'],
     ['.mention-popup, .wikilink-popup, .ticketref-popup', 'lift-near', 'near-lg'], ['.gn-skip', 'lift-near', 'near-lg'],
     ['.gn-toc-launcher__panel', 'lift-near', 'near-lg'], ['.wikilink-preview', 'lift-near', 'near-lg'], ['.table-toolbar', 'lift-near', 'near-lg'],
     ['.gn-button--primary', 'action', 'action-filled'], ['.gn-button--primary:hover', 'action-near', 'action-filled-near'],
@@ -319,5 +321,74 @@ describe('24.044 a neo field inside a dark well still has a visible edge (Review
     // CONTROL: the soft edge is NOT claimed — the light lip and the dark band are under 3:1 and the test says so.
     expect(contrastRatio(over('#fffaf4cc', '#e6dcd2'), '#e6dcd2')).toBeLessThan(3.0);
     expect(contrastRatio(over('#000000bf', '#141a33'), '#141a33')).toBeLessThan(3.0);
+  });
+});
+
+// ---- T6 — halo clearance, sized pairs on large surfaces and the 14px board (N7; cases 24.080–24.083)
+const t6Ui = readUiCss();
+const t6Globals = readFileSync(join(REPO_ROOT, 'apps/web/app/globals.css'), 'utf8');
+
+describe('24.080 the halo tokens: offset + blur of each raised pair, per style (spec §3.4; N7)', () => {
+  it('24.080 neo 23/14/6, hig and minimal 8/8/3, emitted under every style selector', () => {
+    expect(halo.neo).toEqual({ lg: '23px', card: '14px', compact: '6px' });
+    expect(halo.hig).toEqual({ lg: '8px', card: '8px', compact: '3px' }); // kept by choice: today's spacing, not derived
+    expect(halo.minimal).toEqual({ lg: '8px', card: '8px', compact: '3px' }); // same: zero drift (spec §7)
+    expect(haloVariableName('card')).toBe('--gn-halo');
+    expect(haloVariableName('lg')).toBe('--gn-halo-lg');
+    expect(haloVariableName('compact')).toBe('--gn-halo-compact');
+    const sheet = themeStylesheet();
+    expect(sheet).toContain('[data-style="neo"] {');
+    expect(sheet.match(/--gn-halo: 14px;/g)?.length).toBe(3); // neo light, OS-dark arm, data-theme dark
+    expect(sheet.match(/--gn-halo: 8px;/g)?.length).toBe(6); // hig and minimal
+    // CONTROL: the other two steps ride the same emitter.
+    expect(sheet.match(/--gn-halo-lg: 23px;/g)?.length).toBe(3);
+    expect(sheet.match(/--gn-halo-compact: 6px;/g)?.length).toBe(3);
+  });
+});
+
+describe('24.081 the board clears the card halo: 14px in neo, 8px in hig and minimal, through one token (N7; rule 02 amended)', () => {
+  it('24.081 column gap, cards gap and the column-header bottom padding read var(--gn-halo)', () => {
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column'), 'gap')).toBe('var(--gn-halo)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__cards'), 'gap')).toBe('var(--gn-halo)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column-header'), 'padding')).toBe('0.5rem 0.5rem var(--gn-halo)');
+    // CONTROL: the column's own padding (the card-to-track inset, not text) stays 8px.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-board__column'), 'padding')).toBe('0.5rem');
+  });
+});
+
+describe("24.082 the listed crowding sites clear their neighbour's halo (N7)", () => {
+  it('24.082 account sections 14px, the shell heading 24px under the nav; the workspace grid (18px) and settings gap (20px) already clear 14px', () => {
+    expect(valueOf(ruleExactly(t6Globals, '.gn-account__section'), 'gap')).toBe('max(0.75rem, var(--gn-halo))');
+    expect(valueOf(ruleExactly(t6Globals, '.gn-shell__main'), 'margin-top')).toBe('max(1.25rem, var(--gn-halo-lg))');
+    // CONTROL: these two already clear 14px and are left alone.
+    expect(valueOf(ruleExactly(t6Globals, '.gn-workspace-list'), 'gap')).toBe('1.125rem');
+    expect(valueOf(ruleExactly(t6Globals, '.gn-settings'), 'gap')).toBe('1.25rem');
+  });
+});
+
+describe('24.083 large surfaces wear the large pair; floating panels the near-lg; the two generic drops are gone (N7)', () => {
+  it('24.083 nav, sheet, dialog, popovers, menus, infotip read raised-lg/near-lg/sheet; the two generic drops read drop/drop-side; the toc button and the help sidebar are excluded on purpose', () => {
+    expect(valueOf(ruleExactly(t6Globals, '.gn-nav'), 'box-shadow')).toBe('var(--gn-shadow-raised-lg)');
+    expect(valueOf(ruleExactly(t6Ui, '.gn-sheet'), 'box-shadow')).toBe('var(--gn-shadow-sheet)');
+    for (const sel of ['.gn-dialog', '.gn-select__panel', '.gn-popover', '.gn-infotip__panel']) {
+      expect(valueOf(ruleExactly(t6Ui, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
+    }
+    expect(valueOf(ruleExactly(t6Ui, '.workflow-rebind-dialog'), 'box-shadow')).toBe('var(--gn-shadow-drop)');
+    for (const sel of ['.gn-nav__menu', '.gn-nav__menu-panel', '.gn-card-menu__list', '.gn-skip', '.gn-toc-launcher__panel', '.wikilink-preview', '.table-toolbar']) {
+      expect(valueOf(ruleExactly(t6Globals, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
+    }
+    expect(valueOf(ruleExactly(t6Globals, ['.mention-popup', '.wikilink-popup', '.ticketref-popup']), 'box-shadow')).toBe('var(--gn-shadow-near-lg)'); // a group of 3
+    expect(valueOf(ruleExactly(t6Ui, '.gn-filters__panel'), 'box-shadow')).toBe('var(--gn-shadow-drop-side)');
+    expect(t6Ui).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
+    expect(t6Globals).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
+    // CONTROL: cards keep the card pair.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-card'), 'box-shadow')).toBe('var(--gn-shadow-lift)');
+    // EXCLUSIONS (reviewer A N2, 2026-10-02): a button and a docked sidebar are not floating panels; each keeps lift-near and says why in a comment.
+    expect(valueOf(ruleExactly(t6Ui, '.gn-toc-launcher__button'), 'box-shadow')).toBe('var(--gn-shadow-lift-near)');
+    const sidebar = parseRules(t6Ui).filter((r) => r.selectors.includes('.gn-help__sidebar') && /box-shadow:\s*var\(--gn-shadow-/.test(r.body));
+    expect(sidebar.length).toBeGreaterThan(0);
+    for (const r of sidebar) expect(r.body).toContain('var(--gn-shadow-lift-near)');
+    expect(t6Ui).toMatch(/N7[^*]*24\.083[^*]*\*\/\s*\.gn-toc-launcher__button \{/);
+    expect(t6Ui).toMatch(/N7[^*]*24\.083[^*]*\*\/\s*box-shadow: var\(--gn-shadow-lift-near\);\s*transform-origin/);
   });
 });

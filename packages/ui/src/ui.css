@@ -443,7 +443,7 @@
 .gn-dialog {
   border-radius: var(--gn-radius-track);
   /* Styling refresh Plan A Task 4: a dialog sits above a scrim, so it floats on the near lift (24px; neo 28px). Beats the `.gn-dialog, .gn-sheet` group's `overlay` by source order at equal specificity; the sheet took its own `sheet` shadow in Task 7. */
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   width: min(34rem, 92vw);
   animation: gnRise 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -1163,7 +1163,9 @@ a.gn-ticket-sheet__crumb--link {
    it on its lower lip), radius 24 (neo 28), padding 8 — so the card inside,
    radius 16 (neo 20), obeys rule 05 (inner = outer − padding). Before this the
    column was `surface-sunken`, a flat fill measured at 1.14:1 on the paper
-   (case 20.001): it vanished. 8px between cards (rule 02). The lane stays a
+   (case 20.001): it vanished. Cards sit `var(--gn-halo)` apart (rule 02 amended
+   by N7, 2026-10-02, case 24.081: 14px in neo so a card's raised pair clears
+   its neighbour; hig and minimal keep 8px). The lane stays a
    fixed 18rem in a scrolling rail (plan D13). Pattern P-TRACK. */
 .gn-board__column {
   background: var(--gn-surface-track);
@@ -1174,7 +1176,7 @@ a.gn-ticket-sheet__crumb--link {
   flex: 0 0 18rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--gn-halo);
 }
 /* UX fixes T7 (BRD-01, case 23.120): `display: flex` above outranks the UA sheet's own `hidden`, so a hidden column
    would stay painted. On a phone `BoardGroupSection` hides every column the picker did not choose (and makes it
@@ -1209,7 +1211,8 @@ a.gn-ticket-sheet__crumb--link {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem;
+  /* N7 (2026-10-02, 24.081): the title clears the first card's halo — 14px in neo, 8px in hig (rule 02's 8px becomes 14px for neo). */
+  padding: 0.5rem 0.5rem var(--gn-halo);
 }
 /* `Close all (N)` to the far edge; the name chip and its count read left. */
 .gn-board__column-header > .gn-board__column-action { margin-left: auto; }
@@ -1284,7 +1287,7 @@ a.gn-ticket-sheet__crumb--link {
    type-scale.ts:113`) — the ratchet those specs hold counts offenders BELOW
    that floor, so this move cannot add one. */
 .gn-board__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-subtle); }
-.gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gn-halo); }
 /* Board prototype port Task 7 (2026-09-16), spec Board `:354-399`, "Empty
    column"/"Empty icon"/"Empty copy"/"Empty action" rows — the PER-COLUMN
    empty state, a different granularity from `.gn-board__empty-*` above (the
@@ -4230,7 +4233,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 
-/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-select__panel {
   position: absolute;
   z-index: 30;
@@ -4241,7 +4244,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding: 0.25rem;
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
 }
 
 /* Popover (spec 2026-09-22) — the visibility menu's container. The same
@@ -4251,14 +4254,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    are the full-screen scrim/dialog pair, a different role), because both
    are anchored surfaces over the sheet and two treatments for one role is
    the drift this file's comments exist to prevent.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-popover {
   position: absolute;
   z-index: 30;
   padding: 0.75rem;
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   max-width: min(22rem, calc(100vw - 2rem));
 }
 
@@ -4556,7 +4559,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: 8px;
   background: var(--gn-surface-overlay);
   color: var(--gn-text);
-  box-shadow: 0 8px 24px var(--gn-shadow);
+  box-shadow: var(--gn-shadow-drop);
   padding: 1rem;
 }
 .workflow-rebind-dialog__title { margin: 0 0 0.4rem; font-size: 0.95rem; }
@@ -6705,6 +6708,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    surface and `lift-near`. MOVED here from `apps/web/app/globals.css` so Help (shared with `apps/desktop`, which
    loads only this sheet) and the Notes page draw ONE button instead of two copies that drift. Its corner and its
    lift are each screen's own: `.gn-notes__toc` places it bottom-left, `.gn-help__launcher` bottom-right. */
+/* N7 (2026-10-02, 24.083; reviewer A N2): stays `lift-near` — a round button, not a floating panel, so no `near-lg`. */
 .gn-toc-launcher__button {
   position: relative;
   width: 2.75rem;
@@ -6760,6 +6764,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
     padding: 1rem 0.75rem 0.5rem 1rem;
     background: var(--gn-surface-raised);
     border-radius: var(--gn-radius-card);
+    /* N7 (2026-10-02, 24.083; reviewer A N2): stays `lift-near` — a docked sidebar on its own screen, not a floating panel, so no `near-lg`. */
     box-shadow: var(--gn-shadow-lift-near);
     transform-origin: bottom right;
     transition: opacity 160ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0s;
@@ -7707,7 +7712,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   width: min(23.75rem, 100%);
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card) 0 0 var(--gn-radius-card);
-  box-shadow: -0.75rem 0 2.5rem var(--gn-shadow);
+  box-shadow: var(--gn-shadow-drop-side);
   display: flex; flex-direction: column;
 }
 .gn-filters__header { padding: 1.25rem 1.5rem 0.75rem; }
@@ -8229,7 +8234,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    painted over the number input beneath it with no boundary at all.
    The hairline is what draws the edge in every style and theme; the shadow
    stays as the thing that lifts the panel off the page where shadows exist.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-infotip__panel {
   position: absolute;
   top: calc(100% + 0.375rem);
@@ -8242,7 +8247,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border: 1px solid var(--gn-border);
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   color: var(--gn-text);
   font-size: 0.8125rem;
   line-height: 1.125rem;

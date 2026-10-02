@@ -961,7 +961,8 @@ describe('Select panel/option styling', () => {
   // reads `--gn-shadow-lift-near`, which resolves to neo's own larger raised pair through the
   // token, so the panel is still shadow-only under neo without a `[data-style]` restatement.
   it('the neo panel gets shadow-only elevation, through the base rule and the token', () => {
-    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-lift-near\)/);
+    // N7 (2026-10-02, 24.083): the base rule reads `near-lg` (hig/minimal: = `lift-near`, no drift).
+    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-near-lg\)/);
     expect(UI_CSS).not.toMatch(/\[data-style="neo"\]\s+\.gn-select__panel\s*\{/);
   });
 

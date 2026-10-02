@@ -1894,7 +1894,7 @@ describe('20.046 the column header and the rail sit on the 8pt grid', () => {
    it on its lower lip), radius 24 (neo 28), padding 8 — so the card inside,
    radius 16 (neo 20), obeys rule 05 (inner = outer − padding). Before this the
    column was `surface-sunken`, a flat fill measured at 1.14:1 on the paper
-   (case 20.001): it vanished. 8px between cards (rule 02). The lane stays a
+   (case 20.001): it vanished. 8px between cards (rule 02). [N7, 2026-10-02: `var(--gn-halo)` — 14px in neo, 8px in hig and minimal; case 24.081.] The lane stays a
    fixed 18rem in a scrolling rail (plan D13). Pattern P-TRACK. */
 .gn-board__column {
   background: var(--gn-surface-track);
