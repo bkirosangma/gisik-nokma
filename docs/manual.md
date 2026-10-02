@@ -610,6 +610,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   removed for everyone.* — and leaves *Comment deleted*, with who wrote it and when, where it was. Only the person
   who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit
   notify the new people only. The ticket's History tab reads *Comment edited* and *Comment deleted*.
+- **A comment box keeps its formatting tools out of the way.** Under every comment box, on a ticket or a note, and
+  in a comment you are editing, a small **Aa** button sits at the left of the row, next to **Attach**. Press it
+  (it reads *Show formatting*) to open the same formatting tools above the box, and press it again (*Hide formatting*)
+  to put them away; Escape inside the tools closes them too. Your choice is kept on this device for every comment
+  box. Hidden tools are still there to type with: Ctrl or ⌘ with B, I or K, Markdown such as `**bold**`, pasting,
+  `@` mentions and `:ticket` links all work. A ticket's description and a note's own body always show their tools.
 - **You can attach a file to a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet's
   **Attachments** tab lists the ticket's files and has its own **Attach a file** button, and the comment
