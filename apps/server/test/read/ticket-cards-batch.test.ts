@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { assembleTicketCards, fetchTicketRows } from '../../src/read/ticket-cards.js';
-import { rollupsFor, type RollupView } from '../../src/visibility/rollup.js';
+import { rollupsFor } from '../../src/visibility/rollup.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { legacyRollupFor } from '../helpers/legacy-rollup-for.js';
 import {
@@ -205,7 +205,8 @@ describe('the batched card assembly answers what the per-ticket rollup answers (
     expect(differing).toBeGreaterThan(0);
   });
 
-  it('25.195 rollupsFor on an empty page asks the database nothing', async () => {
+  it('25.195 the card assembly costs the same number of queries at two parents as at five, and an empty page asks the database nothing', async () => {
+    const board = await seedBoard();
     let queries = 0;
     const spy = {
       query: (...args: unknown[]) => {
@@ -213,10 +214,29 @@ describe('the batched card assembly answers what the per-ticket rollup answers (
         return (db.pool.query as (...a: unknown[]) => unknown)(...args);
       },
     } as unknown as typeof db.pool;
-    const none: Map<string, RollupView> = await rollupsFor(spy, newUlid(), []);
-    expect(none.size).toBe(0);
+    const viewer = board.viewers.member;
+    const [parentA, parentB] = board.parents as [string, string];
+
+    const small = await fetchTicketRows(db.pool, [parentA, parentB]);
+    queries = 0;
+    await assembleTicketCards(spy, viewer, small);
+    const atTwo = queries;
+
+    const all = await fetchTicketRows(db.pool, board.parents);
+    queries = 0;
+    await assembleTicketCards(spy, viewer, all);
+    const atFive = queries;
+    // The rollup is no longer a slope: five cards cost what two cost (the old shape added one
+    // query, or more, per card).
+    expect(atFive).toBe(atTwo);
+    // CONTROL: the count is a real measurement, not a spy that saw nothing, and the member's page
+    // reaches the arm query (parent B holds children the member is not admitted to).
+    expect(atTwo).toBeGreaterThan(3);
+
+    // An empty page asks the database nothing; a page with one parent does.
+    queries = 0;
+    expect((await rollupsFor(spy, newUlid(), [])).size).toBe(0);
     expect(queries).toBe(0);
-    // Control: a page with one parent does ask.
     await rollupsFor(spy, newUlid(), [newUlid()]);
     expect(queries).toBeGreaterThan(0);
   });
