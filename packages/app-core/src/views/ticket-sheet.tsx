@@ -25,6 +25,7 @@ import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.j
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { actorLabelFrom, memberLabel } from '../member-label.js';
 import { useActorNames } from './use-actor-names.js';
+import { useSheetHeaderCompact } from './sheet-header-compact.js';
 import { mentionCandidatesOf } from '../mention-candidates.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
@@ -663,6 +664,9 @@ function TitleField({
     const observer = new ResizeObserver(() => {
       if (el.clientWidth === width) return;
       width = el.clientWidth;
+      // G-8: while the phone header is compacting, the title's width is tweened every frame and
+      // `useSheetHeaderCompact` re-fits it itself when its natural width changes.
+      if (el.closest('[data-compact]') !== null) return;
       fit();
     });
     observer.observe(el);
@@ -1129,6 +1133,25 @@ export function TicketSheet({
   const purgedComments = usePurgedPredicate(
     dataSource.query,
     (comments.data ?? []).map((comment) => comment.body),
+  );
+
+  /**
+   * G-8 — THE PHONE HEADER THAT COMPACTS WITH THE SCROLL (`sheet-header-compact.ts` has the whole
+   * mechanism). Off above 40rem, where it changes nothing. `headingRef` is the `titleSlot` root. It is
+   * called HERE, above the early returns, because a hook cannot follow them; the layout key is built
+   * from what is known at this point (`read.data` is `null` until the read lands).
+   */
+  const headingRef = useRef<HTMLDivElement>(null);
+  const compactHeader = useSheetHeaderCompact(
+    headingRef,
+    [
+      titleDraft ?? read.data?.title ?? '',
+      workspaceName ?? '',
+      projectName ?? '',
+      read.data?.key ?? '',
+      read.data?.epic?.id ?? '',
+      read.data?.parent?.id ?? '',
+    ].join('\u0001'),
   );
 
   if (read.error !== null) {
@@ -2824,8 +2847,24 @@ export function TicketSheet({
     label: string,
     href: string | undefined,
     testId: string,
+    fold?: { expanded: boolean; onToggle: () => void },
   ): ReactElement =>
-    href === undefined ? (
+    fold !== undefined ? (
+      // G-8: in the compact phone header, when the line does not fit, the project crumb IS the
+      // "…" — narrowed by the header's own width tween — and is the button that opens the full
+      // breadcrumb. A real `<button>`, never a role on a link.
+      <button
+        type="button"
+        className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--fold"
+        data-testid={testId}
+        data-peek-opener=""
+        aria-label="Show the full breadcrumb"
+        aria-expanded={fold.expanded}
+        onClick={fold.onToggle}
+      >
+        {label}
+      </button>
+    ) : href === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>
         {label}
       </span>
@@ -2885,6 +2924,10 @@ export function TicketSheet({
     setTransportError(null);
     setMoveOpen(true);
   };
+
+  const titleText = titleDraft ?? ticketRead.title;
+  const crumbsPeekOpen = compactHeader.peek?.kind === 'crumbs' && !compactHeader.peek.closing;
+  const titlePeekOpen = compactHeader.peek?.kind === 'title' && !compactHeader.peek.closing;
 
   /**
    * THE ASSIGNEE ROW — a control, a claim line, and FOUR arms for the candidate
@@ -3177,7 +3220,7 @@ export function TicketSheet({
         control mid-edit is not a name.
       */
       titleSlot={
-        <div className="gn-sheet__heading">
+        <div className="gn-sheet__heading" ref={headingRef}>
           {/*
             ⚠ THE WHOLE NAV IS GATED ON BOTH NAMES, and my first cut was wrong
             in a way worth recording. It drew whatever crumbs it had — so a
@@ -3203,7 +3246,14 @@ export function TicketSheet({
               <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                 ›
               </span>
-              {locationCrumb(projectCrumb, projectHref, 'sheet-crumb-project')}
+              {locationCrumb(
+                projectCrumb,
+                projectHref,
+                'sheet-crumb-project',
+                compactHeader.mode === 'compact' && compactHeader.folded
+                  ? { expanded: crumbsPeekOpen, onToggle: () => compactHeader.togglePeek('crumbs') }
+                  : undefined,
+              )}
               {/* THE ANCESTORS, in the authority's order and under its own
                   conditionals (`desktop.dc.html:3410-3419`): the grandparent
                   only when there is one, the parent only when there is one.
@@ -3299,6 +3349,73 @@ export function TicketSheet({
               }
             }}
           />
+          {/*
+            G-8 — THE COMPACT HEADER'S TWO TAPS AND THEIR OVERLAYS (phone, compact only).
+
+            The small title is the textarea itself, scaled; this button sits over it so a tap opens the
+            FULL-SIZE title (with Move beside it — the header's own Move button, moved there by CSS), and
+            carries the one-line ellipsised copy of the title that shows once the header has settled
+            (a textarea cannot ellipsise). Both overlays hang below the header, change no layout and no
+            scroll position, and collapse on an outside tap, Escape or any scroll.
+          */}
+          {compactHeader.mode === 'compact' ? (
+            <button
+              type="button"
+              className="gn-sheet__title-hit"
+              data-peek-opener=""
+              aria-label="Show the full title"
+              aria-expanded={titlePeekOpen}
+              onClick={() => compactHeader.togglePeek('title')}
+            >
+              <span className="gn-sheet__title-hit-text" aria-hidden="true">
+                {titleText}
+              </span>
+            </button>
+          ) : null}
+          {compactHeader.peek?.kind === 'crumbs' && workspaceCrumb !== null && projectCrumb !== null ? (
+            <div
+              className="gn-sheet__peek gn-sheet__peek--crumbs"
+              role="group"
+              aria-label="Full breadcrumb"
+              data-state={compactHeader.peek.closing ? 'closing' : 'open'}
+            >
+              {locationCrumb(workspaceCrumb, workspaceHref, 'sheet-peek-crumb-workspace')}
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              {locationCrumb(projectCrumb, projectHref, 'sheet-peek-crumb-project')}
+              {epicCrumb === null || epicCrumbIsTheParent ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(epicCrumb, 'sheet-peek-crumb-epic', openParentSheet, 'epic')}
+                </>
+              )}
+              {parent === null ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(parent, 'sheet-peek-crumb-parent', openParentSheet, 'parent')}
+                </>
+              )}
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--current">{lastCrumb}</span>
+            </div>
+          ) : null}
+          {compactHeader.peek?.kind === 'title' ? (
+            <div
+              className="gn-sheet__peek gn-sheet__peek--title"
+              role="group"
+              aria-label="Full title"
+              data-state={compactHeader.peek.closing ? 'closing' : 'open'}
+            >
+              <p className="gn-sheet__peek-title">{titleText}</p>
+            </div>
+          ) : null}
         </div>
       }
       /*
@@ -3329,6 +3446,7 @@ export function TicketSheet({
           aria-label="Move this ticket"
           onClick={openMove}
           disabled={closed !== null}
+          inert={compactHeader.moveInert}
         >
           Move
         </Button>
