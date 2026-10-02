@@ -85,7 +85,7 @@ describe('MCP comments through the hosted door', () => {
       { tool: 'delete_comment', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, commentId: x.commentId }), stranger: NOT_MEMBER,
         forbidden: { text: `refused by ${COMMENT_PERMISSION_RULE}: ${COMMENT_DELETE_AUTHORITY_REASON}` }, allowed: { caller: 'owner', eventType: 'comment.deleted' } },
     ]);
-    // list_comments pages, and a note's comments are read the same way
+    // list_comments pages
     const first = await callTool(w.app, w.owner.token, 'list_comments', { workspaceId: w.workspaceId, ticketId: w.ticketId, limit: 1 });
     expect(first.isError, first.text).toBe(false);
     const pageOne = first.json as { comments: unknown[]; nextCursor: string | null };
@@ -93,5 +93,11 @@ describe('MCP comments through the hosted door', () => {
     expect(pageOne.nextCursor).not.toBeNull();
     const second = await callTool(w.app, w.owner.token, 'list_comments', { workspaceId: w.workspaceId, ticketId: w.ticketId, limit: 1, cursor: pageOne.nextCursor });
     expect((second.json as { comments: unknown[] }).comments).toHaveLength(1);
+    // a note's comments are read the same way: file one against the note, then list it back by noteId
+    const onNote = await callTool(w.app, w.owner.token, 'add_comment', { workspaceId: w.workspaceId, noteId: w.workspaceNoteId, markdown: 'A note remark' });
+    expect(onNote.isError, onNote.text).toBe(false);
+    const noteList = await callTool(w.app, w.owner.token, 'list_comments', { workspaceId: w.workspaceId, noteId: w.workspaceNoteId });
+    expect(noteList.isError, noteList.text).toBe(false);
+    expect((noteList.json as { comments: Array<{ markdown: string }> }).comments.map((c) => c.markdown)).toEqual(['A note remark']);
   });
 });

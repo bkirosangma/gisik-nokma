@@ -106,6 +106,19 @@ describe('14.380–14.388 comments in Markdown', () => {
       { commentId: C, authorId: ASHA, recordedAt: '2026-10-02T09:00:00.000Z', editedAt: '2026-10-02T09:05:00.000Z', deleted: false, markdown: '## Hi', lossy: [], files: [] },
       { commentId: ulid('G0NE'), authorId: ASHA, recordedAt: '2026-10-02T09:01:00.000Z', editedAt: null, deleted: true, markdown: null, lossy: [], files: [] },
     ]);
+    // The control above reads a TICKET; a NOTE's comments come from the note's own endpoint, and only from it.
+    expect(f.asked).toEqual([`/v1/workspaces/${WS}/tickets/${T}/comments`]);
+    const NOTE_COMMENT = ulid('NC');
+    const g = fake({
+      [`/v1/notes/${N}/comments`]: {
+        comments: [{ commentId: NOTE_COMMENT, authorId: ASHA, body, recordedAt: '2026-10-02T09:02:00.000Z', editedAt: null, deletedAt: null, files: [] }],
+      },
+    });
+    const onNote = (await tool('list_comments', g.session).handler({ workspaceId: WS, noteId: N })) as { comments: Array<Record<string, unknown>> };
+    expect(g.asked).toEqual([`/v1/notes/${N}/comments`]);
+    expect(onNote.comments).toEqual([
+      { commentId: NOTE_COMMENT, authorId: ASHA, recordedAt: '2026-10-02T09:02:00.000Z', editedAt: null, deleted: false, markdown: '## Hi', lossy: [], files: [] },
+    ]);
   });
 
   it('14.386 / 14.387 edit and delete emit one event each; refusals verbatim', async () => {
