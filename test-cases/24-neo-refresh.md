@@ -39,9 +39,9 @@
 
 ## 24.4 Depth on ghost and icon buttons (T4)
 
-- ❌ **24.060 — ghost buttons keep their border and gain the quiet depth, through the base rule only (N3, 13.340).**
-- ❌ **24.061 — icon buttons (the sheet close, the row actions) take the same quiet depth (N3).**
-- ❌ **24.065 — reduced motion removes the transition, never the shadow (Review Focus 5).**
+- ✅ **24.060 — ghost buttons keep their border and gain the quiet depth, through the base rule only (N3, 13.340).**
+- ✅ **24.061 — icon buttons (the sheet close, the row actions) take the same quiet depth (N3).**
+- ✅ **24.065 — reduced motion removes the transition, never the shadow (Review Focus 5).**
 
 ## 24.5 Switch and checkbox neo arms (T5)
 

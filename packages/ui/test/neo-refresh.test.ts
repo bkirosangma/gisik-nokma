@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import { contrastRatio, over } from './helpers/contrast.js';
-import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 import { readGlobalsCss } from './helpers/style-patterns.js';
 import {
   CONTRAST_PAIRS,
@@ -390,5 +390,82 @@ describe('24.071 the neo column checkbox: a recessed box when off, a flat accent
     const base = ruleExactly(t5Ui, '.gn-list__column-box');
     expect(valueOf(base, 'background')).toBe('var(--gn-fill-tertiary)');
     expect(valueOf(base, 'box-sizing')).toBeNull();
+  });
+});
+
+// ---- T4 depth on ghost and icon buttons (24.060-24.065; N3) ----
+// Read once under a T4-only name: the other neo lanes append to this file and declare their own.
+const t4Ui = readUiCss();
+
+describe('24.060 ghost buttons keep their border and gain the quiet depth, through the base rule only (N3, 13.340)', () => {
+  it('24.060 .gn-button--ghost reads quiet / quiet-near / quiet-press; the 1px --gn-border edge stays; no [data-style] block names a button', () => {
+    const ghost = ruleExactly(t4Ui, '.gn-button--ghost');
+    expect(valueOf(ghost, 'box-shadow')).toBe('var(--gn-shadow-quiet)');
+    expect(valueOf(ghost, 'border')).toBe('1px solid var(--gn-border)');
+    expect(valueOf(ruleExactly(t4Ui, '.gn-button--ghost:hover:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-quiet-near)');
+    expect(valueOf(ruleExactly(t4Ui, '.gn-button--ghost:active:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-quiet-press)');
+    // T2's flat disabled ghost stays as landed
+    expect(valueOf(ruleExactly(t4Ui, '.gn-button--ghost:disabled'), 'box-shadow')).toBe('none');
+    // 13.340: the depth arrives through the base rule; no [data-style] rule names a ghost button
+    expect(parseRules(t4Ui).filter((r) => r.selectors.some((sel) => sel.includes('[data-style') && sel.includes('.gn-button--ghost')))).toEqual([]);
+    // CONTROL: hig and minimal ghosts stay flat because their quiet roles are none.
+    expect(shadowValueOf('hig', 'light', 'quiet')).toBe('none');
+    expect(shadowValueOf('minimal', 'dark', 'quiet-press')).toBe('none');
+    expect(shadowValueOf('neo', 'light', 'quiet-press').startsWith('inset')).toBe(true);
+  });
+});
+
+describe('24.061 icon buttons (the dialog and sheet close, the row actions) take the same quiet depth (N3)', () => {
+  it('24.061 the close group and .gn-row-action read quiet at rest and quiet-press on :active, keep their hover fill, and go flat when disabled', () => {
+    const close = ruleExactly(t4Ui, ['.gn-dialog__close', '.gn-sheet__close']); // a group of 2
+    expect(valueOf(close, 'box-shadow')).toBe('var(--gn-shadow-quiet)');
+    expect(valueOf(close, 'transition')).toContain('box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)');
+    expect(valueOf(ruleExactly(t4Ui, ['.gn-dialog__close:active:not(:disabled)', '.gn-sheet__close:active:not(:disabled)']), 'box-shadow')).toBe(
+      'var(--gn-shadow-quiet-press)',
+    );
+    const action = ruleExactly(t4Ui, '.gn-row-action');
+    expect(valueOf(action, 'box-shadow')).toBe('var(--gn-shadow-quiet)');
+    expect(valueOf(action, 'transition')).toContain('box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)');
+    expect(valueOf(ruleExactly(t4Ui, '.gn-row-action:active:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-quiet-press)');
+    // the hover/focus fills are unchanged (a group of 4 for the close, a group of 2 for the row action)
+    expect(
+      valueOf(
+        ruleExactly(t4Ui, ['.gn-dialog__close:hover', '.gn-dialog__close:focus-visible', '.gn-sheet__close:hover', '.gn-sheet__close:focus-visible']),
+        'background',
+      ),
+    ).toBe('var(--gn-fill-tertiary)');
+    expect(valueOf(ruleExactly(t4Ui, ['.gn-row-action:hover:not(:disabled)', '.gn-row-action:focus-visible']), 'background')).toBe('var(--gn-fill-tertiary)');
+    expect(valueOf(ruleExactly(t4Ui, ['.gn-row-action:disabled', '.gn-list__bulk-close:disabled']), 'box-shadow')).toBe('none');
+    // CONTROL: hig/minimal render none for quiet, so these icon buttons are unchanged there (24.009 pins it).
+    expect(shadowValueOf('hig', 'dark', 'quiet')).toBe('none');
+    expect(shadowValueOf('minimal', 'light', 'quiet-press')).toBe('none');
+  });
+});
+
+describe('24.065 reduced motion removes the transition, never the shadow (Review Focus 5)', () => {
+  const rules = parseRules(t4Ui);
+  const reduced = (r: (typeof rules)[number]) => r.atRule?.includes('prefers-reduced-motion: reduce') === true;
+
+  it('24.065 the prefers-reduced-motion arm for .gn-button sets transition: none and no box-shadow', () => {
+    const arm = rules.find((r) => reduced(r) && r.selectors.includes('.gn-button'));
+    expect(arm, 'the reduced-motion arm exists').toBeTruthy();
+    expect(valueOf(arm!.body, 'transition')).toBe('none');
+    expect(valueOf(arm!.body, 'box-shadow')).toBeNull();
+  });
+
+  it('24.065 the icon buttons turn their transition off in an arm AFTER their base rules (equal specificity: source order decides), and no reduced-motion rule names a quiet role', () => {
+    const arm = rules.find((r) => reduced(r) && r.selectors.includes('.gn-row-action'));
+    expect(arm, 'the icon-button reduced-motion arm exists').toBeTruthy();
+    expect(arm!.selectors).toEqual(['.gn-dialog__close', '.gn-sheet__close', '.gn-row-action']);
+    expect(valueOf(arm!.body, 'transition')).toBe('none');
+    expect(valueOf(arm!.body, 'box-shadow')).toBeNull();
+    // the arm is (0,1,0) like the base rules it cancels, so it must come later in the file than both
+    const at = rules.indexOf(arm!);
+    expect(at).toBeGreaterThan(rules.findIndex((r) => !r.atRule && r.selectors.join() === '.gn-dialog__close,.gn-sheet__close'));
+    expect(at).toBeGreaterThan(rules.findIndex((r) => !r.atRule && r.selectors.join() === '.gn-row-action'));
+    // the shadow swap itself is never inside a reduced-motion arm: the press must still show, instantly
+    expect(rules.filter((r) => reduced(r) && /--gn-shadow-quiet/.test(r.body))).toEqual([]);
+    // CONTROL: the base rules do carry a box-shadow transition, so the arm has something to cancel
+    expect(valueOf(ruleExactly(t4Ui, '.gn-row-action'), 'transition')).toContain('box-shadow');
   });
 });

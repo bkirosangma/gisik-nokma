@@ -981,8 +981,16 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   color: var(--gn-text-muted);
   cursor: pointer;
-  transition: background-color var(--gn-motion-feedback) ease-out;
+  box-shadow: var(--gn-shadow-quiet);
+  transition:
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out),
+    background-color var(--gn-motion-feedback) ease-out;
 }
+/* Neo refresh N3 (24.061): the dialog's close is the same icon button as the sheet's and takes the same quiet depth (none in hig and
+   minimal) — the `box-shadow` and `transition` in the rule above, pressed here. The comment sits OUTSIDE that body on purpose: 13.1148
+   compares the raw body `rule('.gn-sheet__close')` reads with the comment-stripped one. */
+.gn-dialog__close:active:not(:disabled),
+.gn-sheet__close:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 /* Styling refresh (Plan A Task 7): the overlay dismiss control is a GHOST icon (pattern P-GHOST; the mockup's header icons, `Sheet.dc.html:30-35`): transparent at rest, a soft fill and the focus ring when pointed at or focused. */
 .gn-dialog__close:hover,
 .gn-dialog__close:focus-visible,
@@ -2028,7 +2036,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 1px;
 }
 .gn-row-action:disabled,
-.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
+.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; box-shadow: none; }
 /* Styling refresh Plan B (Task B6): P-GHOST — a control inside a table row is a text control with no edge; hover or focus washes it. */
 .gn-row-action {
   display: inline-flex;
@@ -2044,13 +2052,26 @@ a.gn-ticket-sheet__crumb--link {
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
+  /* Neo refresh N3 (24.061): the quiet depth (none in hig and minimal), pressed on :active. */
+  box-shadow: var(--gn-shadow-quiet);
+  transition:
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out),
+    background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-row-action:hover:not(:disabled),
 .gn-row-action:focus-visible {
   background: var(--gn-fill-tertiary);
   color: var(--gn-text-muted);
 }
+.gn-row-action:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 .gn-row-action:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+/* Neo refresh 24.065: no transition for a reduced-motion user, the shadow swap itself still happens (instantly). This arm sits AFTER
+   the close group's and `.gn-row-action`'s base rules: all three are (0,1,0), so an arm written beside `.gn-button`'s would lose to them. */
+@media (prefers-reduced-motion: reduce) {
+  .gn-dialog__close,
+  .gn-sheet__close,
+  .gn-row-action { transition: none; }
+}
 /* Styling refresh Plan B (Task B6): P-QUIET — the bulk close is a standalone toolbar control: an outlined pill, a soft wash on hover. */
 .gn-list__bulk-close {
   display: inline-flex;
@@ -7273,8 +7294,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border: 1px solid var(--gn-border);
   color: var(--gn-text-muted);
   font-weight: 600;
+  /* Neo refresh N3 (2026-10-02, 24.060): depth on the quiet button, the border KEPT (D6). `quiet` renders none in hig and
+     minimal, so this base-rule line is how neo gets its pair without a [data-style] block (13.340). */
+  box-shadow: var(--gn-shadow-quiet);
 }
-.gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
+.gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); box-shadow: var(--gn-shadow-quiet-near); }
+.gn-button--ghost:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 
 /* ── The quiet danger button (UX fixes T2, U1/SYS-12, case 23.022): the ONE destructive treatment until the confirm
    dialog. A row's "Delete" / "Remove" is OUTLINED, not filled: a danger-coloured 1px edge and label on a transparent
