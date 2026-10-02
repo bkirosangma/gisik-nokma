@@ -1590,7 +1590,9 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
     await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
-    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'))).toHaveAttribute('role', 'status');
+    // 2026-10-02 (HK-7): findByText has its OWN 1000 ms budget, which the config's testTimeout does not touch. CI run 37019480109 (#937) missed this
+    // line after 2554 ms while the test itself was inside its budget: the line renders after the mint round trip and a re-render, which a loaded runner delays.
+    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'), undefined, { timeout: 10_000 })).toHaveAttribute('role', 'status');
     expect(screen.getByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
     expect(screen.getByText(/It stops working after/)).toBeInTheDocument();
   });

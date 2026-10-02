@@ -492,7 +492,7 @@ describe('TicketSheet — the transition round-trip', () => {
     // Belt and braces: the plan's key must not be present under any value.
     expect(Object.keys(batch[0]!.payload as Record<string, unknown>)).not.toContain('toStateId');
     // 13.1725 — a 20 s budget for THIS test only: four userEvent clicks plus a typed comment through the real engine took 5249 ms in CI against the 5000 ms default (a ~102 s file under turbo load). The assertions above are unchanged, so the budget buys time without weakening the proof.
-  }, 20_000);
+  });
 
   it('PLANTED DEFECT: prompted field claims are emitted BEFORE the transition, in one ordered batch', async () => {
     const user = userEvent.setup();
