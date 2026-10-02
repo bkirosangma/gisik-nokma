@@ -169,7 +169,7 @@ export function PasskeysSection({
                       <span className="gn-account__passkey-stale">Not used recently</span>
                     ) : null}
                     <Button
-                      variant="danger"
+                      variant="danger-quiet"
                       // An unnamed passkey carries its added date so two of them are still told apart by name.
                       aria-label={
                         passkey.name === null ? `Delete passkey ${label} added ${added}` : `Delete passkey ${label}`

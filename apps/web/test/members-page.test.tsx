@@ -1772,14 +1772,19 @@ describe('6.287 the row action is offered to an admin, on another member’s row
     { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
   ];
 
-  it('6.287 an admin sees it on a member’s row (named by role and text, described by the person), beside the role picker; NEVER on their own row nor on the last owner’s; CONTROL: with a SECOND owner that owner’s row has it', async () => {
+  it('6.287 / 23.023 an admin sees a "More actions for <name>" overflow on a member’s row, beside the role picker, and "Remove from workspace…" is INSIDE it (no longer a button on the row); NEVER on their own row nor on the last owner’s; CONTROL: with a SECOND owner that owner’s row has it', async () => {
+    const user = userEvent.setup();
     mountRemove(ROWS);
     const anselma = await rowOf('Anselma Marak');
-    const button = within(anselma).getByRole('button', { name: REMOVE });
-    expect(button).toHaveAccessibleDescription('Anselma Marak');
+    const more = within(anselma).getByRole('button', { name: 'More actions for Anselma Marak' });
+    expect(within(anselma).queryByRole('button', { name: REMOVE })).toBeNull(); // 23.023: not a row button any more
+    expect(more).toHaveAttribute('aria-haspopup', 'menu');
+    await user.click(more);
+    expect(await within(anselma).findByRole('menu', { name: 'Actions for Anselma Marak' })).toBeInTheDocument();
+    expect(within(anselma).getByRole('menuitem', { name: REMOVE })).toBeInTheDocument();
     expect(within(anselma).getByRole('button', { name: /Role for Anselma Marak/ })).toBeInTheDocument(); // control
-    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull(); // their own row
-    expect(within(await rowOf('Olga Sangma')).queryByRole('button', { name: REMOVE })).toBeNull(); // the last owner
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: /More actions for/ })).toBeNull(); // their own row
+    expect(within(await rowOf('Olga Sangma')).queryByRole('button', { name: /More actions for/ })).toBeNull(); // the last owner
 
     // CONTROL, same case: with a SECOND owner the other owner's row offers it.
     cleanup();
@@ -1787,8 +1792,8 @@ describe('6.287 the row action is offered to an admin, on another member’s row
       { id: ME, name: 'Kiro', role: 'owner' },
       { id: '01J9USER000000000000000009', name: 'Olga Sangma', role: 'owner' },
     ]);
-    expect(within(await rowOf('Olga Sangma')).getByRole('button', { name: REMOVE })).toBeInTheDocument();
-    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull();
+    expect(within(await rowOf('Olga Sangma')).getByRole('button', { name: 'More actions for Olga Sangma' })).toBeInTheDocument();
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: /More actions for/ })).toBeNull();
   });
 
   it('6.287 a non-admin (the pending read refused 403) is offered no removal anywhere; CONTROL: the roster still renders', async () => {
@@ -1796,6 +1801,7 @@ describe('6.287 the row action is offered to an admin, on another member’s row
     expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
     await screen.findByText(ADMIN_ONLY);
     expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
   });
 });
 
@@ -1807,9 +1813,15 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
   ];
   const REMOVED: RemoveMemberOutcome = { kind: 'removed', invitesWithdrawn: 0, invitesNotWithdrawn: [] };
 
-  async function openDialog(user: ReturnType<typeof userEvent.setup>, name = 'Anselma Marak') {
-    const trigger = within(await rowOf(name)).getByRole('button', { name: REMOVE });
+  /** 23.023: the confirm is reached through the row's overflow, whose trigger is what focus returns to. */
+  async function chooseRemove(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement) {
     await user.click(trigger);
+    await user.click(await screen.findByRole('menuitem', { name: REMOVE }));
+  }
+
+  async function openDialog(user: ReturnType<typeof userEvent.setup>, name = 'Anselma Marak') {
+    const trigger = within(await rowOf(name)).getByRole('button', { name: `More actions for ${name}` });
+    await chooseRemove(user, trigger);
     return { trigger, dialog: await screen.findByRole('dialog', { name: `Remove ${name} from Convenience Corner?` }) };
   }
 
@@ -1827,7 +1839,7 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
     await waitFor(() => expect(trigger).toHaveFocus());
     expect(screen.getByText('Anselma Marak')).toBeInTheDocument();
 
-    await user.click(trigger);
+    await chooseRemove(user, trigger);
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(screen.queryByText('Anselma Marak')).toBeNull());
     expect(remove).toHaveBeenCalledTimes(1);
@@ -1896,7 +1908,7 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
   it('6.288 the title says "this workspace" when the workspace’s name is not served; the copy is otherwise verbatim', async () => {
     const user = userEvent.setup();
     mountRemove(ROWS, { remove: async () => REMOVED }, { workspaceName: null });
-    await user.click(within(await rowOf('Bora Sangma')).getByRole('button', { name: REMOVE }));
+    await chooseRemove(user, within(await rowOf('Bora Sangma')).getByRole('button', { name: 'More actions for Bora Sangma' }));
     expect(await screen.findByRole('dialog', { name: 'Remove Bora Sangma from this workspace?' })).toBeInTheDocument();
   });
 });

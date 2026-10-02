@@ -148,7 +148,7 @@ export function FieldsEditor(props: {
             ) : null}
             {props.disabled === true ? null : (
               <Button
-                variant="danger"
+                variant="danger-quiet"
                 aria-label="Remove field"
                 onClick={() => props.onChange(props.fields.filter((_field, at) => at !== index))}
               >
