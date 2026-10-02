@@ -238,9 +238,10 @@ cites, and the first draft cited a line it had not read.*
   have meant writing a test to make a verdict come out (a). (`packages/app-core/test/views/board.test.tsx`)
 
 - ✅ **13.302 — the provenance control unfolds to text carrying BOTH an actor and a time.** Witness:
-  clicks the control whose accessible name is `who · when` and asserts the unfolded string
-  `marked Doing by Anselma Marak on 19 Aug 2026` — one assertion, both halves. A sibling two cases
-  down asserts the nameless-claim arm (`marked Doing by user_anselma on 19 Aug 2026`), so the actor is
+  clicks the control whose accessible name starts `Moved to Doing by` (it was `who · when`, and the string
+  `marked Doing …`, until UX T7 / 23.123 on 2026-10-02) and asserts the unfolded string
+  `Moved to Doing by Anselma Marak on 19 Aug 2026` — one assertion, both halves. A sibling two cases
+  down asserts the nameless-claim arm (`Moved to Doing by Unknown person on 19 Aug 2026`; the floor is `Unknown person` since 6.254), so the actor is
   never dropped for want of a display name. The block below it varies `TZ` over the same unfold, so the
   *time* half is witnessed against the domain's formatter rather than the machine's zone.
   (`packages/app-core/test/views/board.test.tsx`)

@@ -121,3 +121,21 @@ export function formatDateTime(iso: string): string {
 export function formatStateProvenance(stateName: string, claim: ClaimProvenance): string {
   return `marked ${stateName} by ${actorLabel(claim.actorId, claim.actorName)} on ${formatDate(claim.serverTime)}`;
 }
+
+/**
+ * The BOARD CARD's line (UX fixes T7, FD5, audit BRD-03): "Moved to In progress by Kiro on 30 Sep". It is the
+ * sheet's own claim in the words of a history entry, and it replaces the card's "who · when" placeholder. A NEW
+ * function rather than an edit of `formatStateProvenance`, which the sheet's State row and My Work still use
+ * ("marked … by … on 30 Sep 2026").
+ *
+ * The year is dropped only when the claim falls in the year of `today`, the IST day the shell hands the board
+ * (the same clock-free seam the card's due date reads); a claim from another year, or a caller with no `today`,
+ * keeps it. `full` always keeps it — the card's unfolded form.
+ */
+export function formatCardProvenance(stateName: string, claim: ClaimProvenance, today?: string, full = false): string {
+  const day = formatDate(claim.serverTime);
+  const year = /\s(\d{4})$/.exec(day)?.[1];
+  const sameYear = today !== undefined && year !== undefined && today.startsWith(`${year}-`);
+  const shown = !full && sameYear ? day.slice(0, day.length - 5) : day;
+  return `Moved to ${stateName} by ${actorLabel(claim.actorId, claim.actorName)} on ${shown}`;
+}
