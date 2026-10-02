@@ -288,8 +288,11 @@ describe('25.209 the rebuilt move capability still carries cache and uploadEvide
   }
 
   it('25.209 (i) the instant pre-check evaluates against the cache; without one it says nothing', async () => {
-    const cache = cacheOf(['tk_a', 'tk_b', 'tk_c']);
-    const withCache = await moveDialogOnSkippedSlot(() => ({ cache }));
+    // The page's first render hands a cache that holds nothing (the pre-check can say nothing); its re-render, before the
+    // dialog opens, hands the cache that holds the tickets. The capability must follow the NEWEST cache.
+    const caches = [cacheOf([]), cacheOf(['tk_a', 'tk_b', 'tk_c'])];
+    let renders = 0;
+    const withCache = await moveDialogOnSkippedSlot(() => ({ cache: caches[Math.min(renders++, 1)]! }));
     // THE PROPERTY — the engine ran against the cache and named the rule the candidate (no evidence) breaks.
     expect(await within(withCache.dialog).findByText(/instant check: require-evidence/)).toBeInTheDocument();
     withCache.view.unmount();
