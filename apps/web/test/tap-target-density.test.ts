@@ -48,7 +48,8 @@ import {
  *   * `DENSE_IN_LIST` emptied → 13.991 fails on the non-empty half.
  *   * `STANDALONE_FLOOR_PX` changed 44 → 24 — i.e. THE blanket-24 this change
  *     exists to prevent → 13.990 fails by name.
- *   * `.gn-help__pager-link` deleted from `ui.css` → 13.991 fails naming that
+ *   * `.gn-help__pager-link` deleted from `ui.css` → 13.991 fails naming that (the pager was removed by 23.230;
+ *     the same witness was RE-RUN with `.gn-help__group-toggle`, see 23.230)
  *     selector as "not a rule head", which is the stale-entry direction.
  *
  * ⚠ AND THE MUTATION THAT FOUND A REAL DEFECT IN THIS CHANGE, kept because it is

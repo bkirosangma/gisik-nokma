@@ -24,7 +24,7 @@ const FLOAT = [
 const ROWS: RosterRow[] = [
   ...FLOAT.map(([sheet, selectors]) => ({ sheet, selectors, pattern: 'P-FLOAT' as const })),
   { sheet: 'ui', selectors: '.gn-infotip__panel', declarations: { border: '1px solid var(--gn-border)' } },
-  { sheet: 'globals', selectors: '.gn-toc-launcher__button', declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)' } },
+  { sheet: 'ui', selectors: '.gn-toc-launcher__button', declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)' } },
 ];
 
 describe('20.221 floating panels float near', () => {

@@ -37,10 +37,11 @@ import type { HelpDocument, HelpSection } from './types.js';
  * that half is for. `§10` now opens "Permissions and setup" instead, beside the
  * two configuration chapters it precedes.
  *
- * The constraint is not arbitrary. The sidebar reads this order and the `Next`
- * pager reads the document's; a non-contiguous group makes the two disagree, so
- * a reader following the sidebar downward and a reader following `Next` visit
- * the same sections in different sequences. Regrouping therefore means choosing
+ * The constraint is not arbitrary. The sidebar reads this order and the page
+ * reads the document's; a non-contiguous group makes the two disagree, so a
+ * reader following the sidebar downward and a reader scrolling the page visit
+ * the same sections in different sequences. (AMENDED 2026-10-02, 23.230: the
+ * per-section `Next` pager that once read the document's order too is gone.) Regrouping therefore means choosing
  * where the CUTS fall, not which chapters go together — and if a grouping is
  * only expressible by reordering, the thing to reorder is `docs/manual.md`.
  *
@@ -76,9 +77,9 @@ export interface HelpGroup {
  * `packages/app-core/test/help/groups.test.ts` (case 15.19): concatenating the
  * `sectionIds` must equal the document's own section order EXACTLY. That single
  * assertion catches a stray id, a duplicate, a missing section and a reordering
- * — and the reordering half matters because the `Next` pager and the sidebar
- * both read this order, so a difference would make the sidebar present a
- * reading order the document does not have.
+ * — and the reordering half matters because the sidebar and the page both
+ * read this order, so a difference would make the sidebar present a reading
+ * order the document does not have.
  */
 export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly HelpGroup[]>>> = {
   manual: [
@@ -217,20 +218,4 @@ export function helpGroupTitle(document: HelpDocument, sectionId: string): strin
   const groups = HELP_GROUPS[document.id] ?? [];
   const owner = groups.find((group) => group.sectionIds.includes(sectionId));
   return owner === undefined ? null : owner.title;
-}
-
-/**
- * The section after `sectionId` in the document's own order, for the `Next`
- * pager. `null` at the last section — the pager is then not drawn at all,
- * rather than drawn pointing nowhere.
- *
- * Document order and not sidebar order, and they are the same thing: case 15.19
- * asserts it. Reading `document.sections` directly means the pager still works
- * for a document with no groups, and still works for a section that drifted out
- * of every group.
- */
-export function helpNextSection(document: HelpDocument, sectionId: string): HelpSection | null {
-  const at = document.sections.findIndex((section) => section.id === sectionId);
-  if (at < 0 || at === document.sections.length - 1) return null;
-  return document.sections[at + 1] ?? null;
 }
