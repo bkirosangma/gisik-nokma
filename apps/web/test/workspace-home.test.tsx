@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,6 +107,18 @@ const COMMITTED = (event: SubmittedEvent): IngestResult => ({
  * thing that actually changed the world, which is invariant to how many
  * components independently ask what the directory currently says.
  */
+/**
+ * The NAME-AS-TRIGGER (13.969): the rename button INSIDE the level-1 heading. Since 23.177 an admin also has
+ * the pencil icon button beside the heading, with the SAME accessible name, so a bare `getByRole('button',
+ * { name: /^Rename / })` is ambiguous by design; the name control is found by where it lives.
+ */
+async function nameTrigger(): Promise<HTMLElement> {
+  // The page paints a loading heading first, so wait for the button INSIDE whichever level-1 heading is current.
+  return waitFor(() =>
+    within(screen.getByRole('heading', { level: 1 })).getByRole('button', { name: /^Rename / }),
+  );
+}
+
 function mount(
   reads: WorkspaceRef[][],
   options: {
@@ -1045,7 +1060,7 @@ describe('the rename control (13.962–13.965)', () => {
     for (const role of ['owner', 'admin']) {
       cleanup();
       mount([[workspaceAs(role)]]);
-      expect(await screen.findByRole('button', { name: /^Rename / })).toBeInTheDocument();
+      expect(await nameTrigger()).toBeInTheDocument();
     }
     // The other half, and the reason the loop above is not sufficient alone. It
     // is also the half the ORIGINAL absence was measured on: a guest could
@@ -1066,7 +1081,7 @@ describe('the rename control (13.962–13.965)', () => {
     const sent: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
 
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     const input = screen.getByLabelText('New workspace name');
     await userEvent.clear(input);
     await userEvent.type(input, 'Corner HQ');
@@ -1085,7 +1100,7 @@ describe('the rename control (13.962–13.965)', () => {
     const sent: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
 
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     await userEvent.clear(screen.getByLabelText('New workspace name'));
 
     // Both halves on purpose: a form that disabled the button but still
@@ -1101,9 +1116,7 @@ describe('the rename control (13.962–13.965)', () => {
 
   it('13.965 the control names the WORKSPACE, so the page is not a column of identical buttons', async () => {
     mount([[workspaceAs('owner')]]);
-    expect(
-      await screen.findByRole('button', { name: 'Rename Convenience Corner' }),
-    ).toBeInTheDocument();
+    expect(await nameTrigger()).toHaveAccessibleName('Rename Convenience Corner');
   });
 });
 
@@ -1136,7 +1149,8 @@ describe('the rename control (13.962–13.965)', () => {
 describe('13.969 the NAME is the rename’s control', () => {
   it('13.969 the control a person clicks IS the workspace name, and it is focusable', async () => {
     mount([[workspaceAs('admin')]]);
-    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+    const control = await nameTrigger();
+    expect(control).toHaveAccessibleName('Rename Convenience Corner');
 
     // THE VISIBLE TEXT IS THE NAME. This is the change: a control whose label
     // were the word "Rename" would satisfy every case above and fail here.
@@ -1148,17 +1162,17 @@ describe('13.969 the NAME is the rename’s control', () => {
     expect(document.activeElement).toBe(control);
   });
 
-  it('13.969 exactly ONE rename control exists in the header — the second button is gone', async () => {
+  it('13.969 exactly ONE rename control lives in the HEADING, and no bare `Rename` button exists (AMENDED 23.177: the icon beside it is outside the h1)', async () => {
     mount([[workspaceAs('admin')]]);
-    await screen.findByRole('button', { name: /^Rename / });
-    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    await nameTrigger();
+    expect(within(screen.getByRole('heading', { level: 1 })).getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     // ...and no bare `Rename` control survives anywhere on the page.
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
 
   it('13.969 ESCAPE cancels the edit, and the name is the heading again', async () => {
     mount([[workspaceAs('admin')]]);
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     const input = screen.getByLabelText('New workspace name');
     await userEvent.clear(input);
     await userEvent.type(input, 'Discarded');
@@ -1168,7 +1182,7 @@ describe('13.969 the NAME is the rename’s control', () => {
     // than committed: nothing was sent, which is the half a "the input closed"
     // assertion would miss.
     expect(screen.queryByLabelText('New workspace name')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Rename Convenience Corner' })).toHaveTextContent(
+    expect(await nameTrigger()).toHaveTextContent(
       'Convenience Corner',
     );
   });
@@ -1214,7 +1228,8 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     // POSITIVE CONTROL FIRST, so a green below cannot be "there was no heading
     // and no control". The control is present and is still the shape 13.969
     // rules on.
-    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+    const control = await nameTrigger();
+    expect(control).toHaveAccessibleName('Rename Convenience Corner');
     const h1 = screen.getByRole('heading', { level: 1 });
 
     // ⚠ WHAT THIS ARM DOES **NOT** WITNESS, stated because its green is
@@ -1251,12 +1266,12 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     // likely to reach for.
     expect(h1).not.toHaveAttribute('aria-label');
 
-    // THE OWNER'S SHAPE IS INTACT — one control, a real button, still inside the
-    // heading, and its own accessible name unchanged. These three are `13.969`'s
+    // THE OWNER'S SHAPE IS INTACT — one control INSIDE the heading (23.177's icon sits
+    // outside it, pinned there), a real button, and its own accessible name unchanged. These three are `13.969`'s
     // arms restated where an E4-5-shaped change would break them, so a future
     // move to the two-element remedy is a deliberate act with a red case rather
     // than a silent one.
-    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    expect(within(h1).getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     expect(h1).toContainElement(control);
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
@@ -1362,5 +1377,60 @@ describe('13.1217 the bar’s project item and the card door do not share one na
     // CONTROL: the bar item still answers to ITS own name, and the bare project name matches no link.
     expect(screen.getAllByRole('link', { name: 'Shop operations, projects menu' })).toHaveLength(1);
     expect(screen.queryByRole('link', { name: 'Shop operations' })).toBeNull();
+  });
+});
+
+/**
+ * **23.177 (UX fixes Task 10, audit WS-13) — a visible Rename cue beside the name.** The name is the rename's
+ * control (13.969) but looks like plain text, so an admin also gets a pencil icon button, named
+ * `Rename <workspace>`, as a SIBLING of the level-1 heading (inside it, the heading would announce an action:
+ * 13.995). A member or guest gets neither control.
+ */
+describe('23.177 the workspace home has a visible Rename icon button for admins', () => {
+  const iconOf = async (): Promise<HTMLElement> => {
+    await nameTrigger();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    const all = screen.getAllByRole('button', { name: 'Rename Convenience Corner' });
+    const outside = all.filter((button) => !h1.contains(button));
+    expect(outside, 'exactly one Rename button sits OUTSIDE the heading').toHaveLength(1);
+    return outside[0] as HTMLElement;
+  };
+
+  it('23.177 an owner and an admin see the icon button beside the heading, outside it, drawing a pencil', async () => {
+    for (const role of ['owner', 'admin']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      const icon = await iconOf();
+      // A real icon button: the glyph is decorative and the name is the label, with no visible text of its own.
+      expect(icon).toHaveTextContent('');
+      expect(icon.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      // BESIDE the heading: the same row, never inside it.
+      expect(screen.getByRole('heading', { level: 1 }).parentElement).toContainElement(icon);
+      // CONTROL: the name-as-trigger is still there, so the icon is "alongside", not a replacement.
+      await nameTrigger();
+    }
+  });
+
+  it('23.177 a member and a guest see NEITHER Rename control', async () => {
+    for (const role of ['member', 'guest']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      expect((await screen.findAllByText('Convenience Corner')).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
+    }
+  });
+
+  it('23.177 clicking the icon opens the same in-place field, with the name filled in, and the icon steps aside', async () => {
+    mount([[workspaceAs('admin')]]);
+    await userEvent.click(await iconOf());
+    expect(screen.getByLabelText('New workspace name')).toHaveValue('Convenience Corner');
+    expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
+  });
+
+  it('23.177 the icon is a 44px target (the P-GHOST floor), pinned on the stylesheet', () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../app/globals.css'), 'utf8');
+    const rule = /\.gn-workspace-home__rename-icon\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/min-height:\s*2\.75rem/);
+    expect(rule).toMatch(/min-width:\s*2\.75rem/);
   });
 });

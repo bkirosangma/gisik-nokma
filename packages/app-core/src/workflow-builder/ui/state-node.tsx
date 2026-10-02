@@ -7,6 +7,15 @@ export function StateNode(props: NodeProps) {
   const data = props.data as StateNodeData;
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
+  // UX fixes T10 (WF-03, 23.176): WHY "Tickets can start here" is locked, as visible text — it was a hover-only
+  // `title`, which a phone cannot show and a keyboard cannot reach.
+  const creatableReason =
+    data.category === 'terminal'
+      ? "A done state can't be a starting status"
+      : data.isInitial
+        ? 'The start state always allows new tickets'
+        : null;
+  const reasonId = `gn-state-reason-${data.stateId}`;
   const className = [
     'gn-state-node',
     `gn-state-node--${data.category}`,
@@ -61,19 +70,19 @@ export function StateNode(props: NodeProps) {
           aria-label="Tickets can start here"
           className="nodrag"
           disabled={!canAuthor || data.category === 'terminal' || data.isInitial}
-          title={
-            data.category === 'terminal'
-              ? "A done state can't be a starting status"
-              : data.isInitial
-                ? 'The start state always allows new tickets'
-                : undefined
-          }
+          title={creatableReason ?? undefined}
+          aria-describedby={creatableReason === null ? undefined : reasonId}
           checked={data.creatable}
           onClick={(mouseEvent) => mouseEvent.stopPropagation()}
           onChange={(changeEvent) => store.actions.setStateCreatable(data.stateId, changeEvent.target.checked)}
         />
         <span>Tickets can start here</span>
       </label>
+      {creatableReason === null ? null : (
+        <p className="gn-state-node__reason" id={reasonId} data-testid={reasonId}>
+          {creatableReason}
+        </p>
+      )}
       <Handle type="source" position={Position.Right} isConnectable={canAuthor} />
     </div>
   );

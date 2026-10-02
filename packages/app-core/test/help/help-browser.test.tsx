@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { HELP_CONTENT } from '../../src/help/content.generated.js';
 import { HELP_GROUPS } from '../../src/help/groups.js';
 import { HelpBrowser } from '../../src/help/help-browser.js';
+import { parseRules, ruleExactly, valueOf, readUiCss } from '../../../ui/test/helpers/css-rules.js';
 
 /**
  * The first render test for `HelpBrowser`. Until now this directory held only
@@ -416,5 +417,42 @@ describe('T-E4-36 the help search count is announced', () => {
     // The load-bearing half: an inline element's height is its line box, so a
     // `min-height` needs a box that honours it.
     expect(body?.[1]).toMatch(/display:\s*inline-flex/);
+  });
+});
+
+/**
+ * UX fixes T10 (HLP, 23.174) — at phone width the topic tree is behind a "Contents" disclosure, so the article
+ * starts within the first screen; at desktop width nothing changes.
+ */
+describe('23.174 Help — Contents on a phone', () => {
+  const PHONE = '@media (max-width: 47.9375rem)';
+  it('23.174 a "Contents" disclosure controls the topic nav (closed to start); the phone arm hides the tree until it is open, and desktop draws no toggle', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<HelpBrowser />);
+    const toggle = screen.getByRole('button', { name: 'Contents' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const nav = container.querySelector('nav.gn-help__nav')!;
+    expect(toggle.getAttribute('aria-controls')).toBe(nav.id);
+    expect(container.querySelector('aside.gn-help__sidebar')).toHaveAttribute('data-contents-open', 'false');
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('aside.gn-help__sidebar')).toHaveAttribute('data-contents-open', 'true');
+    // Picking a topic closes it again, so the article it jumped to is what the reader sees.
+    await user.click(within(nav as HTMLElement).getAllByRole('link')[0]!);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    // The stylesheet half: the tree is hidden only in the phone arm, and only while closed…
+    const css = readUiCss();
+    const hide = parseRules(css).find(
+      (r) => r.atRule === PHONE && r.selectors.includes(".gn-help__sidebar[data-contents-open='false'] .gn-help__nav"),
+    );
+    expect(hide, 'no phone rule hides the closed tree').toBeDefined();
+    expect(valueOf(hide!.body, 'display')).toBe('none');
+    expect(valueOf(ruleExactly(css, '.gn-help__contents-toggle', PHONE), 'min-height')).toBe('2.75rem');
+    // CONTROL — on desktop the toggle is not drawn and the tree is never hidden: the base rule hides the toggle,
+    // and no rule outside the arm hides the nav.
+    expect(valueOf(ruleExactly(css, '.gn-help__contents-toggle'), 'display')).toBe('none');
+    expect(parseRules(css).filter((r) => r.atRule === null && r.selectors.some((x) => x.includes('data-contents-open')))).toEqual([]);
   });
 });
