@@ -190,6 +190,14 @@ describe('the phone sheet', () => {
     // The body reserves the header's FULL height once, by custom property (CSS turns it into padding).
     expect(panel().style.getPropertyValue('--gh-h0')).not.toBe('');
     expect(panel().style.getPropertyValue('--gh-h1')).not.toBe('');
+    // F2 (G-8 FIX 1): `data-top` marks p = 0, where CSS lays every crumb out wrapped and whole; the first pixel of scroll takes it off
+    // (the one-line nowrap form), and the top again puts it back. Mutants: never set; set while p > 0.
+    expect(panel()).toHaveAttribute('data-top');
+    await scrollTo(10);
+    expect(Number(panel().style.getPropertyValue('--p'))).toBeGreaterThan(0);
+    expect(panel()).not.toHaveAttribute('data-top');
+    await scrollTo(0);
+    expect(panel()).toHaveAttribute('data-top');
   });
 
   it('25.423 at p = 1 the header is compact: Move is inert, the small title is a button; back at the top, full again', async () => {
@@ -385,7 +393,9 @@ describe('the phone sheet', () => {
     await waitFor(() => expect(titleGroup()).toBeNull());
     cleanup();
 
-    // G14: the "…" opener carries data-peek-opener, so ITS pointerdown does not close the overlay its click opens.
+    // G14 (mutant: the "…" opener loses data-peek-opener): the outside-tap listener only exists while an overlay is open, so the opening
+    // press is never seen by it; the press that matters is the SECOND one, which toggles the overlay shut. Without the marker its
+    // pointerdown starts the close, and the click that follows finds a closing overlay and re-opens it.
     renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
     await settled();
     await scrollTo(500);
@@ -394,6 +404,12 @@ describe('the phone sheet', () => {
     fireEvent.click(fold);
     expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).not.toBeNull();
     expect(panel()).toHaveAttribute('data-peek-state', 'open');
+    fireEvent.pointerDown(fold);
+    fireEvent.click(fold);
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).toBeNull());
+    fireEvent.pointerDown(fold);
+    fireEvent.click(fold);
+    expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).not.toBeNull();
     // And a pointerdown on Move while only the CRUMB overlay is open is still an outside tap (Move is exempt for the title overlay only).
     fireEvent.pointerDown(moveButton());
     await waitFor(() => expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).toBeNull());
