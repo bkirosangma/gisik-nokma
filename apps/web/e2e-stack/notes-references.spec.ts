@@ -63,7 +63,7 @@ test('18.282 posting a ticket comment with :note Compressor attaches the note; i
   // independent of any note another spec created or attached.
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: 'New note' }).click();
+  await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
@@ -113,7 +113,7 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   const noteTitle = `Ticket reference check ${uniqueTag()}`;
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('button', { name: 'New note' }).click();
+  await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(noteTitle);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });

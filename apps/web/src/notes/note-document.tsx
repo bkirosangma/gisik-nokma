@@ -389,9 +389,9 @@ function NoteDocumentBody({
 
   /**
    * Imperative access to the live Tiptap instance (owner, 2026-09-23: the
-   * page should "feel like its a note" — `.gn-notes__editor`'s own
-   * `min-height` pads the area below short text, and this is what a click
-   * there does). Threaded through `TicketEditorSlot`'s existing `editorRef`
+   * page should "feel like its a note" — the editor field's own
+   * `min-height` (`globals.css`, 23.162) makes the area tall, and this is what a click
+   * on the wrapper's own padding does). Threaded through `TicketEditorSlot`'s existing `editorRef`
    * prop rather than a new one, so the twin-contract tests
    * (`ticket-editor-slot.test.tsx`) see no new surface.
    */
