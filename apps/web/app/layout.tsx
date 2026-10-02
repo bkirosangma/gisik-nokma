@@ -7,6 +7,7 @@ import './globals.css';
 import { Providers } from '../src/providers.js';
 import { SkipLink } from '../src/skip-link.js';
 import { RouteAnnouncer } from '../src/route-announcer.js';
+import { AnnounceRegion } from '../src/announce-region.js';
 
 export const metadata = { title: 'Gisik Nokma', icons: { icon: '/favicon.svg' } };
 
@@ -80,6 +81,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           including the pages that render no shell.
         */}
         <RouteAnnouncer />
+        {/* Smoothness T5 (spec §5): the ONE polite status region, here for the same reason as the announcer: every route, shell or not. */}
+        <AnnounceRegion />
         <Providers>{children}</Providers>
       </body>
     </html>
