@@ -95,6 +95,24 @@ export function watchTicketSummaries(
   };
 }
 
+/**
+ * The two answers of one list read, as the handlers `TicketList` hands to `.then`: rows clear any earlier failure and replace the list; a
+ * rejection is shown (E2-41's shape) rather than swallowed into an endless skeleton. Extracted so a test calls them — the effect that wires
+ * them never runs under `react-dom/server`.
+ */
+export function readInto(
+  setTickets: (rows: TicketSummary[]) => void,
+  setReadError: (message: string | null) => void,
+): [onRows: (rows: TicketSummary[]) => void, onError: (err: unknown) => void] {
+  return [
+    (rows) => {
+      setReadError(null);
+      setTickets(rows);
+    },
+    (err) => setReadError(err instanceof Error ? err.message : 'the list could not be read'),
+  ];
+}
+
 export function TicketList(props: { ds: ReplicaDataSource; workspaceId: string }) {
   // `null` until the first read answers (spec §3.3): the view tells "not read yet" from "read, empty".
   const [tickets, setTickets] = useState<TicketSummary[] | null>(null);
@@ -103,14 +121,9 @@ export function TicketList(props: { ds: ReplicaDataSource; workspaceId: string }
     // DEVIATION beyond the plan text: ds.query.listTickets does not exist on ReplicaDataSource's query surface — the real method is
     // listTicketSummaries(workspaceId), which already returns {ticketId, title, stateId, pending, openContests} among other fields.
     // A read that rejects is shown (E2-41's shape), not swallowed into an endless skeleton.
+    const [onRows, onError] = readInto(setTickets, setReadError);
     const read = (): void => {
-      props.ds.query.listTicketSummaries(props.workspaceId).then(
-        (rows) => {
-          setReadError(null);
-          setTickets(rows);
-        },
-        (err: unknown) => setReadError(err instanceof Error ? err.message : 'the list could not be read'),
-      );
+      props.ds.query.listTicketSummaries(props.workspaceId).then(onRows, onError);
     };
     return watchTicketSummaries(props.ds, props.workspaceId, read);
   }, [props.ds, props.workspaceId]);

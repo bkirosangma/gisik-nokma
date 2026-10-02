@@ -10,7 +10,7 @@ import {
 import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaimText } from '@gisik-nokma/domain';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
 import { EDITOR_MIN_HEIGHT } from '../editor/editor-band.js';
-import { loadEditorHtml } from '../editor/editor-html-loader.js';
+import { editorSlotState, loadEditorHtml } from '../editor/editor-html-loader.js';
 import { EDITOR_LOAD_FAILURE_MESSAGE } from '../editor/editor-refusals.js';
 import { SkeletonBlock, TicketSkeleton } from '../components/skeleton.js';
 import { loadTicket } from './ticket-read.js';
@@ -29,6 +29,8 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   const [readError, setReadError] = useState<string | null>(null);
   // The editor page arrives by a lazy import on the first open (spec §3.3); the slot is a skeleton until it is here.
   const [html, setHtml] = useState<string | null>(null);
+  // A failed lazy load is its own state, independent of the comment `error` (which `onComment` clears): it is shown in the slot.
+  const [editorLoadFailed, setEditorLoadFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -37,7 +39,7 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
         if (live) setHtml(page);
       },
       () => {
-        if (live) setError(EDITOR_LOAD_FAILURE_MESSAGE);
+        if (live) setEditorLoadFailed(true);
       },
     );
     return () => {
@@ -66,6 +68,7 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   if (ticket === null) return <TicketSkeleton />;
   const state = ticket.pending?.pending ?? ticket.confirmed;
   const openContests = ticket.contests.filter((c) => !c.resolved);
+  const editorSlot = editorSlotState(html, editorLoadFailed);
   const title = String((state?.fields.title?.value as string | undefined) ?? '');
 
   const onComment = (): void => {
@@ -151,9 +154,9 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
       ))}
       {COMMENTING_AVAILABLE ? (
         <>
-          {html === null ? (
-            <SkeletonBlock height={EDITOR_MIN_HEIGHT} />
-          ) : (
+          {editorSlot === 'loading' ? <SkeletonBlock height={EDITOR_MIN_HEIGHT} /> : null}
+          {editorSlot === 'failed' ? <Text accessibilityRole="alert">{EDITOR_LOAD_FAILURE_MESSAGE}</Text> : null}
+          {editorSlot === 'page' && html !== null ? (
             <EditorWebView
               initialDoc={draft}
               onChange={setDraft}
@@ -163,12 +166,12 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
               }
               onEditorError={setError}
             />
-          )}
+          ) : null}
           {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
           <Text accessibilityRole="text">
             Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
           </Text>
-          <Button title="Comment" onPress={onComment} />
+          <Button title="Comment" onPress={onComment} disabled={editorSlot === 'failed'} />
         </>
       ) : (
         <Text accessibilityRole="text">{COMMENTING_WITHHELD_MESSAGE}</Text>

@@ -12,7 +12,8 @@ import { fontVariableName, themeStylesheet } from '@gisik-nokma/ui/tokens';
  * `:root` block anywhere in the file. The definitions come from one place,
  * `themeStylesheet()`, and until this module existed exactly one shipped call
  * site reached it — `apps/web/app/layout.tsx:32`. `apps/desktop/src/main.tsx`
- * imported `ui.css` alone and `apps/desktop/index.html` carries no `<style>`,
+ * imported `ui.css` alone and `apps/desktop/index.html` carried no `<style>` (T13 has since added a ground-only `<style data-gn-ground>`;
+ * it defines no `--gn-` token, so the point stands),
  * so every `color: var(--gn-text)` and `background: var(--gn-surface)` in the
  * desktop window resolved to nothing and the elements fell back to browser
  * defaults.

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Easing, useColorScheme, View } from 'react-native';
 import { themeFor } from '../screens/help-theme.js';
 import { BOARD_ROW_FRAME_STYLE } from '../screens/board-row-frame.js';
-import { SKELETON_LINE_HEIGHT, SKELETON_PULSE_LOW, SKELETON_PULSE_MS, SKELETON_RADIUS, skeletonFill } from './skeleton-model.js';
+import { SKELETON_BLOCK_GAP, SKELETON_PULSE_LOW, SKELETON_PULSE_MS, SKELETON_RADIUS, skeletonBarMetrics, skeletonFill } from './skeleton-model.js';
 
 /**
  * Loading placeholders for the phone (smoothness T13; spec §4, amendment S-R1). Structural, like the web's: a screen's skeleton renders the
@@ -46,14 +46,14 @@ export function SkeletonRegion(props: { label: string; children: ReactNode }) {
   );
 }
 
-/** One PART: a bar the size of the text (or chip, or block) it stands in for. */
+/** One PART: a bar the size of the text it stands in for (shorter than the line, with air above and below), or a solid block when given a height. */
 export function SkeletonBar(props: { width?: number | `${number}%`; height?: number }) {
   const theme = themeFor(useColorScheme());
   return (
     <View
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
-      style={{ width: props.width ?? '60%', height: props.height ?? SKELETON_LINE_HEIGHT, borderRadius: SKELETON_RADIUS, backgroundColor: skeletonFill(theme) }}
+      style={{ width: props.width ?? '60%', ...skeletonBarMetrics(props.height), borderRadius: SKELETON_RADIUS, backgroundColor: skeletonFill(theme) }}
     />
   );
 }
@@ -88,7 +88,9 @@ export function TicketSkeleton() {
     <SkeletonRegion label="Opening ticket">
       <SkeletonBar width="70%" />
       <SkeletonBar width="30%" />
-      <SkeletonBar width="100%" height={96} />
+      <View style={{ marginTop: SKELETON_BLOCK_GAP }}>
+        <SkeletonBar width="100%" height={96} />
+      </View>
     </SkeletonRegion>
   );
 }

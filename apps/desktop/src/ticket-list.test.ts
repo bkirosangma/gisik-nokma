@@ -2,7 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TicketSummary } from '@gisik-nokma/app-core';
-import { OpeningSkeleton, TicketListView, ticketListBody, watchTicketSummaries } from './ticket-list.js';
+import { readFileSync } from 'node:fs';
+import { OpeningSkeleton, TicketListView, readInto, ticketListBody, watchTicketSummaries } from './ticket-list.js';
 
 /**
  * Smoothness T13 (spec §3.3; audit SM-12): the desktop list's loading states. The package's vitest is node-only with no DOM library, so the
@@ -64,6 +65,25 @@ describe('the list says "No tickets yet" only after a read answered empty (spec 
     expect(later).toMatch(/Ticket a/);
     // CONTROL (same it): no failure, no alert.
     expect(markup(createElement(TicketListView, { tickets: [row('a')], readError: null }))).not.toMatch(/role="alert"/);
+  });
+
+  it("25.214 the read's two handlers: a rejection becomes the reason (or a generic sentence), a success replaces the rows AND clears the failure; TicketList wires exactly these to the read", () => {
+    const setTickets = vi.fn();
+    const setReadError = vi.fn();
+    const [onRows, onError] = readInto(setTickets, setReadError);
+    onError(new Error('disk is full'));
+    expect(setReadError, 'a rejection is shown, not swallowed').toHaveBeenLastCalledWith('disk is full');
+    onError('not an Error');
+    expect(setReadError).toHaveBeenLastCalledWith('the list could not be read');
+    expect(setTickets, 'a failure never touches the rows').not.toHaveBeenCalled();
+    const rows = [row('a')];
+    onRows(rows);
+    expect(setTickets).toHaveBeenCalledWith(rows);
+    expect(setReadError, 'a success clears an earlier failure').toHaveBeenLastCalledWith(null);
+    // CONTROL (same it): the handlers are the ones the component hands to the read's `.then`, so the wiring is what is tested.
+    const source = readFileSync(new URL('./ticket-list.tsx', import.meta.url), 'utf8');
+    expect(source).toMatch(/readInto\(setTickets, setReadError\)/);
+    expect(source).toMatch(/listTicketSummaries\(props\.workspaceId\)\.then\(onRows, onError\)/);
   });
 });
 
