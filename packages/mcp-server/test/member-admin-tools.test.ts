@@ -19,6 +19,7 @@ const INV = '01J0NV0000000000000000000A';
 const G = '01J0GRP000000000000000000A'; // top-level, rank 'm'
 const G2 = '01J0GRP000000000000000000B'; // child of G (level 2), rank 'g'
 const G3 = '01J0GRP000000000000000000C'; // top-level, rank 't'
+const G4 = '01J0GRP000000000000000000D'; // top-level, rank 'p'
 
 const ROUTES: Record<string, unknown> = {
   '/v1/me/workspaces': {
@@ -37,6 +38,7 @@ const ROUTES: Record<string, unknown> = {
       { id: G, parentId: null, level: 1, name: 'Corner Shop', rank: 'm', projectCount: 2, childCount: 1 },
       { id: G2, parentId: G, level: 2, name: 'Back room', rank: 'g', projectCount: 0, childCount: 0 },
       { id: G3, parentId: null, level: 1, name: 'Front', rank: 't', projectCount: 1, childCount: 0 },
+      { id: G4, parentId: null, level: 1, name: 'Stockroom', rank: 'p', projectCount: 0, childCount: 0 },
     ],
   },
 };
@@ -214,7 +216,7 @@ describe('14.504 manage_groups', () => {
     expect(first.groups.map((g) => g.id)).toEqual([G, G2]);
     expect(first.nextCursor).toBe('2');
     const rest = (await tool('manage_groups', f.session).handler({ workspaceId: WS, action: 'list', limit: 2, cursor: '2' })) as { groups: Array<{ id: string }>; nextCursor: string | null };
-    expect(rest.groups.map((g) => g.id)).toEqual([G3]);
+    expect(rest.groups.map((g) => g.id)).toEqual([G3, G4]);
     expect(rest.nextCursor).toBeNull();
   });
 
@@ -231,25 +233,31 @@ describe('14.504 manage_groups', () => {
     [top, child].forEach(accepted);
   });
 
+  it('14.504 reorder neighbours must be siblings of the group', async () => {
+    const f = fake();
+    await expect(tool('manage_groups', f.session).handler({ workspaceId: WS, action: 'reorder', groupId: G3, before: G2, confirm_name: 'Front' })).rejects.toThrow('before and after must be siblings of the group');
+    expect(f.batches).toEqual([]);
+  });
+
   it('14.504 rename, reorder, delete and file_project send their events; delete previews the projects in it', async () => {
     const f = fake();
     const g = (args: Record<string, unknown>, name: string) => tool('manage_groups', f.session).handler({ workspaceId: WS, ...args, confirm_name: name });
     expect(await tool('manage_groups', f.session).handler({ workspaceId: WS, action: 'delete', groupId: G })).toMatchObject({ counts: { projects: 2 }, confirm: 'confirm_name must be "Corner Shop"' });
     await g({ action: 'rename', groupId: G3, name: 'Shopfront' }, 'Front');
-    await g({ action: 'reorder', groupId: G3, before: G2, after: G }, 'Front');
+    await g({ action: 'reorder', groupId: G4, before: G, after: G3 }, 'Stockroom');
     await g({ action: 'delete', groupId: G3 }, 'Front');
     await g({ action: 'file_project', projectId: P, groupId: G }, 'Shop floor');
     await g({ action: 'file_project', projectId: P, groupId: null }, 'Shop floor');
     const events = f.batches.flat();
     expect(events).toMatchObject([
       { type: 'group.renamed', entity: { kind: 'group', id: G3 }, payload: { name: 'Shopfront' } },
-      { type: 'group.reordered', entity: { kind: 'group', id: G3 } },
+      { type: 'group.reordered', entity: { kind: 'group', id: G4 } },
       { type: 'group.deleted', entity: { kind: 'group', id: G3 }, payload: {} },
       { type: 'project.updated', entity: { kind: 'project', id: P }, payload: { groupId: G } },
       { type: 'project.updated', entity: { kind: 'project', id: P }, payload: { groupId: null } },
     ]);
     const rank = (events[1]!['payload'] as { rank: string }).rank;
-    expect(rank > 'g' && rank < 'm').toBe(true); // between the neighbours it was given
+    expect(rank > 'm' && rank < 't').toBe(true); // between the neighbours it was given
     events.forEach(accepted);
   });
 });

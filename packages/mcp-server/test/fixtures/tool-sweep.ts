@@ -45,6 +45,10 @@ export const SWEEP: Record<string, SweepEntry> = {
   // discovery begin (T10)
   // discovery end
   // member-admin begin (T11)
+  // No `confirm_name`: each answers its preview, which is all the stdout sweep needs from a write.
+  manage_members: { args: { workspaceId: 'w', action: 'change_role', userId: 'u', role: 'admin' }, session: { get: async (path) => (path.endsWith('/members') ? { members: [{ userId: 'u', displayName: 'U', role: 'member' }] } : { workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }] }) } },
+  change_prefix: { args: { workspaceId: 'w', prefix: 'ZZ' } },
+  manage_groups: { args: { workspaceId: 'w', action: 'list' }, session: { get: async () => ({ groups: [] }) } },
   // member-admin end
   // definition-admin begin (T12)
   // definition-admin end
