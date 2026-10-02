@@ -21,7 +21,9 @@ describe('23.120 a hidden column takes no room, so the phone rail is as tall as 
   });
 });
 
-describe('23.122 (BRD-02) the card footer is one row at every width', () => {
+// Amended 2026-10-02 (neo follow-up F-1, 23.320): "every width" is now "up to 1024px". The base rules asserted here are
+// unchanged; above 1024px an `@media (min-width: 64.0625rem)` arm makes the footer two rows (`neo-f1-card-footer.test.ts`).
+describe('23.122 (BRD-02) the card footer is one row up to 1024px', () => {
   it('23.122 the footer never wraps; the provenance line truncates with an ellipsis and may shrink below its text', () => {
     const footer = ruleExactly(css, '.gn-board-card__footer');
     expect(valueOf(footer, 'flex-wrap')).toBe('nowrap');
