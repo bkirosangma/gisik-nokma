@@ -7,10 +7,11 @@ import { HELP_PHONE_QUERY, HelpBrowser } from '@gisik-nokma/app-core';
 import type { DataSourceQuery, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
+import { ruleFor } from './helpers/css-rule-scan.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * Cases 25.346–25.349 — Notes on a phone, modelled on /help (smoothness G-3).
+ * Cases 25.346–25.349 and 25.358 — Notes on a phone, modelled on /help (smoothness G-3).
  *
  * The phone is a stubbed `matchMedia` answering the query /help itself uses (`HELP_PHONE_QUERY`); jsdom has none,
  * which is the desktop layout every other Notes suite drives. The note's body carries four headings so the
@@ -252,5 +253,80 @@ describe('G-3 Notes on a phone', () => {
     renderPage(NOTE);
     fireEvent.click(await screen.findByRole('button', { name: 'Notes and contents' }));
     expect(within(screen.getByTestId('notes-panel')).getByRole('tab', { name: 'Contents' })).toBeInTheDocument();
+  });
+
+  it('25.358 the panel closes like /help’s: Escape (focus back on the button), a tap outside, a tap on a note or a Contents link — and not a tap inside it or inside a Select popover', async () => {
+    stubPhone(true);
+    renderPage(NOTE);
+    const launcher = await screen.findByRole('button', { name: 'Notes and contents' });
+    const panel = screen.getByTestId('notes-panel');
+    // A tap on a link would navigate jsdom; the page's own handlers run first (React's root), then this cancels it.
+    const cancel = (event: Event): void => event.preventDefault();
+    document.addEventListener('click', cancel);
+    try {
+      const open = (): void => {
+        if (panel.getAttribute('data-panel-open') !== 'true') fireEvent.click(launcher);
+        expect(panel).toHaveAttribute('data-panel-open', 'true');
+      };
+      const closed = (): void => expect(panel).toHaveAttribute('data-panel-open', 'false');
+
+      open();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      closed();
+      expect(launcher).toHaveFocus();
+
+      open();
+      fireEvent.pointerDown(document.body);
+      closed();
+
+      // CONTROLS, same it(): a tap inside the panel, and inside a Select's portalled popover, are not "outside".
+      open();
+      fireEvent.pointerDown(within(panel).getByRole('searchbox', { name: 'Search notes' }));
+      open();
+      const popover = document.createElement('div');
+      popover.className = 'gn-select__panel';
+      document.body.appendChild(popover);
+      fireEvent.pointerDown(popover);
+      popover.remove();
+      open();
+
+      // A Contents link: the headings are read once the editor has painted.
+      const list = await within(panel).findByTestId('notes-contents');
+      await waitFor(() => expect(list.querySelectorAll('a')).toHaveLength(4));
+      fireEvent.click(list.querySelector('a')!);
+      closed();
+      expect(launcher).toHaveFocus();
+
+      // A note link on the Notes pane.
+      open();
+      fireEvent.click(within(panel).getByRole('tab', { name: 'Notes' }));
+      fireEvent.click(await within(panel).findByTestId(`note-row-${OTHER_NOTE}`));
+      closed();
+    } finally {
+      document.removeEventListener('click', cancel);
+    }
+  });
+
+  it('25.340 Edit stays at the top right of the note header: the head is a flex row spread apart, the mode button does not shrink', () => {
+    const head = ruleFor(GLOBALS_CSS, /^\.gn-note-document__head \{/)!;
+    expect(head).toMatch(/display:\s*flex/);
+    expect(head).toMatch(/justify-content:\s*space-between/);
+    expect(ruleFor(GLOBALS_CSS, /^\.gn-note-document__mode \{/)!).toMatch(/flex:\s*none/);
+    // CONTROL, same it(): it is the breadcrumb that gives way (it may shrink), so the button is what stays put.
+    expect(ruleFor(GLOBALS_CSS, /^\.gn-note-document__head \.gn-breadcrumb \{/)!).toMatch(/min-width:\s*0/);
+  });
+
+  it('25.346 the Contents list indents level 3 by 1.25rem and levels 4-6 by 2rem; /help’s own list has no heading levels, so none of it applies there', async () => {
+    expect(ruleFor(GLOBALS_CSS, /li\[data-heading-level='3'\] > \.gn-help__nav-link/)!).toMatch(/padding-left:\s*1\.25rem/);
+    const deep = ruleFor(GLOBALS_CSS, /li\[data-heading-level='4'\] > \.gn-help__nav-link/)!;
+    expect(deep).toMatch(/padding-left:\s*2rem/);
+    expect(deep).toContain("[data-heading-level='5']");
+    expect(deep).toContain("[data-heading-level='6']");
+    // CONTROL, same it(): /help's list carries no `data-heading-level`, so these rules select nothing on it.
+    stubPhone(true);
+    render(<HelpBrowser />);
+    await screen.findByRole('button', { name: 'Contents and search' });
+    expect(document.querySelector('.gn-help__group-items')).not.toBeNull();
+    expect(document.querySelectorAll('[data-heading-level]')).toHaveLength(0);
   });
 });
