@@ -52,7 +52,8 @@ export const PATTERNS = {
   'P-ROW': RAISED,
   'P-FLOAT': {
     background: 'var(--gn-surface-raised)',
-    'box-shadow': 'var(--gn-shadow-lift-near)',
+    // N7 (2026-10-02, 24.083): every floating panel rests on `near-lg` (hig/minimal: = `lift-near`, no drift, 24.009).
+    'box-shadow': 'var(--gn-shadow-near-lg)',
     'border-radius': 'var(--gn-radius-card)',
   },
   'P-HOVER': { background: 'var(--gn-fill-quaternary)' },

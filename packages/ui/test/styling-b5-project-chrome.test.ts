@@ -25,6 +25,9 @@ describe('20.242 no flat boundary in the project chrome', () => {
   it('20.242 none', () => {
     const css = cssOf('ui');
     expect(parseRules(css).filter((rule) => rule.selectors.some((s) => PREFIXES.some((p) => s.includes(p)))).length).toBeGreaterThan(40);
-    expect(flatBoundaryOffenders(css, PREFIXES, [])).toEqual([]);
+    // KEPT (amended 2026-10-02 by N10, case 24.040): the neo project search is the rim-less neo field — a sunken ground whose boundary is
+    // the `--gn-shadow-field` line layer (>= 3:1, 24.044), not a flat fill. The base rule and hig/minimal keep their ring.
+    const KEPT = ['[data-style="neo"] .gn-project__search'];
+    expect(flatBoundaryOffenders(css, PREFIXES, KEPT)).toEqual([]);
   });
 });

@@ -147,7 +147,9 @@ describe('20.011 a shadow layer can spread', () => {
   it('20.011 the spread renders as a fourth length, and the old layers render as before', () => {
     expect(shadowValueOf('hig', 'light', 'lift')).toContain('0px 8px 16px -8px');
     expect(shadowValueOf('neo', 'light', 'sunken-compact')).toBe(
-      'inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2',
+      // Amended 2026-10-02 (neo refresh N9, 24.004): the chip-sized inset is 1/3 with a half-strength highlight, and the fall is
+      // the derived `#a89c9199`; was `inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2`.
+      'inset 1px 1px 3px #a89c9199, inset -1px -1px 2px #fffaf480',
     );
   });
 });
@@ -209,10 +211,13 @@ describe('20.013 neo speaks its own depth language', () => {
       expect(shadowValueOf('neo', theme, 'sheet')).toBe(shadowValueOf('neo', theme, 'overlay'));
       expect(shadowValueOf('neo', theme, 'action-press')).toBe(shadowValueOf('neo', theme, 'selected'));
       expect(shadowValueOf('neo', theme, 'action-near')).toBe(shadowValueOf('neo', theme, 'raised'));
-      expect(shadowValueOf('neo', theme, 'lift-near')).toMatch(/^10px 10px 24px /);
+      // Amended 2026-10-02 (neo refresh N1/N7, 24.003–24.004): lift-near is the 6/14 `near` (the 10/24 pair is the new `near-lg`),
+      // lift-press INVERTS to the recess inset, the quiet `action` is the compact 2/4 pair.
+      expect(shadowValueOf('neo', theme, 'lift-near')).toMatch(/^6px 6px 14px /);
+      expect(shadowValueOf('neo', theme, 'near-lg')).toMatch(/^10px 10px 24px /);
       expect(shadowValueOf('neo', theme, 'lift-drag')).toMatch(/^14px 14px 32px /);
-      expect(shadowValueOf('neo', theme, 'lift-press')).toMatch(/^4px 4px 10px /);
-      expect(shadowValueOf('neo', theme, 'action')).toMatch(/^4px 4px 10px /);
+      expect(shadowValueOf('neo', theme, 'lift-press')).toMatch(/^inset 3px 3px 5px /);
+      expect(shadowValueOf('neo', theme, 'action')).toMatch(/^2px 2px 4px /);
       // CONTROL — no hig primitive leaks into neo. Amended UX T1 (owner U8, 2026-10-02): neo's dark raised highlight is now
       // `#f2e9e11f`, the same hex as hig's `lift-near` highlight, so the hex alone no longer tells them apart; hig's is the
       // INSET `0px 1px 0px` layer, and neo draws none.

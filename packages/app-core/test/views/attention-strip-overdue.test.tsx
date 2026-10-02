@@ -31,7 +31,7 @@ describe('21.242 overdue is its own label and leads the strip', () => {
       <AttentionStrip
         items={[
           itemOf('due-soon', 'T1', SOON),
-          itemOf('blocked', 'T2', 'In "Waiting" — a blocked state.'),
+          itemOf('blocked', 'T2', 'In the blocked state "Waiting".'),
           itemOf('overdue', 'T3', OVERDUE),
         ]}
         onOpenTicket={() => {}}
@@ -58,10 +58,10 @@ describe('21.244 a ticket that is overdue and stale is ONE row, the overdue one'
     const { container } = render(
       <AttentionStrip
         items={[
-          itemOf('stale', 'T1', 'In an active state since 2026-08-01 — past the 7-day staleness threshold.', 'Late and stale'),
+          itemOf('stale', 'T1', 'In an active state since 1 Aug, past the 7-day staleness threshold.', 'Late and stale'),
           itemOf('overdue', 'T1', OVERDUE, 'Late and stale'),
-          itemOf('stale', 'T2', 'In an active state since 2026-08-02 — past the 7-day staleness threshold.', 'Only stale'),
-          itemOf('blocked', 'T3', 'In "Waiting" — a blocked state.', 'Late and blocked'),
+          itemOf('stale', 'T2', 'In an active state since 2 Aug, past the 7-day staleness threshold.', 'Only stale'),
+          itemOf('blocked', 'T3', 'In the blocked state "Waiting".', 'Late and blocked'),
           itemOf('overdue', 'T3', OVERDUE, 'Late and blocked'),
         ]}
         onOpenTicket={() => {}}
