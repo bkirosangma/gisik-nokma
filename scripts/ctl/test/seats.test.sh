@@ -33,7 +33,7 @@ mkpane() {
 meta() { printf 'name=%s\nmode=%s\nbranch=%s\nhead=%s\nunpushed=%s\ndirty=%s\nwt=%s\n' "$3" "$4" "${5:-}" "${6:-}" "${7:-}" "${8:-}" "${9:-}" > "$1/$2.meta"; }
 run() { local d="$1"; shift; CTL_SEATS_NOW="$NOW" python3 "$PY" --dir "$d" "$@"; }
 # jv JSON IDX EXPR — evaluate EXPR over the seat object `d` of window IDX.
-jv() { printf '%s\n' "$1" | python3 -c 'import sys,json; d=[json.loads(l) for l in sys.stdin if l.startswith("{")]; d=[x for x in d if x["window"]==int(sys.argv[1])][0]; print(eval(sys.argv[2]))' "$2" "$3" 2>/dev/null || echo ERR; }
+jv() { printf '%s\n' "$1" | python3 -c 'import sys,json; d=[json.loads(l) for l in sys.stdin if l.startswith("{")]; d=[x for x in d if x["window"]==int(sys.argv[1])][0]; r=eval(sys.argv[2]); print(" ".join(map(str,r)) if isinstance(r,tuple) else r)' "$2" "$3" 2>/dev/null || echo ERR; }
 fixture() { local dir; dir=$(mktemp -d "$T/fx.XXXX"); echo "$dir"; }
 
 # ============ 1. state: busy / idle, from the real captures ============
