@@ -25,6 +25,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   attachment: [
     // attachment begin (T8)
+    'list_attachments', 'get_attachment', 'add_attachment',
     // attachment end
   ],
   ticket: [
