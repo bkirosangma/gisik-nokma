@@ -83,7 +83,9 @@ describe('21.130 Notes on a phone', () => {
     expect(valueOf(ruleExactly(editor, '.ticket-editor__tool', PHONE), 'min-height')).toBe('2.75rem');
     expect(valueOf(ruleExactly(editor, '.ticket-editor__tool', PHONE), 'min-width')).toBe('2.75rem');
     expect(valueOf(ruleExactly(editor, '.ticket-editor__heading-select', PHONE), 'min-height')).toBe('2.75rem');
-    expect(valueOf(ruleExactly(editor, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('wrap');
+    // AMENDED 2026-10-02 (smoothness G-7, the 25.40 block): the phone group no longer wraps — the bar is ONE row that scrolls, with
+    // the overflow tools in the More sheet. CONTROL below: the base toolbar still wraps (the desktop and tablet row).
+    expect(valueOf(ruleExactly(editor, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('nowrap');
     expect(after(editor, '.ticket-editor__tool', null, '.ticket-editor__tool')).toBe(true);
     // The toolbar row itself already wraps in the editor sheet (the base the phone rules rely on).
     expect(valueOf(ruleExactly(editor, '.ticket-editor__toolbar'), 'flex-wrap')).toBe('wrap');

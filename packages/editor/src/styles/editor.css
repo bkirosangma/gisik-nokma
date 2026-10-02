@@ -329,15 +329,6 @@
 .ticket-editor__tool svg {
   flex: none;
 }
-/* The phone "More tools" tray (≤40rem only — it is never rendered above): the tools that do not fit
-   on the bar, in a row of their own under it. */
-.ticket-editor__tray {
-  display: flex;
-  flex-basis: 100%;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
 /* Groups (marks / blocks / insert), each `role="group"` in the markup — a
    thin divider between clusters rather than a bigger gap alone, so the
    strip reads as three related sets and not one undifferentiated row of
@@ -371,7 +362,12 @@
    the viewport less 2 × 1.5rem (312px at 360), and the second row (heading select, three lists, More = 297.5px)
    needs more than the 296px the base padding leaves — a third row, where Notes' wider box never saw one (21.236). */
 @media (max-width: 40rem) {
+  /* G-7: the bar is ONE row, `--ticket-editor-bar-h` tall (a 44px tool + 2 × 6px), and the positioned box the link field
+     and the docked bar hang from. The tools scroll inside `.ticket-editor__scroll` (the G-7 arm at the foot of this file). */
   .ticket-editor__toolbar {
+    position: relative;
+    flex-wrap: nowrap;
+    height: var(--ticket-editor-bar-h);
     padding-left: 0.25rem;
     padding-right: 0.25rem;
   }
@@ -385,9 +381,9 @@
   .ticket-editor__tool-divider {
     display: none;
   }
-  /* A group wider than the row wraps inside itself rather than being clipped by `.editor-slot` (the audit's cut row). */
+  /* A group never wraps now: the one row scrolls sideways (G-7; it wrapped inside itself while the bar was two rows). */
   .ticket-editor__tool-group {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 }
 /* The tooltip itself — `role="tooltip"` in the markup, shown on hover AND
@@ -1363,4 +1359,221 @@
   color: transparent;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   SMOOTHNESS G-7 (owner 2026-10-02, "all 5 in"): the phone editors. PHONES ONLY — every rule below sits in this one
+   ≤40rem arm, so a desktop and a tablet keep the frame, the wrapping strip and the in-flow bar (25.416 scans for it).
+   It is the LAST block of the file on purpose: the unbox and padding rules fight `.editor-slot .ticket-editor__content`
+   (above) and ui.css's `[data-style="neo"] .gn-field__input` (a different file, whose load order the web app and the
+   mobile webview do not share), so they take THREE classes — (0,3,0), more than either — and never lean on source order
+   against ui.css. The ground and text of the floating pieces carry a SYSTEM-colour fallback (`Canvas`, `CanvasText`; the
+   mask's opaque stop is `Canvas` too, a mask reads only alpha): the mobile webview imports this file alone and defines no
+   `--gn-*` token, and a bar or a sheet with no ground is unreadable. No hex, no colour function and no named colour
+   is written here, as the header requires; the scrim's dim is `--gn-surface-overlay` with no fallback (the webview
+   keeps the tap target, loses only the dim).
+   ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 40rem) {
+  /* `--gn-shadow-reach` is emitted for neo ONLY (tokens.ts `shadowReachOf`, DERIVED from the shadow table), so hig, minimal and
+     the mobile webview — which defines no token — read 0 here and keep the 56px bar below byte for byte. In neo the raised
+     tools throw a 20px shadow (`shadowReachOf`, G-2): the bar grows to hold the tool plus that room on each side (44 + 2 × 20 = 84), and the scroller
+     takes the room as padding with an equal negative margin (G-2's `.gn-board__rail` pattern, ui.css) so it is not the clip. */
+  .ticket-editor {
+    --ticket-editor-reach: var(--gn-shadow-reach, 0px);
+    --ticket-editor-bar-h: calc(2.75rem + 2 * max(0.375rem, var(--ticket-editor-reach)));
+  }
+
+  /* 1 · UNBOXED LONG TEXT. The note body and the description lose the field frame — border, ground, shadow, side
+     padding — and the text's left edge is the page gutter (the content's negative margin is exactly its side padding,
+     so 390 − 2 × 24 = 342px of text instead of 312). The slot stops clipping, or the margin would be cut. The freed
+     6px holds the focus indicator: a 3px accent bar down the left edge, in place of the ring that sat over the glyphs
+     once the padding was gone (a positive-offset ring would be clipped by the slot). */
+  .editor-slot.editor-slot--note,
+  .editor-slot.editor-slot--description {
+    overflow: visible;
+  }
+  .editor-slot.editor-slot--note .ticket-editor__content,
+  .editor-slot.editor-slot--description .ticket-editor__content {
+    margin-inline: -0.375rem;
+    padding: 0.5rem 0.375rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .editor-slot.editor-slot--note .ticket-editor__content:focus-within,
+  .editor-slot.editor-slot--description .ticket-editor__content:focus-within {
+    outline: none;
+    box-shadow: inset 0.1875rem 0 0 var(--gn-focus-ring);
+  }
+
+  /* 2 · SLIMMER COMMENT BOXES. A composer is an input, so it keeps its box; only the side padding goes 0.875rem → 0.625rem. */
+  .editor-slot.editor-slot--comment .ticket-editor__content {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+
+  /* 3 · ONE DOCKED ROW. The tools scroll sideways in `.ticket-editor__scroll`, a right-edge fade says there is more (the
+     23.092 pattern, `.gn-scroll-fade` in ui.css, restated here because this package cannot import ui), and "More
+     tools" is pinned outside the scroll area. */
+  .ticket-editor__scroll {
+    --ticket-editor-fade-size: calc(1.5rem + var(--ticket-editor-reach));
+    --ticket-editor-fade-from: Canvas;
+    --ticket-editor-fade-to: Canvas;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    padding: var(--ticket-editor-reach);
+    margin: calc(-1 * var(--ticket-editor-reach));
+    scroll-padding-inline: var(--ticket-editor-reach);
+  }
+  .ticket-editor__scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .ticket-editor__scroll[data-at-start='false'] {
+    --ticket-editor-fade-from: transparent;
+  }
+  .ticket-editor__scroll[data-at-end='false'] {
+    --ticket-editor-fade-to: transparent;
+  }
+  .ticket-editor__scroll[data-at-start='false'],
+  .ticket-editor__scroll[data-at-end='false'] {
+    -webkit-mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), Canvas var(--ticket-editor-fade-size), Canvas calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
+    mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), Canvas var(--ticket-editor-fade-size), Canvas calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
+  }
+  .ticket-editor__scroll > .ticket-editor__tool-group {
+    flex: none;
+  }
+  .ticket-editor__more {
+    flex: none;
+    margin-left: calc(0.25rem + var(--ticket-editor-reach));
+    padding-left: 0.25rem;
+    border-left: 1px solid var(--gn-border);
+  }
+  /* The anchor holds the bar's place while it floats (no jump of the text under it), and the content clears the bar. */
+  .ticket-editor__toolbar-anchor[data-docked='true'] {
+    min-height: var(--ticket-editor-bar-h);
+  }
+  .ticket-editor__toolbar-anchor[data-docked='true'] ~ .ticket-editor__content {
+    padding-bottom: calc(0.75rem + var(--ticket-editor-bar-h));
+  }
+  /* DOCKED: fixed to the bottom of the LAYOUT viewport, lifted by an inline `bottom` that `EditorToolbar` computes from
+     `window.visualViewport` (innerHeight − offsetTop − height), so it sits just above the on-screen keyboard. Under the
+     sheet and dialog scrims (z-index 40) and over the page. The inline value is the VARIABLE `--ticket-editor-dock-bottom`
+     (the keyboard's height); the web app's phone bottom bar, shown while no keyboard is up, declares `--gn-bar-lift` on
+     `body` (its height + the home-indicator inset) and is covered by a bar at the same z-index and spot, so the docked bar
+     rises above it (G-7 FIX 1, F3). The two are NOT added (FIX 2, F2): the lift is declared whenever the keyboard is not
+     "open" (under 0.75 × innerHeight), while the offset counts ANY visual-viewport inset — a small one (an iOS accessory
+     strip, a suggestion bar) would stack on the lift and float the bar ~56px above the visible bottom. The larger wins: the
+     lift alone with no inset, the inset once it covers the nav. The webview defines neither variable, so both read 0 there. */
+  .ticket-editor__toolbar--docked {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(var(--ticket-editor-dock-bottom, 0px), var(--gn-bar-lift, 0px));
+    z-index: 30;
+    border-top: 1px solid var(--gn-border);
+    background: var(--gn-surface-raised, Canvas);
+    color: var(--gn-text, CanvasText);
+  }
+  /* The Link field floats over the bar instead of joining the row, so the row stays one row. 16px type: iOS zooms a
+     smaller field on focus. */
+  .ticket-editor__link-url {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: none;
+    border-top: 1px solid var(--gn-border);
+    background: var(--gn-surface-raised, Canvas);
+    color: var(--gn-text, CanvasText);
+    font-size: 1rem;
+  }
+
+  /* 5 · MORE AS A BOTTOM SHEET. Above the sheet and dialog scrims (40) and the editor's popovers (50 is theirs, and
+     they never coexist with it). */
+  .ticket-editor__sheet-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: flex-end;
+    background: var(--gn-surface-overlay);
+  }
+  .ticket-editor__sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 80dvh;
+    overflow-y: auto;
+    padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--gn-radius-track, 1rem) var(--gn-radius-track, 1rem) 0 0;
+    background: var(--gn-surface-raised, Canvas);
+    color: var(--gn-text, CanvasText);
+    box-shadow: var(--gn-shadow-sheet);
+    outline: none;
+  }
+  .ticket-editor__sheet-grab {
+    width: 2.5rem;
+    height: 0.3125rem;
+    margin: 0.25rem auto 0.75rem;
+    border-radius: 999px;
+    background: var(--gn-border);
+  }
+  .ticket-editor__sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.625rem;
+  }
+  .ticket-editor__sheet-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 4.25rem;
+    padding: 0.25rem;
+    border: none;
+    border-radius: var(--gn-radius-control);
+    background: var(--gn-fill-tertiary);
+    box-shadow: var(--gn-shadow-raised);
+    color: inherit;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  .ticket-editor__sheet-cell:active {
+    box-shadow: var(--gn-shadow-sunken-compact);
+  }
+  .ticket-editor__sheet-cell:focus-visible {
+    outline: 2px solid var(--gn-focus-ring);
+    outline-offset: 2px;
+  }
+  .ticket-editor__sheet-cell:disabled {
+    cursor: not-allowed;
+    opacity: var(--gn-disabled-opacity);
+  }
+  .ticket-editor__sheet-cell--active {
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+  .ticket-editor__sheet-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .ticket-editor__sheet-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--gn-text-muted);
+  }
 }
