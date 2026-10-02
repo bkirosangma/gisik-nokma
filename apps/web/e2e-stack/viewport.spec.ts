@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
@@ -1097,22 +1097,26 @@ test('records non-text contrast across the signed-in surface, with a positive co
     await expect(field).toBeVisible();
     const style = await field.evaluate((el) => {
       const computed = getComputedStyle(el);
-      return { borderStyle: computed.borderStyle, boxShadow: computed.boxShadow };
+      return { borderStyle: computed.borderStyle, borderColor: computed.borderColor, boxShadow: computed.boxShadow };
     });
-    // AMENDED 2026-10-02 (UX fixes T1, owner U5: "borders on buttons AND text fields"; cases 23.002, 13.339): the neo
-    // field now wears a 1px solid ring in `--gn-field-rim`, so the border is `solid`, not `none`. The 1.18/1.0 waiver
-    // below is SUPERSEDED for text fields: this sweep now composites the ring itself (>= 3:1), and the persisted
-    // roster entry is kept only as the record of what the owner once accepted.
+    // AMENDED 2026-10-02 (N10, case 24.040; earlier UX fixes T1, owner U5, 23.002, 13.339): the neo field wears NO uniform ring. Its
+    // border is 1px `solid` but TRANSPARENT (the box keeps its size), and its boundary is the line layer of `--gn-shadow-field`: a crisp
+    // 1px edge >= 3:1 on one side, computed from the token in `neo-refresh.test.ts` (24.044) and read here from the rendered route.
+    // This suite is light-theme-only, so the line is the light one (#897362); the dark one (#7d88a8) is pinned by 24.044/24.005.
     expect(
       style.borderStyle,
-      `13.356: .gn-field__input on ${routeLabel} has no ring (${style.borderStyle}) — the neo field ring ` +
-        `(U5, 23.002) no longer holds.`,
+      `13.356: .gn-field__input on ${routeLabel} has no 1px border box (${style.borderStyle}) — the transparent border that keeps ` +
+        `the neo field's size (N10, 24.040) no longer holds.`,
     ).toBe('solid');
     expect(
+      style.borderColor,
+      `13.356: .gn-field__input on ${routeLabel} paints a ring (${style.borderColor}) — N10 (24.040) retired it.`,
+    ).toBe('rgba(0, 0, 0, 0)');
+    expect(
       style.boxShadow,
-      `13.356: .gn-field__input on ${routeLabel} has no box-shadow — there is no boundary at all here, ` +
-        `not merely one this sweep cannot compute, which is a worse defect than the waiver discloses.`,
-    ).not.toBe('none');
+      `13.356: .gn-field__input on ${routeLabel} has no field line layer in its box-shadow (${style.boxShadow}) — there is no ` +
+        `boundary at all here, which is worse than the soft edge the roster discloses.`,
+    ).toContain('rgb(137, 115, 98)');
   }
 
   // 13.356 — visited BEFORE signing in: this is the one signed-out route the
@@ -1206,8 +1210,9 @@ test('records non-text contrast across the signed-in surface, with a positive co
       backdrop: 'surface (neo)',
       routes: ['/sign-in', '/workspaces'],
       citation:
-        'SUPERSEDED 2026-10-02 (UX fixes T1, owner U5): the neo text field now wears a 1px ring, so this waiver ' +
-        'no longer applies to it; kept as the record. ' +
+        'SUPERSEDED 2026-10-02 (UX fixes T1, owner U5; then N10, case 24.040): the neo text field no longer relies on a ' +
+        'sunken inset alone — its boundary = the `--gn-shadow-field` line layer (N10, 24.040), 3.31 light / 4.86 dark, ' +
+        'computed in `neo-refresh.test.ts`, so this waiver no longer applies to it; kept as the record. ' +
         'Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo ' +
         'look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) ' +
         'at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in ' +
@@ -1250,39 +1255,96 @@ test('records non-text contrast across the signed-in surface, with a positive co
   };
   const headSha = gitOrNull('rev-parse HEAD');
   const treeWasClean = (gitOrNull('status --porcelain') ?? '') === '';
-  writeFileSync(
-    new URL('./non-text-contrast-roster.json', import.meta.url),
-    `${JSON.stringify(
-      {
-        headSha,
-        producedAt: new Date().toISOString(),
-        treeWasClean,
-        provenance:
-          'Every number below describes the tree at `headSha`, at `producedAt` — no other. ' +
-          'A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and ' +
-          'nothing here re-checks that: the file is regenerated only by a run of this sweep. ' +
-          'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
-          '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
-          '`headSha` then names its BASE rather than what was actually swept.',
-        belowCount: failingBelow.length,
-        exemptions: exemptBelow,
-        totalClasses: roster.length,
-        examined: examinedTotal,
-        highestReading: Number(bestSeen.toFixed(2)),
-        routes: sweptRoutes,
-        roster: roster.map(([selector, r]) => ({
-          selector,
-          ratio: Number(r.ratio.toFixed(2)),
-          border: r.border,
-          backdrop: r.backdrop,
-          routes: r.routes,
-        })),
-        sanctionedWaivers,
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  /*
+   * What the sweep MEASURED, apart from the stamp that says which run measured
+   * it. Only this part is ever compared: `headSha`, `producedAt` and
+   * `treeWasClean` differ on every run by construction.
+   */
+  const measured = {
+    belowCount: failingBelow.length,
+    exemptions: exemptBelow,
+    totalClasses: roster.length,
+    examined: examinedTotal,
+    highestReading: Number(bestSeen.toFixed(2)),
+    routes: sweptRoutes,
+    roster: roster.map(([selector, r]) => ({
+      selector,
+      ratio: Number(r.ratio.toFixed(2)),
+      border: r.border,
+      backdrop: r.backdrop,
+      routes: r.routes,
+    })),
+    sanctionedWaivers,
+  };
+  /*
+   * ## Written only under `UPDATE_ROSTER=1` (F-11, case 23.357)
+   *
+   * It used to be written on EVERY run, like a log. A run on a dirty tree, or
+   * on a stack built from another branch, then left the file modified with a
+   * `headSha` that named the wrong tree, one `git add -A` from being committed
+   * as a record of something it never measured. The three baseline files in
+   * this suite are already explicit acts (`UPDATE_*_BASELINE=1`); this one is
+   * the same. Without the flag the run COMPARES the measurement against the
+   * committed file and fails on any difference (23.358). Run with the flag on
+   * a CLEAN tree, then commit the file.
+   */
+  const rosterUrl = new URL('./non-text-contrast-roster.json', import.meta.url);
+  if (process.env['UPDATE_ROSTER'] === '1') {
+    writeFileSync(
+      rosterUrl,
+      `${JSON.stringify(
+        {
+          headSha,
+          producedAt: new Date().toISOString(),
+          treeWasClean,
+          provenance:
+            'Every number below describes the tree at `headSha`, at `producedAt` — no other. ' +
+            'A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and ' +
+            'nothing here re-checks that: the file is regenerated only by a run of this sweep ' +
+            'under `UPDATE_ROSTER=1`. ' +
+            'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
+            '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
+            '`headSha` then names its BASE rather than what was actually swept.',
+          ...measured,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  } else {
+    type Verdict = Pick<typeof measured, 'belowCount' | 'exemptions' | 'routes' | 'roster' | 'sanctionedWaivers'>;
+    // Compared: the VERDICT, which the DB cannot move. `examined`, `totalClasses` and the above-3:1 roster follow the rows the
+    // stack holds (`.gn-attention__more` renders only past ATTENTION_CAP rows, attention-strip.tsx:174), so a fresh CI seed
+    // differs from the dev stack on data alone; their drift is reported below, never failed (F-11 FIX 1).
+    const verdictOf = (m: Verdict) => ({
+      belowCount: m.belowCount,
+      below: m.roster.filter((r) => r.ratio < 3).map((r) => ({ selector: r.selector, ratio: r.ratio })),
+      exemptions: m.exemptions,
+      routes: m.routes,
+      sanctionedWaivers: m.sanctionedWaivers,
+    });
+    const committed = JSON.parse(readFileSync(rosterUrl, 'utf8')) as typeof measured;
+    const was = verdictOf(committed);
+    const now = verdictOf(measured);
+    const differing = (Object.keys(now) as (keyof typeof now)[]).filter(
+      (key) => JSON.stringify(was[key]) !== JSON.stringify(now[key]),
+    );
+    const drift = (['totalClasses', 'examined'] as const)
+      .filter((key) => committed[key] !== measured[key])
+      .map((key) => `${key} ${committed[key]} -> ${measured[key]}`);
+    const aboveNow = JSON.stringify(measured.roster.filter((r) => r.ratio >= 3));
+    if (aboveNow !== JSON.stringify(committed.roster.filter((r) => r.ratio >= 3))) drift.push('above-3:1 roster');
+    if (drift.length > 0) {
+      const note = `non-text-contrast roster drift (data-dependent, not a failure): ${drift.join('; ')}`;
+      console.log(`[non-text-contrast] ${note}`);
+      test.info().annotations.push({ type: 'roster-drift', description: note });
+    }
+    expect(
+      differing,
+      'non-text-contrast-roster.json differs from this run in the listed verdict keys; roster differs, ' +
+        're-run with UPDATE_ROSTER=1 on a clean tree and COMMIT the file',
+    ).toEqual([]);
+  }
   console.log(
     `[non-text-contrast] ${below.length} of ${roster.length} distinct bordered classes below 3:1 ` +
       `(${examinedTotal} bordered elements examined across ${sweptRoutes.length} routes; ` +

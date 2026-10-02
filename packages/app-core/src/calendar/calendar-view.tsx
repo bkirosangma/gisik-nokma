@@ -1,12 +1,13 @@
 import { useId, useMemo, useState } from 'react';
 import { IST_DAY_REGEX } from '@gisik-nokma/domain';
-import type { WeekDays } from '../claims/dates.js';
+import { DAY_MS, dateMs, isCalendarDay, type WeekDays } from '../claims/dates.js';
 import type { UserNameFn } from '../claims/claim-labels.js';
-import { formatDate } from '../provenance.js';
+import { formatDate, formatDay } from '../provenance.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
-import { buildCalendarModel, type CalendarItem, type CalendarMonth } from './calendar-model.js';
+import { usePhoneBoard } from '../views/use-phone-board.js';
+import { buildCalendarModel, type CalendarItem, type CalendarMonth, type CalendarWeek } from './calendar-model.js';
 
 /**
  * The month grid, over Task 8's landed model. Everything this component owns
@@ -98,6 +99,15 @@ export type CalendarViewProps = {
  * opinion about item order living one layer above the one the model states.
  */
 export const MAX_VISIBLE_PER_WEEK = 4;
+
+/**
+ * F-4 (neo-refresh, 2026-10-02): on a PHONE the grid draws marks, not chips, and the fold is the same one — the
+ * model's order taken as given and truncated, never re-ranked (11.65) — at a smaller count, because a mark is a few
+ * pixels and a cell is 44. A day shows at most this many DOTS and a week row at most this many LINES; the rest
+ * fold to "+n", and the day agenda under the grid (which never folds) lists every one. Dots and lines fold apart:
+ * a bar never starves a marker of its dot, which is the desktop row's own known consequence of one shared count.
+ */
+export const PHONE_MAX_MARKS = 3;
 
 /**
  * The heading's month names, and they are NOT the drift `claim-labels.ts`
@@ -212,6 +222,28 @@ function weekSpan(item: CalendarItem, days: WeekDays): string | null {
   return index === -1 ? null : `${index + 1} / ${index + 2}`;
 }
 
+/** An item that names no day of this week (see `weekSpan`): drawn, and listed, under the week's FIRST day. */
+function isUnplaceable(item: CalendarItem, week: CalendarWeek): boolean {
+  return weekSpan(item, week.days) === null;
+}
+
+/**
+ * Is this item active on `day`, within the week that holds it? A marker on its date, a bar on every day from its real
+ * (unclipped) start to its due, an unplaceable claim on the week's first day only. Reading ONE week's items — the week
+ * that contains `day` — is what stops a bar that crosses a week boundary from being listed twice.
+ */
+function activeOn(item: CalendarItem, day: string, week: CalendarWeek): boolean {
+  if (isUnplaceable(item, week)) return day === week.days[0];
+  return item.kind === 'bar' ? item.start <= day && day <= item.end : item.date === day;
+}
+
+/** "day k of n" for a bar on `day`, or null when a claimed day is not a real one (the range is then shown verbatim). */
+function barPosition(item: Extract<CalendarItem, { kind: 'bar' }>, day: string): { k: number; n: number } | null {
+  if (![item.start, item.end, day].every(isCalendarDay)) return null;
+  const start = dateMs(item.start);
+  return { k: Math.round((dateMs(day) - start) / DAY_MS) + 1, n: Math.round((dateMs(item.end) - start) / DAY_MS) + 1 };
+}
+
 function itemClassName(item: CalendarItem, unplaceable: boolean): string {
   const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
   return [
@@ -229,6 +261,9 @@ export function CalendarView(props: CalendarViewProps) {
   const idPrefix = useId();
   const [month, setMonth] = useState<CalendarMonth>(props.initialMonth ?? monthOf(props.today));
   const [expandedWeeks, setExpandedWeeks] = useState<ReadonlySet<number>>(new Set());
+  /** Phone only: the day whose agenda is open. `null` means the default (today when it is in the shown month, else the 1st). */
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const phone = usePhoneBoard();
   /**
    * The legend's switches: pure view state, exactly like `expandedWeeks`.
    * Nothing is stored and nothing is fetched — a decision that lasts one
@@ -263,12 +298,17 @@ export function CalendarView(props: CalendarViewProps) {
   );
 
   const currentMonthKey = monthKey(month);
+  const defaultDay = monthKey(monthOf(props.today)) === currentMonthKey ? props.today : `${currentMonthKey}-01`;
+  const selectedDay =
+    pickedDay !== null && model.weeks.some((week) => week.days.includes(pickedDay)) ? pickedDay : defaultDay;
+  const selectedWeek = model.weeks.find((week) => week.days.includes(selectedDay));
 
   function moveTo(next: CalendarMonth): void {
     setMonth(next);
     // The fold is per grid: a row unfolded in August says nothing about the
     // row that lands in the same position in September.
     setExpandedWeeks(new Set());
+    setPickedDay(null);
   }
 
   function toggleWeek(index: number): void {
@@ -464,7 +504,9 @@ export function CalendarView(props: CalendarViewProps) {
                       // E4-28: the day's full date, for the assistive-tech
                       // reader landing on a cell whose only rendered text is
                       // a bare number ("31", "1", "2") with no month or year.
-                      aria-label={formatDate(day)}
+                      // On a phone the day BUTTON inside carries the name (the
+                      // date and its item count), so the cell does not repeat it.
+                      aria-label={phone ? undefined : formatDate(day)}
                     >
                       {/* The spec's "Today ring" — a 24px accent circle around
                           the NUMBER, not an outline around the whole cell (the
@@ -472,21 +514,34 @@ export function CalendarView(props: CalendarViewProps) {
                           tests key on stays on the outer div: `aria-current`,
                           `data-today`, `data-day` (11.64) — moving those onto
                           this span would be a gratuitous break for no gain. */}
-                      <span
-                        className={[
-                          'gn-calendar__day-number',
-                          isToday ? 'gn-calendar__day-number--today' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        {Number(day.slice(8))}
-                      </span>
+                      {phone ? (
+                        <PhoneDayButton
+                          day={day}
+                          week={week}
+                          selected={day === selectedDay}
+                          today={isToday}
+                          onSelect={() => setPickedDay(day)}
+                        />
+                      ) : (
+                        <span
+                          className={[
+                            'gn-calendar__day-number',
+                            isToday ? 'gn-calendar__day-number--today' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                        >
+                          {Number(day.slice(8))}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
+              {phone ? (
+                <PhoneLines week={week} />
+              ) : (
               <ul className="gn-calendar__items">
                 {visibleItems.map((item, itemIndex) => {
                   const span = weekSpan(item, week.days);
@@ -550,13 +605,14 @@ export function CalendarView(props: CalendarViewProps) {
                   );
                 })}
               </ul>
+              )}
 
-              {folded > 0 && (
+              {!phone && folded > 0 && (
                 <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
                   +{folded} more
                 </button>
               )}
-              {expanded && week.items.length > MAX_VISIBLE_PER_WEEK && (
+              {!phone && expanded && week.items.length > MAX_VISIBLE_PER_WEEK && (
                 <button type="button" className="gn-calendar__fold" onClick={() => toggleWeek(weekIndex)}>
                   show fewer
                 </button>
@@ -565,6 +621,160 @@ export function CalendarView(props: CalendarViewProps) {
           );
         })}
       </div>
+
+      {phone && selectedWeek !== undefined && (
+        <DayAgenda
+          day={selectedDay}
+          week={selectedWeek}
+          today={props.today}
+          onOpenTicket={props.onOpenTicket}
+        />
+      )}
     </div>
+  );
+}
+
+/** The items active on `day`, in the model's order, from the one week that holds the day. */
+function itemsOn(day: string, week: CalendarWeek): CalendarItem[] {
+  return week.items.filter((item) => activeOn(item, day, week));
+}
+
+/**
+ * One day of the phone grid: a 44px button that selects the day (`aria-pressed`) and holds the number and the day's
+ * DOTS — a marker's own date, plus (on the week's first day) any claim that names no day of this week. The mark is
+ * decoration (`aria-hidden`): the button's name carries the date and the count, and the agenda carries the items.
+ */
+function PhoneDayButton(props: {
+  day: string;
+  week: CalendarWeek;
+  selected: boolean;
+  today: boolean;
+  onSelect: () => void;
+}) {
+  const { day, week } = props;
+  const count = itemsOn(day, week).length;
+  const dots = week.items.filter(
+    (item) =>
+      isUnplaceable(item, week) ? day === week.days[0] : item.kind === 'marker' && item.date === day,
+  );
+  const shown = dots.slice(0, PHONE_MAX_MARKS);
+  const folded = dots.length - shown.length;
+  return (
+    <button
+      type="button"
+      className="gn-calendar__day-select"
+      aria-pressed={props.selected}
+      aria-label={count === 0 ? formatDate(day) : `${formatDate(day)}, ${count} ${count === 1 ? 'item' : 'items'}`}
+      onClick={props.onSelect}
+    >
+      <span className={['gn-calendar__day-number', props.today ? 'gn-calendar__day-number--today' : ''].filter(Boolean).join(' ')}>
+        {Number(day.slice(8))}
+      </span>
+      <span className="gn-calendar__dots" aria-hidden="true">
+        {shown.map((item, index) => (
+          <span
+            key={`${index}:${item.ticketId}`}
+            className={[
+              'gn-calendar__dot',
+              item.kind === 'marker' && item.marker === 'custom' ? 'gn-calendar__dot--custom' : '',
+              (item.kind === 'bar' ? item.pending : item.claim.pending) ? 'gn-calendar__dot--pending' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            data-unplaceable={isUnplaceable(item, week) ? 'true' : undefined}
+            aria-hidden="true"
+          />
+        ))}
+        {folded > 0 && <span className="gn-calendar__more">+{folded}</span>}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * A week's BARS as thin lines across their clipped span, in the grid columns `weekSpan` already computes (so a
+ * line sits under the days it covers, and a bar entering from the last week starts at the first column). No text.
+ * A claim that names no day of this week has no span to draw: it is the first day's dot instead.
+ */
+function PhoneLines(props: { week: CalendarWeek }) {
+  const lines = props.week.items.filter((item) => item.kind === 'bar' && !isUnplaceable(item, props.week));
+  if (lines.length === 0) return null;
+  const shown = lines.slice(0, PHONE_MAX_MARKS);
+  const folded = lines.length - shown.length;
+  return (
+    <ul className="gn-calendar__items gn-calendar__lines" aria-hidden="true">
+      {shown.map((item, index) => (
+        <li key={`${index}:${item.ticketId}`} className="gn-calendar__slot" style={{ gridColumn: weekSpan(item, props.week.days) ?? '1 / 8' }}>
+          <span
+            className={[
+              'gn-calendar__line',
+              item.kind === 'bar' && item.pending ? 'gn-calendar__line--pending' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            data-ticket={item.ticketId}
+            aria-hidden="true"
+          />
+        </li>
+      ))}
+      {folded > 0 && (
+        <li className="gn-calendar__slot gn-calendar__more" style={{ gridColumn: '1 / 8' }}>
+          +{folded}
+        </li>
+      )}
+    </ul>
+  );
+}
+
+/**
+ * The selected day's items, full width, under the grid: `<key> <title>`, then a marker's claim or a span's range and
+ * its position in it ("28 Aug → 1 Sep (day 3 of 5)"). Every item active that day, never folded; a span is listed under
+ * each day it covers; each row opens its ticket the way a chip does on a desktop. The name and its detail are two
+ * elements, not one " · "-joined string (23.191).
+ */
+function DayAgenda(props: {
+  day: string;
+  week: CalendarWeek;
+  today: string;
+  onOpenTicket: (ticketId: string) => void;
+}) {
+  const headingId = useId();
+  const items = itemsOn(props.day, props.week);
+  const label = formatDay(props.day, props.today);
+  return (
+    <section className="gn-calendar__agenda" aria-labelledby={headingId}>
+      <h3 id={headingId} className="gn-calendar__agenda-title">
+        {label}
+      </h3>
+      {items.length === 0 ? (
+        <p className="gn-calendar__agenda-empty">No dates claimed for {label}</p>
+      ) : (
+        <ul className="gn-calendar__agenda-list">
+          {items.map((item, index) => {
+            const name = item.key === null ? item.title : `${item.key} ${item.title}`;
+            const position = item.kind === 'bar' ? barPosition(item, props.day) : null;
+            const detail =
+              item.kind === 'bar'
+                ? `${formatDay(item.start, props.today)} → ${formatDay(item.end, props.today)}${position === null ? '' : ` (day ${position.k} of ${position.n})`}`
+                : item.tooltip;
+            const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
+            return (
+              <li key={`${index}:${item.kind}:${item.ticketId}`}>
+                <button
+                  type="button"
+                  className="gn-calendar__agenda-item"
+                  data-pending={pending ? 'true' : undefined}
+                  data-unplaceable={isUnplaceable(item, props.week) ? 'true' : undefined}
+                  onClick={() => props.onOpenTicket(item.ticketId)}
+                >
+                  <span className="gn-calendar__agenda-name">{name}</span>{' '}
+                  <span className="gn-calendar__agenda-detail">{detail}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

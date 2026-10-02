@@ -69,6 +69,8 @@ export type CalendarMarker =
 export type CalendarBar = {
   kind: 'bar';
   ticketId: string;
+  /** The ticket's key, as a marker's (F-4, 2026-10-02): the phone agenda names a span `<key> <title>`; the chip still reads the title alone. */
+  key: string | null;
   title: string;
   start: string;
   end: string;
@@ -248,6 +250,7 @@ function collectItems(
       items.push({
         kind: 'bar',
         ticketId,
+        key,
         title,
         start: start.date,
         end: due.date,

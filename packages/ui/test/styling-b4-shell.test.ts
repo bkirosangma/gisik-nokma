@@ -11,13 +11,15 @@ function stillDeclared(list: string): boolean {
 
 const CURRENT = [".gn-nav a[aria-current='page']", ".gn-nav button[aria-current='page']"];
 const ROWS: RosterRow[] = [
-  { sheet: 'globals', selectors: '.gn-nav', declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } },
+  { sheet: 'globals', selectors: '.gn-nav', declarations: { 'box-shadow': 'var(--gn-shadow-raised-lg)' } }, // N7 (2026-10-02, 24.083): the nav wears the large pair (hig: = lift, 24.009)
   {
     sheet: 'globals',
     selectors: ['.gn-nav a'], // amended 2026-10-02: the retired `Menu` toggle (`.gn-nav__more-toggle`) left this selector list (UX fixes Task 4, case 23.042)
     declarations: {
       'border-radius': '0.75rem',
-      transition: 'background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out',
+      // amended 2026-10-02 by N9 (case 24.043): the nav link also eases its `box-shadow` (the neo current-item inset).
+      transition:
+        'background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out, box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)',
       color: 'var(--gn-text-muted)',
     },
   },
@@ -33,7 +35,7 @@ const ROWS: RosterRow[] = [
     },
   },
   { sheet: 'globals', selectors: '.gn-theme-toggle', declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } },
-  { sheet: 'globals', selectors: '.gn-skip', declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)' } },
+  { sheet: 'globals', selectors: '.gn-skip', declarations: { 'box-shadow': 'var(--gn-shadow-near-lg)' } }, // N7 (2026-10-02, 24.083): floating, so `near-lg`
   {
     sheet: 'globals',
     selectors: '.gn-nav__menu .gn-nav__menu-item--signout',
@@ -107,6 +109,7 @@ describe('20.233 under neo a current button is pressed in like a current link', 
     expect(winnerFor(css, 'a', true, 'background')).toBe('var(--gn-surface-sunken)');
     // the cascade winner for a current <button> under neo
     expect(winnerFor(css, 'button', true, 'background')).toBe('var(--gn-surface-sunken)');
-    expect(winnerFor(css, 'button', true, 'box-shadow')).toBe('var(--gn-shadow-sunken)');
+    // amended 2026-10-02 by N9 (case 24.041): the neo current item is a control inset, `recess`.
+    expect(winnerFor(css, 'button', true, 'box-shadow')).toBe('var(--gn-shadow-recess)');
   });
 });

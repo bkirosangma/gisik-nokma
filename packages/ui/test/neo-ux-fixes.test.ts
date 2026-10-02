@@ -71,27 +71,28 @@ describe('23.001 the field rim is a role, defined in every style and theme (audi
     // Neo measurements recorded in the case: light 3.31 on the well, 3.75 on paper; dark 3.14 on raised, 3.57 on surface.
     expect(contrastRatio('#897362', colorOf('light', 'surfaceWell', 'neo'))).toBeGreaterThan(3.3);
     expect(contrastRatio('#6f7997', colorOf('dark', 'surfaceRaised', 'neo'))).toBeGreaterThan(3.1);
-    // CONTROL: the old shadow hue is not a ring (fails on paper), and the plan's #6b7491 fails on the new dark raised.
+    // CONTROL: the old shadow hue is not a ring (fails on paper), and a ring one step dimmer than #6f7997 fails on the dark raised.
+    // Amended by N4 = B (2026-10-02, 24.007): the dark raised is now the page hex #1b2340, so the plan's #6b7491 reads 3.33 there
+    // and is no longer a control; #5f6987 is.
     expect(contrastRatio('#b09884', colorOf('light', 'surface', 'neo'))).toBeLessThan(3);
-    expect(contrastRatio('#6b7491', colorOf('dark', 'surfaceRaised', 'neo'))).toBeLessThan(3);
+    expect(contrastRatio('#5f6987', colorOf('dark', 'surfaceRaised', 'neo'))).toBeLessThan(3);
   });
 });
 
-describe('23.002 neo text fields wear a 1px full ring and keep the sunken shadow (audit SYS-05, WS-04, NP-25, TT-14)', () => {
+// AMENDED 2026-10-02 by N10 (owner, "go with B in neumorphic"; case 24.040): the 1px full ring is retired for neo. Every neo field arm is now
+// `border: 1px solid transparent` with `box-shadow: var(--gn-shadow-field)` (the one-sided >= 3:1 line, asserted in 24.044); hig/minimal keep the ring.
+describe('23.002 neo text fields: no rim, the field shadow carries the boundary (audit SYS-05, WS-04, NP-25, TT-14; amended by N10, 24.040)', () => {
   const NEO_FIELDS = [
     '[data-style="neo"] .gn-field__input',
     '[data-style="neo"] .gn-help__search-input',
     '[data-style="neo"] .workflow-builder-screen__name',
     '[data-style="neo"] .gn-project__search',
   ];
-  it('23.002 every neo field arm has border: 1px solid var(--gn-field-rim) and box-shadow: var(--gn-shadow-sunken)', () => {
+  it('23.002 every neo field arm has border: 1px solid transparent and box-shadow: var(--gn-shadow-field) (amended by N10, 24.040)', () => {
     for (const selector of NEO_FIELDS) {
       const body = ruleExactly(ui, selector);
-      expect(valueOf(body, 'border'), selector).toBe('1px solid var(--gn-field-rim)');
-      // The project search keeps its sunken shadow in its BASE rule; the neo arm only adds the ring.
-      const base = selector.replace('[data-style="neo"] ', '');
-      const shadow = valueOf(body, 'box-shadow') ?? valueOf(ruleExactly(ui, base), 'box-shadow');
-      expect(shadow, selector).toBe('var(--gn-shadow-sunken)');
+      expect(valueOf(body, 'border'), selector).toBe('1px solid transparent');
+      expect(valueOf(body, 'box-shadow'), selector).toBe('var(--gn-shadow-field)');
     }
     // CONTROL: the base (hig) field rule is unchanged, so the ring is neo's own.
     expect(valueOf(ruleExactly(ui, '.gn-field__input'), 'border')).toBe('1px solid var(--gn-border)');
@@ -140,10 +141,10 @@ describe('23.004 a neo disabled field is flat: no ring, no inset, muted text, AF
       const disabledAt = rules.findIndex((rule) => rule.selectors.includes(disabled));
       expect(disabledAt, `${disabled} after ${neoBase}`).toBeGreaterThan(indexOfRule(neoBase));
     }
-    // CONTROL: an enabled neo field still has its ring and its inset.
+    // CONTROL: an enabled neo field still has its recess edge (amended by N10, 24.040: a transparent border and the `field` shadow, no ring).
     const enabled = ruleExactly(ui, '[data-style="neo"] .gn-field__input');
-    expect(valueOf(enabled, 'border')).toBe('1px solid var(--gn-field-rim)');
-    expect(valueOf(enabled, 'box-shadow')).toBe('var(--gn-shadow-sunken)');
+    expect(valueOf(enabled, 'border')).toBe('1px solid transparent');
+    expect(valueOf(enabled, 'box-shadow')).toBe('var(--gn-shadow-field)');
   });
 });
 
@@ -162,16 +163,17 @@ describe('23.005 the focus ring sits 3px outside fields (audit SYS-08)', () => {
 });
 
 describe('23.006 neo dark depth ships: a lighter raised surface and a 12% highlight (audit BRD-21, ENT-19, SYS-07)', () => {
-  it('23.006 neo/dark surfaceRaised is #232c50, the highlight is #f2e9e11f and the text roles still read on it', () => {
-    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe('#232c50');
+  // AMENDED 2026-10-02 by the neo refresh (N4 = B, 24.007): dark raised is the page hex `#1b2340` again — extrusion, not elevation;
+  // the 16% highlight (`shadowNeoHighlightDark` `#f2e9e129`) carries the lift. `neoNavyRaised` `#232c50` is retired, kept as a primitive.
+  it('23.006 neo/dark surfaceRaised is #1b2340 (N4 = B), and the text roles still read on it', () => {
+    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe('#1b2340');
     expect(primitives.neoNavyRaised).toBe('#232c50');
-    expect(primitives.shadowNeoRaisedHighlightDark).toBe('#f2e9e11f');
     // accent (a fill, so not a CONTRAST_PAIRS row: tokens.ts retired that pairing), textAccent and textSubtle (5.40).
     // `textSubtle` is `neoTextSubtleDark` `#a3a3a8` in neo dark, not `#a0a0a5`: a placeholder composited on this raised
     // surface read 4.46 with the old hex (18.306), under the neo floor of 4.5.
-    expect(contrastRatio(colorOf('dark', 'accent', 'neo'), '#232c50')).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(colorOf('dark', 'accent', 'neo'), '#1b2340')).toBeGreaterThanOrEqual(4.5);
     for (const fg of ['textAccent', 'textSubtle'] as const) {
-      expect(contrastRatio(colorOf('dark', fg, 'neo'), '#232c50'), fg).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colorOf('dark', fg, 'neo'), '#1b2340'), fg).toBeGreaterThanOrEqual(4.5);
       expect(
         CONTRAST_PAIRS.some((pair) => pair.fg === fg && pair.bg === 'surfaceRaised' && pair.minimum === 4.5),
         `CONTRAST_PAIRS holds ${fg} on surfaceRaised`,
@@ -186,7 +188,7 @@ describe('23.006 neo dark depth ships: a lighter raised surface and a 12% highli
 });
 
 describe('23.007 the neo well and track step in both themes; fields do not (audit BRD-21, ENT-19, SYS-07)', () => {
-  it('23.007 surfaceTrack and surfaceWell are #e6dcd2 light and #141a33 dark; surfaceSunken is unchanged', () => {
+  it('23.007 surfaceTrack and surfaceWell are #e6dcd2 light and #141a33 dark; surfaceSunken now equals them (N2, 24.007)', () => {
     for (const role of ['surfaceTrack', 'surfaceWell'] as const) {
       expect(colorOf('light', role, 'neo'), `${role} light`).toBe('#e6dcd2');
       expect(colorOf('dark', role, 'neo'), `${role} dark`).toBe('#141a33');
@@ -198,9 +200,10 @@ describe('23.007 the neo well and track step in both themes; fields do not (audi
       expect(CONTRAST_PAIRS.some((pair) => pair.fg === 'textAccent' && pair.bg === role && pair.minimum === 4.5), `textAccent on ${role}`).toBe(true);
       expect(CONTRAST_PAIRS.some((pair) => pair.fg === 'accent' && pair.bg === role && pair.minimum === 3), `accent fill on ${role}`).toBe(true);
     }
-    // CONTROL: the field ground did not step, and hig/minimal keep their own track/well.
-    expect(colorOf('light', 'surfaceSunken', 'neo')).toBe('#f1eae3');
-    expect(colorOf('dark', 'surfaceSunken', 'neo')).toBe('#1b2340');
+    // CONTROL: hig/minimal keep their own track/well. AMENDED 2026-10-02 by the neo refresh (N2, 24.007): the neo field ground now
+    // IS the well — `surfaceSunken` was `#f1eae3` / `#1b2340` here, a pressed fill lighter than its ground.
+    expect(colorOf('light', 'surfaceSunken', 'neo')).toBe('#e6dcd2');
+    expect(colorOf('dark', 'surfaceSunken', 'neo')).toBe('#141a33');
     expect(colorOf('light', 'surfaceWell', 'hig')).toBe(primitives.wellWarm);
     expect(colorOf('dark', 'surfaceTrack', 'minimal')).toBe(primitives.trackNavy);
   });
