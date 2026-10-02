@@ -621,18 +621,21 @@ describe('R1(c) at the component layer', () => {
   });
 
   /**
-   * 13.339 — under `data-style="neo"` the empty input renders the sunken,
-   * no-border treatment (Task 14 AMENDMENT rule (a), owner ruling 2026-09-09:
-   * "pure neo look"). `hig`/`minimal` are UNCHANGED by this rule and keep
-   * 13.291's bordered look — the override is scoped to `[data-style="neo"]`.
+   * 13.339 — under `data-style="neo"` the empty input renders the sunken
+   * treatment (Task 14 AMENDMENT rule (a), owner ruling 2026-09-09: "pure neo
+   * look"). `hig`/`minimal` are UNCHANGED by this rule and keep 13.291's
+   * bordered look — the override is scoped to `[data-style="neo"]`.
    *
-   * **OWNER-ACCEPTED WAIVER, recorded verbatim (Task 13's measurement, the
+   * **AMENDED 2026-10-02 (U5-U8, owner: "borders on buttons AND text fields";
+   * UX fixes T1, cases 23.002 and 23.004).** The 2026-09-09 ruling dropped the
+   * border and accepted, verbatim, a waiver (Task 13's measurement, the
    * neo-round ruling item 5): the sunken field's shadow edge measures 1.24
-   * (light) / 1.16 (dark) — both below the 3:1 WCAG 1.4.11 floor a non-text
-   * boundary owes. The owner reaffirmed "pure neo look" knowing this, so the
-   * border is dropped rather than kept as a compromise.** This is the one
-   * exemption from the non-text-contrast sweep the ruling authorises — no
-   * other selector may drop below 3:1 on this ground.
+   * (light) / 1.16 (dark), below the 3:1 WCAG 1.4.11 floor a non-text boundary
+   * owes. The 2026-10-01 audit found people could not find empty neo fields,
+   * and the owner reversed it for TEXT FIELDS: the neo rule now carries a 1px
+   * full ring in `--gn-field-rim` (≥ 3:1) beside the sunken shadow. The
+   * waiver is retired; cards, wells, notices and rows still carry no border.
+   * The owner's words and the measurement above stay as the record.
    *
    * Two positive controls guard against `rule()`'s substring matching: the
    * neo selector and the base selector must read back DIFFERENT bodies (the
@@ -642,12 +645,13 @@ describe('R1(c) at the component layer', () => {
    * value, because the base rule's `border: 1px solid var(--gn-border)` would
    * otherwise cascade in and still paint.
    */
-  it('13.339 under neo the field input is sunken and borderless — hig/minimal keep their border', () => {
+  it('13.339 under neo the field input is sunken and ringed (U5) — hig/minimal keep their border', () => {
     const base = rule('.gn-field__input');
     const neo = rule('[data-style="neo"] .gn-field__input');
     expect(neo, 'the neo override must be a distinct rule, not a re-match of the base').not.toBe(base);
     expect(base).toMatch(/border:\s*1px solid var\(--gn-border\)/);
-    expect(neo).toMatch(/border:\s*none/);
+    expect(neo).toMatch(/border:\s*1px solid var\(--gn-field-rim\)/);
+    expect(neo).not.toMatch(/border:\s*none/);
     expect(neo).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
     expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
   });
@@ -989,13 +993,13 @@ describe('E4-21 — the searchable Select paints a focus ring', () => {
     // `rule()` throws "no rule for …" when the selector is absent, so this is the
     // assertion that reddens while the removal has no replacement — the state the
     // finding measured. The offset is asserted, not just the outline: `.gn-field__input`'s
-    // own rule carries `outline-offset: 1px` and the point of putting the ring here
+    // own rule carries `outline-offset: 3px` (U9, 2026-10-02; it was 1px) and the point of putting the ring here
     // is that the two branches of this control look the same when focused.
     const body = rule('.gn-select__trigger--searchable:focus-within');
     expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(
       /outline:\s*2px solid var\(--gn-focus-ring\)/,
     );
-    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(/outline-offset:\s*1px/);
+    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(/outline-offset:\s*3px/);
   });
 
   it('E4-21: the suppression is still there and still scoped to the input alone', () => {
