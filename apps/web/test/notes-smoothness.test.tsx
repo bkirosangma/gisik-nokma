@@ -421,4 +421,21 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     expect(screen.queryByText('Loading the note')).toBeNull();
     expect(screen.queryByText('Loading…')).toBeNull();
   });
+
+  it('25.165 the editor band stays reserved while the purged-chip read is pending: the slot\'s own box, then the editor; no gap between', async () => {
+    const held = deferred<Array<{ kind: 'ticket' | 'note'; id: string }>>();
+    const chip = { type: 'ticketRef', attrs: { ticketId: 't1', projectId: 'p1', key: 'CC-1', title: 'A ticket' } };
+    const withChip = noteDetail({ body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'See ' }, chip] }] } as never });
+    currentPath = '/notes/n1';
+    render(page(world({ getNote: async (w: string, id: string) => (w === 'ws2' && id === 'n1' ? withChip : null), purgedAmong: () => held.promise as never }), 'a', 'n1'));
+    await screen.findByTestId('note-document');
+    const band = (await screen.findAllByText('Loading the editor'))[0]!.parentElement!;
+    expect(band.closest('.gn-notes__editor')).not.toBeNull();
+    expect(band.classList.contains('editor-slot--note')).toBe(true);
+    expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(0);
+    // CONTROL: the answer lands, and the editor takes the band's place.
+    await act(async () => held.resolve([]));
+    await waitFor(() => expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(1));
+    expect(screen.queryByText('Loading the editor')).toBeNull();
+  });
 });

@@ -89,8 +89,9 @@ export function markNoteAsNew(noteId: string): void {
  * it calls is `GET /v1/notes/<noteId>`, which learns the workspace from the
  * note's own row — while the REPLICA implementation filters by workspace, so
  * the parameter is load-bearing offline. **So: try each workspace until one
- * answers non-null.** Online that is one read; offline it is at most one per
- * workspace, and the alternative (guessing `workspaces[0]`) would answer `null`
+ * answers non-null — all of them at once, the first non-null in the
+ * person's own order winning (smoothness T9, 25.151).** Online one read answers and the rest say `null`; offline
+ * each is a local lookup; and the alternative (guessing `workspaces[0]`) would answer `null`
  * for a note in the second workspace and draw "no longer shared" for a note that
  * is right there.
  *
@@ -169,7 +170,7 @@ function NoteDocumentBody({
   // prop itself. A caller that passes a fresh array of the same workspaces on
   // every render (the page does, and so does every test) would otherwise restart
   // this read on every paint, resetting `searched` to false each time and
-  // leaving the document stuck on "Loading…" forever. `workspaceKey` is the
+  // leaving the document stuck on its loading band forever. `workspaceKey` is the
   // dependency because it is the VALUE the read depends on, and a ref is how the
   // effect reads that value without listing the array.
   const workspacesRef = useRef(workspaces);

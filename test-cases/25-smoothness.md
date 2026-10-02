@@ -73,24 +73,24 @@ Spec D5, S1, P10; amendment S-R1 (the skeleton is the page's real container plus
 
 ## 25.15 Notes: cheap remount, parallel resolve, the reserved band, a quiet keystroke (T9)
 
-Spec D5/S1/S4/S7, amendment S-R1; audit SM-07, NP-03. Tests: `apps/web/test/notes-smoothness.test.tsx`, `apps/web/test/use-note-autosave.test.tsx` (25.161). The block is 25.150–25.169; 25.163–25.165 are the T10 carry items (step 4), 25.166–25.169 unused.
+Spec D5/S1/S4/S7, amendment S-R1; audit SM-07, NP-03. Tests: `apps/web/test/notes-smoothness.test.tsx`, `apps/web/test/use-note-autosave.test.tsx` (25.161). Existing cases amended with their reasons: 18.184, 18.460, 18.462, 18.488, 13.1486, 23.162 (each says so in its own line). The geometry claim (the band's height is the same while the skeleton shows and after the editor loads) is jsdom-blind: the structure and the one shared number are asserted here, and a measured 🧪 pass at 390 and 1280 is not part of this task. The block is 25.150–25.169; 25.163–25.165 are the T10 carry items (step 4), 25.166–25.169 unused.
 
-- ❌ **25.150 — `/notes` reads the workspaces through the shared read: a remount inside 30 s makes no extra `getMyWorkspaces` call and paints the tree on the first frame (audit SM-05, SM-07).** Control: a remount past the stale window makes exactly one.
-- ❌ **25.151 — opening a note asks every workspace in parallel and reads the found note once (audit SM-07).** Control: all three workspaces are asked before the first answers.
-- ❌ **25.152 — a switch to a note not seen yet keeps the tree on screen from the cache and draws the document band as the editor slot's own box, busy, with no well fill (S-R1; audit SM-07).** Control: when the read lands, the document replaces the band.
-- ❌ **25.153 — the comment composer's editor mounts on click, not on open (audit SM-07).** Control: the open page holds exactly one editor.
-- ❌ **25.154 — the signed-out note URL says how to sign in instead of "Loading…" (audit NP-03).**
-- ❌ **25.155 — one workspace whose read fails does not sink the resolve.** Control: every workspace failing says the note is not shared.
-- ❌ **25.156 — the editor band is ONE number: the field floor and the page shell's document skeleton read `--gn-notes-editor-min`, declared once.** Control: the value is still the 23.162 floor.
-- ❌ **25.157 — a keystroke that changes the headings re-renders the page but not the tree sections (audit SM-07).** Control: the title filter does re-render them.
-- ❌ **25.158 — while a search is running with no result yet, the list shows skeleton note rows and never "No notes match" (S-R1; audit SM-07).** Control: the answered empty search does say it.
-- ❌ **25.159 — while the workspaces read is pending the tree is the notes list item's own container with parts, busy and named once (S-R1).** Control: answered, there is none.
-- ❌ **25.160 — a keystroke inside the note does not re-render the byline, the comments or the rest of the document (audit SM-07).** Control: leaving edit mode does.
-- ❌ **25.161 — the draft write to `localStorage` is coalesced with the autosave timer: five keystrokes write it once, at the flush, before the ingest (audit SM-07).** Control: `beforeunload` with a pending draft writes it too.
-- ❌ **25.162 — a note opened before paints from the cache on its next mount while its read is in flight (S4).**
+- ✅ **25.150 — `/notes` reads the workspaces through the shared read: a remount inside 30 s makes no extra `getMyWorkspaces` call and paints the tree on the first frame (audit SM-05, SM-07).** Control: a remount past the stale window makes exactly one.
+- ✅ **25.151 — opening a note asks every workspace in parallel and reads the found note once (audit SM-07).** Control: all three workspaces are asked before the first answers.
+- ✅ **25.152 — a switch to a note not seen yet keeps the tree on screen from the cache and draws the document band as the editor slot's own box, busy, with no well fill (S-R1; audit SM-07).** Control: when the read lands, the document replaces the band.
+- ✅ **25.153 — the comment composer's editor mounts on click, not on open (audit SM-07).** Control: the open page holds exactly one editor.
+- ✅ **25.154 — the signed-out note URL says how to sign in instead of "Loading…" (audit NP-03).**
+- ✅ **25.155 — one workspace whose read fails does not sink the resolve.** Control: every workspace failing says the note is not shared.
+- ✅ **25.156 — the editor band is ONE number: the field floor and the page shell's document skeleton read `--gn-notes-editor-min`, declared once.** Control: the value is still the 23.162 floor.
+- ✅ **25.157 — a keystroke that changes the headings re-renders the page but not the tree sections (audit SM-07).** Control: the title filter does re-render them.
+- ✅ **25.158 — while a search is running with no result yet, the list shows skeleton note rows and never "No notes match" (S-R1; audit SM-07).** Control: the answered empty search does say it.
+- ✅ **25.159 — while the workspaces read is pending the tree is the notes list item's own container with parts, busy and named once (S-R1).** Control: answered, there is none.
+- ✅ **25.160 — a keystroke inside the note does not re-render the byline, the comments or the rest of the document (audit SM-07).** Control: leaving edit mode does.
+- ✅ **25.161 — the draft write to `localStorage` is coalesced with the autosave timer: five keystrokes write it once, at the flush, before the ingest (audit SM-07).** Control: `beforeunload` with a pending draft writes it too.
+- ✅ **25.162 — a note opened before paints from the cache on its next mount while its read is in flight (S4).**
 - ❌ **25.163 — the notes document reaches the editor only through the dynamic editor slot (T10 carry; step 4).**
 - ❌ **25.164 — the notes list prefetches the editor chunk before a note opens (T10 carry; step 4).**
-- ❌ **25.165 — the notes band stays reserved while the purged-chips read is pending (S1; audit SM-07).**
+- ✅ **25.165 — the notes band stays reserved while the purged-chips read is pending (S1; audit SM-07).**
 
 ## 25.12 Server: one rollup pass per page, compressed answers (T11)
 
