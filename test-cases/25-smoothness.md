@@ -10,7 +10,7 @@
 
 ## 25.4 Notes read-only by default, the phone layout, and the last note (G-3, owner-approved add-on)
 
-Tests: `apps/web/test/note-document.test.tsx` (25.340–25.345), `apps/web/test/notes-phone.test.tsx` (25.346–25.349), `apps/web/test/notes-last-note.test.tsx` (25.350–25.354). Case block 25.340–25.359 (25.355–25.359 free).
+Tests: `apps/web/test/note-document.test.tsx` (25.340–25.345, 25.355), `apps/web/test/notes-phone.test.tsx` (25.346–25.349), `apps/web/test/notes-last-note.test.tsx` (25.350–25.354). Case block 25.340–25.359 (25.356–25.359 free).
 
 - ✅ **25.340 — an existing note opens to a READING view: the editor is not contenteditable, there is no toolbar, the title is static, a tap below the text raises no caret, and an "Edit note" button (a `.gn-button`, 44px floor) sits in the header row.** Control, same test: Edit flips every one of those.
 - ✅ **25.341 — Edit leads to the existing editor and Done returns to reading, any number of times.** Control: the Edit button is gone while editing and Done is gone while reading.
@@ -27,3 +27,4 @@ Tests: `apps/web/test/note-document.test.tsx` (25.340–25.345), `apps/web/test/
 - ✅ **25.352 — a remembered note that is gone, deleted, or not under the key's workspace is ignored silently, its key cleared, the list shown, with no "no longer shared" sentence.** Control: a readable remembered note's key is kept.
 - ✅ **25.353 — with `localStorage` throwing on every call the list shows, the note opens and nothing is resumed or broken.** Control: the stubs were reached.
 - ✅ **25.354 — on a phone the remembered note is NOT forced over the list: no replace, the panel open on Notes with the note marked current (`aria-current="page"`).** Control: a desktop viewport opens it directly.
+- ✅ **25.355 — a note's headings (the Contents list and the TOC) are reported when the editor paints after the note loaded, with no edit and no draft change; a DOM change that adds no heading is not reported again.** Control: before the late heading is added it is not among the reported headings. Found painting /notes at 390: Contents read "This note has no headings" on a note with three.
