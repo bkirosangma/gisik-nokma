@@ -31,7 +31,7 @@ test('18.228 create a note, save it, and find it in the tree after a reload', as
   // POSITIVE CONTROL FIRST.
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'New note' }).click();
+  await page.getByRole('button', { name: 'Create note' }).click();
   // Home defaults to the first workspace, at the WORKSPACE level
   // (homeProjectId ''), and Scope defaults to Private — this note is meant
   // to stay both, so neither select is touched.
@@ -63,7 +63,7 @@ test('18.229 renaming updates the tree row and the document title without a relo
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'New note' }).click();
+  await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('dialog', { name: 'New note' }).getByRole('textbox', { name: 'Title', exact: true }).fill(FREEZER);
   await page.getByRole('dialog', { name: 'New note' }).getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });

@@ -1,4 +1,5 @@
-import { Chip, type ChipTone } from '@gisik-nokma/ui';
+import { useId, useState } from 'react';
+import { Button, Chip, type ChipTone } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
 import type { AttentionItem, AttentionKind } from '../view-types.js';
@@ -32,21 +33,33 @@ const KIND_LABEL: Record<AttentionKind, string> = {
   contested: 'Contested',
 };
 
+/** Strongest first: the order a ticket's reasons are weighed in, and the order the rows are drawn in (NP-05). */
+const SEVERITY: readonly AttentionKind[] = ['overdue', 'blocked', 'stale', 'due-soon', 'contested'];
+const severityOf = (kind: AttentionKind): number => SEVERITY.indexOf(kind);
+
+/** How many rows the strip draws before "Show all N" (NP-05). */
+export const ATTENTION_CAP = 5;
+
 /**
- * What the strip draws, in order (NP-06):
+ * What the strip draws, in order (NP-05, NP-06; UX fixes T9, case 23.163):
  *
- * - **Overdue FIRST.** A missed date is the most urgent line here, whatever
- *   order a source handed the items over in; every other kind keeps its order.
- * - **A ticket that is overdue AND stale is one row**, the overdue one. Both say
- *   "this has waited too long", the overdue reason names the date, and the
- *   stale row under it was the NP-05 repeat. This is the ONE pair collapsed:
- *   a ticket that is also Blocked keeps its Blocked row, because that is a
- *   different fact and not the same urgency said twice.
+ * - **ONE row per ticket, with its strongest reason** — overdue, then blocked,
+ *   stale, due soon, contested. A ticket on two or three lists was the NP-05
+ *   repeat: it inflated the count and made the person read one title up to
+ *   three times. Overdue still beats stale (21.244), and now every other pair
+ *   collapses the same way (21.244 amended: overdue + blocked is one Overdue row).
+ * - **Strongest FIRST.** The rows are in that same severity order (a stable sort,
+ *   so equals keep the order the source gave), because the strip is capped
+ *   (`ATTENTION_CAP`) and the cap must hide the least urgent rows, never the
+ *   most. An overdue row leads whatever order a source handed the items in (21.242).
  */
 export function orderAttention(items: AttentionItem[]): AttentionItem[] {
-  const overdueTickets = new Set(items.filter((item) => item.kind === 'overdue').map((item) => item.ticketId));
-  const kept = items.filter((item) => !(item.kind === 'stale' && overdueTickets.has(item.ticketId)));
-  return [...kept.filter((item) => item.kind === 'overdue'), ...kept.filter((item) => item.kind !== 'overdue')];
+  const strongest = new Map<string, AttentionItem>();
+  for (const item of items) {
+    const held = strongest.get(item.ticketId);
+    if (held === undefined || severityOf(item.kind) < severityOf(held.kind)) strongest.set(item.ticketId, item);
+  }
+  return [...strongest.values()].sort((a, b) => severityOf(a.kind) - severityOf(b.kind));
 }
 
 export type AttentionStripProps = {
@@ -99,7 +112,11 @@ export type AttentionStripProps = {
  * paragraph rules out, and the flat list above is what keeps it impossible.
  */
 export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
+  const [showAll, setShowAll] = useState(false);
+  const listId = useId();
   if (items.length === 0) return null;
+  const rows = orderAttention(items);
+  const shown = showAll ? rows : rows.slice(0, ATTENTION_CAP);
   return (
     /* The accessible name is the visible heading, character for character.
        WCAG 2.5.3 fails on a visible label that its accessible name does not
@@ -133,9 +150,9 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
         </svg>
         Needs your attention
       </p>
-      <ul className="gn-attention__items">
-        {orderAttention(items).map((item) => (
-          <li key={`${item.kind}:${item.ticketId}`} className="gn-attention__item">
+      <ul id={listId} className="gn-attention__items">
+        {shown.map((item) => (
+          <li key={item.ticketId} className="gn-attention__item">
             <button
               type="button"
               className="gn-attention__title"
@@ -153,6 +170,12 @@ export function AttentionStrip({ items, onOpenTicket }: AttentionStripProps) {
           </li>
         ))}
       </ul>
+      {/* NP-05: five rows, then the rest on request — the strip must not bury the person's own list under it. */}
+      {rows.length > ATTENTION_CAP ? (
+        <Button className="gn-attention__more" aria-expanded={showAll} aria-controls={listId} onClick={() => setShowAll((open) => !open)}>
+          {showAll ? 'Show fewer' : `Show all ${rows.length}`}
+        </Button>
+      ) : null}
     </aside>
   );
 }

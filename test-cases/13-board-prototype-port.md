@@ -1770,7 +1770,7 @@ person reaches for rather than as a hard failure.
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
 there is no feature bullet to edit — recorded here rather than left as a silent omission.
 
-## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
+## Every board card's provenance disclosure (the `who · when` button of the time; "Moved to … by … on …" since UX T7, 23.123) meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
 
 **The finding, round 2 `E4-3`, IMPORTANT, scored PARTIAL.** `button.gn-board-card__provenance`
 toggles the state-provenance line on each card. Measured on the board at 1512×900 against the product's

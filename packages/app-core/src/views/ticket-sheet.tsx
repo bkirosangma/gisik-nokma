@@ -50,6 +50,7 @@ import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
+import { usePhoneBoard } from './use-phone-board.js';
 import { usePurgedPredicate } from './use-purged-predicate.js';
 
 /**
@@ -720,6 +721,9 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  // The sheet's phone arm is the same 40rem as the board's (`use-phone-board.ts`), so the one query serves both.
+  const phone = usePhoneBoard();
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   // The outsider arm of the Assignee row (access plan W6) — state lives up here, not in the row's IIFE.
   const [findingOutsider, setFindingOutsider] = useState(false);
   // Who was just pulled in through the finder, so the picker can NAME them while
@@ -2999,6 +3003,78 @@ export function TicketSheet({
     setEditorError(err instanceof Error ? err.message : String(err));
   };
 
+  // UX fixes T7 (BRD-12, case 23.125): on a phone the sheet opens on its FIELDS (State, Assignee, Priority) and the
+  // description editor waits behind "Add a description" / "Edit description". A description that exists stays on
+  // the page, read-only, until the button is tapped; a sheet with no editor wired has nothing to collapse. The
+  // description is rendered after the fields list there (DOM order, so Tab and the screen reader agree with the eye).
+  const descriptionCollapsed = phone && canEditDescription && !descriptionOpen;
+  const descriptionSection = (
+          <section
+            className="gn-ticket-sheet__description"
+            aria-labelledby="gn-ticket-sheet-description-label"
+            data-testid="field-description"
+          >
+            {/* The field id was leaking into the UI: `:2454` renders
+                `{fieldId}` for custom fields, and this row copied that shape
+                instead of writing a caption, so the sheet read "description"
+                beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                Title case, matching those siblings. */}
+            {/* The caption, and the `id` the composer below is NAMED BY
+                (exec1 P21). The `id` is load-bearing, not decorative: it is
+                what `EditorSlot`'s `labelledBy` points at, so the words a
+                sighted reader sees here and the name a screen reader
+                announces are the SAME NODE and cannot drift. An `id` that
+                nothing references would be a leftover — if this mount ever
+                stops passing `labelledBy`, delete it in the same change. */}
+          <h3 id="gn-ticket-sheet-description-label" className="gn-ticket-sheet__caption">Description</h3>
+              {/*
+                ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
+                collapse them. `editorSlot` is the app's real Tiptap composer;
+                `PlainTextEditorSlot` is this package's read-only default,
+                which renders the document and offers no control to type into.
+                A build that has not wired an editor is not a broken build, and
+                the fallback is the correct behaviour for it — what was wrong
+                was that the editor was never available. THIS CHANGE IS THE ONE
+                THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
+
+                `submit` is what makes a mounted editor usable at all:
+                `TicketEditorSlot` disables its control and NAMES the gap when
+                it is absent ("there is nowhere to send the words"). It is
+                passed unconditionally because the read-only fallback ignores
+                every capability prop on purpose.
+              */}
+              {purgedDescription.ready && !(descriptionCollapsed && descriptionClaim === undefined) ? (
+              <EditorSlot
+                key={descriptionCollapsed ? 'view' : 'edit'}
+                mode="description"
+                // The composer is NAMED BY the `<dt>` above rather than given
+                // its own copy of the words (exec1 P21) — the same mechanism
+                // the ticket sheet's tablist fix used, and the reason this row
+                // does not also pass a `label` to contradict it.
+                labelledBy="gn-ticket-sheet-description-label"
+                doc={descriptionClaim?.value}
+                readOnly={!canEditDescription || descriptionCollapsed}
+                workspaceId={workspaceId}
+                ticketId={ticketId}
+                placeholder="No description yet"
+                submit={submitDescription}
+                queryUsers={queryUsers}
+                queryNotes={queryNotes}
+                {...(queryTickets === undefined ? {} : { queryTickets })}
+                {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                isPurged={purgedDescription.isPurged}
+                onError={reportEditorError}
+              />
+              ) : null}
+              {descriptionCollapsed ? (
+                <Button onClick={() => setDescriptionOpen(true)}>
+                  {descriptionClaim === undefined ? 'Add a description' : 'Edit description'}
+                </Button>
+              ) : null}
+              <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
+          </section>
+  );
+
   return (
     <Sheet
       open
@@ -3440,64 +3516,7 @@ export function TicketSheet({
 
       {tab === 'details' ? (
         <div className="gn-ticket-sheet__details">
-          <section
-            className="gn-ticket-sheet__description"
-            aria-labelledby="gn-ticket-sheet-description-label"
-            data-testid="field-description"
-          >
-            {/* The field id was leaking into the UI: `:2454` renders
-                `{fieldId}` for custom fields, and this row copied that shape
-                instead of writing a caption, so the sheet read "description"
-                beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
-                Title case, matching those siblings. */}
-            {/* The caption, and the `id` the composer below is NAMED BY
-                (exec1 P21). The `id` is load-bearing, not decorative: it is
-                what `EditorSlot`'s `labelledBy` points at, so the words a
-                sighted reader sees here and the name a screen reader
-                announces are the SAME NODE and cannot drift. An `id` that
-                nothing references would be a leftover — if this mount ever
-                stops passing `labelledBy`, delete it in the same change. */}
-          <h3 id="gn-ticket-sheet-description-label" className="gn-ticket-sheet__caption">Description</h3>
-              {/*
-                ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
-                collapse them. `editorSlot` is the app's real Tiptap composer;
-                `PlainTextEditorSlot` is this package's read-only default,
-                which renders the document and offers no control to type into.
-                A build that has not wired an editor is not a broken build, and
-                the fallback is the correct behaviour for it — what was wrong
-                was that the editor was never available. THIS CHANGE IS THE ONE
-                THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
-
-                `submit` is what makes a mounted editor usable at all:
-                `TicketEditorSlot` disables its control and NAMES the gap when
-                it is absent ("there is nowhere to send the words"). It is
-                passed unconditionally because the read-only fallback ignores
-                every capability prop on purpose.
-              */}
-              {purgedDescription.ready ? (
-              <EditorSlot
-                mode="description"
-                // The composer is NAMED BY the `<dt>` above rather than given
-                // its own copy of the words (exec1 P21) — the same mechanism
-                // the ticket sheet's tablist fix used, and the reason this row
-                // does not also pass a `label` to contradict it.
-                labelledBy="gn-ticket-sheet-description-label"
-                doc={descriptionClaim?.value}
-                readOnly={!canEditDescription}
-                workspaceId={workspaceId}
-                ticketId={ticketId}
-                placeholder="No description yet"
-                submit={submitDescription}
-                queryUsers={queryUsers}
-                queryNotes={queryNotes}
-                {...(queryTickets === undefined ? {} : { queryTickets })}
-                {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
-                isPurged={purgedDescription.isPurged}
-                onError={reportEditorError}
-              />
-              ) : null}
-              <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
-          </section>
+          {phone ? null : descriptionSection}
           <dl className="gn-ticket-sheet__fields">
             <div className={fieldRowClass(0)} data-testid="field-state">
               <dt>State</dt>
@@ -3856,6 +3875,7 @@ export function TicketSheet({
                 </div>
               ))}
           </dl>
+          {phone ? descriptionSection : null}
 
           {ticketRead.rollup !== null ? (
             <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>

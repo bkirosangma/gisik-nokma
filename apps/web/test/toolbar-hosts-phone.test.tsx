@@ -97,6 +97,9 @@ async function mountSheet(phone: boolean): Promise<Mounted & { unmount: () => vo
     <TicketSheet dataSource={services.dataSource} workspaceId={WS} ticketId={TICKET} currentUserId={USER} onClose={() => undefined} editorSlot={TicketEditorSlot} />,
   );
   const host = await screen.findByTestId('field-description');
+  // AMENDED 2026-10-02 (23.125): a phone sheet opens on its fields and keeps the description behind a disclosure, so
+  // the editor mounts only once it is pressed. The assertions below are unchanged; only the way in is.
+  if (phone) fireEvent.click(await within(host).findByRole('button', { name: /^(Add a|Edit) description$/ }));
   await waitFor(() => expect(host.querySelector('.ticket-editor .ProseMirror')).not.toBeNull());
   return { host, toolbar: host.querySelector('.ticket-editor__toolbar') as HTMLElement, unmount: view.unmount };
 }

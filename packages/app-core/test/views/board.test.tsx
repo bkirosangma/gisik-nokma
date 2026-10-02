@@ -179,20 +179,20 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
   /* 13.302 — the provenance control unfolds to text carrying BOTH an actor and
    * a time, in one asserted string. The sibling below pins the nameless-claim
    * arm, so the actor is never dropped for want of a display name. */
-  it('unfolds to "marked <state> by <who> on <when>"', async () => {
+  it('unfolds to "Moved to <state> by <who> on <when>" (UX T7, 23.123: the card line, was "who · when" / "marked …")', async () => {
     const user = userEvent.setup();
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
-    await user.click(screen.getByRole('button', { name: 'who · when' }));
-    expect(screen.getByText('marked Doing by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Moved to Doing by/ }));
+    expect(screen.getByText('Moved to Doing by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: a nameless claim still names the actor by id — never anonymous', async () => {
     const user = userEvent.setup();
     const board = errandBoard([boardCardSeed({ stateProvenance: claim({ actorName: null }) })]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    await user.click(screen.getByRole('button', { name: 'who · when' }));
+    await user.click(screen.getByRole('button', { name: /^Moved to Doing by/ }));
     // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
-    expect(screen.getByText('marked Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
+    expect(screen.getByText('Moved to Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done · 2 restricted" with only 6 visible', () => {
@@ -269,7 +269,7 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
     process.env.TZ = zone;
     try {
       const view = render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
-      const fold = screen.getByRole('button', { name: 'who · when' });
+      const fold = screen.getByRole('button', { name: /^Moved to Doing by/ });
       act(() => {
         fold.click();
       });
@@ -290,11 +290,11 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
   }
 
   it('PLANTED DEFECT: the unfold reads the same IST day from a zone fourteen hours ahead', () => {
-    expect(unfoldUnder('Pacific/Kiritimati')).toBe('marked Doing by Anselma Marak on 19 Aug 2026');
+    expect(unfoldUnder('Pacific/Kiritimati')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2026');
   });
 
   it('PLANTED DEFECT: and from a zone eleven hours behind — two zones, one answer', () => {
-    expect(unfoldUnder('Pacific/Niue')).toBe('marked Doing by Anselma Marak on 19 Aug 2026');
+    expect(unfoldUnder('Pacific/Niue')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2026');
     expect(unfoldUnder('Pacific/Kiritimati')).toEqual(unfoldUnder('Pacific/Niue'));
   });
 
