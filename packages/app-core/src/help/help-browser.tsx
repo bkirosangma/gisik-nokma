@@ -1,4 +1,4 @@
-import { SegmentedControl } from '@gisik-nokma/ui';
+import { SegmentedControl, useScrollEdges } from '@gisik-nokma/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { HELP_CONTENT } from './content.generated.js';
 import {
@@ -470,9 +470,10 @@ function TopicSidebar({
 }) {
   const [collapsed, setCollapsed] = useState<Readonly<Record<string, true>>>({});
   const nav = useMemo(() => helpNav(document), [document]);
+  const edgesRef = useScrollEdges<HTMLElement>('y');
 
   return (
-    <aside className="gn-help__sidebar">
+    <aside className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y" ref={edgesRef}>
       {/*
         The document switch, MOVED here from above the search box and REBUILT
         on the shared `SegmentedControl` (2026-09-15).

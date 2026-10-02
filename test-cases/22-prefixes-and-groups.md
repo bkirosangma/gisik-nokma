@@ -51,7 +51,15 @@
 - ✅ **22.067 — `parseTicketKey(" ccso2-12 ")` is `{ letters: "CCSO2", number: 12 }` (one trailing digit 2–9, the collision suffix of a DERIVED project prefix, `collisionCandidates` → `SO2`…`SO9`);** control, same `it`: `"CC1O-12"` (digit in the middle), `"CCSO22-1"` (two digits), `"CCSO1-1"`, `"CCSO0-1"`, a leading digit, a digit then a letter and `"C2-1"` all stay `null`. Mutation: letters-only regex → red (also 22.068). (`packages/domain/test/prefix.test.ts`; `packages/domain/src/prefix.ts`)
 - ✅ **22.068 — two projects that derive the same prefix (`ZO` and `ZO2`): `<ws>ZO2-1` finds the SECOND project's ticket, and its card reads that same key;** control, same `it`: `<ws>ZO-1` finds the first project's ticket, and `<ws>ZO3-1` (a digit nothing took) finds nothing. Mutation: letters-only regex → red (also 22.067). (`apps/server/test/routes/search-by-key.test.ts`)
 
-## 22.5 The group tree — events, projection, door, read route
+## 22.5 Note search follows a prefix change
+
+*Task 5. Ids `22.083`–`22.089` are unused.*
+
+- ✅ **22.080 — after `project.updated {prefix:"SH"}`, a note attached to ticket `CCRE-3` has `ticket_text` `ccsh-3 …` and a note search for `CCSH-3` finds it;** control: before the change `ccre-3` was indexed and `CCRE-3` found it, and `CCSH-3` did not. Mutation: ignore `project.updated` in the projection → red. (`apps/server/test/projections/note-search-prefix.test.ts`; `apps/server/src/projections/note-search.ts`)
+- ✅ **22.081 — after `workspace.prefix_changed {prefix:"CD"}` the same note reads `cdsh-4` and is found by `CDSH-4`;** control: before, `ccsh-4` and `CCSH-4` found it. Mutation: ignore `workspace.prefix_changed` → red (also 22.082). (same file)
+- ✅ **22.082 — `verifyProjections` stays clean (`proj_note_search` AND `proj_note_lexemes`) at TWO checkpoints: right after a project prefix change, and again after a workspace prefix change.** Self-contained: the case founds its own project and note and makes both changes itself (it reads nothing 22.080/22.081 left); control: the note's `ticket_text` is re-keyed at each step. Mutations: drop the lexeme re-derivation from the PROJECT path (`reindexNotesAttachedInProject`) → red at checkpoint 1 (the later workspace change would otherwise re-derive the whole vocabulary and hide it); drop it from the WORKSPACE path → red at checkpoint 2; ignore `workspace.prefix_changed` → red. **A missing project-prefix re-index is NOT caught by verify** (measured): the rebuild reads `proj_projects` in its final state, so live and rebuild are stale together; 22.080 pins it. (same file)
+
+## 22.6 The group tree — events, projection, door, read route
 
 *Task 6. Ids `22.108`–`22.119` are unused.*
 

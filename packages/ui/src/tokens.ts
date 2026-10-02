@@ -1140,6 +1140,15 @@ export function phoneVariableName(key: PhoneKey): string {
   return `--gn-phone-${key}`;
 }
 
+/**
+ * The ONE disabled opacity (UX fixes Task 6, audit SYS-09/TT-07): a disabled control reads as "not now" at the same
+ * strength in every style and theme. Before this the product carried 0.4, 0.55, 0.6 and 0.7 in a dozen `:disabled`
+ * rules, so two disabled buttons side by side could not agree. Neo's disabled FIELDS are flat instead (U7, Task 1)
+ * and do not use it. Like spacing and motion it varies with neither axis, so it is emitted ONCE under the bare `:root`.
+ */
+export const disabledOpacity = '0.5';
+export const disabledOpacityVariableName = '--gn-disabled-opacity';
+
 export const motion = {
   feedback: '100ms',
   move: '200ms',
@@ -1909,7 +1918,7 @@ export function themeStylesheet(): string {
       .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
       .join(' ')} ${(Object.keys(phone) as PhoneKey[])
       .map((key) => `${phoneVariableName(key)}: ${phone[key]};`)
-      .join(' ')} }`,
+      .join(' ')} ${disabledOpacityVariableName}: ${disabledOpacity}; }`,
     `:root { ${declarationsFor('hig', 'light')} }`,
     `[data-theme="dark"] { ${declarationsFor('hig', 'dark')} }`,
     `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${declarationsFor('hig', 'dark')} } }`,

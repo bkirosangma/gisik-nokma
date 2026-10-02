@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { PublishedWorkflowDef, StateCategory } from '@gisik-nokma/domain';
 import { Button, Card } from '@gisik-nokma/ui';
+import { CATEGORY_LABEL } from '../category-label.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from './builder-context.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
@@ -232,6 +233,7 @@ export function WorkflowListScreen(props: {
                       aria-hidden="true"
                     />
                     {state.name}
+                    <span className="workflow-list__state-category">{CATEGORY_LABEL[state.category]}</span>
                   </span>
                 ))}
               </div>

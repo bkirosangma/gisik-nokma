@@ -75,6 +75,7 @@ export function BoardPhonePicker({
   return (
     <SegmentedControl
       className="gn-board-phone-picker"
+      fade
       aria-label="Column"
       options={columns.map((column) => ({ value: column.stateId, label: `${column.name} ${column.count}` }))}
       value={activeStateId}
