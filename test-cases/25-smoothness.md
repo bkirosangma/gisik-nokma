@@ -7,3 +7,18 @@
 ## 25.1 Catalogue (T1)
 
 - ❌ **25.001 — the bucket is registered in `test-cases/README.md` and the citations baseline, and `pnpm check:citations` passes with it empty (audit: none, the bucket's own registration).** Control: a case id cited by no test reddens the check.
+
+## 25.2 The read cache, dedupe and one reload wave (T3)
+
+- ✅ **25.020 — a number as `useLiveQuery`'s fifth argument still means `debounceMs`, and the sixth argument is still the 18.461 `initial` seed; a hook with no `cacheKey` reads and writes no cache (audit SM-01).** Control: the same remount without a `cacheKey` starts from `null`.
+- ✅ **25.021 — a hook with a `cacheKey` serves the last answer on its FIRST render and still asks again; `settled` stays false until the fresh read lands and the fresh answer replaces the cached one; the same `cacheKey` in another workspace is another question (audit SM-01).** Control: a mount with no `cacheKey` starts from `null`; the workspace the answer was stored under serves it.
+- ✅ **25.022 — a key change serves the NEW key's cached answer, never the old key's, and `null` when it has none (audit SM-01).** Control: the three keys A, B, C, one rerender each.
+- ✅ **25.023 — the cache evicts by age (10 minutes, the expired entry is deleted, not hidden) and by size (200 entries, oldest first, a recall counts as use) and clears whole (audit SM-01).** Control: the entry a reader keeps touching outlives the one nobody asks for.
+- ✅ **25.024 — one stream frame reloads every hook on the workspace ONCE each, from one timer per workspace; a frame on another workspace reloads nothing here, and an unmounted hook is not reloaded (audit SM-05).** Control: two frames, two hooks, two loads each overall, never four.
+- ✅ **25.025 — two identical reads in flight share one call; a different argument, a read after settlement, and a read after a failure are new calls; writes and the stream are the source's own (audit SM-05).** Control: the undecorated source makes a call per read.
+- ✅ **25.026 — two board reads inside one second join the roster ONCE; a read a second later joins again; a failed join is not memoised (audit SM-05; FD7).** Control: a read just inside the burst window does not join again.
+- ✅ **25.027 — a read the server refused evicts its cache entry: the next mount does not resurrect an answer the person may no longer read (audit SM-01).** Control: the stale answer is served at once, before the refusal lands.
+- ✅ **25.028 — no cached answer of one signed-in person is ever served to the next on the same device: the cache is emptied at the account menu's accepted sign-out, a write's 401, a read's 401, and the session resolving to somebody else or to nobody; it is NOT emptied by a refused sign-out, a non-401 failure, the first session resolve, or a re-render of the same person (audit SM-01; review focus 2).** Control: each door's nearest non-door action leaves the planted answer in place.
+- ✅ **25.029 — a read that was in flight when the cache was cleared does not write its answer back (audit SM-01; review focus 2).** Control: a read issued after the clear writes as usual.
+- ✅ **25.030 — an identical read in flight across a sign-out is not shared with the next person's read (audit SM-05; review focus 2).** Control: with no clear between them the same two reads share one call.
+- ✅ **25.031 — the roster burst memo does not cross a sign-out: the next person's read inside the same second joins the roster for itself (audit SM-05; review focus 2).** Control: with no clear between them the second read is served from the memo.

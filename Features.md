@@ -3697,6 +3697,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
 
+- ⚙️ **A read cache, in-flight dedupe and one reload wave** (smoothness T3; audit SM-01, SM-05; cases 25.020–25.031). `useLiveQuery` takes a `cacheKey` and serves the last answer for it on the first render and on a key change while the fresh read runs (stale-while-revalidate, 10 minutes or 200 entries, a refused read evicts); one reload timer per workspace fires every hook's reload once per stream frame; `withInflightDedupe` makes identical reads in flight share one call; the roster join is memoised for one second per workspace. The cache is per person: sign-out, a 401 on a write or a read, and the session changing to somebody else or to nobody empty it (`clearReadCaches`), and a read in flight across that moment neither writes back nor is shared (the read epoch). `packages/app-core/src/views/live-query-cache.ts`, `reload-scheduler.ts`, `use-live-query.ts`, `inflight-dedupe.ts`, `read-epoch.ts`, `online/online-data-source.ts`; `apps/web/src/clear-read-caches.ts`, `expired-session.tsx`, `account-menu.tsx`, `providers.tsx`.
+
 ## 23. Comment edit and delete, Markdown bodies
 
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*

@@ -7,6 +7,7 @@ import {
   SessionExpiredError,
   type DataSource,
 } from '@gisik-nokma/app-core';
+import { clearReadCaches } from './clear-read-caches.js';
 
 /**
  * The ONE author of "a 401 is not a refusal, it is a session that ended".
@@ -76,6 +77,9 @@ export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>
   const expired = messages.some(isExpiredSession);
   useEffect(() => {
     if (!expired) return;
+    // The session ended: what this device read for that person is not the next
+    // person's to be served (smoothness T3, case 25.028).
+    clearReadCaches();
     // E5-32: the destination is CARRIED, not dropped. This hook was the ONE
     // author of the 401 redirect and pushed a bare `/sign-in`, while
     // `docs/manual.md` promises the opposite in two places — *"it puts you back
@@ -167,7 +171,12 @@ export function withSignInOnExpiredWrite(source: DataSource, onExpired: () => vo
       try {
         return await source.ingest(events);
       } catch (cause) {
-        if (cause instanceof SessionExpiredError) onExpired();
+        if (cause instanceof SessionExpiredError) {
+          // Before the redirect: the cache is emptied whether or not the router
+          // gets there (smoothness T3, case 25.028).
+          clearReadCaches();
+          onExpired();
+        }
         throw cause;
       }
     },
