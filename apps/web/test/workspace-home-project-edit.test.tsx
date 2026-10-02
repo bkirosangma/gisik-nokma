@@ -78,6 +78,12 @@ function commit(event: SubmittedEvent): IngestResult {
 
 const card = async (projectId: string) => within(await screen.findByTestId(`project-row-${projectId}`));
 
+/** Edit is the first item of the card's overflow menu (WS-03, 22.147): open the menu and press it. */
+async function openEdit(c: ReturnType<typeof within>, projectName: string): Promise<void> {
+  await userEvent.click(c.getByRole('button', { name: `More actions for ${projectName}` }));
+  await userEvent.click(c.getByRole('menuitem', { name: 'Edit' }));
+}
+
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -105,14 +111,16 @@ describe('13.1608 the card offers Edit to whoever may archive', () => {
     for (const role of ['owner', 'admin']) {
       mount([[workspaceAs(role)]]);
       const c = await card('p1');
-      expect(c.getByRole('button', { name: 'Edit Shop operations' })).toBeInTheDocument();
-      expect(c.getByRole('button', { name: 'Archive Shop operations' })).toBeInTheDocument(); // control: Archive's own gate
+      await userEvent.click(c.getByRole('button', { name: 'More actions for Shop operations' }));
+      expect(c.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+      expect(c.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument(); // control: Archive's own gate
       cleanup();
     }
     mount([[workspaceAs('member')]]);
     const c = await card('p1');
+    expect(c.queryByRole('button', { name: /More actions/ })).toBeNull();
+    expect(c.queryByRole('menuitem', { name: 'Edit' })).toBeNull();
     expect(c.queryByRole('button', { name: 'Edit Shop operations' })).toBeNull();
-    expect(c.queryByRole('button', { name: 'Archive Shop operations' })).toBeNull();
   });
 });
 
@@ -124,7 +132,7 @@ describe('13.1609 the inline edit form', () => {
     ]);
     const c = await card('p1');
 
-    await userEvent.click(c.getByRole('button', { name: 'Edit Shop operations' }));
+    await openEdit(c, 'Shop operations');
     expect(c.getByLabelText('Name')).toHaveValue('Shop operations');
     expect(c.getByLabelText('Description (optional)')).toHaveValue('Daily shop work');
 
@@ -132,16 +140,17 @@ describe('13.1609 the inline edit form', () => {
     await userEvent.type(c.getByLabelText('Name'), ' draft');
     await userEvent.click(c.getByRole('button', { name: 'Cancel' }));
     expect(c.queryByLabelText('Name')).toBeNull();
-    expect(c.getByRole('button', { name: 'Edit Shop operations' })).toBeInTheDocument();
+    // the card's menu trigger is back and is where focus returns
+    expect(c.getByRole('button', { name: 'More actions for Shop operations' })).toHaveFocus();
     expect(sent).toHaveLength(0);
 
-    await userEvent.click(c.getByRole('button', { name: 'Edit Shop operations' }));
+    await openEdit(c, 'Shop operations');
     expect(c.getByLabelText('Name')).toHaveValue('Shop operations'); // the discarded draft did not stick
     await userEvent.type(c.getByLabelText('Name'), ' draft{Escape}');
     expect(c.queryByLabelText('Name')).toBeNull();
     expect(sent).toHaveLength(0);
 
-    await userEvent.click(c.getByRole('button', { name: 'Edit Shop operations' }));
+    await openEdit(c, 'Shop operations');
     await userEvent.clear(c.getByLabelText('Name'));
     await userEvent.type(c.getByLabelText('Name'), 'Shop floor');
     await userEvent.click(c.getByRole('button', { name: 'Save' }));
@@ -155,7 +164,7 @@ describe('13.1609 the inline edit form', () => {
     });
     // the outcome is OBSERVED by the re-read: the form closes and the card shows the served name
     await waitFor(() => expect(screen.queryByLabelText('Name')).toBeNull());
-    expect(await screen.findByRole('button', { name: 'Edit Shop floor' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'More actions for Shop floor' })).toBeInTheDocument();
   });
 
   it('13.1609 a refused save keeps the form open and says why; Save with nothing changed sends nothing', async () => {
@@ -166,7 +175,7 @@ describe('13.1609 the inline edit form', () => {
       reason: 'Only a workspace owner or admin can do this. Your role is member.',
     }) as IngestResult);
     const c = await card('p1');
-    await userEvent.click(c.getByRole('button', { name: 'Edit Shop operations' }));
+    await openEdit(c, 'Shop operations');
     await userEvent.type(c.getByLabelText('Name'), '!');
     await userEvent.click(c.getByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('permission.role: Only a workspace owner or admin can do this.');
@@ -184,7 +193,7 @@ describe('13.1610 a blank name is not sent', () => {
   it('13.1610 the form says why and sends nothing; a one-character name is sent', async () => {
     const { sent } = mount([[workspaceAs('owner')]]);
     const c = await card('p1');
-    await userEvent.click(c.getByRole('button', { name: 'Edit Shop operations' }));
+    await openEdit(c, 'Shop operations');
     await userEvent.clear(c.getByLabelText('Name'));
     expect(c.getByText('A project needs a name.')).toBeInTheDocument();
     expect(c.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');

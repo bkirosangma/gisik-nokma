@@ -466,6 +466,8 @@ type AbsenceDecision =
   | 'getMyWorkspaces'
   | 'getMembers'
   | 'getActorNames'
+  // Prefixes and groups Task 6/7 (22.123): the workspace's group tree, one flat row per group.
+  | 'getGroups'
   | 'getBoard'
   | 'getTickets'
   | 'getTicket'
@@ -544,6 +546,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   // `proj_memberships` joined to `user`. It never touches `proj_tickets`, so the
   // marker (a ticket TITLE) cannot reach it even before the delete.
   getActorNames: { verdict: 'excluded', carries: false },
+  // A group row is `{id, parentId, level, name, rank, projectCount, childCount}` (`routes/groups.ts`,
+  // `mapGroupRows`): a group's NAME and two counts, from `proj_groups` and a `count(*)` over
+  // `proj_projects` / `proj_groups`. It never reads `proj_tickets`, so the marker (a ticket TITLE)
+  // cannot reach it even before the delete.
+  getGroups: { verdict: 'excluded', carries: false },
   getBoard: { verdict: 'excluded', carries: true },
   getTickets: { verdict: 'excluded', carries: true },
   getTicket: {
@@ -710,6 +717,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getMyWorkspaces: () => ds.getMyWorkspaces(),
     getMembers: () => ds.getMembers(workspaceId),
     getActorNames: () => ds.getActorNames(workspaceId),
+    getGroups: () => ds.getGroups(workspaceId),
     getBoard: () => ds.getBoard(projectId),
     getTickets: () => ds.getTickets(projectId, {}, 'status'),
     getTicket: () => ds.getTicket(workspaceId, childId),
@@ -835,8 +843,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // 16 until the notes series (Plan 1 of 6) added its seven reads; 23 until
   // Plan 3 of 6 added `searchNotes`; 24 until the trash series (Plan 1) added
   // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`; 26 until
-  // `fix/names-nav-focus` added `getActorNames`.
-  expect(MEMBERS).toHaveLength(27);
+  // `fix/names-nav-focus` added `getActorNames`; 27 until prefixes and groups
+  // Task 7 (22.123) added `getGroups`.
+  expect(MEMBERS).toHaveLength(28);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);
