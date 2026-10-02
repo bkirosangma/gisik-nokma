@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { SegmentedControl } from '@gisik-nokma/ui';
 
 /** One option of the picker: a column of the group, however the person had it collapsed on a wider screen. */
@@ -50,7 +50,8 @@ export function useActiveColumn(
  *
  * `focus` is true for an activation and false for an arrow key. The segmented control reports both through the
  * one `onChange`, so the wrapper marks a click on its way down (a tap, and Enter/Space, which the browser turns
- * into a click) and `onChange` reads and clears the mark.
+ * into a click) and `onChange` reads and clears the mark; a key press clears it too, so a click that changed nothing
+ * cannot arm the next arrow key.
  */
 export function BoardPhonePicker({
   columns,
@@ -63,7 +64,14 @@ export function BoardPhonePicker({
 }) {
   const activated = useRef(false);
   return (
-    <div className="gn-board-phone-picker__activation" onClickCapture={() => { activated.current = true; }}>
+    <div
+      className="gn-board-phone-picker__activation"
+      onClickCapture={() => { activated.current = true; }}
+      // A click on the option already selected fires no `onChange`, so the mark would outlive it and the NEXT arrow
+      // key would be taken for an activation (U-T7 fix 1, 23.128). Every key press starts afresh; Enter and Space
+      // reach `onClickCapture` after their keydown, so they are still marked.
+      onKeyDownCapture={() => { activated.current = false; }}
+    >
       <SegmentedControl
         className="gn-board-phone-picker"
         fade
@@ -78,4 +86,37 @@ export function BoardPhonePicker({
       />
     </div>
   );
+}
+
+/**
+ * A phone Move must never leave its dialog or notice in a column the person cannot see (UX T7 fix 1, 23.126).
+ *
+ * `Dialog` does not portal and the card is remounted in its landing column the moment a move is laid, so the move
+ * dialog and the refusal/transport notices are drawn in whichever column the card is in — and on a phone every column
+ * but the shown one is `hidden` and `inert`. While any card has an open dialog or a notice (`heldIn` is the column
+ * that holds it), the phone SHOWS that column; when the last one closes, the view goes back to the column the person
+ * was on. The follow is a pick, made when the holder's column CHANGES, never a lock: the person can choose another
+ * column at any time (a notice that lingers after a failed direct move does not trap them).
+ */
+export function useFollowOpenMove(
+  heldIn: string | null,
+  activeStateId: string | null,
+  pick: (stateId: string) => void,
+): void {
+  const returnTo = useRef<string | null>(null);
+  const latest = useRef({ activeStateId, pick });
+  latest.current = { activeStateId, pick };
+  useLayoutEffect(() => {
+    const { activeStateId: shown, pick: choose } = latest.current;
+    if (heldIn !== null) {
+      if (heldIn !== shown) {
+        returnTo.current ??= shown;
+        choose(heldIn);
+      }
+    } else if (returnTo.current !== null) {
+      const back = returnTo.current;
+      returnTo.current = null;
+      choose(back);
+    }
+  }, [heldIn]);
 }

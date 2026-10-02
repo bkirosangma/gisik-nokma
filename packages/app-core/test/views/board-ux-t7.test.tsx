@@ -148,3 +148,24 @@ describe('23.123 (BRD-03) the card says what happened, in words', () => {
     expect(formatStateProvenance('Doing', claim())).toBe('marked Doing by Anselma Marak on 19 Aug 2026');
   });
 });
+
+describe('23.128 (U-T7 fix 1) a click that landed in the picker but chose nothing does not arm the next arrow key', () => {
+  it('23.128 click the picker\'s own track (no option), then press ArrowRight on the focused option: the selection moves and focus stays on the picker', async () => {
+    viewport(true);
+    const user = userEvent.setup();
+    render(<Board board={boardOf()} onOpenTicket={() => {}} />);
+    await user.click(screen.getByRole('tablist', { name: 'Column' })); // a click in the picker, on no option: no `onChange`
+    screen.getByRole('tab', { name: /^To do/ }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(SHOWN('doing')).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: /^Doing/ }));
+  });
+
+  it('23.128 CONTROL — a click ON an option (the selected one included) still moves focus into the column', async () => {
+    viewport(true);
+    const user = userEvent.setup();
+    render(<Board board={boardOf()} onOpenTicket={() => {}} />);
+    await user.click(screen.getByRole('tab', { name: /^Doing/ }));
+    expect(section('doing').contains(document.activeElement)).toBe(true);
+  });
+});

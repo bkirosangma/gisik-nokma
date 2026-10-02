@@ -31,7 +31,7 @@ import type {
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { allBoardTargets, arrowTargets } from './board-arrows.js';
-import { BoardPhonePicker, useActiveColumn } from './board-phone-picker.js';
+import { BoardPhonePicker, useActiveColumn, useFollowOpenMove } from './board-phone-picker.js';
 import { usePhoneBoard } from './use-phone-board.js';
 import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
@@ -1149,6 +1149,18 @@ function BoardGroupSection({
     railRef,
     group.columns.map((column) => column.stateId),
   );
+  // U-T7 fix 1 (23.126): the column that holds a card with an open Move dialog or a notice is the one shown, so
+  // neither is ever in a `hidden`, `inert` column. `Dialog` does not portal and the card is drawn in its landing column.
+  const sessions = useContext(MoveStateContext)?.sessions;
+  const heldIn = !phone || sessions === undefined
+    ? null
+    : (group.columns.find((column) =>
+        column.cards.some((card) => {
+          const held = sessions[card.ticketId];
+          return held !== undefined && (held.dialog !== null || held.refusal !== null || held.serverRefusal !== null || held.transportError !== null);
+        }),
+      )?.stateId ?? null);
+  useFollowOpenMove(heldIn, activeStateId, pickColumn);
   useHydrationLayoutEffect(() => {
     const pending = pendingFocusRef.current;
     if (pending === null) return;

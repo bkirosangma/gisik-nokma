@@ -80,10 +80,12 @@ const boardOf = (...groups: BoardGroup[]): BoardView => ({ projectId: PROJECT, g
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 const committed = (events: { id: string }[]): IngestResult[] =>
   events.map((event) => ({ status: 'committed' as const, eventId: event.id, seq: 1, serverTime: '2026-10-01T09:00:00.000Z' }));
@@ -395,11 +397,94 @@ describe('21.049 a Move submits through the same optimistic path as the arrows',
     await user.click(within(dialog).getByRole('button', { name: 'Move' }));
 
     // The card changed column when the move was laid, so the dialog is the one inside its new slot: ask afresh.
-    // That column is not the one the phone shows (23.120), hence `hidden: true`; whether a refusal should bring the
-    // person to it is a finding for the owner, not something this task decides.
+    // AMENDED 2026-10-02 (23.126): the phone shows the column that holds the open dialog, so it is found as a person finds it.
     await waitFor(() => expect(screen.getByText(/Refused by the server — some-rule: Not allowed right now\./)).toBeInTheDocument());
-    await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket', hidden: true })).getByRole('button', { name: 'Cancel', hidden: true }));
+    await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
     expect(idsIn('waiting')).toEqual([]);
+  });
+});
+
+describe('23.126 (U-T7 fix 1) a phone Move never leaves its dialog or notice in a column the person cannot see', () => {
+  /** Choose a destination in the open Move dialog and press Move. */
+  async function moveVia(user: ReturnType<typeof userEvent.setup>, destination: string, comment?: string) {
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: new RegExp(`^${destination}`) }));
+    if (comment !== undefined) await user.type(within(dialog).getByLabelText(/Comment/), comment);
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+  }
+
+  it('23.126 a write that fails (ingest rejects): the dialog is shown in the column the card went to, says so, and Cancel returns the person to Doing', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    await mount(boardOf(errandGroup()), WF_ERRAND, () => write.promise);
+    await showColumn(/^Doing/);
+    expect(selectedTab()).toEqual(['Doing 1']); // CONTROL — the person starts on Doing
+    await user.click(moveButtonIn('tk_b'));
+    await moveVia(user, 'Waiting');
+
+    // The card is laid in Waiting while the write is open, and the phone shows Waiting: the dialog is in the page.
+    await waitFor(() => expect(idsIn('waiting')).toEqual(['tk_b']));
+    expect(columnOf('waiting')).not.toHaveAttribute('hidden');
+    expect(selectedTab()).toEqual(['Waiting on counterparty 1']);
+    expect(await screen.findByRole('dialog', { name: 'Move ticket' })).toBeVisible();
+    // CONTROL — 23.120 still holds for every other column.
+    for (const hiddenId of ['todo', 'doing', 'done']) {
+      expect(columnOf(hiddenId)).toHaveAttribute('hidden');
+      expect(columnOf(hiddenId)).toHaveAttribute('inert');
+    }
+
+    await act(async () => write.reject(new Error('network down')));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(within(dialog).getByRole('alert')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
+    expect(columnOf('doing')).not.toHaveAttribute('hidden');
+    expect(columnOf('waiting')).toHaveAttribute('hidden');
+    expect(selectedTab()).toEqual(['Doing 1']);
+  });
+
+  it('23.126 CONTROL — a Move that succeeds leaves the dialog gone and the person back on the column they were in', async () => {
+    const user = userEvent.setup();
+    await mount(boardOf(errandGroup()), WF_ERRAND, (events) => committed(events));
+    await showColumn(/^Doing/);
+    await user.click(moveButtonIn('tk_b'));
+    await moveVia(user, 'Waiting');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull());
+    expect(idsIn('waiting')).toEqual(['tk_b']);
+    expect(selectedTab()).toEqual(['Doing 0']);
+    expect(columnOf('doing')).not.toHaveAttribute('hidden');
+  });
+});
+
+describe('23.127 (U-T7 fix 1) a gated move\'s comment step and its refusal are visible and operable on a phone', () => {
+  it('23.127 Done needs a comment: typed in the dialog, the card is laid in Done and that column is shown while the write is open; a refusal then reads in the dialog, and Cancel brings the person back to Doing', async () => {
+    const user = userEvent.setup();
+    const write = deferred<IngestResult[]>();
+    await mount(boardOf(errandGroup()), WF_ERRAND, () => write.promise);
+    await showColumn(/^Doing/);
+    await user.click(moveButtonIn('tk_b'));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: /^Done/ }));
+    expect(within(dialog).getByRole('button', { name: 'Move' })).toBeDisabled(); // CONTROL — no comment, no Move
+    await user.type(within(dialog).getByLabelText(/Comment/), 'all paid');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+
+    await waitFor(() => expect(idsIn('done')).toEqual(['tk_b']));
+    expect(columnOf('done')).not.toHaveAttribute('hidden');
+    expect(columnOf('doing')).toHaveAttribute('hidden');
+    const open = await screen.findByRole('dialog', { name: 'Move ticket' });
+    expect(open).toBeVisible();
+    expect(within(open).getByRole('button', { name: 'Cancel' })).toBeVisible();
+
+    await act(async () => write.resolve([{ status: 'refused', eventId: 'x', rule: 'some-rule', reason: 'Not allowed right now.' }]));
+    await waitFor(() => expect(screen.getByText(/Refused by the server — some-rule: Not allowed right now\./)).toBeVisible());
+    await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
+    expect(columnOf('doing')).not.toHaveAttribute('hidden');
+    expect(selectedTab()).toEqual(['Doing 1']);
   });
 });
