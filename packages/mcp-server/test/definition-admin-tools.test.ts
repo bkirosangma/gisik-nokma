@@ -185,6 +185,21 @@ describe('14.530–14.534 definition admin tools', () => {
     await expect(tool('migrate_ticket_type', refused.session).handler({ ...args, confirm_name: 'Task' })).rejects.toThrow(
       'refused by migration.same-workflow: The source and target workflow are the same.',
     );
+    // The route answers a non-admin 404. A MEMBER (read the workspace and the type, so the 404 is the admin gate) is told so in the gate's own
+    // sentence with their role; CONTROL: an owner's 404 is not turned into a refusal.
+    const as = (role: string) =>
+      fake(
+        { '/v1/me/workspaces': { workspaces: [{ workspaceId: WS, name: 'Corner Shop', prefix: 'CC', role, archived: false, projects: [] }] } },
+        {
+          post: async () => {
+            throw new HttpError(404, NOT_FOUND);
+          },
+        },
+      );
+    await expect(tool('migrate_ticket_type', as('member').session).handler({ ...args, confirm_name: 'Task' })).rejects.toThrow(
+      'refused by permission.role: Only a workspace owner or admin can do this. Your role is member.',
+    );
+    await expect(tool('migrate_ticket_type', as('owner').session).handler({ ...args, confirm_name: 'Task' })).rejects.toThrow('gisik-nokma answered 404');
     // An unknown type is the uniform not-found, before any confirm.
     await expect(tool('migrate_ticket_type', f.session).handler({ ...args, typeId: 'nope', confirm_name: 'Task' })).rejects.toThrow('ticket type not found or not visible to you');
     // A stateMap that is not a map is refused here, naming it, rather than sent for the route's 400.
