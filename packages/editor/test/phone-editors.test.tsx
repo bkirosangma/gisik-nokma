@@ -283,7 +283,7 @@ describe('G-7 3: one docked toolbar row', () => {
     expect(bar(view)).toHaveClass('ticket-editor__toolbar--docked');
     // The keyboard is up: the visual viewport is 500 tall in an 844 layout viewport → the bar's bottom edge sits 344px up.
     expect(dockOffset(bar(view))).toBe('344px');
-    expect(bar(view).style.bottom, 'the bar carries a variable, never an inline bottom (25.421)').toBe('');
+    expect(bar(view).style.bottom, 'the bar carries a variable, never an inline bottom (25.441)').toBe('');
 
     // The keyboard grows (visual viewport 400) and the page pans (offsetTop 30): the bar follows both events.
     vv.height = 400;
@@ -689,7 +689,7 @@ describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom
     expect(barHeightPx(0)).toBe(56); // CONTROL: hig, minimal and the webview keep the 3.5rem bar
   });
 
-  it('25.420 (F2) while docked the view keeps the caret above the bar: scrollMargin and scrollThreshold have a bottom of at least the bar plus a gap, and undocking (blur, or a desktop mount) restores ProseMirror\'s default', async () => {
+  it('25.440 (F2) while docked the view keeps the caret above the bar: scrollMargin and scrollThreshold have a bottom of at least the bar plus a gap, and undocking (blur, or a desktop mount) restores ProseMirror\'s default', async () => {
     const barHeight = 84;
     const spy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function offsetHeight(this: HTMLElement) {
       return this.classList.contains('ticket-editor__toolbar') ? barHeight : 0;
@@ -725,7 +725,7 @@ describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom
     }
   });
 
-  it('25.421 (F3) the docked bar clears the phone bottom bar when no keyboard is up: its bottom is the dock offset PLUS `--gn-bar-lift`, the offset is a variable the bar carries (0px with no keyboard), and inside a modal dialog or sheet (over the bottom bar) the lift is 0', async () => {
+  it('25.441 (F3) the docked bar clears the phone bottom bar when no keyboard is up: its bottom is the dock offset PLUS `--gn-bar-lift`, the offset is a variable the bar carries (0px with no keyboard), and inside a modal dialog or sheet (over the bottom bar) the lift is 0', async () => {
     const docked = phoneRule('.ticket-editor__toolbar--docked');
     expect(valueOf(docked, 'bottom')).toBe('calc(var(--ticket-editor-dock-bottom, 0px) + var(--gn-bar-lift, 0px))');
     // No keyboard: the visual viewport is the layout viewport → the variable is 0px (and the lift alone clears the nav).
@@ -754,7 +754,7 @@ describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom
     expect(CSS.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/^\.ticket-editor__toolbar[^{]*\{[^}]*gn-bar-lift/m);
   });
 
-  it('25.422 (F4) the sheet is a dialog: focus moves into it on open, Tab from the last cell wraps to the first and Shift+Tab from the first wraps to the last', async () => {
+  it('25.442 (F4) the sheet is a dialog: focus moves into it on open, Tab from the last cell wraps to the first and Shift+Tab from the first wraps to the last', async () => {
     const { view } = await mountEditor(true);
     const user = userEvent.setup();
     focusEditor(view);
