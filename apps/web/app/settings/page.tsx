@@ -3,19 +3,26 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { TicketTypeListScreen, WorkflowListScreen, useLiveQuery } from '@gisik-nokma/app-core';
+import {
+  TicketTypeListScreen,
+  WorkflowListScreen,
+  makeSubmittedFactory,
+  useLiveQuery,
+  writeFailureCopy,
+} from '@gisik-nokma/app-core';
 import { useScrollEdges } from '@gisik-nokma/ui';
 import { AppNav } from '../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
 import { useAppServices } from '../../src/providers.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
 import { useWorkspaceName } from '../../src/use-workspace-name.js';
+import { GroupsTree, type GroupAction, type GroupActionResult } from '../../src/settings/groups-tree.js';
 import { WorkspaceSettingsForm } from '../../src/workspace-settings-form.js';
 
-type SettingsTab = 'ticket-types' | 'workflows' | 'workspace';
+type SettingsTab = 'ticket-types' | 'workflows' | 'groups' | 'workspace';
 
 function isSettingsTab(value: string | null): value is SettingsTab {
-  return value === 'ticket-types' || value === 'workflows' || value === 'workspace';
+  return value === 'ticket-types' || value === 'workflows' || value === 'groups' || value === 'workspace';
 }
 
 function tabHref(workspaceId: string | null, tab: SettingsTab): string {
@@ -203,6 +210,18 @@ function SettingsContent() {
           ) : (
             <span className="gn-settings__sidebar-item--disabled">Workflows</span>
           )}
+          {/* Prefixes/groups T11: the project-group tree, between the two authoring tabs and the
+              set-once workspace knobs. Every workspace member may read it; only an admin edits. */}
+          {workspaceId !== null ? (
+            <Link
+              href={tabHref(workspaceId, 'groups')}
+              aria-current={tab === 'groups' ? 'page' : undefined}
+            >
+              Groups
+            </Link>
+          ) : (
+            <span className="gn-settings__sidebar-item--disabled">Groups</span>
+          )}
           {/* Second wave Task 6 (plan ruling R5): the workspace's own knobs —
               `staleDays`, `dueSoonDays` and `autoCloseAfterDays` — which had no
               UI anywhere in the product until now. Third in the sidebar rather
@@ -232,6 +251,8 @@ function SettingsContent() {
             </p>
           ) : tab === 'workflows' ? (
             <WorkspaceWorkflows workspaceId={workspaceId} />
+          ) : tab === 'groups' ? (
+            <WorkspaceGroups workspaceId={workspaceId} />
           ) : tab === 'workspace' ? (
             <WorkspaceSettingsTab workspaceId={workspaceId} />
           ) : (
@@ -240,6 +261,77 @@ function SettingsContent() {
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * Settings → Groups (prefixes and groups plan Task 11). Reads `GET /groups` and files the tree's actions as
+ * claims; the door (Task 6) decides, so a refusal is shown as the server worded it. The read is any member's, the
+ * write controls are the workspace owner's and admins' — `canEdit` is the same rule the door applies.
+ */
+function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
+  const { dataSource } = useAppServices();
+  const wiring = useBuilderWiring(workspaceId);
+  const groups = useLiveQuery(dataSource, workspaceId, `groups:${workspaceId}`, () =>
+    dataSource.query.getGroups(workspaceId),
+  );
+
+  if (wiring.kind !== 'ready') return <WiringNotReady wiring={wiring} />;
+  if (groups.error !== null) {
+    return (
+      <p role="alert" className="gn-refusal gn-refusal--server">
+        {groups.error}
+      </p>
+    );
+  }
+  if (groups.data === null) return <p>Loading groups…</p>;
+
+  const make = makeSubmittedFactory({ actorId: wiring.session.userId, origin: 'web' });
+  const onSubmit = async (action: GroupAction): Promise<GroupActionResult> => {
+    try {
+      const claim = make({
+        workspaceId,
+        entity: { kind: 'group', id: action.id },
+        type: action.type,
+        payload: action.payload,
+      });
+      const result = (await dataSource.ingest([claim]))[0];
+      if (result === undefined) return { ok: false, message: 'The server did not answer this change.' };
+      if (result.status === 'committed') {
+        // Re-read: the tree then shows the SERVER's order and counts, not a local guess.
+        groups.reload();
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        message:
+          result.status === 'refused'
+            ? `Refused by the server — ${result.rule}: ${result.reason}`
+            : `Refused by the server — ${result.code}: ${result.message}`,
+      };
+    } catch (cause) {
+      return {
+        ok: false,
+        message: writeFailureCopy(cause, (message) => `We could not reach the server for this change — ${message}`),
+      };
+    }
+  };
+
+  return (
+    <section aria-labelledby="gn-groups-heading">
+      <h2 id="gn-groups-heading" className="gn-groups__heading">
+        Groups
+      </h2>
+      <p className="gn-groups__lede">
+        Groups sort your projects into up to four levels. A group can be deleted once nothing is filed under it.
+      </p>
+      <GroupsTree
+        workspaceId={workspaceId}
+        canEdit={wiring.session.role === 'owner' || wiring.session.role === 'admin'}
+        groups={groups.data}
+        onSubmit={onSubmit}
+      />
+    </section>
   );
 }
 

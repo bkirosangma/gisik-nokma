@@ -165,6 +165,8 @@ describe('the ticket-type editor is inlined on /settings, not a separate route',
     const sidebar = screen.getByRole('navigation', { name: 'Settings sections' });
     expect(within(sidebar).getByRole('link', { name: 'Ticket types' })).toBeInTheDocument();
     expect(within(sidebar).getByRole('link', { name: 'Workflows' })).toBeInTheDocument();
+    // 22.200 — the fourth tab sits between Workflows and Workspace.
+    expect(within(sidebar).getByRole('link', { name: 'Groups' })).toBeInTheDocument();
   });
 
   /**
