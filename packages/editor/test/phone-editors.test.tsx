@@ -602,6 +602,11 @@ describe('G-7 5: the sheet keeps its Escape and its clicks from the host around 
     stubPhone(true);
     const keys = vi.fn();
     const clicks = vi.fn();
+    // The new-ticket dialog closes on an unconditional document CAPTURE listener: stands in for it (measured on the lane
+    // port: one Escape in the sheet closed the sheet AND the dialog).
+    const dialogLike = vi.fn();
+    const onDocumentKey = (event: KeyboardEvent): void => dialogLike(event.key);
+    document.addEventListener('keydown', onDocumentKey, true);
     const view = render(
       <div onKeyDown={(event) => keys(event.key)} onClick={() => clicks()}>
         <TicketEditorSlot {...slotProps({ mode: 'comment' })} />
@@ -621,6 +626,7 @@ describe('G-7 5: the sheet keeps its Escape and its clicks from the host around 
     await user.keyboard('{Escape}');
     expect(sheet(), 'Escape closes the sheet').toBeNull();
     expect(keys, 'the ancestor never saw the Escape').not.toHaveBeenCalledWith('Escape');
+    expect(dialogLike, 'a document capture listener (the dialog) never saw the Escape').not.toHaveBeenCalledWith('Escape');
     // The strip is untouched: it is a sibling of the portal, not a parent of it.
     expect(format).toHaveAttribute('aria-expanded', 'true');
     expect(view.container.querySelector('[role="toolbar"]')).not.toBeNull();
@@ -631,10 +637,24 @@ describe('G-7 5: the sheet keeps its Escape and its clicks from the host around 
     expect(sheet(), 'a backdrop tap closes').toBeNull();
     expect(clicks, 'a tap on the scrim stays inside the sheet').not.toHaveBeenCalled();
 
-    // CONTROL (same it): a plain Escape on the editor's own bar DOES reach the ancestor, so the spy can fire.
+    // With the table grid open, Escape closes ONLY the grid (the sheet stays) and is hidden from the host as well.
+    await user.click(tool(view, 'More tools'));
+    await user.click(cellNamed('Insert table'));
+    expect(document.body.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    await user.keyboard('{Escape}');
+    expect(document.body.querySelector('.ticket-editor__table-picker'), 'the grid closed').toBeNull();
+    expect(sheet(), 'the sheet stayed').not.toBeNull();
+    expect(document.activeElement, 'focus is back on the table cell').toBe(cellNamed('Insert table'));
+    expect(dialogLike).not.toHaveBeenCalledWith('Escape');
+    await user.keyboard('{Escape}');
+    expect(sheet()).toBeNull();
+
+    // CONTROL (same it): a plain Escape on the editor's own text DOES reach the ancestor and the document listener.
     const control = view.container.querySelector('.ProseMirror') as HTMLElement;
     fireEvent.keyDown(control, { key: 'Escape' });
     expect(keys).toHaveBeenCalledWith('Escape');
+    expect(dialogLike).toHaveBeenCalledWith('Escape');
+    document.removeEventListener('keydown', onDocumentKey, true);
     view.unmount();
     window.localStorage.clear();
   });

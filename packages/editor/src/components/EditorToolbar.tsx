@@ -597,14 +597,15 @@ function HeadingSelect({ editor }: { editor: Editor }): React.JSX.Element {
 /**
  * The phone's "More tools" sheet (G-7): a bottom sheet holding every tool the one-row bar does not carry, as a grid of
  * icon + label cells (the label IS the cell's accessible name, so what is read is what is seen). It copies the CONTRACT
- * of `@gisik-nokma/ui`'s `Sheet` — `role="dialog"`, `aria-modal`, a scrim tap and Escape close it (an Escape a child
- * already handled keeps it: the table grid's own), focus moves in on open — and not the component: this package cannot
+ * of `@gisik-nokma/ui`'s `Sheet` — `role="dialog"`, `aria-modal`, a scrim tap and Escape close it (with the table grid open, Escape
+ * closes only the grid), focus moves in on open — and not the component: this package cannot
  * import `ui` (the dependency runs the other way, and the mobile webview bundles this package alone), and `Sheet` is the
  * ticket sheet's RIGHT-hand panel. Portalled to <body>, so the composer's `overflow: hidden` cannot clip it; React
- * events still bubble through the portal to the sheet's React ANCESTORS, so the scrim and the panel stop `click` and Escape
- * here — a press in the sheet must not reach the host's own handlers (the note page focuses its editor on a click; a
- * dialog or sheet around the editor closes on an Escape). The comment Format strip is NOT such a handler: it sits on the
- * toolbar element, and the portal is a sibling of that element, not a child (25.418).
+ * events still bubble through the portal to the sheet's React ANCESTORS, so the scrim and the panel stop `click`, and
+ * Escape is taken at the window in the capture phase (see `onEscape`) — a press in the sheet must not reach the host's own
+ * handlers (the note page focuses its editor on a click; the dialog or sheet around the editor closes on an Escape). The
+ * comment Format strip is NOT such a handler: it sits on the toolbar element, and the portal is a sibling of that
+ * element, not a child (25.418).
  */
 function MoreSheet({
   id,
@@ -631,14 +632,29 @@ function MoreSheet({
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
-  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
-    if (event.key === 'Escape') {
+  // Escape is taken at the WINDOW, in the capture phase, so it runs before anything a host listens with. The new-ticket
+  // dialog closes on an unconditional `document` capture listener (`Dialog`, ui), which no handler inside the sheet can
+  // outrun — measured on the lane port: one Escape in this sheet closed the sheet AND the dialog. The ticket sheet's own
+  // listener (bubble, honours `defaultPrevented`) and an editor ancestor's `onKeyDown` are covered by the same line. The
+  // table grid's Escape is handled here too, for the same reason: it closes only the grid and hands focus back to the cell.
+  const latest = useRef({ tablePanelOpen, onTableClose, onClose });
+  latest.current = { tablePanelOpen, onTableClose, onClose };
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
       event.stopPropagation();
-      if (event.defaultPrevented) return;
       event.preventDefault();
-      onClose();
-      return;
-    }
+      if (latest.current.tablePanelOpen) {
+        latest.current.onTableClose();
+        panelRef.current?.querySelector<HTMLElement>('[aria-expanded]')?.focus();
+        return;
+      }
+      latest.current.onClose();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  }, []);
+  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
     if (event.key !== 'Tab') return;
     // `aria-modal` alone does not keep Tab inside: wrap it by hand.
     const focusable = [...(panelRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])];
