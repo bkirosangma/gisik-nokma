@@ -257,8 +257,8 @@ count and — once it has any projects — a line naming them.
   workspace's name first, because it removes the workspace from every member at once; it then sits
   under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
-If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
-— or create your own."* Both of those are real options.
+If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link, or
+create your own."* Both of those are real options.
 
 If you have been given a limited role, you may see a workspace's name with no projects listed under
 it. **That is deliberate, not broken** — you are being shown your share.
@@ -552,7 +552,7 @@ are in the first screen.
 Under the ticket's title, above the tabs, there is a short line of chips: the state it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
 *"Closed by … on …"* chip once it is closed. Directly below that line is where the ticket sits: *"At project
-root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent — exists, but you
+root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent: it exists, but you
 can't see it"*.
 
 The Details tab then reads top to bottom: the **description** box first, then the field rows — **State**,
@@ -730,7 +730,7 @@ straight away.
   be done first. This is the one rule that sits above every workflow and cannot be turned off — you
   will see it named in the workflow editor as a fixed system rule.
 
-### "5 of 8 done · 2 restricted"
+### "5 of 8 done, 2 restricted"
 
 Five of its eight children are finished, and two of those eight are hidden **from you** — not from
 everybody, from you, because of who can see what.
@@ -740,7 +740,7 @@ true total and tells you part of it is not yours to see. If nothing is hidden, i
 "restricted" part at all. If a ticket has no children at all, no progress number shows — not "0 of 0",
 just nothing.
 
-### "Restricted parent — exists, but you can't see it"
+### "Restricted parent: it exists, but you can't see it"
 
 This means the ticket really does belong to a bigger ticket, and you are not allowed to see what that bigger
 ticket is — not even its title. The product deliberately tells you a parent *exists* rather than making
@@ -756,11 +756,11 @@ Open a ticket and its panel carries a **Subtasks** section, sitting between the 
 fields. It has four parts.
 
 **The heading** reads "Subtasks", and when the ticket has children it carries their progress on the same
-line — **"Subtasks · 3 of 5 done"**, with **"· 2 restricted"** added when some of them are not yours to
-see.
+line, in brackets after it — **Subtasks (3 of 5 done)** — with **, 2 restricted** added inside the brackets
+when some of them are not yours to see.
 
-**The children**, one line each, with **each child's own state** beside it: *"Order the brochures ·
-To do"*. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
+**The children**, one line each, with **each child's own state** beside it: *Order the brochures* with a
+**To do** chip. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
 its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty
 space to interpret.
 
@@ -768,8 +768,8 @@ space to interpret.
 Rebrand for Kalita Tea"**. Press it and that parent's panel opens in place of the one you were reading.
 It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in
 turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one
-you are not allowed to see, the chip reads **"Subtask of a restricted parent"** instead and is not
-pressable — see "Restricted parent — exists, but you can't see it" above.
+you are not allowed to see, the line reads "Restricted parent: it exists, but you can't see it" instead,
+and there is nothing to press.
 
 **The add row** at the bottom of the section takes a **New subtask title** and files the new child under
 the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent
@@ -787,7 +787,7 @@ weighed exactly as the standard ones are. Two tickets at the same rank cannot ne
 **Sub-task**.
 
 **Where nothing at all is smaller, the row is not drawn.** You get a sentence instead — *"This is a
-Sub-task — nothing smaller can sit under it."* — rather than a box and a button that could only end in
+Sub-task. Nothing smaller can sit under it."* — rather than a box and a button that could only end in
 a refusal. And if your list of types cannot be read at all, the section says *that* rather than showing
 you an empty row and letting you conclude there is nothing below.
 
@@ -1079,7 +1079,7 @@ is simply empty. So turning the switch on changes what the line **says** and nev
 **looks like** — nothing above or below it moves.
 
 > **Read that last sentence carefully.** The switch **does not affect the Board** — and a project opens
-> on the Board the first time you look at it. So you can turn it on, read "done are excluded", and be
+> on the Board the first time you look at it. So you can turn it on, read "Not started and done are both excluded", and be
 > looking at a Done column full of done cards. The note exists precisely because of this.
 
 > **And the Backlog is the odd one of the four.** The switch narrows the list, calendar and timeline; on
@@ -1193,8 +1193,7 @@ Overdue row. The strip shows the first five; if there are more, **Show all** and
 rest, and **Show fewer** folds it back.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
-since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-08-30 — due within 7
-days."*
+since 2026-07-10 — past the 7-day staleness threshold."* or *"due 30 Aug (in 4 days)"*
 
 **If nothing needs attention, the strip does not appear at all.** No box, no "all caught up" message,
 nothing. That is deliberate — an empty box headed "Needs your attention" reads like an all-clear you did
@@ -1214,7 +1213,7 @@ a sixth kind.
 2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a ticket's comment or description, or in a note or one of its comments. The row names the ticket or the note, and clicking it opens that ticket or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
-5. Something has been sitting in one state too long — *"In Doing since 21 Aug — moved there by
+5. Something has been sitting in one state too long — *"In Doing since 21 Aug, moved there by
    Anselma Marak"*
 
 **To mark one thing read: click the row.** If the marking fails, it reloads to show you the truth
@@ -1377,7 +1376,7 @@ the list. Reaching it through the link never has this problem.
 
 ### Who can use it
 
-Owners and admins only. If a member goes there they get: *"You can look, not touch — only a workspace
+Owners and admins only. If a member goes there they get: *"You can look, but not change anything. Only a workspace
 owner or admin can change workflows and ticket types."* No "New workflow" button, all the boxes
 switched off. They can look, they cannot break anything, and there is no way to accidentally publish.
 
@@ -1500,8 +1499,8 @@ there is no finished state; an arrow points at a state that does not exist; a st
 a finished state with no way in; two identical arrows; or a "who may move it" rule that names nobody.
 
 Each issue is clickable and jumps you to the offending box or arrow. **The Publish button stays off,
-with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues
-— this workflow can be published."*
+with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues.
+This workflow can be published."*
 
 ### Advisories
 

@@ -1,7 +1,7 @@
 import type { RollupToViewer } from '../view-types.js';
 
 /**
- * "5 of 8 done · 2 restricted" — counts are over ALL direct children
+ * "5 of 8 done, 2 restricted" — counts are over ALL direct children
  * (server-computed with no visibility filtering); the children this viewer
  * cannot see are named in the restricted count, never pretended absent
  * (spec §6: "true counts, restriction named, nothing pretended absent").

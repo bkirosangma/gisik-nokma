@@ -62,21 +62,29 @@
 #      A comment that names its own measurement is worth more than one that
 #      states a conclusion: this one could be re-run and was.
 #
-#   4. Every image tag is pinned, including minio, mailpit and minio/mc,
-#      which the plan left floating (minio/minio:latest, axllent/mailpit,
-#      minio/mc) while pinning postgres:16-alpine. A floating tag makes "the
-#      stack comes up healthy" unreproducible.
+#   4. Every image tag is pinned, including minio and mailpit, which the plan
+#      left floating (minio/minio:latest, axllent/mailpit, minio/mc) while
+#      pinning postgres:16-alpine. A floating tag makes "the stack comes up
+#      healthy" unreproducible.
 #
-#   5. The MinIO healthcheck uses the server's own /minio/health/live
-#      endpoint via curl, not the plan's ["CMD","mc","ready","local"].
-#      Verified 2026-09-06 with `docker run --rm --entrypoint sh
-#      minio/minio:<pinned> -c 'mc ready local'` — it happens to work
-#      against this tag (the image ships a pre-seeded "local" mc alias) —
-#      but that behavior is undocumented upstream and not something to
-#      depend on. `curl -f http://localhost:9000/minio/health/live` is
-#      MinIO's own documented liveness endpoint, confirmed present and
-#      returning 200 in the same image, and it does not depend on an
-#      implicit alias.
+#      MinIO and its client share ONE image, `ghcr.io/coollabsio/minio`
+#      (2026-10-02, CI repair). Docker Hub's `minio/minio` and `minio/mc` no
+#      longer resolve at all (every tag, `latest` included, answers "pull access
+#      denied"; measured with `docker manifest inspect`), which is what turned
+#      the CI `e2e` job red at "bring the stack up", and `quay.io/minio/*` has
+#      none of our old tags either. coollabsio publishes the community build of
+#      the upstream source with the same layout (`minio` and `mc` both in
+#      /usr/bin, root, `/data`), amd64 and arm64. Verified on linux/amd64:
+#      `server /data` starts with the same MINIO_ROOT_* variables and the
+#      minio-init commands below create both buckets. The tag is an exact
+#      RELEASE, not a floating one.
+#
+#   5. The MinIO healthcheck is `mc ready` against an alias the check sets
+#      itself, not the plan's bare `mc ready local`, which leans on a
+#      pre-seeded "local" alias that is undocumented upstream. The image
+#      carries no `curl` (the previous image did, and the check used MinIO's
+#      /minio/health/live through it), but it does carry `mc`, which asks the
+#      server the same question and needs no other binary.
 #
 #   6. The server's environment is checked against apps/server/src/config.ts's
 #      zod schema: every key with NO `.default()` (DATABASE_URL,
@@ -116,8 +124,8 @@ services:
       retries: 30
 
   minio:
-    # Deviation 4: pinned, not minio/minio:latest.
-    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    # Deviation 4: pinned, not minio/minio:latest (see the header: that image is gone).
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: gisik
@@ -128,16 +136,15 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      # Deviation 5: MinIO's own liveness endpoint, not `mc ready local`
-      # (see header comment for what was verified and why).
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # Deviation 5: `mc ready` against an alias set here (see header comment).
+      test: ["CMD-SHELL", "mc alias set h http://localhost:9000 gisik gisik-dev-secret >/dev/null && mc ready h"]
       interval: 3s
       timeout: 5s
       retries: 20
 
   minio-init:
-    # Deviation 4: pinned, not minio/mc.
-    image: minio/mc:RELEASE.2024-11-05T11-29-45Z
+    # Deviation 4: pinned, not minio/mc. The same image as `minio`: it ships `mc`.
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
     depends_on:
       minio:
         condition: service_healthy
@@ -232,7 +239,8 @@ services:
     volumes:
       - ./reference:/app/reference:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz > /dev/null"]
+      # 127.0.0.1, NOT localhost: the server listens on IPv4 only, and on a CI runner the container has an IPv6 loopback, so busybox wget resolves localhost to ::1 first and is REFUSED (never falling back); Docker Desktop has no ::1 and falls back, which hid this locally (13.1727).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/healthz > /dev/null"]
       interval: 3s
       timeout: 5s
       retries: 40

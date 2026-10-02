@@ -354,3 +354,199 @@ ctl-scripts	13	done	642	6809f0db	ctl rebuild — pull --ff-only in the primary c
 ctl-scripts	14	done	642	6809f0db	ctl selftest wired as pnpm check:ctl — the eighth check; branch ctl/ctl-scripts
 ctl-scripts	15	done	642	6809f0db	README and the wiring (card, plan, briefs, check:ctl in the merge bar); branch ctl/ctl-scripts
 ctl-scripts	16	done	649	54f391f4	first live use (checks → pr open → gate → land), hook installed, refusal demonstrated, anchor 45; branch ctl/ctl-scripts
+# ---------------------------------------------------------------------------
+# Backfill, 2026-10-02 (task/ci-repair). 182 plan tasks (notes 1-7, trash 1-4, workspace access
+# and invites, access follow-ups, styling refresh A, remote MCP, devices and passkeys, MCP
+# workspace/project CRUD, mobile web, prefixes/groups, UX fixes) had no row at all: the ledger was
+# last maintained at "Cycle 47" and the check-tasks job failed on "PLAN TASKS WITH NO LEDGER ROW"
+# for every release PR since 2026-09-20. Read the statuses by the vocabulary above:
+#   done      the merged PR's title names this plan's task (or its number) - sha is its merge commit
+#   claimed   a plan-, group- or feature-level PR covers it; the task mapping is INFERRED
+#   in-flight landed on release/prefix-groups-ux or is a browser pass that is only partly run - no sha
+#   todo      not started
+# The sha of every done/claimed row is reachable from origin/main (the PR landed in a release that
+# was merged to main by merge commit); the note names that release PR.
+# ---------------------------------------------------------------------------
+notes-1-backend-core	1	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	2	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	3	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	4	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	5	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	6	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	7	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	8	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-1-backend-core	9	claimed	703	9f2fac4d	#703 "Notes 1/6: backend core — entity, permissions, p" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	1	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	2	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	3	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	4	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	5	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	6	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	7	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	8	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-2-sync	9	claimed	707	35e2f465	#707 "Notes 2/6: sync — note stream audience, reach an" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	1	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	2	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	3	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	4	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	5	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	6	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	7	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	8	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-3-search	9	claimed	709	5796d72b	#709 "Notes 3/6: search — extensions, note search inde" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	1	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	2	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	3	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	4	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	5	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	6	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	7	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	8	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-4-editor-port	9	claimed	704	44d137e4	#704 "Notes 4/6: editor port — schema v2, collapsible," - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	1	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	2	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	3	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	4	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	5	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	6	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	7	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	8	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	9	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-5-notes-page	10	claimed	713	5b7f8fe9	#713 "Notes 5/6: the Notes page" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-6-ticket-section	1	claimed	719	cf10e685	#719 "Notes 6/7: the ticket's Notes section" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-6-ticket-section	2	claimed	719	cf10e685	#719 "Notes 6/7: the ticket's Notes section" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-6-ticket-section	3	claimed	719	cf10e685	#719 "Notes 6/7: the ticket's Notes section" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-6-ticket-section	4	claimed	719	cf10e685	#719 "Notes 6/7: the ticket's Notes section" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	1	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	2	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	3	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	4	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	5	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+notes-7-inline-references	6	claimed	723	4d12ae02	#723 "Notes Plan 7: inline :ticket / :note references" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #733
+trash-1-lifecycle-core	1	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	2	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	3	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	4	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	5	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	6	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	7	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-1-lifecycle-core	8	done	737	218a00a9	#737 "Trash series Plan 1: lifecycle core (Tasks 1-8)"; reached main in #761
+trash-2-purge-engine	1	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	2	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	3	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	4	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	5	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	6	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	7	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	8	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	9	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+trash-2-purge-engine	10	done	745	efa3b1aa	#745 "Trash series Plan 2 ... (Tasks 1-10)"; reached main in #761
+access-followups	1	done	769	91e568a7	#769 "R2 + R3: the lookup drops the role; no r" names R2; reached main in #772
+access-followups	2	done	769	91e568a7	#769 "R2 + R3: the lookup drops the role; no r" names R3 server; reached main in #772
+access-followups	3	done	769	91e568a7	#769 "R2 + R3: the lookup drops the role; no r" names R3 client; reached main in #772
+access-followups	4	done	767	03832f58	#767 "R4: an invitation link opens only for th" names R4; reached main in #772
+access-followups	5	done	768	20fd9066	#768 "R1: the assignee's access extends to wha" names R1; reached main in #772
+access-followups	6	done	770	17538e17	#770 "R5: an admin removes a member from the w" names R5; reached main in #772
+styling-system-refresh	1	done	773	7caf568b	#773 "Styling A / Task 1: track, well and accent-edge roles with t"; reached main in #849
+styling-system-refresh	2	done	774	92fd33be	#774 "Styling A Task 2 — shadow, radius, space, motion tokens (20."; reached main in #849
+styling-system-refresh	3	done	775	2a740d44	#775 "Styling A Task 3 — the shared Button (20.021–20.026)"; reached main in #849
+styling-system-refresh	4	done	777	c3ef41da	#777 "Styling A Task 4 — Card on lift, Dialog floats near (20.031–"; reached main in #849
+styling-system-refresh	5	done	778	a59d7b9c	#778 "Styling A Task 5 — board tracks, raised cards, shadow-only h"; 5A drag #781 and 5B collapse #784 are follow-ups; reached main in #849
+styling-system-refresh	6	done	787	39e317af	#787 "Styling A/Task 6: the board card's content (20.051-20.059)"; reached main in #849
+styling-system-refresh	7	done	790	2c466924	#790 "Styling A/Task 7: the ticket sheet (20.071-20.077)"; reached main in #849
+styling-system-refresh	8	in-flight	-	-	cases written (#792); browser evidence recorded in #795/#806/#809, but 20.092-20.094, 20.096, 20.121, 20.122 are still 🧪 and 20.091/095/097/098 🟡: the pass is partly run
+trash-3-replica-sync	1	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	2	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	3	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	4	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	5	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	6	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	7	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	8	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	9	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-3-replica-sync	10	claimed	749	8b11d76e	#749 "Trash 3: replica and sync" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+trash-4-ui	1	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	2	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	3	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	4	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	5	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	6	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	7	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	8	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	9	done	746	265d029f	#746 "Trash series Plan 4: UI (Tasks 1-9)"; reached main in #761
+trash-4-ui	10	todo	-	-	case 19.260 is written and merged (#746) but still 🧪: the browser run on the dev stack has not happened
+workspace-access-and-invites	1	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	2	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	3	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	4	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	5	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	6	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	7	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	8	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+workspace-access-and-invites	9	claimed	754	cef3c165	#754 "Workspace access + invites" - plan-level PR; the per-task mapping is inferred, not audited; reached main in #761
+devices-and-passkeys	1	claimed	831	37eb045a	#831 "Devices + passkeys 1: gn_device cookie, lastSeenAt, signed-in devices API" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	2	claimed	831	37eb045a	#831 "Devices + passkeys 1: gn_device cookie, lastSeenAt, signed-in devices API" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	3	claimed	831	37eb045a	#831 "Devices + passkeys 1: gn_device cookie, lastSeenAt, signed-in devices API" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	4	claimed	839	48e61224	#839 "Devices 3: passkey last-used + provider grouping, expired-session sweep, unique sign-out names" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	5	claimed	839	48e61224	#839 "Devices 3: passkey last-used + provider grouping, expired-session sweep, unique sign-out names" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	6	claimed	832	bbe3194b	#832 "Devices + passkeys group 2: Sign-in and devices, one row per device"; reached main in #849
+devices-and-passkeys	7	claimed	839	48e61224	#839 "Devices 3: passkey last-used + provider grouping, expired-session sweep, unique sign-out names" - group-level PR; mapping inferred; reached main in #849
+devices-and-passkeys	8	in-flight	-	-	teardown (6.338) is ✅; the browser cases 6.355-6.357 are still 🧪: the pass has not run
+remote-mcp-server	1	done	810	6337334e	#810 "Hosted remote MCP — Task 1: OAuth storage (14.200–14.209)" names Remote MCP task 1; reached main in #849
+remote-mcp-server	2	done	813	933cf6ce	#813 "Hosted remote MCP — Task 2: config switch, metadata, client " names Remote MCP task 2; reached main in #849
+remote-mcp-server	3	done	817	121893a3	#817 "Remote MCP 3, 4, 8: authorize + consent, consent page, Conne" names Remote MCP task 3; reached main in #849
+remote-mcp-server	4	done	817	121893a3	#817 "Remote MCP 3, 4, 8: authorize + consent, consent page, Conne" names Remote MCP task 4; reached main in #849
+remote-mcp-server	5	done	814	5328292c	#814 "Remote MCP 5: token endpoint, PKCE, rotating refresh, revoke" names Remote MCP task 5; reached main in #849
+remote-mcp-server	6	done	812	ec6f3585	#812 "Hosted remote MCP — Task 6: one tool code path (14.250–14.25" names Remote MCP task 6; reached main in #849
+remote-mcp-server	7	done	819	8d6339b6	#819 "Remote MCP 7 + 10: POST /mcp and the end-to-end round trip" names Remote MCP task 7; reached main in #849
+remote-mcp-server	8	done	817	121893a3	#817 "Remote MCP 3, 4, 8: authorize + consent, consent page, Conne" names Remote MCP task 8; empty state and arrival orders in #818; reached main in #849
+remote-mcp-server	9	done	815	4ace34b6	#815 "Remote MCP 9: manual §16 Connecting Claude or ChatGPT (14.28" names Remote MCP task 9; reached main in #849
+remote-mcp-server	10	done	819	8d6339b6	#819 "Remote MCP 7 + 10: POST /mcp and the end-to-end round trip" names Remote MCP task 10; reached main in #849
+remote-mcp-server	11	in-flight	-	-	14.295-14.297 are 🧪 not run; 14.298 (real claude.ai) is 🟡 measured partially 2026-10-01; 14.299 (ChatGPT) accepted not-run by the owner
+mcp-workspace-project-crud	1	claimed	855	f8c22598	#855 "Project rename/description: project.updated + Edit control (" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	2	claimed	855	f8c22598	#855 "Project rename/description: project.updated + Edit control (" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	3	claimed	852	1cd51b9e	#852 "MCP CRUD reads: plural filters, me, workspace ticket-list (7" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	4	claimed	852	1cd51b9e	#852 "MCP CRUD reads: plural filters, me, workspace ticket-list (7" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	5	claimed	851	4c5844f7	#851 "MCP workspace tools: Session.post, shared submit, nine works" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	6	claimed	851	4c5844f7	#851 "MCP workspace tools: Session.post, shared submit, nine works" - titled by feature, not task number; mapping inferred; reached main in #862
+mcp-workspace-project-crud	7	done	856	a0a570d8	#856 "MCP CRUD Task 7: the project tools"; reached main in #862
+mcp-workspace-project-crud	8	done	859	305a0fd2	#859 "MCP CRUD Task 8: list_members, workspace-scoped list_tickets, plural filters"; reached main in #862
+mcp-workspace-project-crud	9	claimed	860	7f1f78ec	#860 "MCP CRUD Task 9: member help and the hosted /mcp round trip" (+#861); the real-client browser pass is 14.298 partial / 14.299 accepted not-run; reached main in #862
+mobile-web	1	claimed	857	184e09ac	#857 "Mobile shell: phone foundation, top bar, customizable bottom bar (21.001-21.037)" covers tasks 1-3; mapping inferred; reached main in #880
+mobile-web	2	claimed	857	184e09ac	#857 "Mobile shell: phone foundation, top bar, customizable bottom bar (21.001-21.037)" covers tasks 1-3; mapping inferred; reached main in #880
+mobile-web	3	claimed	857	184e09ac	#857 "Mobile shell: phone foundation, top bar, customizable bottom bar (21.001-21.037)" covers tasks 1-3; mapping inferred; reached main in #880
+mobile-web	4	done	867	2bd7fc66	#867 "Mobile T4+T5: the board on a phone and Move to… on desktop c" names the task; reached main in #880
+mobile-web	5	done	867	2bd7fc66	#867 "Mobile T4+T5: the board on a phone and Move to… on desktop c" names the task; reached main in #880
+mobile-web	6	done	858	c19261a6	#858 "Mobile Task 6: ticket sheet full screen, dialogs as bottom s" names the task; reached main in #880
+mobile-web	7	done	866	b7df14ef	#866 "Mobile T7: workspaces, workspace home, Members, Inbox on a p" names the task; reached main in #880
+mobile-web	8	done	868	5d25b6f7	#868 "Mobile web T8 — the project page's other views on a phone: h" names the task; reached main in #880
+mobile-web	9	done	869	21326f13	#869 "Mobile web T9 — Notes, a note's page and My work on a phone " names the task; reached main in #880
+mobile-web	10	done	864	6a742684	#864 "Mobile T10: Account, Settings, MCP tokens, Help, Privacy, Te" names the task; reached main in #880
+mobile-web	11	done	870	d22d4ffa	#870 "Mobile web T11 — the workflow editor, workflow list/history/" names the task; reached main in #880
+mobile-web	12	done	865	7d68e535	#865 "Mobile T12: sign-in, invite accept, MCP connect/authorize an" names the task; reached main in #880
+mobile-web	13	done	873	32fecea5	#873 "Mobile web T13: the browser pass - two defects fixed (21.115, 21.177), 15 cases" + #879 measured 21.238 (BRD-08); reached main in #880. Some 21.x cases stay 🧪 (measured in a browser, not gated)
+prefixes-groups-create-buttons	1	in-flight	-	-	landed in release/prefix-groups-ux as #882; reaches main with that release
+prefixes-groups-create-buttons	2	in-flight	-	-	landed in release/prefix-groups-ux as #883; reaches main with that release
+prefixes-groups-create-buttons	3	in-flight	-	-	landed in release/prefix-groups-ux as #885; reaches main with that release
+prefixes-groups-create-buttons	4	in-flight	-	-	landed in release/prefix-groups-ux as #896; reaches main with that release
+prefixes-groups-create-buttons	5	in-flight	-	-	landed in release/prefix-groups-ux as #893; reaches main with that release
+prefixes-groups-create-buttons	6	in-flight	-	-	landed in release/prefix-groups-ux as #888; reaches main with that release
+prefixes-groups-create-buttons	7	in-flight	-	-	landed in release/prefix-groups-ux as #895; reaches main with that release
+prefixes-groups-create-buttons	8	in-flight	-	-	landed in release/prefix-groups-ux as #891; reaches main with that release
+prefixes-groups-create-buttons	9	in-flight	-	-	landed in release/prefix-groups-ux as #901; reaches main with that release
+prefixes-groups-create-buttons	10	in-flight	-	-	landed in release/prefix-groups-ux as #903; reaches main with that release
+prefixes-groups-create-buttons	11	in-flight	-	-	landed in release/prefix-groups-ux as #904; reaches main with that release
+prefixes-groups-create-buttons	12	in-flight	-	-	landed in release/prefix-groups-ux as #909; reaches main with that release
+ux-fixes	1	in-flight	-	-	landed in release/prefix-groups-ux as #886; reaches main with that release
+ux-fixes	2	in-flight	-	-	landed in release/prefix-groups-ux as #890; reaches main with that release
+ux-fixes	3	in-flight	-	-	landed in release/prefix-groups-ux as #902; reaches main with that release
+ux-fixes	4	in-flight	-	-	landed in release/prefix-groups-ux as #902; reaches main with that release
+ux-fixes	5	in-flight	-	-	landed in release/prefix-groups-ux as #902; reaches main with that release
+ux-fixes	6	in-flight	-	-	landed in release/prefix-groups-ux as #892; reaches main with that release
+ux-fixes	7	in-flight	-	-	landed in release/prefix-groups-ux as #900; reaches main with that release
+ux-fixes	8	in-flight	-	-	landed in release/prefix-groups-ux as #899; reaches main with that release
+ux-fixes	9	in-flight	-	-	landed in release/prefix-groups-ux as #897; reaches main with that release
+ux-fixes	10	in-flight	-	-	landed in release/prefix-groups-ux as #905; reaches main with that release
+ux-fixes	11	in-flight	-	-	landed in release/prefix-groups-ux as #910; reaches main with that release
+ux-fixes	12	todo	-	-	not started
+ux-fixes	13	in-flight	-	-	landed in release/prefix-groups-ux as #906; reaches main with that release

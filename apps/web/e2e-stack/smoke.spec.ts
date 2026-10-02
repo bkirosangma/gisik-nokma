@@ -59,7 +59,8 @@ test('sign in through the real stack, reach the seeded board, and see the guarde
   await openSeededBoard(page);
 
   // The board rendered from real projections, not a fixture.
-  await expect(page.locator('[data-testid^="board-column-"]').first()).toBeVisible({
+  // `:visible`, because an EMPTY workflow group on a multi-workflow board rests collapsed (owner 2026-09-23, board.tsx `defaultCollapsed`): its columns are in the DOM but `hidden`, and in CI's fresh browser (no stored choice) the first one in document order can be such a column. 13.1729.
+  await expect(page.locator('[data-testid^="board-column-"]:visible').first()).toBeVisible({
     timeout: 20_000,
   });
 
