@@ -97,6 +97,7 @@ The UI/UX audit (`gisik-nokma-lanes/audit-2026-10-01/AUDIT-REPORT.md`) found thr
 - T10 22.180–199
 - T11 22.200–219
 - T12 22.220–239
+- T13 22.240–259 (P-T13 follow-ups from the T12 browser pass)
 
 ---
 
