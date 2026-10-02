@@ -147,7 +147,7 @@ const ATTENTION_ITEM = {
 };
 
 describe('a refused read is rendered as the refusal, never as a spinner or an empty list', () => {
-  it('My Work: both reads refuse, and both refusals are on the page instead of "Loading…"', async () => {
+  it('My work: both reads refuse, and both refusals are on the page instead of "Loading…"', async () => {
     // **The two refusals are CONSTRUCTED here now, and that is a change.** This
     // case used to take them from `stubServices({})`, which read them off
     // `SERVING_GAPS` — correct while `getMyWork` and `getAttention` refused,
@@ -194,8 +194,8 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // says which one went missing and what stood in its place.
     const texts = (await screen.findAllByRole('status')).map((node) => node.textContent ?? '');
     expect(texts).toEqual([
-      expect.stringContaining('What needs your attention could not be loaded — reload to try again.'),
-      expect.stringContaining('My Work could not be loaded — reload to try again.'),
+      expect.stringContaining('What needs your attention could not be loaded. Reload to try again.'),
+      expect.stringContaining('My work could not be loaded. Reload to try again.'),
     ]);
     expect(texts[0]).toContain("AttentionItem kind 'contested' — its title");
     // `WorkItem.stateName`. It named `WorkItem.projectName` until P32/P38, then
@@ -313,7 +313,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
    * owner named as the one that keeps it: the same read, the same component,
    * rendered.
    */
-  it('My Work: the same read still renders the strip', async () => {
+  it('My work: the same read still renders the strip', async () => {
     const getAttention = vi.fn(async () => [ATTENTION_ITEM]);
     render(
       <Providers services={stubServices({ getAttention })}>
@@ -411,7 +411,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
       expect(
         statuses.some(
-          (text) => text.includes('The ticket list could not be loaded — reload to try again.') && text.includes(ownWords),
+          (text) => text.includes('The ticket list could not be loaded. Reload to try again.') && text.includes(ownWords),
         ),
       ).toBe(true);
     });
@@ -654,7 +654,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
  * deliberately NOT a refusal … it redirects to `/sign-in`"*. Enumerated:
  * `app/workspaces/page.tsx:25` did it and the other two data-reading pages did
  * not, so an expired session on `/w/<id>/my-work` or `/w/<id>/p/<id>` rendered
- * *"My Work could not be loaded — HTTP 401 for /v1/me/work"* — a refusal panel
+ * *"My work could not be loaded — HTTP 401 for /v1/me/work"* — a refusal panel
  * naming a serving gap that was not the cause, with nothing the viewer could act
  * on. It survived because the ONLY 401 case in this file was on the page that
  * already worked, so no mutation to the other two could go red.
@@ -667,7 +667,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
 describe('3.141 an expired session sends the viewer to sign in — on ALL THREE data-reading pages', () => {
   const expired = (path: string) => () => Promise.reject(new HttpError(401, path));
 
-  it('13.1160 My Work: both reads 401, and the page says so instead of refusing', async () => {
+  it('13.1160 My work: both reads 401, and the page says so instead of refusing', async () => {
     render(
       <Providers
         services={stubServices({
@@ -688,7 +688,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
     // The half that makes it a test: the sentence this page used to show —
     // named specifically, per the same reasoning as the Workspaces case above.
-    expect(screen.queryByText(/My Work could not be loaded/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/My work could not be loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
@@ -763,7 +763,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
         <MyWorkPage />
       </Providers>,
     );
-    expect(await screen.findByText(/My Work could not be loaded/)).toBeInTheDocument();
+    expect(await screen.findByText(/My work could not be loaded/)).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByText(EXPIRED_SESSION_COPY)).not.toBeInTheDocument();
   });
@@ -772,7 +772,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
 describe('17.070 the shared refusal panel says what to DO (E5-30)', () => {
   /**
    * 17.070 — E5-30. The panel on every refusing read rendered
-   * `"{what} could not be loaded — reload to try again."` followed by the transport's raw string —
+   * `"{what} could not be loaded. Reload to try again."` followed by the transport's raw string —
    * `LiveQueryResult.error`, which is the stringified cause. So a 500 read *"Your
    * inbox cannot be shown yet. HTTP 500 for /v1/me/notifications"*: a sentence
    * that says the read failed, never that a RELOAD is the way out, and which
@@ -797,15 +797,15 @@ describe('17.070 the shared refusal panel says what to DO (E5-30)', () => {
     // Scoped to the panel's own class rather than `role="status"`: the page
     // carries other status roles (the attention strip's arm among them), so the
     // role query is ambiguous and reddens for a reason that is not this case's.
-    await screen.findByText(/My Work could not be loaded/);
-    // The page carries TWO refusal panels (My Work's own and the attention
+    await screen.findByText(/My work could not be loaded/);
+    // The page carries TWO refusal panels (My work's own and the attention
     // strip's), so this picks the one this case is about rather than the first
     // in document order — a bare `querySelector` found the strip's.
     const panel = Array.from(document.querySelectorAll('.gn-shell__refusal')).find((node) =>
-      (node.textContent ?? '').includes('My Work could not be loaded'),
+      (node.textContent ?? '').includes('My work could not be loaded'),
     ) as HTMLElement;
     expect(panel).not.toBeUndefined();
-    expect(panel).toHaveTextContent('My Work could not be loaded — reload to try again.');
+    expect(panel).toHaveTextContent('My work could not be loaded. Reload to try again.');
     // The wire string is kept, on its OWN line rather than spliced into the
     // sentence — the two are different kinds of statement.
     const wire = panel.querySelector('.gn-shell__refusal-wire');

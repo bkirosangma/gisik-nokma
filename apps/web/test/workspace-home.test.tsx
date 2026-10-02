@@ -206,7 +206,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     // fixture's member sees), the role as a CLAUSE from the same `viewerOf`
     // the card reads. ONE text node, the same discipline every other
     // multi-interpolation sentence in this file keeps.
-    expect(screen.getByText("5 members · 2 active projects · you're a member")).toBeInTheDocument();
+    expect(screen.getByText("5 members, 2 active projects, you're a member")).toBeInTheDocument();
 
     // Scoped per row, both ways: the number is IN its own row and NOT in the
     // other's. A page that rendered one project's count everywhere passes a
@@ -225,10 +225,10 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       name: 'Show archived projects in Convenience Corner',
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Round 20: the VISIBLE text is the reference's ("1 archived · show"), while
+    // Round 20: the VISIBLE text is the reference's ("Show 1 archived"), while
     // the accessible name above stays the sentence that names the workspace —
     // deliberately two different strings, argued at the control's own call site.
-    expect(toggle).toHaveTextContent('1 archived · show');
+    expect(toggle).toHaveTextContent('Show 1 archived');
     // ...and MARKED once revealed.
     await userEvent.click(toggle);
     expect(within(row('p3')).getByText('Old signage')).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
 
     // The restricted line, one text node — a three-interpolation version is
     // split across nodes and fails this.
-    const restrictedLine = screen.getByText('2 projects · name restricted');
+    const restrictedLine = screen.getByText('2 projects, name restricted');
     expect(restrictedLine).toBeInTheDocument();
     // IMPORTANT 2 (Task 7 fix round 1): the CSS-scan tests in
     // `workspace-restricted-spacing.test.ts` only prove the STYLESHEET rule
@@ -334,7 +334,7 @@ describe('13.385 every admin affordance is gated on the caller’s served role',
     // Everybody gets the list and the links — the gate is on the mutations
     // alone, and a page that refused the whole screen to a member would fail
     // here rather than passing the absence assertions below by accident.
-    expect(await screen.findByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'My work' })).toBeInTheDocument();
     expect(screen.getByTestId('project-row-p1')).toBeInTheDocument();
 
     await userEvent.click(
@@ -534,7 +534,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
     const projectsHeading = screen.getByRole('heading', { name: 'Projects' });
     expect(nav.compareDocumentPosition(projectsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const expected: Array<[string, string]> = [
-      ['My Work', `/w/${WORKSPACE}/my-work`],
+      ['My work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
       ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
       ['Workflows', `/settings?workspaceId=${WORKSPACE}&tab=workflows`],
@@ -572,7 +572,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
       within(nav).getByText('Everything assigned to you across this workspace.'),
     ).toBeInTheDocument();
     expect(
-      within(nav).getByText('5 people · roles and pending invitations.'),
+      within(nav).getByText('5 people: roles and pending invitations.'),
     ).toBeInTheDocument();
     expect(
       within(nav).getByText('Fields and the workflow each type follows.'),
@@ -591,7 +591,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
     mount([[workspaceAs('guest', { memberCount: null })]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
-    expect(within(nav).queryByText(/\d+ (person|people) ·/)).toBeNull();
+    expect(within(nav).queryByText(/\d+ (person|people):/)).toBeNull();
   });
 });
 
@@ -649,8 +649,8 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         }),
       ],
     ]);
-    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
-    expect(screen.queryByText(/members? ·/)).toBeNull();
+    expect(await screen.findByText('1 active project, you\'re a guest')).toBeInTheDocument();
+    expect(screen.queryByText(/members?,/)).toBeNull();
   });
 
   /**
@@ -677,11 +677,11 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         }),
       ],
     ]);
-    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
+    expect(await screen.findByText('1 active project, you\'re a guest')).toBeInTheDocument();
     expect(screen.queryByText(/7 members?/)).toBeNull();
     const nav = screen.getByRole('navigation', { name: 'Workspace sections' });
     expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
-    expect(within(nav).queryByText(/7 (person|people) ·/)).toBeNull();
+    expect(within(nav).queryByText(/7 (person|people):/)).toBeNull();
   });
 });
 

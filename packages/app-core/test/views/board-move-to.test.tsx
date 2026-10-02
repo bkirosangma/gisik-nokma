@@ -70,7 +70,7 @@ async function listed(user: ReturnType<typeof userEvent.setup>, trigger: HTMLEle
   await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
   return within(await screen.findByRole('listbox'))
     .getAllByRole('option')
-    .map((option) => (option.textContent ?? '').split(' — ')[0] ?? '');
+    .map((option) => (option.textContent ?? '').split(' (')[0] ?? '');
 }
 
 describe('21.060 above 40rem each card footer carries a "Move to…" after the ‹ › arrows', () => {
@@ -78,7 +78,7 @@ describe('21.060 above 40rem each card footer carries a "Move to…" after the �
     await mount(boardOf({ doing: ['tk_b'] }));
     expect(footerButtons('tk_b')).toEqual([
       'Move to To do',
-      'Move to next state — Waiting on counterparty or Done',
+      'Move to next state: Waiting on counterparty or Done',
       'Move to another state',
     ]);
     // CONTROL — the arrows keep their behaviour: › still asks which of its two, with only those two on offer.
@@ -99,8 +99,8 @@ describe('21.061 Move to… opens the same dialog over every board destination',
     const user = userEvent.setup();
     const { source } = await mount(boardOf({ done: ['tk_d'] }));
     expect(footerButtons('tk_d')).toEqual([
-      'Move to previous state — Doing or To do',
-      'Move to next state — unavailable',
+      'Move to previous state: Doing or To do',
+      'Move to next state: unavailable',
       'Move to another state',
       'Close Ticket tk_d',
     ]);

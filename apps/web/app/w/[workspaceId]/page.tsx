@@ -193,7 +193,7 @@ export function foundingSeeds(
  * is the exact question rulings P32 and P38 already answered. Widening later is
  * reversible and discloses one more name; serving a name and retracting it is
  * not. **Owner: whoever next revisits P32/P38 for the admin role.** The
- * *"N projects · name restricted"* line below discloses PART of this, and the
+ * *"N projects, name restricted"* line below discloses PART of this, and the
  * difference matters: that count is the owner's option 2 — the projects the
  * caller already holds a ticket id in — so a project an admin can neither name
  * nor see any ticket in is in NEITHER the list nor the count.
@@ -738,7 +738,7 @@ function ProjectCard({
  * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
  * transcribed, not invented, except the one place the prototype's copy
  * assumes a number this route may not have: the Members note reads *"{N}
- * people · roles and pending invitations."* only when `memberCount` is
+ * people: roles and pending invitations."* only when `memberCount` is
  * served; a guest (withheld, `null`) gets the same sentence with no number
  * prefix, the same "omit rather than leave a dangling clause" rule the
  * header's meta line keeps.
@@ -780,16 +780,16 @@ function WorkspaceLinks({
   const membersNote =
     countsWithheld || memberCount === null
       ? 'roles and pending invitations.'
-      : `${memberCount} ${memberCount === 1 ? 'person' : 'people'} · roles and pending invitations.`;
+      : `${memberCount} ${memberCount === 1 ? 'person' : 'people'}: roles and pending invitations.`;
   return (
     <nav className="gn-workspace-home__links" aria-label="Workspace sections">
       <Link
         href={`/w/${workspaceId}/my-work`}
         className="gn-workspace-home__link"
-        aria-label="My Work"
+        aria-label="My work"
         aria-describedby="gn-link-note-my-work"
       >
-        <span className="gn-workspace-home__link-label">My Work</span>
+        <span className="gn-workspace-home__link-label">My work</span>
         <span className="gn-workspace-home__link-note" id="gn-link-note-my-work">
           Everything assigned to you across this workspace.
         </span>
@@ -993,7 +993,7 @@ function WorkspaceHome({
   // looking at (case 22.142), never shown a plain list under a Grouped tab as though it were the tree.
   const groupedView = grouping === 'grouped' && Array.isArray(groups);
   const groupsFailed = grouping === 'grouped' && groups === 'failed';
-  // "N members · M active projects · you're an owner" — every number SERVED,
+  // "N members, M active projects, you're an owner" — every number SERVED,
   // never derived a second way. The member-count gate is `viewer.
   // countsWithheld`, NOT `workspace.memberCount === null` — a review caught
   // the first draft reading the second, the exact anti-pattern case 13.381
@@ -1008,8 +1008,8 @@ function WorkspaceHome({
   const memberClause =
     viewer.countsWithheld || workspace.memberCount === null
       ? ''
-      : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'} · `;
-  const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'} · you're ${viewer.clause}`;
+      : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'}, `;
+  const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'}, you're ${viewer.clause}`;
 
   /**
    * The rename ruling, 2026-09-19.
@@ -1240,12 +1240,12 @@ function WorkspaceHome({
         <h2 className="gn-workspace-home__heading">Projects</h2>
         {/* Marked AND hidden, both — the `/workspaces` card's precedent. Per
             Task 18/19's own ruling the control renders only when there is
-            something behind it: the prototype's "0 archived · show" is not
+            something behind it: the prototype's "Show 0 archived" is not
             adopted — a control that reveals nothing lies about the shape of the
             data.
 
-            The VISIBLE text is the reference's ("1 archived · show" / "Hide
-            archived"); the ACCESSIBLE NAME is deliberately not, and stays the
+            The VISIBLE text ("Show 1 archived" / "Hide archived") began as the
+            reference's "1 archived · show" and lost the dot in the 23.191 copy pass; the ACCESSIBLE NAME is deliberately not, and stays the
             sentence Round 19b gave it. The reference's collapsed label leads
             with a number and its expanded one names no workspace, so a screen
             reader on a page that will grow more disclosures would hear "1
@@ -1263,7 +1263,7 @@ function WorkspaceHome({
               aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
               onClick={onToggleArchived}
             >
-              {showArchived ? 'Hide archived' : `${archived.length} archived · show`}
+              {showArchived ? 'Hide archived' : `Show ${archived.length} archived`}
             </Button>
           ) : null}
           {grouping === null ? null : (

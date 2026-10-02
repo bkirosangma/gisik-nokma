@@ -83,18 +83,18 @@ function touchedEntries(): HelpEntry[] {
     ...entries('faq', 'notes'),
     // Unit 4 (starting-status, board card badges): the specific ### entries
     // and FAQ questions this task edited, not their untouched siblings.
-    ...entries('manual', '5-adding-a-job-and-what-you-can-change-about-it', [
-      'Adding a job',
-      'The things you cannot do to a job',
+    ...entries('manual', '5-adding-a-ticket-and-what-you-can-change-about-it', [
+      'Adding a ticket',
+      'The things you cannot do to a ticket',
     ]),
     ...entries('manual', '8-looking-at-the-work', ['Board']),
-    ...entries('manual', '11-setting-up-your-own-stages-owners-and-admins', ['Building one']),
-    ...entries('faq', 'jobs', [
-      'Can I set the dates when I create the job, instead of afterwards?',
-      'Can I choose which stage a new job starts in?',
+    ...entries('manual', '11-setting-up-your-own-states-owners-and-admins', ['Building one']),
+    ...entries('faq', 'tickets', [
+      'Can I set the dates when I create the ticket, instead of afterwards?',
+      'Can I choose which state a new ticket starts in?',
     ]),
     ...entries('faq', 'boards-lists-and-dates', [
-      'Can a new job start in a column other than the first?',
+      'Can a new ticket start in a column other than the first?',
       'Why is there no Add button on this column?',
       'What do the coloured badges on a card mean?',
     ]),
@@ -107,7 +107,7 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
    * ratcheted against the real `help-quoted-strings-absent.json`), not a
    * stricter one — a touched ### entry carries pre-existing prose this task
    * never wrote too, including the manual's own worked examples (fictional
-   * job titles and the like), and those are legitimately in the baseline
+   * ticket titles and the like), and those are legitimately in the baseline
    * already. Naming this without quoting it is deliberate, for the same
    * reason `corpus-vs-product.test.ts`'s own docblock gives and demonstrates
    * the hard way: this file is itself under `packages/`, inside the real

@@ -155,7 +155,7 @@ describe('13.594 the Backlog tab', () => {
 
 /** 13.596 — the empty copy when the project holds no backlog rows. */
 describe('13.596 the Backlog tab, empty', () => {
-  it('shows "Nothing in the backlog — new tickets land here." with no backlog rows', async () => {
+  it('shows "Nothing in the backlog. New tickets land here." with no backlog rows', async () => {
     const focusedRow = row({ ticketId: 'ft_1', title: 'Focused ticket' });
     render(
       <Providers services={servedWorld([focusedRow])}>
@@ -164,7 +164,7 @@ describe('13.596 the Backlog tab, empty', () => {
     );
     await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
     expect(
-      await screen.findByText('Nothing in the backlog — new tickets land here.'),
+      await screen.findByText('Nothing in the backlog. New tickets land here.'),
     ).toBeInTheDocument();
   });
 });
@@ -175,7 +175,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
    * SERVER read (`listFilter`, above `useTicketList`), and a backlog ticket's
    * category is `open` — so with the toggle on, every backlog row is stripped
    * before any screen-level fold sees it. The Backlog tab then rendered
-   * *"Nothing in the backlog — new tickets land here."* over a project that may
+   * *"Nothing in the backlog. New tickets land here."* over a project that may
    * hold plenty, and nothing on the tab said the toggle was why. The file itself
    * recorded this as `RECORDED, NOT FIXED`.
    *
@@ -221,7 +221,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
 
     expect(await screen.findByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeInTheDocument();
     expect(
-      screen.queryByText('Nothing in the backlog — new tickets land here.'),
+      screen.queryByText('Nothing in the backlog. New tickets land here.'),
     ).toBeNull();
     // And the backlog's own row is really gone from the read — without this the
     // case would pass against a page that never narrowed anything.
@@ -244,7 +244,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
     await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
 
     expect(
-      await screen.findByText('Nothing in the backlog — new tickets land here.'),
+      await screen.findByText('Nothing in the backlog. New tickets land here.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeNull();
   });
@@ -346,7 +346,7 @@ describe('13.595 Start on a Backlog row', () => {
     const startButton = await screen.findByRole('button', { name: 'Start Backlog ticket' });
     await userEvent.click(startButton);
 
-    expect(await screen.findByText('Refused by the server — some-rule: Some reason.')).toBeInTheDocument();
+    expect(await screen.findByText('Refused by the server: some-rule: Some reason.')).toBeInTheDocument();
     await waitFor(() => expect(startButton).toBeEnabled());
     // Never the transport wording, for a refusal — Ruling 27/41's split.
     expect(screen.queryByText(/did not answer this start/)).not.toBeInTheDocument();
@@ -648,7 +648,7 @@ describe('13.708 the Backlog tab in rank order, and Move down', () => {
 
     expect(
       await screen.findByText(
-        'Refused by the server — rank-requires-backlog: Only a backlog ticket can be ranked; this one is in "To do".',
+        'Refused by the server: rank-requires-backlog: Only a backlog ticket can be ranked; this one is in "To do".',
       ),
     ).toBeInTheDocument();
     await waitFor(() => expect(backlogOrder()).toEqual(['br_1', 'br_2', 'br_3']));
@@ -929,7 +929,7 @@ describe('13.712 the unranked backlog tail — option B: rank first, then move',
     fireEvent.drop(tailZone(), { dataTransfer });
 
     expect(
-      await screen.findByText('Only 1 of the 4 parts of this move reached the server — the list has been reloaded to match what the server holds.'),
+      await screen.findByText('Only 1 of the 4 parts of this move reached the server. The list has been reloaded to match what the server holds.'),
     ).toBeInTheDocument();
     // Reloaded: the tab shows what the server holds, not what was asked for.
     await waitFor(() => expect(reloads).toBeGreaterThan(before));
@@ -953,8 +953,8 @@ describe('23.144 Move up / Move down name the order they change', () => {
 
     const down = screen.getByRole('button', { name: 'Move First down' });
     const up = screen.getByRole('button', { name: 'Move Second up' });
-    expect(down).toHaveAttribute('title', 'Move down in backlog order — the order of the whole backlog, not only this group');
-    expect(up).toHaveAttribute('title', 'Move up in backlog order — the order of the whole backlog, not only this group');
+    expect(down).toHaveAttribute('title', 'Move down in backlog order: the order of the whole backlog, not only this group');
+    expect(up).toHaveAttribute('title', 'Move up in backlog order: the order of the whole backlog, not only this group');
 
     // CONTROL — the tooltip is the controls' own: Start sits in the same cell and says nothing about the order.
     const start = screen.getAllByRole('button', { name: /^Start/ })[0];

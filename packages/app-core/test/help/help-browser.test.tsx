@@ -97,7 +97,7 @@ describe('15.22 HelpBrowser — the topic sidebar', () => {
     render(<HelpBrowser />);
     const toggle = within(topics()).getByRole('button', { name: 'Getting started 4' });
     expect(within(topics()).getByRole('link', { name: '§1 — Signing in' })).toBeInTheDocument();
-    const elsewhere = '§6 — Jobs inside jobs';
+    const elsewhere = '§6 — Tickets inside tickets';
     expect(within(topics()).getByRole('link', { name: elsewhere })).toBeInTheDocument();
 
     return user.click(toggle).then(() => {
@@ -269,25 +269,25 @@ describe('15.25 HelpBrowser — the active row follows the reader', () => {
       };
 
       act(() => {
-        notify?.([{ isIntersecting: true, target: { id: 'manual-6-jobs-inside-jobs' } }]);
+        notify?.([{ isIntersecting: true, target: { id: 'manual-6-tickets-inside-tickets' } }]);
       });
-      expect(current()).toEqual(['§6 — Jobs inside jobs']);
+      expect(current()).toEqual(['§6 — Tickets inside tickets']);
 
       // §5 joins the band while §6 is still in it — the earlier one takes over.
       act(() => {
         notify?.([
-          { isIntersecting: true, target: { id: 'manual-5-adding-a-job-and-what-you-can-change-about-it' } },
+          { isIntersecting: true, target: { id: 'manual-5-adding-a-ticket-and-what-you-can-change-about-it' } },
         ]);
       });
-      expect(current()).toEqual(['§5 — Adding a job, and what you can change about it']);
+      expect(current()).toEqual(['§5 — Adding a ticket, and what you can change about it']);
 
       // §5 leaves; §6 is alone in the band again.
       act(() => {
         notify?.([
-          { isIntersecting: false, target: { id: 'manual-5-adding-a-job-and-what-you-can-change-about-it' } },
+          { isIntersecting: false, target: { id: 'manual-5-adding-a-ticket-and-what-you-can-change-about-it' } },
         ]);
       });
-      expect(current()).toEqual(['§6 — Jobs inside jobs']);
+      expect(current()).toEqual(['§6 — Tickets inside tickets']);
     } finally {
       (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = original;
     }
@@ -305,7 +305,7 @@ describe('15.23 HelpBrowser — the section eyebrow', () => {
     const { container } = render(<HelpBrowser />);
     const section = container.querySelector('#manual-1-signing-in');
     expect(section).not.toBeNull();
-    expect(within(section as HTMLElement).getByText('Manual · Getting started')).toBeInTheDocument();
+    expect(within(section as HTMLElement).getByText('Manual, Getting started')).toBeInTheDocument();
   });
 
   /**

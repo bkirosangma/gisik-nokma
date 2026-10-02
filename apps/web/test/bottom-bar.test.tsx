@@ -487,19 +487,19 @@ describe('23.044 the top nav and the bar light My work and Members the same way'
 
   it('23.044 /w/<id>/my-work/x lights My work in BOTH, /w/<id>/members/x lights Members in the top nav; a lookalike lights neither; /w/<id> lights nothing in the bar', async () => {
     await renderBoth(`/w/${WS}/my-work/x`);
-    expect(lit(topLink('My Work'))).toBe(true);
+    expect(lit(topLink('My work'))).toBe(true);
     expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(true);
     expect(lit(topLink('Members'))).toBe(false);
 
     cleanup();
     await renderBoth(`/w/${WS}/members/x`);
     expect(lit(topLink('Members'))).toBe(true);
-    expect(lit(topLink('My Work'))).toBe(false);
+    expect(lit(topLink('My work'))).toBe(false);
 
     // CONTROL (same `it`): a lookalike segment lights neither surface …
     cleanup();
     await renderBoth(`/w/${WS}/my-workshop`);
-    expect(lit(topLink('My Work'))).toBe(false);
+    expect(lit(topLink('My work'))).toBe(false);
     expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(false);
     cleanup();
     await renderBoth(`/w/${WS}/membersx`);

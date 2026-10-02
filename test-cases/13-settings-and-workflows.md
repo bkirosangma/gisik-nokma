@@ -1345,7 +1345,7 @@ mutation they kill.
 An independent review mutated this change set and found three survivors. Each is now killed by a case, so
 they are recorded with the mutation they close rather than as extra coverage:
 
-- ✅ **13.943 — a workflow that answers nothing says *"No published versions to show."* rather than
+- ✅ **13.943 — a workflow that answers nothing says *"No published versions yet."* rather than
   loading forever.** `packages/app-core/test/workflow-builder/history.test.tsx`. **Mutation killed:**
   replacing the missing-workflow branch with a bare `return` left **all four** history cases green, because
   nothing asserted the state a stale `workflowId` in the URL reaches — the shell would claim an answer was
@@ -1614,7 +1614,7 @@ deferral recorded under `13.1141`, `13.1148` and `13.1151`. **Owner: whoever wid
 ## The builder's advisories title stops overriding its panel's ink with `warning` (lane ds1, 2026-09-21, batch B10) — case `13.1146` (second arm)
 
 **The finding, round 2 `E4-32`, MINOR** (the verifier would have raised it to IMPORTANT; no upward
-re-grading by policy). `h3.advisories-panel__title` (*"Worth a look — none of these block publishing"*)
+re-grading by policy). `h3.advisories-panel__title` (*"Worth a look (none of these block publishing)"*)
 painted `color: var(--gn-warning)` on the panel's `--gn-surface-sunken` ground at `font-size: 0.85rem` —
 **13.6px**, far below the large-text exemption — measuring **3.71:1** in `hig` and `minimal` light
 (rgb(178,80,0) on rgb(228,216,204). `neo` light passed and all three darks passed, which is how a

@@ -73,14 +73,14 @@ describe('13.569 checkTicketReopened', () => {
 describe('13.570 transitions are refused while closed', () => {
   it('refuses before any edge is looked at', async () => {
     expect(await evaluateEvent(move('doing'), ctx(move('done'), close()))).toEqual({
-      refused: true, rule: 'closed-ticket', reason: 'This ticket is closed — reopen it first.',
+      refused: true, rule: 'closed-ticket', reason: 'This ticket is closed. Reopen it first.',
     });
     // Fix round 1 (review, Minor 3): a destination that is not even a real
     // state still answers closed-ticket, not unknown-state — proof the closed
     // check runs before the workflow is even consulted, not merely before one
     // particular legal move.
     expect(await evaluateEvent(move('nowhere'), ctx(move('done'), close()))).toEqual({
-      refused: true, rule: 'closed-ticket', reason: 'This ticket is closed — reopen it first.',
+      refused: true, rule: 'closed-ticket', reason: 'This ticket is closed. Reopen it first.',
     });
   });
   it('after a reopen the same move is judged by the workflow again', async () => {

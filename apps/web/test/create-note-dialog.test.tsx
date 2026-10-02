@@ -141,11 +141,11 @@ describe('18.11 The Notes page — creating a note', () => {
     );
 
     const labels = await optionsOf(user, /Home/);
-    expect(labels).toContain('Garo Hills Logistics — workspace');
+    expect(labels).toContain('Garo Hills Logistics (workspace)');
     expect(labels).toContain('Garo Hills Logistics / Cold room');
     expect(labels).toContain('Garo Hills Logistics / Freezer');
     // CONTROL: the projectless workspace is offered, and contributes no project.
-    expect(labels).toContain('Quiet Corner — workspace');
+    expect(labels).toContain('Quiet Corner (workspace)');
     expect(labels.filter((label) => label.startsWith('Quiet Corner /'))).toHaveLength(0);
 
     // The default is the home it was opened with, shown on the closed trigger.

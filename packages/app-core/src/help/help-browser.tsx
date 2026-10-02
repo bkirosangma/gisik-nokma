@@ -165,7 +165,7 @@ function DocumentView({ document }: { document: HelpDocument }) {
               shows the label alone rather than an empty separator.
             */}
             <p className="gn-help__section-eyebrow">
-              {group === null ? label : `${label} · ${group}`}
+              {group === null ? label : `${label}, ${group}`}
             </p>
             <h2 className="gn-help__h2">{section.title}</h2>
             <Blocks blocks={section.intro} />
@@ -710,7 +710,7 @@ export function HelpBrowser() {
             <p className="gn-help__none" role="status">
               Nothing in the manual or FAQ matches <strong>“{result.reason.query}”</strong>. All{' '}
               {result.reason.searched} entries were searched, so this is a real absence rather than a
-              search that did not run — the product may simply not do that thing yet. The list below is
+              search that did not run. The product may simply not do that thing yet. The list below is
               everything there is.
             </p>
           ) : null}

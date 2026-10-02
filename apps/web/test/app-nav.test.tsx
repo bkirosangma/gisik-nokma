@@ -203,11 +203,11 @@ describe('AppNav — the mounts, not the components', () => {
    *
    * `AppNav` carries three destinations and the review's mutation proved the
    * suite noticed none of them going missing. Asserting all three by their
-   * rendered names and hrefs — and asserting `My Work` is withheld when there is
+   * rendered names and hrefs — and asserting `My work` is withheld when there is
    * no workspace in scope, which is the one conditional in this file — makes the
    * whole nav a measured surface rather than only the line this round added.
    */
-  it('11.171 carries Workspaces always and My Work only inside a workspace', async () => {
+  it('11.171 carries Workspaces always and My work only inside a workspace', async () => {
     currentPath = '/workspaces';
     const { rerender } = render(
       <Providers services={NO_NAV_SERVICES}>
@@ -216,7 +216,7 @@ describe('AppNav — the mounts, not the components', () => {
     );
     expect(screen.getByRole('link', { name: 'Workspaces' })).toHaveAttribute('href', '/workspaces');
     // Absent, not empty: no workspace is in scope, so there is nowhere for it to go.
-    expect(screen.queryByRole('link', { name: 'My Work' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'My work' })).not.toBeInTheDocument();
 
     currentPath = '/w/ws_1/my-work';
     rerender(
@@ -224,7 +224,7 @@ describe('AppNav — the mounts, not the components', () => {
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    expect(await screen.findByRole('link', { name: 'My Work' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
       '/w/ws_1/my-work',
     );
@@ -246,7 +246,7 @@ describe('AppNav — the mounts, not the components', () => {
    * this file's own case-id line in `test-cases/11-calendar-notifications.md`.
    */
   describe('11.185 the link set is closed at each of the three nav shapes', () => {
-    it('WITHOUT a workspace: only the four ALWAYS items, no My Work/Board/Settings', () => {
+    it('WITHOUT a workspace: only the four ALWAYS items, no My work/Board/Settings', () => {
       currentPath = '/workspaces';
       render(
         <Providers services={NO_NAV_SERVICES}>
@@ -265,7 +265,7 @@ describe('AppNav — the mounts, not the components', () => {
       expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
     });
 
-    it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
+    it('WITH a workspace, no project: the served name, My work and Members join, Board does not', async () => {
       currentPath = '/w/ws_1/my-work';
       render(
         <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
@@ -454,7 +454,7 @@ describe('13.391 the nav is contextual', () => {
     // HAS a remembered workspace, on every global page they open.
     expect(
       await screen.findByText(
-        'No workspace selected — pick one to reach its board, members and settings.',
+        'No workspace selected. Pick one to reach its board, members and settings.',
       ),
     ).toBeInTheDocument();
 
@@ -488,7 +488,7 @@ describe('13.391 the nav is contextual', () => {
     expect(screen.queryByRole('link', { name: '' })).not.toBeInTheDocument();
     // The other workspace-scoped items are NOT held hostage to the name read —
     // they need only the id, which is already in hand.
-    expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My work' })).toBeInTheDocument();
   });
 
   /**
@@ -572,7 +572,7 @@ describe('13.391 the nav is contextual', () => {
       'href',
       '/w/ws_1',
     );
-    expect(screen.getByRole('link', { name: 'My Work' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
       '/w/ws_1/my-work',
     );
@@ -585,7 +585,7 @@ describe('13.391 the nav is contextual', () => {
       '/settings?workspaceId=ws_1',
     );
     // Not current: you are on `/inbox`, not in the workspace.
-    expect(screen.getByRole('link', { name: 'My Work' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'My work' })).not.toHaveAttribute('aria-current');
     // And the note must not claim otherwise.
     expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
   });
@@ -614,7 +614,7 @@ describe('13.391 the nav is contextual', () => {
     // merely slow.
     expect(await screen.findByText(/No workspace selected/)).toBeInTheDocument();
     expect(screen.queryByText('Convenience Corner')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
   });
 
   /**
@@ -639,9 +639,9 @@ describe('13.391 the nav is contextual', () => {
     );
 
     // The inbox link is the settled-render witness: it proves the bar painted,
-    // so "no My Work" below is a decision and not a snapshot taken too early.
+    // so "no My work" below is a decision and not a snapshot taken too early.
     expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
@@ -678,7 +678,7 @@ describe('13.391 the nav is contextual', () => {
 
     // No `await`. These must be present in the first committed render.
     expect(screen.getByRole('link', { name: 'Convenience Corner' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My work' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Members' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
     // And the note never flashes in their place.
@@ -723,7 +723,7 @@ describe('13.391 the nav is contextual', () => {
       </Providers>,
     );
     expect(screen.queryByRole('link', { name: 'Convenience Corner' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
   });
 
   /**
@@ -1234,7 +1234,7 @@ describe('13.393 exactly one nav item is current, and sign-out keeps its full na
       </Providers>,
     );
     await screen.findByRole('link', { name: 'Convenience Corner' });
-    const myWork = screen.getByRole('link', { name: 'My Work' });
+    const myWork = screen.getByRole('link', { name: 'My work' });
     expect(myWork).toHaveAttribute('aria-current', 'page');
     const others = screen.getAllByRole('link').filter((a) => a !== myWork);
     for (const other of others) {
@@ -1339,7 +1339,7 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
    * Signed out on `/help` — the route `app-nav.tsx` itself calls *"the route
    * most likely to be wanted by someone who cannot get in"* — the bar painted
    * `Workspaces`, `Help`, `Account`, an unlabelled inbox icon and the scope
-   * note *"No workspace selected — pick one to reach its board, members and
+   * note *"No workspace selected. Pick one to reach its board, members and
    * settings."*, and **no Sign in**. Pressing Workspaces signed out landed on
    * `/sign-in` by a 401 bounce with no `next=`, so the destination was thrown
    * away; Account repainted the page E5-13's second reproduction describes; the
@@ -1438,7 +1438,7 @@ describe('E4-11 — the workspace links are in the document with no Menu toggle 
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    for (const name of ['My Work', 'Members', 'Settings']) {
+    for (const name of ['My work', 'Members', 'Settings']) {
       expect(screen.getByRole('link', { name }), `${name} left the document`).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
@@ -1548,8 +1548,8 @@ describe('the nav brand group', () => {
 });
 
 /**
- * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings, My Work and Members (audit SYS-20, NP-26, WS-08);
- * this block pins Settings, `bottom-bar.test.tsx` pins My Work and Members against the bar's own light.
+ * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings, My work and Members (audit SYS-20, NP-26, WS-08);
+ * this block pins Settings, `bottom-bar.test.tsx` pins My work and Members against the bar's own light.
  * The workspace link stays exact (`/w/<id>` is not "inside" `/w/<id>/members`, case 13.393).
  */
 describe('23.044 Settings lights on every route under it', () => {

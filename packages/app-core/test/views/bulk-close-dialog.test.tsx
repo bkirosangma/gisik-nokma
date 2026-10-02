@@ -182,7 +182,7 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Could not close' })).toBeInTheDocument();
     expect(
-      screen.getByText('Renew the trade licence — Only a terminal ticket can be closed.'),
+      screen.getByText('Renew the trade licence: Only a terminal ticket can be closed.'),
     ).toBeInTheDocument();
     // Nothing left to try: the control is GONE, not disabled at zero. Both were
     // offered by the plan; this is the one the plan told us to pick.
@@ -206,7 +206,7 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
     await user.click(confirm());
     const notice = await screen.findByRole('alert');
     expect(notice).toHaveClass('gn-refusal', 'gn-refusal--transport');
-    expect(notice).toHaveTextContent('We could not reach the server for this close — socket closed');
+    expect(notice).toHaveTextContent('We could not reach the server for this close: socket closed');
 
     expect(onClosed).not.toHaveBeenCalled();
     await waitFor(() => expect(confirm()).toBeEnabled());
@@ -416,7 +416,7 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
     expect(onClosed).not.toHaveBeenCalled();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(
-      screen.getByText('File the GST return — Only a terminal ticket can be closed.'),
+      screen.getByText('File the GST return: Only a terminal ticket can be closed.'),
     ).toBeInTheDocument();
     // Nothing left to try, the same rule 13.641 asserts for the partial case.
     expect(screen.queryByRole('button', { name: /^Close \d+ tickets?$/ })).toBeNull();
@@ -445,7 +445,7 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
 
     await user.click(confirm());
     await waitFor(() => expect(onClosed).toHaveBeenCalledWith(['b', 'c']));
-    expect(screen.getByText('File the GST return — payload must be an object')).toBeInTheDocument();
+    expect(screen.getByText('File the GST return: payload must be an object')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);

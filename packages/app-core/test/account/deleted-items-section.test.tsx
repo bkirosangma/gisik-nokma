@@ -89,17 +89,17 @@ describe('19.251–19.256 Account → Deleted items', () => {
     expect(ws.querySelector('svg[data-kind="workspace"]')).toHaveAttribute('aria-hidden', 'true');
     expect(within(ws).getByText('Old Shop')).toBeInTheDocument();
     expect(within(ws).getByText('Workspace')).toBeInTheDocument();
-    expect(within(ws).getByText('Deleted by you · 30 Sep')).toBeInTheDocument();
+    expect(within(ws).getByText('Deleted by you, 30 Sep')).toBeInTheDocument();
     expect(within(ws).getByText('and 42 items inside')).toBeInTheDocument();
 
     const project = rowOf('prj2');
-    expect(within(project).getByText('Project · Convenience Corner')).toBeInTheDocument();
-    expect(within(project).getByText('Deleted by Anselma Marak · 29 Sep')).toBeInTheDocument();
+    expect(within(project).getByText('Project, Convenience Corner')).toBeInTheDocument();
+    expect(within(project).getByText('Deleted by Anselma Marak, 29 Sep')).toBeInTheDocument();
     expect(within(project).getByText('and 1 item inside')).toBeInTheDocument();
 
     const ticket = rowOf('tkt1');
-    expect(within(ticket).getByText('Ticket · Convenience Corner › Shop operations')).toBeInTheDocument();
-    expect(within(ticket).getByText('Deleted by someone · 28 Sep')).toBeInTheDocument();
+    expect(within(ticket).getByText('Ticket, Convenience Corner › Shop operations')).toBeInTheDocument();
+    expect(within(ticket).getByText('Deleted by someone, 28 Sep')).toBeInTheDocument();
     // CONTROL — nothing inside a ticket.
     expect(within(ticket).queryByText(/inside$/)).toBeNull();
   });

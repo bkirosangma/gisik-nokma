@@ -1600,7 +1600,8 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
     const heading = rule('.gn-visibility__heading');
     expect(heading).toMatch(/font-size:\s*0\.75rem/); // 12px
     expect(heading).toMatch(/line-height:\s*1rem/); // 16px
-    expect(heading).toMatch(/text-transform:\s*uppercase/);
+    // 23.192: the prototype's all-caps is gone; the label stays sentence case.
+    expect(heading).not.toMatch(/text-transform/);
     expect(heading).toMatch(/letter-spacing:\s*0\.6px/);
     expect(heading).toMatch(/color:\s*var\(--gn-text-muted\)/);
     // …and the sentences are the same scale, `text-wrap:pretty` included

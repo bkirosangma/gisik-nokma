@@ -299,7 +299,7 @@ export function WorkspaceSettingsForm({
       // it is decided in one place, not here.
       if (mountedRef.current) {
         setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this save — ${message}`),
+          writeFailureCopy(cause, (message) => `We could not reach the server for this save: ${message}`),
         );
       }
     } finally {
@@ -424,7 +424,7 @@ export function WorkspaceSettingsForm({
             that produced it. */}
         {serverRefusal !== null ? (
           <p role="alert" className="gn-refusal gn-refusal--server">
-            {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
           </p>
         ) : null}
         {transportError !== null ? (

@@ -277,7 +277,7 @@ export type BoardMoveCapability = {
  * assert the same string this renders rather than a re-typed copy of it — two
  * spellings of one sentence is how a copy change passes a test it broke.
  */
-export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
+export const EMPTY_BOARD_COPY = 'No tickets here yet. Create one.';
 
 /**
  * The words an empty board says when NOBODY WIRED THE CREATE AFFORDANCE (E5… V1,
@@ -321,7 +321,7 @@ export const EMPTY_BOARD_UNWIRED_COPY = 'No tickets here yet.';
  * mount written before this prop existed reading exactly as it did. Reachability is
  * witnessed both ways: `13.1043` (all-epic) and `13.303`/`13.466` (genuinely empty).
  */
-export const EMPTY_BOARD_EPICS_COPY = 'No tickets in this view — epics appear in the List.';
+export const EMPTY_BOARD_EPICS_COPY = 'No tickets in this view. Epics appear in the List.';
 
 /**
  * The words a single COLUMN says when it holds no cards of its own — a
@@ -377,7 +377,7 @@ export const EMPTY_COLUMN_COPY = 'No tickets in this column.';
  * a filter AND by the epic rule takes the OLD text: "epics are why this is empty" would
  * be a half-truth, and `EMPTY_COLUMN_COPY` is the one written to survive not knowing.
  */
-export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column — epics appear in the List.';
+export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column. Epics appear in the List.';
 
 /**
  * The `dataTransfer` format a dragged card's ticket id travels under
@@ -2170,7 +2170,7 @@ function BoardCardView({
         {card.pending ? <Chip tone="pending">claim in transit</Chip> : null}
         {card.cause !== null ? (
           <Chip tone="active" title="This parent was reopened because it acquired live work">
-            reopened — live work added
+            reopened, live work added
           </Chip>
         ) : null}
         {card.rollup !== null ? (
@@ -2213,12 +2213,12 @@ function BoardCardView({
           {card.priority.value}
         </span>
         {card.dueDate !== null ? (
-          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `·` and the
+          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `,` and the
              due label wrap TOGETHER, so a separator is never left alone at the
              end of one line with its date at the start of the next. The
-             markup's text is unchanged and the `·` stays `aria-hidden`. */
+             markup's text is unchanged and the `,` stays `aria-hidden`. */
           <span className="gn-board-card__due-unit">
-            <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
+            <span className="gn-board-card__meta-sep" aria-hidden="true">{', '}</span>
             {/* Colour is never the only signal (UX fixes T6, 23.093): a past date SAYS "Overdue" as well as turning red. */}
             <span className={late ? 'gn-board-card__due-label gn-board-card__due-label--late' : 'gn-board-card__due-label'}>
               {late ? 'Overdue' : 'Due'}
@@ -2293,7 +2293,7 @@ export function refusalCopy(workflow: WorkflowDef, available: string[]): string 
   const onBoard = available.filter((stateId) => stateId !== BACKLOG_STATE_ID);
   if (onBoard.length === 0) return "This ticket can't move from here.";
   const names = onBoard.map((stateId) => stateNameOf(workflow, stateId));
-  return `Can't move there — try ${names.join(' or ')}.`;
+  return `Can't move there. Try ${names.join(' or ')}.`;
 }
 
 /**
@@ -2592,7 +2592,7 @@ function MoveArrows({
       // a 401 is neither, and `writeFailureCopy` is the one place that is
       // decided.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move: ${message}`),
       );
       moveState.dropPending(card.ticketId);
     } finally {
@@ -2688,7 +2688,7 @@ function MoveArrows({
       // `transportError` channel `submitDirect` uses, own sentence, never
       // `serverRefusal`. E5-25: the 401 arm joins it, one author.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this close: ${message}`),
       );
     } finally {
       setSubmitting(false);
@@ -2769,12 +2769,12 @@ function MoveArrows({
     });
   };
 
-  /** "Move to Doing" for one target; "Move to next state — Doing or Done" for a choice; the "unavailable" sentence for none. */
+  /** "Move to Doing" for one target; "Move to next state: Doing or Done" for a choice; the "unavailable" sentence for none. */
   const arrowLabel = (direction: 'previous' | 'next', targets: string[]): string => {
-    if (targets.length === 0) return `Move to ${direction} state — unavailable`;
+    if (targets.length === 0) return `Move to ${direction} state: unavailable`;
     if (targets.length === 1) return `Move to ${stateNameOf(workflow, targets[0]!)}`;
     const names = targets.map((stateId) => stateNameOf(workflow, stateId));
-    return `Move to ${direction} state — ${names.join(' or ')}`;
+    return `Move to ${direction} state: ${names.join(' or ')}`;
   };
 
   /**
@@ -2917,7 +2917,7 @@ function MoveArrows({
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
       // E5-25: a 401 goes to the session sentence through the same author.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move: ${message}`),
       );
       settleFailedDialogWrite();
     }
@@ -2998,7 +2998,7 @@ function MoveArrows({
         {refusal !== null ? <MoveRefusalNotice workflow={workflow} available={refusal.available} /> : null}
         {serverRefusal !== null && dialog === null ? (
           <p role="alert" className="gn-refusal gn-refusal--server">
-            {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
           </p>
         ) : null}
         {/*

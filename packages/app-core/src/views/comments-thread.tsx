@@ -233,12 +233,12 @@ export function CommentsThread({
             read that failed — or over one that has not answered — is a count
             nobody measured, which is why the heading drops it in BOTH cases
             rather than only the one the failure arm already handled. */}
-        {failed || comments === null ? 'Comments' : `Comments · ${comments.length}`}
+        {failed || comments === null ? 'Comments' : `Comments (${comments.length})`}
       </p>
 
       {failed ? (
         <p className="gn-comments__error" role="alert" data-testid="sheet-comments-unavailable">
-          {`This ticket's comments could not be read — ${commentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+          {`This ticket's comments could not be read: ${commentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
         </p>
       ) : comments === null ? (
         /*

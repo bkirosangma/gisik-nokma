@@ -39,7 +39,7 @@ const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-wit
 // Hardcoded, NOT imported from the component. If both sides read one constant a
 // copy drift is invisible and this whole file asserts only "the banner agrees
 // with itself". The string is the Pinned UI copy row, character for character.
-const BANNER = 'You can look, not touch — only a workspace owner or admin can change workflows and ticket types.';
+const BANNER = 'You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.';
 
 // All four of WorkspaceRole, because the whole gate is `canAuthorRole`, a
 // one-line predicate over this union. A suite that only ever passes 'member'
@@ -173,7 +173,7 @@ describe('read-only workflow views for non-admins', () => {
     expect(await screen.findByText(BANNER)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Workflow name' })).toBeDisabled();
     expect(
-      screen.queryByText('Could not load workspace people and types — reload to try again.'),
+      screen.queryByText('Could not load workspace people and types. Reload to try again.'),
     ).not.toBeInTheDocument();
     for (const button of screen.queryAllByRole('button')) {
       // The canvas Category pickers (Select, Phase 2 Wave B Task 1) are real
@@ -250,7 +250,7 @@ describe('read-only workflow views for non-admins', () => {
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('No workflows published yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No workflows yet.')).toBeInTheDocument();
     expect(screen.queryByText(BANNER)).not.toBeInTheDocument();
   });
 

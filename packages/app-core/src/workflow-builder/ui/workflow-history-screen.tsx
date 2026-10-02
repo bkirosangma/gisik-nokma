@@ -70,6 +70,8 @@ export function WorkflowHistoryScreen(props: {
   workspaceId: string;
   workflowId: string;
   gateway: WorkflowAuthoringGateway;
+  /** Client-side navigation back to the workflow list; without it the link is a plain navigation to the same route. */
+  onBack?(): void;
 }) {
   const [versions, setVersions] = useState<PublishedWorkflowDef[] | null>(null);
   const [missing, setMissing] = useState(0);
@@ -114,11 +116,27 @@ export function WorkflowHistoryScreen(props: {
   }, [gateway, workspaceId, workflowId]);
 
   if (loadFailed) {
-    return <p className="workflow-history__load-error">Could not load this workflow's history — reload to try again.</p>;
+    return <p className="workflow-history__load-error">Could not load this workflow's history. Reload to try again.</p>;
   }
   if (versions === null) return <p className="workflow-history__loading">Loading history…</p>;
   if (versions.length === 0) {
-    return <p className="workflow-history__empty">No published versions to show.</p>;
+    return (
+      <div className="workflow-history__empty-state">
+        <p className="workflow-history__empty">No published versions yet.</p>
+        {/* The next step (UX fixes T11, 23.195): the route the page's own breadcrumb links to. */}
+        <a
+          className="workflow-history__back"
+          href={`/w/${workspaceId}/settings/workflows`}
+          onClick={(event) => {
+            if (props.onBack === undefined) return;
+            event.preventDefault();
+            props.onBack();
+          }}
+        >
+          Back to workflows
+        </a>
+      </div>
+    );
   }
   return (
     <section className="workflow-history">
@@ -174,11 +192,11 @@ export function WorkflowHistoryScreen(props: {
                   ))}
                 </div>
                 <p className="workflow-history__meta">
-                  {`${version.states.length} ${version.states.length === 1 ? 'state' : 'states'} · ` +
+                  {`${version.states.length} ${version.states.length === 1 ? 'state' : 'states'}, ` +
                     `${version.transitions.length} ${version.transitions.length === 1 ? 'transition' : 'transitions'}` +
                     (version.stateMapping === undefined
                       ? ''
-                      : ` · maps ${Object.keys(version.stateMapping).length} state${
+                      : `, maps ${Object.keys(version.stateMapping).length} state${
                           Object.keys(version.stateMapping).length === 1 ? '' : 's'
                         }`)}
                 </p>

@@ -231,7 +231,7 @@ export type TransitionDialogProps = {
   initialToStateId?: string | null;
   /**
    * Say, beside each destination whose edge carries rules the dialog will prompt for, what it will ask for —
-   * "Done — needs a comment". The Move button opens the dialog over EVERY destination at once (mobile plan
+   * "Done (needs a comment)". The Move button opens the dialog over EVERY destination at once (mobile plan
    * FD6), so the person is choosing between edges and should not have to pick one to learn which is gated.
    * Off by default: the arrows offer one direction at a time and their option names are asserted as bare names.
    */
@@ -244,7 +244,7 @@ function ruleMark(rules: TransitionRules): string {
   if (rules.some((rule) => rule.kind === 'require-comment')) asks.push('needs a comment');
   if (rules.some((rule) => rule.kind === 'require-evidence')) asks.push('needs evidence');
   for (const rule of rules) if (rule.kind === 'require-field') asks.push(`needs ${rule.field}`);
-  return asks.length === 0 ? '' : ` — ${asks.join(', ')}`;
+  return asks.length === 0 ? '' : ` (${asks.join(', ')})`;
 }
 
 /**
@@ -555,19 +555,19 @@ export function TransitionDialog({
           {`This transition carries ${rules
             .filter((rule) => rule.kind === 'restrict-to' || rule.kind === 'require-different-user')
             .map((rule) => rule.kind)
-            .join(' and ')} rules — the server decides, and its answer appears here.`}
+            .join(' and ')} rules. The server decides, and its answer appears here.`}
         </p>
       ) : null}
 
       {preview !== null && preview.kind === 'refused' ? (
         <p className="gn-refusal gn-refusal--preview">
-          {`instant check — ${preview.rule}: ${preview.reason}`}
+          {`instant check: ${preview.rule}: ${preview.reason}`}
         </p>
       ) : null}
 
       {serverRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
 
@@ -593,8 +593,8 @@ export function TransitionDialog({
       {uploadError !== null ? (
         <p role="alert" className={`gn-refusal gn-refusal--${uploadError.tone}`}>
           {uploadError.tone === 'server'
-            ? `The server would not store that file — ${uploadError.message}`
-            : `That file could not be uploaded — ${uploadError.message}`}
+            ? `The server would not store that file: ${uploadError.message}`
+            : `That file could not be uploaded: ${uploadError.message}`}
         </p>
       ) : null}
 

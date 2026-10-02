@@ -18,18 +18,18 @@ const shipped = JSON.stringify(HELP_CONTENT);
  */
 describe('22.227 the manual and FAQ describe prefixes, groups, the Create buttons and the UX fixes', () => {
   it.each([
-    ['docs/manual.md', 'Old numbers still find the job'],
+    ['docs/manual.md', 'Old numbers still find the ticket'],
     ['docs/manual.md', 'A retired prefix cannot be taken by another project'],
     ['docs/manual.md', 'Notes keep the key they were written with'],
     ['docs/manual.md', 'Edit prefix'],
     ['docs/manual.md', 'Grouped'],
     ['docs/manual.md', 'Settings → Groups'],
     ['docs/faq.md', 'Can I change a project\'s prefix, or the workspace\'s?'],
-    ['docs/faq.md', 'What happens to the old job numbers when a prefix changes?'],
+    ['docs/faq.md', 'What happens to the old ticket numbers when a prefix changes?'],
     ['docs/faq.md', 'Why can\'t I use a prefix a project used to have?'],
     ['docs/faq.md', 'How do I put my projects into groups?'],
     ['docs/faq.md', 'What are Grouped and Plain on the workspace page?'],
-    ['docs/faq.md', 'Where do I create a workspace, a project or a job?'],
+    ['docs/faq.md', 'Where do I create a workspace, a project or a ticket?'],
     // The UX series (UX fixes T1-T10, T13): the words a person will meet on a phone, in the Help page
     // and in the views. T10 and T13 are written from their branches until they land.
     ['docs/manual.md', 'On a phone or a narrow window'],
@@ -95,7 +95,7 @@ describe('22.154 / 22.228 the help says Create ticket and Create project, never 
   it('control: the patterns do match the old wording', () => {
     expect(OLD_WORDING.test('Find the **New ticket** button')).toBe(true);
     expect(OLD_WORDING.test('gets a **New project** form')).toBe(true);
-    expect(OLD_WORDING.test('click **Add a ticket** in an empty stage')).toBe(true);
+    expect(OLD_WORDING.test('click **Add a ticket** in an empty column')).toBe(true);
     // a hard-wrapped line is the form the first sweep missed
     expect(OLD_WORDING.test('get a **New\n   project** form')).toBe(true);
   });

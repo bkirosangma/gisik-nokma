@@ -25,7 +25,7 @@ import type { HelpDocument, HelpSection } from './types.js';
  * already rejected its section prose as *"illustrative and not shipped"*
  * (`docs/superpowers/plans/2026-09-08-hig-per-screen.md:917`). So these names
  * are not ported; they are written against the 16 sections that actually exist,
- * in the product's own vocabulary — it says **jobs**, never "tickets". They sit
+ * in the product's own vocabulary — it says **tickets** and **states**, never "jobs" or "stages". They sit
  * in one array so the owner can rewrite all five in a single edit.
  *
  * ## Groups are CONTIGUOUS RUNS of the document, and that is enforced
@@ -47,7 +47,7 @@ import type { HelpDocument, HelpSection } from './types.js';
  * ## The FAQ declares no groups, on purpose
  *
  * Its 13 sections are ALREADY topic names — "Signing in", "Workspaces and
- * projects", "People and roles", "Jobs", "Privacy" — so a group layer over them
+ * projects", "People and roles", "Tickets", "Privacy" — so a group layer over them
  * would be a second index saying what the first already says. The manual's 16
  * are `§`-numbered chapters, which is the shape that genuinely wants grouping.
  * `helpNav` renders an ungrouped document as one flat list, which is why the
@@ -98,12 +98,12 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
       sectionIds: ['3-workspaces-and-the-project-problem', '4-getting-your-people-in'],
     },
     {
-      id: 'manual-jobs',
-      title: 'Working with jobs',
+      id: 'manual-tickets',
+      title: 'Working with tickets',
       sectionIds: [
-        '5-adding-a-job-and-what-you-can-change-about-it',
-        '6-jobs-inside-jobs',
-        '7-moving-a-job-through-its-stages',
+        '5-adding-a-ticket-and-what-you-can-change-about-it',
+        '6-tickets-inside-tickets',
+        '7-moving-a-ticket-through-its-states',
         '8-looking-at-the-work',
         '9-what-needs-attention-and-the-inbox',
       ],
@@ -113,8 +113,8 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
       title: 'Permissions and setup',
       sectionIds: [
         '10-who-can-see-what',
-        '11-setting-up-your-own-stages-owners-and-admins',
-        '12-setting-up-your-own-job-types-owners-and-admins',
+        '11-setting-up-your-own-states-owners-and-admins',
+        '12-setting-up-your-own-ticket-types-owners-and-admins',
       ],
     },
     {

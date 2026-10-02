@@ -75,7 +75,7 @@ describe('RestrictToEditor', () => {
       userIds: [ASHA],
     });
     // Absent half: something is picked, so the emptiness helper must not show.
-    expect(screen.queryByText('Pick at least one — a restriction that names nobody can never be satisfied.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pick at least one. A restriction that names nobody can never be satisfied.')).not.toBeInTheDocument();
   });
 
   it('renders without a member roster at all', () => {
@@ -102,7 +102,7 @@ describe('RestrictToEditor', () => {
     renderInspector(store);
     await user.click(screen.getByRole('checkbox', { name: 'The assignee' }));
     expect(
-      screen.getByText('Pick at least one — a restriction that names nobody can never be satisfied.'),
+      screen.getByText('Pick at least one. A restriction that names nobody can never be satisfied.'),
     ).toBeInTheDocument();
   });
 });
@@ -201,7 +201,7 @@ describe('RequireDifferentUserEditor', () => {
     renderInspector(store);
     expect(
       screen.getByText(
-        'A ticket born in the start state has nobody to differ from — this rule only bites once the move to "To do" has actually been performed.',
+        'A ticket born in the start state has nobody to differ from. This rule only bites once the move to "To do" has actually been performed.',
       ),
     ).toBeInTheDocument();
   });

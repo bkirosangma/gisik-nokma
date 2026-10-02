@@ -285,7 +285,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
                 ) : (
                   <>
                     <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link>{' '}
-                    to see your notes — you land back here.
+                    to see your notes. You land back here.
                   </>
                 )}
               </p>

@@ -147,7 +147,7 @@ describe('15.21 the eyebrow and the pager read the document, not a hand-kept lis
     const manual = document('manual');
     const faq = document('faq');
     expect(helpGroupTitle(manual, '1-signing-in')).toBe('Getting started');
-    expect(helpGroupTitle(manual, '11-setting-up-your-own-stages-owners-and-admins')).toBe(
+    expect(helpGroupTitle(manual, '11-setting-up-your-own-states-owners-and-admins')).toBe(
       'Permissions and setup',
     );
     expect(helpGroupTitle(manual, 'not-a-section')).toBeNull();

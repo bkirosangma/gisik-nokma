@@ -81,7 +81,7 @@ describe('RouteAnnouncer — P18: a client-side navigation says which page you a
 
   it('P18: stays silent when the title changed, because the App Router has already announced that', async () => {
     const { rerender } = render(<Page heading="Workspaces" />);
-    document.title = 'Board · Gisik Nokma';
+    document.title = 'Board | Gisik Nokma';
     currentPath = '/w/ws1/p/p1';
     rerender(<Page heading="Board" />);
 

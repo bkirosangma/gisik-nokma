@@ -24,7 +24,7 @@ export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
   {
     id: 'simple-kanban',
     name: 'Simple kanban',
-    tagline: 'To do, doing, done. No rules — anything moves along the arrows.',
+    tagline: 'To do, doing, done. No rules: anything moves along the arrows.',
     def: SIMPLE_KANBAN_TEMPLATE,
   },
   {
@@ -38,7 +38,7 @@ export const WORKFLOW_TEMPLATES: readonly WorkflowTemplate[] = [
     id: 'approval-chain',
     name: 'Approval chain',
     tagline:
-      'Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves.',
+      'Draft, submit, approve, with four eyes: whoever submitted cannot be the one who approves.',
     def: {
       name: 'Approval chain',
       initialStateId: 'draft',

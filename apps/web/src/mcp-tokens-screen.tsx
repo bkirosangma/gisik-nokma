@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
 import { createHttpClient, HttpError, refusalText } from '@gisik-nokma/app-core/online';
-import { IST_TIME_ZONE } from '@gisik-nokma/domain';
+import { formatDay } from '@gisik-nokma/app-core';
+import { istToday } from './ist-today.js';
 import { useSessionStatus } from './providers.js';
 
 /**
@@ -63,20 +64,13 @@ type ConnectionRow = {
  * owner decided on one timezone should not render "yesterday" to one person and
  * "today" to another looking at the same row.
  *
- * `IST_TIME_ZONE` imported rather than the literal re-spelled. `packages/domain/
- * src/ist-day.ts` is the ONE declaration site, and `reporting-scope-guard.test.ts`
- * scans every source root to keep it that way — it caught the literal here on the
- * first full gate, which is the guard doing exactly its job.
+ * `formatDay` (app-core `provenance.ts`) is the one day renderer (23.193): it reads the
+ * IST day, so the zone is never re-spelled here, and it drops the year when it is
+ * the current one (`istToday()`).
  */
 function approvedOn(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return 'an unknown date';
-  return at.toLocaleDateString('en-IN', {
-    timeZone: IST_TIME_ZONE,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (Number.isNaN(new Date(iso).getTime())) return 'an unknown date';
+  return formatDay(iso, istToday());
 }
 
 /**
@@ -128,7 +122,7 @@ export function McpTokensScreen({
    * which is what `tokens === null` alone says.
    *
    * The rejection arm used to be `() => setTokens([])`, and `[]` is precisely the
-   * value the empty arm asserts over: *"No assistants are connected. One appears
+   * value the empty arm asserts over: *"No assistants connected yet. One appears
    * here after you approve it on the connect page."* So a 500 was drawn as a
    * confident claim about the person's account — on the one screen whose whole
    * subject is which assistants still hold access — and the sentence it printed
@@ -341,13 +335,13 @@ export function McpTokensScreen({
         ) : session.kind === 'signed-out' ? (
           <p className="gn-mcp-tokens__signed-out">
             <Link href={`/sign-in?next=${encodeURIComponent(returnTo)}`}>Sign in</Link> to see
-            and revoke the assistants connected to your account — you land back here.
+            and revoke the assistants connected to your account. You land back here.
           </p>
         ) : (
           <>
             <p className="gn-mcp-tokens__lead">
               Each of these can see and change whatever you can, and every claim it records carries
-              your name. Revoking one takes effect at that assistant&rsquo;s next request — nothing
+              your name. Revoking one takes effect at that assistant&rsquo;s next request. Nothing
               is interrupted mid-task, and it will simply be asked to sign in again.
             </p>
 
@@ -358,7 +352,7 @@ export function McpTokensScreen({
                 data-testid="mcp-tokens-failed"
               >
                 {loadRefusal ??
-                  'Your connected assistants could not be loaded — reload to try again. The list is unknown, not empty.'}
+                  'Your connected assistants could not be loaded. Reload to try again. The list is unknown, not empty.'}
               </p>
             ) : tokens === null ? (
               <p data-testid="mcp-tokens-loading">Loading…</p>
@@ -383,10 +377,10 @@ export function McpTokensScreen({
                       {/* The honest answer for a token nothing has used yet, rather than a date
                           picked to fill the column. `last_used` is NULL until the first resolution. */}
                       <span className="gn-mcp-tokens__used">
-                        {`Created ${approvedOn(token.createdAt)} · ${
+                        {`Created ${approvedOn(token.createdAt)}. ${
                           token.lastUsedAt === null
-                            ? 'never used'
-                            : `last used ${approvedOn(token.lastUsedAt)}`
+                            ? 'Never used.'
+                            : `Last used ${approvedOn(token.lastUsedAt)}.`
                         }`}
                       </span>
                     </span>
@@ -404,7 +398,7 @@ export function McpTokensScreen({
                             id={`mcp-token-name-${token.id}`}
                             className="gn-field__input"
                             data-testid={`mcp-tokens-name-input-${token.id}`}
-                            placeholder="e.g. Claude Desktop — Anjali"
+                            placeholder="e.g. Claude Desktop for Anjali"
                             value={draft}
                             onChange={(event) => setDraft(event.target.value)}
                             disabled={busy !== null}
@@ -469,7 +463,7 @@ export function McpTokensScreen({
                 its emptiness are its own, so neither door can hide the other. */}
             {connectionsFailed ? (
               <p role="status" className="gn-mcp-tokens__load-error" data-testid="mcp-connections-failed">
-                Your connected assistant apps could not be loaded — reload to try again. The list is
+                Your connected assistant apps could not be loaded. Reload to try again. The list is
                 unknown, not empty.
               </p>
             ) : connections !== null && connections.length > 0 ? (
@@ -507,8 +501,9 @@ export function McpTokensScreen({
 
             {tokens !== null && tokens.length === 0 && connections !== null && connections.length === 0 ? (
               <p className="gn-mcp-tokens__empty" data-testid="mcp-tokens-empty">
-                No assistants are connected. One appears here after you approve it on the{' '}
-                <Link href="/mcp/authorize">connect page</Link>.
+                No assistants connected yet. One appears here after you approve it on the{' '}
+                <Link href="/mcp/authorize">connect page</Link>.{' '}
+                <Link href="/help#manual-16-connecting-claude-or-chatgpt">How to connect an assistant</Link>
               </p>
             ) : null}
 
@@ -540,7 +535,7 @@ export function McpTokensScreen({
                 opens: the product cannot show the credential, and saying so is
                 more honest than a masked string implying it could. */}
             <p className="gn-mcp-tokens__what">
-              The connection itself is never shown — only a one-way hash of it is stored, so there is
+              The connection itself is never shown. Only a one-way hash of it is stored, so there is
               nothing here to copy or leak. &ldquo;Last used&rdquo; is the day the assistant last made
               a request as you; the product records that so you can tell a live connection from a
               forgotten one before revoking it.

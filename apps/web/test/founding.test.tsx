@@ -123,7 +123,7 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
 });
 
 describe('3.126 founding — the happy path', () => {
-  it('posts the name and routes the founder to the workspace HOME, not My Work', async () => {
+  it('posts the name and routes the founder to the workspace HOME, not My work', async () => {
     const names: string[] = [];
     mount({
       foundWorkspace: async (name) => {
@@ -136,7 +136,7 @@ describe('3.126 founding — the happy path', () => {
     await user.type(screen.getByLabelText('Name'), 'Convenience Corner');
     await user.click(submitButton());
     // E5/F5 — the workspace HOME, not `/my-work`. Seconds after founding, every
-    // one of My Work's four sections is empty, so the founder landed on four
+    // one of My work's four sections is empty, so the founder landed on four
     // negatives; the home carries the owner's New project form (`manual.md:174`
     // — "an owner or admin gets a New project form INSIDE the workspace"), which
     // is the control that makes the new workspace usable.

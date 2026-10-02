@@ -145,12 +145,12 @@ describe('6.335/6.336 passkeys grouped by provider (devices plan Task 7)', () =>
   const mount = (list: PasskeySummary[], onRemove = vi.fn()) =>
     render(<PasskeysSection passkeys={list} onAdd={vi.fn()} onRemove={onRemove} now={NOW} />);
 
-  it('6.335 passkeys sit under their provider heading with a count ("iCloud Keychain · 2"), providers alphabetical and "Security key or other" last; control: a single provider still shows its heading', () => {
+  it('6.335 passkeys sit under their provider heading with a count ("iCloud Keychain (2)"), providers alphabetical and "Security key or other" last; control: a single provider still shows its heading', () => {
     mount(passkeys);
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(['1Password · 1', 'iCloud Keychain · 2', 'Security key or other · 1']);
+    expect(headings).toEqual(['1Password (1)', 'iCloud Keychain (2)', 'Security key or other (1)']);
     // a row sits inside ITS provider's group
-    const group = screen.getByRole('heading', { name: 'iCloud Keychain · 2' }).parentElement!;
+    const group = screen.getByRole('heading', { name: 'iCloud Keychain (2)' }).parentElement!;
     expect(within(group).getByText('MacBook Touch ID')).toBeInTheDocument();
     expect(within(group).getByText('Unnamed passkey')).toBeInTheDocument();
     expect(within(group).queryByText('YubiKey')).toBeNull();
@@ -163,13 +163,13 @@ describe('6.335/6.336 passkeys grouped by provider (devices plan Task 7)', () =>
       pk({ id: 'g', provider: 'Google Password Manager' }),
     ]);
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Google Password Manager · 1',
-      'Windows Hello · 1',
-      'Security key or other · 1',
+      'Google Password Manager (1)',
+      'Windows Hello (1)',
+      'Security key or other (1)',
     ]);
     cleanup();
     mount([pk({ id: 'only', provider: 'Windows Hello' })]);
-    expect(screen.getByRole('heading', { name: 'Windows Hello · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Windows Hello (1)' })).toBeInTheDocument();
   });
 
   it('6.335 each row reads its name (or "Unnamed passkey"), "Added <date>" and "Last used <relative>" or "Never used"; control: a just-now use reads "Last used just now", an old one the date', () => {
@@ -207,7 +207,7 @@ describe('6.346/6.347 rows inside a provider group (devices-3 survivors)', () =>
       pk({ id: 'b', name: 'Bravo', createdAt: '2026-02-01T10:00:00Z' }),
       pk({ id: 'c', name: 'Charlie', createdAt: '2026-03-01T10:00:00Z' }),
     ]);
-    expect(screen.getByRole('heading', { name: 'iCloud Keychain · 3' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'iCloud Keychain (3)' })).toBeInTheDocument();
     const titles = () => screen.getAllByRole('listitem').map((li) => within(li).getByText(/^(Alpha|Bravo|Charlie|Zulu|Yankee)$/).textContent);
     expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
     cleanup();

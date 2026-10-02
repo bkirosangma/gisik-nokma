@@ -52,7 +52,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     const assigned = screen.getByRole('region', { name: 'Assigned to me' });
     expect(within(assigned).getByText('File the GST return')).toBeInTheDocument();
     expect(within(assigned).getByText('Registrations')).toBeInTheDocument();
-    expect(within(assigned).getByText("needed by 30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+    expect(within(assigned).getByText("needed by 30 Aug 2026, Kiro's claim")).toBeInTheDocument();
     expect(
       within(assigned).getByTitle('marked Doing by Anselma Marak on 19 Aug 2026'),
     ).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
       ],
     };
     render(<MyWork view={nameless} onOpenTicket={vi.fn()} />);
-    expect(screen.getByText("needed by 30 Aug 2026 — Unknown person's claim")).toBeInTheDocument();
+    expect(screen.getByText("needed by 30 Aug 2026, Unknown person's claim")).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: an item with no due date renders no due line — no invented deadline', () => {
@@ -421,8 +421,8 @@ describe('3.58 MyWork — the in-transit section is empty because there is no ou
  * `29/8/2026` from Niue. The `TZ` control proves the KNOB moves; it does not
  * make these assertions discriminate. What they are is a REGRESSION GUARD, and
  * the one-line defect named above is what they kill — TWO cases here, `zone
- * Pacific/Kiritimati: expected 'needed by 30/8/2026 — Kiro's claim' to be
- * 'needed by 30 Aug 2026 — Kiro's claim'` and its day-anchored twin.
+ * Pacific/Kiritimati: expected 'needed by 30/8/2026, Kiro's claim' to be
+ * 'needed by 30 Aug 2026, Kiro's claim'` and its day-anchored twin.
  */
 describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s laptop', () => {
   const ZONES = ['Pacific/Kiritimati', 'Asia/Kolkata', 'Pacific/Niue'] as const;
@@ -489,7 +489,7 @@ describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s la
   });
 
   it('PLANTED DEFECT: the due day renders as claimed from every zone, each checked alone', () => {
-    const expected = `needed by ${spellDay(DUE_DAY)} — Kiro's claim`;
+    const expected = `needed by ${spellDay(DUE_DAY)}, Kiro's claim`;
     for (const zone of ZONES) {
       expect(dueLineUnder(zone), `zone ${zone}`).toBe(expected);
     }
@@ -508,7 +508,7 @@ describe('3.61 MyWork — the due DAY CLAIM does not move with the viewer’s la
    */
   it('PLANTED DEFECT: and no zone can slide the deadline off the day it claims', () => {
     for (const zone of ZONES) {
-      expect(dueLineUnder(zone), `zone ${zone}`).toMatch(/^needed by 30 Aug 2026 — /);
+      expect(dueLineUnder(zone), `zone ${zone}`).toMatch(/^needed by 30 Aug 2026, /);
       expect(dueLineUnder(zone), `zone ${zone}`).not.toContain('29 Aug');
       expect(dueLineUnder(zone), `zone ${zone}`).not.toContain('31 Aug');
     }

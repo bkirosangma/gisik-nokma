@@ -23,7 +23,7 @@ export type SessionsSectionProps = {
 const ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const titleOf = (d: DeviceSummary): string =>
-  d.legacy ? `Older sign-in · ${d.label}` : d.tag === null ? d.label : `${d.label} · ${d.tag}`;
+  d.legacy ? `Older sign-in (${d.label})` : d.tag === null ? d.label : `${d.label} (${d.tag})`;
 
 /**
  * The `/account` "Sign-in and devices" section, Sessions half - framework-free beyond React itself.
@@ -57,7 +57,7 @@ const titleOf = (d: DeviceSummary): string =>
  * indistinguishable get an ordinal ("2 of 2"). A row that is already unique keeps the plain name.
  */
 function signOutLabels(devices: DeviceSummary[], clock: Date): Map<string, string> {
-  const base = (d: DeviceSummary) => `Sign out this device — ${titleOf(d)}`;
+  const base = (d: DeviceSummary) => `Sign out this device: ${titleOf(d)}`;
   const activity = (d: DeviceSummary) => (d.lastSeenAt === null ? 'never active' : `last active ${relativeTime(d.lastSeenAt, clock)}`);
   const first = (d: DeviceSummary) => `first signed in ${formatDate(d.firstSignedInAt)}`;
   const tally = (names: string[]) => names.reduce((m, n) => m.set(n, (m.get(n) ?? 0) + 1), new Map<string, number>());
@@ -118,7 +118,7 @@ export function SessionsSection({ devices, onSignOutDevice, onSignOutOthers, err
       <h2 className="gn-account__section-title">
         {devices.length === 0
           ? 'Sign-in and devices'
-          : `Sign-in and devices · ${devices.length} signed in · ${active.length} active`}
+          : `Sign-in and devices (${devices.length} signed in, ${active.length} active)`}
       </h2>
       {error !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
@@ -159,7 +159,7 @@ export function SessionsSection({ devices, onSignOutDevice, onSignOutOthers, err
       {/* Prototype copy, kept because it is TRUE of this product: history is append-only, so signing a device
           out does not retract what it recorded. */}
       <p className="gn-account__note">
-        Signing a device out does not remove what it recorded — those claims stay, attributed to it.
+        Signing a device out does not remove what it recorded. Those claims stay, attributed to it.
       </p>
     </section>
   );

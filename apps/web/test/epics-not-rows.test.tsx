@@ -486,7 +486,7 @@ describe('13.1044 the all-epic Backlog names the cause, and an empty backlog kee
    * ⚠ RULING (b): *"a project with nothing in it is not that case."* One fixture array
    * different from the arm above.
    */
-  it('13.1044 CONTROL — a genuinely empty backlog keeps "Nothing in the backlog — new tickets land here."', async () => {
+  it('13.1044 CONTROL — a genuinely empty backlog keeps "Nothing in the backlog. New tickets land here."', async () => {
     render(
       <Providers services={servedWorld({ rows: [] })}>
         <ProjectPage />

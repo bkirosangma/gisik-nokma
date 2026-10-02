@@ -255,7 +255,7 @@ async function collectClasses(): Promise<{ rendered: string[]; exempt: string[];
       ...createFakeGateway(),
       listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/x/ticket-types')),
     },
-    () => screen.findByText('Could not load workspace people and types — reload to try again.'),
+    () => screen.findByText('Could not load workspace people and types. Reload to try again.'),
   );
 
   // 4, 5, 6 — the panels' three selections.

@@ -195,7 +195,7 @@ describe('20.127 a refused move glides the card back to its source slot, with th
     expect(idsIn('todo')).toEqual(['tk_a', 'tk_c', 'tk_z']);
     expect(idsIn('doing')).toEqual(['tk_b', 'tk_d']);
     const notice = within(slotOf('tk_c')).getByRole('alert');
-    expect(notice).toHaveTextContent('Refused by the server — some-rule: Not allowed right now.');
+    expect(notice).toHaveTextContent('Refused by the server: some-rule: Not allowed right now.');
     expect(slotOf('tk_c')).not.toHaveAttribute('data-move-phase');
   });
 
@@ -1121,7 +1121,7 @@ describe('20.173 an arrow move reached through the picker (several targets one w
       const top = this.tagName === 'LI' && id.startsWith('ticket-card-') ? 100 + 130 * Array.from(this.parentElement!.children).indexOf(this) : 0;
       return { left, top, right: left + 280, bottom: top + 120, width: 280, height: 120, x: left, y: top, toJSON: () => ({}) } as DOMRect;
     });
-    await user.click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to next state — Doing or Done' }));
+    await user.click(within(slotOf('tk_c')).getByRole('button', { name: 'Move to next state: Doing or Done' }));
     const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
     await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));

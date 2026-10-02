@@ -109,7 +109,7 @@ labels absent, the dialog on "Choose a state" with three options). Node v22.23.2
 - **13.530** ✅ `‹` MIRRORED — on a def built so the negative can fail. From `WF_ERRAND`'s `done` every
   declared target is backward, so "offers only the backward ones" passed under M4 in the first draft of
   this case (measured; a check that could not fail). Rebuilt on `WF_ERRAND` + `waiting → done`, card in
-  `waiting`: `‹` reads "Move to previous state — Doing or To do", the picker offers `Doing`/`To do` and
+  `waiting`: `‹` reads "Move to previous state: Doing or To do", the picker offers `Doing`/`To do` and
   NOT `Done`, which `transitionOptions` does declare from `waiting`. M4 → fails; M6 → fails.
 - **13.531** ✅ ONE gated forward target (`todo → doing` with `require-comment`, `13.501`'s idiom): the
   arrow keeps its plain name "Move to Doing"; the dialog opens with the trigger reading `Doing` and the
@@ -634,7 +634,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
 - **13.586** ✅ A closed ticket shows the header badge — `Closed by <name> on <date>`, the name resolved
   through the SAME `actorLabel`/roster join every other claim in this sheet uses, the date through the one
   IST formatter (`formatDate`) — shows **Reopen** (not **Close**), disables **Move…**
-  (`disabled={closed !== null}`), and shows the sentence "Closed — reopen it first" beside it as a
+  (`disabled={closed !== null}`), and shows the sentence "Closed. Reopen it first" beside it as a
   `<span className="gn-sheet__closed-note">` — TEXT, never a `title=` tooltip (spec §5.3). Clicking Reopen
   ingests exactly one `ticket.reopened` with `payload {}`. The badge reuses `Chip` tone `terminal`
   (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch. The fixture's `closed.at` is
@@ -693,7 +693,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   (case 13.504, "never claims to be the server's own verdict"): a dropped connection is not an
   adjudication, however the sentence is worded. Proven with a fake data source whose `ingest` throws
   (`socket hung up`): clicking **Close** shows the amber transport notice with the message carried
-  verbatim (`We could not reach the server for this change — socket hung up`), the text "Refused by the
+  verbatim (`We could not reach the server for this change: socket hung up`), the text "Refused by the
   server" is absent from the document, and **Close** re-enables once the rejection settles — the
   `finally` reset does not care which branch ran. `results[0]` (not `results.find(...)`) is THE result,
   since exactly one event is ingested; a `result === undefined` (the door answering nothing) shares the
@@ -705,7 +705,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   branch clears `serverRefusal` too, the same pairing the `catch` branch already carries (13.588b): a
   wording gap in Ruling 33 itself left this one branch setting `transportError` without clearing
   `serverRefusal`, so a REFUSED click followed by a SILENT one rendered BOTH notices at once — the
-  earlier "Refused by the server — …" describing an answer that no longer holds. Proven by sequencing
+  earlier "Refused by the server: …" describing an answer that no longer holds. Proven by sequencing
   two different answers through the fake data source's ordinary per-call closure (no test-helper change
   needed): `refused` (rule `close-requires-terminal`) on the first `ingest`, an empty `[]` on the second.
   First click shows the server notice with the reason; second click shows ONLY the transport notice
@@ -739,7 +739,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `role="alert"`, `.gn-refusal--server`, the rule and reason carried VERBATIM, the same invariant every
   other refusal on this board holds. A REJECTED `ingest` (a transport failure, never a server answer)
   renders instead through `.gn-refusal--transport` with `closeCard`'s own "this close" wording ("We could
-  not reach the server for this close — …"), the words "Refused by the server" absent from the document —
+  not reach the server for this close: …"), the words "Refused by the server" absent from the document —
   mirroring case `13.504`'s two-branch shape and Ruling 27's split exactly, `closeCard` sharing
   `submitDirect`'s identical `serverRefusal`/`transportError` channels rather than inventing its own. Both
   branches leave **Close** and `‹` (a live, two-target picker from `done` — `arrowTargets` finds both
@@ -916,7 +916,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `ticket.transitioned { to: toStateId }` straight through `dataSource.ingest`, mirroring `board.tsx`'s
   `submitDirect` idiom (`submitting` latch reset in a `finally`, a `committed` answer calling the page's
   `list.reload()`, a real refusal rendered as `role="alert" className="gn-refusal gn-refusal--server"`
-  reading `Refused by the server — <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
+  reading `Refused by the server: <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
   `ingest` rendered as `gn-refusal--transport`, never the word "Refused"). Proven end to end: Start
   ingests `ticket.transitioned` with `to` equal to the fixture workflow's `initialStateId` (the exact
   payload captured and asserted, not merely "an event fired"), and the row leaves the Backlog tab once a
@@ -937,7 +937,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   can reach it. Mutation (submitting `to: row.stateId` instead of `toStateId`, `cp`/`sha256sum` restore):
   kills exactly this case's ingest-payload assertion (`PASS (3) FAIL (1)` of the file's 4) and no other —
   (`apps/web/test/backlog-tab.test.tsx`, `apps/web/test/backlog-start.test.ts`)
-- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog — new tickets land here.`,
+- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog. New tickets land here.`,
   passed to `TicketList`'s new `emptyCopy?` prop. **`emptyCopy` defaults to ABSENCE, not a new sentence**:
   before this task `TicketList` rendered NOTHING beneath its controls bar for a zero-row set (`groupRows([],
   DEFAULT_GROUPING, labels)` answers `[]` for every grouping but `flat`, and `sections.map` over `[]`
@@ -1937,7 +1937,7 @@ file rather than shifted by a delta.
   record this view cannot make.
 
 - ✅ **13.668 — progress reads `N of M done`, and its absence is a dash.** `3 of 8 done` and
-  `4 of 8 done · 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
+  `4 of 8 done, 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
   silently dropped), and a row with no rollup rendering `—` — asserted together with the absence of
   `/done/`, so the empty arm cannot pass on a `0 of 0 done` that would be a claim about nothing.
 
@@ -2276,12 +2276,12 @@ ONLY when an epic is the reason the view is empty**, keeping its own sentence ot
 not decoration: an all-epic view and a genuinely empty one are the **same state** at all three literal sites,
 so one sentence for both would be false of one of them. **Every case below therefore carries a CONTROL arm.**
 
-- **13.1043** ✅ CLOSED — an all-epic Board says *"No tickets in this view — epics appear in the List."*
+- **13.1043** ✅ CLOSED — an all-epic Board says *"No tickets in this view. Epics appear in the List."*
   (`EMPTY_BOARD_EPICS_COPY`); **a genuinely empty project keeps `EMPTY_BOARD_COPY`, unchanged.** The
   distinction arrives as a PROP, because the component cannot derive it: the epic is dropped before `total`
   increments and `isNarrowed` is deliberately false here, so both cases reach the banner identically.
   `apps/web/test/epics-not-rows.test.tsx`.
-- **13.1044** ✅ CLOSED — the all-epic Backlog says *"Nothing in the backlog — epics appear in the List."*; an
+- **13.1044** ✅ CLOSED — the all-epic Backlog says *"Nothing in the backlog. Epics appear in the List."*; an
   empty backlog keeps the original. Chosen by the **page**, not by `TicketList`, which sees only the
   surviving rows; `backlogNarrowing` is the one place both sets exist.
 - **13.1045** ✅ CLOSED — the calendar's and the timeline's cause-lists **gain the cause** rather than being
@@ -2340,7 +2340,7 @@ rather than five.
 
 **The fix.** The two failures have different causes and different remedies, so they are different fields:
 `error` is now `list.error` alone, and `prefsError` carries the preferences half. It renders BESIDE the
-column chooser — *"Your column choice was not saved — {the server's own words}"* — because that is where
+column chooser — *"Your column choice was not saved: {the server's own words}"* — because that is where
 the person who needs the sentence is standing.
 
 - **13.1116** ✅ The preferences error is its own field: with `getPreferences` rejecting and

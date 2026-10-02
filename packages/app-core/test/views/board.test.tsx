@@ -195,12 +195,12 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     expect(screen.getByText('Moved to Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done · 2 restricted" with only 6 visible', () => {
+  it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done, 2 restricted" with only 6 visible', () => {
     const board = errandBoard([
       boardCardSeed({ rollup: { totalChildren: 8, terminalChildren: 5, restrictedCount: 2 } }),
     ]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    expect(screen.getByText('5 of 8 done · 2 restricted')).toBeInTheDocument();
+    expect(screen.getByText('5 of 8 done, 2 restricted')).toBeInTheDocument();
   });
 
   /* 13.301 — the reopen-cause chip. Present-arm only: every card in this render
@@ -213,7 +213,7 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
       boardCardSeed({ cause: { kind: 'reopened-for-child', childTicketId: 't_child' } }),
     ]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    expect(screen.getByText('reopened — live work added')).toBeInTheDocument();
+    expect(screen.getByText('reopened, live work added')).toBeInTheDocument();
   });
 
   it('badges a claim in transit as visually distinct, and only then', () => {
@@ -814,7 +814,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     // case hands one down. The unwired arm has its own case below (3.113).
     render(<Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
-    expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create one.');
+    expect(EMPTY_BOARD_COPY).toBe('No tickets here yet. Create one.');
     // No scaffolding: not one column region is drawn for a board with no groups.
     expect(screen.queryAllByRole('region')).toEqual([]);
   });
@@ -1224,7 +1224,7 @@ describe('13.1177 the board card draws the due label, and the late tone (ruling 
  * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty state's instruction and
  * its control are ONE decision.
  *
- * `EMPTY_BOARD_COPY` says *"No tickets here yet — create one."* and the button
+ * `EMPTY_BOARD_COPY` says *"No tickets here yet. Create one."* and the button
  * beneath it renders only when `onCreateTicket` is passed. **Every mount in the
  * product passed nothing** — measured at the ruling: `grep -rn 'onCreateTicket='
  * apps/web/app apps/web/src` answered 0 across 63 files while the string appears
@@ -1393,7 +1393,7 @@ describe('20.602 the keys row binds the separator to the due label', () => {
     expect(unit.contains(within(line).getByText(formatDate(DUE)))).toBe(true);
     expect(sep.getAttribute('aria-hidden')).toBe('true');
     // The unwrapped row still reads `key priority · due` — amended by 23.093 (UX fixes T6): the due half now opens with the word "Due" ("Overdue" once late).
-    expect(line.textContent).toBe(`GN-1101P2 · Due ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`GN-1101P2, Due ${formatDate(DUE)}`);
     // CONTROL — every `·` in the row is inside a unit, and a card with no due date draws neither.
     expect([...line.querySelectorAll('.gn-board-card__meta-sep')].every((el) => el.closest('.gn-board-card__due-unit') !== null)).toBe(true);
   });
@@ -1430,13 +1430,13 @@ describe('13.1281 the board card meta line leads with the ticket key', () => {
     expect(key.className).toContain('gn-board-card__key');
     const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
     // `boardCardSeed`'s own default priority is P2 (the birth default).
-    expect(line.textContent).toBe(`GN-1101P2 · Due ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`GN-1101P2, Due ${formatDate(DUE)}`);
     expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
   });
   it('13.1281 CONTROL — a null key draws the priority badge and the due label, with no key and no placeholder', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(`P2 · Due ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`P2, Due ${formatDate(DUE)}`);
     expect(line.querySelector('.gn-board-card__key')).toBeNull();
   });
   it('13.1281 CONTROL — a key with no due date draws the key and the priority badge, with no due separator', () => {

@@ -280,8 +280,8 @@ export function AccountMenu() {
               data-testid="account-menu-signout-refusal"
             >
               {signOutFailure === 'refused'
-                ? 'The server refused the sign-out — you are still signed in on this device. Try again.'
-                : 'We could not reach the server — you are still signed in on this device. Try again.'}
+                ? 'The server refused the sign-out. You are still signed in on this device. Try again.'
+                : 'We could not reach the server. You are still signed in on this device. Try again.'}
             </p>
           ) : null}
         </div>

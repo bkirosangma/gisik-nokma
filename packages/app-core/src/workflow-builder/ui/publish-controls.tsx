@@ -168,7 +168,7 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       // sentence says whose failure it was. Same words the sheet uses for the
       // same fact, for the same reason.
       const message = cause instanceof Error ? cause.message : String(cause);
-      setState({ phase: 'transport', message: `We could not reach the server for this publish — ${message}` });
+      setState({ phase: 'transport', message: `We could not reach the server for this publish: ${message}` });
     }
   }
 

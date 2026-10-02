@@ -242,7 +242,7 @@ export function TicketTypeListScreen(props: {
   // records: a failed read and a read still in flight are different states, and a
   // reader who sees the loading sentence cannot tell them apart.
   if (loadFailed) {
-    return <p className="ticket-type-list__load-error">Could not load ticket types — reload to try again.</p>;
+    return <p className="ticket-type-list__load-error">Could not load ticket types. Reload to try again.</p>;
   }
   if (types === null || workflows === null) return <p className="ticket-type-list__loading">Loading ticket types…</p>;
   // The narrowed array, named once. `types` is still `TicketTypeDef[] | null` to

@@ -171,7 +171,7 @@ export function DeletedItemsSection({
                 <span className="gn-deleted-items__text">
                   <span className="gn-deleted-items__label">{label}</span>
                   <span className="gn-deleted-items__meta">
-                    {where === null ? KIND_LABEL[item.kind] : `${KIND_LABEL[item.kind]} · ${where}`}
+                    {where === null ? KIND_LABEL[item.kind] : `${KIND_LABEL[item.kind]}, ${where}`}
                   </span>
                   <span className="gn-deleted-items__meta">{deletedByLine(who, istDayLabel(item.deletedAt))}</span>
                   {inside !== null ? <span className="gn-deleted-items__meta">{inside}</span> : null}

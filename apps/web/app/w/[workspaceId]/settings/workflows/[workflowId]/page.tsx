@@ -87,7 +87,7 @@ export default function EditWorkflowPage() {
       ) : draft.kind === 'loading' ? (
         <p role="status">Loading this workflow…</p>
       ) : draft.kind === 'missing' ? (
-        <p>No published workflow has this id — it may never have existed, or it may not be yours.</p>
+        <p>No published workflow has this id. It may never have existed, or it may not be yours.</p>
       ) : draft.kind === 'failed' ? (
         <ShellRefusal what="This workflow" message={draft.why} />
       ) : (

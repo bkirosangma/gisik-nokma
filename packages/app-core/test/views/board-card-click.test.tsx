@@ -317,7 +317,7 @@ function errandBoardWithCardInDoing(): BoardView {
 async function openPickerDropdown(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
   await settled();
   await user.click(
-    screen.getByRole('button', { name: 'Move to next state — Waiting on counterparty or Done' }),
+    screen.getByRole('button', { name: 'Move to next state: Waiting on counterparty or Done' }),
   );
   const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
   await user.click(within(dialog).getByRole('button', { name: /Move to/ }));

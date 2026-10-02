@@ -93,7 +93,7 @@ export function ReopenDialog({
           refusalOrigin === 'server' ? 'gn-refusal gn-refusal--server' : 'gn-refusal gn-refusal--preview'
         }
       >
-        {refusalOrigin === 'server' ? 'Refused by the server — ' : 'instant check — '}
+        {refusalOrigin === 'server' ? 'Refused by the server: ' : 'instant check: '}
         {refusal.rule}: {refusal.reason}
       </p>
       {reopenStates.length === 0 ? (
@@ -117,7 +117,7 @@ export function ReopenDialog({
       )}
       {parentRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
-          Refused by the server — {parentRefusal.rule}: {parentRefusal.reason}
+          Refused by the server: {parentRefusal.rule}: {parentRefusal.reason}
         </p>
       ) : null}
       <div className="gn-reopen__actions">

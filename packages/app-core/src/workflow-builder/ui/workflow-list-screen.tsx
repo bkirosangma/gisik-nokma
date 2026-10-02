@@ -196,7 +196,7 @@ export function WorkflowListScreen(props: {
   }, [props.gateway, props.workspaceId]);
 
   if (loadFailed) {
-    return <p className="workflow-list__load-error">Could not load workflows — reload to try again.</p>;
+    return <p className="workflow-list__load-error">Could not load workflows. Reload to try again.</p>;
   }
   if (workflows === null) return <p className="workflow-list__loading">Loading workflows…</p>;
   const canAuthor = canAuthorRole(props.session.role);
@@ -219,7 +219,16 @@ export function WorkflowListScreen(props: {
       </header>
       {canAuthor ? null : <ReadOnlyBanner />}
       {workflows.length === 0 ? (
-        <p className="workflow-list__empty">No workflows published yet.</p>
+        <div className="workflow-list__empty-state">
+          <p className="workflow-list__empty">No workflows yet.</p>
+          {/* The next step (UX fixes T11, 23.195): the header's own "New workflow" door, named for what it
+              opens. Absent for a person who cannot author, whose click would only be refused. */}
+          {canAuthor ? (
+            <Button className="workflow-list__empty-action" onClick={props.onNew}>
+              Create one from a template
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <div className="workflow-list__cards">
           {workflows.map((workflow) => (
@@ -238,7 +247,7 @@ export function WorkflowListScreen(props: {
                 ))}
               </div>
               <p className="workflow-list__meta">
-                {`v${workflow.version} · ${workflow.states.length} ${workflow.states.length === 1 ? 'state' : 'states'} · ${workflow.transitions.length} ${workflow.transitions.length === 1 ? 'transition' : 'transitions'}`}
+                {`Version ${workflow.version}, ${workflow.states.length} ${workflow.states.length === 1 ? 'state' : 'states'}, ${workflow.transitions.length} ${workflow.transitions.length === 1 ? 'transition' : 'transitions'}`}
               </p>
               <div className="workflow-list__actions">
                 <Button

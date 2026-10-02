@@ -26,7 +26,7 @@ const OPTIONS: ReadonlyArray<{ value: StyleName; label: string }> = [
 const NOTES: Record<StyleName, string> = {
   hig: 'Apple HIG: the same palette as Minimal, with a light shadow lifting cards and fields off the page.',
   minimal:
-    'Minimal: the same colours, no shadows at all — cards and fields are flat, and spacing does the separating.',
+    'Minimal: the same colours, no shadows at all. Cards and fields are flat, and spacing does the separating.',
   neo: 'Neomorphic: soft raised surfaces, no borders. Heavier on the eye, lighter on lines.',
 };
 

@@ -79,7 +79,7 @@ export function StateMappingDialog(props: {
     <div className="state-mapping-dialog" role="dialog" aria-label="Every dropped state needs a destination">
       <h3 className="state-mapping-dialog__title">Every dropped state needs a destination</h3>
       <p className="state-mapping-dialog__body">
-        {`Version ${props.toVersion} removes states that version ${props.fromVersion} has. The counts below are for your information only — the rule needs a destination for every removed state, occupied or not.`}
+        {`Version ${props.toVersion} removes states that version ${props.fromVersion} has. The counts below are for your information only. The rule needs a destination for every removed state, occupied or not.`}
       </p>
       <ul className="state-mapping-dialog__rows">
         {props.dropped.map((state) => (
@@ -94,7 +94,7 @@ export function StateMappingDialog(props: {
                 options={props.targetStates.map((target) => ({ value: target.id, label: target.name }))}
                 value={mapping[state.id] ?? null}
                 onChange={(next) => setMapping((current) => ({ ...current, [state.id]: next }))}
-                aria-label={`Send them to — ${state.name}`}
+                aria-label={`Send tickets from ${state.name} to`}
               />
             </div>
           </li>

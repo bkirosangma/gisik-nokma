@@ -211,13 +211,13 @@ describe('12.384 the summary says when the rows are not the whole project', () =
     expect(screen.getByTestId('list-summary')).toHaveTextContent('4 matching');
     expect(screen.getByTestId('list-summary')).not.toHaveTextContent('done');
     expect(screen.getByTestId('list-narrowing')).toHaveTextContent(
-      'narrowed to tickets in progress — not the whole project',
+      'narrowed to tickets in progress, not the whole project',
     );
   });
 
   it('CONTROL: unnarrowed, the count still speaks for the project and no note appears', () => {
     render(<ControlledList />);
-    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets · 1 done');
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets, 1 done');
     expect(screen.queryByTestId('list-narrowing')).not.toBeInTheDocument();
   });
 });
@@ -258,7 +258,7 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     render(<ControlledList />);
     const summary = () => screen.getByTestId('list-summary').textContent;
     const baseline = summary();
-    expect(baseline).toBe('4 tickets · 1 done');
+    expect(baseline).toBe('4 tickets, 1 done');
     for (const grouping of ALL_GROUPINGS) {
       await user.click(screen.getByRole('button', { name: /Group by/ }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: grouping }));
@@ -305,7 +305,7 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     // column — the case is about the CHOSEN columns' order and placement, and
     // the two fixed columns around them are the frame it reads them in.
     expect(headers).toEqual(['Key', 'Title', 'Due date', 'Status']);
-    expect(within(section).getByText("30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+    expect(within(section).getByText("30 Aug 2026, Kiro's claim")).toBeInTheDocument();
   });
 
   /**
@@ -392,7 +392,7 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     expect(screen.getByText('Chase the vendor')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Collapse DLT registration' }));
     expect(screen.queryByText('Chase the vendor')).not.toBeInTheDocument();
-    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets · 1 done');
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('4 tickets, 1 done');
   });
 
   it('persists grouping and column changes through onPrefsChange', async () => {
@@ -492,7 +492,7 @@ describe('3.51 TicketList — restriction is named, never a vanish (invariant 5)
 
   it('PLANTED DEFECT: it is COUNTED too — a hidden parent does not shrink the summary', () => {
     render(<ControlledList rows={[RESTRICTED_CHILD]} initial={chose([], 'flat')} />);
-    expect(screen.getByTestId('list-summary')).toHaveTextContent('1 tickets · 0 done');
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('1 tickets, 0 done');
   });
 
   /**
@@ -507,7 +507,7 @@ describe('3.51 TicketList — restriction is named, never a vanish (invariant 5)
       listRowSeed({ ticketId: 'd1', title: 'Finished', stateCategory: 'terminal' }),
     ];
     render(<ControlledList rows={rows} initial={chose([], 'flat')} />);
-    expect(screen.getByTestId('list-summary')).toHaveTextContent('3 tickets · 1 done');
+    expect(screen.getByTestId('list-summary')).toHaveTextContent('3 tickets, 1 done');
   });
 
   it('PLANTED DEFECT: progress keeps the true denominator and names the restricted children', () => {
@@ -517,7 +517,7 @@ describe('3.51 TicketList — restriction is named, never a vanish (invariant 5)
       rollup: { totalChildren: 8, terminalChildren: 5, restrictedCount: 2 },
     });
     render(<ControlledList rows={[parent]} initial={chose(['progress'], 'flat')} />);
-    expect(screen.getByText('5 of 8 done · 2 restricted')).toBeInTheDocument();
+    expect(screen.getByText('5 of 8 done, 2 restricted')).toBeInTheDocument();
     // The two deceptive alternatives, refused by name.
     expect(screen.queryByText('5 of 6 done')).not.toBeInTheDocument();
     expect(screen.queryByText('5 of 8 done')).not.toBeInTheDocument();
@@ -528,7 +528,7 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
   it('PLANTED DEFECT: says so on screen when the arrangement is this client’s default', () => {
     render(<ControlledList initial={DEFAULT_VIEW_PREFS} />);
     expect(screen.getByTestId('list-prefs-origin')).toHaveTextContent(
-      'default arrangement — you have not arranged this project',
+      'default arrangement. You have not arranged this project',
     );
   });
 
@@ -557,7 +557,7 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
    * that fires for both halves, or for the wrong one, cannot pass.
    */
   /**
-   * 3.65 — the surface names WHICH half nobody chose: a half-set project is told "default grouping — you have not chosen a grouping for this project" and stays SILENT about the chosen half. The mirror case below proves neither note is hard-wired to one side.
+   * 3.65 — the surface names WHICH half nobody chose: a half-set project is told "default grouping. You have not chosen a grouping for this project" and stays SILENT about the chosen half. The mirror case below proves neither note is hard-wired to one side.
    */
   it('PLANTED DEFECT: a HALF the user never chose is named as a default, and the chosen half is not', () => {
     render(
@@ -569,7 +569,7 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
       />,
     );
     expect(screen.getByTestId('list-prefs-origin-grouping')).toHaveTextContent(
-      'default grouping — you have not chosen a grouping for this project',
+      'default grouping. You have not chosen a grouping for this project',
     );
     expect(screen.queryByTestId('list-prefs-origin-columns')).not.toBeInTheDocument();
     // NOT the whole-project sentence: the user HAS arranged this project, half of it.
@@ -586,7 +586,7 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
       />,
     );
     expect(screen.getByTestId('list-prefs-origin-columns')).toHaveTextContent(
-      'default columns — you have not chosen columns for this project',
+      'default columns. You have not chosen columns for this project',
     );
     expect(screen.queryByTestId('list-prefs-origin-grouping')).not.toBeInTheDocument();
     expect(screen.queryByTestId('list-prefs-origin')).not.toBeInTheDocument();
@@ -654,8 +654,8 @@ describe('3.53 TicketList — a default arrangement never wears the user’s aut
  * `new Date(value).toLocaleDateString()` (`packages/app-core/src/provenance.ts:27`)
  * kills THREE cases in this block — the +14 case, the −11 case and the
  * day-anchored one. Measured 2026-09-02: `expected '30/8/2026 — Kiro's claim'
- * to be '30 Aug 2026 — Kiro's claim'` from Kiritimati and
- * `expected '29/8/2026 — Kiro's claim' to be '30 Aug 2026 — Kiro's claim'` from
+ * to be '30 Aug 2026, Kiro's claim'` from Kiritimati and
+ * `expected '29/8/2026 — Kiro's claim' to be '30 Aug 2026, Kiro's claim'` from
  * Niue — note that the +14 case dies on the SPELLING while only the −11 case
  * dies on the wrong DAY, which is why both zones are kept. That is what they
  * are for.
@@ -704,11 +704,11 @@ describe('3.52 TicketList — one clock, named, and not the device’s', () => {
   }
 
   it('PLANTED DEFECT: the due date reads the same from a zone fourteen hours ahead', () => {
-    expect(dueTextUnder('Pacific/Kiritimati')).toBe("30 Aug 2026 — Kiro's claim");
+    expect(dueTextUnder('Pacific/Kiritimati')).toBe("30 Aug 2026, Kiro's claim");
   });
 
   it('PLANTED DEFECT: and from a zone eleven hours behind — two zones, one answer', () => {
-    expect(dueTextUnder('Pacific/Niue')).toBe("30 Aug 2026 — Kiro's claim");
+    expect(dueTextUnder('Pacific/Niue')).toBe("30 Aug 2026, Kiro's claim");
     expect(dueTextUnder('Pacific/Kiritimati')).toEqual(dueTextUnder('Pacific/Niue'));
   });
 
@@ -721,8 +721,8 @@ describe('3.52 TicketList — one clock, named, and not the device’s', () => {
    * must not.
    */
   it('PLANTED DEFECT: no zone can move a claimed day off the day it claims', () => {
-    expect(dueTextUnder('Pacific/Kiritimati')).toMatch(/^30 Aug 2026 — /);
-    expect(dueTextUnder('Pacific/Niue')).toMatch(/^30 Aug 2026 — /);
+    expect(dueTextUnder('Pacific/Kiritimati')).toMatch(/^30 Aug 2026, /);
+    expect(dueTextUnder('Pacific/Niue')).toMatch(/^30 Aug 2026, /);
   });
 
   /**
@@ -1569,8 +1569,8 @@ describe('13.1232 the priority column draws the level with its claimant', () => 
         ]}
       />,
     );
-    const cell = screen.getByText(/^P1 — /);
-    expect(cell.textContent).toBe("P1 — Kiro's claim");
+    const cell = screen.getByText(/^P1, /);
+    expect(cell.textContent).toBe("P1, Kiro's claim");
   });
 });
 
@@ -1603,17 +1603,17 @@ describe('13.662 the group header band names its group and counts its own rows',
     // THREE, not four; and type → epicA is the `epic` type while t2/t3/t5 are
     // the seed's `task`, so `task` holds three. Both counts were MEASURED, not
     // reasoned: the first version of these two lines said four each and the run
-    // answered `assignee · 3 tickets` then `type · 3 tickets`.
+    // answered `assignee, 3 tickets` then `type, 3 tickets`.
     const expected: [Grouping, string, string, string][] = [
       // F7 — the EPIC axis says ROWS, not TICKETS. This model counts the epic row
       // too while the prototype counts children only, so the same words named two
       // different numbers depending on which build you read; naming the unit
       // settles which membership is being counted. The other three axes agree with
       // the prototype and keep their word.
-      ['epic', 'No epic', 'epic · 2 rows', 'Registrations'],
-      ['status', 'To do', 'state · 2 tickets', 'Doing'],
-      ['assignee', 'Unassigned', 'assignee · 3 tickets', 'Kiro'],
-      ['type', 'task', 'type · 3 tickets', 'epic'],
+      ['epic', 'No epic', 'epic, 2 rows', 'Registrations'],
+      ['status', 'To do', 'state, 2 tickets', 'Doing'],
+      ['assignee', 'Unassigned', 'assignee, 3 tickets', 'Kiro'],
+      ['type', 'task', 'type, 3 tickets', 'epic'],
     ];
     for (const [grouping, title, meta, alsoTitle] of expected) {
       const view = render(<ControlledList initial={chose([], grouping)} />);
@@ -1643,12 +1643,12 @@ describe('13.662 the group header band names its group and counts its own rows',
     const region = screen.getByRole('region', { name: 'Doing' });
     const band = region.querySelector('.gn-list__section-title');
     if (band === null) throw new Error('no band over Doing');
-    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('state · 1 ticket');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('state, 1 ticket');
   });
 
   it('the flat grouping renders no band at all — there is no group to name', () => {
     render(<ControlledList initial={chose([], 'flat')} />);
-    expect(screen.queryByText(/^state · /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^state, /)).not.toBeInTheDocument();
     expect(document.querySelector('.gn-list__section-meta')).toBeNull();
   });
 
@@ -1668,7 +1668,7 @@ describe('13.662 the group header band names its group and counts its own rows',
     const region = screen.getByRole('region', { name: 'Registrations' });
     const band = region.querySelector('.gn-list__section-title');
     if (band === null) throw new Error('no band over Registrations');
-    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 rows');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic, 2 rows');
 
     await user.click(within(region).getByRole('button', { name: 'Collapse DLT registration' }));
 
@@ -1677,7 +1677,7 @@ describe('13.662 the group header band names its group and counts its own rows',
     // about which number the band reads.
     expect(within(region).queryByTestId('ticket-card-t3')).toBeNull();
     expect(within(region).getByTestId('ticket-card-t2')).not.toBeNull();
-    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 rows');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic, 2 rows');
     // The band answers for its section the way the summary answers for the
     // project: a count that shrank when a row was collapsed would be a count of
     // the user's scroll position. And the row's own state agrees with the table:
@@ -1768,20 +1768,20 @@ describe('13.664 the status pill renders the state’s name and its category dot
 });
 
 describe('13.665 a due date is rendered as a claim, with its claimant', () => {
-  it('reads `30 Aug 2026 — Kiro’s claim`', () => {
+  it('reads `30 Aug 2026, Kiro’s claim`', () => {
     render(<ControlledList rows={[DUE_CLAIMED]} initial={chose(['dueDate'], 'flat')} />);
     const row = screen.getByTestId('ticket-card-due_open').closest('tr');
     if (row === null) throw new Error('no <tr> for due_open');
-    expect(within(row).getByText("30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+    expect(within(row).getByText("30 Aug 2026, Kiro's claim")).toBeInTheDocument();
   });
 });
 
 describe('13.666 a closed ticket’s due cell reads its closure, still attributed', () => {
-  it('reads `Closed 17 Sep 2026 — Kiro’s claim`', () => {
+  it('reads `Closed 17 Sep 2026, Kiro’s claim`', () => {
     render(<ControlledList rows={[DUE_CLOSED]} initial={chose(['dueDate'], 'flat')} />);
     const row = screen.getByTestId('ticket-card-due_closed').closest('tr');
     if (row === null) throw new Error('no <tr> for due_closed');
-    expect(within(row).getByText("Closed 17 Sep 2026 — Kiro's claim")).toBeInTheDocument();
+    expect(within(row).getByText("Closed 17 Sep 2026, Kiro's claim")).toBeInTheDocument();
     // The date's own claimant outlives the closure: `closed.actorId` is `me`
     // here too, so a cell that switched to the CLOSER would pass by accident.
     // This asserts the sentence's SHAPE instead, which is the part that would
@@ -1822,7 +1822,7 @@ describe('13.668 progress reads `N of M done`, and its absence is a dash', () =>
     const partialRow = screen.getByTestId('ticket-card-partial').closest('tr');
     if (rolledRow === null || partialRow === null) throw new Error('rows not found');
     expect(within(rolledRow).getByText('3 of 8 done')).toBeInTheDocument();
-    expect(within(partialRow).getByText('4 of 8 done · 2 restricted')).toBeInTheDocument();
+    expect(within(partialRow).getByText('4 of 8 done, 2 restricted')).toBeInTheDocument();
   });
 
   it('a row with no rollup renders the dash, not `0 of 0 done`', () => {
@@ -1863,7 +1863,7 @@ describe('13.669 the controls row, tray and table render under all three styles'
         screen.getByTestId('list-columns-tray').querySelectorAll('input[type="checkbox"]'),
         style,
       ).toHaveLength(6);
-      expect(screen.getByTestId('list-summary'), style).toHaveTextContent('4 tickets · 1 done');
+      expect(screen.getByTestId('list-summary'), style).toHaveTextContent('4 tickets, 1 done');
       expect(view.container.querySelector('.gn-list__section-title'), style).not.toBeNull();
       expect(view.container.querySelector('.gn-list__table-wrap'), style).not.toBeNull();
       // React Aria derives its ids from `useId`, whose counter advances per

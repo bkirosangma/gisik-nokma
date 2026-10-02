@@ -15,5 +15,5 @@ import type { RollupToViewer } from '../view-types.js';
  */
 export function formatRollup(rollup: RollupToViewer): string {
   const base = `${rollup.terminalChildren} of ${rollup.totalChildren} done`;
-  return rollup.restrictedCount > 0 ? `${base} · ${rollup.restrictedCount} restricted` : base;
+  return rollup.restrictedCount > 0 ? `${base}, ${rollup.restrictedCount} restricted` : base;
 }

@@ -232,7 +232,7 @@ export function BulkCloseDialog({
     } catch (cause) {
       if (attemptRef.current !== attempt) return;
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this close: ${message}`),
       );
     } finally {
       // Gated, not merely tidy: an ungated reset would release the latch of a
@@ -256,7 +256,7 @@ export function BulkCloseDialog({
           <ul>
             {failures.map((failure) => (
               <li key={failure.ticketId}>
-                {failure.title} — {failure.reason}
+                {failure.title}: {failure.reason}
               </li>
             ))}
           </ul>

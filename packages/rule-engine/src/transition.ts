@@ -72,7 +72,7 @@ export async function evaluateTicketTransitioned(
   // Explicit reopen (spec §2): a closed ticket has no legal move at all, so
   // this is decided before any edge is looked at.
   if ((ticket.closed ?? null) !== null) {
-    return { refused: true, rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed — reopen it first.' };
+    return { refused: true, rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed. Reopen it first.' };
   }
 
   const latest = await ctx.getWorkflowDef(env, ticket.workflowId);

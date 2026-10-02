@@ -39,9 +39,9 @@ describe('the generated content is the documents, not a summary of them', () => 
    * documents rather than shipping the wrong claim. Then the starting-status
    * release (2026-09-23) made the ORIGINAL correction itself read as a wider
    * claim than true — "It will not get you a due date" was about this one
-   * typing box, but by then a job's date COULD be set at creation through a
+   * typing box, but by then a ticket's date COULD be set at creation through a
    * different control, and an unqualified sentence would have read as "you
-   * cannot set a due date when creating a job". This asserts the
+   * cannot set a due date when creating a ticket". This asserts the
    * RE-corrected, scoped version survived the parse into the app — because a
    * build-time transform is exactly where a carefully corrected sentence
    * could quietly lose its correction and nobody would look again.

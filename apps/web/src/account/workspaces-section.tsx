@@ -53,7 +53,7 @@ export function WorkspacesSection({ workspaces }: WorkspacesSectionProps) {
             This row counted `workspace.projects.length`, the whole array, while
             `/workspaces`' own card counts LIVE projects only and says "archived"
             separately (`projectCountLine` + the archived chip). So one workspace
-            read "2 projects" here and "1 project · 1 archived" there, and NEITHER
+            read "2 projects" here and "1 project, 1 archived" there, and NEITHER
             screen named its unit — the same word for two different measurements.
 
             The live-only count is what is kept, because that is the unit the
@@ -91,7 +91,7 @@ export function WorkspacesSection({ workspaces }: WorkspacesSectionProps) {
                   <span className="gn-account__workspace-role">{workspace.role}</span>
                   <span className="gn-account__workspace-count">
                     {live.length} {live.length === 1 ? 'project' : 'projects'}
-                    {archived > 0 ? ` · ${archived} archived` : ''}
+                    {archived > 0 ? `, ${archived} archived` : ''}
                   </span>
                 </span>
               </span>

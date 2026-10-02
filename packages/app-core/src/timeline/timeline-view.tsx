@@ -301,7 +301,7 @@ export function TimelineView(props: TimelineViewProps) {
             // `timeline-view.test.tsx` pins to the ticket title alone — the
             // same ARIA shape `WorkspaceLinks` already uses and documents
             // (`apps/web/app/w/[workspaceId]/page.tsx`).
-            const detail = [row.provenance, ...row.customClaims.map((entry) => entry.label)].join(' · ');
+            const detail = [row.provenance, ...row.customClaims.map((entry) => entry.label)].join('; ');
             const detailId = `${idPrefix}-detail-${row.ticketId}`;
             return (
               <div key={row.ticketId} className="gn-timeline__row" data-ticket-id={row.ticketId}>

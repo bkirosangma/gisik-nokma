@@ -45,7 +45,7 @@ describe('19.185 SyncNotices', () => {
     const region = screen.getByRole('region', { name: 'Sync notices' });
     expect(region).toHaveAttribute('aria-live', 'polite');
     expect(screen.getByText(PURGED_OUTBOX_NOTICE)).toBeInTheDocument();
-    expect(failed).toBe('A change could not be saved — restrict-to: Only admins may make this move.');
+    expect(failed).toBe('A change could not be saved: restrict-to: Only admins may make this move.');
     expect(failedClaimNotice(null)).toBe('A change could not be saved.');
     await userEvent.click(screen.getByRole('button', { name: `${SYNC_NOTICE_DISMISS}: ${PURGED_OUTBOX_NOTICE}` }));
     expect(onDismiss).toHaveBeenCalledWith('purged:e1');

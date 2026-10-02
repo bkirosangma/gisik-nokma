@@ -3450,7 +3450,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem;
   margin: 0;
   color: var(--gn-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 /*
@@ -3577,7 +3576,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   font-size: 0.75rem;
   line-height: 1rem;
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 .gn-visibility__viewer-chips {
@@ -3640,7 +3638,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   font-size: 0.75rem;
   line-height: 1rem;
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 .gn-visibility__mode,
@@ -5282,7 +5279,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem; /* 16px */
   font-weight: 600;
   color: var(--gn-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.03125rem; /* 0.5px */
 }
 
@@ -6513,7 +6509,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--gn-text-muted);
 }
 
@@ -6744,7 +6739,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.125rem;
   font-weight: 600;
   letter-spacing: 0.0308em;
-  text-transform: uppercase;
   color: var(--gn-text-subtle);      /* `--label3`, as `.gn-help__eyebrow` */
 }
 /* 22px/28px/600, from the reference. It was 1.3rem (20.8px) with an inherited
@@ -7650,7 +7644,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-filters__heading { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; margin: 0; }
 .gn-filters__section-label {
   font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600;
-  color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.0375rem;
+  color: var(--gn-text-muted); letter-spacing: 0.0375rem;
 }
 .gn-filters__footer {
   padding: 1rem 1.5rem; background: var(--gn-fill-quaternary);

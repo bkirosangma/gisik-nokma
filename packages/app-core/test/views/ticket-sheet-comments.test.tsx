@@ -196,7 +196,7 @@ describe('TicketSheet — the comment thread and its box', () => {
     renderSheet();
     const section = await screen.findByTestId('sheet-comments');
 
-    expect(within(section).getByText('Comments · 1')).toBeInTheDocument();
+    expect(within(section).getByText('Comments (1)')).toBeInTheDocument();
     expect(within(section).getByText('The bucket is the defect.')).toBeInTheDocument();
     // The name comes from the sheet's ONE actor join, the same `nameOf` every
     // other row uses — a second lookup here is how two rows name one person
@@ -343,7 +343,7 @@ describe('TicketSheet — the comment thread and its box', () => {
     // earned it. This is the whole reason `getTicketComments` throws on a 404
     // rather than answering `[]`.
     expect(screen.queryByText('No comments yet.')).toBeNull();
-    expect(screen.queryByText('Comments · 0')).toBeNull();
+    expect(screen.queryByText('Comments (0)')).toBeNull();
   });
 
   /**
@@ -397,7 +397,7 @@ describe('TicketSheet — the comment thread and its box', () => {
     // …and the element really is the heading, so neither assertion above is a
     // reading of some other node that happens to start with the word.
     expect(heading.tagName).toBe('P');
-    expect(heading.textContent).toBe('Comments · 1');
+    expect(heading.textContent).toBe('Comments (1)');
   });
 
   /**
@@ -688,7 +688,7 @@ describe('TicketSheet — tagging a note in a ticket comment attaches it', () =>
     const body = commentBody(wikiLink('n1', 'Cold room'), { type: 'text', text: ' and ' }, wikiLink('n2', 'Compressor log'));
     renderSheet(src, { editorSlot: referencingEditorSlot(body) });
     await screen.findByTestId('fake-comment-editor');
-    await screen.findByText('Notes · 0');
+    await screen.findByText('Notes (0)');
 
     await user.click(screen.getByRole('button', { name: 'Post' }));
 
@@ -708,7 +708,7 @@ describe('TicketSheet — tagging a note in a ticket comment attaches it', () =>
     );
 
     // The section's OWN live query reloads and shows both badges.
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     expect(screen.getByRole('link', { name: 'Cold room' })).toHaveAttribute('href', '/notes/n1');
     expect(screen.getByRole('link', { name: 'Compressor log' })).toHaveAttribute('href', '/notes/n2');
   });
