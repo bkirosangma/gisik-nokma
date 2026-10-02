@@ -16,14 +16,17 @@ import { EditorSkeleton } from './skeletons/editor-skeleton.js';
  * and the first client render both paint the skeleton and there is no markup to disagree with.
  */
 let Loaded: ComponentType<TicketEditorSlotProps> | null = null;
+// One load for every slot on the page (a sheet mounts a description and a comment composer, and prefetch may already be in flight).
+let loading: Promise<ComponentType<TicketEditorSlotProps>> | null = null;
 const load = () =>
-  import('@gisik-nokma/editor').then((module) => {
+  (loading ??= import('@gisik-nokma/editor').then((module) => {
     Loaded = module.TicketEditorSlot;
     return Loaded;
-  });
+  }));
 
+// `useState(() => Loaded)` and `setEditor(() => component)`: a component is a function, and React would CALL a bare one as an initializer/updater.
 export const TicketEditorSlot = (props: TicketEditorSlotProps) => {
-  const [Editor, setEditor] = useState<ComponentType<TicketEditorSlotProps> | null>(Loaded);
+  const [Editor, setEditor] = useState<ComponentType<TicketEditorSlotProps> | null>(() => Loaded);
   useEffect(() => {
     if (Editor !== null) return;
     let live = true;
