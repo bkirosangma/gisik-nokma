@@ -229,7 +229,7 @@ export function TicketTypeEditorScreen(props: {
   const [context, setContext] = useState<{ workflows: PublishedWorkflowDef[]; types: TicketTypeDef[] } | null>(null);
   // A read that REJECTED, told apart from one still in flight (E2-20). The
   // `context === null` gate below cannot make that distinction on its own, so a
-  // rejected `Promise.all` was drawn as "Loading ticket types…" for ever.
+  // rejected `Promise.all` was drawn as the loading skeleton for ever.
   const [loadFailed, setLoadFailed] = useState(false);
   const [save, setSave] = useState<SavePhase>({ phase: 'idle' });
   const [population, setPopulation] = useState<Population>(null);
@@ -261,7 +261,7 @@ export function TicketTypeEditorScreen(props: {
         if (!cancelled) setContext({ workflows, types });
       })
       // Without this arm a rejected read left `context` null, which the gate below
-      // draws as "Loading ticket types…" — an error reported as a load that never
+      // draws as the loading skeleton — an error reported as a load that never
       // ends. The sentence is the one the sibling screens use
       // (`workflow-list-screen.tsx:198`, `workflow-builder-screen.tsx:88`).
       .catch(() => {

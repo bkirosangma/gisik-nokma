@@ -213,7 +213,7 @@ export function TicketTypeListScreen(props: {
         setWorkflows(loadedWorkflows);
       })
       // Without this arm a rejected read left both `types` and `workflows` null,
-      // which the gate below draws as "Loading ticket types…" — an error reported
+      // which the gate below draws as the loading skeleton — an error reported
       // as a load that never ends, on the two screens the help corpus calls the
       // ones that make the product yours. The sentence is the one every sibling
       // data screen in this package already uses (`workflow-list-screen.tsx:198`,
