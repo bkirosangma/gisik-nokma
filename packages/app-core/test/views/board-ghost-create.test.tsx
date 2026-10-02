@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult } from '@gisik-nokma/domain';
@@ -197,6 +197,8 @@ describe('the optimistic Close (spec S5)', () => {
 
   /** The card's own slot: busy, dimmed (by its class) and not draggable while its Close is open. */
   const slotOf = (ticketId: string) => screen.getByTestId(`ticket-card-${ticketId}`);
+  /** The card's Move button, found inside its own slot (the neighbour has one too). */
+  const moveOf = (ticketId: string) => within(slotOf(ticketId)).getByRole('button', { name: 'Move to another state' });
 
   it('25.097 Close DIMS the card in place while the write is open — busy, not draggable, no second Close; the neighbour is untouched; the refusal undims it and shows the reason', async () => {
     const open = deferred<IngestResult[]>();
@@ -207,12 +209,14 @@ describe('the optimistic Close (spec S5)', () => {
     expect(slotOf('tk_x').className).not.toContain('gn-board__card-slot--closing');
     expect(slotOf('tk_x').getAttribute('draggable')).toBe('true');
     expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeEnabled();
+    expect(moveOf('tk_x')).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
     // Open: the card is STILL on the board, in its place, dimmed and busy; it cannot be dragged and cannot be closed twice.
     expect(slotOf('tk_x')).toHaveAttribute('aria-busy', 'true');
     expect(slotOf('tk_x').className).toContain('gn-board__card-slot--closing');
     expect(slotOf('tk_x').getAttribute('draggable')).not.toBe('true');
     expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeDisabled();
+    expect(moveOf('tk_x')).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
     expect(ingest).toHaveBeenCalledTimes(1);
     // The neighbour is untouched throughout.
@@ -226,6 +230,7 @@ describe('the optimistic Close (spec S5)', () => {
     expect(slotOf('tk_x').className).not.toContain('gn-board__card-slot--closing');
     expect(slotOf('tk_x').getAttribute('draggable')).toBe('true');
     expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeEnabled();
+    expect(moveOf('tk_x')).toBeEnabled();
     expect(onMoved).not.toHaveBeenCalled();
   });
 

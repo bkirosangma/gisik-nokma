@@ -75,7 +75,9 @@ async function fillAndCreate(title: string, { inBacklog = false }: { inBacklog?:
   await user.click(screen.getByRole('button', { name: 'Create ticket' }));
   fireEvent.change(screen.getByLabelText('Title'), { target: { value: title } });
   // The dialog starts in the Backlog, which the board does not draw; a ghost is for a ticket that lands on the board.
-  if (!inBacklog) await user.click(screen.getByLabelText('Starts in the backlog?'));
+  // The dialog remembers the last answer, so a second Create in one test finds it already off.
+  const backlog = screen.getByLabelText('Starts in the backlog?');
+  if (!inBacklog && (backlog as HTMLInputElement).checked) await user.click(backlog);
   fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 }
 
@@ -203,20 +205,26 @@ describe('25.100 the create flow takes its draft back', () => {
 
   it('25.112 the restored draft keeps ITS OWN ticket id even when another dialog was opened while it was pending (a retry is the same ticket, never a second)', async () => {
     const { writes, sent, onRefused } = mount();
-    await fillAndCreate('Buy milk');
+    // Control: a fresh dialog opened after a COMMITTED create mints a DIFFERENT id, so the "same id" assertion below can tell the draft's id from a fresh dialog's.
+    await fillAndCreate('Earlier ticket');
     await waitFor(() => expect(writes).toHaveLength(1));
-    const firstId = sent[0]!.entity.id;
-    // While the first create is pending the person opens a NEW dialog (which mints an id of its own) and cancels it.
+    writes[0]!.resolve([{ status: 'committed', eventId: sent[0]!.id, seq: 4, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult]);
+    await fillAndCreate('Buy milk');
+    await waitFor(() => expect(writes).toHaveLength(2));
+    const firstId = sent[1]!.entity.id;
+    expect(firstId).not.toBe(sent[0]!.entity.id);
+    await waitFor(() => expect(dialog()).toBeNull());
+    // While the second create is pending the person opens a NEW dialog (which mints an id of its own) and cancels it.
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue(''));
     await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(dialog()).toBeNull());
-    writes[0]!.resolve(refusedAnswer);
+    writes[1]!.resolve(refusedAnswer);
     await waitFor(() => expect(onRefused).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Buy milk'));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
-    await waitFor(() => expect(sent).toHaveLength(2));
-    expect(sent[1]!.entity.id).toBe(firstId);
+    await waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent[2]!.entity.id).toBe(firstId);
   });
 });
