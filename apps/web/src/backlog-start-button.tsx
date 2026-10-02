@@ -8,6 +8,7 @@ import {
   type DataSource,
   type ListRow,
 } from '@gisik-nokma/app-core';
+import type { StartRefusal } from './use-optimistic-starts.js';
 
 export type BacklogStartButtonProps = {
   row: ListRow;
@@ -33,6 +34,15 @@ export type BacklogStartButtonProps = {
   currentUserId: string;
   /** Called after a `committed` answer. The page's own `list.reload()` — the row leaves this tab on the next read. */
   onStarted: () => void;
+  /**
+   * The optimistic arms (smoothness T7, spec S5), all optional so the button still stands alone. The PAGE hides the
+   * row on `onBegin` — which unmounts this button — so the answer is reported through `onSettled` / `onFailed`
+   * (closures that outlive the button), and a refusal the page kept comes back as `initialRefusal` when the row does.
+   */
+  onBegin?: (ticketId: string) => void;
+  onSettled?: (ticketId: string) => void;
+  onFailed?: (ticketId: string, refusal: StartRefusal) => void;
+  initialRefusal?: StartRefusal;
 };
 
 /**
@@ -63,10 +73,23 @@ export type BacklogStartButtonProps = {
  * its state moves, the same "the reload is what makes it leave" reasoning
  * `board.tsx`'s `closeCard` docblock gives for the board's own `getBoard`.
  */
-export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, currentUserId, onStarted }: BacklogStartButtonProps) {
+export function BacklogStartButton({
+  row,
+  toStateId,
+  dataSource,
+  workspaceId,
+  currentUserId,
+  onStarted,
+  onBegin,
+  onSettled,
+  onFailed,
+  initialRefusal,
+}: BacklogStartButtonProps) {
   const [submitting, setSubmitting] = useState(false);
-  const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
-  const [transportError, setTransportError] = useState<string | null>(null);
+  const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(
+    initialRefusal?.kind === 'server' ? { rule: initialRefusal.rule, reason: initialRefusal.reason } : null,
+  );
+  const [transportError, setTransportError] = useState<string | null>(initialRefusal?.kind === 'transport' ? initialRefusal.message : null);
   const mountedRef = useRef(true);
   useEffect(
     () => () => {
@@ -78,6 +101,7 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
   const start = async (): Promise<void> => {
     if (toStateId === null) return; // disabled in the DOM too; guarded here against a stray programmatic click
     setSubmitting(true);
+    onBegin?.(row.ticketId);
     try {
       const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
       const transition = make({
@@ -90,6 +114,7 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
       const result = results[0];
       if (result === undefined) {
         // Ruling 41/27: silence, not a refusal.
+        onFailed?.(row.ticketId, { kind: 'transport', message: 'The server did not answer this start.' });
         if (mountedRef.current) {
           setServerRefusal(null);
           setTransportError('The server did not answer this start.');
@@ -101,9 +126,16 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
           setServerRefusal(null);
           setTransportError(null);
         }
+        onSettled?.(row.ticketId);
         onStarted();
         return;
       }
+      onFailed?.(
+        row.ticketId,
+        result.status === 'refused'
+          ? { kind: 'server', rule: result.rule, reason: result.reason }
+          : { kind: 'server', rule: result.code, reason: result.message },
+      );
       if (mountedRef.current) {
         setTransportError(null);
         setServerRefusal(
@@ -115,11 +147,9 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — own channel,
       // own sentence. E5-25: the 401 arm joins it through the one author.
-      if (mountedRef.current) {
-        setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this start: ${message}`),
-        );
-      }
+      const message = writeFailureCopy(cause, (reason) => `We could not reach the server for this start: ${reason}`);
+      onFailed?.(row.ticketId, { kind: 'transport', message });
+      if (mountedRef.current) setTransportError(message);
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }

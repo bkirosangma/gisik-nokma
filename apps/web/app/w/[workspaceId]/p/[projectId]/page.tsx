@@ -61,6 +61,7 @@ import {
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import { useOptimisticStarts } from '../../../../../src/use-optimistic-starts.js';
 import { NewTicketDescriptionSlot } from '../../../../../src/new-ticket-description-slot.js';
 import { BacklogRankControls, submitRank } from '../../../../../src/backlog-rank-controls.js';
 import {
@@ -1214,6 +1215,12 @@ function ProjectBoard() {
    * resolve. The scope note beside the switch names the Backlog now too; it
    * had named three tabs of five.
    */
+  /** The rows a read still holds in the backlog: what retires a committed Start's optimistic hide. */
+  const rowsInBacklog = useMemo(
+    () => (list.rows === null ? null : new Set(list.rows.filter((row) => row.stateId === BACKLOG_STATE_ID).map((row) => row.ticketId))),
+    [list.rows],
+  );
+  const starts = useOptimisticStarts(rowsInBacklog);
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
     /**
@@ -1247,14 +1254,16 @@ function ProjectBoard() {
    */
   const backlogRows = useMemo(() => {
     if (backlogNarrowing === null) return [];
+    // A row whose Start is open (or committed and not yet read back) is off the tab already (smoothness T7, spec S5).
+    const standing = starts.hidden.size === 0 ? backlogNarrowing.rows : backlogNarrowing.rows.filter((row) => !starts.hidden.has(row.ticketId));
     const withOverrides =
       rankOverrides.size === 0
-        ? backlogNarrowing.rows
-        : backlogNarrowing.rows.map((row) =>
+        ? standing
+        : standing.map((row) =>
             rankOverrides.has(row.ticketId) ? { ...row, rank: rankOverrides.get(row.ticketId) ?? null } : row,
           );
     return sortByRank(withOverrides);
-  }, [backlogNarrowing, rankOverrides]);
+  }, [backlogNarrowing, rankOverrides, starts.hidden]);
 
   /**
    * A DRAG'S MOVE — the same `submitRank` the two buttons call.
@@ -3383,6 +3392,10 @@ function ProjectBoard() {
                                 workspaceId={workspaceId}
                                 currentUserId={currentUserId}
                                 onStarted={list.reload}
+                                onBegin={starts.begin}
+                                onSettled={starts.settle}
+                                onFailed={starts.fail}
+                                {...(starts.refusals[row.ticketId] !== undefined ? { initialRefusal: starts.refusals[row.ticketId]! } : {})}
                               />
                               {/*
                                 The rank controls sit in the SAME row action as
