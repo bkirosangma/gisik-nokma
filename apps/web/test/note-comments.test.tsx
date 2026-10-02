@@ -54,6 +54,8 @@ const nameOf = (id: string): string => NAMES[id] ?? id;
 
 function comment(over: Partial<NoteComment> & { commentId: string }): NoteComment {
   return {
+    editedAt: null,
+    deletedAt: null,
     authorId: 'u_kiro',
     body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a comment' }] }] },
     recordedAt: '2026-09-23T08:00:00.000Z',
