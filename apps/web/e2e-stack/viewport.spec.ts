@@ -1312,14 +1312,36 @@ test('records non-text contrast across the signed-in surface, with a positive co
       )}\n`,
     );
   } else {
-    const committed = JSON.parse(readFileSync(rosterUrl, 'utf8')) as Record<string, unknown>;
-    const differing = Object.keys(measured).filter(
-      (key) =>
-        JSON.stringify(committed[key]) !== JSON.stringify(measured[key as keyof typeof measured]),
+    type Verdict = Pick<typeof measured, 'belowCount' | 'exemptions' | 'routes' | 'roster' | 'sanctionedWaivers'>;
+    // Compared: the VERDICT, which the DB cannot move. `examined`, `totalClasses` and the above-3:1 roster follow the rows the
+    // stack holds (`.gn-attention__more` renders only past ATTENTION_CAP rows, attention-strip.tsx:174), so a fresh CI seed
+    // differs from the dev stack on data alone; their drift is reported below, never failed (F-11 FIX 1).
+    const verdictOf = (m: Verdict) => ({
+      belowCount: m.belowCount,
+      below: m.roster.filter((r) => r.ratio < 3).map((r) => ({ selector: r.selector, ratio: r.ratio })),
+      exemptions: m.exemptions,
+      routes: m.routes,
+      sanctionedWaivers: m.sanctionedWaivers,
+    });
+    const committed = JSON.parse(readFileSync(rosterUrl, 'utf8')) as typeof measured;
+    const was = verdictOf(committed);
+    const now = verdictOf(measured);
+    const differing = (Object.keys(now) as (keyof typeof now)[]).filter(
+      (key) => JSON.stringify(was[key]) !== JSON.stringify(now[key]),
     );
+    const drift = (['totalClasses', 'examined'] as const)
+      .filter((key) => committed[key] !== measured[key])
+      .map((key) => `${key} ${committed[key]} -> ${measured[key]}`);
+    const aboveNow = JSON.stringify(measured.roster.filter((r) => r.ratio >= 3));
+    if (aboveNow !== JSON.stringify(committed.roster.filter((r) => r.ratio >= 3))) drift.push('above-3:1 roster');
+    if (drift.length > 0) {
+      const note = `non-text-contrast roster drift (data-dependent, not a failure): ${drift.join('; ')}`;
+      console.log(`[non-text-contrast] ${note}`);
+      test.info().annotations.push({ type: 'roster-drift', description: note });
+    }
     expect(
       differing,
-      'non-text-contrast-roster.json differs from this run in the listed keys; roster differs, ' +
+      'non-text-contrast-roster.json differs from this run in the listed verdict keys; roster differs, ' +
         're-run with UPDATE_ROSTER=1 on a clean tree and COMMIT the file',
     ).toEqual([]);
   }
