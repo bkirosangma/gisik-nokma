@@ -3098,6 +3098,12 @@ input, textarea, select { font-family: inherit; }
    `.gn-legal__meta` (globals.css:250) were both raised from 0.95rem to fix. */
 .gn-sign-in__hint,
 .gn-sign-in__legal { margin: 0; text-align: center; font-size: 1rem; color: var(--gn-text-muted); }
+/* F-10 (owner 2026-10-02, "Fix in neo now", ALL styles; cases 23.350-23.352). The email form is a bare <form>: field, hint and
+   primary were block siblings with 0px between them, so the hint touched the primary's top edge. In neo that put the 14px
+   fall (`--gn-halo`) on the sentence, which N7 forbids. The margin is `space-1` above (clears the field's 3px focus offset) and
+   `space-2` below (16px, at least every style's halo: 14 neo, 8 hig and minimal). Scoped to the form, so the shared `margin: 0`
+   above still serves "Or continue with" and the legal line. The one hig/minimal change in the neo refresh, owner-approved. */
+.gn-sign-in__method-form .gn-sign-in__hint { margin: var(--gn-space-1) 0 var(--gn-space-2); }
 /* ── Sign-in on a phone (mobile-web plan Task 12, case 21.190). The 26rem column and the card's own cap
    give way to the viewport, with the same 24px gutter as every page (a LONGHAND on the `--centred` modifier: the `.gn-shell`
    shorthand at ≤60rem supplies the same `--gn-space-3` and must stay the one `padding` there). The page is still
