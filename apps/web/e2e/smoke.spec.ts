@@ -361,7 +361,7 @@ test('the board renders a card, its restricted-count line, and its attributed pr
   // states. The route segments are this app's own (`app/w/[workspaceId]/p/[projectId]`).
   await page.goto(`/w/${WS}/p/${PRJ}`);
   await expect(page.getByRole('region', { name: 'Doing' })).toBeVisible();
-  await expect(page.getByText('5 of 8 done · 2 restricted')).toBeVisible();
+  await expect(page.getByText('5 of 8 done, 2 restricted')).toBeVisible();
   await page.getByRole('button', { name: /^Moved to Doing by/ }).click();
   await expect(page.getByText('Moved to Doing by Anselma Marak on 19 Aug 2026')).toBeVisible();
 });

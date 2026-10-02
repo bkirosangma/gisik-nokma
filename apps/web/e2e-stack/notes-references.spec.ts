@@ -65,7 +65,7 @@ test('18.282 posting a ticket comment with :note Compressor attaches the note; i
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title);
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   const noteId = /\/notes\/([^/]+)$/.exec(page.url())?.[1] ?? '';
   expect(noteId, 'a note id must be readable off the just-created note\'s URL').not.toBe('');
@@ -115,7 +115,7 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(noteTitle);
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
 
   // POSITIVE CONTROL FIRST: the note's own comment thread mounted.
