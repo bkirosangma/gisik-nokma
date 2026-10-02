@@ -858,6 +858,14 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 
 ### T10 — discovery and me
 
+- ✅ **14.480 — `list_ticket_types(workspaceId)` reads `GET /v1/workspaces/:id/ticket-types` (`builder-reads.ts:757`); `list_workflows(workspaceId)` reads `/workflows` and with `workflowId` reads `/workflows/:workflowId` (states and transitions, `:708`, `:726`); a 404 is "workspace not found or not visible to you" / "workflow not found or not visible to you";** control: the answers pass through unchanged. Mutation: read `/workflows` for a `workflowId` call → red.
+- ✅ **14.481 — `my_work(workspaceId)` reads `GET /v1/me/work?workspaceId=` (REQUIRED, SC11) and `get_attention(workspaceId)` reads `/v1/workspaces/:id/attention`;** control: the query string carries the id. Mutation: omit `workspaceId` → the server's 400.
+- ✅ **14.482 — `list_notifications({ unreadOnly?, cursor?, limit? })` reads `/v1/me/notifications` with `unread=true`, `cursor`, `limit` (1–100) and passes `nextCursor` through;** control: no arguments → no query string. Mutation: send `unread=1` → the server's `invalid_unread`.
+- ✅ **14.483 — `mark_notifications_read({ ids })` posts `{ ids, read: true }` to `/v1/me/notifications/read` (1–100 ids) and answers `{ changed }`; `{ all: true }` pages the UNREAD list (at most 10 pages of 100) and posts each page's ids, answering the total; both or neither is refused;** control: an empty unread list answers `{ changed: 0 }` with no POST. Mutation: post `read: false` → red.
+- ✅ **14.484 — `list_my_invitations()` reads `/v1/me/invitations`; `respond_to_invitation({ inviteId, answer: 'accept' | 'decline' })` posts to `/v1/me/invitations/:id/accept` (answers `{ workspaceId }`) or `/decline` (204 → `{ declined: true }`); an invitation that is not the caller's answers the server's own 404 sentence;** control: accept. Mutation: post `decline` for `accept` → red.
+- ✅ **14.485 — through the HOSTED door (a token caller), accept and decline work — they use `requireSession` alone (`my-invitations.ts:220-222`, `:262-264`);** control: `list_my_invitations` lists the pending one first. Mutation: none (proves the assumption the spec made).
+- ✅ **14.486 — the door matrix (hosted): every discovery tool answers a stranger "workspace not found or not visible to you" (or an empty per-person list), an unknown invitation "invitation not found or not yours", and the member's reads succeed; the three lists page;** control: the allowed calls. Mutation: drop the 404 mapping in `respond_to_invitation` → "gisik-nokma answered 404".
+
 ### T11 — members, prefix, groups
 
 ### T12 — definitions, migration, visibility, settings
