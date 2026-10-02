@@ -138,6 +138,7 @@ describe('every write builds an envelope the SERVER would accept', () => {
     const parsed = parseEvent({ ...(envelope as object), serverTime: '2026-10-02T10:00:00.000Z', seq: 1 }, domainRegistry);
     if (!parsed.ok) throw new Error(`${parsed.code}: ${parsed.message}`);
     // `start: 'backlog'` WITH a stateId is the domain's refusal: say so here, before anything is sent.
+    // 23.372 (HK-3b): the refusal reads with no spaced em dash.
     await expect(tool('create_ticket', session).handler({ ...base, start: 'backlog', stateId: 'todo' })).rejects.toThrow(/backlog ticket has no starting status/);
     expect(sent).toHaveLength(2);
     // An empty or blank markdown is no description, not an empty document.

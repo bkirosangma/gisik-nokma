@@ -2466,7 +2466,7 @@ describe('F — the subtasks section', () => {
         // typecheck refused it: an `as const` on a member that does not exist
         // asserts the shape rather than checking it.
         code: 'invalid-payload' as const,
-        message: 'must not be blank — a title of only spaces names nothing',
+        message: 'must not be blank: a title of only spaces names nothing',
       }));
     };
     renderSheet(read, source);

@@ -53,7 +53,7 @@ export function writeTools(session: Session): ToolDefinition[] {
           })
           .parse(args);
         if (a.stateId !== undefined && a.start === 'backlog') {
-          throw new Error('a backlog ticket has no starting status — pass either start: "backlog" or a stateId, not both');
+          throw new Error('a backlog ticket has no starting status, so pass either start: "backlog" or a stateId, not both');
         }
         const ticketId = newUlid();
         const event = envelope(session, a.workspaceId, ticketId, 'ticket.created', {

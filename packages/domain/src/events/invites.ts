@@ -92,7 +92,7 @@ const inviteChannelSchema = z.enum(INVITE_CHANNELS, {
 const inviteAddress = z
   .string()
   .min(1)
-  .refine((value) => value.trim() !== '', 'must not be blank — an address of only spaces reaches nobody');
+  .refine((value) => value.trim() !== '', 'must not be blank: an address of only spaces reaches nobody');
 
 /**
  * `projectIds` on a GUEST invite is refused, with the remedy named.

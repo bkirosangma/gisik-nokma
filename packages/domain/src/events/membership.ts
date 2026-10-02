@@ -95,7 +95,7 @@ const descriptionText = z
   .max(500)
   .refine(
     (value) => value.trim() !== '',
-    'must not be blank — a description of only spaces describes nothing',
+    'must not be blank: a description of only spaces describes nothing',
   );
 
 export const projectCreatedPayload = z.object({
@@ -208,8 +208,8 @@ export const projectMemberAddedPayload = z
   .object({
     userId: ulidString,
     projectAdmin: z.boolean({
-      required_error: 'is required — a project-admin flag is a claim, not a default',
-      invalid_type_error: 'is required — a project-admin flag is a claim, not a default',
+      required_error: 'is required: a project-admin flag is a claim, not a default',
+      invalid_type_error: 'is required: a project-admin flag is a claim, not a default',
     }),
   })
   .strict();
