@@ -316,7 +316,9 @@
     });
   }
 
-  type Gesture = { id: string; start: { x: number; y: number }; cancelled: boolean };
+  type Point = { x: number; y: number };
+  /** `last` is written SYNCHRONOUSLY inside `onNodesChange`: React Flow emits the drag-end change and calls `onNodeDragStop` in the SAME pointer-up handler, before React re-renders, so anything read from rendered state there is one step stale (reviewer C, 2026-10-03). */
+  type Gesture = { id: string; start: Point; last: Point; cancelled: boolean };
 
   /**
    * Owns the dragged id's position from drag start until `onNodeDragStop` returns (spec §2.1).
@@ -325,7 +327,6 @@
    */
   export function useWorkingNodes(draftNodes: Node[]) {
     const [nodes, setNodes] = useState<Node[]>(draftNodes);
-    const nodesRef = useRef(nodes); nodesRef.current = nodes;
     const gesture = useRef<Gesture | null>(null);
     useEffect(() => {
       setNodes((working) => mergeDraftNodes(draftNodes, working, gesture.current?.id ?? null));
@@ -333,11 +334,14 @@
     const onNodesChange = useCallback((changes: NodeChange[]) => {
       const g = gesture.current;
       const kept = g?.cancelled ? changes.filter((change) => !(change.type === 'position' && change.id === g.id)) : changes;
+      if (g && !g.cancelled) {
+        for (const change of kept) if (change.type === 'position' && change.id === g.id && change.position) g.last = change.position; // live, pre-render
+      }
       if (kept.length > 0) setNodes((working) => applyNodeChanges(kept, working));
     }, []);
     const beginDrag = useCallback((id: string) => {
       const found = draftNodes.find((candidate) => candidate.id === id);
-      gesture.current = found ? { id, start: found.position, cancelled: false } : null;
+      gesture.current = found ? { id, start: found.position, last: found.position, cancelled: false } : null;
     }, [draftNodes]);
     /** Escape: restore the start position and keep the gesture ACTIVE but cancelled, so later changes are dropped and the nudge guard cannot fire. */
     const cancelDrag = useCallback((): void => {
@@ -347,18 +351,17 @@
       setNodes((working) => working.map((candidate) => (candidate.id === g.id ? { ...candidate, position: g.start, dragging: false } : candidate)));
     }, []);
     /** Called from `onNodeDragStop`. Returns the position to commit, or null after a cancel. */
-    const endDrag = useCallback((): { id: string; position: { x: number; y: number } } | null => {
+    const endDrag = useCallback((): { id: string; position: Point } | null => {
       const g = gesture.current;
       gesture.current = null;
       if (g === null || g.cancelled) return null;
-      const live = nodesRef.current.find((candidate) => candidate.id === g.id);
-      return live ? { id: g.id, position: live.position } : null;
+      return { id: g.id, position: g.last }; // the live ref, never rendered state (one step stale in the same pointer-up handler)
     }, []);
     const draggingId = useCallback(() => gesture.current?.id ?? null, []);
     return { nodes, setNodes, onNodesChange, beginDrag, cancelDrag, endDrag, draggingId };
   }
   ```
-  Add a unit case **25.518** (from T1's reserved tail) in `working-nodes.test.ts` that drives the hook through `renderHook`: begin → a `dragging: true` change → `cancelDrag()` → another `dragging: true` change and a `dragging: false` change → `endDrag()` returns `null` and `nodes` shows the start position; control, same `it`: the same sequence without `cancelDrag()` returns the last applied position.
+  Add a unit case **25.518** (from T1's reserved tail) in `working-nodes.test.ts` that drives the hook through `renderHook`: begin → a `dragging: true` change → `cancelDrag()` → another `dragging: true` change and a `dragging: false` change → `endDrag()` returns `null` and `nodes` shows the start position; control, same `it`: the same sequence without `cancelDrag()` returns the last applied position. Same `it`, the staleness pin: call `onNodesChange([positionChange])` and `endDrag()` inside ONE `act()` with no render between them; `endDrag()` returns that change's position. Mutation: `endDrag` reads from rendered `nodes` instead of the gesture's `last` → red.
 
   Run the unit test. Expected: PASS (25.502, 25.503).
 
@@ -444,7 +447,7 @@
   |---|---|---|
   | 25.500 | remove `onNodesChange` | red |
   | 25.517 | remove the Escape listener; separately, `onNodeDragStop` reads `node.position` instead of `endDrag()` | red both ways |
-  | 25.518 | `cancelDrag` clears the gesture instead of marking it cancelled | red |
+  | 25.518 | `cancelDrag` clears the gesture instead of marking it cancelled; separately, `endDrag` reads rendered `nodes` | red both ways |
   | 25.502 | `mergeDraftNodes` returns `working` | red |
   | 25.503 | ignore `draggingId` | red |
   | 25.504 | remove `nodrag` from the Category wrapper | red |
