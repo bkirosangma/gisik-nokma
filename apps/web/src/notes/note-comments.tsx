@@ -4,10 +4,13 @@ import { useEffect, useRef } from 'react';
 import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
 import {
   CommentsThread,
+  commentDeletedSeed,
+  commentEditedSeed,
   makeSubmittedFactory,
   mentionCandidatesOf,
   useLiveQuery,
   usePurgedPredicate,
+  type CommentActions,
   type TicketComment,
 } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
@@ -44,6 +47,7 @@ export function NoteComments({
   noteId,
   nameOf,
   canComment,
+  canModerate,
   notes = [],
   members = [],
 }: {
@@ -51,6 +55,8 @@ export function NoteComments({
   noteId: string;
   nameOf: (authorId: string) => string;
   canComment: boolean;
+  /** The viewer is a workspace owner or admin: they may delete anyone's comment, never edit it (MCP-everything T5). */
+  canModerate: boolean;
   /**
    * The workspace's notes, for the composer's `:note`/`[[` picker (spec
    * §14, D26) — a final-review finding (2026-09-23): `queryTickets` reached
@@ -116,6 +122,73 @@ export function NoteComments({
     return false;
   };
 
+  /**
+   * Edit and delete (MCP-everything T5) — the same two writes as the ticket sheet's, filed against THIS note and
+   * leaving through `dataSource.ingest`, the one door the offline outbox sits behind. A reader who cannot comment
+   * gets no controls (there is no editor to edit in), and the gate decides what commits either way.
+   */
+  const noteParent = { kind: 'note' as const, id: noteId };
+  /**
+   * What a comment editor can do on a note, built once for the composer AND the in-place edit (T5 FIX 1) so the
+   * two cannot drift: an edit that lacked these found nobody on `@` and no ticket or note on `[[`.
+   */
+  const editorCapabilities = {
+    queryUsers: async (query: string) => mentionCandidatesOf(members, query),
+    queryTickets: buildWorkspaceQueryTickets(dataSource, workspaceId),
+    resolveTicketHref: ticketRefHrefIn(workspaceId),
+    queryNotes: async (query: string) => {
+      const needle = query.trim().toLowerCase();
+      const hits: Array<{ noteId: string; title: string }> = [];
+      for (const candidate of notes) {
+        if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+        hits.push({ noteId: candidate.noteId, title: candidate.title });
+        if (hits.length === 8) break;
+      }
+      return hits;
+    },
+  };
+  const actions: CommentActions | undefined =
+    user === null || !canComment
+      ? undefined
+      : {
+          currentUserId: user.id,
+          canModerate,
+          renderEditor: (comment, done) => (
+            <TicketEditorSlot
+              mode="comment"
+              doc={comment.body}
+              readOnly={false}
+              workspaceId={workspaceId}
+              ticketId=""
+              noteId={noteId}
+              submitLabel="Save"
+              footerNote="Saving records an edit citing you."
+              submit={async (submission: EditorSubmission) => {
+                if (submission.type !== 'comment.added') return false;
+                const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+                const [result] = await dataSource.ingest([
+                  make(commentEditedSeed(workspaceId, noteParent, comment.commentId, submission.payload.body)),
+                ]);
+                if (result?.status !== 'committed') return false;
+                comments.reload();
+                done();
+                return true;
+              }}
+              {...editorCapabilities}
+            />
+          ),
+          deleteComment: async (comment) => {
+            const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+            const [result] = await dataSource.ingest([make(commentDeletedSeed(workspaceId, noteParent, comment.commentId))]);
+            if (result?.status === 'committed') {
+              comments.reload();
+              return null;
+            }
+            if (result === undefined) return 'The server did not answer this change.';
+            return result.status === 'refused' ? result.reason : result.message;
+          },
+        };
+
   return (
     <CommentsThread
       comments={comments.data}
@@ -123,6 +196,7 @@ export function NoteComments({
       nameOf={nameOf}
       ticketHref={ticketRefHrefIn(workspaceId)}
       isPurged={purged.isPurged}
+      {...(actions === undefined ? {} : { actions })}
       composer={
         canComment ? (
           <TicketEditorSlot
@@ -135,19 +209,7 @@ export function NoteComments({
             placeholder="Add a comment"
             submit={submitComment}
             footerNote="Posting records an event citing you."
-            queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
-            queryTickets={buildWorkspaceQueryTickets(dataSource, workspaceId)}
-            resolveTicketHref={ticketRefHrefIn(workspaceId)}
-            queryNotes={async (query: string) => {
-              const needle = query.trim().toLowerCase();
-              const hits: Array<{ noteId: string; title: string }> = [];
-              for (const candidate of notes) {
-                if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-                hits.push({ noteId: candidate.noteId, title: candidate.title });
-                if (hits.length === 8) break;
-              }
-              return hits;
-            }}
+            {...editorCapabilities}
           />
         ) : undefined
       }

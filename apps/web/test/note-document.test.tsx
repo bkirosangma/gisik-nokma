@@ -117,6 +117,7 @@ function world(
     search?: DataSourceQuery['search'];
     getTickets?: DataSourceQuery['getTickets'];
     getNote?: DataSourceQuery['getNote'];
+    getNoteComments?: DataSourceQuery['getNoteComments'];
     actorNames?: Actor[];
   } = {},
 ) {
@@ -124,6 +125,7 @@ function world(
     getMyWorkspaces: async () => [{ ...WS_A_REF, role: opts.role ?? 'owner' }],
     ...(opts.search === undefined ? {} : { search: opts.search }),
     ...(opts.getTickets === undefined ? {} : { getTickets: opts.getTickets }),
+    ...(opts.getNoteComments === undefined ? {} : { getNoteComments: opts.getNoteComments }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
@@ -165,7 +167,9 @@ beforeEach(() => {
   });
 });
 
-function renderDocument(opts: { note?: NoteDetail; role?: string; actorNames?: Actor[] } = {}) {
+function renderDocument(
+  opts: { note?: NoteDetail; role?: string; actorNames?: Actor[]; getNoteComments?: DataSourceQuery['getNoteComments'] } = {},
+) {
   return render(
     <Providers services={world(opts)}>
       <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
@@ -290,6 +294,35 @@ describe('18.460 opening a note never draws the lost-access copy while the note 
       </Providers>,
     );
     expect(await screen.findByText(LOST)).toBeInTheDocument();
+  });
+});
+
+describe('26.112 the note page passes the viewer\'s role to its comments', () => {
+  const kiroComment = {
+    commentId: 'c-kiro',
+    authorId: 'u_kiro',
+    body: body('walrus'),
+    recordedAt: '2026-10-02T08:00:00.000Z',
+    editedAt: null,
+    deletedAt: null,
+  };
+  const menuOf = async () => {
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: "More actions for Kiro's comment" }));
+    return screen.getAllByRole('menuitem').map((item) => item.textContent);
+  };
+
+  it('26.112 an admin and an owner are offered Delete on another person\'s note comment; CONTROL: a member gets no "…" at all', async () => {
+    mockSessionUser = { id: 'u_ana', name: 'Anselma Marak', email: 'ana@example.com' };
+    for (const role of ['admin', 'owner']) {
+      cleanup();
+      renderDocument({ role, getNoteComments: async () => [kiroComment] });
+      expect(await menuOf(), role).toEqual(['Delete']);
+    }
+    cleanup();
+    renderDocument({ role: 'member', getNoteComments: async () => [kiroComment] });
+    const row = (await screen.findByText('walrus')).closest('li')!;
+    expect(within(row).queryByRole('button', { name: /More actions/ })).toBeNull();
   });
 });
 

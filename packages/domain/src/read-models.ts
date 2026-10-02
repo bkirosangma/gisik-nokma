@@ -894,7 +894,15 @@ export type NoteSummary = {
 };
 export type NoteDetail = NoteSummary & { body: unknown; schemaVersion: number };
 export type NoteVersion = { eventId: string; authorId: string; recordedAt: string; seq: number };
-export type NoteComment = { commentId: string; authorId: string; body: unknown; recordedAt: string };
+export type NoteComment = {
+  commentId: string;
+  authorId: string;
+  /** `null` once the comment is deleted (spec §6): the placeholder keeps the author and time, never the text. */
+  body: unknown;
+  recordedAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+};
 
 /**
  * `GET /v1/me/deleted-items` (trash series, Plan 1 Task 7, spec §6.3's read).

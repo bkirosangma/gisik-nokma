@@ -258,3 +258,15 @@ describe('3.973 history copy — the field_set sentence', () => {
     expect(describeEvent(fieldSet({ fieldId: 'dueDate', value: null }))).toBe('Cleared dueDate');
   });
 });
+
+describe('26.117 comment edits and deletions are narrated, never echoed', () => {
+  const ev = (type: string, payload: unknown): TicketHistoryEvent => ({
+    ...eventOf(type),
+    payload,
+  });
+  it('26.117 says "Comment edited" / "Comment deleted", and leaves "Comment added" alone', () => {
+    expect(describeEvent(ev('comment.edited', { commentId: '01C', body: { type: 'doc' } }))).toBe('Comment edited');
+    expect(describeEvent(ev('comment.deleted', { commentId: '01C' }))).toBe('Comment deleted');
+    expect(describeEvent(ev('comment.added', { body: { type: 'doc' } }))).toBe('Comment added'); // control
+  });
+});

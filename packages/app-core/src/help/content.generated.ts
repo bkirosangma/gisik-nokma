@@ -3819,6 +3819,96 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
+                      "text": "You can edit or delete your own comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Each comment you wrote has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button: "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " opens it in place — change it and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to leave it as it was. An edited comment says "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " beside its time; press that word (or hold it on a phone) to see when. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks once — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Delete this comment? It is removed for everyone."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — and leaves "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", with who wrote it and when, where it was. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit notify the new people only. The ticket's History tab reads "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
                       "text": "You can attach a file to a ticket now."
                     },
                     {
@@ -10331,6 +10421,85 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " message, naming the note, and follows your Mentions setting under Account → Notifications, exactly like a mention on a ticket."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "editing-or-deleting-a-comment-on-a-note",
+            "title": "Editing or deleting a comment on a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A comment on a note works as it does on a ticket. Each comment you wrote has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens it in place — change it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Cancel"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to leave it as it was — and an edited comment says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "edited"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside its time (press the word to see when). "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " asks once, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Delete this comment? It is removed for everyone."
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and leaves "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Comment deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with who wrote it and when. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is restored. Mentions you add in an edit notify the new people only."
                   }
                 ]
               }

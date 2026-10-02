@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import {
   NOTE_EVENT_TYPES,
   docToPlainText,
+  isCommentEvent,
   foldSearchText,
   ticketKey,
   type LedgerEvent,
@@ -128,11 +129,11 @@ export const noteSearchProjection: Projection = {
   async apply(event: LedgerEvent, tx: PoolClient): Promise<void> {
     if (event.entity.kind === 'note') {
       // The same pair of guards `proj_notes` uses, for the same reason:
-      // `comment.added` IS in NOTE_EVENT_TYPES and is folded by neither, and
+      // the comment events ARE in NOTE_EVENT_TYPES and are folded by neither, and
       // re-deriving a row for it would be a write per comment that changes
       // nothing indexed.
       if (!(NOTE_EVENT_TYPES as readonly string[]).includes(event.type)) return;
-      if (event.type === 'comment.added') return;
+      if (isCommentEvent(event.type)) return;
       await reindexNote(tx, event.entity.id);
       return;
     }

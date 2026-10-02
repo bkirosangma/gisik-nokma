@@ -23,6 +23,7 @@ import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
+import { checkCommentAuthority } from './check-comment-authority.js';
 import { checkLifecycle } from './check-lifecycle.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -1987,7 +1988,13 @@ export async function checkPermission(
   if (lifecycleRefusal !== null) {
     return lifecycleRefusal;
   }
-  return checkVisibilityPermission(env, permissionContext);
+  const visibilityRefusal = await checkVisibilityPermission(env, permissionContext);
+  if (visibilityRefusal !== null) {
+    return visibilityRefusal;
+  }
+  // LAST: the comment's own author/admin question (MCP-everything T2), after every audience question,
+  // so it can never answer for a parent the person cannot see (`check-comment-authority.ts`).
+  return checkCommentAuthority(env, permissionContext);
 }
 
 /**

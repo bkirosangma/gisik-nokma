@@ -92,6 +92,7 @@ import {
   useLastProject,
   type ProjectTab,
 } from '../../../../../src/use-last-project.js';
+import { useCanModerateComments } from '../../../../../src/use-can-moderate-comments.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
 import {
@@ -271,6 +272,8 @@ function ProjectBoard() {
    */
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
+  // Owner/admin may delete anyone's comment (MCP-everything T5); the ticket sheet draws Delete from this fact.
+  const canModerateComments = useCanModerateComments(workspaceId);
   /**
    * The breadcrumb and the title (Task 2 fix round 1 — coordinator Ruling 6).
    * Both read `GET /v1/me/workspaces`, the SAME call `<AppNav>` below already
@@ -3611,6 +3614,7 @@ function ProjectBoard() {
           workspaceId={workspaceId}
           ticketId={openTicketId}
           currentUserId={currentUserId}
+          canModerateComments={canModerateComments}
           /*
             THE ATTACHMENTS — the prop this mount never passed, for the same
             reason `editorSlot` above was never passed: nothing served the read,

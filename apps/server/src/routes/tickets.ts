@@ -981,6 +981,8 @@ export function registerTicketRoutes(
           authorId: comment.authorId,
           body: comment.body,
           recordedAt: comment.recordedAt,
+          editedAt: comment.editedAt,
+          deletedAt: comment.deletedAt,
           files: comment.files.map((file) => ({
             attachmentId: file.attachmentId,
             // Sanitized for the same reason the attachments list sanitizes: the

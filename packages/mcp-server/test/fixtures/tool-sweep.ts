@@ -1,4 +1,23 @@
+import { HttpError } from '../../src/http-client.js';
 import type { Session } from '../../src/session.js';
+
+// definition-admin helpers (T12): one `get` that answers every route the five tools read.
+const SWEEP_WORKFLOW = {
+  id: '01J0WF000000000000000000AA',
+  version: 1,
+  name: 'Flow',
+  initialStateId: 'open',
+  states: [{ id: 'open', name: 'Open', category: 'open' }],
+  transitions: [],
+};
+const SWEEP_TYPE = { id: 'ty2', name: 'Type two', icon: 'tag', rank: 2, workflowId: 'wf', fields: [] };
+const definitionsGet: Session['get'] = async (path) => {
+  if (path === '/v1/me/workspaces') {
+    return { workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }] };
+  }
+  if (path.includes('/workflows/')) throw new HttpError(404, {});
+  return { ticketTypes: [{ id: 'ty', name: 'Type', icon: 'tag', rank: 1, workflowId: 'a', fields: [] }], counts: {}, count: 0, key: 'K-1', ticket: { resolved_mode: 'workspace' } };
+};
 
 /** One entry per tool: valid arguments for the 14.88 sweep, and optionally a session override for that tool. */
 export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Session> };
@@ -43,10 +62,30 @@ export const SWEEP: Record<string, SweepEntry> = {
   // ticket begin (T9)
   // ticket end
   // discovery begin (T10)
+  list_ticket_types: { args: { workspaceId: 'w' }, session: { get: async () => ({ ticketTypes: [] }) } },
+  list_workflows: { args: { workspaceId: 'w' }, session: { get: async () => ({ workflows: [] }) } },
+  my_work: { args: { workspaceId: 'w' } },
+  get_attention: { args: { workspaceId: 'w' } },
+  list_notifications: { args: {}, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  mark_notifications_read: { args: { all: true }, session: { get: async () => ({ notifications: [], nextCursor: null }) } },
+  list_my_invitations: { args: {}, session: { get: async () => ({ invitations: [] }) } },
+  respond_to_invitation: { args: { inviteId: 'i', answer: 'accept' } },
   // discovery end
   // member-admin begin (T11)
+  // No `confirm_name`: each answers its preview, which is all the stdout sweep needs from a write.
+  manage_members: { args: { workspaceId: 'w', action: 'change_role', userId: 'u', role: 'admin' }, session: { get: async (path) => (path.endsWith('/members') ? { members: [{ userId: 'u', displayName: 'U', role: 'member' }] } : { workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }] }) } },
+  change_prefix: { args: { workspaceId: 'w', prefix: 'ZZ' } },
+  manage_groups: { args: { workspaceId: 'w', action: 'list' }, session: { get: async () => ({ groups: [] }) } },
   // member-admin end
   // definition-admin begin (T12)
+  define_workflow: { args: { workspaceId: 'w', definition: SWEEP_WORKFLOW, confirm_name: 'W' }, session: { get: definitionsGet } },
+  define_ticket_type: { args: { workspaceId: 'w', definition: SWEEP_TYPE, confirm_name: 'W' }, session: { get: definitionsGet } },
+  migrate_ticket_type: {
+    args: { workspaceId: 'w', typeId: 'ty', fromWorkflowId: 'a', toWorkflowId: 'b', stateMap: { open: 'open' }, confirm_name: 'Type' },
+    session: { get: definitionsGet },
+  },
+  set_visibility: { args: { workspaceId: 'w', ticketId: 't', mode: 'project', confirm_name: 'K-1' }, session: { get: definitionsGet } },
+  update_workspace_settings: { args: { workspaceId: 'w', staleDays: 9, confirm_name: 'W' }, session: { get: definitionsGet } },
   // definition-admin end
   // trash begin (T13)
   // trash end

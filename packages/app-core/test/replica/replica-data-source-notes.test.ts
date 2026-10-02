@@ -292,6 +292,36 @@ describe('the replica data source answers the note reads (Plan 2 of 6)', () => {
     expect(await ds.query.getDeletedNotes(WS)).toEqual([]);
   });
 
+  it('26.091 the offline note thread carries a comment’s edit and deletion', async () => {
+    const { ds, replica } = await fixture();
+    await replica.loadNoteEvents(noteLife());
+    const body = (text: string) => ({ body: plainTextToDoc(text) });
+    const kept = envelope({ kind: 'note', id: NOTE }, 'comment.added', body('walrus kept'), { seq: 5, workspaceSeq: 44 });
+    const gone = envelope({ kind: 'note', id: NOTE }, 'comment.added', body('seal gone'), { seq: 6, workspaceSeq: 45 });
+    const sibling = envelope({ kind: 'note', id: NOTE }, 'comment.added', body('sibling stays'), { seq: 7, workspaceSeq: 46 });
+    for (const c of [kept, gone, sibling]) await replica.applyServerItem(c);
+    await replica.applyServerItem(
+      envelope({ kind: 'note', id: NOTE }, 'comment.edited', { commentId: kept.id, ...body('narwhal kept') }, { seq: 8, workspaceSeq: 47 }),
+    );
+    await replica.applyServerItem(
+      envelope({ kind: 'note', id: NOTE }, 'comment.deleted', { commentId: gone.id }, { seq: 9, workspaceSeq: 48 }),
+    );
+
+    const thread = await ds.query.getNoteComments(WS, NOTE);
+    expect(thread.find((c) => c.commentId === kept.id)).toMatchObject({
+      body: plainTextToDoc('narwhal kept'),
+      editedAt: CLIENT_TIME,
+      deletedAt: null,
+    });
+    expect(thread.find((c) => c.commentId === gone.id)).toMatchObject({ body: null, deletedAt: CLIENT_TIME });
+    // CONTROL: the sibling comment reads as written, with no edit or deletion.
+    expect(thread.find((c) => c.commentId === sibling.id)).toMatchObject({
+      body: plainTextToDoc('sibling stays'),
+      editedAt: null,
+      deletedAt: null,
+    });
+  });
+
   it('18.089 attachedTickets omits a ticket the replica does not hold', async () => {
     const { ds, replica } = await fixture();
     const absent = newUlid();

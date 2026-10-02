@@ -159,7 +159,7 @@ function fakeEditorSlot(seen: {
             })
           }
         >
-          Post
+          {props.submitLabel ?? 'Post'}
         </button>
         {/* The uploader seam, driven directly. ⚠ THE `.catch` IS THE CONTRACT
             BEING MODELLED, not defensive noise: the real
@@ -888,5 +888,185 @@ describe('19.195 the description editor waits for its chips', () => {
     renderSheet(source(), { editorSlot: StubSlot });
     await screen.findByTestId('stub-description-editor');
     expect(captured.find((props) => props['mode'] === 'description')?.['isPurged']).toBeDefined();
+  });
+});
+
+describe('26.115 comment edit and delete leave through the one write door', () => {
+  const MINE = { ...COMMENT, authorId: 'user_kiro', editedAt: null, deletedAt: null };
+  const NAMES = [
+    { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+    { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+  ];
+  const mount = (extra: Record<string, unknown> = {}, comment: TicketComment = MINE) =>
+    renderSheet(source({ getTicketComments: async () => [comment], getMembers: async () => NAMES }), {
+      editorSlot: fakeEditorSlot({ modes: [] }),
+      ...extra,
+    });
+  const ofType = (src: { ingested: Array<Array<{ type: string }>> }, type: string) =>
+    src.ingested.flat().filter((e) => e.type === type);
+
+  it('26.115 Edit then Save ingests exactly one comment.edited against the ticket, origin web, the viewer as actor', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    await user.click(within(screen.getByTestId(`comment-${MINE.commentId}`)).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(ofType(src, 'comment.edited')).toHaveLength(1));
+    expect(ofType(src, 'comment.edited')[0]).toMatchObject({
+      entity: { kind: 'ticket', id: TICKET },
+      payload: { commentId: MINE.commentId, body: { type: 'doc', content: [] } },
+      origin: 'web',
+      actorId: 'user_kiro',
+    });
+    expect(ofType(src, 'comment.added')).toHaveLength(0); // control: an edit never posts a second comment
+  });
+
+  it('26.113 Cancel closes the in-place editor and ingests nothing', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const row = screen.getByTestId(`comment-${MINE.commentId}`);
+    expect(within(row).getByRole('button', { name: 'Save' })).toBeTruthy(); // control: the editor really opened
+    await user.click(within(row).getByRole('button', { name: 'Cancel' }));
+    expect(within(row).queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(within(row).getByText('The bucket is the defect.')).toBeTruthy();
+    expect(src.ingested.flat().filter((e) => e.type !== 'ticket.created')).toEqual([]);
+  });
+
+  it('26.115 Delete then confirm ingests exactly one comment.deleted', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(ofType(src, 'comment.deleted')).toHaveLength(0); // control: the question comes first
+    await user.click(screen.getByRole('button', { name: 'Delete comment' }));
+    await waitFor(() => expect(ofType(src, 'comment.deleted')).toHaveLength(1));
+    expect(ofType(src, 'comment.deleted')[0]).toMatchObject({
+      entity: { kind: 'ticket', id: TICKET },
+      payload: { commentId: MINE.commentId },
+      origin: 'web',
+      actorId: 'user_kiro',
+    });
+  });
+
+  it('26.112 canModerateComments offers a moderator Delete on someone else’s comment, never Edit; without it, nothing', async () => {
+    const theirs = { ...COMMENT, editedAt: null, deletedAt: null };
+    mount({ canModerateComments: true }, theirs);
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Anselma Marak's comment" }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Delete']);
+  });
+
+  const committed = (e: { id: string }) => ({ status: 'committed' as const, eventId: e.id, seq: 1, serverTime: '2026-10-02T10:00:00.000Z' });
+  const EDITED_AT = '2026-10-02T09:05:00.000Z';
+
+  it('26.113 after a committed edit the thread RELOADS and shows "edited", and the editor closes', async () => {
+    let edited = false;
+    const src = renderSheet(
+      source(
+        { getTicketComments: async () => [edited ? { ...MINE, editedAt: EDITED_AT } : MINE], getMembers: async () => NAMES },
+        (events) => events.map((e) => { if (e.type === 'comment.edited') edited = true; return committed(e); }),
+      ),
+      { editorSlot: fakeEditorSlot({ modes: [] }) },
+    );
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    const row = () => screen.getByTestId(`comment-${MINE.commentId}`);
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(within(row()).queryByText('edited')).toBeNull(); // control: not edited before Save
+    await user.click(within(row()).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(src.ingested.flat().some((e) => e.type === 'comment.edited')).toBe(true));
+    expect(await within(row()).findByText('edited')).toBeTruthy(); // what the reader SEES, from the reloaded read
+    expect(within(row()).queryByRole('button', { name: 'Save' })).toBeNull(); // the editor closed
+    expect(within(row()).getByText('The bucket is the defect.')).toBeTruthy();
+  });
+
+  it('26.113 a REFUSED edit shows the server\'s sentence and keeps the editor open', async () => {
+    const sentence = 'Only the person who wrote a comment can edit it.';
+    renderSheet(
+      source(
+        { getTicketComments: async () => [MINE], getMembers: async () => NAMES },
+        (events) => events.map((e) => ({ status: 'refused' as const, eventId: e.id, rule: 'permission.comment', reason: sentence })),
+      ),
+      { editorSlot: fakeEditorSlot({ modes: [] }) },
+    );
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    await user.click(within(section).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(`Refused by the server: permission.comment: ${sentence}`)).toBeTruthy();
+    expect(within(section).getByRole('button', { name: 'Save' })).toBeTruthy(); // the edit is not lost
+  });
+
+  it('26.114 after a committed delete the thread RELOADS and shows "Comment deleted"', async () => {
+    let deleted = false;
+    renderSheet(
+      source(
+        { getTicketComments: async () => [deleted ? { ...MINE, body: null, deletedAt: '2026-10-02T10:00:00.000Z' } : MINE], getMembers: async () => NAMES },
+        (events) => events.map((e) => { if (e.type === 'comment.deleted') deleted = true; return committed(e); }),
+      ),
+      { editorSlot: fakeEditorSlot({ modes: [] }) },
+    );
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(within(section).queryByText('Comment deleted')).toBeNull(); // control: still live before the confirm
+    await user.click(screen.getByRole('button', { name: 'Delete comment' }));
+    expect(await within(section).findByText('Comment deleted')).toBeTruthy();
+    expect(within(section).queryByText('The bucket is the defect.')).toBeNull();
+  });
+
+  it('26.122 a double click on the confirm files ONE comment.deleted through the sheet', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const confirm = screen.getByRole('button', { name: 'Delete comment' });
+    await user.dblClick(confirm);
+    await waitFor(() => expect(ofType(src, 'comment.deleted')).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ofType(src, 'comment.deleted')).toHaveLength(1);
+  });
+
+  it('26.121 the in-place edit editor takes the SAME capabilities as the composer (nothing excluded on purpose)', async () => {
+    const CAPABILITIES = ['queryUsers', 'queryNotes', 'queryTickets', 'resolveTicketHref', 'isPurged', 'uploadAttachment', 'emitAttachmentAdded', 'onError'];
+    const mounts: Array<Record<string, unknown>> = [];
+    const Recording: EditorSlotComponent = (props) => {
+      mounts.push(props as unknown as Record<string, unknown>);
+      return <div data-testid={`rec-${props.mode}-${props.doc === null ? 'composer' : 'edit'}`} />;
+    };
+    mount({
+      editorSlot: Recording,
+      queryTickets: async () => [],
+      resolveTicketHref: () => null,
+      uploadAttachment: async () => ({ attachmentId: 'a', filename: 'f', mime: 'image/png', size: 1, url: '/v1/attachments/a', sha256: 'b'.repeat(64) }),
+    });
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    await screen.findByTestId('rec-comment-edit');
+    const keysOf = (props: Record<string, unknown> | undefined) => CAPABILITIES.filter((k) => props?.[k] !== undefined).sort();
+    const composer = [...mounts].reverse().find((p) => p['mode'] === 'comment' && p['doc'] === null);
+    const edit = [...mounts].reverse().find((p) => p['mode'] === 'comment' && p['doc'] !== null);
+    expect(keysOf(composer)).toContain('queryUsers'); // control: the composer HAS them, so equality is not vacuous
+    expect(keysOf(composer).length).toBe(CAPABILITIES.length);
+    expect(keysOf(edit)).toEqual(keysOf(composer));
+  });
+
+  it('26.112 CONTROL — a viewer who is neither the writer nor a moderator gets no "…"', async () => {
+    mount({}, { ...COMMENT, editedAt: null, deletedAt: null });
+    const section = await screen.findByTestId('sheet-comments');
+    await within(section).findByText('The bucket is the defect.');
+    expect(within(section).queryByRole('button', { name: /More actions/ })).toBeNull();
   });
 });

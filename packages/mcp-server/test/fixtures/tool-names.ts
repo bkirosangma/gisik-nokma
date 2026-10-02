@@ -31,14 +31,22 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   discovery: [
     // discovery begin (T10)
+    'list_ticket_types', 'list_workflows', 'my_work', 'get_attention',
+    'list_notifications', 'mark_notifications_read', 'list_my_invitations', 'respond_to_invitation',
     // discovery end
   ],
   memberAdmin: [
     // member-admin begin (T11)
+    'manage_members', 'change_prefix', 'manage_groups',
     // member-admin end
   ],
   definitionAdmin: [
     // definition-admin begin (T12)
+    'define_workflow',
+    'define_ticket_type',
+    'migrate_ticket_type',
+    'set_visibility',
+    'update_workspace_settings',
     // definition-admin end
   ],
   trash: [
