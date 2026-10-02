@@ -210,7 +210,7 @@ describe('25.126 My work', () => {
       </Providers>,
     );
     const band = await regionNamed('Loading what needs your attention');
-    expect(band.closest('aside.gn-attention') ?? band.querySelector('aside.gn-attention') ?? band).toBeTruthy();
+    expect(band, 'the band region is not the attention strip\'s own class').toHaveClass('gn-attention');
     const body = await regionNamed('Loading your work');
     expect(body.querySelectorAll('.gn-my-work section.gn-my-work__section')).toHaveLength(4);
     expect(body.querySelectorAll('.gn-my-work__item').length).toBeGreaterThanOrEqual(4);
@@ -239,6 +239,7 @@ describe('25.135 a skeleton means "a read is in flight", never "the value is nul
     );
     await screen.findByText('No members are listed here.');
     await waitFor(() => expect(busyRegions()).toEqual([]));
+    expect(document.querySelector('.gn-skeleton')).toBeNull();
     cleanup();
     render(
       <Providers services={stubServices({ getMyWorkspaces: async () => [ws], getMembers: () => Promise.reject(new Error('boom')) }, { invitesAdmin: { listPending: async () => [] }, ...noUnread })}>
@@ -247,6 +248,8 @@ describe('25.135 a skeleton means "a read is in flight", never "the value is nul
     );
     await screen.findByText(/boom/);
     await waitFor(() => expect(busyRegions()).toEqual([]));
+    // the summary bar is a BARE Skeleton, not a region: a refusal draws no pulsing block anywhere
+    expect(document.querySelector('.gn-skeleton'), 'a pulsing block is drawn above the roster\'s refusal').toBeNull();
   });
 
   it('25.135 Workspaces and Inbox: an ANSWERED-EMPTY list and a refused read leave no region (the empty state, the refusal)', async () => {

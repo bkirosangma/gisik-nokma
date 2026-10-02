@@ -280,17 +280,6 @@ export function AccountSectionSkeleton({ title }: { title: string }) {
   );
 }
 
-/** The deleted-items section's body while its list is read (the section keeps its own heading). */
-export function DeletedItemsSkeleton() {
-  return (
-    <div>
-      <SkeletonRegion label="Loading deleted items">
-        <Skeleton shape="block" height="3rem" rows={2} />
-      </SkeletonRegion>
-    </div>
-  );
-}
-
 /** The MCP tokens card's list while it is read: rows in the card's own list and row classes. */
 export function McpTokensRowsSkeleton() {
   return (

@@ -332,7 +332,9 @@ export default function AccountPage() {
             error={passkeyError}
             listFailed={passkeysListFailed}
           />
-        ) : user !== null ? (
+        ) : session.isPending || user !== null ? (
+          // Not signed out: `user` is null while the session is still PENDING too, so gating on it alone drew this card late
+          // and pushed Connected assistants down. A signed-out visitor makes no read, so no skeleton (25.128).
           <AccountSectionSkeleton title="Passkeys" />
         ) : null}
         {/* Connected assistants — MOVED HERE in Round 21 (owner: "lets move MCP
