@@ -98,13 +98,14 @@ export type NoteState = {
 };
 
 /**
- * Every type this reducer folds, `comment.added` included.
+ * Every type this reducer folds, the three comment types included.
  *
- * `comment.added` is here although it moves no note state: it is a claim on a
- * note's history and the projection that stores it keys on the note, so a
- * reader iterating this list must not skip it. It is also the ONE type in the
- * list the registry admits against a second kind (`vocabulary.ts`), which is
- * why the reducer's first act is a kind check rather than a type lookup alone.
+ * `comment.added`, `comment.edited` and `comment.deleted` are here although they
+ * move no note state: they are claims on a note's history and the projection
+ * that stores them keys on the note, so a reader iterating this list must not
+ * skip them. They are also the ONLY types in the list the registry admits
+ * against a second kind (`vocabulary.ts`), which is why the reducer's first act
+ * is a kind check rather than a type lookup alone.
  */
 export const NOTE_EVENT_TYPES = [
   'note.created',
@@ -117,6 +118,8 @@ export const NOTE_EVENT_TYPES = [
   'note.deleted',
   'note.restored',
   'comment.added',
+  'comment.edited',
+  'comment.deleted',
 ] as const;
 
 /** Throws, naming the event type and the reason — the shape `applyTicketEvent` uses. */
@@ -207,7 +210,9 @@ export function applyNoteEvent(state: NoteState | null, env: EventEnvelope): Not
     case 'note.deleted':
       return { ...next, deleted: true };
     case 'comment.added':
-      // Legal on a live note and moves nothing: the body lives in
+    case 'comment.edited':
+    case 'comment.deleted':
+      // Legal on a live note and moves nothing: the comment rows live in
       // `proj_note_comments`, filed by the comments projection, not in the
       // note's own head state.
       return next;

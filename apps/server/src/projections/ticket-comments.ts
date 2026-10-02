@@ -1,9 +1,16 @@
 import type { PoolClient } from 'pg';
-import { commentAddedPayload, type LedgerEvent } from '@gisik-nokma/domain';
+import {
+  commentAddedPayload,
+  commentDeletedPayload,
+  commentEditedPayload,
+  isCommentEvent,
+  type LedgerEvent,
+} from '@gisik-nokma/domain';
 import type { Projection } from './registry.js';
 
 /**
- * Comments, one row per `comment.added` — a ticket's in `proj_ticket_comments`
+ * Comments, one row per `comment.added` (updated in place by `comment.edited` and `comment.deleted`,
+ * MCP-everything T2: a deleted row keeps its id, author and time and loses its body) — a ticket's in `proj_ticket_comments`
  * and a NOTE's in `proj_note_comments` (the notes series, Plan 1 of 6, spec
  * §6.3). This is the READ the event has never had: `comment.added` was fully
  * wired — vocabulary, reducer, mention fan-out, sync, a `require-comment` seed
@@ -58,7 +65,7 @@ export const ticketCommentsProjection: Projection = {
   tables: ['proj_ticket_comments', 'proj_note_comments'],
 
   async apply(event: LedgerEvent, tx: PoolClient): Promise<void> {
-    if (event.type !== 'comment.added') {
+    if (!isCommentEvent(event.type)) {
       return;
     }
 
@@ -76,6 +83,37 @@ export const ticketCommentsProjection: Projection = {
     // a comment filed against, say, a project would put a row in the ticket
     // table that no route could ever scope to a ticket.
     if (event.entity.kind !== 'ticket' && event.entity.kind !== 'note') {
+      return;
+    }
+
+    // `comment.edited` / `comment.deleted` (MCP-everything T2): an UPDATE of the row `comment.added`
+    // inserted, keyed by comment id AND parent so a stray id from another parent touches nothing. The
+    // two statements per event are literal branches over the parent kind, for the reason the INSERT
+    // below gives. `deleted_at IS NULL`: the permission gate refuses an edit or delete of a deleted
+    // comment, so this guard never fires live; it keeps a REPLAY of a hand-ordered ledger from
+    // resurrecting deleted text.
+    if (event.type === 'comment.edited') {
+      const edited = commentEditedPayload.parse(event.payload);
+      await tx.query(
+        event.entity.kind === 'note'
+          ? `UPDATE proj_note_comments SET body = $3, edited_at = $4, edited_by = $5
+              WHERE comment_id = $1 AND note_id = $2 AND deleted_at IS NULL`
+          : `UPDATE proj_ticket_comments SET body = $3, edited_at = $4, edited_by = $5
+              WHERE comment_id = $1 AND ticket_id = $2 AND deleted_at IS NULL`,
+        [edited.commentId, event.entity.id, JSON.stringify(edited.body), event.serverTime, event.actorId],
+      );
+      return;
+    }
+    if (event.type === 'comment.deleted') {
+      const deleted = commentDeletedPayload.parse(event.payload);
+      await tx.query(
+        event.entity.kind === 'note'
+          ? `UPDATE proj_note_comments SET body = NULL, deleted_at = $3, deleted_by = $4
+              WHERE comment_id = $1 AND note_id = $2 AND deleted_at IS NULL`
+          : `UPDATE proj_ticket_comments SET body = NULL, deleted_at = $3, deleted_by = $4
+              WHERE comment_id = $1 AND ticket_id = $2 AND deleted_at IS NULL`,
+        [deleted.commentId, event.entity.id, event.serverTime, event.actorId],
+      );
       return;
     }
 

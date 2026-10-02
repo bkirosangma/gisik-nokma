@@ -345,8 +345,8 @@ What changes and what does not:
 - **The workspace's prefix works the same way**, for every project at once. A workspace may take back one
   of its own old prefixes.
 
-Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and
-search by them, but it cannot change a prefix.
+Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix —
+but only after it has shown you what would change and you have confirmed with the old letters.
 
 ### Group your projects
 
@@ -459,7 +459,7 @@ already signed in, there is a **Join [workspace]** button.
   and projects, with a fresh link and a new email. Either way the older link stops working.
 
 If somebody tells you their link does not work, the message they see is: *"This invitation link does
-not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
+not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new
 one."*
 
 That message sits under a heading, **This invitation can't be used**, with a **Go to sign in** button
@@ -604,6 +604,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
   signed-in identity the phone shell does not have yet, so the control is withheld there rather than
   shipped in a shape that always fails silently (E5-44).
+- **You can edit or delete your own comments.** Each comment you wrote has a **…** button: **Edit** opens it in
+  place — change it and press **Save**, or **Cancel** to leave it as it was. An edited comment says *edited* beside
+  its time; press that word (or hold it on a phone) to see when. **Delete** asks once — *Delete this comment? It is
+  removed for everyone.* — and leaves *Comment deleted*, with who wrote it and when, where it was. Only the person
+  who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit
+  notify the new people only. The ticket's History tab reads *Comment edited* and *Comment deleted*.
 - **You can attach a file to a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet's
   **Attachments** tab lists the ticket's files and has its own **Attach a file** button, and the comment
@@ -1942,6 +1948,15 @@ comment that mentions somebody tells them as soon as it is posted. **Only people
 yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
 setting under Account → Notifications, exactly like a mention on a ticket.
 
+### Editing or deleting a comment on a note
+
+A comment on a note works as it does on a ticket. Each comment you wrote has a **…** button: **Edit** opens it in
+place — change it and press **Save**, or **Cancel** to leave it as it was — and an edited comment says *edited*
+beside its time (press the word to see when). **Delete** asks once, *Delete this comment? It is removed for
+everyone.*, and leaves *Comment deleted* with who wrote it and when. Only the person who wrote a comment can edit it;
+they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is
+restored. Mentions you add in an edit notify the new people only.
+
 ### Linking to a ticket or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the tickets you
@@ -2014,12 +2029,28 @@ do it yourself.
 - **Workspaces.** See the workspaces you belong to, start a new one (you become its owner), rename one,
   archive or restore one, and delete one or bring it back.
 - **Projects.** See a workspace's projects, start one, change its name or description, archive or restore
-  it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts
-  one, but it cannot change a prefix afterwards; do that yourself (§3).
+  it, file it in a group, and delete one or bring it back. The assistant can give a new project a short
+  prefix when it starts one, and an owner or admin can have it change that prefix later (§3).
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the tickets
   shared with you — never the full list, and never anyone's email address.
 - **Tickets.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
   me* works — and add, move, comment on and assign them.
+- **Notes.** Read, write and change notes — the whole body, one section under a heading, or a few lines at the end —
+  move them, attach them to tickets, and delete or bring them back.
+- **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
+  anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
+- **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
+- **Every ticket action** — change any field, close and reopen, reorder the backlog, see a ticket's history, delete
+  one or bring it back.
+- **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
+  read), and invitations waiting for you.
+- **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
+  who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing
+  happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the
+  item's current name.
+
+**Formatting comes through.** The assistant writes in Markdown, so headings, lists, bold text, links, mentions and
+ticket links appear in comments and notes exactly as if you had typed them in the app.
 
 **Deleting is never final here.** When your assistant deletes a workspace or a project it goes to **Deleted
 items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased.

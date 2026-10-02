@@ -2215,7 +2215,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and search by them, but it cannot change a prefix."
+                    "text": "Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix — but only after it has shown you what would change and you have confirmed with the old letters."
                   }
                 ]
               }
@@ -2880,7 +2880,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   }
                 ]
               },
@@ -3814,6 +3814,96 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — commenting from the phone needs a signed-in identity the phone shell does not have yet, so the control is withheld there rather than shipped in a shape that always fails silently (E5-44)."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "You can edit or delete your own comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Each comment you wrote has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button: "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " opens it in place — change it and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to leave it as it was. An edited comment says "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " beside its time; press that word (or hold it on a phone) to see when. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks once — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Delete this comment? It is removed for everyone."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — and leaves "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", with who wrote it and when, where it was. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit notify the new people only. The ticket's History tab reads "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ],
                   [
@@ -10337,6 +10427,85 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "editing-or-deleting-a-comment-on-a-note",
+            "title": "Editing or deleting a comment on a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A comment on a note works as it does on a ticket. Each comment you wrote has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens it in place — change it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Cancel"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to leave it as it was — and an edited comment says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "edited"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside its time (press the word to see when). "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " asks once, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Delete this comment? It is removed for everyone."
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and leaves "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Comment deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with who wrote it and when. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is restored. Mentions you add in an edit notify the new people only."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "linking-to-a-ticket-or-another-note",
             "title": "Linking to a ticket or another note",
             "blocks": [
@@ -10728,7 +10897,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, but it cannot change a prefix afterwards; do that yourself (§3)."
+                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, file it in a group, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, and an owner or admin can have it change that prefix later (§3)."
                     }
                   ],
                   [
@@ -10758,7 +10927,88 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " works — and add, move, comment on and assign them."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Notes."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Read, write and change notes — the whole body, one section under a heading, or a few lines at the end — move them, attach them to tickets, and delete or bring them back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete anyone's). Mentions like "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "@Asha"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " notify only people who can read the ticket or note."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Files."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Every ticket action"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — change any field, close and reopen, reorder the backlog, see a ticket's history, delete one or bring it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Your work and your inbox."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " What is on your plate, what needs attention, your notifications (and marking them read), and invitations waiting for you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Admin, with a check first."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Inviting and removing people, roles, prefixes, groups, workflows, ticket types, who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the item's current name."
+                    }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Formatting comes through."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The assistant writes in Markdown, so headings, lists, bold text, links, mentions and ticket links appear in comments and notes exactly as if you had typed them in the app."
+                  }
                 ]
               },
               {
@@ -12611,7 +12861,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   },
                   {
                     "kind": "text",

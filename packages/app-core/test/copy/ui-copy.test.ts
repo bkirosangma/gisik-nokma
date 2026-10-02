@@ -191,6 +191,59 @@ describe('23.192 no stylesheet or inline style sets text-transform: uppercase', 
 });
 
 // ---------------------------------------------------------------------------------------------
+// 23.360 — the server's response bodies a client shows verbatim (MCP-everything follow-up)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The route files whose message strings reach a client that prints them: the invitation page and
+ * banner show the two invitation bodies, and the token-name refine message is the schema's own words.
+ * Pinned by file (not by a sweep of the routes) so a file the sweep cannot yet vouch for is not
+ * claimed. Each pins a sentence it must still hold, so the scan is proven to be reading its subject.
+ */
+const SERVER_BODY_FILES: ReadonlyArray<{ file: string; holds: string }> = [
+  { file: 'apps/server/src/routes/invites.ts', holds: 'does not open anything' },
+  { file: 'apps/server/src/routes/my-invitations.ts', holds: 'no longer open' },
+  { file: 'apps/server/src/routes/mcp-tokens.ts', holds: 'must not be blank' },
+];
+
+/** Strings in those files that keep " — " because they are not copy a client shows. Each carries its reason. */
+const SERVER_BODY_ALLOWED: readonly AllowEntry[] = [];
+
+describe('23.360 the invitation and token-name bodies hold no " — "', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds a planted body)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
+
+    // Control: the scan reads an object-literal message and a refine message, and never a comment.
+    const planted = [
+      "// lapsed — in a comment",
+      "export const BODY = { error: 'not_found', message: 'It may have lapsed — ask for a new one.' };",
+      "const schema = z.string().refine((v) => v !== '', 'must not be blank — a name of only spaces');",
+      "const ok = 'It may have lapsed. Ask for a new one.';",
+    ].join('\n');
+    expect(hitsOf('apps/server/src/routes/planted.ts', planted).map((hit) => hit.text)).toEqual([
+      'It may have lapsed — ask for a new one.',
+      'must not be blank — a name of only spaces',
+    ]);
+
+    const hits = SERVER_BODY_FILES.flatMap(({ file, holds }) => {
+      const source = readFileSync(resolve(REPO_ROOT, file), 'utf8');
+      // Control: the file is read, and it still holds the sentence this case is about.
+      expect(
+        stringsIn(file, source).some((hit) => hit.text.includes(holds)),
+        `${file} holds "${holds}"`,
+      ).toBe(true);
+      return hitsOf(file, source);
+    });
+    expect(withoutAllowed(hits, SERVER_BODY_ALLOWED).map(describeHit)).toEqual([]);
+  });
+
+  it('reasons are written: every allow-list entry says why it stays', () => {
+    for (const entry of SERVER_BODY_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // 23.193 — one date format: "17 Aug", plus the year when it is not the current one
 // ---------------------------------------------------------------------------------------------
 

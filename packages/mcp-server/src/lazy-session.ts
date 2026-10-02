@@ -73,5 +73,13 @@ export function lazySession(open: () => Promise<Session>): LazySession {
       await ready();
       return resolved().postEvents(events);
     },
+    getBytes: async (path) => {
+      await ready();
+      return resolved().getBytes(path);
+    },
+    postMultipart: async (path, fields, file) => {
+      await ready();
+      return resolved().postMultipart(path, fields, file);
+    },
   };
 }

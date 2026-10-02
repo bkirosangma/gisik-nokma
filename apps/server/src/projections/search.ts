@@ -136,6 +136,17 @@ export const searchProjection: Projection = {
           WHERE ticket_id = $1`,
         [event.entity.id, text],
       );
+      return;
+    }
+
+    if (event.type === 'comment.edited' || event.type === 'comment.deleted') {
+      // RE-DERIVED from the ledger up to THIS event's seq, so a rebuild (canonical replay order) and the
+      // live ingest compute the same text at every step (case 26.048). Appending, as `comment.added`
+      // does, cannot express "replace" or "remove". Note comments are in no index (`note-search.ts`).
+      await tx.query('UPDATE proj_search SET comments = $2 WHERE ticket_id = $1', [
+        event.entity.id,
+        await ticketCommentText(tx, event.entity.id, event.seq),
+      ]);
     }
   },
 
@@ -143,3 +154,24 @@ export const searchProjection: Projection = {
     await tx.query('TRUNCATE proj_search');
   },
 };
+
+/** The ticket's live comment text, oldest first, one line per non-empty comment — what `comment.added`'s appends build. */
+async function ticketCommentText(tx: PoolClient, ticketId: string, uptoSeq: number): Promise<string> {
+  const { rows } = await tx.query<{ id: string; type: string; payload: { body?: unknown; commentId?: string } }>(
+    `SELECT id, type, payload FROM events
+      WHERE entity_kind = 'ticket' AND entity_id = $1 AND seq <= $2
+        AND type IN ('comment.added', 'comment.edited', 'comment.deleted')
+      ORDER BY seq`,
+    [ticketId, uptoSeq],
+  );
+  const bodies = new Map<string, unknown>();
+  for (const row of rows) {
+    if (row.type === 'comment.added') bodies.set(row.id, row.payload.body ?? null);
+    else if (row.type === 'comment.edited' && row.payload.commentId !== undefined && bodies.has(row.payload.commentId)) {
+      bodies.set(row.payload.commentId, row.payload.body ?? null);
+    } else if (row.type === 'comment.deleted' && row.payload.commentId !== undefined) bodies.delete(row.payload.commentId);
+  }
+  const live = [...bodies.values()];
+  const isPurged = await purgedResolverFor(tx, live);
+  return live.map((body) => docToPlainText(body, { isPurged })).filter((t) => t.length > 0).join('\n');
+}

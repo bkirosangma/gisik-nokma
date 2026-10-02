@@ -8,6 +8,7 @@ import { projectTools } from '../src/tools/project-tools.js';
 import { readTools } from '../src/tools/read-tools.js';
 import { workspaceTools } from '../src/tools/workspace-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 8. Cases 14.60–14.66.
@@ -18,6 +19,7 @@ function sessionRecording(answer: unknown): { session: Session; paths: string[] 
     userId: () => '01J0USER0000000000000000AA',
     get: async (path) => { paths.push(path); return answer; },
     post: async () => { throw new Error('not a read'); },
+    ...NO_TRANSFER,
     postEvents: async () => { throw new Error('not a read'); },
   };
   return { session, paths };
@@ -86,6 +88,24 @@ describe('the read tools', () => {
     expect(paths).toEqual([]);
   });
 
+  it('14.550 search reads /v1/search with kinds and mode; search_tickets keeps its reply and points at search', async () => {
+    const { session, paths } = sessionRecording({ hits: [], notes: [] });
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold', kinds: ['note'], mode: 'meaning' });
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold' }); // control: no kinds, no mode → neither is sent
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold', kinds: ['ticket', 'note'], filter: { priority: 'P1' } });
+    expect(paths[0]).toBe('/v1/search?workspaceId=w&q=cold&kinds=note&mode=meaning');
+    expect(paths[1]).toBe('/v1/search?workspaceId=w&q=cold');
+    expect(paths[2]).toBe(`/v1/search?workspaceId=w&q=cold&kinds=ticket%2Cnote&filter=${encodeURIComponent('{"priority":"P1"}')}`);
+    // the old name: the SAME request it always made (no kinds), and a description that sends the reader to `search`
+    await tool('search_tickets', session).handler({ workspaceId: 'w', query: 'cold' });
+    expect(paths[3]).toBe('/v1/search?workspaceId=w&q=cold');
+    expect(tool('search_tickets', session).description).toMatch(/^Kept for one release as the old name of `search`/);
+    expect(tool('search', session).description).toContain('no pages');
+    await expect(tool('search', session).handler({ workspaceId: 'w', query: 'x', filter: { text: 'y' } })).rejects.toThrow(/^search takes the search text as `query`/);
+    expect(paths).toHaveLength(4);
+    expect(readTools(session)[0]!.name, '`search` is the first read tool').toBe('search');
+  });
+
   it('14.65 list_tickets JSON-encodes the FilterSpec into one filter parameter', async () => {
     const { session, paths } = sessionRecording({ projectId: 'p1', groupBy: 'flat', groups: [], nextCursor: null });
     await tool('list_tickets', session).handler({
@@ -109,10 +129,33 @@ describe('the read tools', () => {
       title: 'A ticket', stateProvenance: null, parent: null, rollup: null,
     };
     const { session, paths } = sessionRecording(body);
-    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual(body);
+    // T9 adds ONE key (`description`, as Markdown); everything else is the server's, untouched.
+    expect(await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).toEqual({ ...body, description: { markdown: '', lossy: [] } });
     expect(paths).toEqual(['/v1/workspaces/w1/tickets/t1']);
     // The mixed casing is the SERVER's contract. Normalising it here would be
     // this package inventing a shape, which is exactly what the spec forbids.
+  });
+
+  it('14.456 get_ticket answers the description as { markdown, lossy } and no raw document', async () => {
+    const doc = { type: 'doc', content: [{ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Steps' }] }, { type: 'paragraph', content: [{ type: 'text', text: 'Call.' }] }] };
+    const body = {
+      key: 'CCSO-4', title: 'Chiller', rollup: null,
+      ticketState: { kind: 'ticket', id: 't1', assigneeId: 'u1', fields: { description: { value: doc }, priority: { value: 'P2' } } },
+    };
+    const { session } = sessionRecording(body);
+    const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as Record<string, unknown> & {
+      ticketState: { fields: Record<string, unknown>; assigneeId: string };
+    };
+    expect(out['description']).toEqual({ markdown: '## Steps\n\nCall.', lossy: [] });
+    expect(out.ticketState.fields, 'no raw description document; the other fields are unchanged').toEqual({ priority: { value: 'P2' } });
+    expect(out.ticketState.assigneeId).toBe('u1');
+    expect(out['key']).toBe('CCSO-4');
+    expect(JSON.stringify(out)).not.toContain('"type":"doc"');
+  });
+
+  it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {
+    const session = { ...sessionRecording({}).session, get: async () => { throw new HttpError(404, { error: 'not_found' }); } };
+    await expect(tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow('ticket not found or not visible to you');
   });
 });
 
@@ -133,6 +176,7 @@ function sessionAnswering(answers: Record<string, Answer>): { session: Session; 
       return answer;
     },
     post: async () => { throw new Error('not a read'); },
+    ...NO_TRANSFER,
     postEvents: async () => { throw new Error('not a read'); },
   };
   return { session, paths };
@@ -297,6 +341,7 @@ describe('list_tickets filters (14.331, 14.333)', () => {
       userId: () => 'u',
       get: async (path) => { gets.push(path); return { groups: [] }; },
       post: async () => ({}),
+      ...NO_TRANSFER,
       postEvents: async () => ({}),
     };
     const server = new McpServer({ name: 'gisik-nokma', version: '0.1.0' });

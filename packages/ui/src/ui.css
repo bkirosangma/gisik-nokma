@@ -8880,6 +8880,85 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-comment__meta { font-size: 0.9375rem; /* 15px */ line-height: 1.25rem; margin: 0; }
 .gn-comment__name { font-weight: 600; }
 .gn-comment__time { color: var(--gn-text-muted); margin-left: 0.5rem; font-size: 0.8125rem; }
+/* MCP-everything T5 — edit and delete on a comment. Every colour, radius and shadow is a token the three styles
+   (hig, minimal, neo) and both themes already define; the only literals are sizes. The "…" is the one new control on
+   the row, so it stays quiet (no fill until hover) and keeps the 44px touch floor (`min-*: 2.75rem`) that
+   `.gn-button` and `.add-rule-menu__item` keep, without pushing the name row taller: a negative margin returns the
+   difference the target adds. */
+.gn-comment__head { position: relative; }
+.gn-comment__edited {
+  margin-left: 0.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-comment__edited:hover { text-decoration: underline; }
+.gn-comment__edited:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; text-decoration: underline; }
+.gn-comment__more {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -0.75rem 0 -0.75rem 0.25rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.gn-comment__more:hover,
+.gn-comment__more[aria-expanded='true'] { background: var(--gn-fill-quaternary); }
+.gn-comment__more:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.gn-comment__menu {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem;
+  border-radius: var(--gn-radius-card);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift-near);
+}
+.gn-comment__menu > [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-comment__menu > [role='menuitem']:hover { background: var(--gn-fill-quaternary); }
+.gn-comment__menu > [role='menuitem']:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.gn-comment__editing { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.gn-comment__editing > :first-child { align-self: stretch; }
+.gn-comment--deleted .gn-comment__avatar { opacity: 0.6; }
+.gn-comment__deleted { margin: 0; font-style: italic; color: var(--gn-text-muted); }
+.gn-comment__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-sunken-compact);
+}
+.gn-comment__confirm > p { margin: 0; flex: 1 1 14rem; }
+.gn-comment__refusal { margin: 0; color: var(--gn-danger); }
 /* `pre-wrap` because `docToPlainText` separates blocks with NEWLINES
    (`packages/domain/src/doc-text.ts`), so without it a two-paragraph comment
    renders as one line and the words run together. The same declaration and the

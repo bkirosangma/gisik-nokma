@@ -207,7 +207,7 @@ the older link stops working.
 
 **Somebody says the invitation link doesn't work.**
 They will see: *"This invitation link does not open anything. It may have been used, withdrawn, or
-lapsed — ask whoever invited you for a new one."* The page is headed **This invitation can't be used** and
+lapsed. Ask whoever invited you for a new one."* The page is headed **This invitation can't be used** and
 has a **Go to sign in** button (and **See your workspaces** if they are already signed in).
 
 That is genuinely all anyone can find out. The product deliberately refuses to say which of the four

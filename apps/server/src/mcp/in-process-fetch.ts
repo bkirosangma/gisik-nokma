@@ -19,18 +19,27 @@ export function inProcessFetch(app: FastifyInstance, outer: OuterCaller): typeof
       headers[k] = v;
     });
     if (outer.xff !== undefined) headers['x-forwarded-for'] = outer.xff;
+    const body = init?.body;
     const res = await app.inject({
       method: (init?.method ?? 'GET') as 'GET' | 'POST',
       url: `${url.pathname}${url.search}`,
       headers,
-      payload: typeof init?.body === 'string' ? init.body : undefined,
+      // A multipart upload arrives as bytes (`encodeMultipart`); JSON as a string. Anything else is a bug upstream.
+      payload:
+        typeof body === 'string'
+          ? body
+          : body instanceof Uint8Array
+            ? Buffer.from(body.buffer, body.byteOffset, body.byteLength)
+            : undefined,
       remoteAddress: outer.ip,
     });
     const out = new Headers();
     for (const [k, v] of Object.entries(res.headers)) {
       if (v !== undefined) out.set(k, Array.isArray(v) ? v.join(', ') : String(v));
     }
-    return new Response(res.body === '' ? null : res.body, { status: res.statusCode, headers: out });
+    // `rawPayload`, never `res.body`: `body` is the payload decoded as UTF-8, which corrupts every
+    // download that is not text (an image's bytes would come back as replacement characters).
+    return new Response(res.rawPayload.length === 0 ? null : res.rawPayload, { status: res.statusCode, headers: out });
   }) as typeof fetch;
 }
 
@@ -50,5 +59,7 @@ export function hostedSession(
     get: (path) => client.get(path, accessToken),
     post: (path, body) => client.post(path, body, accessToken),
     postEvents: (events) => client.post('/v1/events', { events }, accessToken),
+    getBytes: (path) => client.getBytes(path, accessToken),
+    postMultipart: (path, fields, file) => client.postMultipart(path, fields, file, accessToken),
   }));
 }

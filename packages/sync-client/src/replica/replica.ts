@@ -206,9 +206,14 @@ export function viewToEnvelope(row: LedgerEventView): LedgerEvent {
 export type LocalNoteComment = {
   commentId: string;
   authorId: string;
+  /** `null` once the comment is deleted (MCP-everything T4): the text is gone from every view. */
   body: unknown;
   recordedAt: string;
   workspaceSeq: number;
+  /** When the author last edited it, or `null`. */
+  editedAt: string | null;
+  /** When it was deleted, or `null`. */
+  deletedAt: string | null;
 };
 
 export type Replica = {
@@ -1034,7 +1039,10 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       `INSERT INTO note_comments (comment_id, workspace_id, note_id, author_id, body, recorded_at, workspace_seq)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(comment_id) DO UPDATE SET
-         body = excluded.body, recorded_at = excluded.recorded_at, workspace_seq = excluded.workspace_seq`,
+         -- a comment that has been edited or deleted keeps its current body when its original event comes round again
+         body = CASE WHEN EXISTS (SELECT 1 FROM comment_changes c WHERE c.comment_id = note_comments.comment_id)
+                     THEN note_comments.body ELSE excluded.body END,
+         recorded_at = excluded.recorded_at, workspace_seq = excluded.workspace_seq`,
       [
         env.id,
         env.workspaceId,
@@ -1044,6 +1052,39 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         env.serverTime,
         env.workspaceSeq,
       ],
+    );
+  }
+
+  /** `comment.edited` / `comment.deleted`, ticket or note: the change row, and a note comment's own row. */
+  async function applyCommentChange(tx: SyncStorage, env: LedgerEvent): Promise<void> {
+    const commentId = String((env.payload as { commentId?: unknown }).commentId);
+    const deleted = env.type === 'comment.deleted';
+    await tx.run(
+      `INSERT INTO comment_changes (comment_id, workspace_id, entity_kind, entity_id, edited_at, edited_by, deleted_at, deleted_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(comment_id) DO UPDATE SET
+         edited_at = COALESCE(excluded.edited_at, comment_changes.edited_at),
+         edited_by = COALESCE(excluded.edited_by, comment_changes.edited_by),
+         deleted_at = COALESCE(comment_changes.deleted_at, excluded.deleted_at),
+         deleted_by = COALESCE(comment_changes.deleted_by, excluded.deleted_by)`,
+      [
+        commentId,
+        env.workspaceId,
+        env.entity.kind,
+        env.entity.id,
+        deleted ? null : env.serverTime,
+        deleted ? null : env.actorId,
+        deleted ? env.serverTime : null,
+        deleted ? env.actorId : null,
+      ],
+    );
+    if (env.entity.kind !== 'note') return;
+    const body = deleted ? 'null' : JSON.stringify((env.payload as { body?: unknown }).body ?? null);
+    // An edit that arrives after a delete changes nothing: a deleted comment stays gone.
+    await tx.run(
+      `UPDATE note_comments SET body = ? WHERE comment_id = ? AND note_id = ?
+         AND NOT EXISTS (SELECT 1 FROM comment_changes c WHERE c.comment_id = ? AND c.deleted_at IS NOT NULL AND ? = 0)`,
+      [body, commentId, env.entity.id, commentId, deleted ? 1 : 0],
     );
   }
 
@@ -1063,6 +1104,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       await insertEnvelopeIfAbsent(tx, env);
       if (env.entity.kind !== 'note') continue;
       if (env.type === 'comment.added') await applyNoteComment(tx, env);
+      else if (env.type === 'comment.edited' || env.type === 'comment.deleted') await applyCommentChange(tx, env);
       else touched.add(env.entity.id);
     }
     // One refold per note, AFTER the whole batch is stored — not one per event.
@@ -1160,6 +1202,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     // differs from `purgeEntity` (D2). A stub embeds the refused claim whole, and
     // a purge is an erasure, not a loss of access.
     await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
+    await tx.run("DELETE FROM comment_changes WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
   }
 
   async function eraseNoteIn(tx: SyncStorage, noteId: string, at: string): Promise<void> {
@@ -1171,6 +1214,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     await tx.run("DELETE FROM events WHERE entity_kind = 'note' AND entity_id = ?", [noteId]);
     await tx.run('DELETE FROM notes WHERE note_id = ?', [noteId]);
     await tx.run('DELETE FROM note_comments WHERE note_id = ?', [noteId]);
+    await tx.run("DELETE FROM comment_changes WHERE entity_kind = 'note' AND entity_id = ?", [noteId]);
   }
 
   /** Everything the workspace owns on this device; answers the ticket and note ids it held. */
@@ -1191,7 +1235,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       await tx.run("DELETE FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
       await tx.run("DELETE FROM snapshot_provenance WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
     }
-    for (const table of ['events', 'tickets', 'notes', 'note_comments', 'contests']) {
+    for (const table of ['events', 'tickets', 'notes', 'note_comments', 'comment_changes', 'contests']) {
       await tx.run(`DELETE FROM ${table} WHERE workspace_id = ?`, [workspaceId]);
     }
     // One workspace per replica — the assumption `revokeScope`'s whole-workspace
@@ -1310,6 +1354,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
             const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
             if (dupe.length === 0) await insertEnvelope(tx, env);
             if (CONTEST_TYPES.includes(env.type)) await applyContest(tx, env);
+            else if (env.type === 'comment.edited' || env.type === 'comment.deleted') await applyCommentChange(tx, env);
           }
           await refoldTicket(tx, ticket.ticketId, localDeps);
         }
@@ -1424,6 +1469,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
           if (dupe.length === 0) await insertEnvelope(tx, env);
           if (CONTEST_TYPES.includes(env.type)) await applyContest(tx, env);
+          else if (env.type === 'comment.edited' || env.type === 'comment.deleted') await applyCommentChange(tx, env);
         }
         await refoldTicket(tx, ticket.ticketId, localDeps);
       });
@@ -1540,6 +1586,9 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           // Contests fold into their own table. They are history ABOUT a
           // ticket, never part of its state: a refused claim did not happen.
           await applyContest(tx, env);
+        } else if (env.type === 'comment.edited' || env.type === 'comment.deleted') {
+          // Ticket or note. BEFORE the note arm, so a comment change never refolds a note's head row (18.078).
+          await applyCommentChange(tx, env);
         } else if (env.entity.kind === 'ticket' && FOLDING_TICKET_TYPES.includes(env.type)) {
           await refoldTicket(tx, env.entity.id, await buildLocalDeps(tx));
         } else if (env.entity.kind === 'note') {
@@ -1607,6 +1656,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         // either must clear whichever it names.
         await tx.run('DELETE FROM notes WHERE note_id = ?', [entityId]);
         await tx.run('DELETE FROM note_comments WHERE note_id = ?', [entityId]);
+        await tx.run('DELETE FROM comment_changes WHERE entity_id = ?', [entityId]);
         // Outbox rows for the purged ticket STAY: they are the user's claims in
         // transit and must go up, contest, and surface — nothing silently vanishes.
       });
@@ -1653,6 +1703,10 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         // the workspace-wide case is finished off.
         await tx.run('DELETE FROM notes WHERE workspace_id = ?', [instruction.workspaceId]);
         await tx.run('DELETE FROM note_comments WHERE workspace_id = ?', [instruction.workspaceId]);
+        for (const ticketId of goneIds) await tx.run('DELETE FROM comment_changes WHERE entity_id = ?', [ticketId]);
+        if (instruction.projectId === undefined) {
+          await tx.run('DELETE FROM comment_changes WHERE workspace_id = ?', [instruction.workspaceId]);
+        }
         if (instruction.projectId === undefined) {
           // Losing the workspace loses its definitions and cursor too — a replica
           // for a workspace you are not in should hold nothing of it beyond your
@@ -1862,15 +1916,19 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
 
     async listNoteComments(noteId) {
       const rows = await storage.all(
-        'SELECT * FROM note_comments WHERE note_id = ? ORDER BY workspace_seq',
+        `SELECT n.*, c.edited_at, c.deleted_at FROM note_comments n
+           LEFT JOIN comment_changes c ON c.comment_id = n.comment_id
+          WHERE n.note_id = ? ORDER BY n.workspace_seq`,
         [noteId],
       );
       return rows.map((row) => ({
         commentId: row.comment_id as string,
         authorId: row.author_id as string,
-        body: JSON.parse(row.body as string) as unknown,
+        body: row.deleted_at == null ? (JSON.parse(row.body as string) as unknown) : null,
         recordedAt: row.recorded_at as string,
         workspaceSeq: Number(row.workspace_seq),
+        editedAt: (row.edited_at as string | null) ?? null,
+        deletedAt: (row.deleted_at as string | null) ?? null,
       }));
     },
 
@@ -1947,12 +2005,33 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         ),
       );
       const isPurged = (kind: 'ticket' | 'note', id: string): boolean => purged.has(`${kind}:${id}`);
+      // The CURRENT text of every live comment (spec §6): an edited comment is searched by its latest
+      // edit, a deleted one not at all. Read in JS rather than with json_extract so both storage seams
+      // (better-sqlite3 and the phone's) answer identically.
+      const deleted = new Set(
+        (
+          await storage.all('SELECT comment_id FROM comment_changes WHERE workspace_id = ? AND deleted_at IS NOT NULL', [
+            workspaceId,
+          ])
+        ).map((row) => row['comment_id'] as string),
+      );
+      const latest = new Map<string, { seq: number; body: unknown }>();
+      for (const row of await storage.all(
+        "SELECT seq, payload FROM events WHERE workspace_id = ? AND type = 'comment.edited'",
+        [workspaceId],
+      )) {
+        const p = JSON.parse(row['payload'] as string) as { commentId: string; body: unknown };
+        const seen = latest.get(p.commentId);
+        if (seen === undefined || Number(row['seq']) > seen.seq) latest.set(p.commentId, { seq: Number(row['seq']), body: p.body });
+      }
       const comments = await storage.all(
-        "SELECT entity_id, payload FROM events WHERE workspace_id = ? AND type = 'comment.added' AND LOWER(payload) LIKE ?",
-        [workspaceId, needle],
+        "SELECT id, entity_id, payload FROM events WHERE workspace_id = ? AND entity_kind = 'ticket' AND type = 'comment.added'",
+        [workspaceId],
       );
       for (const row of comments) {
-        const body = (JSON.parse(row.payload as string) as { body: unknown }).body;
+        const id = row['id'] as string;
+        if (deleted.has(id)) continue;
+        const body = latest.get(id)?.body ?? (JSON.parse(row['payload'] as string) as { body: unknown }).body;
         if (!docToPlainText(body, { isPurged }).toLowerCase().includes(text.toLowerCase())) continue;
         if (hits.has(row.entity_id as string)) continue;
         const owning = await storage.all('SELECT state FROM tickets WHERE ticket_id = ?', [row.entity_id as string]);

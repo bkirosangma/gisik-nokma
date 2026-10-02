@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as pkg from '../src/index.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
+import { TOOL_NAMES } from './fixtures/tool-names.js';
 
 /**
  * Hosted MCP plan, Task 6. Case 14.250.
@@ -15,33 +17,8 @@ describe('14.250 package exports', () => {
     expect(typeof pkg.allTools).toBe('function');
     expect(typeof pkg.lazySession).toBe('function');
     // CONTROL, same `it`: the export is not merely present, it is THE registry —
-    // the tools in their pinned order (the order `register.test.ts` pins).
-    const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}) };
-    expect(pkg.allTools(fake).map((t) => t.name)).toEqual([
-      'search_tickets',
-      'list_tickets',
-      'get_ticket',
-      'list_members',
-      'create_ticket',
-      'transition_ticket',
-      'add_comment',
-      'assign_ticket',
-      'list_workspaces',
-      'get_workspace',
-      'create_workspace',
-      'rename_workspace',
-      'archive_workspace',
-      'restore_workspace',
-      'delete_workspace',
-      'undelete_workspace',
-      'list_projects',
-      'get_project',
-      'create_project',
-      'update_project',
-      'archive_project',
-      'restore_project',
-      'delete_project',
-      'undelete_project',
-    ]);
+    // the tools in their pinned order (`test/fixtures/tool-names.ts`, MCP-everything T3 case 14.366).
+    const fake = { userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER };
+    expect(pkg.allTools(fake).map((t) => t.name)).toEqual(TOOL_NAMES);
   });
 });

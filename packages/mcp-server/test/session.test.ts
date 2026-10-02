@@ -6,6 +6,7 @@ import { createSession } from '../src/session.js';
 import { HttpError, type GisikClient } from '../src/http-client.js';
 import { writeCachedToken } from '../src/token-cache.js';
 import { DEFAULT_POLL_INTERVAL_MS } from '../src/config.js';
+import { NO_CLIENT_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 7. Cases 14.54–14.57.
@@ -23,7 +24,7 @@ describe('the session', () => {
     const config = scratchConfig();
     await writeCachedToken(config.tokenPath, { token: 'cached', userId: '01J0USER0000000000000000AA' });
     const post = vi.fn();
-    const client: GisikClient = { get: async () => ({ ok: true }), post };
+    const client: GisikClient = { get: async () => ({ ok: true }), post, ...NO_CLIENT_TRANSFER };
 
     const session = await createSession({
       config, client, prompt: () => {}, sleep: async () => {}, now: () => 0,
@@ -38,6 +39,7 @@ describe('the session', () => {
     await writeCachedToken(config.tokenPath, { token: 'stale', userId: 'old' });
     let gets = 0;
     const client: GisikClient = {
+      ...NO_CLIENT_TRANSFER,
       get: async (_path, token) => {
         gets += 1;
         if (token === 'stale') throw new HttpError(401, { error: 'unauthenticated' });
@@ -65,6 +67,7 @@ describe('the session', () => {
     await writeCachedToken(config.tokenPath, { token: 'stale', userId: 'old' });
     let gets = 0;
     const client: GisikClient = {
+      ...NO_CLIENT_TRANSFER,
       get: async () => { gets += 1; throw new HttpError(401, { error: 'unauthenticated' }); },
       post: async (path) =>
         path === '/v1/mcp/device/code'
@@ -86,6 +89,7 @@ describe('the session', () => {
     await writeCachedToken(config.tokenPath, { token: 'good', userId: 'u' });
     const post = vi.fn();
     const client: GisikClient = {
+      ...NO_CLIENT_TRANSFER,
       get: async () => { throw new HttpError(404, { error: 'not_found' }); },
       post,
     };
@@ -99,6 +103,7 @@ describe('the session', () => {
     await writeCachedToken(config.tokenPath, { token: 'stale', userId: 'old' });
     const posted: Array<[string, unknown, string | null]> = [];
     const client: GisikClient = {
+      ...NO_CLIENT_TRANSFER,
       get: async () => ({}),
       post: async (path, body, token) => {
         if (path === '/v1/mcp/device/code') {

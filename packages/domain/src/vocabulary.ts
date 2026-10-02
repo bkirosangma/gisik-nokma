@@ -35,6 +35,8 @@ import {
 import {
   attachmentAddedPayload,
   commentAddedPayload,
+  commentDeletedPayload,
+  commentEditedPayload,
   ticketAssignedPayload,
   ticketClosedPayload,
   ticketCollaboratorPayload,
@@ -282,6 +284,10 @@ domainRegistry.register({
   entityKind: ['ticket', 'note'],
   payloadSchema: commentAddedPayload,
 });
+
+// MCP-everything T2 (spec §6, M-E9): a comment's edit and deletion span the same two kinds as its add.
+domainRegistry.register({ type: 'comment.edited', version: 1, entityKind: ['ticket', 'note'], payloadSchema: commentEditedPayload });
+domainRegistry.register({ type: 'comment.deleted', version: 1, entityKind: ['ticket', 'note'], payloadSchema: commentDeletedPayload });
 
 domainRegistry.register({
   type: 'attachment.added',

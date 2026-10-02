@@ -178,6 +178,8 @@ export type EditorSlotProps = {
    * there and not for any reason of this package's own.
    */
   footerNote?: string;
+  /** The submit button's label when the default ("Post" / "Save description") is wrong — an in-place comment edit says "Save". */
+  submitLabel?: string;
   // Editor capabilities. Optional in the shared declaration because Plan 6's
   // read-only PlainTextEditorSlot supplies none of them. This component STATES
   // the gap rather than pretending: without `submit` the submit button is
@@ -672,7 +674,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         >
           {/* The prototype's word for this control (`:1330`). A LABEL change
               only: `handleSubmit` and the event it composes are untouched. */}
-          {isComment ? 'Post' : 'Save description'}
+          {props.submitLabel ?? (isComment ? 'Post' : 'Save description')}
         </button>
         )}
       </div>

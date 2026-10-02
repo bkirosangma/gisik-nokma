@@ -101,6 +101,8 @@ type AppCoreEditorSlotProps = {
   autoFocus?: boolean;
   labelledBy?: string;
   footerNote?: string;
+  // 26.118 — the submit button's label override (MCP-everything T5), transcribed with the same name.
+  submitLabel?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   // 9.280 — the wiki-link four (Plan 4 Task 5). Transcribed here with the same
   // names and inline shapes so the case below, which compares THIS type's field
@@ -729,6 +731,19 @@ describe('13.1270 the composer chrome', () => {
     c.unmount();
     const d = render(<TicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} />);
     expect(d.container.querySelector('.editor-slot__footer')!.contains(d.getByRole('button', { name: 'Save description' }))).toBe(true);
+  });
+
+  it('26.118 submitLabel labels the submit button; absent, the defaults stand', () => {
+    const edit = render(<TicketEditorSlot mode="comment" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} submitLabel="Save" />);
+    expect(edit.getByRole('button', { name: 'Save' })).toBeTruthy();
+    expect(edit.queryByRole('button', { name: 'Post' })).toBeNull();
+    edit.unmount();
+    // CONTROL — no override: both modes keep their own words.
+    const post = render(<TicketEditorSlot mode="comment" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} />);
+    expect(post.getByRole('button', { name: 'Post' })).toBeTruthy();
+    post.unmount();
+    const desc = render(<TicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} />);
+    expect(desc.getByRole('button', { name: 'Save description' })).toBeTruthy();
   });
 
   it('13.1271 the footer note sits in the footer in comment mode; the Markdown hint sits in the footer in description mode; neither is drawn twice', () => {

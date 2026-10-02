@@ -6,6 +6,17 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { signInWithPhone } from '../helpers/session.js';
 import { buildOAuthApp, hostedToken, pkcePair, PUBLIC_URL } from '../helpers/oauth.js';
+import { allTools, type Session } from '@gisik-nokma/mcp-server';
+
+// A session that is never called: `allTools` only needs one to build the definitions it lists.
+const STUB_SESSION: Session = {
+  userId: () => 'u',
+  get: async () => ({}),
+  post: async () => ({}),
+  postEvents: async () => ({}),
+  getBytes: async () => { throw new Error('unused'); },
+  postMultipart: async () => { throw new Error('unused'); },
+};
 
 /**
  * Hosted MCP plan, Task 10. Cases 14.290–14.293: the whole door driven the way a
@@ -101,16 +112,9 @@ async function journey(app: FastifyInstance, otp: Parameters<typeof signInWithPh
   // EXACT and order-insensitive: the set of names, so a tool silently added or dropped goes red here as well as
   // in `mcp-http.test.ts` (14.262, which also pins the order). A count would say less; `arrayContaining`
   // would let a dropped tool through.
-  expect((list.json().result.tools as Array<{ name: string }>).map((t) => t.name).sort()).toEqual(
-    [
-      'list_workspaces', 'get_workspace', 'create_workspace', 'rename_workspace', 'archive_workspace',
-      'restore_workspace', 'delete_workspace', 'undelete_workspace',
-      'list_projects', 'get_project', 'create_project', 'update_project', 'archive_project',
-      'restore_project', 'delete_project', 'undelete_project',
-      'search_tickets', 'list_tickets', 'get_ticket', 'list_members',
-      'create_ticket', 'transition_ticket', 'add_comment', 'assign_ticket',
-    ].sort(),
-  );
+  const listed = (list.json().result.tools as Array<{ name: string }>).map((t) => t.name).sort();
+  expect(listed).toEqual(allTools(STUB_SESSION).map((t) => t.name).sort());
+  expect(listed.length).toBeGreaterThanOrEqual(24); // CONTROL: not an empty registry agreeing with itself
   const call = async (name: string, args: Record<string, unknown>, token = first.access_token) => {
     const r = (await mcp(app, token, rpc('tools/call', { name, arguments: args }, 3))).json().result as { isError?: boolean; content: { text: string }[] };
     return { isError: r.isError === true, text: r.content[0]?.text ?? '' };

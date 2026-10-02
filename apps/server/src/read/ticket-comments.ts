@@ -63,10 +63,14 @@ export type TicketCommentRow = {
   /** The `comment.added` event's id — a comment's only identity. */
   commentId: string;
   authorId: string;
-  /** The structured document the editor wrote, untouched. */
+  /** The structured document the editor wrote, untouched — `null` once the comment is deleted (spec §6). */
   body: unknown;
   /** The envelope's `serverTime`, ISO 8601. */
   recordedAt: string;
+  /** `serverTime` of the latest `comment.edited`, ISO 8601, or `null` for a comment never edited. */
+  editedAt: string | null;
+  /** `serverTime` of `comment.deleted`, ISO 8601, or `null`. A deleted comment keeps its author and time, never its text. */
+  deletedAt: string | null;
   files: TicketCommentFile[];
 };
 
@@ -82,6 +86,8 @@ type DbRow = {
    * compare it to a `serverTime` byte for byte.
    */
   recorded_at: Date;
+  edited_at: Date | null;
+  deleted_at: Date | null;
 };
 
 /**
@@ -104,7 +110,7 @@ export async function listTicketComments(
   ticketId: string,
 ): Promise<TicketCommentRow[]> {
   const result = await db.query(
-    `SELECT comment_id, author_id, body, recorded_at
+    `SELECT comment_id, author_id, body, recorded_at, edited_at, deleted_at
        FROM proj_ticket_comments
       WHERE ticket_id = $1
       ORDER BY workspace_seq`,
@@ -128,6 +134,8 @@ export async function listTicketComments(
     authorId: row.author_id,
     body: row.body,
     recordedAt: row.recorded_at.toISOString(),
+    editedAt: row.edited_at?.toISOString() ?? null,
+    deletedAt: row.deleted_at?.toISOString() ?? null,
     files: ids.map((attachmentId) => {
       const attachment = resolved.get(attachmentId);
       return attachment === undefined

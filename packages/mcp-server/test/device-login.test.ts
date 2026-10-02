@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runDeviceLogin } from '../src/device-login.js';
 import type { GisikClient } from '../src/http-client.js';
+import { NO_CLIENT_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 7. Cases 14.50–14.52.
@@ -15,6 +16,7 @@ function clientAnswering(script: unknown[]): { client: GisikClient; posts: strin
   const posts: string[] = [];
   let i = 0;
   const client: GisikClient = {
+    ...NO_CLIENT_TRANSFER,
     get: async () => { throw new Error('not used'); },
     post: async (path) => {
       posts.push(path);
@@ -75,6 +77,7 @@ describe('the device flow', () => {
   it('14.52 surfaces the prompt BEFORE the first poll', async () => {
     const order: string[] = [];
     const client: GisikClient = {
+    ...NO_CLIENT_TRANSFER,
       get: async () => { throw new Error('not used'); },
       post: async (path) => {
         order.push(`post ${path}`);
