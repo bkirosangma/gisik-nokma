@@ -1315,3 +1315,52 @@
   cursor: pointer;
 }
 .table-toolbar__btn:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
+
+/* THE EDITOR'S LOADING SKELETON (smoothness T10, apps/web `EditorSkeleton`; spec S1, amendment S-R1). It stands in the slot's own
+   box, so what it draws must take the real controls' boxes or the page moves when the editor arrives. The formatting strip's items
+   are laid out in the real bar's own groups (`.ticket-editor__tool-group`, so the real `.ticket-editor__toolbar` wraps them into the
+   same rows) and the two item sets, desktop and phone, are both in the markup: `display: contents` makes a set's groups the
+   toolbar's own flex items, and the ≤40rem arm shows the phone set instead (the query `EditorToolbar` switches on). The 44px floors
+   come from here, like the real tools', never from an inline style. The fill is `.gn-skeleton`'s (the placeholder surface). */
+.gn-editor-skeleton__set {
+  display: contents;
+}
+.gn-editor-skeleton__set--phone {
+  display: none;
+}
+.gn-skeleton.gn-editor-skeleton__tool,
+.gn-skeleton.gn-editor-skeleton__format {
+  width: 34px;
+  height: 32px;
+  border-radius: 6px;
+}
+.gn-skeleton.gn-editor-skeleton__select {
+  width: 6.5rem;
+  height: 32px;
+  border-radius: 6px;
+}
+@media (max-width: 40rem) {
+  .gn-editor-skeleton__set--desktop {
+    display: none;
+  }
+  .gn-editor-skeleton__set--phone {
+    display: contents;
+  }
+  .gn-skeleton.gn-editor-skeleton__tool,
+  .gn-skeleton.gn-editor-skeleton__format {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .gn-skeleton.gn-editor-skeleton__select {
+    height: 2.75rem;
+  }
+}
+
+/* The skeleton's hint is the real sentence on the placeholder fill: inline, so each wrapped line gets its own bar, as the text's lines
+   will. `.gn-skeleton` supplies the fill and the pulse; this only makes it inline and hides the glyphs. */
+.gn-skeleton.gn-editor-skeleton__hint-text {
+  display: inline;
+  color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}

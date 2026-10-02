@@ -11,7 +11,7 @@ import {
   type NotificationPreferencesGateway,
   type NotificationsGateway,
   type WorkflowAuthoringGateway,
-} from '@gisik-nokma/app-core';
+} from '@gisik-nokma/app-core/data';
 import {
   createHttpClient,
   createHttpFoundingGateway,
