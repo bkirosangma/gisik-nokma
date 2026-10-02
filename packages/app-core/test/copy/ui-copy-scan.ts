@@ -84,6 +84,25 @@ export function uiStringsMatching(pattern: RegExp, roots: readonly string[] = UI
   return found;
 }
 
+/**
+ * The lines a `description:` property's initializer covers: the model-facing text of an MCP tool
+ * definition (HK-3b, 23.372). A string on one of these lines is a description, not a reply.
+ */
+export function descriptionLines(file: string, source: string): Set<number> {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const lines = new Set<number>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name) && node.name.text === 'description') {
+      const first = sf.getLineAndCharacterOfPosition(node.initializer.getStart()).line + 1;
+      const last = sf.getLineAndCharacterOfPosition(node.initializer.getEnd()).line + 1;
+      for (let line = first; line <= last; line++) lines.add(line);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return lines;
+}
+
 /** One reasoned exception. An entry with no `reason` is a review blocker. */
 export type AllowEntry = { file: string; contains: string; reason: string };
 

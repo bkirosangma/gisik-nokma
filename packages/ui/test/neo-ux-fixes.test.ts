@@ -41,41 +41,22 @@ function indexOfRule(selector: string): number {
   return hits[0] as number;
 }
 
-describe('23.001 the field rim is a role, defined in every style and theme (audit SYS-05, WS-04, NP-25, TT-14)', () => {
-  it('23.001 fieldRim resolves everywhere, neo is #897362 / #6f7997 and clears 3.0 on all four surfaces', () => {
-    for (const [style, theme] of COMBOS) {
-      expect(colorOf(theme, 'fieldRim', style), `${style}/${theme} fieldRim`).toMatch(/^#[0-9a-f]{6}$/);
-    }
-    expect(colorOf('light', 'fieldRim', 'neo')).toBe('#897362');
-    // Planner ruling 03:15: the plan said #6b7491 (2.93 on the new raised, 3.14 for #6f7997, 3.57 on surface).
-    expect(colorOf('dark', 'fieldRim', 'neo')).toBe('#6f7997');
-    // hig and minimal map it to their existing field edge, so the role is defined without moving their fields.
+// RETIRED 2026-10-02 (housekeeping HK-4, cases 24.120–24.123): the `fieldRim` role, `--gn-field-rim` and the four CONTRAST_PAIRS rows are
+// gone; nothing read them after N10. What 23.001 guarded survives for hig and minimal, whose field edge is `border`: it still clears 3.0
+// on the four grounds a field sits on, asserted below on `border` itself.
+describe('23.001 the hig/minimal field edge (formerly the fieldRim role, retired by HK-4) clears 3.0 on every ground a field sits on (audit SYS-05, WS-04, NP-25, TT-14)', () => {
+  it('23.001 hig and minimal: border is the field edge and measures >= 3.0 on surface, raised, sunken and well; the role is gone', () => {
     for (const style of ['hig', 'minimal'] as const) {
       for (const theme of ['light', 'dark'] as const) {
-        expect(colorOf(theme, 'fieldRim', style), `${style}/${theme}`).toBe(colorOf(theme, 'border', style));
+        for (const bg of ['surface', 'surfaceRaised', 'surfaceSunken', 'surfaceWell'] as const) {
+          expect(contrastRatio(colorOf(theme, 'border', style), colorOf(theme, bg, style)), `${style}/${theme} border on ${bg}`).toBeGreaterThanOrEqual(3);
+        }
       }
     }
-    expect(themeStylesheet()).toContain(`${cssVariableName('fieldRim')}: #897362;`);
-    for (const bg of ['surface', 'surfaceRaised', 'surfaceSunken', 'surfaceWell'] as const) {
-      expect(
-        CONTRAST_PAIRS.some((pair) => pair.fg === 'fieldRim' && pair.bg === bg && pair.minimum === 3),
-        `CONTRAST_PAIRS holds fieldRim on ${bg}`,
-      ).toBe(true);
-      for (const [style, theme] of COMBOS) {
-        expect(
-          contrastRatio(colorOf(theme, 'fieldRim', style), colorOf(theme, bg, style)),
-          `${style}/${theme} fieldRim on ${bg}`,
-        ).toBeGreaterThanOrEqual(3);
-      }
-    }
-    // Neo measurements recorded in the case: light 3.31 on the well, 3.75 on paper; dark 3.14 on raised, 3.57 on surface.
-    expect(contrastRatio('#897362', colorOf('light', 'surfaceWell', 'neo'))).toBeGreaterThan(3.3);
-    expect(contrastRatio('#6f7997', colorOf('dark', 'surfaceRaised', 'neo'))).toBeGreaterThan(3.1);
-    // CONTROL: the old shadow hue is not a ring (fails on paper), and a ring one step dimmer than #6f7997 fails on the dark raised.
-    // Amended by N4 = B (2026-10-02, 24.007): the dark raised is now the page hex #1b2340, so the plan's #6b7491 reads 3.33 there
-    // and is no longer a control; #5f6987 is.
-    expect(contrastRatio('#b09884', colorOf('light', 'surface', 'neo'))).toBeLessThan(3);
+    // CONTROL: the check can fail — a ring one step dimmer than the dark border does not clear the dark raised surface.
     expect(contrastRatio('#5f6987', colorOf('dark', 'surfaceRaised', 'neo'))).toBeLessThan(3);
+    // The retired role is not resolvable and its variable is not emitted.
+    expect(themeStylesheet()).not.toContain('--gn-field-rim');
   });
 });
 
