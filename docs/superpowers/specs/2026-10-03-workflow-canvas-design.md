@@ -38,10 +38,11 @@
 ### 2.1 A working copy of the nodes
 `WorkflowCanvas` keeps a `workingNodes` state, seeded from `toFlowGraph(draft)`.
 - **`onNodesChange`** applies changes with React Flow's `applyNodeChanges`:
-  - position changes while `dragging: true`;
+  - position changes for the dragged id while the gesture is in progress (`dragging: true`), each one passed through snapping and the collision check (§3) first;
+  - React Flow's final `dragging: false` drag-end change for that id carries React Flow's RAW pointer position (`@xyflow/system` 0.0.82 `:2330-2331`), so it is REPLACED by the pipeline's last valid position, or dropped after a cancel;
   - selection and dimension changes always.
 - **When the draft changes** (add, delete, rename, Tidy, publish reset), `workingNodes` is re-derived from it, keeping the in-flight position of the node being dragged, if any. A draft change mid-drag therefore never snaps the dragged node back, and never loses a state added meanwhile.
-- **On drop**, the final position, after snapping and the collision check (§3), is committed with `moveState` exactly once. The draft stays the single source of truth for everything except the gesture in progress.
+- **On drop**, `onNodeDragStop` commits the WORKING COPY's position for the dragged id with `moveState`, exactly once. It never reads the handler's `node.position`, which is React Flow's raw pointer position. The canvas owns the dragged id's position from drag start until `onNodeDragStop` returns, and the draft stays the single source of truth for everything except the gesture in progress.
 
 ### 2.2 The lifted look
 While a node has `dragging`:
@@ -54,7 +55,7 @@ Other states and arrows keep full strength (the Knowledgebase module's dimming i
 
 ### 2.3 The gesture
 - **Drag threshold:** `nodeDragThreshold={4}` (px), so a click selects without moving.
-- **Escape during a drag** restores the node's start position into `workingNodes`, ends the drag and commits nothing. A keydown listener is active only while a drag is in progress.
+- **Escape during a drag** restores the node's start position into `workingNodes` and marks the gesture *cancelled while still active*: React Flow keeps emitting position changes until pointer-up (nothing outside the library can end its gesture), so every further change for that id, the final `dragging: false` one included, is dropped, and the release commits nothing. A keydown listener is active only while a drag is in progress.
 - **Pointer handling:** pointer events and pointer capture come from React Flow's drag (`XYDrag`), so mouse, pen and touch behave the same, and releasing outside the window ends the drag.
 - **Re-renders:** `StateNode` and `AnyStateNode` are memoised on their data, so a drag re-renders only the dragged node and its edges.
 
@@ -153,10 +154,10 @@ Unchanged, except that the header gains Full screen, Tidy and Add transition.
 ## 5. Testing and proof
 
 ### 5.1 Case block
-Cases **25.500–25.559** (G-9), in `test-cases/25-smoothness.md`. 25.500–25.559: G-7 (task/smoothness-g7-phone-editors, FIX 1 5d8907dd) took 25.440–25.442, so G-9 shifted +60 on the orchestrator's grep of every origin task/release/docs branch (25.500–25.599 free, 2026-10-03 01:36). Each case's test carries its id.
+G-9 owns cases **25.500–25.559**, in `test-cases/25-smoothness.md`. G-7's FIX 1 (`task/smoothness-g7-phone-editors`, 5d8907dd) took 25.440–25.442, so G-9 moved +60 (orchestrator grep of every origin ref, 2026-10-03 01:36). Each case's test carries its id.
 
 ### 5.2 RED first: 25.500
-- **Suite:** a Playwright spec in `apps/web/e2e` (mock-only, Chromium), `workflow-canvas-drag.spec.ts`.
+- **Suite:** a Playwright spec in the new private package `packages/workflow-canvas-browser` (`tests/drag.spec.ts`), which serves the builder through a Vite harness on port 3190. Not `apps/web/e2e`: that suite boots `pnpm dev` on :3001, the dev stack's port, so it cannot run on the gate (decided 2026-10-03 in the plan; the spec follows it).
 - **Steps:** press on a state, move 200 px in 10 steps, and **before release** assert:
   - the node's bounding box moved 200 ± 4 px;
   - the attached edge's `d` attribute changed.
@@ -188,7 +189,7 @@ Same suite; desktop, and a phone viewport with `hasTouch`:
 - the Add transition validation mirroring `addTransition`.
 
 ### 5.5 On the gate
-- The canvas specs (`apps/web/e2e/workflow-canvas-*.spec.ts`, Chromium) become a turbo task (`@gisik-nokma/web#test:e2e:canvas`), added to the local `ctl gate` set (owner: "Yes, on the gate"). Estimated cost: +~1 min and ~300 MB per gate.
+- The canvas specs (`packages/workflow-canvas-browser/tests/*.spec.ts`, Chromium) run as that package's `test` turbo task, which the gate's `turbo run build test typecheck` picks up (owner: "Yes, on the gate"). The package declares `test` and `typecheck` and no `build`, so the gate's task count goes from 34 to **36**. Estimated cost: +~1 min and ~300 MB per gate.
 - They also run in CI on the release PR.
 - Each case gets a named post-commit mutation (e.g. remove `onNodesChange` → 25.500 red; drop the gap → the gap case red; skip Alt → the Alt case red).
 
@@ -211,8 +212,8 @@ Same suite; desktop, and a phone viewport with `hasTouch`:
 | `packages/app-core/src/workflow-builder/ui/add-transition-form.tsx` | new (§4.4) |
 | `packages/app-core/src/workflow-builder/ui/floating-panel.tsx` | new (§4.3) |
 | `packages/ui/src/ui.css` | `[data-fullscreen]`, toolbar, panel, the dragging look, guides, outline (pre-seeded G-9 block, plan #21) |
-| `apps/web/e2e/workflow-canvas-*.spec.ts` | new |
-| `apps/web/package.json`, `turbo.json`, `scripts/ctl` gate set | the `test:e2e:canvas` task on the gate |
+| `packages/workflow-canvas-browser/` (package.json, Vite harness, Playwright config, `tests/*.spec.ts`) | new |
+| `scripts/ctl/verbs/gate.sh`, `scripts/ctl/test/lib.test.sh`, `docs/lanes/gate-lock/README.md`, `.github/workflows/ci.yml` | 34 → 36 gate tasks; Chromium install in CI |
 | `test-cases/25-smoothness.md`, `Features.md` §22, `docs/manual.md` | catalogue and help |
 
 ## 7. Risks

@@ -42,7 +42,7 @@
 **Tests and tooling**
 - Node 22. vitest `--maxWorkers=2`. Never pipe a test run into `head`.
 - **Browser cases** live ONLY in `packages/workflow-canvas-browser` (new), never in `apps/web/e2e`. That suite boots `pnpm dev` on :3001, which is the dev stack's port.
-- **Gate:** the gate asserts `35 successful, 35 total` after Task 1. It was 34.
+- **Gate:** the gate runs `turbo run build test typecheck` (`scripts/ctl/test/lib.test.sh:141-143`). The new package declares `test` and `typecheck` and no `build`, so it adds TWO tasks: the gate asserts `36 successful, 36 total` after Task 1 (it was 34). Task 1 COUNTS the number from a local `pnpm turbo run build test typecheck --dry=json` before pinning it.
 - **CSS:** shared CSS goes in the pre-seeded `/* G-9: <task> */` blocks in `packages/ui/src/ui.css` (Task 1 seeds them). Never EOF appends.
 
 ## Review Focus
@@ -78,7 +78,7 @@
 | `packages/app-core/src/workflow-builder/ui/floating-panel.tsx` (new) | Tabbed panel / phone bottom sheet | 5 |
 | `packages/app-core/src/workflow-builder/ui/use-escape-ladder.ts` (new) | One owner of Escape | 5 |
 | `packages/ui/src/ui.css` | G-9 blocks | 1, 3, 4, 5 |
-| `scripts/ctl/verbs/gate.sh`, `scripts/ctl/test/lib.test.sh`, `docs/lanes/gate-lock/README.md`, `.github/workflows/ci.yml` | 34 → 35 tasks; Chromium in CI's test job | 1 |
+| `scripts/ctl/verbs/gate.sh`, `scripts/ctl/test/lib.test.sh`, `docs/lanes/gate-lock/README.md`, `.github/workflows/ci.yml` | 34 → 36 tasks; Chromium in CI's test job | 1 |
 | `test-cases/25-smoothness.md`, `Features.md` §22, `docs/manual.md` | Catalogue and help | each task its own lines; manual in 5 |
 
 **Parallelism:**
@@ -237,11 +237,16 @@
   import { expect, test } from '@playwright/test';
   import { dragBy, edgePath, node, nodeBox, openHarness, readDraftPositions } from './helpers';
 
-  test('25.500 a dragged state moves live under the pointer and its arrow follows, before release', async ({ page }) => {
+  test('25.500/25.501 a dragged state moves live under the pointer and its arrow follows, before release; control: a press-release without movement selects and does not move', async ({ page }) => {
     await openHarness(page);
     const name = await page.locator('.gn-state-node__name').first().innerText();
     const before = await nodeBox(page, name);
     const pathBefore = await edgePath(page, 0);
+    // control first (25.501): no movement → selected, not moved
+    await dragBy(page, name, 0, 0, { steps: 1 });
+    expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
+    await expect(node(page, name).locator('.gn-state-node')).toHaveClass(/gn-state-node--selected/);
+    // the case (25.500)
     await dragBy(page, name, 200, 0, { steps: 10, release: false });
     const during = await nodeBox(page, name);
     expect(during.x - before.x).toBeGreaterThan(196);
@@ -251,16 +256,6 @@
     const positions = await readDraftPositions(page);
     expect(Object.keys(positions).length).toBeGreaterThan(0);
   });
-
-  test('25.501 control: a press-release without movement selects and does not move', async ({ page }) => {
-    await openHarness(page);
-    const name = await page.locator('.gn-state-node__name').first().innerText();
-    const before = await nodeBox(page, name);
-    await dragBy(page, name, 0, 0, { steps: 1 });
-    const after = await nodeBox(page, name);
-    expect(Math.abs(after.x - before.x)).toBeLessThan(1);
-    await expect(node(page, name).locator('.gn-state-node')).toHaveClass(/gn-state-node--selected/);
-  });
   ```
   Edge 0 must touch the dragged state. Pick the first edge whose source or target is that node; read `toFlowGraph`'s edge ids (`t:<index>`).
 
@@ -268,8 +263,7 @@
 
   Run: `pnpm --filter @gisik-nokma/workflow-canvas-browser test > /tmp/g9-t1-red.log 2>&1; tail -30 /tmp/g9-t1-red.log`
   Expected:
-  - 25.500 FAILS at `during.x - before.x`: a delta of ~0, because the node does not move before release;
-  - 25.501 PASSES.
+  - 25.500/25.501 FAILS at `during.x - before.x` (a delta of ~0, because the node does not move before release) AFTER its control assertions passed; quote both lines of the log.
 
   Quote both in the step's commit message.
 
@@ -289,12 +283,13 @@
     });
   });
   describe('25.503 a draft change mid-drag keeps the dragged node where the pointer has it', () => {
-    it('keeps the in-flight position for the dragged id and still adds a state created meanwhile', () => {
-      const merged = mergeDraftNodes([n('a', 0), n('c', 50)], [n('a', 120), n('b', 10)], 'a');
+    it('keeps the in-flight position for the dragged id, still adds a state created meanwhile, and carries measured sizes; control: without an in-flight drag the draft position wins', () => {
+      const measuredA = { ...n('a', 120), measured: { width: 210, height: 118 } };
+      const merged = mergeDraftNodes([n('a', 0), n('c', 50)], [measuredA, n('b', 10)], 'a');
       expect(merged.map((m) => [m.id, m.position.x])).toEqual([['a', 120], ['c', 50]]);
-    });
-    it('control: without an in-flight drag the draft position wins', () => {
-      expect(mergeDraftNodes([n('a', 0)], [n('a', 120)], null)[0].position.x).toBe(0);
+      expect(merged[0].measured).toEqual({ width: 210, height: 118 });
+      expect(mergeDraftNodes([n('a', 0)], [measuredA], null)[0].position.x).toBe(0);      // control
+      expect(mergeDraftNodes([n('a', 0)], [measuredA], null)[0].measured).toEqual({ width: 210, height: 118 }); // measured survives either way
     });
   });
   ```
@@ -307,35 +302,64 @@
   import { useCallback, useEffect, useRef, useState } from 'react';
   import { applyNodeChanges, type Node, type NodeChange } from '@xyflow/react';
 
-  /** The draft is the source of truth; only the node under an in-flight drag keeps the pointer's position (spec §2.1). */
+  /**
+   * The draft is the source of truth; only the node under an in-flight drag keeps the pipeline's position (spec §2.1).
+   * `measured` (written by React Flow's dimension changes) is carried from the working copy, because T3's obstacles read it.
+   */
   export function mergeDraftNodes(draftNodes: Node[], working: Node[], draggingId: string | null): Node[] {
-    if (draggingId === null) return draftNodes;
-    const live = working.find((candidate) => candidate.id === draggingId);
-    return draftNodes.map((candidate) => (candidate.id === draggingId && live ? { ...candidate, position: live.position, dragging: true } : candidate));
+    const byId = new Map(working.map((candidate) => [candidate.id, candidate]));
+    return draftNodes.map((candidate) => {
+      const live = byId.get(candidate.id);
+      const measured = live?.measured ? { measured: live.measured } : {};
+      if (candidate.id === draggingId && live) return { ...candidate, ...measured, position: live.position, dragging: true };
+      return { ...candidate, ...measured };
+    });
   }
 
+  type Gesture = { id: string; start: { x: number; y: number }; cancelled: boolean };
+
+  /**
+   * Owns the dragged id's position from drag start until `onNodeDragStop` returns (spec §2.1).
+   * React Flow keeps emitting position changes for the id until pointer-up, and its last one (`dragging: false`)
+   * carries the RAW pointer position (`@xyflow/system` :2330-2331); after a cancel every change for the id is dropped.
+   */
   export function useWorkingNodes(draftNodes: Node[]) {
     const [nodes, setNodes] = useState<Node[]>(draftNodes);
-    const dragging = useRef<{ id: string; start: { x: number; y: number } } | null>(null);
+    const nodesRef = useRef(nodes); nodesRef.current = nodes;
+    const gesture = useRef<Gesture | null>(null);
     useEffect(() => {
-      setNodes((working) => mergeDraftNodes(draftNodes, working, dragging.current?.id ?? null));
+      setNodes((working) => mergeDraftNodes(draftNodes, working, gesture.current?.id ?? null));
     }, [draftNodes]);
-    const onNodesChange = useCallback((changes: NodeChange[]) => setNodes((working) => applyNodeChanges(changes, working)), []);
+    const onNodesChange = useCallback((changes: NodeChange[]) => {
+      const g = gesture.current;
+      const kept = g?.cancelled ? changes.filter((change) => !(change.type === 'position' && change.id === g.id)) : changes;
+      if (kept.length > 0) setNodes((working) => applyNodeChanges(kept, working));
+    }, []);
     const beginDrag = useCallback((id: string) => {
       const found = draftNodes.find((candidate) => candidate.id === id);
-      dragging.current = found ? { id, start: found.position } : null;
+      gesture.current = found ? { id, start: found.position, cancelled: false } : null;
     }, [draftNodes]);
-    const cancelDrag = useCallback((): Node | null => {
-      const current = dragging.current;
-      dragging.current = null;
-      if (current === null) return null;
-      setNodes((working) => working.map((candidate) => (candidate.id === current.id ? { ...candidate, position: current.start, dragging: false } : candidate)));
-      return draftNodes.find((candidate) => candidate.id === current.id) ?? null;
-    }, [draftNodes]);
-    const endDrag = useCallback(() => { dragging.current = null; }, []);
-    return { nodes, onNodesChange, beginDrag, cancelDrag, endDrag, draggingId: () => dragging.current?.id ?? null };
+    /** Escape: restore the start position and keep the gesture ACTIVE but cancelled, so later changes are dropped and the nudge guard cannot fire. */
+    const cancelDrag = useCallback((): void => {
+      const g = gesture.current;
+      if (g === null) return;
+      g.cancelled = true;
+      setNodes((working) => working.map((candidate) => (candidate.id === g.id ? { ...candidate, position: g.start, dragging: false } : candidate)));
+    }, []);
+    /** Called from `onNodeDragStop`. Returns the position to commit, or null after a cancel. */
+    const endDrag = useCallback((): { id: string; position: { x: number; y: number } } | null => {
+      const g = gesture.current;
+      gesture.current = null;
+      if (g === null || g.cancelled) return null;
+      const live = nodesRef.current.find((candidate) => candidate.id === g.id);
+      return live ? { id: g.id, position: live.position } : null;
+    }, []);
+    const draggingId = useCallback(() => gesture.current?.id ?? null, []);
+    return { nodes, setNodes, onNodesChange, beginDrag, cancelDrag, endDrag, draggingId };
   }
   ```
+  Add a unit case **25.518** (from T1's reserved tail) in `working-nodes.test.ts` that drives the hook through `renderHook`: begin → a `dragging: true` change → `cancelDrag()` → another `dragging: true` change and a `dragging: false` change → `endDrag()` returns `null` and `nodes` shows the start position; control, same `it`: the same sequence without `cancelDrag()` returns the last applied position.
+
   Run the unit test. Expected: PASS (25.502, 25.503).
 
   Commit.
@@ -349,12 +373,13 @@
   const cancelled = useRef(false);
   ```
   Then:
-  - `onNodeDragStart={(_e, n) => { cancelled.current = false; working.beginDrag(n.id); }}`;
+  - `onNodeDragStart={(_e, n) => working.beginDrag(n.id)}`;
   - `onNodesChange={working.onNodesChange}`;
-  - in `onNodeDragStop`: `if (cancelled.current) { cancelled.current = false; return; }`, then the existing `moveState`, then `working.endDrag()`.
-  - A `useEffect` adds a window `keydown` listener only while `working.draggingId() !== null`. Implement it as: register on drag start, remove on drag stop. On `Escape`: `cancelled.current = true; working.cancelDrag(); event.stopPropagation();`.
+  - `onNodeDragStop`: `const done = working.endDrag(); if (done === null) return; store.actions.moveState(keyOf(done.id), done.position);`. **Never read the handler's `node.position`**: it is React Flow's raw pointer position (`@xyflow/system` :2094/:2108), and T3 makes the working copy the clamped one. `keyOf` is the existing `node.id === ANY_STATE_NODE_ID ? node.id : node.id.slice('s:'.length)`.
+  - Drop the `cancelled` ref: the hook owns that state.
+  - A window `keydown` listener registered on drag start and removed in `onNodeDragStop`. On `Escape`: `working.cancelDrag(); event.stopPropagation();`.
 
-    React Flow's drag continues until pointer-up. On release, `onNodeDragStop` returns early, because `cancelled` is set. The working copy has already been restored, and the node stays at its start.
+    React Flow's drag continues until pointer-up (its only abort is internal, `@xyflow/system` :2293). After the cancel the hook drops every further position change for that id, including the final `dragging: false` one, so the node stays at its start whether or not the pointer keeps moving, and `endDrag()` returns null so nothing is committed.
   - Pass `nodes={working.nodes}`, `edges={graph.edges}`, `nodeDragThreshold={4}`.
 
   Wrap `StateNode` and `AnyStateNode` in `memo(...)`. Keep the names: export `const StateNode = memo(function StateNode(props) {...})`.
@@ -385,9 +410,10 @@
     expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
   });
   ```
-  Also add an Escape case to 25.500's file as **25.517** (borrowed from T2's reserved tail; suffixed ids are not policed by `check-case-ids`, so none are used):
-  - drag 150 px without releasing, press `Escape`, release;
-  - the node's box is back at `before` (±1 px), and `readDraftPositions` is unchanged.
+  Also add an Escape case to 25.500's file as **25.517** (borrowed from T2's reserved tail; suffixed ids are not policed by `check-case-ids`, so none are used), ONE `it`:
+  - drag 150 px without releasing, press `Escape`; the node's box is back at `before` (±1 px) while the button is still down;
+  - move the pointer a further 80 px (React Flow is still emitting moves); the box is STILL at `before` (±1 px);
+  - release; the box is at `before` (±1 px) and `readDraftPositions` equals what it was before the drag.
 
   Run: `pnpm --filter @gisik-nokma/workflow-canvas-browser test > /tmp/g9-t1.log 2>&1; tail -20 /tmp/g9-t1.log`
   Expected: all PASS.
@@ -396,8 +422,8 @@
 
 - [ ] **Step 10: Put the package on the gate and in CI**
 
-  1. `scripts/ctl/verbs/gate.sh`: `'34 successful, 34 total'` → `'35 successful, 35 total'`.
-  2. Grep `scripts/ctl/test/lib.test.sh` and `docs/lanes/gate-lock/README.md` for the gate count `34`, and update each to `35` (do not touch unrelated 34s; read each hit).
+  1. COUNT first: `pnpm turbo run build test typecheck --dry=json > /tmp/g9-dry.json 2>/dev/null; python3 -c "import json;print(len(json.load(open('/tmp/g9-dry.json'))['tasks']))"`. Expected **36** (34 + the package's `test` and `typecheck`; it has no `build`). Pin THAT number, whatever it prints, and quote it in DONE.
+  2. `scripts/ctl/verbs/gate.sh`: `'34 successful, 34 total'` → `'36 successful, 36 total'` (or the counted number). Grep `scripts/ctl/test/lib.test.sh` and `docs/lanes/gate-lock/README.md` for the gate count `34`, and update each (do not touch unrelated 34s; read each hit).
   3. `turbo.json`: if `test` has per-package `inputs`, add `"@gisik-nokma/workflow-canvas-browser#test"` with inputs `["tests/**", "harness/**", "*.config.ts", "$TURBO_ROOT$/packages/app-core/src/workflow-builder/**", "$TURBO_ROOT$/packages/ui/src/ui.css"]` and `dependsOn: ["^build"]`.
   4. `.github/workflows/ci.yml`: in the job whose step is `pnpm turbo run test --filter='!@gisik-nokma/server'` (`:543`), add before it:
      ```yaml
@@ -412,12 +438,13 @@
 
 - [ ] **Step 11: Catalogue + mutation pass + DONE**
 
-  Under `<!-- G-9 T1 -->` in `test-cases/25-smoothness.md`, write ✅ lines for 25.500, 25.517, 25.501, 25.502, 25.503 and 25.504, each with its test file and its named mutation:
+  Under `<!-- G-9 T1 -->` in `test-cases/25-smoothness.md`, write ✅ lines for 25.500/25.501 (one `it`), 25.517, 25.502, 25.503, 25.518 and 25.504, each with its test file and its named mutation:
 
   | Case | Mutation | Expected |
   |---|---|---|
   | 25.500 | remove `onNodesChange` | red |
-  | 25.517 | remove the Escape listener | red |
+  | 25.517 | remove the Escape listener; separately, `onNodeDragStop` reads `node.position` instead of `endDrag()` | red both ways |
+  | 25.518 | `cancelDrag` clears the gesture instead of marking it cancelled | red |
   | 25.502 | `mergeDraftNodes` returns `working` | red |
   | 25.503 | ignore `draggingId` | red |
   | 25.504 | remove `nodrag` from the Category wrapper | red |
@@ -639,7 +666,7 @@
     | 25.514 | guide filtering removed |
     | 25.515 | `alt` ignored |
 
-  - 25.517 is used by Task 1 (the Escape case). 25.518–25.519 are reserved and unused. Leave the numbers unused; do not renumber.
+  - 25.517 and 25.518 are used by Task 1 (the Escape cases). 25.519 is reserved and unused. Leave the numbers unused; do not renumber.
   - Run the mutations, the sweeps (app-core WHOLE) and the checks.
 
   Push. DONE + REVIEW.
@@ -666,12 +693,11 @@
   - `CanvasOverlays` props `{ guides: Guide[]; outline: { x: number; y: number; width: number; height: number } | null }`.
 
 - [ ] **Step 1: Failing browser tests** (`collision.spec.ts`)
-  - **25.520:** drag state A into state B. Before release, A's box is ≥ 8 px from B's box on the approach side, and an element `.gn-canvas-outline` is visible. After release, the outline is gone and the draft position equals the clamped spot.
-  - **25.521:** control. Dragging A to a free spot shows no outline.
+  - **25.520/25.521** (one `it`): drag state A into state B. Before release, A's box is ≥ 8 px from B's box on the approach side, and an element `.gn-canvas-outline` is visible. Record A's on-screen box, then release: the outline is gone and `readDraftPositions` for A equals that last on-screen (clamped) box converted to flow units, NOT the pointer's drop point. Control, same `it`: dragging A to a free spot shows no outline and lands under the pointer.
   - **25.522:** drag so A's centre-y passes within 4 screen px of B's. `.gn-canvas-guide[data-axis="y"]` is visible, and A's centre-y equals B's exactly.
   - **25.523:** at zoom 0.25 (click zoom-out until the React Flow viewport transform's scale ≤ 0.26), the same guide still appears within 6 screen px.
   - **25.524:** hold Alt (`page.keyboard.down('Alt')`) and drag 37 px. The final x delta is 37 ± 1 in flow units (not a multiple of 16).
-  - **25.525:** focus state A (Tab until `.react-flow__node:focus`), press ArrowRight. The draft x increases by exactly 16. Press Alt+ArrowRight: +1.
+  - **25.525:** focus state A (Tab until `.react-flow__node:focus`), press ArrowRight. The draft x increases by exactly 16. Press Alt+ArrowRight: +1. Same `it`: start a drag of A, press Escape, release; the draft x is unchanged (an Escape-cancelled drag must not commit a nudge: React Flow's drag-end change arrives with `dragging: false`).
   - **25.526:** place A one grid step left of B's gap. ArrowRight is blocked: the position is unchanged, and the live region `[aria-live="polite"]` reads `Blocked by <B's name>`.
 
   The overlay classes must not collide with existing ones. Grep `ui.css` for `gn-canvas-` first, and record that no hit was found.
@@ -686,12 +712,11 @@
   In `CanvasInner`:
   1. **Keep Alt state:** `const altDown = useRef(false)`, updated by window `keydown`/`keyup` for `Alt`.
   2. **On drag start, snapshot the obstacles:** `others = working.nodes.filter(n => n.id !== id).map(n => ({ x: n.position.x, y: n.position.y, width: n.measured?.width ?? 208, height: n.measured?.height ?? 120 }))`. Also store `lastValid = node.position`.
-  3. **Wrap `onNodesChange`:** for each `{ type: 'position', id, position, dragging: true }` change for the dragged id, compute `snapPosition(position, size, others, { zoom: getViewport().zoom, alt: altDown.current, lastValid })`.
-     - Replace `change.position` with `result.position`.
-     - Set `lastValid = result.position`.
-     - Set the `guides` state, and `outline = result.blocked ? { ...result.target, ...size } : null`.
-     - Then pass the changes to `working.onNodesChange`.
-  4. **On drag stop:** clear the guides and the outline, and commit `node.position` (already clamped) with `moveState`.
+  3. **Wrap `onNodesChange`:** for each `{ type: 'position', id, position }` change for the dragged id while `working.draggingId() === id`:
+     - if `change.dragging === true`: compute `snapPosition(position, size, others, { zoom: getViewport().zoom, alt: altDown.current, lastValid })`, replace `change.position` with `result.position`, set `lastValid = result.position`, set the `guides` state and `outline = result.blocked ? { ...result.target, ...size } : null`;
+     - if `change.dragging === false` (React Flow's drag-end change, which carries the RAW pointer position): replace `change.position` with `lastValid`. This is what makes the working copy's final position the clamped one.
+     - Then pass the changes to `working.onNodesChange` (after a cancel the hook drops them, which is correct).
+  4. **On drag stop:** clear the guides and the outline. The commit is Task 1's: `working.endDrag()` returns the working copy's position, now equal to `lastValid`, and `moveState` writes it. Never `node.position`.
 
   `useReactFlow().getViewport` gives the zoom. The `208×120` fallback is the existing `UNMEASURED_NODE` in `flow-graph.ts`. Export it from there and import it; do not duplicate the numbers.
 
@@ -733,7 +758,7 @@
 
   React Flow moves selected nodes on arrow keys through `updateNodePositions` with `dragging: false`. That arrives in our `onNodesChange` as a position change with `dragging: false` and no active drag.
 
-  In the wrapped `onNodesChange`, treat a position change with `dragging === false` when `working.draggingId() === null` as a nudge:
+  In the wrapped `onNodesChange`, treat a position change with `dragging === false` when `working.draggingId() === null` as a nudge. The guard holds because Task 1's hook keeps the gesture active (cancelled or not) until `onNodeDragStop` calls `endDrag()`, so React Flow's drag-end change never reaches this branch:
   1. compute `step = alt ? 1 : GRID` along the change's direction (its sign versus the current position);
   2. set `intended = current + step`, and `clamped = clampToAvoidOverlap(intended, size, othersFresh, current)`;
   3. **if `clamped` equals `current`:** drop the change, and announce `Blocked by ${nameOfFirstOverlapping}` in a polite live region rendered by `CanvasInner` (`<div className="gn-visually-hidden" aria-live="polite">`; grep the real visually-hidden class);
@@ -741,7 +766,7 @@
 
   Before coding, read React Flow's arrow-key handling in node_modules (`moveSelectedNodes`/`updatePositions` in `@xyflow/react` `index.mjs`) to confirm:
   - the change shape;
-  - that the final drag-stop change also arrives with `dragging: false`. That is why the guard is "no active drag", tracked via `beginDrag`/`endDrag`.
+  - that the final drag-stop change also arrives with `dragging: false` (`@xyflow/system` :2330-2331). That is why the guard is "no active drag", tracked via `beginDrag`/`endDrag`, and why step 2 consumes that change before this branch.
 
   If React Flow's keyboard step is not 1 unit per press, compute the direction only from the sign, as above.
 
@@ -752,8 +777,7 @@
 - [ ] **Step 5: Free placement for Add state (25.527–25.528, unit)**
 
   `add-state-placement.test.ts`:
-  - **25.527:** a draft whose positions fill (0,0)…(16·k) around `near = {x: 0, y: 0}`; `addState({ near: {x: 0, y: 0}, sizes })` puts the new state at a grid point that overlaps no existing rect (with the gap), nearest to `near`.
-  - **25.528:** control. `addState()` with no `near` keeps the old `nextFreePosition` result.
+  - **25.527/25.528** (one `it`): a draft whose positions fill (0,0)…(16·k) around `near = {x: 0, y: 0}`; `addState({ near: {x: 0, y: 0}, sizes })` puts the new state at a grid point that overlaps no existing rect (with the gap), nearest to `near`. Control, same `it`: `addState()` with no `near` keeps the old `nextFreePosition` result.
 
   Implementation in `draft-store.ts` `addState`:
   - when `input.near` is given, search grid points in rings of radius r = 0, 1, 2, …, up to 40 around `near` (snapped to `GRID`);
@@ -770,7 +794,7 @@
 
   | Case | Mutation |
   |---|---|
-  | 25.520 | `snapPosition` bypassed in `onNodesChange` |
+  | 25.520 | `snapPosition` bypassed in `onNodesChange`; separately, the drag-end change passed through with its raw position |
   | 25.522 | guides not rendered |
   | 25.523 | zoom fixed at 1 |
   | 25.524 | Alt ref never set |
