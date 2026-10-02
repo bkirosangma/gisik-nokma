@@ -1193,7 +1193,7 @@ Overdue row. The strip shows the first five; if there are more, **Show all** and
 rest, and **Show fewer** folds it back.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
-since 2026-07-10 — past the 7-day staleness threshold."* or *"due 30 Aug (in 4 days)"*
+since 10 Jul, past the 7-day staleness threshold."* or *"due 5 Oct (in 4 days)"*
 
 **If nothing needs attention, the strip does not appear at all.** No box, no "all caught up" message,
 nothing. That is deliberate — an empty box headed "Needs your attention" reads like an all-clear you did

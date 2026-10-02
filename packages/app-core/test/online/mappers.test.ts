@@ -1630,7 +1630,7 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
           enteredStateAt: '2026-08-19T10:00:00.000Z',
           daysInFlight: 14,
           thresholdDays: 7,
-          reason: 'In an active state since 2026-08-19 — past the 7-day staleness threshold.',
+          reason: 'In an active state since 19 Aug, past the 7-day staleness threshold.',
         },
         {
           kind: 'due-soon',
