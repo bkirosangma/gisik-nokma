@@ -34,7 +34,7 @@ describe('the mobile skeleton fill and frame (spec S-R1)', () => {
 
     const skeleton = source('components/skeleton.tsx');
     const board = source('screens/board-screen.tsx');
-    expect(skeleton).toMatch(/BOARD_ROW_FRAME_STYLE/);
+    expect(skeleton, 'the skeleton row IS the real row frame, not just an import of it').toMatch(/<View key=\{index\} style=\{BOARD_ROW_FRAME_STYLE\}>/);
     expect(board).toMatch(/style=\{BOARD_ROW_FRAME_STYLE\}/);
     expect(skeleton).toMatch(/from '\.\.\/screens\/board-row-frame\.js'/);
     expect(board).toMatch(/from '\.\/board-row-frame\.js'/);
