@@ -588,3 +588,8 @@ smoothness	11	todo	-	-	not started
 smoothness	12	todo	-	-	not started
 smoothness	13	todo	-	-	not started
 smoothness	14	todo	-	-	not started
+workflow-canvas	1	in-flight	-	-	G-9 T1 on task/g9-t1-live-drag (lane 7); not merged into release/smoothness yet
+workflow-canvas	2	in-flight	-	-	G-9 T2 on task/g9-t2-collision-snap (98e73a78, in review); not merged into release/smoothness yet
+workflow-canvas	3	todo	-	-	not started (waits for T1 + T2)
+workflow-canvas	4	todo	-	-	not started (waits for T1)
+workflow-canvas	5	todo	-	-	not started (waits for T3 + T4)
