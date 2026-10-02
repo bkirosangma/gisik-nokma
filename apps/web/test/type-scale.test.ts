@@ -76,6 +76,7 @@ const SECTION_RULES: ReadonlyArray<{ sheet: keyof typeof SHEETS; selector: strin
   { sheet: 'ui', selector: '.workflow-history__title' },
   { sheet: 'ui', selector: '.ticket-type-list__title' },
   { sheet: 'globals', selector: '.gn-workspace-settings__title' },
+  { sheet: 'globals', selector: '.gn-groups__heading' },
   { sheet: 'globals', selector: '.gn-mcp-tokens__subtitle' },
 ];
 

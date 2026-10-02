@@ -1524,6 +1524,117 @@ input, textarea, select { font-family: inherit; }
   .gn-settings__content { flex: 1 1 auto; }
 }
 
+/* ── Settings → Groups, the tree page (prefixes/groups Task 11, cases 22.200–22.215). One COLUMN per level: a node
+   is a row of its box and its children, every box a fixed width so a level shares one x, and the connectors join them. The
+   level strip is the level's colour (one token per LEVEL, never per group) and is named in the DOM, so colour is
+   not the only signal. Every control is 2.75rem (44px) square or tall; focus is the shared ring. At 40rem or less
+   the same markup is an indented list (the arm below). */
+.gn-groups { display: flex; flex-direction: column; gap: 0.75rem; }
+/* The tab's section head: the section token (23.072), as the Workspace tab's `.gn-workspace-settings__title` is. */
+.gn-groups__heading { margin: 0 0 0.25rem; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
+.gn-groups__lede { margin: 0 0 0.75rem; color: var(--gn-text-muted); }
+.gn-groups__toolbar { display: flex; gap: 0.5rem; }
+.gn-groups__tree,
+.gn-groups__children { list-style: none; margin: 0; padding: 0; }
+.gn-groups__tree { display: flex; flex-direction: column; gap: 0.5rem; overflow-x: auto; }
+.gn-groups__node { display: flex; align-items: flex-start; gap: 1rem; }
+/* The joining lines. The children column's left edge is the SPINE; a short horizontal line leaves the parent's box
+   to the spine (`::before` of the column) and another runs from the spine to each child's box (`::before` of the
+   child). 1.375rem is the middle of a 2.75rem box. */
+.gn-groups__children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-left: 2px solid var(--gn-border);
+}
+.gn-groups__children::before {
+  content: '';
+  position: absolute;
+  top: 1.375rem;
+  left: -1rem;
+  width: 1rem;
+  border-top: 2px solid var(--gn-border);
+}
+.gn-groups__children > .gn-groups__node { gap: 0; }
+/* `gap: 0` above puts the child's stub flush against its box, but it also removed the gap between that child's box
+   and ITS OWN children column, so at level 2 and below the column's `::before` ran over the box's last 1rem (next
+   to the ⊕) and the spine touched the box. The offset restores the 1rem a root node gets from the node's `gap`, which
+   is exactly the length of `.gn-groups__children::before`. */
+.gn-groups__children > .gn-groups__node > .gn-groups__children { margin-left: 1rem; }
+.gn-groups__children > .gn-groups__node::before {
+  content: '';
+  flex: 0 0 1rem;
+  margin-top: 1.375rem;
+  border-top: 2px solid var(--gn-border);
+}
+/* A FIXED width, so every box of one level shares one x whatever its name's length: a long name wraps (the name
+   is `overflow-wrap: anywhere`) instead of pushing its subtree's next column out of line. */
+.gn-groups__box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  width: 15rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  border-radius: var(--gn-radius-card);
+  overflow: hidden;
+}
+.gn-groups__box[draggable='true'] { cursor: grab; }
+.gn-groups__strip { align-self: stretch; flex: 0 0 auto; width: 0.375rem; border-radius: 0; }
+.gn-groups__strip[data-level="1"] { background: var(--gn-level-1); }
+.gn-groups__strip[data-level="2"] { background: var(--gn-level-2); }
+.gn-groups__strip[data-level="3"] { background: var(--gn-level-3); }
+.gn-groups__strip[data-level="4"] { background: var(--gn-level-4); }
+.gn-groups__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
+.gn-groups__name--button {
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-groups__name--button:hover { background: var(--gn-fill-quaternary); }
+.gn-groups__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-groups__add:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+.gn-groups__name--button:focus-visible,
+.gn-groups__add:focus-visible,
+.gn-groups__input:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-groups__field { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; flex: 1 1 auto; min-width: 0; }
+.gn-groups__input { flex: 1 1 8rem; min-width: 0; min-height: 2.75rem; }
+.gn-groups__draft { display: flex; }
+.gn-groups__empty { margin: 0; color: var(--gn-text-muted); }
+.gn-groups__confirm { display: flex; flex-direction: column; gap: 1rem; }
+.gn-groups__confirm-note { margin: 0; }
+.gn-groups__confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+@media (max-width: 40rem) {
+  .gn-groups__node { display: block; }
+  .gn-groups__children { margin-left: 1rem; border-left: 0; padding-left: 0; margin-top: 0.5rem; }
+  .gn-groups__children::before { display: none; }
+  .gn-groups__children > .gn-groups__node::before { display: none; }
+  .gn-groups__box { width: auto; }
+}
+
 /* ── The Create workspace dialog's form (prefixes/groups Task 8, case 22.151). ───
    Until Task 8 two founding forms sat open on their pages: `.gn-workspace-founding`
    under the `/workspaces` list (Round 19b, owner feedback item 3) and the home's
@@ -5473,8 +5584,9 @@ input, textarea, select { font-family: inherit; }
   max-width: var(--gn-measure);
 }
 
-/* The two settings section heads on a phone take the phone step of the scale (UX fixes Task 5, case 23.072). */
+/* The settings section heads on a phone take the phone step of the scale (UX fixes Task 5, case 23.072). */
 @media (max-width: 40rem) {
+  .gn-groups__heading,
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
 }

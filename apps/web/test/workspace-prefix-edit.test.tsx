@@ -73,7 +73,7 @@ describe('22.185 the workspace header Edit prefix', () => {
     for (const role of ['owner', 'admin']) {
       mount(role);
       expect(await screen.findByRole('button', { name: 'Edit prefix' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Rename Convenience Corner' })).toBeInTheDocument(); // control: it sits beside the rename
+      expect(screen.getAllByRole('button', { name: 'Rename Convenience Corner' })).toHaveLength(2); // control: it sits beside the rename (the name and the 23.177 pencil)
       cleanup();
     }
     for (const role of ['member', 'guest']) {
