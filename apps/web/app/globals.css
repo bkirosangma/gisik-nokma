@@ -971,7 +971,15 @@ input, textarea, select { font-family: inherit; }
    trailing edge, while a switch in a form field wants its control beside its
    own label. Both are correct for their screen, so the edge-alignment lives
    HERE, on the account row, rather than in the shared component. */
-.gn-account__notification-row { justify-content: space-between; }
+/* G-4 (25.360, 25.361): a switch row is ONE line of layout. The shared base rule above wraps, which a session row needs
+   (its button drops under its text) and a switch row must not: a label that wrapped to two lines let the switch
+   fall BELOW it at the left while one-line rows kept it at the right (measured at 390: the switch's right edge was
+   346 on one-line rows and 95 on a wrapped one). So the row never wraps, the label takes the column and wraps INSIDE
+   it (`min-width: 0` is the shared label's), and `.gn-switch` is already `flex: none` and `order: 2`, so it is always
+   the row's last item at its trailing edge. The shared `.gn-switch-row` and `.gn-switch__label` stay untouched: the
+   Settings → Workspace switch wants its control beside its own label. */
+.gn-account__notification-row { justify-content: space-between; flex-wrap: nowrap; }
+.gn-account__notification-row .gn-switch__label { flex: 1 1 auto; }
 
 /* ── Your workspaces — the row is a door. ──────────────────────────────────
    The prototype's row is a control that opens the workspace, with an accent

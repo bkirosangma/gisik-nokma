@@ -3696,6 +3696,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 *Every screen paints a same-shape placeholder instead of a sentence or a blank, renders from memory on a return visit, shows a write the moment it is made and rolls it back honestly on refusal, and carries only the code the route needs. Owner decisions D1–D13 and D2b accepted 2026-10-02 (~13:50). Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md`; plan `docs/superpowers/plans/2026-10-02-smoothness.md` (14 tasks, ledger plan `smoothness`); audit findings SM-01–SM-16. Mirrored by `test-cases/25-smoothness.md`, 3-digit padded. Ships on `release/smoothness`, after neo (§21) and MCP everything (§23).*
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
+- ✅ **Notification switches sit at the row's end whatever the label's length** (smoothness add-on G-4, owner 2026-10-02; cases 25.360–25.362) — on `/account`'s Notifications card a label that wrapped to two lines used to drop its switch below the text; the row no longer wraps, the label takes the column and wraps inside it, and every switch's right edge is the row's right edge. The shared `Switch` is unchanged, so Settings → Workspace's switch still sits beside its own label. `apps/web/app/globals.css` (`.gn-account__notification-row`).
 
 ## 23. Comment edit and delete, Markdown bodies
 
