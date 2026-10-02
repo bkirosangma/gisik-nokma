@@ -260,7 +260,8 @@ describe('21.173 ticket types carry the classes the full-width / reorder rules k
     );
     await screen.findByRole('textbox', { name: 'Type name' });
     const actions = container.querySelector('.gn-type-editor-header > .gn-type-editor-header__actions')!;
-    expect(actions.querySelector('.ticket-type-editor__save')).toHaveClass('gn-button--primary');
+    // An unchanged type's Save is the QUIET ghost (23.094, UX fixes T6); it is the primary once the form changes.
+    expect(actions.querySelector('.ticket-type-editor__save')).toHaveClass('gn-button--ghost');
     const row = container.querySelector('.fields-editor__row')!;
     expect(row.querySelector('.fields-editor__name')).not.toBeNull();
     expect(row.querySelector('.fields-editor__type')).not.toBeNull();

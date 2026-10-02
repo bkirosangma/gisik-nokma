@@ -1,5 +1,6 @@
 // packages/ui/src/components/segmented-control.tsx
 import { useRef, type KeyboardEvent } from 'react';
+import { useScrollEdges } from '../use-scroll-edges.js';
 
 export type SegmentedOption<T extends string> = { value: T; label: string };
 
@@ -29,6 +30,12 @@ export type SegmentedControlProps<T extends string> = {
    * here has no `.gn-segmented` in its own selector, so it cannot shadow one.
    */
   className?: string;
+  /**
+   * The track scrolls sideways when its options do not fit (the phone view tabs, the board's column picker):
+   * wear `.gn-scroll-fade` and keep its edge attributes current, so no option is hidden without a cue. Off by default —
+   * a track that wraps or fits never needs it.
+   */
+  fade?: boolean;
 };
 
 /**
@@ -74,7 +81,9 @@ export function SegmentedControl<T extends string>({
   onChange,
   'aria-label': ariaLabel,
   className,
+  fade = false,
 }: SegmentedControlProps<T>) {
+  const edgesRef = useScrollEdges<HTMLDivElement>('x');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = options.findIndex((option) => option.value === value);
   // A `value` matching no option is reachable (a caller whose options narrowed
@@ -120,7 +129,12 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={className === undefined ? 'gn-segmented' : `gn-segmented ${className}`}
+      ref={fade ? edgesRef : undefined}
+      className={[
+        'gn-segmented',
+        ...(className === undefined ? [] : [className]),
+        ...(fade ? ['gn-scroll-fade'] : []),
+      ].join(' ')}
     >
       {options.map((option, index) => {
         const on = option.value === value;

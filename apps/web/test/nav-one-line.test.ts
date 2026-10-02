@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Cases 13.1530–13.1534 — the signed-in bar is ONE line above the disclosure breakpoint and
- * collapses behind the disclosure below it (owner browser pass 2026-09-29:
+ * Cases 13.1530–13.1534 — the signed-in bar is ONE line above 64rem and hands the links to the
+ * bottom bar at or below it (case 23.042; it was a `Menu` disclosure below 70rem until 2026-10-02) (owner browser pass 2026-09-29:
  * "Settings" wrapped to a second row at 1280 with a real workspace name).
  *
  * MEASURED in a real browser on the dev stack before the fix, at the house 16px:
@@ -61,7 +61,7 @@ function decls(body: string, selector: string): string {
 const WIDE = block('(min-width: 64.0625rem)', '.gn-nav__label') as string;
 const NARROW = block('(max-width: 64rem)', '.gn-nav__more') as string;
 
-describe('13.1530–13.1534 the wide bar is one line; the narrow bar is a disclosure', () => {
+describe('13.1530–13.1534 the wide bar is one line; the narrow bar hands off to the bottom bar', () => {
   it('13.1530 above 64rem (was 70rem; amended 2026-10-02, case 23.042) the links row does not wrap', () => {
     expect(WIDE, 'no wide arm names .gn-nav__label').toBeDefined();
     expect(decls(WIDE, '.gn-nav__links')).toContain('flex-wrap: nowrap');

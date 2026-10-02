@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { PublishedWorkflowDef, StateCategory } from '@gisik-nokma/domain';
 import { Card } from '@gisik-nokma/ui';
+import { CATEGORY_LABEL } from '../category-label.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 
 /**
@@ -168,6 +169,7 @@ export function WorkflowHistoryScreen(props: {
                         aria-hidden="true"
                       />
                       {state.name}
+                      <span className="workflow-list__state-category">{CATEGORY_LABEL[state.category]}</span>
                     </span>
                   ))}
                 </div>

@@ -1427,6 +1427,8 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   this instrument's reach is a rule that targets the ELEMENT rather than naming the row (`tr`, `tbody`); no
   stylesheet in the product carries one today, and a rendered measurement is the e2e-viewport suite's job.
 
+  **AMENDED 2026-10-02 (23.095):** the zebra is gone. A members row now carries a `--gn-border` HAIRLINE (`border-bottom`) on `.gn-members__row` and the `:nth-child(even)` tint no longer exists — a tinted stripe inside a card read as a sunken band. Of the claims above, the even-child `--gn-fill-quaternary` rule and the no-odd-rule claim are RETIRED with the zebra (23.095 pins the hairline instead); the claim that EXACTLY ONE rule selector names the row still holds.
+
 - ✅ **13.888 — the four treatments that were already the prototype's, pinned as VALUES.**
   `apps/web/test/members-styling.test.ts:125`. It asserts declarations — `0.8125rem`, `1.125rem`, `600`,
   `var(--gn-surface-sunken)`, `0.6875rem 1.125rem`, `1.0625rem`, `51.25rem`, `var(--gn-radius-card)` —
