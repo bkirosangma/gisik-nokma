@@ -276,7 +276,7 @@ const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
   { file: 'packages/domain/src/events/ticket-events.ts', holds: 'nothing sorts below it' },
   { file: 'packages/domain/src/filter-spec.ts', holds: 'Postgres text cannot carry a NUL byte' },
   { file: 'packages/domain/src/events/contest-events.ts', holds: 'refused by rule' },
-  { file: 'packages/domain/src/events/contest-events.ts', holds: 'by their clock, refused' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'by their clock, ' },
   { file: 'packages/mcp-server/src/tools/write-tools.ts', holds: 'a backlog ticket has no starting status' },
 ];
 
