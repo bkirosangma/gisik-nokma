@@ -38,7 +38,7 @@ export function validateWorkflowDef(def: WorkflowDef): Issue[] {
   if (declaresReserved) {
     issues.push({
       code: 'reserved-state-id',
-      message: '`backlog` is reserved — every workflow has it without declaring it.',
+      message: '`backlog` is reserved: every workflow has it without declaring it.',
     });
   }
 

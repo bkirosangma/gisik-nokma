@@ -244,6 +244,101 @@ describe('23.360 the invitation and token-name bodies hold no " — "', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
+// 23.370 — the domain's refusal messages (HK-3, the follow-up to 23.360)
+// ---------------------------------------------------------------------------------------------
+
+const DOMAIN_SRC = 'packages/domain/src';
+const SPACED_EM_DASH = / — /;
+
+/**
+ * The refusal messages HK-3 rewrote: the zod issue messages and the `parse-event` refusals a client prints
+ * (the MCP server passes a refusal on verbatim). Each pins the sentence its file must still hold, so the
+ * sweep below is proven to be reading its subject.
+ */
+const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
+  { file: 'packages/domain/src/envelope.ts', holds: "must name this event's own workspace" },
+  { file: 'packages/domain/src/events/invites.ts', holds: 'an invite cannot confer ownership' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a backlog ticket has no starting status' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'the ledger accepts only what it can later replay' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'cannot be addressed at all' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'Filing it anywhere else starts a second stream' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'every invite event carries the inviteId' },
+  { file: 'packages/domain/src/parse-event.ts', holds: "an invite's entity id IS its inviteId" },
+  { file: 'packages/domain/src/validate-workflow.ts', holds: 'every workflow has it without declaring it' },
+];
+
+/**
+ * Strings under `packages/domain/src` that still hold " — ", outside the sites above. NOT cleared by HK-3:
+ * the brief named eight sites, and these are the rest of the same scan's catch. Each carries its reason, and
+ * each leaves this list when its sentence is rewritten. The first group are developer invariants (thrown
+ * `Error`s that name the function and are never drawn in the UI); the second are refusal and zod messages
+ * a client can print and are the follow-up this list exists to show.
+ */
+const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
+  { file: 'ticket-state.ts', contains: 'is a purged (redacted) row', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the engine must refuse ticket.created', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'vanished', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the engine must refuse ticket.workflow_rebound', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the version chain has a hole', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: '— state "', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'note-state.ts', contains: 'refused —', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ist-day.ts', contains: 'a day claim is not an instant', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'display-name.ts', contains: 'a name of only spaces names nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'envelope.ts', contains: 'two ULIDs joined by a colon', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'envelope.ts', contains: 'an event with no payload is not a claim', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/invites.ts', contains: 'an address of only spaces reaches nobody', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/membership.ts', contains: 'a description of only spaces describes nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/membership.ts', contains: 'a project-admin flag is a claim, not a default', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/ticket-events.ts', contains: 'a title of only spaces names nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/ticket-events.ts', contains: 'a field claim with no value', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/ticket-events.ts', contains: 'nothing sorts below it', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'filter-spec.ts', contains: 'Postgres text cannot carry a NUL byte', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
+  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'frozen by ruling P39 (contest-events.ts): this text is written into append-only comment bodies on convert-to-comment, so re-wording it splits one sentence into two spellings in the ledger' },
+  { file: 'events/contest-events.ts', contains: 'by their clock —', reason: 'the contest provenance line a person reads (HK-3b)' },
+];
+
+describe('23.370 the domain refusal messages hold no " — "', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds a planted message)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => SPACED_EM_DASH.test(hit.text));
+
+    // Control: the scan reads a zod message, a custom issue message and a template chunk, and never a comment.
+    const planted = [
+      "// lapsed — in a comment",
+      "const a = z.string().refine((v) => v !== '', 'must not be blank — a name of only spaces');",
+      "const b = { message: \"must name this workspace — a membership id is workspaceId:userId\" };",
+      'const c = { message: `unknown event type \'${type}\' — the ledger accepts only what it can replay` };',
+      "const d = 'must not be blank: a name of only spaces';",
+    ].join('\n');
+    expect(hitsOf('packages/domain/src/planted.ts', planted).map((hit) => hit.text)).toEqual([
+      'must not be blank — a name of only spaces',
+      'must name this workspace — a membership id is workspaceId:userId',
+      "' — the ledger accepts only what it can replay",
+    ]);
+
+    // Control: every site is read, and still holds the sentence this case is about.
+    for (const { file, holds } of DOMAIN_REFUSAL_SITES) {
+      const source = readFileSync(resolve(REPO_ROOT, file), 'utf8');
+      expect(
+        stringsIn(file, source).some((hit) => hit.text.includes(holds)),
+        `${file} holds "${holds}"`,
+      ).toBe(true);
+    }
+
+    const hits = uiStringsMatching(SPACED_EM_DASH, [DOMAIN_SRC]);
+    expect(withoutAllowed(hits, DOMAIN_DASH_ALLOWED).map(describeHit)).toEqual([]);
+  });
+
+  it('reasons are written, and no allow-list entry is stale', () => {
+    const hits = uiStringsMatching(SPACED_EM_DASH, [DOMAIN_SRC]);
+    for (const entry of DOMAIN_DASH_ALLOWED) {
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+      expect(hits.some((hit) => hit.file.endsWith(entry.file) && hit.text.includes(entry.contains)), `${entry.file}: ${entry.contains}`).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // 23.193 — one date format: "17 Aug", plus the year when it is not the current one
 // ---------------------------------------------------------------------------------------------
 
