@@ -25,6 +25,7 @@ const LIVE = '01J9GLIV000000000000000000';
 const DOOMED = '01J9GDOM000000000000000000';
 const PEER = '01J9GPER000000000000000000';
 const CONTEST = '01J9GCON000000000000000000';
+const COMMENT = '01J9GCMT000000000000000000';
 
 const on = (id: string, type: string, payload: unknown, origin: EventEnvelope['origin'] = 'web'): EventEnvelope =>
   makeEnvelope({ type, entity: { kind: 'ticket', id }, workspaceId: WS, payload, origin });
@@ -71,6 +72,10 @@ const GATED: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown]> 
   ['ticket.reopened', () => ({})],
   ['ticket.ranked', () => ({ rank: 'a1' })],
   ['comment.added', () => ({ body: plainTextToDoc('a comment') })],
+  // MCP-everything T2 (plan Review Focus 4, case 26.052): editing or deleting a comment is an ordinary write
+  // against the ticket, so a deleted ticket refuses it `deleted-ticket`, exactly as it refuses `comment.added`.
+  ['comment.edited', () => ({ commentId: COMMENT, body: plainTextToDoc('an edited comment') })],
+  ['comment.deleted', () => ({ commentId: COMMENT })],
   ['attachment.added', () => ({ attachmentId: '01J9GATT000000000000000000', filename: 'a.txt', mime: 'text/plain', size: 1, sha256: 'ab' })],
   ['visibility.set', (id) => ({ ticketId: id, mode: 'explicit', userIds: [PEER] })],
 ];
@@ -99,7 +104,7 @@ describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write agai
     // hand. Each `domainRegistry.register({ … })` block yields its `type` and
     // its `entityKind`; the two tables above must be exactly the ticket-scoped
     // ones. The two controls beside the equality say the parse found the
-    // registrations at all (MEASURED at this commit: 43 blocks, 18 of them
+    // registrations at all (MEASURED at the commit that added `comment.edited` and `comment.deleted`: 60 blocks, 23 of them
     // ticket-scoped) rather than matching an empty file against an empty table.
     //
     // ⚠ **A block counts as ticket-scoped when its `entityKind` expression
