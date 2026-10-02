@@ -850,6 +850,17 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 
 ### T6 — comments in Markdown
 
+- ✅ **14.380 — through the hosted `/mcp`, `add_comment` with the owner's 13:37 text stores a comment whose document holds two `heading` nodes and a `bulletList`, never a paragraph of raw Markdown; the old `text` argument does exactly the same; both or neither is refused, sending nothing;** control: a one-line plain comment is one paragraph. Mutation: keep `plainTextToDoc` → the heading assertion fails.
+- ✅ **14.381 — `add_comment` with `noteId` files `comment.added` against the NOTE (origin `mcp`); `ticketId` and `noteId` together, or neither, are refused naming the rule;** control: the ticket form. Mutation: always file against a ticket → the note case is refused by the gate.
+- ✅ **14.382 — a mention written `@[Name](user:<id>)` for a workspace member is stored as a `mention` node labelled with the roster's name, and that member gets a mention notification;** control: a plain `@Asha` is text and notifies nobody. Mutation: drop the `user` resolver → the mention is refused.
+- ✅ **14.383 — an unknown mention, ticket key or note is refused BEFORE anything is sent, naming each token (`unknown mention @[X](user:…)`, `unknown ticket [[ZZ-9]]`, `unknown note [[note:Nowhere]]`);** control: the resolvable body is sent. Mutation: send the body with the problems ignored → an event is written.
+- ✅ **14.384 — `[[KEY-12]]` resolves only to a search hit whose key is EXACTLY that key (a hit for `CCSO-40` does not answer `[[CCSO-4]]`), and a note ref matches a note id or ONE exact title — two notes with that title is a refusal saying to use the id;** control: the exact key resolves. Mutation: take the first search hit → the wrong ticket is referenced.
+- ✅ **14.385 — `list_comments` (ticket or note) answers each comment's `markdown`, `lossy`, `editedAt`, `deleted`, author and time; a deleted comment's `markdown` is `null`;** control: an untouched comment has `editedAt: null`, `deleted: false`. Mutation: return the stored JSON body → `markdown` is missing.
+- ✅ **14.386 — `edit_comment` emits ONE `comment.edited { commentId, body }` against the given ticket or note (origin `mcp`); editing someone else's comment returns the gate's sentence VERBATIM;** control: the author's edit commits. Mutation: reword the refusal → the verbatim assertion fails.
+- ✅ **14.387 — `delete_comment` emits ONE `comment.deleted { commentId }`; a member deleting another's comment gets the gate's sentence verbatim;** control: the author's delete commits. Mutation: send `comment.edited` with an empty body instead → red.
+- ✅ **14.388 — every description of the four comment tools carries `MARKDOWN_SYNTAX_HELP` (the mention, ref and image forms), so an assistant learns the syntax from the tool list;** control: `list_comments`' description says bodies come back as Markdown. Mutation: drop the help from `add_comment` → red.
+- ✅ **14.389 — the door matrix (hosted): for each of the four tools, a stranger gets the exact uniform not-found sentence (reads) or the product's refusal (writes), the member is refused editing/deleting the owner's comment in the gate's words, and the allowed caller's event is in the ledger with `origin: 'mcp'`; `list_comments` pages (cursor/limit);** control: the allowed calls. Mutation: `session.get` without `readOrNotFound` in `list_comments` → the stranger reads "gisik-nokma answered 404".
+
 ### T7 — notes
 
 ### T8 — attachments
