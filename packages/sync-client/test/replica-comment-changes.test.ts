@@ -4,9 +4,12 @@ import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
 import { LOCAL_SCHEMA_VERSION, LOCAL_TABLE_RULES, migrateLocal } from '../src/storage/schema.js';
 import {
   OTHER,
+  P,
+  P_OTHER,
   TIME,
   WS,
   apply,
+  bootstrap,
   commentOnNote,
   commentOnTicket,
   count,
@@ -149,5 +152,85 @@ describe('26.090–26.093 the replica sees comment edits and deletions', () => {
     expect(await count(storage, 'SELECT count(*) AS n FROM comment_changes')).toBe(1); // CONTROL
     await replica.revokeScope({ kind: 'scope-revoked', workspaceId: WS });
     expect(await count(storage, 'SELECT count(*) AS n FROM comment_changes')).toBe(0);
+  });
+
+  it('26.091 loadNoteEvents (a note’s whole history) carries the edit and the delete', async () => {
+    const { replica } = await freshReplica();
+    const N = newUlid();
+    const kept = commentOnNote(N, 'walrus kept');
+    const gone = commentOnNote(N, 'seal gone');
+    const sibling = commentOnNote(N, 'sibling stays');
+    await replica.loadNoteEvents([
+      noteCreated(N, ''),
+      kept,
+      gone,
+      sibling,
+      edit('note', N, kept.id, 'narwhal kept'),
+      remove('note', N, gone.id),
+    ]);
+    const rows = await replica.listNoteComments(N);
+    expect(rows.find((r) => r.commentId === kept.id)).toMatchObject({
+      body: plainTextToDoc('narwhal kept'),
+      editedAt: TIME,
+      deletedAt: null,
+    });
+    expect(rows.find((r) => r.commentId === gone.id)).toMatchObject({ body: null, deletedAt: TIME });
+    // CONTROL: the sibling, in the same load, is as written.
+    expect(rows.find((r) => r.commentId === sibling.id)).toMatchObject({
+      body: plainTextToDoc('sibling stays'),
+      editedAt: null,
+      deletedAt: null,
+    });
+  });
+
+  it('26.092 loadBootstrap (a device’s first sync) searches the edited word, not the original or the deleted one', async () => {
+    const { replica } = await freshReplica();
+    const T = newUlid();
+    const first = commentOnTicket(T, plainTextToDoc('walrusword'));
+    const gone = commentOnTicket(T, plainTextToDoc('sealword'));
+    const sibling = commentOnTicket(T, plainTextToDoc('penguinword'));
+    await replica.loadBootstrap({
+      ...bootstrap(),
+      tickets: [
+        {
+          ticketId: T,
+          snapshot: null,
+          events: [ticketCreated(T), first, gone, sibling, edit('ticket', T, first.id, 'narwhalword'), remove('ticket', T, gone.id)],
+        },
+      ],
+    });
+    const found = async (word: string) => (await replica.searchLocal(WS, word)).map((h) => h.ticketId);
+    expect(await found('penguinword')).toEqual([T]); // CONTROL: an unchanged comment in the same bootstrap is found
+    expect(await found('narwhalword')).toEqual([T]);
+    expect(await found('walrusword')).toEqual([]);
+    expect(await found('sealword')).toEqual([]);
+  });
+
+  it('26.093 a single-ticket erase and a project revoke erase the ticket’s rows; another ticket and project keep theirs', async () => {
+    const rowsOf = (storage: Awaited<ReturnType<typeof freshReplica>>['storage'], id: string) =>
+      count(storage, 'SELECT count(*) AS n FROM comment_changes WHERE entity_id = ?', [id]);
+    const world = async () => {
+      const w = await freshReplica();
+      const [A, B, C] = [newUlid(), newUlid(), newUlid()];
+      const comments = [A, B, C].map((id) => commentOnTicket(id, plainTextToDoc('word')));
+      await apply(w.replica, [ticketCreated(A, P), ticketCreated(B, P), ticketCreated(C, P_OTHER), ...comments]);
+      for (const [i, id] of [A, B, C].entries()) await w.replica.applyServerItem(edit('ticket', id, comments[i]!.id, 'edited'));
+      return { ...w, A, B, C };
+    };
+
+    // single-ticket erase
+    const one = await world();
+    expect(await rowsOf(one.storage, one.A)).toBe(1); // CONTROL: the row exists before
+    await one.replica.eraseEntities([{ kind: 'ticket', id: one.A }]);
+    expect(await rowsOf(one.storage, one.A)).toBe(0);
+    expect(await rowsOf(one.storage, one.B)).toBe(1); // CONTROL: another ticket's row survives
+
+    // project revoke
+    const proj = await world();
+    expect(await rowsOf(proj.storage, proj.A)).toBe(1); // CONTROL
+    await proj.replica.revokeScope({ kind: 'scope-revoked', workspaceId: WS, projectId: P });
+    expect(await rowsOf(proj.storage, proj.A)).toBe(0);
+    expect(await rowsOf(proj.storage, proj.B)).toBe(0);
+    expect(await rowsOf(proj.storage, proj.C)).toBe(1); // CONTROL: a ticket in another project keeps its row
   });
 });
