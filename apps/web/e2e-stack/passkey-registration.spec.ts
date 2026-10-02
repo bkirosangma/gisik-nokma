@@ -92,7 +92,7 @@ async function attachVirtualAuthenticator(client: CDPSession): Promise<string> {
       hasUserVerification: true,
       isUserVerified: true,
       automaticPresenceSimulation: true,
-  };
+  } as const;
   diag(`WebAuthn.addVirtualAuthenticator options ${JSON.stringify(options)}`);
   const result = (await client.send('WebAuthn.addVirtualAuthenticator', { options })) as AddVirtualAuthenticatorResult;
   diag(`WebAuthn.addVirtualAuthenticator -> authenticatorId ${result.authenticatorId}`);
@@ -183,8 +183,10 @@ test('register a passkey on /account, then sign in with it — no magic link in 
       page.getByRole('button', { name: `Delete passkey ${passkeyName}` }),
     ).toBeVisible();
 
-    // AppNav's control, addressed by its full accessible name (`Sign out
-    // {name}`). A bare `/sign out/i` would also match every Sessions row's own
+    // AppNav's control, addressed by its accessible name (`Sign out {name}`). The name part is NOT
+    // required: the e2e owner signs up by email and has `name: ''`, so the label is `Sign out ` and
+    // its accessible name is just `Sign out` (CI run 36976174333: `/^Sign out .+/` waited 20 s for
+    // it; a dev machine's owner had been given a name, so it passed there). 13.1731. A bare `/sign out/i` would also match every Sessions row's own
     // revoke button on this very page, which is a different control entirely.
     //
     // ROUND 24 put it inside the account menu, so the trigger is opened first.
@@ -192,7 +194,7 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     // which is why this selector is unchanged below and only gained a step
     // above it.
     await page.getByRole('button', { name: /^Account menu for / }).click();
-    await page.getByRole('menuitem', { name: /^Sign out .+/ }).click();
+    await page.getByRole('menuitem', { name: /^Sign out/ }).click();
     diag('step: signed out');
 
     await page.goto('/sign-in');
