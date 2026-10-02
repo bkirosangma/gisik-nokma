@@ -59,7 +59,7 @@ J=$(run "$d" --json)
 check "13.1803 counts: the singular \"1 shell\" parses (no monitors segment -> 0)" '[ "$(jv "$J" 5 "d[\"shells\"],d[\"monitors\"]")" = "1 0" ]'
 d=$(fixture); mkpane "$d/5.pane" "✢ Misting… (32s · ↓ 2.2k tokens · thought for 1s)" "" 12 haiku-4-5 ""; meta "$d" 5 exec5 0
 check "13.1803 busy: a spinner of the \"✢ Misting… (32s\" shape (seconds only) is busy" '[ "$(jv "$(run "$d" --json)" 5 "d[\"state\"],d[\"elapsed\"]")" = "busy 32s" ]'
-d=$(fixture); mkpane "$d/5.pane" "$(printf '⏺ ran a test that printed\n  ⎿  … (3s of output)\n⏺ all done.')" "" 12 sonnet-5-5 ""; meta "$d" 5 exec5 0
+d=$(fixture); mkpane "$d/5.pane" "$(printf '⏺ ran a test that printed\n  ⎿  Running… (3s of output)\n⏺ all done.')" "" 12 sonnet-5-5 ""; meta "$d" 5 exec5 0
 check "13.1803 CONTROL: ellipsis-and-parenthesis text inside tool output is not a spinner (no glyph-verb-… start)" '[ "$(jv "$(run "$d" --json)" 5 "d[\"state\"]")" = idle ]'
 
 # ============ 2. the input box ============
