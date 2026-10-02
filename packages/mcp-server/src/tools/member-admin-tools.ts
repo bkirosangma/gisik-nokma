@@ -44,6 +44,29 @@ async function invitesOf(session: Session, workspaceId: string): Promise<Array<{
   }
 }
 
+/**
+ * The rank that puts `group` exactly where `before` / `after` say, as the app's `placeAt` does
+ * (`apps/web/src/settings/groups-tree.tsx`): the siblings, sorted, WITHOUT the group itself; the neighbour not
+ * given is the sibling next to the one that was (a missing neighbour is NOT "the end"). At least one is required,
+ * and two must already be adjacent — otherwise there is no one place to put the group, and we do not guess.
+ */
+function reorderRank(groups: Group[], group: Group, before: string | undefined, after: string | undefined): string {
+  if (before === undefined && after === undefined) throw new Error('reorder needs before or after');
+  if (before === group.id || after === group.id) throw new Error('before and after must be other groups than the one being moved');
+  const siblings = groups.filter((x) => x.parentId === group.parentId && x.id !== group.id).sort((x, y) => (x.rank < y.rank ? -1 : 1));
+  const indexOf = (gid: string): number => {
+    const found = siblings.findIndex((x) => x.id === gid);
+    if (found === -1) throw new Error('before and after must be siblings of the group');
+    return found;
+  };
+  const iBefore = before === undefined ? undefined : indexOf(before);
+  const iAfter = after === undefined ? undefined : indexOf(after);
+  if (iBefore !== undefined && iAfter !== undefined && iAfter !== iBefore + 1) throw new Error('before and after are not next to each other, so there is no one place between them');
+  const lower = iBefore !== undefined ? iBefore : iAfter! - 1;
+  const upper = iBefore !== undefined ? iBefore + 1 : iAfter!;
+  return rankBetween(siblings[lower]?.rank ?? null, siblings[upper]?.rank ?? null);
+}
+
 const membersShape = {
   workspaceId: id,
   action: z.enum(['invite', 'revoke_invite', 'change_role', 'remove', 'add_to_project', 'remove_from_project']),
@@ -150,7 +173,7 @@ export function memberAdminTools(session: Session): ToolDefinition[] {
     {
       name: 'manage_groups',
       description:
-        'Project groups (up to 4 levels): list; create (name, parentId?); rename (groupId, name); reorder (groupId, before? = the sibling that will sit just before it, after? = the one just after); delete (groupId); ' +
+        'Project groups (up to 4 levels): list; create (name, parentId?); rename (groupId, name); reorder (groupId, and before = the sibling that will sit just before it and/or after = the one just after; at least one); delete (groupId); ' +
         "file_project (projectId, groupId or null to ungroup). Every change but list needs confirm_name — the group's exact name (the workspace's for create, the project's for file_project); without it you get a preview.",
       inputSchema: groupsShape,
       handler: async (args) => {
@@ -189,13 +212,7 @@ export function memberAdminTools(session: Session): ToolDefinition[] {
         }
         const group = g(a.groupId);
         if (a.action === 'rename' && a.name === undefined) throw new Error('rename needs name');
-        const neighbour = (gid: string | undefined): string | null => {
-          if (gid === undefined) return null;
-          const sibling = g(gid);
-          if (sibling.parentId !== group.parentId) throw new Error('before and after must be siblings of the group');
-          return sibling.rank;
-        };
-        const rank = a.action === 'reorder' ? rankBetween(neighbour(a.before), neighbour(a.after)) : null;
+        const rank = a.action === 'reorder' ? reorderRank(groups, group, a.before, a.after) : null;
         const sentences = { rename: `Renames "${group.name}" to "${a.name ?? ''}".`, reorder: `Moves "${group.name}" among its siblings.`, delete: `Deletes the group "${group.name}".` } as const;
         const preview = await confirmOrPreview(group.name, a.confirm_name, async () => ({
           sentence: sentences[a.action as 'rename' | 'reorder' | 'delete'],

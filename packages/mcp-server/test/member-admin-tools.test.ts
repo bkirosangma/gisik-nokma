@@ -114,6 +114,7 @@ describe('14.500 / 14.502 the confirmation', () => {
       ['manage_members', { workspaceId: WS, action: 'change_role', userId: RAVI, role: 'admin', confirm_name: 'ravi sangma' }],
       ['manage_members', { workspaceId: WS, action: 'invite', address: 'new@example.in', channel: 'email', inviteRole: 'member', confirm_name: 'new@example.in ' }],
       ['change_prefix', { workspaceId: WS, prefix: 'CC', confirm_name: 'Corner Shop ' }],
+      ['change_prefix', { workspaceId: WS, prefix: 'CC', confirm_name: 'Corner  Shop' }],
       ['manage_groups', { workspaceId: WS, action: 'create', name: 'Garage', confirm_name: 'Corner Shop ' }],
       ['manage_groups', { workspaceId: WS, action: 'rename', groupId: G3, name: 'Shopfront', confirm_name: 'Front ' }],
     ];
@@ -231,6 +232,38 @@ describe('14.504 manage_groups', () => {
     expect(isRankKey((child!['payload'] as { rank: string }).rank)).toBe(true);
     expect((top!['entity'] as { id: string }).id).not.toBe((child!['entity'] as { id: string }).id);
     [top, child].forEach(accepted);
+  });
+
+  it('14.507 reorder puts the group exactly where before / after say — a missing neighbour is the next sibling, not the end', async () => {
+    // Top-level siblings: G 'm' Corner Shop, G4 'p' Stockroom, G3 't' Front. Move G.
+    const move = async (args: Record<string, unknown>) => {
+      const f = fake();
+      const r = await tool('manage_groups', f.session).handler({ workspaceId: WS, action: 'reorder', groupId: G, confirm_name: 'Corner Shop', ...args });
+      return { f, r };
+    };
+    const rankOf = (f: Fake) => (f.batches.flat()[0]!['payload'] as { rank: string }).rank;
+    // CONTROL: both neighbours given → between them.
+    const both = await move({ before: G4, after: G3 });
+    expect(rankOf(both.f) > 'p' && rankOf(both.f) < 't', `both: ${rankOf(both.f)}`).toBe(true);
+    // before only: the other neighbour is the sibling right after Stockroom (Front), not the end.
+    const onlyBefore = await move({ before: G4 });
+    expect(rankOf(onlyBefore.f) > 'p' && rankOf(onlyBefore.f) < 't', `before only: ${rankOf(onlyBefore.f)}`).toBe(true);
+    // after only: the sibling right before Front is Stockroom, not the start.
+    const onlyAfter = await move({ after: G3 });
+    expect(rankOf(onlyAfter.f) > 'p' && rankOf(onlyAfter.f) < 't', `after only: ${rankOf(onlyAfter.f)}`).toBe(true);
+    // before the first / after the last still reach the ends (the group itself is not a neighbour).
+    expect(rankOf((await move({ after: G4 })).f) < 'p').toBe(true);
+    expect(rankOf((await move({ before: G3 })).f) > 't').toBe(true);
+
+    const refused = async (args: Record<string, unknown>, message: string) => {
+      const f = fake();
+      await expect(tool('manage_groups', f.session).handler({ workspaceId: WS, action: 'reorder', groupId: G, confirm_name: 'Corner Shop', ...args })).rejects.toThrow(message);
+      expect(f.batches, message).toEqual([]);
+    };
+    await refused({}, 'reorder needs before or after');
+    await refused({ before: G }, 'other groups than the one being moved');
+    await refused({ after: G }, 'other groups than the one being moved');
+    await refused({ before: G3, after: G4 }, 'not next to each other');
   });
 
   it('14.504 reorder neighbours must be siblings of the group', async () => {
