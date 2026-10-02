@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -129,16 +130,17 @@ describe('the optimistic Close (spec S5)', () => {
 
   async function mount(ingest: () => Promise<IngestResult[]> | IngestResult[]) {
     const onMoved = vi.fn();
-    const source = createFakeDataSource({}, ingest as never);
+    const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND }, ingest as never);
     const moves: BoardMoveCapability = { dataSource: source, workspaceId: WS, currentUserId: CURRENT_USER, onMoved };
     const utils = render(<Board board={TERMINAL} onOpenTicket={() => {}} moves={moves} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeInTheDocument());
     return { source, onMoved, ...utils };
   }
 
   it('25.097 Close takes the card off the board at once and keeps it off while the write is open; a commit reloads; the refusal puts it back with the reason', async () => {
     const open = deferred<IngestResult[]>();
     const { onMoved, rerender } = await mount(() => open.promise);
-    const closeButton = within_(screen.getByTestId('ticket-card-tk_x'));
+    const closeButton = screen.getByRole('button', { name: 'Close Ticket tk_x' });
     expect(screen.getByTestId('ticket-card-tk_x')).toBeInTheDocument();
     await userEvent.click(closeButton);
     // Gone this frame; the neighbour stays; the write is still open.
@@ -155,7 +157,7 @@ describe('the optimistic Close (spec S5)', () => {
 
   it('25.097 a committed Close keeps the card off, reloads the board, and the entry retires when a read no longer holds the card', async () => {
     const { onMoved, rerender } = await mount(() => [{ status: 'committed', eventId: 'e', seq: 4, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult]);
-    await userEvent.click(within_(screen.getByTestId('ticket-card-tk_x')));
+    await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
     await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull();
     // A STALE read (still holding the card) does not bring it back.
@@ -184,12 +186,6 @@ describe('the closes arms of the move state (spec S5)', () => {
   });
 });
 
-function within_(slot: HTMLElement): HTMLElement {
-  const button = [...slot.querySelectorAll('button')].find((b) => /^Close\b/.test(b.textContent ?? '') || /Close/.test(b.getAttribute('aria-label') ?? ''));
-  if (button === undefined) throw new Error('no Close button on the card');
-  return button as HTMLElement;
-}
-
 function readUiCss(): string {
-  return readFileSync(new URL('../../../ui/src/ui.css', import.meta.url), 'utf8');
+  return readFileSync(resolve(process.cwd(), '../ui/src/ui.css'), 'utf8');
 }

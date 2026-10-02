@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { FieldClaim } from '@gisik-nokma/domain';
-import type { Priority, StateCategory, TicketRead } from '../view-types.js';
+import type { FieldClaim, StateCategory } from '@gisik-nokma/domain';
+import type { Priority, TicketRead } from '../view-types.js';
 import type { LiveQueryResult } from './use-live-query.js';
 
 /**

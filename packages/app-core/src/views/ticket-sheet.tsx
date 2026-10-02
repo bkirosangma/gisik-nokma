@@ -50,6 +50,7 @@ import { TicketNotesSection } from './ticket-notes-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
+import { useOptimisticTicket, type OverlayField, type TicketOverlay } from './optimistic-ticket.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 import { usePhoneBoard } from './use-phone-board.js';
 import { usePurgedPredicate } from './use-purged-predicate.js';
@@ -683,6 +684,12 @@ function TitleField({
   );
 }
 
+/**
+ * What a claim line says while its field's write is open or its read has not landed (smoothness T7): the overlay
+ * carries no actor and no time, so no "set by … on …" is printed for a value nobody has stamped yet.
+ */
+const SAVING_CLAIM = 'Saving…';
+
 export function TicketSheet({
   dataSource,
   cache,
@@ -948,6 +955,9 @@ export function TicketSheet({
   const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
     dataSource.query.getTicket(workspaceId, ticketId),
   );
+  // Every edit is shown at once and rolled back honestly (smoothness T7, spec S5; `optimistic-ticket.ts`).
+  // `read` stays the DATA (the workflow, the subtasks and the reloads below ask it); what is DRAWN is `optimistic.ticket`.
+  const optimistic = useOptimisticTicket(read);
   const ticketState = read.data?.ticket ?? null;
   const workflowKey =
     ticketState === null ? '' : `${ticketState.workflowId}@${ticketState.workflowVersion}`;
@@ -1166,7 +1176,7 @@ export function TicketSheet({
     );
   }
 
-  const ticketRead: TicketRead = read.data;
+  const ticketRead: TicketRead = optimistic.ticket ?? read.data;
   /**
    * What the "Who can see this" section draws, from the ONE read this sheet
    * already made — with the caller's `visibility` prop winning when one is
@@ -1268,6 +1278,25 @@ export function TicketSheet({
    * Field claims go FIRST and the transition last, in one ordered batch, so a
    * `require-field` rule sees the value the dialog just collected.
    */
+  /**
+   * The overlay a move lays over the sheet: the target state (with its category, so the chip's tone and the Close
+   * button follow) and every collected field value whose id is an overlay field, in the overlay's own shape — the
+   * level for a priority, the day for a date. A value that is not in that shape is left to the reload.
+   */
+  const overlayOf = (submission: TransitionSubmission): TicketOverlay => {
+    const overlay: TicketOverlay = { stateId: submission.toStateId };
+    const category = workflow.data === null ? undefined : statesWithBacklog(workflow.data).find((candidate) => candidate.id === submission.toStateId)?.category;
+    if (category !== undefined) overlay.stateCategory = category;
+    for (const [fieldId, value] of Object.entries(submission.fieldValues)) {
+      if (fieldId === 'priority' && prioritySchema.safeParse(value).success) overlay.priority = value as Priority;
+      if (fieldId === 'startDate' || fieldId === 'dueDate') {
+        if (value === null) overlay[fieldId] = null;
+        else if (typeof value === 'object' && typeof (value as { date?: unknown }).date === 'string') overlay[fieldId] = (value as { date: string }).date;
+      }
+    }
+    return overlay;
+  };
+
   const submitTransition = async (submission: TransitionSubmission): Promise<void> => {
     // E5-27 — the latch, the same one and the same shape `submitTicketEvent`
     // above uses. The early return is the belt; the `disabled` the dialog
@@ -1303,9 +1332,25 @@ export function TicketSheet({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
+    // The move is shown NOW (smoothness T7, spec S5) — the State row, and every collected value that names an
+    // overlay field. A custom field has no overlay: the reload below is what shows it.
+    const shownFields = overlayOf(submission);
+    const shown = Object.keys(shownFields) as OverlayField[];
+    optimistic.begin(shownFields);
     try {
       const results = await dataSource.ingest([...fieldEvents, transition]);
       const failed = results.find((result) => result.status !== 'committed');
+      // INDEPENDENT per field: a field claim that committed stays shown (and waits for its read) even when the
+      // transition after it is refused — the E2-36 batch already holds it on the server — while the state goes back.
+      const stateFields = shown.filter((field) => field === 'stateId' || field === 'stateCategory');
+      const claimFields = shown.filter((field) => field !== 'stateId' && field !== 'stateCategory');
+      const entries = Object.keys(submission.fieldValues);
+      const claimCommitted = (field: OverlayField): boolean =>
+        results[entries.indexOf(field)]?.status === 'committed';
+      optimistic.settle(...claimFields.filter(claimCommitted));
+      optimistic.drop(...claimFields.filter((field) => !claimCommitted(field)));
+      if (failed === undefined) optimistic.settle(...stateFields);
+      else optimistic.drop(...stateFields);
       /*
         BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
         The batch above is ordered `[...fieldEvents, transition]` so a
@@ -1366,6 +1411,7 @@ export function TicketSheet({
       // carries the sentence: it is the surface in view, and the retry lives
       // there.
       const message = cause instanceof Error ? cause.message : String(cause);
+      optimistic.drop(...shown);
       setServerRefusal(null);
       setTransportError(`We could not reach the server for this move: ${message}`);
     } finally {
@@ -1405,17 +1451,27 @@ export function TicketSheet({
     // The outsider door (access plan W6) for someone found by email who is not
     // in the workspace; the ordinary door for everyone else. Same answer shape,
     // same refusal rendering below (case 3.990).
-    const results =
-      viaOutsider && assignOutsider !== undefined && assigneeId !== null
-        ? await outsiderIngest(assignOutsider, assigneeId)([event])
-        : await dataSource.ingest([event]);
+    // The assignee is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+    optimistic.begin({ assigneeId });
+    let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+    try {
+      results =
+        viaOutsider && assignOutsider !== undefined && assigneeId !== null
+          ? await outsiderIngest(assignOutsider, assigneeId)([event])
+          : await dataSource.ingest([event]);
+    } catch (cause) {
+      optimistic.drop('assigneeId');
+      throw cause;
+    }
     const failed = results.find((result) => result.status !== 'committed');
     if (failed === undefined) {
+      optimistic.settle('assigneeId');
       setServerRefusal(null);
       read.reload();
       history.reload();
       return;
     }
+    optimistic.drop('assigneeId');
     if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
     else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
@@ -1962,14 +2018,24 @@ export function TicketSheet({
         type: 'ticket.field_set',
         payload: { fieldId: 'title', value: next },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ title: next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('title');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('title');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('title');
         setServerRefusal(null);
         setTransportError(null);
         setTitleDraft(null);
@@ -1981,6 +2047,7 @@ export function TicketSheet({
       // hand the reader back the old title next to a sentence refusing the new
       // one, with their words gone — the same rule `TicketEditorSlot` states for
       // a refused description.
+      optimistic.drop('title');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2047,14 +2114,24 @@ export function TicketSheet({
         // own `v || null`, and the shape this event's door docblock names.
         payload: { fieldId: 'dueDate', value: next === '' ? null : { date: next } },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ dueDate: next === '' ? null : next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('dueDate');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('dueDate');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('dueDate');
         setServerRefusal(null);
         setTransportError(null);
         setDueDraft(null);
@@ -2062,6 +2139,7 @@ export function TicketSheet({
         history.reload();
         return;
       }
+      optimistic.drop('dueDate');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2099,20 +2177,31 @@ export function TicketSheet({
         type: 'ticket.field_set',
         payload: { fieldId: 'priority', value: next },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ priority: next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('priority');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('priority');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('priority');
         setServerRefusal(null);
         setTransportError(null);
         read.reload();
         history.reload();
         return;
       }
+      optimistic.drop('priority');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2151,14 +2240,24 @@ export function TicketSheet({
         // `v || null` shape `submitDueDate` gives for the same reason.
         payload: { fieldId: 'startDate', value: next === '' ? null : { date: next } },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ startDate: next === '' ? null : next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('startDate');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('startDate');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('startDate');
         setServerRefusal(null);
         setTransportError(null);
         setStartDraft(null);
@@ -2166,6 +2265,7 @@ export function TicketSheet({
         history.reload();
         return;
       }
+      optimistic.drop('startDate');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2922,8 +3022,9 @@ export function TicketSheet({
   const UNASSIGNED = '__unassigned__';
   const OUTSIDER_OPTION = '__outsider__';
   const assigneeRow = ((): { control: ReactNode; claim: string } => {
-    const claim =
-      ticketRead.assignedProvenance === null
+    const claim = optimistic.overlaidFields.has('assigneeId')
+      ? SAVING_CLAIM
+      : ticketRead.assignedProvenance === null
         ? // `null` is the whole truth for BOTH "never assigned" and "assigned,
           // then cleared" — the server's own reader says why they cannot be told
           // apart (there is no claim without an actor), so this sentence claims
@@ -3605,7 +3706,7 @@ export function TicketSheet({
                 <div className="gn-ticket-sheet__state">
                   <Chip tone={state.stateCategory}>{currentStateName}</Chip>
                   <span className="gn-ticket-sheet__provenance">
-                    {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
+                    {optimistic.overlaidFields.has('stateId') ? SAVING_CLAIM : formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
                   </span>
                   {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
                       moved UP into the chips line (`sheet-chips`, above the tabs) on
@@ -3714,7 +3815,7 @@ export function TicketSheet({
                     rebuilt since priority became built-in.
                   </span>
                 ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('priority') ? SAVING_CLAIM : `set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3782,7 +3883,7 @@ export function TicketSheet({
                      comment exists to prevent. The ABSENT copy stays the
                      prototype's ("No date claimed") — that sentence is about
                      the DATE, and the claim line is about the ACTOR. */
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('dueDate') ? SAVING_CLAIM : `set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3828,7 +3929,7 @@ export function TicketSheet({
                 {startDate === null ? (
                   <span className="gn-ticket-sheet__absent">No date claimed</span>
                 ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('startDate') ? SAVING_CLAIM : `set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>

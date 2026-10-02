@@ -615,7 +615,7 @@ export function NewTicketDialog({
       );
       setStartDate(restoreDraft.startDate ?? '');
       setDueDate(restoreDraft.dueDate ?? '');
-      setDraftTicketId(restoreDraft.ticketId);
+      setDraftTicketId(restoreDraft.ticketId as ReturnType<typeof newUlid>);
       setDescription(restoreDraft.description);
       setAssigneeId(restoreDraft.assigneeId === null || restoreDraft.assigneeIsOutsider === true ? UNASSIGNED : restoreDraft.assigneeId);
       setPriority(restoreDraft.priority);

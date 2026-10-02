@@ -21,13 +21,13 @@ function readOf(overrides: Partial<TicketRead> = {}, fields: Record<string, Retu
 describe('applyOverlay (spec S5; audit SM-03)', () => {
   it('25.091 an overlay replaces exactly its fields on the REAL shapes and nothing else; an empty overlay returns the same object', () => {
     const read = readOf({}, { priority: claim('P2'), dueDate: claim({ date: '2026-10-05' }) });
-    const next = applyOverlay(read, { stateId: 'doing', stateCategory: 'active', title: 'New', priority: 'P0', dueDate: '2026-11-01', assigneeId: null });
+    const next = applyOverlay(read, { stateId: 'doing', stateCategory: 'active', title: 'New', priority: 'P3', dueDate: '2026-11-01', assigneeId: null });
     // title is TOP-LEVEL on the read; the state and assignee live on `ticket`; priority and the dates are CLAIMS in `ticket.fields`.
     expect(next.title).toBe('New');
     expect(next.ticket.stateId).toBe('doing');
     expect(next.ticket.stateCategory).toBe('active');
     expect(next.ticket.assigneeId).toBeNull();
-    expect(next.ticket.fields['priority']?.value).toBe('P0');
+    expect(next.ticket.fields['priority']?.value).toBe('P3');
     expect(next.ticket.fields['dueDate']?.value).toEqual({ date: '2026-11-01' });
     // Nothing else moved: the old claim's provenance is carried (no actor or time is invented), the untouched fields are the same objects.
     expect(next.ticket.fields['priority']?.actorId).toBe('user_old');
@@ -47,12 +47,12 @@ describe('applyOverlay (spec S5; audit SM-03)', () => {
   });
 
   it('25.095 an overlay AGREES with a read per field — a date compares by its day, never by object identity', () => {
-    const read = readOf({}, { dueDate: claim({ date: '2026-11-01' }), priority: claim('P0') });
+    const read = readOf({}, { dueDate: claim({ date: '2026-11-01' }), priority: claim('P3') });
     expect(overlayAgrees(read, 'dueDate', '2026-11-01')).toBe(true); // `{date}` objects are never `===`
     expect(overlayAgrees(read, 'dueDate', '2026-11-02')).toBe(false);
     expect(overlayAgrees(read, 'startDate', null)).toBe(true); // an absent claim agrees with a clear
     expect(overlayAgrees(readOf({}, { dueDate: claim(null) }), 'dueDate', null)).toBe(true);
-    expect(overlayAgrees(read, 'priority', 'P0')).toBe(true);
+    expect(overlayAgrees(read, 'priority', 'P3')).toBe(true);
     expect(overlayAgrees(read, 'priority', 'P1')).toBe(false);
     expect(overlayAgrees(read, 'title', 'Old')).toBe(true);
     expect(overlayAgrees(read, 'title', 'New')).toBe(false);
@@ -111,9 +111,9 @@ describe('useOptimisticTicket (spec S5)', () => {
   it('25.096 drop removes ONE field at once and leaves every other field\'s overlay (and its pending flag) alone', () => {
     const { result: hook } = renderHook(() => useOptimisticTicket(result(readOf())));
     act(() => hook.current.begin({ title: 'New' }));
-    act(() => hook.current.begin({ priority: 'P0' }));
+    act(() => hook.current.begin({ priority: 'P3' }));
     act(() => hook.current.drop('priority'));
-    expect(hook.current.ticket?.ticket.fields['priority']?.value).not.toBe('P0');
+    expect(hook.current.ticket?.ticket.fields['priority']?.value).not.toBe('P3');
     expect(hook.current.ticket?.title).toBe('New');
     expect([...hook.current.pendingFields]).toEqual(['title']);
     // Control: dropping the other one too returns the read itself.
