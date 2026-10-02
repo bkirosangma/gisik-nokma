@@ -89,7 +89,7 @@ Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡`
 ## Admin gating & honesty
 - 10.47 ✅ Non-admins: banner, disabled fields, no publish/save/add anywhere — `access.test.tsx`, `ticket-types.test.tsx`, `screens.test.tsx`
 - 10.48 ✅ permission.role refusal rendered character for character (planted defect) — `access.test.tsx`, `ticket-types.test.tsx`
-- 10.49 ✅ System-rules panel names provenance and the parent-terminal refusal, citing spec §4 — `validation.test.tsx`
+- 10.49 ✅ System-rules panel names provenance and the parent-terminal refusal, in plain words with no spec citation — `validation.test.tsx`
 
 ## Workflow list screen
 - 10.62 ✅ Published workflows list with name, `v<version>` and a state count, and Open hands the route the id — `screens.test.tsx` ("lists published workflows with version and state count, and opens one")
@@ -149,7 +149,7 @@ refusal it names in its own comment (a guest may not call `GET /v1/workspaces/:i
 unable to tell that 404 from a 500, a dropped connection or a roster body it could not parse. All of them became the EMPTY
 roster, which flows into `BuilderEnvironment.members` and out to the rule editors and rule summaries — so an admin authored
 `restrict-to` and `require-different-user` rules against a workspace that appeared to hold nobody, with no sentence anywhere
-saying the read had failed. The screen already HAD the arm for it: *"Could not load workspace people and types — reload to try
+saying the read had failed. The screen already HAD the arm for it: *"Could not load workspace people and types. Reload to try
 again."*, unreachable for the members half.
 
 - **10.110** ✅ A roster read that fails for a reason other than the refusal is a LOAD FAILURE, not an empty roster: the
@@ -192,7 +192,7 @@ of the same degradation is 10.111 above.
 
 **`10.120`, by the controller's rule (22:0x, 2026-09-21) for a section with no block table — the next free id past the max declared over `origin/main` AND every `origin/rel/*` head — with one deliberate gap, stated:** recounted at this lane's sha, `origin/main` tops out at `10.92`, B02's head at `10.93`, B09's at `10.111`, and B06's at `10.113` (line-head declarations only, the rule `scripts/check-case-ids.mjs` applies; union==sum green). `10.114`–`10.119` are therefore free by the letter of the rule, but they sit inside the block B09 declares as its own in the note above this section, and B06 has already minted `10.112`–`10.113` inside that same block — so an id there is a collision waiting for B09's next mint. `10.120` is the first id no head declares AND no head claims. If the controller prefers the letter of the rule, renumbering this one id is a five-file search-and-replace.
 
-- 10.120 ✅ Re-ranking an existing custom type shows, the moment the rank leaves its saved value, that tickets already placed keep their place: `data-testid="rank-divergence"` reads *"Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there."* — absent while the field still reads the saved rank, absent again once it is put back, and absent on a NEW type (no saved rank to diverge from). It carries no count it has not measured, like the workflow-divergence notice beside it. The engine-side decision it announces is 5.76 (E6-3, B12). — `packages/app-core/test/ticket-types/ticket-types.test.tsx` ("keep their place", "placed tickets on a NEW type")
+- 10.120 ✅ Re-ranking an existing custom type shows, the moment the rank leaves its saved value, that tickets already placed keep their place: `data-testid="rank-divergence"` reads *"Tickets already placed keep their place. Re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there."* — absent while the field still reads the saved rank, absent again once it is put back, and absent on a NEW type (no saved rank to diverge from). It carries no count it has not measured, like the workflow-divergence notice beside it. The engine-side decision it announces is 5.76 (E6-3, B12). — `packages/app-core/test/ticket-types/ticket-types.test.tsx` ("keep their place", "placed tickets on a NEW type")
 
 ## Release 2026-09-30, W1 — the States and Transitions panels (task/workflow-panels)
 
@@ -207,7 +207,7 @@ of the same degradation is 10.111 above.
 - 10.147 ✅ **A row is a keyboard-operable disclosure.** A real `<button>` in the tab order; Enter and Space toggle `aria-expanded`; `aria-controls` names the sibling body that exists.
 - 10.148 ✅ **The universal transitions are read-only rows.** *Start* (Backlog → the initial state) and *Send to Backlog* are listed last, are not buttons, carry the line that every workflow has them, and do not count toward *Transitions (N)*.
 - 10.149 ✅ **A read-only viewer gets the lists with the settings read-only.** A member expanding a transition sees the rules and no *Add rule* / *Delete transition*; an admin sees both.
-- 10.150 ✅ **Empty lists say so.** *No states yet*; *No transitions yet — draw one on the canvas, from one state to another.* (a viewer who cannot author reads only *No transitions yet.*); the universal rows remain.
+- 10.150 ✅ **Empty lists say so.** *No states yet*; *No transitions yet. Draw one on the canvas, from one state to another.* (a viewer who cannot author reads only *No transitions yet.*); the universal rows remain.
 - 10.151 ✅ **Publishing is untouched by the new layout.** The header still carries *Add state* and *Publish*, and Publish submits the draft.
 - 10.152 ✅ **A row mounts the existing inspectors, not a copy.** With both inspector modules replaced by marker components, a state row mounts `StateInspector` with its id and a transition row `TransitionInspector` with its index.
 - 10.153 🟡 **In a browser, in hig, minimal and neo:** the panels read as raised cards, the open row's well is recessed, hover on a row is a quiet fill, the left column stays beside the canvas and scrolls on its own at ≥ 64rem, and a canvas click brings its row into view without moving the page. (Controller, on the dev stack with a custom workflow.) *Measured 2026-10-01, dev stack @ e4e92f77: the panels sit at the left above System rules; rows are 44px in all three styles; one open row; a canvas click opens its row and scrolls the column, not the page; the stacked layouts (900/390/1040) do not move the page; no right aside; the universal rows are read-only; keyboard works; the left column is sticky ≥ 1040px. NOT verified: the raised-card / recessed-well / quiet-hover character — in neo "Remove rule" and "Delete transition" are large red pills that dominate the well and the edge label "a comment" overlaps a handle; and the left column is now the tallest item (768px), so it pins for only ~32px of scroll rather than "scrolling on its own".*

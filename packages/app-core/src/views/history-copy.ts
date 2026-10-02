@@ -165,7 +165,7 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
     }
     case 'ticket.workflow_rebound': {
       const toStateId = str(payload, 'toStateId');
-      return toStateId === null ? event.type : `Workflow changed — now in ${stateName(toStateId)}`;
+      return toStateId === null ? event.type : `Workflow changed, now in ${stateName(toStateId)}`;
     }
     case 'ticket.reparented': {
       return payload['newParentId'] === null ? 'Moved to the project root' : 'Moved under a new parent';
@@ -228,7 +228,7 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       // own: the same discipline the publish banner keeps for rule names, and
       // for the same reason — a fourth resolution added to the domain should
       // read as itself here, not as a missing case.
-      return resolution === null ? event.type : `Conflicting claim resolved — ${resolution}`;
+      return resolution === null ? event.type : `Conflicting claim resolved: ${resolution}`;
     }
     default:
       return event.type;

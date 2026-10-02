@@ -113,7 +113,7 @@ function AuthorizeScreen(): React.JSX.Element {
         }
         if (cause instanceof HttpError && cause.status === 404) {
           setRefusal(
-            'That code is not recognised. It may have already been used, or it may have expired — ask for a new one.',
+            'That code is not recognised. It may have already been used, or it may have expired. Ask for a new one.',
           );
           return;
         }
@@ -141,13 +141,13 @@ function AuthorizeScreen(): React.JSX.Element {
              code, which is single-use and short-lived. */
           <p className="gn-mcp-authorize__signed-out">
             <Link href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> to approve
-            an assistant — you land back here.
+            an assistant. You land back here.
           </p>
         ) : state === 'approved' ? (
           <div data-testid="mcp-authorize-approved" role="status">
             <p className="gn-mcp-authorize__granted">Approved. The assistant is connected.</p>
             <p className="gn-mcp-authorize__what">
-              It now acts <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions — it can see
+              It now acts <strong>as {actingAs(session.user.name)}</strong>, with exactly your permissions. It can see
               and change whatever you can, and every claim it records will carry your name.
             </p>
             <p className="gn-mcp-authorize__revoke">
@@ -164,7 +164,7 @@ function AuthorizeScreen(): React.JSX.Element {
           <div data-testid="mcp-authorize-denied" role="status">
             <p className="gn-mcp-authorize__denied">Denied. The assistant was not connected.</p>
             <p className="gn-mcp-authorize__what">
-              The code is spent — it cannot be approved later, and it cannot collect a credential.
+              The code is spent. It cannot be approved later, and it cannot collect a credential.
               Your assistant&rsquo;s next check will tell it the code is no longer recognised, so ask
               it for a new one if you change your mind.
             </p>

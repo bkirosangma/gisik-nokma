@@ -151,7 +151,7 @@ export function PasskeysSection({
       ) : (
         groupByProvider(passkeys).map(({ provider, rows }) => (
           <div key={provider} className="gn-account__device-group">
-            <h3 className="gn-account__group-title">{`${provider} · ${rows.length}`}</h3>
+            <h3 className="gn-account__group-title">{`${provider} (${rows.length})`}</h3>
             <ul className="gn-account__passkey-list">
               {rows.map((passkey) => {
                 const label = passkey.name ?? 'Unnamed passkey';

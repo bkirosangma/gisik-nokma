@@ -527,7 +527,7 @@ export function TicketList({
             project-wide conclusion the count no longer supports.
           */}
           {narrowing === undefined
-            ? `${counts.total} tickets · ${counts.terminal} done`
+            ? `${counts.total} tickets, ${counts.terminal} done`
             : `${counts.total} matching`}
         </span>
         {/*
@@ -544,7 +544,7 @@ export function TicketList({
         */}
         {narrowing === undefined ? null : (
           <span className="gn-list__narrowing" data-testid="list-narrowing">
-            narrowed to {narrowing} — not the whole project
+            narrowed to {narrowing}, not the whole project
           </span>
         )}
         {/* Owner request 2026-09-22: `Group by` was rendering as `Group` over
@@ -615,18 +615,18 @@ export function TicketList({
         */}
         {prefsOriginOf(prefs) === 'default' ? (
           <span className="gn-list__origin" data-testid="list-prefs-origin">
-            default arrangement — you have not arranged this project
+            default arrangement. You have not arranged this project
           </span>
         ) : (
           <>
             {prefs.columns.origin === 'default' ? (
               <span className="gn-list__origin" data-testid="list-prefs-origin-columns">
-                default columns — you have not chosen columns for this project
+                default columns. You have not chosen columns for this project
               </span>
             ) : null}
             {prefs.grouping.origin === 'default' ? (
               <span className="gn-list__origin" data-testid="list-prefs-origin-grouping">
-                default grouping — you have not chosen a grouping for this project
+                default grouping. You have not chosen a grouping for this project
               </span>
             ) : null}
           </>
@@ -650,7 +650,7 @@ export function TicketList({
         */}
         {prefsError === undefined || prefsError === null ? null : (
           <span role="status" className="gn-list__prefs-error" data-testid="list-prefs-error">
-            Your column choice was not saved — {prefsError}
+            Your column choice was not saved: {prefsError}
           </span>
         )}
         {/* The caller's own control — see `controls`' own docblock for why it
@@ -804,8 +804,8 @@ export function TicketList({
                     divergence only one of them has.
                   */}
                   {grouping === 'epic'
-                    ? `${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'row' : 'rows'}`
-                    : `${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
+                    ? `${groupMeta}, ${section.rows.length} ${section.rows.length === 1 ? 'row' : 'rows'}`
+                    : `${groupMeta}, ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
                 </span>
               </h2>
             )}
@@ -1243,7 +1243,7 @@ function ListCell({
       const when = row.closed === null ? formatDate(due.date) : `Closed ${formatDate(row.closed.at)}`;
       return (
         <span className="gn-list__due">
-          {when} — {who(due.claim.actorId, due.claim.actorName)}&apos;s claim
+          {when}, {who(due.claim.actorId, due.claim.actorName)}&apos;s claim
         </span>
       );
     }
@@ -1255,7 +1255,7 @@ function ListCell({
       // reaching this switch always has a level and a claimant.
       return (
         <span className="gn-list__priority">
-          {row.priority.value} — {who(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
+          {row.priority.value}, {who(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
         </span>
       );
     case 'type':

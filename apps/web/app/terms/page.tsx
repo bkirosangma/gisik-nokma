@@ -67,8 +67,8 @@ const SECTIONS: readonly LegalSection[] = [
     body: (
       <>
         <p>
-          You are responsible for what happens under your account. The product has no passwords —
-          access comes from your email, your Google account or a passkey on your device — so
+          You are responsible for what happens under your account. The product has no passwords.
+          Access comes from your email, your Google account or a passkey on your device, so
           keeping those secure is what keeps your account secure. Tell us at{' '}
           <strong>[CONTACT EMAIL]</strong> if you believe someone else has access.
         </p>
@@ -98,7 +98,7 @@ const SECTIONS: readonly LegalSection[] = [
           <li>Break the law with it, or use it to harm or harass anyone.</li>
           <li>Try to reach data belonging to workspaces you have not been invited to.</li>
           <li>
-            Interfere with the service — no attempts to overwhelm it, and no automated traffic
+            Interfere with the service: no attempts to overwhelm it, and no automated traffic
             beyond ordinary use of the product and its documented interfaces.
           </li>
           <li>Upload malware, or content you have no right to upload.</li>
@@ -156,7 +156,7 @@ const SECTIONS: readonly LegalSection[] = [
         <p>
           To the extent the law allows, <strong>[ENTITY NAME]</strong> is not liable for indirect or
           consequential loss, or for lost profits or lost data, arising from your use of Gisik
-          Nokma. Nothing here limits liability that cannot lawfully be limited — including for death
+          Nokma. Nothing here limits liability that cannot lawfully be limited, including for death
           or personal injury caused by negligence, or for fraud.{' '}
           <strong>[LIABILITY CAP]</strong>
         </p>
@@ -204,8 +204,8 @@ export default function Terms() {
           not yet filled in.
         </p>
         <p className="gn-legal__meta">
-          Last updated <strong>[DATE]</strong> · An agreement between you and{' '}
-          <strong>[ENTITY NAME]</strong> · Governed by the laws of <strong>[JURISDICTION]</strong>
+          Last updated <strong>[DATE]</strong>. An agreement between you and{' '}
+          <strong>[ENTITY NAME]</strong>. Governed by the laws of <strong>[JURISDICTION]</strong>.
         </p>
         <LegalToc sections={SECTIONS} />
 

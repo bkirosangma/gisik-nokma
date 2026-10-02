@@ -154,7 +154,7 @@ describe('23.042 the nav hands over to the bar at exactly 64rem, with no Menu bu
     cleanup();
     viewport(1025);
     render(nav());
-    await screen.findByRole('link', { name: 'My Work' });
+    await screen.findByRole('link', { name: 'My work' });
     expect(bar()).toBeNull();
     expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull();
     expect(document.querySelector('.gn-nav__more-toggle')).toBeNull();

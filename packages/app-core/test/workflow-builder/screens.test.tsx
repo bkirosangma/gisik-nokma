@@ -26,8 +26,8 @@ describe('WorkflowBuilderScreen', () => {
     expect(screen.getByText('Loading workspace people and types…')).toBeInTheDocument();
     expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue('Simple kanban');
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
-    expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
-    expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
+    expect(screen.getByText('System rules in every workflow')).toBeInTheDocument();
+    expect(screen.getByText('No issues. This workflow can be published.')).toBeInTheDocument();
     expect(await screen.findByTestId('state-node-todo')).toBeInTheDocument(); // a canvas node — React Flow renders it a tick after mount
     // W1 (2026-09-30): the right inspector and its "Select a state…" hint are gone; the lists took its place.
     expect(screen.queryByText('Select a state or a transition to edit it.')).not.toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('WorkflowBuilderScreen', () => {
       />,
     );
     expect(
-      await screen.findByText('Could not load workspace people and types — reload to try again.'),
+      await screen.findByText('Could not load workspace people and types. Reload to try again.'),
     ).toBeInTheDocument();
   });
 
@@ -115,7 +115,7 @@ describe('WorkflowBuilderScreen', () => {
       />,
     );
     expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue('Simple kanban');
-    expect(screen.queryByText('Could not load workspace people and types — reload to try again.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Could not load workspace people and types. Reload to try again.')).not.toBeInTheDocument();
   });
 
   /**
@@ -149,7 +149,7 @@ describe('WorkflowBuilderScreen', () => {
       />,
     );
     expect(
-      await screen.findByText('Could not load workspace people and types — reload to try again.'),
+      await screen.findByText('Could not load workspace people and types. Reload to try again.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Workflow name' })).not.toBeInTheDocument();
   });
@@ -279,7 +279,7 @@ describe('WorkflowListScreen', () => {
     // card grid replaced the row list — see the screen's docblock for why.
     expect(
       screen.getByText(
-        `v7 · ${first.states.length} states · ${first.transitions.length} transitions`,
+        `Version 7, ${first.states.length} states, ${first.transitions.length} transitions`,
       ),
     ).toBeInTheDocument();
     // 13.311 — the per-row open control's aria-label carries THAT row's name;
@@ -377,7 +377,7 @@ describe('WorkflowListScreen', () => {
         onNew={onNew}
       />,
     );
-    expect(await screen.findByText('No workflows published yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No workflows yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'New workflow' }));
     expect(onNew).toHaveBeenCalledOnce();
   });
@@ -400,7 +400,7 @@ describe('WorkflowListScreen', () => {
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('Could not load workflows — reload to try again.')).toBeInTheDocument();
+    expect(await screen.findByText('Could not load workflows. Reload to try again.')).toBeInTheDocument();
   });
 
   it('hides New workflow from non-authors', async () => {
@@ -414,7 +414,7 @@ describe('WorkflowListScreen', () => {
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('No workflows published yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No workflows yet.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'New workflow' })).not.toBeInTheDocument();
   });
 });

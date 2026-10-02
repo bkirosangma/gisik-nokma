@@ -411,7 +411,7 @@ describe('13.794 a PARTIAL close reloads the list and keeps the dialog with its 
 
     // The committed half is reported and the other is named, verbatim.
     expect(await screen.findByText('Could not close')).toBeInTheDocument();
-    expect(screen.getByText('Done two — Not in a terminal state.')).toBeInTheDocument();
+    expect(screen.getByText('Done two: Not in a terminal state.')).toBeInTheDocument();
 
     // "the rest close and the list reloads" — on THIS outcome too.
     await waitFor(() => expect(reads).toBeGreaterThan(readsBeforeConfirm));

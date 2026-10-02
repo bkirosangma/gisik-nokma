@@ -695,9 +695,9 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   below, asserted absent at zero rather than printing `0 archived`. The restricted line is one text node
   (`2 projects · name restricted`), which a three-interpolation version fails. **Negative controls, because
   zero is where this card lies most easily:** a card with nothing restricted renders no line at all
-  (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
+  (*"0 projects, name restricted"* would appear on every owner's card, where the count is zero by
   construction), a card with nothing archived renders no chip mentioning it, and both singulars — `1
-  member`, `1 project · name restricted` — are asserted on cards that have one, so the plurals above are a
+  member`, `1 project, name restricted` — are asserted on cards that have one, so the plurals above are a
   choice rather than the only string the code can produce. Mutations, each red at its own site: drop the
   `− blocked` subtraction from the active chip; stop splitting archived out of the live list; loosen
   `count <= 0` to `count < 0` so the line prints at zero. **And the TINT, which the rest of this case does
@@ -711,13 +711,13 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   asserted; that would pin the hash rather than the property. Positive control: both avatars carry a tint
   class at all, so the inequality cannot pass on two undefineds.
   — (`apps/web/test/workspaces-cards.test.tsx`)
-- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project · name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
+- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project, name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
   the absence, not the presence: a card printing the chip AND a zero passes *"'Restricted' is present"*
   and fails this. `0` is a claim — *"no work you can see"* — and it is exactly the claim the server
   declined to make by omitting the key (`13.366` on the route side). The numbers are queried away
   individually, by shape, so a failure says which one leaked. What the guest IS still told is asserted in
   the same run: the project's NAME (rulings P32/P38 withhold names, not this), and
-  *"1 project · name restricted"* — the string the whole owner ruling exists to make renderable.
+  *"1 project, name restricted"* — the string the whole owner ruling exists to make renderable.
   Mutation: print `${memberCount ?? 0} members` beside the chip → RED.
   — (`apps/web/test/workspaces-cards.test.tsx`)
 - **13.381** ✅ The role sentence and every gated affordance read ONE value. The fixture is deliberately
@@ -1008,7 +1008,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   computing `tintIndexOf` on the id AND on the name directly (rather than comparing two renders, which
   this page's fixed route param cannot produce) and requiring the rendered class to match the id-keyed
   index and NOT the name-keyed one, with a positive control that the fixture's id and name do not
-  coincidentally hash to the same tint. The meta line — *"N members · M active projects · you're an
+  coincidentally hash to the same tint. The meta line — *"N members, M active projects, you're an
   X"* — reads only SERVED numbers (`memberCount`; `live.length`, this caller's own non-archived list)
   and a role CLAUSE from the SAME `viewerOf` call the `/workspaces` card's sentence reads, so the two
   cannot disagree about the same person. **The member-count gate is `viewer.countsWithheld`, NOT
@@ -1041,7 +1041,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   the rule: a control that reveals nothing lies about the shape of the data. —
   (`workspace-home.test.tsx`)
 - **13.398** ✅ The five door cards carry NOTES now, verbatim from the prototype's own `wsLinks` — except
-  the Members note, whose *"{N} people · roles and pending invitations."* only prints a number when
+  the Members note, whose *"{N} people: roles and pending invitations."* only prints a number when
   `memberCount` is served; a guest (withheld) gets the sentence with the prefix OMITTED, never a `0`, the
   same rule the header's meta line and the `/workspaces` card both keep. Targets are UNCHANGED from Task
   19 (13.387's own literals) — only the notes are new, transcribed rather than invented. —
@@ -2422,7 +2422,7 @@ stays free for the batch's remaining tasks.
 **The defect, in the finding's own words.** The events door answers refusals inside a `200` body, so the only
 `401` a write can meet is the session guard's — produced before the handler. The client transport throws
 `HttpError` with `message = "HTTP 401 for /v1/events"`, and **every write catch in the product painted that
-as transport**: *"We could not reach the server for this change — HTTP 401 for /v1/events"*
+as transport**: *"We could not reach the server for this change: HTTP 401 for /v1/events"*
 (`ticket-sheet.tsx:1074`), and the same sentence at `board.tsx:1430`, `:1532`, `:1736`,
 `bulk-close-dialog.tsx:233`, `backlog-rank-controls.tsx:186`, `backlog-start-button.tsx:113`,
 `workspace-settings-form.tsx:298` and the project page's delete-Undo — **nine sites, and not one of them
@@ -2458,7 +2458,7 @@ above for where the allocation is recorded). `13.1159` is minted here.
 
 **The defect.** Signed out on `/help` — the route `app-nav.tsx`'s own docblock calls *"the route most
 likely to be wanted by someone who cannot get in"* — the bar painted `Workspaces`, `Help`, `Account`, an
-unlabelled inbox icon and the scope note *"No workspace selected — pick one to reach its board, members
+unlabelled inbox icon and the scope note *"No workspace selected. Pick one to reach its board, members
 and settings."* — **and no Sign in.** Pressing Workspaces signed out landed on `/sign-in` by a 401 bounce
 with no `next=`, so the destination was thrown away; pressing Account repainted the page E5-13's second
 reproduction describes; the inbox icon pointed at a session-gated route; and the note instructed a person
@@ -2519,7 +2519,7 @@ capability to remove a sentence.
 **Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
 above). `13.1162` is minted here.
 
-**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet — create one."*,
+**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet. Create one."*,
 and the "Create a ticket" button beneath it — and the per-column "Add a ticket" — render only when
 `onCreateTicket` is passed (`board.tsx:493-497`, `:762-764`). **No web caller passed it**: measured at the
 ruling, `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered **0 across 63 files** while the

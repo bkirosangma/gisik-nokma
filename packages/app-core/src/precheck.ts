@@ -201,7 +201,7 @@ export async function precheckEvent(
   // a ticket whose def or version chain is NOT fully cached, where the gates
   // would otherwise defer on a claim the engine can refuse outright.
   if ((ticket.closed ?? null) !== null) {
-    return { kind: 'refused', rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed — reopen it first.' };
+    return { kind: 'refused', rule: REFUSAL_RULES.closedTicket, reason: 'This ticket is closed. Reopen it first.' };
   }
 
   const def = cache.getWorkflowDef(ticket.workflowId);

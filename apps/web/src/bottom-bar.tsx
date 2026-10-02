@@ -296,7 +296,7 @@ function EditBody({
     <div className="gn-bar-sheet">
       <section>
         <h3 className="gn-bar-sheet__heading">In the bar</h3>
-        {slots.length === 0 ? <p className="gn-bar-sheet__note">Nothing here — the bar shows only More.</p> : null}
+        {slots.length === 0 ? <p className="gn-bar-sheet__note">Nothing here. The bar shows only More.</p> : null}
         <ul className="gn-bar-sheet__list">
           {slots.map((id, index) => {
             const label = DESTINATIONS[id].label;
@@ -312,7 +312,7 @@ function EditBody({
         </ul>
       </section>
       <section>
-        <h3 className="gn-bar-sheet__heading">Available{full ? ' — the bar is full' : ''}</h3>
+        <h3 className="gn-bar-sheet__heading">Available{full ? ' (the bar is full)' : ''}</h3>
         <ul className="gn-bar-sheet__list">
           {available.map((id) => (
             <li key={id} className="gn-bar-sheet__edit-row">

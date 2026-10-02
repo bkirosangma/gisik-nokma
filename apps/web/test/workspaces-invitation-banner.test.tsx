@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PendingInvitation } from '@gisik-nokma/app-core/online';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import WorkspacesPage from '../app/workspaces/page.js';
@@ -140,6 +140,15 @@ function mount(invitations: PendingInvitation[], overrides = {}) {
   );
 }
 
+// 23.193: `formatDay` drops the year when it is the current one, so the clock is named rather than read.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-15T06:00:00.000Z'));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('Workspaces page — the invitation banner (Task 17)', () => {
   /**
    * The two controls this file's date assertion rests on, run in the same file
@@ -194,7 +203,7 @@ describe('Workspaces page — the invitation banner (Task 17)', () => {
     // component builds it as ONE interpolation: three would be three text
     // nodes, split in the accessibility tree and invisible to this query.
     expect(
-      within(banner).getByText('Invited 10 Sept 2026 · lapses 21 Sept 2026'),
+      within(banner).getByText('Invited 10 Sep. Lapses 21 Sep.'),
     ).toBeInTheDocument();
     // The accessible names carry the workspace, so two waiting invitations never
     // present two identically-named buttons.

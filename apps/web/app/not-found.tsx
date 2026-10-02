@@ -130,7 +130,7 @@ export default function NotFound() {
         <li>
           <span className="gn-notfound__cause">The address is mistyped, or the link was
           broken.</span>{' '}
-          The commonest case, and the easiest to check — compare it against a link you know works.
+          The commonest case, and the easiest to check. Compare it against a link you know works.
         </li>
         <li>
           <span className="gn-notfound__cause">The page moved.</span>{' '}
@@ -139,7 +139,7 @@ export default function NotFound() {
         </li>
         <li>
           <span className="gn-notfound__cause">The thing exists and is not yours to see.</span>{' '}
-          If you followed a link to a specific job, this is a real possibility — and{' '}
+          If you followed a link to a specific ticket, this is a real possibility.{' '}
           <strong>Gisik Nokma will not tell you which of the three it was.</strong>
         </li>
       </ul>
@@ -147,9 +147,9 @@ export default function NotFound() {
       <p className="gn-notfound__why">
         <span className="gn-notfound__why-label">Why it will not say.</span> A product that
         answered <em>&ldquo;that exists, but not for you&rdquo;</em> would let anyone discover which
-        records exist by trying addresses until the wording changed. So a job you may not see and a
-        job that was never created are answered identically, on purpose. It is the same reason a
-        sub-job count reads <em>&ldquo;5 of 8 done · 2 restricted&rdquo;</em> rather than
+        records exist by trying addresses until the wording changed. So a ticket you may not see and a
+        ticket that was never created are answered identically, on purpose. It is the same reason a
+        sub-ticket count reads <em>&ldquo;5 of 8 done, 2 restricted&rdquo;</em> rather than
         &ldquo;5 of 6&rdquo;: the shape of what is hidden is itself information.
       </p>
 
@@ -171,7 +171,7 @@ export default function NotFound() {
 
       <p className="gn-notfound__aside">
         If you believe you should be able to see this and cannot, the person who administers your
-        workspace can check — visibility is set per job, and they can see who a job is shared with.
+        workspace can check. Visibility is set per ticket, and they can see who a ticket is shared with.
       </p>
     </main>
   );

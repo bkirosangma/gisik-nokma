@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELP_CONTENT } from '@gisik-nokma/app-core';
 import McpTokensPage from '../app/mcp/tokens/page.js';
 import { Providers } from '../src/providers.js';
@@ -93,10 +93,17 @@ function mount(): void {
 }
 
 beforeEach(() => {
+  // 23.193: the year is dropped when it is the current one, so the clock is named rather than read.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-02T06:00:00.000Z'));
   calls = [];
   hostedCalls = [];
   hosted = { ...HOSTED_DEFAULTS };
   session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('E5-17 the route is not a chrome-less orphan', () => {
@@ -139,7 +146,6 @@ describe('14.96 signed out', () => {
 
 describe('14.97 the list shows what is honestly available', () => {
   it('names the approval date and NEVER anything resembling the credential', async () => {
-    const zone = vi.spyOn(Date.prototype, 'toLocaleDateString');
     fetchStub(() => ({
       status: 200,
       body: { tokens: [{ id: ID, createdAt: '2026-09-07T19:51:44.951Z', lastUsedAt: null }] },
@@ -147,14 +153,10 @@ describe('14.97 the list shows what is honestly available', () => {
     mount();
 
     await screen.findByTestId('mcp-tokens-list');
-    // The rendered day, and then the thing the rendered day CANNOT prove here.
-    // This instant is 19:51Z on the 7th: "7 Sept 2026" in UTC, "8 Sept 2026" in
-    // IST. Asserting the day alone looked like it pinned the timezone — and
-    // measured, it did not: removing `timeZone: 'Asia/Kolkata'` left this case
-    // green, because THIS RUNNER IS ALREADY IN IST and the ambient default
-    // agreed. The options object is what makes the claim falsifiable anywhere.
-    expect(screen.getByText(/Created 8 Sept 2026/)).toBeInTheDocument();
-    expect(zone.mock.calls[0]?.[1]).toMatchObject({ timeZone: 'Asia/Kolkata' });
+    // This instant is 19:51Z on the 7th: the 7th in UTC, the 8th in IST. The day is rendered by `formatDay`
+    // (23.193), which reads the IST day and drops the year when it is the current one, so "8 Sep" is the
+    // falsifiable answer: a renderer in UTC would print "7 Sep", and one that kept the year "8 Sep 2026".
+    expect(screen.getByText(/Created 8 Sep\./)).toBeInTheDocument();
     // `mcp_tokens` stores only sha256(token). A row that printed the id would
     // be showing a hash while implying it had the credential.
     expect(document.body.textContent ?? '').not.toContain(ID);
@@ -175,7 +177,7 @@ describe('14.97 the list shows what is honestly available', () => {
 describe('14.150 a read of your connected assistants that FAILS', () => {
   /**
    * 14.150 — E2-44. `load`'s rejection arm was `() => setTokens([])`, and `[]` is
-   * exactly the value the empty arm asserts over ("No assistants are connected.
+   * exactly the value the empty arm asserts over ("No assistants connected yet.
    * One appears here after you approve it on the connect page."). So a 500 was
    * drawn as a confident statement about the person's account, on the one screen
    * whose whole subject is which assistants still hold access — and the sentence
@@ -185,7 +187,7 @@ describe('14.150 a read of your connected assistants that FAILS', () => {
    * sentence is present AND the empty state is not. Asserting only the sentence
    * would pass on a screen that rendered both.
    */
-  it('14.150 a rejected read is a failure sentence, never “No assistants are connected”', async () => {
+  it('14.150 a rejected read is a failure sentence, never “No assistants connected yet”', async () => {
     fetchStub(() => ({ status: 500, body: { error: 'internal' } }));
     mount();
 
@@ -280,8 +282,8 @@ describe('14.103 last used', () => {
 
     // Both halves, in one case, because either alone passes for a component
     // that renders one string unconditionally.
-    expect(screen.getByText('Created 8 Sept 2026 · never used')).toBeInTheDocument();
-    expect(screen.getByText('Created 6 Sept 2026 · last used 8 Sept 2026')).toBeInTheDocument();
+    expect(screen.getByText('Created 8 Sep. Never used.')).toBeInTheDocument();
+    expect(screen.getByText('Created 6 Sep. Last used 8 Sep.')).toBeInTheDocument();
   });
 });
 
@@ -415,8 +417,8 @@ describe('14.274 hosted connections beside the local tokens', () => {
     expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument();
     expect(screen.getByText('ChatGPT (chatgpt.com)')).toBeInTheDocument();
     const list = screen.getByTestId('mcp-connections-list');
-    expect(list).toHaveTextContent(/Connected .*2026/);
-    expect(list).toHaveTextContent(/Last used .*2026/);
+    expect(list).toHaveTextContent(/Connected 30 Sep/);
+    expect(list).toHaveTextContent(/Last used 30 Sep/);
     expect(list).toHaveTextContent('Never used');
     const disconnect = screen.getByTestId('mcp-connections-disconnect-conn_1');
     expect(disconnect).toHaveTextContent('Disconnect Claude'); // the visible label, not only the accessible name
@@ -434,20 +436,20 @@ describe('14.274 hosted connections beside the local tokens', () => {
 });
 
 describe('14.274 zero local tokens, live hosted connections', () => {
-  it('does NOT say "No assistants are connected" while an app is connected; both lists empty does', async () => {
+  it('does NOT say "No assistants connected yet" while an app is connected; both lists empty does', async () => {
     hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [CONN] } };
     fetchStub(tokensOnly([]));
     mount();
     expect(await screen.findByText('Claude (claude.ai)')).toBeInTheDocument(); // both reads have landed
     await waitFor(() => expect(calls.some((c) => c.method === 'GET')).toBe(true));
     expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
-    expect(screen.queryByText(/No assistants are connected/)).toBeNull();
+    expect(screen.queryByText(/No assistants connected yet/)).toBeNull();
     // CONTROL, same `it`: the same screen with BOTH lists empty says it.
     cleanup();
     hosted['/v1/me/mcp-connections'] = { status: 200, body: { connections: [] } };
     fetchStub(tokensOnly([]));
     mount();
-    expect(await screen.findByTestId('mcp-tokens-empty')).toHaveTextContent('No assistants are connected');
+    expect(await screen.findByTestId('mcp-tokens-empty')).toHaveTextContent('No assistants connected yet.');
   });
 });
 
@@ -591,10 +593,10 @@ describe('23.170 a connected-assistant row speaks plainly', () => {
     const tokens = screen.getByTestId('mcp-tokens-list');
     const unnamed = tokens.querySelectorAll('li')[0]!;
     expect(unnamed).toHaveTextContent('Assistant connected with a token');
-    expect(unnamed).toHaveTextContent('Created 8 Sept 2026 · never used');
+    expect(unnamed).toHaveTextContent('Created 8 Sep. Never used.');
     expect(screen.getAllByRole('button', { name: 'Revoke this token' })).toHaveLength(2);
     const named = tokens.querySelectorAll('li')[1]!;
-    expect(named).toHaveTextContent('Created 6 Sept 2026 · last used 8 Sept 2026');
+    expect(named).toHaveTextContent('Created 6 Sep. Last used 8 Sep.');
 
     const hostedRow = screen.getByTestId('mcp-connections-list');
     expect(hostedRow).toHaveTextContent('Claude (claude.ai)');

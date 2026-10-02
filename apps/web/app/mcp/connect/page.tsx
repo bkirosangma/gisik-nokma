@@ -48,6 +48,9 @@ type View =
   | { kind: 'refused'; message: string }
   | { kind: 'ready'; details: Details };
 
+const HOW_TO_CONNECT_HREF = '/help#manual-16-connecting-claude-or-chatgpt';
+const NO_REQUEST =
+  "There's no connection request on this page. Start connecting from Claude or ChatGPT.";
 const EXPIRED = 'This connection request has expired. Go back to your assistant and connect again.';
 const GENERIC = 'That could not be completed, and the server did not say why. Go back to your assistant and connect again.';
 
@@ -131,9 +134,14 @@ function ConnectScreen(): React.JSX.Element {
           ) : session.kind === 'signed-out' ? (
             <p className="gn-mcp-authorize__signed-out">
               <Link href={`/sign-in?next=${encodeURIComponent(returnPath)}`}>Sign in</Link> to connect an
-              assistant — you land back here.
+              assistant. You land back here.
             </p>
-          ) : request === '' || view.kind === 'expired' ? (
+          ) : request === '' ? (
+            <>
+              <p role="status">{NO_REQUEST}</p>
+              <Link href={HOW_TO_CONNECT_HREF}>How to connect an assistant</Link>
+            </>
+          ) : view.kind === 'expired' ? (
             <p role="status">{EXPIRED}</p>
           ) : view.kind === 'refused' ? (
             <p role="status">{view.message}</p>
@@ -146,9 +154,9 @@ function ConnectScreen(): React.JSX.Element {
                 <strong>you</strong>.
               </p>
               <p className="gn-mcp-authorize__consent">
-                It will be able to see and change everything you can — read tickets, create them, move them, comment
+                It will be able to see and change everything you can: read tickets, create them, move them, comment
                 and assign, and create, rename, archive or delete workspaces and projects (deleted ones can be
-                restored for 15 days) — in all your workspaces.
+                restored for 15 days), in all your workspaces.
               </p>
               <p className="gn-mcp-authorize__revoke">
                 You can disconnect it any time from Account → Connected assistants.

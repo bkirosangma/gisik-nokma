@@ -339,16 +339,19 @@ describe('17.067 the invite page shows the deadline and a next step (E5-18)', ()
    * pinned separately, on the call, the way `13.969`'s own block does it.
    */
   it('17.067 names the day the link lapses', async () => {
-    const zone = vi.spyOn(Date.prototype, 'toLocaleDateString');
-    mount({
-      getInvite: async () => ({ ...SUMMARY, expiresAt: '2026-09-30T04:30:00.000Z' }),
-    });
+    // 23.193: `formatDay` reads the IST day and drops the current year, so the clock is named. 20:00Z on the 30th
+    // is already the 1st in India: a renderer in UTC would print "30 Sep", one that kept the year "1 Oct 2026".
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-20T06:00:00.000Z'));
+    try {
+      mount({
+        getInvite: async () => ({ ...SUMMARY, expiresAt: '2026-09-30T20:00:00.000Z' }),
+      });
 
-    expect(await screen.findByText('This link lapses 30 Sept 2026.')).toBeInTheDocument();
-    // The options object is what makes the claim falsifiable anywhere — a bare
-    // day assertion passes in IST by accident of the runner's own zone.
-    expect(zone.mock.calls.at(-1)?.[1]).toMatchObject({ timeZone: 'Asia/Kolkata' });
-    zone.mockRestore();
+      expect(await screen.findByText('This link lapses 1 Oct.')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   /**

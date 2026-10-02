@@ -444,12 +444,12 @@ describe('10.149 a read-only viewer still gets the lists, with the settings read
 });
 
 describe('10.150 empty lists say so', () => {
-  it('10.150 no states -> "No states yet"; no transitions -> "No transitions yet — …"; the universal rows remain', () => {
+  it('10.150 no states -> "No states yet"; no transitions -> "No transitions yet. …"; the universal rows remain', () => {
     const draft = draftFromTemplate(kanban);
     const store = createDraftStore({ ...draft, def: { ...draft.def, states: [], transitions: [] } });
     renderPanels(store);
     expect(screen.getByText('No states yet')).toBeInTheDocument();
-    expect(screen.getByText(/^No transitions yet — /)).toBeInTheDocument();
+    expect(screen.getByText(/^No transitions yet\. /)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'States (0)' })).toBeInTheDocument();
     expect(rowButtons()).toHaveLength(0);
     // The universal rows remain even with nothing declared.

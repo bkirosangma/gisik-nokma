@@ -171,7 +171,7 @@ describe('11.5 the attributed label is EXACT (planted defect — spec §7)', () 
     const item = onlyItem(model);
     expect(item.kind).toBe('marker');
     if (item.kind === 'marker') {
-      expect(item.label).toBe("needed by 30 Aug — Kiro's claim");
+      expect(item.label).toBe("needed by 30 Aug, Kiro's claim");
     }
   });
 
@@ -198,11 +198,11 @@ describe('11.5 the attributed label is EXACT (planted defect — spec §7)', () 
     const bar = items.find((item) => item.kind === 'bar');
     if (bar === undefined || bar.kind !== 'bar') throw new Error('expected a bar');
     expect(bar.provenance).toBe(
-      "starts 24 Aug — Anselma's claim · needed by 30 Aug — Kiro's claim",
+      "starts 24 Aug, Anselma's claim; needed by 30 Aug, Kiro's claim",
     );
     const marker = items.find((item) => item.kind === 'marker');
     if (marker === undefined || marker.kind !== 'marker') throw new Error('expected a marker');
-    expect(marker.tooltip).toBe(`needed by 11 Aug — Kiro's claim · "GST filing"`);
+    expect(marker.tooltip).toBe(`needed by 11 Aug, Kiro's claim. "GST filing"`);
   });
 });
 
@@ -226,7 +226,7 @@ describe('11.36–11.39 custom date-kind fields are claims like any other (owner
     if (item.kind !== 'marker') throw new Error('expected a marker');
     // The generic-word defect: labelling this "needed by …" or "date 30 Aug"
     // loses the only thing that says what the day MEANS.
-    expect(item.label).toBe("Filed on: 30 Aug — Anselma's claim");
+    expect(item.label).toBe("Filed on: 30 Aug, Anselma's claim");
     expect(item.marker).toBe('custom');
     expect(item.fieldId).toBe('filed-on');
     expect(item.fieldName).toBe('Filed on');
@@ -383,7 +383,7 @@ describe('11.36–11.39 custom date-kind fields are claims like any other (owner
     const item = onlyItem(model);
     if (item.kind !== 'marker') throw new Error('expected a marker');
     expect(item.tooltip).toBe(item.label);
-    expect(item.tooltip).toBe("Filed on: 30 Aug — Kiro's claim");
+    expect(item.tooltip).toBe("Filed on: 30 Aug, Kiro's claim");
     expect(item.tooltip).not.toContain('"');
   });
 

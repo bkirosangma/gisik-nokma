@@ -107,6 +107,20 @@ function openingInstantOf(day: string): string {
   }
 }
 
+/**
+ * The ONE way the UI prints a day (UX fixes T11, 23.193): "17 Aug", and "17 Aug 2025" when the year is not the
+ * year of `now`. `value` is an instant or a day claim, exactly as `formatDate` takes it. `now` is the IST day the
+ * shell hands in (`istToday()` on the web), never a device clock read here; without it the year is kept, because
+ * a day with no year beside it is only safe when the reader's year is known. An unparseable claim comes back as
+ * claimed.
+ */
+export function formatDay(value: string, now?: string): string {
+  const day = formatDate(value);
+  const year = /\s(\d{4})$/.exec(day)?.[1];
+  const sameYear = now !== undefined && year !== undefined && now.startsWith(`${year}-`);
+  return sameYear ? day.slice(0, day.length - 5) : day;
+}
+
 /** The whole instant, clock named: '19 Aug 2026, 15:35 IST'. */
 export function formatDateTime(iso: string): string {
   return formatIstInstant(iso);
@@ -133,9 +147,6 @@ export function formatStateProvenance(stateName: string, claim: ClaimProvenance)
  * keeps it. `full` always keeps it — the card's unfolded form.
  */
 export function formatCardProvenance(stateName: string, claim: ClaimProvenance, today?: string, full = false): string {
-  const day = formatDate(claim.serverTime);
-  const year = /\s(\d{4})$/.exec(day)?.[1];
-  const sameYear = today !== undefined && year !== undefined && today.startsWith(`${year}-`);
-  const shown = !full && sameYear ? day.slice(0, day.length - 5) : day;
+  const shown = formatDay(claim.serverTime, full ? undefined : today);
   return `Moved to ${stateName} by ${actorLabel(claim.actorId, claim.actorName)} on ${shown}`;
 }

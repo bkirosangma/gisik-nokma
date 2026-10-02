@@ -176,7 +176,7 @@ describe('16.42 Toast', () => {
   });
 
   it('16.42 the whole message is rendered — no truncation of a refusal reason', () => {
-    const long = 'Refused by the server — require-evidence: an attachment must be provided to make this move, and none was.';
+    const long = 'Refused by the server: require-evidence: an attachment must be provided to make this move, and none was.';
     renderToast({ message: long });
     expect(screen.getByRole('status')).toHaveTextContent(long);
   });

@@ -243,14 +243,14 @@ describe('21.045 the Move button opens the same dialog over EVERY board destinat
     await showColumn(/^Doing/);
 
     const all = await offered(user, moveButtonIn('tk_b'), 'tk_b');
-    expect(all.map((name) => name.split(' — ')[0])).toEqual(['To do', 'Waiting on counterparty', 'Done']);
+    expect(all.map((name) => name.split(' (')[0])).toEqual(['To do', 'Waiting on counterparty', 'Done']);
     cleanup();
     await mount(boardOf(errandGroup()));
     await showColumn(/^Doing/);
 
     // CONTROL — the arrows are unchanged: › is the forward list only.
     const forward = await offered(user, within(slotOf('tk_b')).getByRole('button', { name: /^Move to next state/ }), 'tk_b');
-    expect(forward.map((name) => name.split(' — ')[0])).toEqual(['Waiting on counterparty', 'Done']);
+    expect(forward.map((name) => name.split(' (')[0])).toEqual(['Waiting on counterparty', 'Done']);
   });
 });
 
@@ -261,7 +261,7 @@ describe('21.046 a branching workflow lists BOTH branches; a single target is li
     await showColumn(/^Doing/);
 
     const doing = await offered(user, moveButtonIn('tk_b'), 'tk_b');
-    expect(doing.map((name) => name.split(' — ')[0])).toEqual(expect.arrayContaining(['Waiting on counterparty', 'Done']));
+    expect(doing.map((name) => name.split(' (')[0])).toEqual(expect.arrayContaining(['Waiting on counterparty', 'Done']));
     cleanup();
     await mount(boardOf(errandGroup()));
 
@@ -280,7 +280,7 @@ describe('21.047 a gated destination says so in the Move list', () => {
     await showColumn(/^Doing/);
     const names = await offered(user, moveButtonIn('tk_b'), 'tk_b');
 
-    expect(names).toContain('Done — needs a comment');
+    expect(names).toContain('Done (needs a comment)');
     expect(names).toContain('Waiting on counterparty'); // CONTROL — an ungated option is its bare name
     expect(names).toContain('To do');
   });
@@ -302,9 +302,9 @@ describe('21.047 a gated destination says so in the Move list', () => {
     const names = await offered(user, moveButtonIn('tk_b'), 'tk_b');
 
     expect(names).toEqual([
-      'To do — needs estimate',
-      'Waiting on counterparty — needs evidence',
-      'Done — needs a comment, needs evidence',
+      'To do (needs estimate)',
+      'Waiting on counterparty (needs evidence)',
+      'Done (needs a comment, needs evidence)',
     ]);
   });
 
@@ -398,7 +398,7 @@ describe('21.049 a Move submits through the same optimistic path as the arrows',
 
     // The card changed column when the move was laid, so the dialog is the one inside its new slot: ask afresh.
     // AMENDED 2026-10-02 (23.126): the phone shows the column that holds the open dialog, so it is found as a person finds it.
-    await waitFor(() => expect(screen.getByText(/Refused by the server — some-rule: Not allowed right now\./)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Refused by the server: some-rule: Not allowed right now\./)).toBeInTheDocument());
     await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
     expect(idsIn('waiting')).toEqual([]);
@@ -481,7 +481,7 @@ describe('23.127 (U-T7 fix 1) a gated move\'s comment step and its refusal are v
     expect(within(open).getByRole('button', { name: 'Cancel' })).toBeVisible();
 
     await act(async () => write.resolve([{ status: 'refused', eventId: 'x', rule: 'some-rule', reason: 'Not allowed right now.' }]));
-    await waitFor(() => expect(screen.getByText(/Refused by the server — some-rule: Not allowed right now\./)).toBeVisible());
+    await waitFor(() => expect(screen.getByText(/Refused by the server: some-rule: Not allowed right now\./)).toBeVisible());
     await user.click(within(await screen.findByRole('dialog', { name: 'Move ticket' })).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(idsIn('doing')).toEqual(['tk_b']));
     expect(columnOf('doing')).not.toHaveAttribute('hidden');

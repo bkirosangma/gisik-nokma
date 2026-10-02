@@ -865,7 +865,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
   it('shows rank implications derived from the workspace types', async () => {
     renderEditor(null);
     expect(await screen.findByTestId('rank-implications')).toHaveTextContent(
-      'Can sit under: Epic, Story · or at the project root.',
+      'Can sit under: Epic, Story, or at the project root.',
     );
   });
 
@@ -886,8 +886,8 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     const list = await screen.findByTestId('rank-implications-list');
     expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Two pickers will re-order: the board’s Create ticket menu and MCP’s create_ticket.',
-      'Can sit under: Epic, Story · or at the project root.',
-      'Published workflows are versioned — nothing already recorded is rewritten.',
+      'Can sit under: Epic, Story, or at the project root.',
+      'Published workflows are versioned. Nothing already recorded is rewritten.',
     ]);
   });
 
@@ -931,7 +931,7 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'epic')!);
     const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
     expect(rankField).toBeDisabled();
-    expect(screen.getByText('Built-in type — its place in the hierarchy is fixed.')).toBeInTheDocument();
+    expect(screen.getByText('Built-in type. Its place in the hierarchy is fixed.')).toBeInTheDocument();
   });
 
   /**
@@ -959,7 +959,7 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     fireEvent.change(rankField, { target: { value: '2' } });
     expect(rankField).toHaveValue(2);
     expect(screen.getByTestId('rank-divergence')).toHaveTextContent(
-      'Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there.',
+      'Tickets already placed keep their place. Re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there.',
     );
 
     // Back to the saved rank: nothing diverges, so nothing is said.
@@ -1232,13 +1232,13 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
   it('says nothing stays behind when nothing does — no invented population', async () => {
     await rebind({ typePopulation: { task: { [kanbanPublished.id]: 0 } } });
     expect(
-      await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}" — nothing stays behind.`),
+      await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}". Nothing stays behind.`),
     ).toBeInTheDocument();
   });
 
   /**
    * 13.923 — the notice carries the prototype's own sentence about the two
-   * choices: *"Neither choice is recommended over the other — leaving them is a
+   * choices: *"Neither choice is recommended over the other. Leaving them is a
    * decision, not a deferral."* (`desktop.dc.html:937`).
    *
    * The product already HELD that position — the source says "Staying put is a
@@ -1254,7 +1254,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const notice = await screen.findByTestId('workflow-divergence');
     expect(
       within(notice).getByText(
-        'Neither choice is recommended over the other — leaving them is a decision, not a deferral.',
+        'Neither choice is recommended over the other. Leaving them is a decision, not a deferral.',
       ),
     ).toBeInTheDocument();
   });
@@ -1265,7 +1265,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(await within(notice).findByText('ticket count unavailable')).toBeInTheDocument();
     expect(
       within(notice).getByText(
-        `Existing tickets of this type stay on "${kanbanPublished.name}" — we could not count how many. New ones will use "${errandPublished.name}".`,
+        `Existing tickets of this type stay on "${kanbanPublished.name}". We could not count how many. New ones will use "${errandPublished.name}".`,
       ),
     ).toBeInTheDocument();
     // The honesty that matters: it never claims a number it does not have.
@@ -1297,7 +1297,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(move).toBeDisabled();
     expect(
       screen.getByText(
-        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+        `Save the ticket type first. Until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
       ),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
@@ -1333,7 +1333,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     ).toBeInTheDocument();
     expect(
       within(dialog).getByText(
-        "Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.",
+        "Leaving them is a real choice: a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.",
       ),
     ).toBeInTheDocument();
 
@@ -1342,7 +1342,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const confirm = within(dialog).getByRole('button', { name: 'Move these tickets' });
     expect(confirm).toBeDisabled();
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     expect(confirm).toBeEnabled();
@@ -1391,7 +1391,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(screen.getByRole('button', { name: `Move them to "${approvalPublished.name}"…` })).toBeDisabled();
     expect(
       screen.getByText(
-        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+        `Save the ticket type first. Until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
       ),
     ).toBeInTheDocument();
     // …and nothing on screen claims the selected binding was saved.
@@ -1421,7 +1421,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const dialog = await screen.findByRole('dialog');
     const target = errandPublished.states[0]!;
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: target.name }));
     }
     await pickFromSearchableSelect(user, combobox, approvalPublished.name);
@@ -1457,7 +1457,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
       name: `Move existing tickets to "${errandPublished.name}"`,
     });
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1489,7 +1489,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1508,7 +1508,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1536,7 +1536,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1769,7 +1769,7 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
     await user.click(await screen.findByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1844,7 +1844,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
   });
 
@@ -1868,7 +1868,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
         initialDef={task}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
     expect(screen.getByTestId('type-editor-header')).toBeTruthy();
   });
@@ -1910,7 +1910,7 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
     cleanup();
 
@@ -1926,7 +1926,7 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
         initialDef={task}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
   });
 });

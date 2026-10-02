@@ -31,7 +31,7 @@
  *
  * ## `clause`, added Round 19b — the SAME role value, a second English shape
  *
- * The home page's header meta line reads *"N members · M active projects ·
+ * The home page's header meta line reads *"N members, M active projects,
  * you're an owner"* — the role sitting mid-sentence rather than opening one, so
  * it needs a CLAUSE ("an owner") rather than the card's full SENTENCE ("You're
  * an owner here."). Both come out of one `viewerOf(role)` call, which is what
@@ -92,11 +92,11 @@ export function mayAdminister(role: string): boolean {
 }
 
 /**
- * *"1 project · name restricted"* — or nothing at all.
+ * *"1 project, name restricted"* — or nothing at all.
  *
  * Zero renders NOTHING, and that is the same rule the invitation banner keeps:
  * a person with nothing withheld from them must not be told about withholding.
- * *"0 projects · name restricted"* would be a sentence announcing an absence
+ * *"0 projects, name restricted"* would be a sentence announcing an absence
  * nobody asked about, and it would appear on every owner's card, where the
  * count is zero by construction.
  *
@@ -106,7 +106,7 @@ export function mayAdminister(role: string): boolean {
  */
 export function restrictedLine(count: number): string | null {
   if (count <= 0) return null;
-  return `${count} ${count === 1 ? 'project' : 'projects'} · name restricted`;
+  return `${count} ${count === 1 ? 'project' : 'projects'}, name restricted`;
 }
 
 /**
@@ -154,7 +154,7 @@ export function projectCountLine(liveCount: number): string {
 export const PROJECT_LINE_CAP = 3;
 
 /**
- * *"Delivery · Site readiness · Winter stock · +1 more"* — the prototype's
+ * *"Delivery, Site readiness, Winter stock, +1 more"* — the prototype's
  * single project line, truncated.
  *
  * `names` is the LIVE, NAMED projects: archived ones never reach this card,
@@ -167,7 +167,7 @@ export const PROJECT_LINE_CAP = 3;
  * `test/workspaces-cards.test.tsx`'s 13.380 is *"a guest card shows one
  * 'Restricted' chip and **no number outside the owner-ruled restricted
  * sentence**"* (retitled, whole-branch review Minor 2 — the card's own "1
- * project · name restricted" is a number, so the original "no number
+ * project, name restricted" is a number, so the original "no number
  * anywhere" title was false; the test strips that exact sentence before its
  * digit scan). A guest still sees the
  * project names — their set is exactly the errands handed to them by name —
@@ -184,8 +184,8 @@ export function projectLine(
   countsWithheld: boolean,
 ): string | null {
   if (names.length === 0) return null;
-  const shown = names.slice(0, PROJECT_LINE_CAP).join(' · ');
+  const shown = names.slice(0, PROJECT_LINE_CAP).join(', ');
   const hidden = names.length - PROJECT_LINE_CAP;
   if (hidden <= 0) return shown;
-  return `${shown} · ${countsWithheld ? 'and more' : `+${hidden} more`}`;
+  return `${shown}, ${countsWithheld ? 'and more' : `+${hidden} more`}`;
 }

@@ -317,13 +317,13 @@ function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
         ok: false,
         message:
           result.status === 'refused'
-            ? `Refused by the server — ${result.rule}: ${result.reason}`
-            : `Refused by the server — ${result.code}: ${result.message}`,
+            ? `Refused by the server: ${result.rule}: ${result.reason}`
+            : `Refused by the server: ${result.code}: ${result.message}`,
       };
     } catch (cause) {
       return {
         ok: false,
-        message: writeFailureCopy(cause, (message) => `We could not reach the server for this change — ${message}`),
+        message: writeFailureCopy(cause, (message) => `We could not reach the server for this change: ${message}`),
       };
     }
   };

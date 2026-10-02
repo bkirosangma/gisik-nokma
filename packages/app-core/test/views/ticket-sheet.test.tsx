@@ -271,7 +271,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
   it('PLANTED DEFECT: a restricted parent renders as existence-without-title, never as parentless', async () => {
     renderSheet(ticketRead({ parent: { kind: 'restricted', id: 'secret' } }));
     await waitFor(() =>
-      expect(screen.getByText("Restricted parent — exists, but you can't see it")).toBeInTheDocument(),
+      expect(screen.getByText("Restricted parent: it exists, but you can't see it")).toBeInTheDocument(),
     );
     expect(screen.queryByText('At project root')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('secret');
@@ -285,7 +285,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
 
   it('shows the derived progress line when the ticket has children', async () => {
     renderSheet(ticketRead({ rollup: { totalChildren: 8, terminalChildren: 5, restrictedCount: 2 } }));
-    await waitFor(() => expect(screen.getByText('5 of 8 done · 2 restricted')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('5 of 8 done, 2 restricted')).toBeInTheDocument());
   });
 
   it('PLANTED DEFECT: a ticket with no rollup renders no progress line — no invented denominator', async () => {
@@ -617,7 +617,7 @@ describe('TicketSheet — the transition round-trip', () => {
     await user.click(screen.getByRole('button', { name: 'Move' }));
     const serverBox = await screen.findByRole('alert');
     expect(serverBox).toHaveTextContent(
-      'Refused by the server — restrict-to: Only Anselma Marak may perform "Doing → Done" on this ticket. [server]',
+      'Refused by the server: restrict-to: Only Anselma Marak may perform "Doing → Done" on this ticket. [server]',
     );
   });
 
@@ -694,7 +694,7 @@ describe('TicketSheet — the transition round-trip', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
     const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent('We could not reach the server for this move — network unreachable');
+    expect(alert).toHaveTextContent('We could not reach the server for this move: network unreachable');
     expect(alert).not.toHaveTextContent('Refused by the server');
     expect(alert).toHaveClass('gn-refusal--transport');
     expect(alert).not.toHaveClass('gn-refusal--server');
@@ -1263,7 +1263,7 @@ describe('3.116 TicketSheet — the "Who can see this" section is mounted', () =
     await settled();
     const section = screen.getByRole('region', { name: 'Who can see this' });
     expect(
-      within(section).getByText('Visible to: these people — and the workspace owner, always.'),
+      within(section).getByText('Visible to: these people, and the workspace owner, always.'),
     ).toBeInTheDocument();
   });
 
@@ -1451,7 +1451,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     // reason.
     expect(screen.getByText('Closed by Anselma Marak on 21 Aug 2026')).toBeInTheDocument();
     expect(within(stateRow()).getByRole('button', { name: 'Move…' })).toBeDisabled();
-    const note = screen.getByText('Closed — reopen it first');
+    const note = screen.getByText('Closed. Reopen it first');
     expect(note.className).toBe('gn-sheet__closed-note');
     expect(note.getAttribute('title')).toBeNull();
 
@@ -1543,7 +1543,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
-      'Refused by the server — close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
+      'Refused by the server: close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
     );
   });
 
@@ -1599,7 +1599,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
   /**
    * 13.588b — Ruling 33 (fix round 2, 2026-09-17): a REJECTED `ingest` is a
    * transport failure, not a refusal, and gets its OWN slot and sentence —
-   * never `serverRefusal`'s "Refused by the server — …", which would claim
+   * never `serverRefusal`'s "Refused by the server: …", which would claim
    * an adjudication the door/engine never made (Ruling 27, case 13.504,
    * `board.tsx`'s identical distinction). Close re-enables once the rejection
    * settles, same as any other outcome (the `finally` reset doesn't care
@@ -1628,7 +1628,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     await user.click(closeButton);
     const notice = await screen.findByRole('alert');
     expect(notice.className).toBe('gn-refusal gn-refusal--transport');
-    expect(notice).toHaveTextContent('We could not reach the server for this change — socket hung up');
+    expect(notice).toHaveTextContent('We could not reach the server for this change: socket hung up');
     expect(document.body.textContent).not.toContain('Refused by the server');
     await waitFor(() => expect(closeButton).toBeEnabled());
   });
@@ -1637,7 +1637,7 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
    * 13.588c — Ruling 34 (fix round 3, 2026-09-17): the `result === undefined`
    * branch clears `serverRefusal` too, the same pairing the `catch` branch
    * already carries (case 13.588b). Without it, a REFUSED click followed by a
-   * SILENT one leaves the earlier "Refused by the server — …" notice on
+   * SILENT one leaves the earlier "Refused by the server: …" notice on
    * screen ALONGSIDE the new transport one — two notices for one click's
    * outcome, the older one describing an answer that no longer holds.
    *
@@ -2265,7 +2265,7 @@ describe('F — the subtasks section', () => {
     // (sheet prototype parity, Task 6, 2026-09-22).** It read
     // `toBe('Order the brochures · To do')` — one exact string for the whole
     // `<li>`. A card is a title element with a meta row BENEATH it, so the whole
-    // row now reads `Order the brochuresTo do · task` and the old string is not
+    // row now reads `Order the brochuresTo do, task` and the old string is not
     // reachable by any correct rendering. **The amendment KEEPS THE PROPERTY
     // rather than dropping it, and it is asserted in BOTH halves:**
     //
@@ -2273,7 +2273,7 @@ describe('F — the subtasks section', () => {
     //      not a run of glyphs — which is what makes the missing separator between
     //      them a layout fact rather than a text defect; and
     //   2. WITHIN the meta row, where the chip and the detail DO share one line,
-    //      the separator is still real characters — `To do · task`, not
+    //      the separator is still real characters — `To do, task`, not
     //      `To dotask`. That is the 2026-09-20 defect's exact shape, one element
     //      to the right, and it is why the markup carries a ` · ` glyph inside the
     //      detail string rather than relying on the flex `gap`.
@@ -2281,8 +2281,8 @@ describe('F — the subtasks section', () => {
     const cardTwo = within(section).getByTestId('subtask-tkt-s2');
     expect(cardOne.querySelector('.gn-ticket-sheet__subtask-title')?.textContent).toBe('Order the brochures');
     expect(cardTwo.querySelector('.gn-ticket-sheet__subtask-title')?.textContent).toBe('Book the venue');
-    expect(cardOne.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('To do · task');
-    expect(cardTwo.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('Done · task');
+    expect(cardOne.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('To do, task');
+    expect(cardTwo.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('Done, task');
   });
 
   /**
@@ -2341,7 +2341,7 @@ describe('F — the subtasks section', () => {
     // The prototype's sentence, verbatim — and it is a claim about the MODEL,
     // which `16.15` above is what makes true.
     expect(await screen.findByTestId('sheet-subtasks-empty')).toHaveTextContent(
-      'No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date and a history.',
+      'No subtasks. A subtask is a ticket of its own: it gets a state, an assignee, a date and a history.',
     );
   });
 
@@ -2585,7 +2585,7 @@ describe('the Add-subtask affordance', () => {
     expect(screen.queryByTestId('sheet-subtask-add')).toBeNull();
     expect(screen.queryByTestId('sheet-subtask-title')).toBeNull();
     const withheld = await screen.findByTestId('sheet-subtask-withheld');
-    expect(withheld).toHaveTextContent('This is a Sub-task — nothing smaller can sit under it.');
+    expect(withheld).toHaveTextContent('This is a Sub-task. Nothing smaller can sit under it.');
     // `status`, not `alert`: nothing has gone wrong and nothing was attempted —
     // the same role the New-ticket dialog's unavailable-parent sentence wears.
     expect(withheld).toHaveAttribute('role', 'status');
@@ -2643,7 +2643,7 @@ describe('the Add-subtask affordance', () => {
     const withheld = await screen.findByTestId('sheet-subtask-withheld');
     // The server's/read's own words, carried — not a paraphrase of them.
     expect(withheld).toHaveTextContent('the type ladder is unavailable');
-    expect(withheld).not.toHaveTextContent('nothing smaller can sit under it');
+    expect(withheld).not.toHaveTextContent('Nothing smaller can sit under it');
 
     // ARM TWO — the same property one step over, and it is a DIFFERENT fact:
     // the ladder READ FINE and simply does not hold this ticket's type, so its
@@ -2811,11 +2811,11 @@ describe('the `Subtask of {parent}` chip', () => {
     // restricted arm used to be a chip in the SUBTASKS header worded `Subtask of
     // a restricted parent`. The owner moved the badge up into the parent
     // indicator and ruled that arm keeps ITS sentence — so this arm is now
-    // `Restricted parent — exists, but you can't see it`, the words the sheet
+    // `Restricted parent: it exists, but you can't see it`, the words the sheet
     // has used for this fact all along. **The properties this case exists for
     // are unchanged and every one is still asserted below.**
     const pill = await screen.findByTestId('sheet-parent-restricted');
-    expect(pill.textContent).toBe("Restricted parent — exists, but you can't see it");
+    expect(pill.textContent).toBe("Restricted parent: it exists, but you can't see it");
     // NOT a control: the restricted arm carries no project and no title, so
     // there is nothing to open and nothing to name — and case 6.14 asserts a
     // direct read of that parent 404s.
@@ -3299,7 +3299,7 @@ describe('sheet prototype parity — the subtasks section', () => {
     expect(heading.textContent).not.toContain('SUBTASKS');
   });
 
-  it('16.124 each subtask is a card: the title, then a chip row carrying the state chip and `type · Due day`', async () => {
+  it('16.124 each subtask is a card: the title, then a chip row carrying the state chip and `type, Due day`', async () => {
     const kid = child({
       ticketId: 'kid',
       title: 'Mint tokens',
@@ -3331,7 +3331,7 @@ describe('sheet prototype parity — the subtasks section', () => {
     // on both sides are the same `U+00B7`, and the mechanism is not recorded here
     // because it was not measured. What is recorded is the probe that works.)
     expect(card.querySelector('.gn-ticket-sheet__subtask-detail')?.textContent).toBe(
-      ` · task · Due ${formatDate('2026-09-10')}`,
+      `, task, Due ${formatDate('2026-09-10')}`,
     );
   });
 
@@ -3342,11 +3342,11 @@ describe('sheet prototype parity — the subtasks section', () => {
     await settled();
     const card = screen.getByTestId('subtask-kid');
     // The direction 16.124 cannot see: its fixture HAS a due day, so a build that
-    // rendered ` · task · Due ` unconditionally would print a separator with
+    // rendered `, task, Due ` unconditionally would print a separator with
     // nothing after it and pass. `No date claimed` is deliberately NOT drawn here
     // — the card is a summary, and the child's own sheet is where an absence is
     // stated.
-    expect(card.querySelector('.gn-ticket-sheet__subtask-detail')?.textContent).toBe(' · task');
+    expect(card.querySelector('.gn-ticket-sheet__subtask-detail')?.textContent).toBe(', task');
     expect(card.textContent).not.toContain('Due');
   });
 
@@ -3594,7 +3594,7 @@ describe('G — Priority, Due and Type as rows', () => {
     await settled();
     fireEvent.click(within(screen.getByTestId('field-priority')).getByRole('tab', { name: 'P3' }));
     // A REGEX, not the sentence: the sheet renders one concatenated line —
-    // `Refused by the server — <rule>: <reason>` — so an exact-string matcher
+    // `Refused by the server: <rule>: <reason>` — so an exact-string matcher
     // would be asking for an element whose whole text is the reason alone, and
     // there is none. Unanchored, so it matches the reason inside the sentence.
     expect(await screen.findByText(/needs one of P1, P2 or P3/)).toBeInTheDocument();
@@ -4247,7 +4247,7 @@ describe('TicketSheet — the editable title (16.86)', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Refused by the server — field\.type-mismatch: Title expects a text value\./),
+        screen.getByText(/Refused by the server: field\.type-mismatch: Title expects a text value\./),
       ).toBeInTheDocument(),
     );
     // The words stay: clearing the draft would hand the reader back the old
@@ -5046,7 +5046,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     await settled();
 
     const indicator = screen.getByTestId('sheet-parent-indicator');
-    expect(indicator).toHaveTextContent("Restricted parent — exists, but you can't see it");
+    expect(indicator).toHaveTextContent("Restricted parent: it exists, but you can't see it");
     expect(indicator).not.toHaveTextContent('At project root');
   });
 });
@@ -5788,7 +5788,7 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
 
     const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
     expect(dialog).toHaveTextContent('File the GST return is Done.');
-    expect(dialog).toHaveTextContent(`Refused by the server — hierarchy.parent-terminal: ${PARENT_TERMINAL_REASON}`);
+    expect(dialog).toHaveTextContent(`Refused by the server: hierarchy.parent-terminal: ${PARENT_TERMINAL_REASON}`);
     const picker = within(dialog).getByTestId('hidden-select-container');
     const offered = [...picker.querySelectorAll('option')]
       .map((option) => option.getAttribute('value'))
@@ -5906,7 +5906,7 @@ describe('16.130–16.132 Add subtask under a terminal parent offers the reopen'
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(source.ingested[1]!.map((e) => e.type)).toEqual(['ticket.reopened', 'ticket.transitioned']);
     const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Refused by the server — transition.guard: doing is not open today.');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Refused by the server: transition.guard: doing is not open today.');
     expect(parent).toMatchObject({ closed: false, stateId: 'done' });
     expect(screen.getByTestId('sheet-subtask-title')).toHaveValue('Book the venue');
 

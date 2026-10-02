@@ -12,7 +12,7 @@ import type { DeviceSummary } from '../../src/account/sessions-client.js';
  * `GET /v1/me/devices` through to this component is proven in `apps/web/test/account-page.test.tsx`.
  *
  * Owner ruling FD3 = A (2026-09-30): the list splits into "Active in the last 24 hours" and a collapsed
- * "Signed in, idle (N)" group; the heading reads "Sign-in and devices · N signed in · M active".
+ * "Signed in, idle (N)" group; the heading reads "Sign-in and devices (N signed in, M active)".
  */
 const NOW = new Date('2026-10-01T00:00:00Z');
 const device = (over: Partial<DeviceSummary> & Pick<DeviceSummary, 'key'>): DeviceSummary => ({
@@ -38,12 +38,12 @@ function mount(devices: DeviceSummary[], extra: { error?: string | null } = {}) 
 }
 
 describe('SessionsSection', () => {
-  it('6.331 one row per device: "<browser> on <os> · TAG", "This device" on the current one only, relative activity, first signed in and the sign-in count when more than one; control: a legacy group reads "Older sign-in" with no tag', () => {
+  it('6.331 one row per device: "<browser> on <os> (TAG)", "This device" on the current one only, relative activity, first signed in and the sign-in count when more than one; control: a legacy group reads "Older sign-in" with no tag', () => {
     mount([CURRENT, ACTIVE, LEGACY]);
-    expect(screen.getByText('Chrome on Mac · 7F3K')).toBeInTheDocument();
-    expect(screen.getByText('Firefox on Windows · Q2ZA')).toBeInTheDocument();
+    expect(screen.getByText('Chrome on Mac (7F3K)')).toBeInTheDocument();
+    expect(screen.getByText('Firefox on Windows (Q2ZA)')).toBeInTheDocument();
     expect(screen.getAllByText('This device')).toHaveLength(1);
-    expect(within(screen.getByText('Chrome on Mac · 7F3K').closest('li')!).getByText('This device')).toBeInTheDocument();
+    expect(within(screen.getByText('Chrome on Mac (7F3K)').closest('li')!).getByText('This device')).toBeInTheDocument();
     expect(screen.getByText('Active now')).toBeInTheDocument(); // the current device, 2 minutes before NOW
     expect(screen.getByText('4 hours ago')).toBeInTheDocument();
     expect(screen.getAllByText('First signed in 12 Sep 2026')).toHaveLength(2);
@@ -51,26 +51,26 @@ describe('SessionsSection', () => {
     expect(screen.queryByText('1 sign-ins')).toBeNull();
     expect(screen.queryByText('1 sign-in')).toBeNull();
     // Control: the legacy group is in the idle group, so it shows once that is opened.
-    expect(screen.queryByText('Older sign-in · Safari on iPad')).toBeNull();
+    expect(screen.queryByText('Older sign-in (Safari on iPad)')).toBeNull();
   });
 
-  it('6.331 a legacy group, once its group is open, reads "Older sign-in · <label>" with no tag', async () => {
+  it('6.331 a legacy group, once its group is open, reads "Older sign-in (<label>)" with no tag', async () => {
     mount([CURRENT, LEGACY]);
     await userEvent.click(screen.getByRole('button', { name: /Signed in, idle \(1\)/ }));
-    expect(screen.getByText('Older sign-in · Safari on iPad')).toBeInTheDocument();
+    expect(screen.getByText('Older sign-in (Safari on iPad)')).toBeInTheDocument();
     expect(screen.queryByText(/Safari on iPad ·/)).toBeNull();
   });
 
-  it('6.332 the heading counts devices and the active ones: "Sign-in and devices · N signed in · M active"; control: N counts devices, not sessions', () => {
+  it('6.332 the heading counts devices and the active ones: "Sign-in and devices (N signed in, M active)"; control: N counts devices, not sessions', () => {
     mount([CURRENT, ACTIVE, IDLE, LEGACY]); // ACTIVE alone carries 3 sessions
-    expect(screen.getByRole('heading', { name: 'Sign-in and devices · 4 signed in · 2 active' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign-in and devices (4 signed in, 2 active)' })).toBeInTheDocument();
   });
 
   it('6.332 a device seen exactly 24 hours ago is idle, 23 h 59 min ago is active', () => {
     const edge = device({ key: 'e1', tag: 'EDGE', lastSeenAt: '2026-09-30T00:00:00Z' }); // exactly 24 h before NOW
     const inside = device({ key: 'e2', tag: 'INSD', lastSeenAt: '2026-09-30T00:01:00Z' });
     mount([CURRENT, edge, inside]);
-    expect(screen.getByRole('heading', { name: 'Sign-in and devices · 3 signed in · 2 active' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign-in and devices (3 signed in, 2 active)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Signed in, idle \(1\)/ })).toBeInTheDocument();
   });
 
@@ -80,14 +80,14 @@ describe('SessionsSection', () => {
     const toggle = screen.getByRole('button', { name: 'Signed in, idle (2)' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     // Collapsed: the idle rows are not rendered at all.
-    expect(screen.queryByText('Safari on iPhone · M5NB')).toBeNull();
-    expect(screen.queryByText('Older sign-in · Safari on iPad')).toBeNull();
+    expect(screen.queryByText('Safari on iPhone (M5NB)')).toBeNull();
+    expect(screen.queryByText('Older sign-in (Safari on iPad)')).toBeNull();
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('Safari on iPhone · M5NB')).toBeInTheDocument();
-    expect(screen.getByText('Older sign-in · Safari on iPad')).toBeInTheDocument();
+    expect(screen.getByText('Safari on iPhone (M5NB)')).toBeInTheDocument();
+    expect(screen.getByText('Older sign-in (Safari on iPad)')).toBeInTheDocument();
     await userEvent.click(toggle);
-    expect(screen.queryByText('Safari on iPhone · M5NB')).toBeNull();
+    expect(screen.queryByText('Safari on iPhone (M5NB)')).toBeNull();
   });
 
   it('6.339 control: with every device active there is no idle group; the current device is always active even with an old stamp', () => {
@@ -96,31 +96,31 @@ describe('SessionsSection', () => {
     const staleCurrent = device({ key: 'c', tag: 'CCCC', isCurrent: true, lastSeenAt: '2026-09-01T00:00:00Z' });
     mount([staleCurrent, IDLE]);
     const heading = screen.getAllByRole('heading', { level: 2 }).at(-1)!;
-    expect(heading).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
-    expect(within(heading.closest('section')!).getByText('Chrome on Mac · CCCC')).toBeInTheDocument();
+    expect(heading).toHaveTextContent('Sign-in and devices (2 signed in, 1 active)');
+    expect(within(heading.closest('section')!).getByText('Chrome on Mac (CCCC)')).toBeInTheDocument();
   });
 
   it('6.339 a NON-current device that was never seen (lastSeenAt null, a pre-migration session the 5-minute stamp has not touched) is IDLE: under "Signed in, idle (1)", not in "M active"; control: the same device with a recent stamp is active', () => {
     const never = device({ key: 'n', tag: 'NNNN', label: 'Edge on Linux', lastSeenAt: null });
     mount([CURRENT, never]);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices (2 signed in, 1 active)');
     expect(screen.getByRole('button', { name: 'Signed in, idle (1)' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText('Edge on Linux · NNNN')).toBeNull();
+    expect(screen.queryByText('Edge on Linux (NNNN)')).toBeNull();
     cleanup();
     mount([CURRENT, { ...never, lastSeenAt: '2026-09-30T23:00:00Z' }]);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 2 active');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices (2 signed in, 2 active)');
     expect(screen.queryByText(/Signed in, idle/)).toBeNull();
-    expect(screen.getByText('Edge on Linux · NNNN')).toBeInTheDocument();
+    expect(screen.getByText('Edge on Linux (NNNN)')).toBeInTheDocument();
   });
 
   it('6.339 when NO device is active and none is current (a list with no isCurrent) the "Active in the last 24 hours" heading and list are absent and the heading reads "0 active"; control: one active device shows the group', () => {
     mount([IDLE, LEGACY]);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 0 active');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices (2 signed in, 0 active)');
     expect(screen.queryByText('Active in the last 24 hours')).toBeNull();
     expect(screen.getByRole('button', { name: 'Signed in, idle (2)' })).toBeInTheDocument();
     cleanup();
     mount([IDLE, ACTIVE]);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices · 2 signed in · 1 active');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Sign-in and devices (2 signed in, 1 active)');
     expect(screen.getByText('Active in the last 24 hours')).toBeInTheDocument();
   });
 
@@ -128,7 +128,7 @@ describe('SessionsSection', () => {
     const { onSignOutDevice, onSignOutOthers } = mount([CURRENT, ACTIVE]);
     const rowButtons = screen.getAllByRole('button', { name: /^Sign out this device/ });
     expect(rowButtons).toHaveLength(1);
-    expect(rowButtons[0]).toHaveAccessibleName('Sign out this device — Firefox on Windows · Q2ZA');
+    expect(rowButtons[0]).toHaveAccessibleName('Sign out this device: Firefox on Windows (Q2ZA)');
     await userEvent.click(rowButtons[0]!);
     expect(onSignOutDevice).toHaveBeenCalledWith('k2');
     expect(screen.getAllByRole('button', { name: 'Sign out all other devices' })).toHaveLength(1);
@@ -139,7 +139,7 @@ describe('SessionsSection', () => {
   it('6.333 an idle row signs out too once opened; control: a single device shows neither action', async () => {
     const { onSignOutDevice } = mount([CURRENT, IDLE]);
     await userEvent.click(screen.getByRole('button', { name: /Signed in, idle/ }));
-    await userEvent.click(screen.getByRole('button', { name: /^Sign out this device — Safari on iPhone/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Sign out this device: Safari on iPhone/ }));
     expect(onSignOutDevice).toHaveBeenCalledWith('k3');
   });
 
@@ -192,12 +192,12 @@ describe('6.348 per-row sign-out names are unique (controller browser pass, devi
     await openIdle();
     const names = signOutNames();
     expect(names).toEqual([
-      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago',
-      'Sign out this device — Older sign-in · Chrome on Mac, last active 5 days ago',
-      'Sign out this device — Safari on iPhone · M5NB',
+      'Sign out this device: Older sign-in (Chrome on Mac), last active 2 days ago',
+      'Sign out this device: Older sign-in (Chrome on Mac), last active 5 days ago',
+      'Sign out this device: Safari on iPhone (M5NB)',
     ]);
     expect(new Set(names).size).toBe(names.length);
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out this device — Older sign-in · Chrome on Mac, last active 5 days ago' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out this device: Older sign-in (Chrome on Mac), last active 5 days ago' }));
     expect(onSignOutDevice).toHaveBeenCalledWith('legacy:b');
   });
 
@@ -211,9 +211,9 @@ describe('6.348 per-row sign-out names are unique (controller browser pass, devi
     await openIdle();
     const names = signOutNames();
     expect(names).toEqual([
-      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago, first signed in 1 Sep 2026',
-      'Sign out this device — Older sign-in · Chrome on Mac, last active 2 days ago, first signed in 10 Sep 2026',
-      'Sign out this device — Older sign-in · Chrome on Mac, never active',
+      'Sign out this device: Older sign-in (Chrome on Mac), last active 2 days ago, first signed in 1 Sep 2026',
+      'Sign out this device: Older sign-in (Chrome on Mac), last active 2 days ago, first signed in 10 Sep 2026',
+      'Sign out this device: Older sign-in (Chrome on Mac), never active',
     ]);
     expect(new Set(names).size).toBe(3);
     await userEvent.click(screen.getByRole('button', { name: /first signed in 10 Sep 2026$/ }));

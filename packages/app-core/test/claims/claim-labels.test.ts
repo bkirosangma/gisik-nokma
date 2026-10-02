@@ -38,36 +38,36 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
 
   it("a due claim renders as the spec's example, verbatim", () => {
     expect(dueClaimLabel({ date: '2026-08-30', actorId: 'user_kiro' }, userName)).toBe(
-      "needed by 30 Aug — Kiro's claim",
+      "needed by 30 Aug, Kiro's claim",
     );
   });
 
   it('a start claim is attributed the same way', () => {
     expect(startClaimLabel({ date: '2026-09-01', actorId: 'user_anselma' }, userName)).toBe(
-      "starts 1 Sep — Anselma's claim",
+      "starts 1 Sep, Anselma's claim",
     );
   });
 
   /** A name the roster does not hold falls back to the raw id — attributed, never blank. */
   it('11.5 an unknown actor is named by id, never anonymised', () => {
     expect(dueClaimLabel({ date: '2026-08-30', actorId: 'user_ghost' }, userName)).toBe(
-      "needed by 30 Aug — user_ghost's claim",
+      "needed by 30 Aug, user_ghost's claim",
     );
   });
 
   it("the tooltip carries the claim's note, quoted — never paraphrased", () => {
     expect(
-      claimTooltip("needed by 30 Aug — Kiro's claim", {
+      claimTooltip("needed by 30 Aug, Kiro's claim", {
         date: '2026-08-30',
         actorId: 'user_kiro',
         note: 'GST filing',
       }),
-    ).toBe(`needed by 30 Aug — Kiro's claim · "GST filing"`);
+    ).toBe(`needed by 30 Aug, Kiro's claim. "GST filing"`);
   });
 
   it('a claim with no note gets no invented one', () => {
-    expect(claimTooltip("needed by 30 Aug — Kiro's claim", { date: '2026-08-30', actorId: 'user_kiro' })).toBe(
-      "needed by 30 Aug — Kiro's claim",
+    expect(claimTooltip("needed by 30 Aug, Kiro's claim", { date: '2026-08-30', actorId: 'user_kiro' })).toBe(
+      "needed by 30 Aug, Kiro's claim",
     );
   });
 
@@ -85,7 +85,7 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
         },
         userName,
       ),
-    ).toBe("Filed on: 30 Aug — Kiro's claim");
+    ).toBe("Filed on: 30 Aug, Kiro's claim");
   });
 
   it('bar provenance names both claims and both authors', () => {
@@ -95,13 +95,13 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
         { date: '2026-08-30', actorId: 'user_kiro' },
         userName,
       ),
-    ).toBe("starts 24 Aug — Anselma's claim · needed by 30 Aug — Kiro's claim");
+    ).toBe("starts 24 Aug, Anselma's claim; needed by 30 Aug, Kiro's claim");
   });
 
   it('11.4 a start-after-due contradiction is shown, not resolved', () => {
     expect(
       contradictionCopy({ date: '2026-08-30', actorId: 'user_kiro' }, { date: '2026-08-24', actorId: 'user_kiro' }),
-    ).toBe('start 30 Aug is after needed-by 24 Aug — both claims shown, no bar drawn');
+    ).toBe('start 30 Aug is after needed-by 24 Aug. Both claims shown, no bar drawn');
   });
 
   /**
@@ -116,7 +116,7 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
    */
   it('11.1 the empty month says why it is empty', () => {
     expect(CALENDAR_EMPTY_MONTH_COPY).toBe(
-      'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.',
+      'No claimed dates are drawn in this month. Undated work is absent, not estimated. The calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed tickets being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.',
     );
   });
 
@@ -154,7 +154,7 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
    */
   it('11.49 the all-hidden month is a DIFFERENT sentence from the empty one', () => {
     expect(CALENDAR_ALL_HIDDEN_COPY).toBe(
-      'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.',
+      'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped. Switch a field back on in the legend to see its claims again.',
     );
     expect(CALENDAR_ALL_HIDDEN_COPY).not.toBe(CALENDAR_EMPTY_MONTH_COPY);
   });

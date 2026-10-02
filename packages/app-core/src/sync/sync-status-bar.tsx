@@ -25,7 +25,7 @@
  */
 export function syncStatusLabel(status: string, queued: number): string {
   const claims = queued === 1 ? '1 claim waiting to send' : `${queued} claims waiting to send`;
-  if (status === 'offline') return queued === 0 ? 'Offline' : `Offline — ${claims}`;
+  if (status === 'offline') return queued === 0 ? 'Offline' : `Offline: ${claims}`;
   if (status === 'catching-up') return 'Catching up…';
   if (status === 'connecting') return 'Connecting…';
   if (status === 'live') return queued === 0 ? 'Live' : claims;
@@ -70,7 +70,7 @@ export function syncStatusLabel(status: string, queued: number): string {
  */
 export function syncErrorNotice(error: { code: string; message: string } | null): string | null {
   if (error === null) return null;
-  return `The server refused this stream (${error.code}): ${error.message} — still retrying.`;
+  return `The server refused this stream (${error.code}): ${error.message}, still retrying.`;
 }
 
 /**

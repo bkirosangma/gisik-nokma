@@ -28,7 +28,7 @@ export function AppearanceSection() {
       <StyleToggle />
       <ThemeToggle />
       <p className="gn-account__note">
-        Appearance is per device, not per workspace — nobody else sees your choice.
+        Appearance is per device, not per workspace. Nobody else sees your choice.
       </p>
     </section>
   );

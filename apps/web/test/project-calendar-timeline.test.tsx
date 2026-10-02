@@ -439,8 +439,8 @@ describe('the project page mounts four views over one list read', () => {
     // Kiro's claim" — is its DESCRIPTION (and its `title`). The property this case keeps is ATTRIBUTION: the
     // roster name reached `userName`, so an unresolved roster would print `user_kiro` in the description.
     const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
-    expect(marker).toHaveAccessibleDescription("needed by 30 Aug — Kiro's claim");
-    expect(marker).toHaveAttribute('title', "needed by 30 Aug — Kiro's claim");
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Kiro's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Kiro's claim");
     // The negative half reads the DESCRIPTION and the `title`, never the name: the name is the ticket now, so
     // `queryByRole('button', { name: /user_kiro/ })` could never match and would pass vacuously.
     expect(marker.getAttribute('title')).not.toContain('user_kiro');
@@ -501,8 +501,8 @@ describe('the project page mounts four views over one list read', () => {
     await openTab('Calendar');
     // 23.140: the chip is named by its ticket; the attribution is read from its DESCRIPTION and `title`.
     const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
-    expect(marker).toHaveAccessibleDescription("needed by 30 Aug — Gita Guest's claim");
-    expect(marker).toHaveAttribute('title', "needed by 30 Aug — Gita Guest's claim");
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Gita Guest's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Gita Guest's claim");
     // Negative half: the raw actor id appears in neither (the name could never match it).
     expect(marker.getAttribute('title')).not.toContain('user_gita');
     expect(document.getElementById(marker.getAttribute('aria-describedby') ?? '')?.textContent).not.toContain('user_gita');
@@ -706,8 +706,8 @@ describe('the project page mounts four views over one list read', () => {
     await openTab('Calendar');
     // 23.140: the chip names the ticket; the custom field's own name rides in the description and `title`.
     const marker = await screen.findByRole('button', { name: 'CCSO-7 Inspected' });
-    expect(marker).toHaveAccessibleDescription("Filed on: 26 Aug — Kiro's claim");
-    expect(marker).toHaveAttribute('title', "Filed on: 26 Aug — Kiro's claim");
+    expect(marker).toHaveAccessibleDescription("Filed on: 26 Aug, Kiro's claim");
+    expect(marker).toHaveAttribute('title', "Filed on: 26 Aug, Kiro's claim");
   });
 
   it('11.167 leaves the Board and List arms exactly as they were — refusals, not spinners', async () => {
@@ -763,8 +763,8 @@ describe('the roster is a convenience, never a gate', () => {
     // need in order to be correct.
     // 23.140: the chip is the ticket; the attribution (the floor, `Unknown person`) is its description and `title`.
     const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
-    expect(marker).toHaveAccessibleDescription("needed by 30 Aug — Unknown person's claim");
-    expect(marker).toHaveAttribute('title', "needed by 30 Aug — Unknown person's claim");
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Unknown person's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Unknown person's claim");
     // The raw actor id is in neither (the old `queryByRole(name: /user_kiro/)` could not match a ticket name).
     expect(marker.getAttribute('title')).not.toContain('user_kiro');
     expect(document.getElementById(marker.getAttribute('aria-describedby') ?? '')?.textContent).not.toContain('user_kiro');

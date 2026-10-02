@@ -232,7 +232,7 @@ describe('3.97 listPending — the roster of outstanding invitations', () => {
     const [gap] = await gappy.listPending('ws_1');
     expect(gap).toEqual({
       inviteId: 'i_1',
-      address: '(no address recorded — row 1)',
+      address: '(no address recorded, row 1)',
       channel: '(no channel recorded)',
       role: '(no role recorded)',
       projectIds: [],

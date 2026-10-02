@@ -746,7 +746,7 @@ export function TicketSheet({
    * apart: `serverRefusal` carries only what the engine actually adjudicated
    * — a real `{rule, reason}` pair the door or the rule engine wrote — and a
    * silence or a dropped connection is not that, however much it might read
-   * the same wrapped in the "Refused by the server — …" sentence. Filed here
+   * the same wrapped in the "Refused by the server: …" sentence. Filed here
    * (fix round 1) as `serverRefusal` under a synthetic `ingest-rejected` rule
    * name until this ruling gave it a proper slot.
    */
@@ -1144,7 +1144,7 @@ export function TicketSheet({
     return (
       <Sheet open title="Ticket" onClose={onClose}>
         <p className="gn-ticket-sheet__absent" data-testid="sheet-ticket-absent">
-          This ticket is not here — it may have been deleted, or you may not be able to see it.
+          This ticket is not here. It may have been deleted, or you may not be able to see it.
         </p>
       </Sheet>
     );
@@ -1359,7 +1359,7 @@ export function TicketSheet({
       // there.
       const message = cause instanceof Error ? cause.message : String(cause);
       setServerRefusal(null);
-      setTransportError(`We could not reach the server for this move — ${message}`);
+      setTransportError(`We could not reach the server for this move: ${message}`);
     } finally {
       // In a `finally`, not after the await, for the reason `submitTicketEvent`'s
       // own docblock records: a REJECTED ingest must not leave Move disabled for
@@ -1801,7 +1801,7 @@ export function TicketSheet({
         // slot is cleared here too, the same pairing the `catch` branch below
         // already does: without it, a REFUSED answer followed by a SILENT one
         // (two separate clicks, two separate ingests) would leave the old
-        // "Refused by the server — …" notice on screen alongside the new
+        // "Refused by the server: …" notice on screen alongside the new
         // transport one — two notices for one click's outcome, the earlier one
         // describing an answer that is no longer what happened.
         clearBoth();
@@ -1827,7 +1827,7 @@ export function TicketSheet({
       // and it decides through the same author as the other eight.
       clearBoth();
       putTransport(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this change — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this change: ${message}`),
       );
     } finally {
       setSubmitting(false);
@@ -2357,7 +2357,7 @@ export function TicketSheet({
       : parentTypeDef === null
         ? `This ticket's type is not in the workspace's list of ticket types, so a subtask cannot be added here.`
         : subtaskType === null
-          ? `This is a ${parentTypeDef.name} — nothing smaller can sit under it.`
+          ? `This is a ${parentTypeDef.name}. Nothing smaller can sit under it.`
           : null;
 
   /**
@@ -2484,7 +2484,7 @@ export function TicketSheet({
       setSubtaskReopen(null);
       setSubtaskRefusal(
         outcome.kind === 'child-refused-after-reopen'
-          ? `${ticketRead.title} was reopened — that is now recorded history. That subtask was not created: ${outcome.refusal.reason}`
+          ? `${ticketRead.title} was reopened. That is now recorded history. That subtask was not created: ${outcome.refusal.reason}`
           : `That subtask was not created: ${outcome.result.message}`,
       );
     } finally {
@@ -2892,7 +2892,7 @@ export function TicketSheet({
       // Assigned to somebody this viewer's roster does not list — a guest, to a
       // non-admin caller. The row says the name it can and offers no control,
       // rather than offering one that cannot state the value.
-      return { control: readOnly, claim: `${claim} — not in the roster you can see` };
+      return { control: readOnly, claim: `${claim}, not in the roster you can see` };
     }
     // With the outsider arm on (final review, 2026-09-29): a member who pulls an
     // outsider in must be able to change or clear that assignment, so the picker
@@ -3393,7 +3393,7 @@ export function TicketSheet({
           <span>At project root</span>
         ) : parent.kind === 'restricted' ? (
           <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
-            Restricted parent — exists, but you can&apos;t see it
+            Restricted parent: it exists, but you can&apos;t see it
           </span>
         ) : openParentSheet === undefined ? (
           <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
@@ -3483,7 +3483,7 @@ export function TicketSheet({
       */}
       {serverRefusal !== null && !moveOpen ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
       {/*
@@ -3575,7 +3575,7 @@ export function TicketSheet({
                     Move…
                   </Button>
                   {closed !== null ? (
-                    <span className="gn-sheet__closed-note">Closed — reopen it first</span>
+                    <span className="gn-sheet__closed-note">Closed. Reopen it first</span>
                   ) : null}
                 </div>
               </dd>
@@ -3629,7 +3629,7 @@ export function TicketSheet({
                 />
                 {priorityClaim === undefined ? (
                   <span className="gn-ticket-sheet__refusal">
-                    This ticket carries no priority claim — the server’s projection has not been
+                    This ticket carries no priority claim. The server’s projection has not been
                     rebuilt since priority became built-in.
                   </span>
                 ) : (
@@ -3932,7 +3932,7 @@ export function TicketSheet({
                   breaking every `getByText` on this heading. */}
               <p className="gn-ticket-sheet__subtasks-heading gn-ticket-sheet__caption">
                 Subtasks
-                {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
+                {ticketRead.rollup === null ? '' : ` (${formatRollup(ticketRead.rollup)})`}
               </p>
             </div>
             {/*
@@ -3951,11 +3951,11 @@ export function TicketSheet({
                 role="alert"
                 data-testid="sheet-subtasks-incomplete"
               >
-                {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read — so this list is not shown rather than shown short.`}
+                {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read, so this list is not shown rather than shown short.`}
               </p>
             ) : subtaskRows.length === 0 ? (
               <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
-                No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date
+                No subtasks. A subtask is a ticket of its own: it gets a state, an assignee, a date
                 and a history.
               </p>
             ) : (
@@ -3970,7 +3970,7 @@ export function TicketSheet({
                         beneath it as a BLOCK rather than as a run of inline spans
                         — which is the 2026-09-20 defect's own shape changed on
                         purpose. The row used to be three adjacent inline spans
-                        with a text ` · ` between them, because two adjacent spans
+                        with a text `, ` between them, because two adjacent spans
                         are ONE RUN OF GLYPHS: the row rendered
                         `Order the brochuresTo do` on screen AND in the accessible
                         name. **A card separates the title from the meta row by
@@ -3991,7 +3991,7 @@ export function TicketSheet({
                         about, one element to the right. The chip and this detail
                         line are two flex items on ONE line with a CSS `gap`
                         between them, and a gap is not a glyph: without the
-                        leading ` · ` inside this string the meta row reads
+                        leading `, ` inside this string the meta row reads
                         `To dotask`, on screen and in the accessible name alike,
                         and jsdom has no layout engine to tell the two treatments
                         apart. So the separator lives INSIDE the detail string and
@@ -4005,8 +4005,8 @@ export function TicketSheet({
                       */}
                       <span className="gn-ticket-sheet__subtask-detail">
                         {row.dueDate === null
-                          ? ` · ${row.typeId}`
-                          : ` · ${row.typeId} · Due ${formatDate(row.dueDate.date)}`}
+                          ? `, ${row.typeId}`
+                          : `, ${row.typeId}, Due ${formatDate(row.dueDate.date)}`}
                       </span>
                     </span>
                   </li>
@@ -4173,7 +4173,7 @@ export function TicketSheet({
                   readOnly={false}
                   workspaceId={workspaceId}
                   ticketId={ticketId}
-                  placeholder="Add a comment — @ to mention someone"
+                  placeholder="Add a comment, or type @ to mention someone"
                   submit={submitComment}
                   queryUsers={queryUsers}
                   queryNotes={queryNotes}
@@ -4288,7 +4288,7 @@ export function TicketSheet({
               className="gn-ticket-sheet__attachments-error"
               data-testid="sheet-attachments-unavailable"
             >
-              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+              {`This ticket's attachments could not be read: ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
             </p>
           )}
         </div>
@@ -4500,7 +4500,7 @@ function HistoryTab({
   if (result.error !== null) {
     return (
       <p className="gn-ticket-sheet__history-error">
-        {`This ticket's history could not be read — ${result.error}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+        {`This ticket's history could not be read: ${result.error}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
       </p>
     );
   }
@@ -4526,7 +4526,7 @@ function HistoryTab({
       */}
       {result.data.length >= HISTORY_PAGE_LIMIT ? (
         <p className="gn-ticket-sheet__history-partial">
-          {`Showing the first ${HISTORY_PAGE_LIMIT} entries — this ticket's history may go on past them.`}
+          {`Showing the first ${HISTORY_PAGE_LIMIT} entries. This ticket's history may go on past them.`}
         </p>
       ) : null}
       <HistoryList events={result.data} nameOf={nameOf} stateName={stateName} typeName={typeName} />

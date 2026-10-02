@@ -102,7 +102,7 @@ export function RestrictToEditor(props: { transitionIndex: number; ruleIndex: nu
       </fieldset>
       {isEmpty ? (
         <p className="restrict-to-editor__empty-warning">
-          Pick at least one — a restriction that names nobody can never be satisfied.
+          Pick at least one. A restriction that names nobody can never be satisfied.
         </p>
       ) : null}
     </div>

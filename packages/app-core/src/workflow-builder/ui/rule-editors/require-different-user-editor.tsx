@@ -35,7 +35,7 @@ export function RequireDifferentUserEditor(props: {
       />
       {target === draft.def.initialStateId ? (
         <p className="require-different-user-editor__start-note">
-          {`A ticket born in the start state has nobody to differ from — this rule only bites once the move to "${summaryCtx.stateName(target)}" has actually been performed.`}
+          {`A ticket born in the start state has nobody to differ from. This rule only bites once the move to "${summaryCtx.stateName(target)}" has actually been performed.`}
         </p>
       ) : null}
     </div>

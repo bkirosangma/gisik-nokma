@@ -46,7 +46,7 @@ export function asNumber(value: unknown, path: string): number {
  */
 export function asStringOrNull(record: Record<string, unknown>, key: string, path: string): string | null {
   if (!Object.prototype.hasOwnProperty.call(record, key)) {
-    throw new MappingError(path, `a "${key}" key — present and either a string or null`);
+    throw new MappingError(path, `a "${key}" key that is present and either a string or null`);
   }
   const value = record[key];
   if (value === null) return null;

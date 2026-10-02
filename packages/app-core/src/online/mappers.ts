@@ -164,7 +164,7 @@ export class ServingGapError extends MappingError {
   constructor(method: string, absences: readonly Absence[]) {
     super(
       method,
-      `facts the shipped route does not serve — ${absences
+      `facts the shipped route does not serve: ${absences
         .map((absence) => `${absence.field} (${absence.because}; owner: ${absence.owner})`)
         .join('; ')}`,
     );
@@ -262,8 +262,8 @@ export const LIST_TOO_LARGE_ABSENCE: Absence = {
   // and no wire key exists for "the project is too big for the view type".
   wireKey: null,
   wireRoute: null,
-  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set — serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
-  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type — the bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
+  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set, so serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
+  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type. The bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
 };
 
 /** A request the shipped route's query language cannot express. */
@@ -403,7 +403,7 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
   if (uncategorized > 0) {
     throw new MappingError(
       `${path}.uncategorizedChildren`,
-      `0 — the server counted ${uncategorized} children whose state category it could not read, and RollupToViewer has no field to say so, so rendering the other counts would present an admittedly incomplete total as a complete one`,
+      `0, because the server counted ${uncategorized} children whose state category it could not read, and RollupToViewer has no field to say so, so rendering the other counts would present an admittedly incomplete total as a complete one`,
     );
   }
   return {
@@ -1075,7 +1075,7 @@ const FILTER_BLOCKED_ABSENCE: Absence = {
   wireRoute: null,
   because:
     "the server's filterSpecSchema carries a `blocked` term and the client's FilterSpec has no key for it, so a saved filter using it cannot be shown, edited or written back without silently dropping the criterion",
-  owner: 'Plan 6 — the client FilterSpec type (view-types.ts), not a route',
+  owner: 'Plan 6: the client FilterSpec type (view-types.ts), not a route',
 };
 
 /**
@@ -1133,8 +1133,8 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
             field: 'FilterSpec.fields',
             wireKey: null,
             wireRoute: null,
-            because: `the client's fields is Record<fieldId, value> — equality only — and this clause asks for op '${op}'`,
-            owner: 'Plan 6 — the client FilterSpec type (view-types.ts), not a route',
+            because: `the client's fields is Record<fieldId, value> (equality only) and this clause asks for op '${op}'`,
+            owner: 'Plan 6: the client FilterSpec type (view-types.ts), not a route',
           },
         ]);
       }
@@ -1421,7 +1421,7 @@ function describedText(
   if (!Object.prototype.hasOwnProperty.call(record, key)) {
     throw new MappingError(
       path,
-      'a project description key — every project row must state its description, ' +
+      'a project description key: every project row must state its description, ' +
         'spelling "not described" as null rather than omitting the key',
     );
   }
@@ -1592,7 +1592,7 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
 /** `string | null`, and the KEY must be present: absent is a route that did not answer, not "ungrouped". */
 function nullableGroupId(row: Record<string, unknown>, path: string): string | null {
   if (!Object.prototype.hasOwnProperty.call(row, 'groupId')) {
-    throw new MappingError(path, 'a project group key — a string, or null when ungrouped; never omitted');
+    throw new MappingError(path, 'a project group key (a string, or null when ungrouped; never omitted)');
   }
   const value = row['groupId'];
   return value === null ? null : asString(value, path);

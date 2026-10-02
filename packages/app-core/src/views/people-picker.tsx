@@ -52,7 +52,7 @@ export function PeoplePicker({
          * same distinction made on a page.
          */
         <p className="gn-visibility__no-roster">
-          No one to choose from — the roster for this workspace has not been read.
+          No one to choose from. The roster for this workspace has not been read.
         </p>
       ) : (
         members.map((member) => (

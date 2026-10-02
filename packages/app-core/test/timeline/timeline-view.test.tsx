@@ -665,7 +665,7 @@ describe('11.80 custom date claims sit beside the ticket, never across the weeks
           userName,
         ),
         customLabel('Filed on', '2026-08-26', 'user_anselma'),
-      ].join(' · '),
+      ].join('; '),
     );
   });
 
