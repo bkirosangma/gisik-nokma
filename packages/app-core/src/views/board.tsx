@@ -17,7 +17,7 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon, useScrollEdges } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, PlusIcon, SnowflakeIcon, useScrollEdges } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -887,6 +887,9 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
             className="gn-board__empty-create"
             onClick={() => onCreateTicket()}
           >
+            {/* The same `+` the header's Create buttons carry (P-T13, 22.245), so every Create action reads alike.
+                Still NOT primary: the header's Create ticket is the view's one (22.150). */}
+            <PlusIcon />
             Create ticket
           </button>
         ) : null}

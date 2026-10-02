@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rankBetween, type GroupRow, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSource, WorkspaceMember } from '@gisik-nokma/app-core';
@@ -207,10 +208,11 @@ describe('22.201 the tree is a real tree, one column per level', () => {
     const kids = item('Delivery').querySelectorAll(':scope > .gn-groups__children > .gn-groups__node');
     expect([...kids].map((node) => node.getAttribute('data-group-id'))).toEqual(['g-alpha', 'g-beta', 'g-chi']);
     // CONTROL (same it) — the left-to-right layout is a real rule, not a bare list: a node is a row (box, then
-    // its children column) and the children column draws the spine that joins them (22.210 pins the connectors).
+    // its children column) and the column holds the 2px the spine is drawn in, per child (22.210 pins the connectors,
+    // 22.244 the spine).
     const css = cssOf('globals');
     expect(valueOf(ruleExactly(css, '.gn-groups__node'), 'display')).toBe('flex');
-    expect(valueOf(ruleExactly(css, '.gn-groups__children'), 'border-left')).toMatch(/^2px solid /);
+    expect(valueOf(ruleExactly(css, '.gn-groups__children'), 'border-left')).toBe('2px solid transparent');
   });
 });
 
@@ -572,5 +574,153 @@ describe('22.215 the page reports what the server said', () => {
     expect(await screen.findByRole('treeitem', { name: 'Platform' })).toBeInTheDocument();
     expect(calls.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+/** The tree held in state, so a committed `group.deleted` takes its row away the way the page's re-read does. */
+function Harness({ initial, result, hold }: { initial: GroupRow[]; result?: GroupActionResult; hold?: Promise<void> }) {
+  const [groups, setGroups] = useState(initial);
+  return (
+    <GroupsTree
+      workspaceId={WORKSPACE}
+      canEdit
+      groups={groups}
+      onSubmit={async (action) => {
+        if (hold !== undefined) await hold; // the door has not answered yet
+        if (result !== undefined && !result.ok) return result;
+        if (action.type === 'group.deleted') setGroups((rows) => rows.filter((row) => row.id !== action.id));
+        return OK;
+      }}
+    />
+  );
+}
+
+/** The name button of a group (its row's control) and the tree item that holds it. */
+const nameButton = (name: string) => within(item(name)).getAllByRole('button', { name })[0]!;
+const focusedItem = () => document.activeElement?.closest('[role="treeitem"]') ?? null;
+
+describe('22.242 keyboard focus returns to the row after a rename', () => {
+  it('22.242 Enter (committed), Escape (cancelled) and Enter on an unchanged name each put focus back on that group\'s name button, inside its tree item', async () => {
+    const user = userEvent.setup();
+    renderTree();
+    for (const finish of ['Bravo{Enter}', '{Escape}', '{Enter}']) {
+      await user.click(nameButton('Beta'));
+      const field = screen.getByRole('textbox', { name: 'Rename Beta' });
+      expect(field).toHaveFocus(); // CONTROL: while it is open the field has focus, so the restore is not the field's own autofocus
+      if (finish === '{Escape}') await user.keyboard(finish);
+      else if (finish === '{Enter}') await user.keyboard(finish);
+      else await user.type(field, finish);
+      await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Rename Beta' })).toBeNull());
+      expect(document.activeElement).toBe(nameButton('Beta'));
+      expect(focusedItem()).toBe(item('Beta'));
+    }
+  });
+
+  it('22.242 control: a refused rename keeps its field open and focused', async () => {
+    const user = userEvent.setup();
+    renderTree({ result: { ok: false, message: 'Refused.' } });
+    await user.click(nameButton('Beta'));
+    await user.type(screen.getByRole('textbox', { name: 'Rename Beta' }), 'Bravo{Enter}');
+    await screen.findByRole('alert');
+    expect(screen.getByRole('textbox', { name: 'Rename Beta' })).toHaveFocus();
+    // …and the refusal leaves no stale focus want behind: opening ANOTHER group's rename afterwards keeps focus on
+    // ITS field and does not send it back to Beta's name button, which the abandoned want would name.
+    await user.click(nameButton('Alpha'));
+    const alpha = screen.getByRole('textbox', { name: 'Rename Alpha' });
+    expect(alpha).toHaveFocus();
+    expect(document.activeElement).not.toBe(nameButton('Beta'));
+  });
+});
+
+describe('22.243 keyboard focus after the delete dialog closes', () => {
+  const openDelete = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(screen.getByRole('button', { name: `Delete ${name}` }));
+    return screen.findByRole('dialog');
+  };
+
+  it('22.243 Delete lands focus on the NEXT sibling, else the PREVIOUS, else the parent', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={GROUPS} />);
+    // Beta has Chi after it.
+    await user.click(within(await openDelete(user, 'Beta')).getByRole('button', { name: 'Delete group' }));
+    await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Beta' })).toBeNull());
+    expect(document.activeElement).toBe(nameButton('Chi'));
+    // Chi is now the last of its list: Alpha is before it.
+    await user.click(within(await openDelete(user, 'Chi')).getByRole('button', { name: 'Delete group' }));
+    await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Chi' })).toBeNull());
+    expect(document.activeElement).toBe(nameButton('Alpha'));
+    // Deep is an only child: its parent Gamma.
+    await user.click(within(await openDelete(user, 'Deep')).getByRole('button', { name: 'Delete group' }));
+    await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Deep' })).toBeNull());
+    expect(document.activeElement).toBe(nameButton('Gamma'));
+  });
+
+  it('22.243 focus waits until the deleted row is gone: while the door has not answered it is NOT on the neighbour, once the re-read takes the row it is', async () => {
+    const user = userEvent.setup();
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    render(<Harness initial={GROUPS} hold={held} />);
+    await user.click(within(await openDelete(user, 'Beta')).getByRole('button', { name: 'Delete group' }));
+    // The ingest is held: Beta's row is still in the tree, and focus must not have jumped to Chi yet.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('treeitem', { name: 'Beta' })).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(nameButton('Chi'));
+    // CONTROL — the same run: once the door answers and the row is taken away, focus lands on Chi.
+    answer();
+    await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Beta' })).toBeNull());
+    expect(document.activeElement).toBe(nameButton('Chi'));
+  });
+
+  it('22.243 the last group of all has no neighbour, no parent and, once gone, no tree: focus goes to Add group', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={[group('g-solo', null, 1, 'Solo', R1)]} />);
+    await user.click(within(await openDelete(user, 'Solo')).getByRole('button', { name: 'Delete group' }));
+    await waitFor(() => expect(screen.queryByRole('tree')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add group' }));
+  });
+
+  it('22.243 Cancel and Escape give focus back to the row\'s Delete button; a refused delete does too', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={GROUPS} />);
+    const dialog = await openDelete(user, 'Beta');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete Beta' }));
+    // Escape
+    await openDelete(user, 'Chi');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete Chi' }));
+    cleanup();
+    // refusal
+    render(<Harness initial={GROUPS} result={{ ok: false, message: 'Refused.' }} />);
+    await user.click(within(await openDelete(user, 'Beta')).getByRole('button', { name: 'Delete group' }));
+    await screen.findByRole('alert');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete Beta' }));
+  });
+});
+
+describe('22.244 the tree spine runs from the first child\'s centre to the last child\'s centre', () => {
+  it('22.244 each child draws its own piece of the spine; an only child draws none; the column\'s own border is no longer the line', () => {
+    const css = cssOf('globals');
+    // CONTROL — the column keeps its 2px (so every x is where it was) but it is transparent: the old line ran the
+    // column's whole height, past the first child's centre above and the last child's below, and met a single
+    // child's elbow in a cross.
+    expect(valueOf(ruleExactly(css, '.gn-groups__children'), 'border-left')).toBe('2px solid transparent');
+    const piece = '.gn-groups__children > .gn-groups__node:not(:only-child)::after';
+    const base = ruleExactly(css, piece);
+    expect(valueOf(base, 'background')).toBe('var(--gn-border)');
+    expect(valueOf(base, 'width')).toBe('2px');
+    // the first child starts at ITS centre (the elbow's line is 2px, centred on 1.625rem, the middle of a 52px box), a middle child spans its row
+    expect(valueOf(ruleExactly(css, `${piece.replace('::after', '')}:first-child::after`), 'top')).toBe('calc(1.625rem - 1px)');
+    expect(valueOf(base, 'top')).toBe('-0.5rem');
+    expect(valueOf(base, 'bottom')).toBe('-0.5rem');
+    // the last child ends at ITS centre: the gap above it plus half a box (and the line's own half)
+    const last = ruleExactly(css, `${piece.replace('::after', '')}:last-child::after`);
+    expect(valueOf(last, 'bottom')).toBe('auto');
+    expect(valueOf(last, 'height')).toBe('calc(0.5rem + 1.625rem + 1px)');
+    // the elbow is centred on the same line, and the phone arm draws no spine
+    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before'), 'margin-top')).toBe('calc(1.625rem - 1px)');
+    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::after', '@media (max-width: 40rem)'), 'display')).toBe('none');
   });
 });
