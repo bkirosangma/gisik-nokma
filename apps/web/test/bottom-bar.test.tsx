@@ -566,3 +566,29 @@ describe('23.238 the More sheet\'s rows sit at the bottom (UX fixes T13)', () =>
     expect(edit.querySelector('.gn-bar-sheet--more')).toBeNull();
   });
 });
+
+describe('23.286 the bar with no user id (the session never loaded) remembers nothing under a made-up id (F-6)', () => {
+  it('23.286 userId "" renders the default bar and a project-tab click writes no storage; CONTROL: the same click with a real id DOES write', async () => {
+    stubPhoneViewport(true);
+    currentPath = `/w/${WS}/p/p1`;
+    const user = userEvent.setup();
+    const anon = render(
+      <Providers services={stubServices({ getMyWorkspaces: async () => [] }, { notifications: { unreadCount: async () => 0 } })}>
+        <BottomBar workspaceId={WS} projectId="p1" userId="" pathname={currentPath} />
+      </Providers>,
+    );
+    expect(items()).toEqual(['Board', 'My work', 'Notes', 'Inbox', 'More']);
+    await user.click(within(phoneNav()).getByRole('link', { name: 'Board' }));
+    expect(window.localStorage.length).toBe(0);
+    anon.unmount();
+
+    // CONTROL — a real id writes (the project it is on, and the tab it clicked).
+    render(
+      <Providers services={stubServices({ getMyWorkspaces: async () => [] }, { notifications: { unreadCount: async () => 0 } })}>
+        <BottomBar workspaceId={WS} projectId="p1" userId={U} pathname={currentPath} />
+      </Providers>,
+    );
+    await user.click(within(phoneNav()).getByRole('link', { name: 'Board' }));
+    expect(window.localStorage.length).toBeGreaterThan(0);
+  });
+});

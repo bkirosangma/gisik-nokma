@@ -83,7 +83,7 @@ const DESTINATIONS: Record<BarDestination, Destination> = {
 };
 
 /** A tab written by the page (or a slot) is re-read here so the indicator follows without a navigation. */
-function useProjectTab(projectId: string | undefined, userId: string): ProjectTab | null {
+function useProjectTab(projectId: string | undefined, userId: string | null): ProjectTab | null {
   const [tab, setTab] = useState<ProjectTab | null>(null);
   useEffect(() => {
     const read = (): void => setTab(projectId === undefined ? null : readProjectTab(projectId, userId));
@@ -112,6 +112,9 @@ export function BottomBar({
   pathname: string;
 }) {
   // The default first, the remembered bar in an effect: the markup the server sent is what hydrates.
+  // `userId=""` is a session that never loaded (F-6, 23.285): the bar offers the default and remembers nothing, so the project
+  // helpers below get `null` — their own "no user" door — rather than a record keyed by an empty id.
+  const knownUser = userId === '' ? null : userId;
   const [slots, setSlots] = useState<BarDestination[]>([...DEFAULT_BAR]);
   useEffect(() => {
     setSlots(readBottomBar(userId));
@@ -120,9 +123,9 @@ export function BottomBar({
   const [sheet, setSheet] = useState<'none' | 'more' | 'edit'>('none');
   const keyboardOpen = useKeyboardOpen();
   const unread = useInboxUnread();
-  const lastProject = useLastProject(workspaceId, projectId, userId);
+  const lastProject = useLastProject(workspaceId, projectId, knownUser);
   const targetProject = projectId ?? (lastProject.status === 'remembered' ? lastProject.projectId : undefined);
-  const activeTab = useProjectTab(projectId, userId);
+  const activeTab = useProjectTab(projectId, knownUser);
 
   const scoped = (id: BarDestination): boolean => DESTINATIONS[id].scope !== 'global';
   const resolvable = (id: BarDestination): boolean => !scoped(id) || workspaceId !== undefined;
@@ -144,7 +147,7 @@ export function BottomBar({
     return {
       href: `/w/${workspaceId}/p/${targetProject}`,
       current: onProject && (activeTab ?? DEFAULT_PROJECT_TAB) === tab,
-      onClick: () => rememberProjectTab(targetProject, tab, userId),
+      onClick: () => rememberProjectTab(targetProject, tab, knownUser),
     };
   }
 
