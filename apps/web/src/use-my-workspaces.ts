@@ -24,9 +24,14 @@ type Entry = {
 
 let shared: Entry | null = null;
 
-/** Tests share one module, so they share this. Also what a sign-out clears (FD5). */
+/** Tests share one module, so they share this. Also what every sign-out door clears, through `clear-read-caches.ts` (FD5; case 25.028). */
 export function clearMyWorkspacesCache(): void {
   shared = null;
+}
+
+/** Tests only: what the shared read holds right now, without mounting a hook (a mount resolves the session, which is itself a door). */
+export function peekMyWorkspacesCache(): { userId: string; rows: Rows | null } | null {
+  return shared === null ? null : { userId: shared.userId, rows: shared.rows };
 }
 
 function snapshotOf(entry: Entry): Snapshot {

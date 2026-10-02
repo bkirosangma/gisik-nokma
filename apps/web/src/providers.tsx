@@ -35,6 +35,7 @@ import { rememberLastUserId } from './last-user-id.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
 import { clearReadCaches } from './clear-read-caches.js';
+import { useFreshness } from './freshness.js';
 import { signInWithNext, withSignInOnExpiredWrite } from './expired-session.js';
 
 /**
@@ -180,6 +181,7 @@ export function Providers({
     };
   }, [services]);
   const value = services ?? constructed;
+  useFreshness();
   return <AppServicesContext.Provider value={value}>{children}</AppServicesContext.Provider>;
 }
 
