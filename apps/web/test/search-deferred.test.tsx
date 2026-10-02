@@ -192,13 +192,13 @@ describe('25.206 the filter chips follow the live filter, not the deferred one',
  */
 describe('25.208 the List tab narrows on the deferred text', () => {
   it('25.208 on the List tab one commit has the new text over all the rows; the narrowed rows follow', async () => {
-    const commits: Array<{ text: string; rows: number }> = [];
+    const commits: Array<{ text: string; rows: number; chip: boolean }> = [];
     render(
       <Profiler
         id="page"
         onRender={() => {
           const box = document.querySelector('input[type="search"]') as HTMLInputElement | null;
-          commits.push({ text: box?.value ?? '', rows: cardsOnScreen() });
+          commits.push({ text: box?.value ?? '', rows: cardsOnScreen(), chip: chipOnScreen() });
         }}
       >
         <Providers services={services()}>
@@ -217,7 +217,9 @@ describe('25.208 the List tab narrows on the deferred text', () => {
       fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'board' } });
     });
     expect(commits.some((commit) => commit.text === 'board' && commit.rows === COUNT + 1)).toBe(true);
-    expect(commits.at(-1)).toEqual({ text: 'board', rows: 1 });
+    // The List strip's chips are live too (`listFilterChips`): the chip is already there in a commit that still shows every row.
+    expect(commits.some((commit) => commit.chip && commit.rows === COUNT + 1)).toBe(true);
+    expect(commits.at(-1)).toEqual({ text: 'board', rows: 1, chip: true });
     expect(within(document.body).getByText('Board onboarding checklist')).toBeInTheDocument();
   });
 });
