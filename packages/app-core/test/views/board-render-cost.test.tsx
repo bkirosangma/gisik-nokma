@@ -304,11 +304,10 @@ describe('25.209 the rebuilt move capability still carries cache and uploadEvide
     const file = new File(['receipt'], 'receipt.png', { type: 'image/png' });
     const staleUpload = vi.fn(async () => ({ attachmentId: 'att_stale' }));
     const upload = vi.fn(async () => ({ attachmentId: 'att_1' }));
-    let current = staleUpload;
-    const first = await moveDialogOnSkippedSlot(() => ({ uploadEvidence: current }));
-    first.view.unmount();
-    current = upload;
-    const { dialog } = await moveDialogOnSkippedSlot(() => ({ uploadEvidence: current }));
+    // The page's first render hands the stale uploader, its re-render (before the dialog opens) the newest.
+    const uploaders = [staleUpload, upload];
+    let renders = 0;
+    const { dialog } = await moveDialogOnSkippedSlot(() => ({ uploadEvidence: uploaders[Math.min(renders++, 1)]! }));
     fireEvent.change(within(dialog).getByLabelText(/Evidence/), { target: { files: [file] } });
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
     expect(upload).toHaveBeenCalledWith(file, 'tk_b');

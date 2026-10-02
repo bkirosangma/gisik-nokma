@@ -1729,15 +1729,11 @@ function BoardGroupWithMoves({
   const onMoved = useStableCallback(moves.onMoved);
   const uploadEvidence = useStableCallback(moves.uploadEvidence ?? NO_UPLOAD);
   const hasUpload = moves.uploadEvidence !== undefined;
+  // Spread, then override the two callbacks: a field added to `BoardMoveCapability` is forwarded by default (a hand-listed
+  // copy silently dropped it), and only the deps below say which of them may change the capability's identity.
   const stableMoves = useMemo<BoardMoveCapability>(
-    () => ({
-      dataSource: moves.dataSource,
-      workspaceId: moves.workspaceId,
-      currentUserId: moves.currentUserId,
-      onMoved,
-      ...(moves.cache !== undefined ? { cache: moves.cache } : {}),
-      ...(hasUpload ? { uploadEvidence } : {}),
-    }),
+    () => ({ ...moves, onMoved, ...(hasUpload ? { uploadEvidence } : {}) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `moves` itself is new every render; these are the fields a card reads.
     [moves.dataSource, moves.workspaceId, moves.currentUserId, moves.cache, onMoved, hasUpload, uploadEvidence],
   );
   // ONE factory for the whole group — the slot calls it with its own card — so a slot's props do not change
@@ -1829,7 +1825,10 @@ const NO_UPLOAD = (): Promise<{ attachmentId: string }> => Promise.reject(new Er
  */
 function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
   const latest = useRef(fn);
-  latest.current = fn;
+  // After the commit, not in the render: a render React discards (a deferred one) must not leave its closure behind.
+  useHydrationLayoutEffect(() => {
+    latest.current = fn;
+  });
   return useCallback((...args: A) => latest.current(...args), []);
 }
 
