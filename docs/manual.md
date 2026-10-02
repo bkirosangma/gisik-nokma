@@ -1852,6 +1852,10 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 ### Writing a note
 
+A note opens for reading: the page shows the finished text, with no toolbar and nowhere to type. Press **Edit** at
+the top right of the note to write in it, and **Done** to go back to reading. A note you have just created opens
+ready to write. If you cannot edit a note, there is no **Edit** button.
+
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
 **Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
 Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**,
@@ -1908,9 +1912,11 @@ animating if your device is set to reduce motion.
 ### Finding a note
 
 The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title
-filter that narrows every group as you type. It opens on that list when no note is open. On a narrow
-screen the list is a drawer: the **Notes** button beside **Create note** opens and closes it, and
-**Create note** is on screen whether the drawer is open or shut.
+filter that narrows every group as you type. It opens on that list when no note is open, and when you come
+back to Notes it opens the note you last had open on this device. On a tablet-width screen the list is a drawer: the
+**Notes** button beside **Create note** opens and closes it. On a phone the list and the search box are in a
+panel behind the round button at the bottom right, with a **Notes** / **Contents** switch once a note is open:
+**Contents** lists that note's headings. **Create note** is on screen either way.
 
 There is also a search box. Type into it and two things happen: spelling matches — the words you typed,
 allowing for a near miss — appear almost immediately, and matches **by meaning** are added a little
