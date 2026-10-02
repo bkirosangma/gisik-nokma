@@ -97,7 +97,9 @@ ctl_parse_common() {
 #     the pause (1 s, 3 s); the SECOND Enter submits. A pasted "\r" never counted for more than one.
 #   - a pane in copy mode swallows send-keys (2026-09-08): leave copy mode first.
 # The box shows dim text that is not input: the prompt suggestion and "Press up to edit queued messages"
-# (ESC[2m … ESC[0m). Only non-dim text after ❯ is real input.
+# (ESC[2m … ESC[0m). Only non-dim text after ❯ is real input. The prompt suggestion may run to the end of the line
+# with NO closing reset (measured 2026-10-02 on gisik:1: `^[[2mRead the WHOLE file …` and nothing after): a dim span
+# ends at its reset or at the end of the line.
 
 # Press Enter once as a real keypress, leaving copy mode first when the pane is in it. TARGET is e.g. gisik:2.
 ctl_press_enter() {
@@ -115,7 +117,7 @@ lines = sys.stdin.read().split("\n")
 idx = max((i for i, l in enumerate(lines) if "\u276f" in l), default=None)
 if idx is None: sys.exit(0)
 after = lines[idx].split("\u276f", 1)[1]
-after = re.sub(r"\x1b\[2m.*?(?:\x1b\[0m|\x1b\[22m)", "", after, flags=re.S)   # dim spans are not input
+after = re.sub(r"\x1b\[2m.*?(?:\x1b\[0m|\x1b\[22m|$)", "", after, flags=re.S)   # dim spans are not input, closed or not
 print(re.sub(r"\x1b\[[0-9;]*m", "", after).strip())'
 }
 
