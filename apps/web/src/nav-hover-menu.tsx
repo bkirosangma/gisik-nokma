@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -224,7 +225,7 @@ export function NavHoverMenu({
           trigger.onClick?.();
         }}
       >
-        {trigger.children}
+        <NavPending>{trigger.children}</NavPending>
       </Link>
       {shown ? (
         <div ref={menuRef} id={menuId} role="menu" aria-label={menuLabel} className="gn-nav__menu gn-nav__menu--hover">
@@ -238,7 +239,7 @@ export function NavHoverMenu({
                 aria-current={item.current ? 'page' : undefined}
                 onClick={() => item.onSelect?.()}
               >
-                {item.label}
+                <NavPending>{item.label}</NavPending>
               </Link>
             ))}
           </div>

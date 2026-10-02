@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ProjectPageSkeleton } from '../../../../../src/skeletons/page-shells.js';
 import {
   BACKLOG_STATE,
   BACKLOG_STATE_ID,
@@ -135,7 +136,7 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  */
 export default function ProjectPage() {
   return (
-    <Suspense fallback={<main className="gn-shell gn-shell--wide" />}>
+    <Suspense fallback={<ProjectPageSkeleton />}>
       <ProjectBoard />
     </Suspense>
   );

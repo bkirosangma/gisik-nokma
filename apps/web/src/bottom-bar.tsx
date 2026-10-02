@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { Sheet } from '@gisik-nokma/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -177,7 +178,7 @@ export function BottomBar({
             >
               {d.icon}
               {dot ? <span className="gn-bottom-bar__dot" aria-hidden="true" /> : null}
-              <span className="gn-bottom-bar__label">{d.label}</span>
+              <span className="gn-bottom-bar__label"><NavPending>{d.label}</NavPending></span>
               <span className="gn-bottom-bar__indicator" aria-hidden="true" />
             </Link>
           );
@@ -248,7 +249,7 @@ function MoreBody({
             <li key={id}>
               <Link href={href} className="gn-bar-sheet__row" aria-current={current ? 'page' : undefined} onClick={() => { onClick?.(); onNavigate(); }}>
                 {DESTINATIONS[id].icon}
-                <span>{DESTINATIONS[id].label}</span>
+                <span><NavPending>{DESTINATIONS[id].label}</NavPending></span>
               </Link>
             </li>
           );
@@ -256,18 +257,18 @@ function MoreBody({
         {workspaceId !== undefined ? (
           <li>
             <Link href={`/settings?workspaceId=${workspaceId}`} className="gn-bar-sheet__row" onClick={onNavigate}>
-              <span>Settings</span>
+              <span><NavPending>Settings</NavPending></span>
             </Link>
           </li>
         ) : null}
         <li>
           <Link href="/account" className="gn-bar-sheet__row" onClick={onNavigate}>
-            <span>Account</span>
+            <span><NavPending>Account</NavPending></span>
           </Link>
         </li>
         <li>
           <Link href="/help" className="gn-bar-sheet__row" onClick={onNavigate}>
-            <span>Help</span>
+            <span><NavPending>Help</NavPending></span>
           </Link>
         </li>
       </ul>
