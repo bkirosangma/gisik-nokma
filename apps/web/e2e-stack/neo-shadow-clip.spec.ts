@@ -254,7 +254,7 @@ async function applyNeo(page: Page, theme: Theme): Promise<void> {
 }
 
 /**
- * The cost of the reach padding: a scroller handed the same box back with a negative margin reaches over its neighbours, and a scroller
+ * Case 25.327. The cost of the reach padding: a scroller handed the same box back with a negative margin reaches over its neighbours, and a scroller
  * paints (and takes the pointer) over an earlier non-positioned sibling. For every visible interactive element, probe four points just
  * inside its edges; a point whose top hit is a NEGATIVE-MARGIN scroller that does not contain the element is a click it has lost.
  */
