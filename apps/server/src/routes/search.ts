@@ -16,6 +16,7 @@ import { HEADLINE_OPTIONS } from '../read/headline.js';
 import { lexicalNoteSearch, meaningNoteSearch } from '../read/note-search.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
+import { ticketIdsForKey } from '../read/ticket-key-lookup.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
 import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 
@@ -205,6 +206,13 @@ export async function readSearch(
     return { workspaceId, query, hits: [], notes, ...(corrected === undefined ? {} : { corrected }) };
   }
 
+  // A KEY-shaped query (`CCSO-12`, upper or lower case, spaces around it) also names tickets: the
+  // ids it resolves to — through current AND former prefixes — join the match below, so they are
+  // found although no column of theirs contains the text. They do NOT bypass anything: they pass
+  // through the same WHERE as every lexical hit (tenancy, `visibleTicketsWhere`, soft delete, the
+  // filter spec), which is what keeps this one visibility rule rather than two.
+  const keyTicketIds = await ticketIdsForKey(db, workspaceId, query);
+
   const params = new SqlParams();
   const where = [
     `t.workspace_id = ${params.add(workspaceId)}`,
@@ -223,7 +231,8 @@ export async function readSearch(
   // the same string a second time for no reason. The `$n` it carries addresses
   // the same parameter wherever it appears.
   const tsquery = `websearch_to_tsquery('${FTS_CONFIG}', ${params.add(query)})`;
-  where.push(`s.tsv @@ ${tsquery}`);
+  const keyIds = keyTicketIds.length === 0 ? null : params.add(keyTicketIds);
+  where.push(keyIds === null ? `s.tsv @@ ${tsquery}` : `(s.tsv @@ ${tsquery} OR t.ticket_id = ANY(${keyIds}))`);
 
   const compiled = compileFilterSpec(spec, params);
   where.push(...compiled.clauses);
@@ -261,9 +270,12 @@ export async function readSearch(
             -- **setweight(…) @@ q is equivalent to to_tsvector(…) @@ q**: the
             -- weights affect RANKING, never MATCHING. So these three predicates
             -- partition the very vector the WHERE clause already tested, and at
-            -- least one of them is therefore true for every row returned. The
-            -- ELSE 'title' is unreachable and kept as a floor rather than as
-            -- a case — see the test that asserts this partition.
+            -- least one of them is therefore true for every row returned BY THE
+            -- TEXT. The ELSE 'title' is unreachable for those rows and kept as a
+            -- floor — see the test that asserts this partition. It is REACHABLE
+            -- for exactly one other kind of row: a ticket a KEY-shaped query
+            -- named (CCSO-12 - no column of it need contain that text), whose
+            -- answer is 'title' because the title is what its card leads with.
             --
             -- ## The PRECEDENCE is the schema's own, and it is load-bearing
             --
@@ -282,7 +294,7 @@ export async function readSearch(
        JOIN proj_tickets t ON t.ticket_id = s.ticket_id
        JOIN proj_visibility v ON v.ticket_id = t.ticket_id
       WHERE ${where.join(' AND ')}
-      ORDER BY ts_rank_cd(s.tsv, ${tsquery}) DESC, t.ticket_id
+      ORDER BY ${keyIds === null ? '' : `(t.ticket_id = ANY(${keyIds})) DESC, `}ts_rank_cd(s.tsv, ${tsquery}) DESC, t.ticket_id
       LIMIT ${params.add(SEARCH_LIMIT)}`,
     params.toArray(),
   );

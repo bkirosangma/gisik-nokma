@@ -132,3 +132,33 @@ export async function ticketNumber(
   const numbers = await ticketNumbers(db, workspaceId, [ticketId]);
   return numbers.get(ticketId) ?? null;
 }
+
+/**
+ * The tickets numbered `number` in each of `projectIds` — at most one per project, since a number
+ * is a ticket's position among its project's creations. The inverse of `ticketNumbers`, over the
+ * same ranking and under the same cost (one scan of the workspace's creations), so a key and the
+ * number it names can never disagree about which ticket is which.
+ */
+export async function ticketIdsAtNumber(
+  db: Queryable,
+  workspaceId: string,
+  projectIds: readonly string[],
+  number: number,
+): Promise<string[]> {
+  if (projectIds.length === 0) {
+    return [];
+  }
+  const { rows } = await db.query<{ ticket_id: string }>(
+    `SELECT ticket_id FROM (
+       SELECT entity_id AS ticket_id,
+              payload->>'projectId' AS project_id,
+              row_number() OVER (PARTITION BY payload->>'projectId' ORDER BY workspace_seq) AS number
+         FROM events
+        WHERE workspace_id = $1 AND type = 'ticket.created'
+     ) ranked
+     WHERE project_id = ANY($2) AND number = $3
+     ORDER BY ticket_id`,
+    [workspaceId, [...projectIds], number],
+  );
+  return rows.map((row) => row.ticket_id);
+}
