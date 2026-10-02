@@ -1572,7 +1572,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
 
   /**
    * 10.160 (W1c, 2026-10-01) — `danger` as TEXT on **`surfaceWell`**, the ground of the quiet danger buttons
-   * (`.gn-button.builder-quiet-danger`: "Remove rule", "Delete transition", "Delete state") inside the builder's
+   * (`.gn-button--danger-quiet`, which "Remove rule", "Delete transition" and "Delete state" wear) inside the builder's
    * recessed row body. Same two controls as 16.84 bind the reading to THIS token table.
    */
   it('10.160 danger-as-ink on surfaceWell clears AA in all six combinations, on the ground the builder\'s danger buttons really have', () => {

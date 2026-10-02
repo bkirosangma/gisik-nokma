@@ -377,6 +377,8 @@ its own quotation is the thing a reader stops trusting.
   in the repo green. Asserted by counting: two buttons in the state inspector, exactly one of them
   `--danger` and it is the one whose text is `Delete state`; two danger buttons in the transition
   inspector (`Remove rule`, `Delete transition`). Precedent for the variant is `fields-editor.tsx:64`.
+  AMENDED 2026-10-02 (UX fixes T2 / 23.022): the three destructive buttons wear `--danger-quiet` (the
+  outlined variant), and the test also asserts none of them carries the filled `--danger`.
   (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:497`)
 
 - ✅ **13.772 — the breadcrumb is on every arm of the builder route.** Not an addition to the design: it
