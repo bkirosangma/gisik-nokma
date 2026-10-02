@@ -144,7 +144,10 @@ describe('25.324 the reach strip takes no neighbour\'s click', () => {
     expect(valueOf(bar, 'position')).toBe('relative');
     // Above 60rem the tree is positioned and later in the DOM: a tie loses, so the bar needs a stacking level.
     expect(valueOf(bar, 'z-index')).toBe('1');
-    expect(valueOf(only(ui, '[data-style="neo"] .gn-board-phone-picker'), 'position')).toBe('relative');
+    const picker = only(ui, '[data-style="neo"] .gn-board-phone-picker');
+    expect(valueOf(picker, 'position')).toBe('relative');
+    // The rail's scroll-fade mask is a stacking context after the picker in the DOM, so the picker needs a level too.
+    expect(valueOf(picker, 'z-index')).toBe('1');
     // CONTROL: the tree really is positioned above 60rem, which is why the bar's bare position would tie.
     expect(rulesNaming(globals, '.gn-notes__tree').some((r) => valueOf(r.body, 'position') === 'relative')).toBe(true);
   });

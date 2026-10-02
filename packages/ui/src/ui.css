@@ -9261,7 +9261,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 /* The padded rail's top strip reaches back over what sits above it, and a scroller paints and takes the pointer over an earlier,
    non-positioned sibling: on a phone the column picker above the rail lost its bottom edge to it (measured with `elementFromPoint`,
-   25.320). A positioned picker paints and takes the pointer above that transparent strip. */
+   25.320). A positioned picker paints and takes the pointer above that transparent strip; `z-index: 1` because the rail's scroll-fade
+   mask makes it a stacking context later in the DOM, which a bare `position: relative` ties with and loses to. */
 [data-style="neo"] .gn-board-phone-picker {
   position: relative;
+  z-index: 1;
 }

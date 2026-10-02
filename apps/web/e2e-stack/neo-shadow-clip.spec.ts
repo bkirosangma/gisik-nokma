@@ -269,6 +269,16 @@ async function stolenClicks(page: Page): Promise<string[]> {
       }
       return null;
     };
+    // A point the element's own clipping ancestors hide (a chip scrolled half out of its row) is not a click the element can take.
+    const visibleAt = (el: Element, x: number, y: number): boolean => {
+      for (let n = el.parentElement; n !== null; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+        const b = n.getBoundingClientRect();
+        if (x < b.left || x >= b.right || y < b.top || y >= b.bottom) return false;
+      }
+      return true;
+    };
     for (const el of document.querySelectorAll('a, button, input, select, textarea, [role="tab"], [role="button"]')) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
@@ -280,6 +290,7 @@ async function stolenClicks(page: Page): Promise<string[]> {
       ];
       for (const [x, y] of points) {
         if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) continue;
+        if (!visibleAt(el, x, y)) continue;
         const hit = document.elementFromPoint(x, y);
         if (hit === null || el.contains(hit) || hit.contains(el)) continue;
         const scroller = negativeScroller(hit);
@@ -306,8 +317,8 @@ async function plantControls(page: Page): Promise<void> {
       `<div style="position:absolute;left:240px;top:40px;width:120px;height:80px;overflow:hidden;padding:14px">` +
       `<div id="neo-clip-padded" style="width:92px;height:52px;box-shadow:${shadow}"></div></div>` +
       // a button with a negative-margin scroller laid over its foot: the click the padding takes
-      `<button id="neo-clip-button" style="position:absolute;left:440px;top:40px;width:80px;height:40px">b</button>` +
-      `<div style="position:absolute;left:420px;top:70px;width:120px;height:60px;overflow:auto;margin:-20px;padding:20px"></div>`;
+      `<button id="neo-clip-button" style="position:absolute;left:40px;top:160px;width:80px;height:40px">b</button>` +
+      `<div style="position:absolute;left:20px;top:190px;width:120px;height:60px;overflow:auto;margin:-20px;padding:20px"></div>`;
     document.body.append(host);
   });
 }
