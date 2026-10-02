@@ -44,7 +44,7 @@
  * shape this repository keeps getting caught by.
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -407,6 +407,25 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
  * whose haystack contains the thing it is checking is the defect class this
  * whole batch exists for, so the exclusion is stated here by name.
  */
+/**
+ * A test file or a test directory (F-7, 2026-10-02): `test/`, `tests/`, `__tests__/`, any directory whose name starts
+ * `e2e` (`e2e`, `e2e-stack`, `e2e-viewport`), and files named `x.test.y` or `x.spec.y`. The path is the one segment or the whole
+ * root-relative path, `/`-separated.
+ *
+ * A manual quotation that is "found" only in a test's fixture string is not shown in the product, so
+ * the haystack leaves tests out: the same reason it leaves out comments (`stripComments`) and the
+ * generated copy of the manual (`GENERATED_COPY`).
+ *
+ * @param {string} path
+ * @returns {boolean}
+ */
+export function isTestPath(path) {
+  const segments = path.split('/');
+  const file = segments[segments.length - 1] ?? '';
+  if (/\.(test|spec)\.[^/]+$/.test(file)) return true;
+  return segments.some((seg) => seg === 'test' || seg === 'tests' || seg === '__tests__' || seg.startsWith('e2e'));
+}
+
 const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
 
 /**
@@ -460,6 +479,7 @@ export function productText(root) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (PRODUCT_SKIP.has(entry.name)) continue;
       const p = join(dir, entry.name);
+      if (isTestPath(relative(root, p).split(sep).join('/'))) continue;
       if (entry.isDirectory()) walk(p);
       else if (PRODUCT_EXT.test(entry.name) && !p.endsWith(GENERATED_COPY)) {
         const raw = readFileSync(p, 'utf8');
