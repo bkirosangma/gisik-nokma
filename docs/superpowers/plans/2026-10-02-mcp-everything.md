@@ -17,7 +17,7 @@
 - Never pipe a test or build run into `head` or `grep -m`. Every run in this plan writes a log (`> /tmp/mcpe-<task>.log 2>&1`) and reads it with `tail -N`.
 - Every MCP write carries `origin: 'mcp'` and `actorId` = the session user (`packages/mcp-server/src/tools/submit.ts:62-83`); every write goes to `POST /v1/events` except the attachment bytes (`POST /v1/attachments`, `apps/server/src/routes/attachments.ts:325`) and the REST doors the app itself uses (invites, member removal, invitation answers, notification marks, ticket-type migration).
 - Every tool exists in BOTH doors through `allTools()` (`packages/mcp-server/src/tools/register.ts:17`). No hosted-only and no stdio-only tool.
-- Refusals are passed through VERBATIM (`refused by <rule>: <reason>` / `<code>: <message>`, `submit.ts:20-56`). Not-found answers are uniform: `<thing> not found or not visible to you`.
+- Refusals are passed through VERBATIM (`refused by <rule>: <reason>` / `<code>: <message>`, `submit.ts:20-56`). Not-found answers are uniform: `<thing> not found or not visible to you` (every read of a parent goes through T3's `readOrNotFound`). Every list tool takes `cursor` and `limit` (default 50, max 200; `list_notifications` max 100, the server's own cap) through T3's `page`/`pageField`. Every tool is driven through the HOSTED door by a stranger, a forbidden member and the allowed caller (T3's `runDoorMatrix`, one table per task).
 - Bodies are Markdown both ways (M-E2). A mention is `@[Display Name](user:<userId>)`, a ticket ref `[[KEY-12]]`, a note link `[[note:<title or id>]]`, an image `![alt](attachment:<attachmentId>)` on a line of its own, a collapsible `<details>` / `<summary>…</summary>` / `</details>` each on its own line. An unresolvable mention, ticket or note is a REFUSAL naming the token; nothing silently becomes plain text.
 - The server never fetches a URL the caller gives it (M-E5). Inline files are base64, at most **10 MiB decoded = 10,485,760 bytes** per call; the base64 string is length-checked (`≤ 13,981,016` characters) BEFORE it is decoded. `get_attachment` never returns more than 10,485,760 bytes.
 - Admin and high-impact tools (M-E4) change NOTHING without an exact `confirm_name`; without it, or with a wrong one, they answer a successful PREVIEW (`{ preview: true, … }`), never an error. Comparison is exact: case, spaces, trailing spaces. The existing workspace/project tools keep their throwing `confirmName` unchanged.
@@ -32,7 +32,7 @@
 
 1. **A Markdown body that contains a literal `[[` that is not a ref** (`[[draft]]`, `[[ ccso-4 ]]`, `` `[[CCSO-4]]` `` in a code span, a fenced block containing `[[note:x]]`) — must store as literal text/code, never refuse and never become a chip. Pinned by **26.006** in T1.
 2. **An `@mention` of someone who cannot read the note** (a member outside an explicit-scope note) — the comment/edit/body commits, the mention node is stored, and NO notification row is written for that person, while a reader mentioned in the same body is notified. Pinned by **26.058** in T2 (edit path) and **14.404** in T7 (note body through the MCP).
-3. **A base64 string of 10 MiB + 1 byte decoded** (and one whose string length alone exceeds 13,981,016) — refused before upload naming "10 MB", with no `POST /v1/attachments` call and no allocation of the decoded buffer for the over-long string; exactly 10,485,760 bytes is accepted. Pinned by **14.432** in T8.
+3. **A base64 string of 10 MiB + 1 byte decoded** (and one whose string length alone exceeds 13,981,016) — refused before upload naming "10 MB", with no `POST /v1/attachments` call and no allocation of the decoded buffer for the over-long string; exactly 10,485,760 bytes is accepted. Pinned by **14.432** (unit) and **14.438** (the hosted path end to end) in T8.
 4. **Editing a comment whose parent was deleted** (a soft-deleted ticket; a soft-deleted note) — refused (`deleted-ticket` "This ticket is deleted; restore it first." / `permission.comment` "This note is deleted; restore it first."), nothing written; restoring the parent makes the same edit commit. Pinned by **26.052** in T2.
 5. **`confirm_name` with a trailing space** (`"Corner Shop "` for `Corner Shop`) — answers a successful preview naming `confirm_name must be "Corner Shop"` and sends no event; the exact name commits. Pinned by **14.362** in T3 (helper) and **14.502** in T11 (a real admin tool).
 
@@ -61,6 +61,9 @@
 - **SC19 — four test files pin the tool list, not one**: `packages/mcp-server/test/register.test.ts:27-52`, `packages/mcp-server/test/exports.test.ts:24-49`, `apps/server/test/mcp/mcp-http.test.ts:169-194` (14.262), `apps/server/test/mcp/mcp-remote-e2e.test.ts:104-112`. T3 moves the literal to one per-module fixture and makes the two server tests assert "hosted lists exactly what `allTools` lists".
 - **SC20 — the hosted `/mcp` POST is bounded by Fastify's default 1 MiB body** (no `bodyLimit` anywhere but the multipart comment at `attachments.ts:264-265`; `routes/mcp-http.ts:43`). A 10 MiB file is ~13.4 MB of JSON, so T3 sets `bodyLimit: 16 MiB` on `POST /mcp` only.
 - **SC21 — the in-process door is text-only today**: `inProcessFetch` forwards only a string body (`apps/server/src/mcp/in-process-fetch.ts:26`) and rebuilds the response from `res.body` (`:33`, a UTF-8 string), and the HTTP client reads every answer with `response.text()` (`packages/mcp-server/src/http-client.ts:26-34`). Binary in both directions is T3's.
+- **SC22 — the comment tools take the PARENT too.** The spec writes `edit_comment(commentId, markdown)` / `delete_comment(commentId)`; the events are filed against the comment's ticket or note (T2), and no route maps a comment id to its parent, so both tools (and `list_comments`, `add_comment`, `list_attachments`, `add_attachment`) take `workspaceId` + exactly one of `ticketId` / `noteId`. A wrong parent is refused "That comment is not on this ticket or note." (26.046).
+- **SC23 — `list_notifications` pages at most 100**, the route's own cap (`apps/server/src/routes/notifications.ts:51`, `MAX_LIMIT = 100`, refused with 400 above it), not the spec's 200.
+- **SC24 — the real-client check runs right AFTER the release merge, not before** (spec §8 "before release"). claude.ai cannot reach a dev stack (the hosted door is reached by public URL, `MCP_PUBLIC_URL`), and a merge to `main` IS the release. T14 runs the check in production immediately after the owner's merge, in a throwaway project; a failure becomes a defect on the next release (owner question Q6).
 
 ## Verified assumptions
 
@@ -85,6 +88,7 @@
 - **Q3 — "Edited/deleted a comment" history lines.** **Recommend: ticket History only (notes have no activity history); a note's thread marks edits and deletions in place.**
 - **Q4 — Where deleted comment text survives.** The thread, `list_comments`, `proj_search`, the offline replica's thread and offline search all lose it (T2, T4, T6). It REMAINS in (a) mention notification excerpts already delivered (the fan-out's "a message you were sent is yours", `fanout.ts:30-33`) and (b) the raw ledger reads (`/v1/tickets/:id/history`, `…/tickets/:id/events`, `/v1/notes/:id/events`, sync) — the spec's "the event log keeps it". **Recommend: accept both, say so in Features §23, and make `get_ticket_history` never echo a comment body (T9).**
 - **Q5 — What `confirm_name` names for each admin tool** (this plan's table in T11/T12): the person's display name for member acts, the invited address for invites, the current workspace/project name for a prefix change, the group's name for group acts (the workspace name for `create`), the workflow's/type's current name for definitions and migration, the ticket KEY for visibility and delete, the workspace name for settings. **Recommend as listed.**
+- **Q6 — When the claude.ai check runs** (SC24). **Recommend: immediately after the owner merges `release/mcp-everything` to `main`, in a throwaway project, with failures fixed on the next release.** The alternative — a temporary public staging door — is new infrastructure.
 
 ## File structure
 
@@ -116,7 +120,7 @@
 
 | Task | Lane branch | Depends on | Parallel with | Size |
 |---|---|---|---|---|
-| T0 release cut + catalogue scaffold | (controller, on the release branch) | prefix-groups-ux merged | — | S |
+| T0 release cut (controller, no checkout) + catalogue scaffold | `task/mcp-e-0-scaffold` | prefix-groups-ux merged | — | S |
 | T1 converter | `task/mcp-e-1-converter` | T0 | T2, T3 | L |
 | T2 comment edit/delete — domain + server | `task/mcp-e-2-comment-events` | T0 | T1, T3 | L |
 | T3 MCP plumbing | `task/mcp-e-3-plumbing` | T0 | T1, T2 | M |
@@ -142,7 +146,7 @@ Lanes T6–T12 each write ONLY their own `src/tools/<module>-tools.ts`, their ow
 
 ---
 
-### Task 0: Cut the release branch and lay the catalogue scaffold (controller, no lane)
+### Task 0: Cut the release branch (controller) and lay the catalogue scaffold (lane `task/mcp-e-0-scaffold`)
 
 **Files:**
 - Create: `test-cases/26-comments-and-markdown.md`
@@ -151,13 +155,13 @@ Lanes T6–T12 each write ONLY their own `src/tools/<module>-tools.ts`, their ow
 **Interfaces:**
 - Produces: the section headings every later task appends under — `## 26.1 The Markdown converter (T1)`, `## 26.2 Comment edit and delete — events and server (T2)`, `## 26.3 The offline replica (T4)`, `## 26.4 The app (T5)` in the new bucket; `## 14.14 MCP everything (block 14.360–14.599)` in §14's bucket; the §14 marker comment and §23 heading in `Features.md`.
 
-- [ ] **Step 1: Cut the branch.** Only after `release/prefix-groups-ux` is merged to `main` (owner's word):
+- [ ] **Step 1: Cut the branch WITHOUT a checkout** (controller). Only after `release/prefix-groups-ux` is merged to `main` (owner's word). The primary checkout is a live tree (`ctl rebuild` builds its current branch while `release/neo-refresh` runs), so no `git switch` there; which branch it sits on stays the controller's call:
 
 ```bash
-cd /Users/kiro/my_projects/gisik-nokma && git fetch -q origin && git switch -c release/mcp-everything origin/main && git branch --show-current
+cd /Users/kiro/my_projects/gisik-nokma && git fetch -q origin && git push origin origin/main:refs/heads/release/mcp-everything && git ls-remote origin refs/heads/release/mcp-everything
 ```
 
-Expected: `release/mcp-everything`.
+Expected: one line, the sha of `origin/main`. Then the scaffold lane works in its own worktree: `git worktree add ../gisik-nokma-mcpe-0 -b task/mcp-e-0-scaffold origin/release/mcp-everything` (Node 22 `pnpm install` there before any check).
 
 - [ ] **Step 2: Write the bucket file** `test-cases/26-comments-and-markdown.md`:
 
@@ -222,18 +226,18 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*
 ```
 
-- [ ] **Step 6: Check and commit on the release branch** (the one direct commit to `release/mcp-everything` this plan makes; it carries no code):
+- [ ] **Step 6: Check, commit on the lane, PR into the release branch** (every change is a PR — CLAUDE.md "Never commit or push to `main`" and the release-branch task flow):
 
 ```bash
 node --version && node scripts/check-case-ids.mjs > /tmp/mcpe-t0.log 2>&1; tail -5 /tmp/mcpe-t0.log
 pnpm check:citations > /tmp/mcpe-t0c.log 2>&1; tail -5 /tmp/mcpe-t0c.log
-git branch --show-current
+git branch --show-current   # task/mcp-e-0-scaffold
 git add test-cases/26-comments-and-markdown.md test-cases/README.md test-cases/14-mcp-server.md Features.md
 git commit -m "MCP everything 0: catalogue scaffold (§23, test-cases/26, §14 block 14.360-14.599)"
-git push -u origin release/mcp-everything
+git push -u origin task/mcp-e-0-scaffold
 ```
 
-Expected: both checks green (no ids minted yet), branch `release/mcp-everything`. If `check:citations`' ratchet complains about a new file with no ids, add `"test-cases/26-comments-and-markdown.md": 0` to `scripts/fixtures/check-case-citations-baseline.json` in the same commit.
+Open the PR with `ctl pr open --base release/mcp-everything --repo <this worktree>` (never `gh pr create` in a compound command), then `ctl gate <sha> --base release/mcp-everything` and `ctl land <pr> --base release/mcp-everything` from the same `--repo`. Expected: both checks green (no ids minted yet). DONE line: `DONE task/mcp-e-0-scaffold <sha40>`. If `check:citations`' ratchet complains about a new file with no ids, add `"test-cases/26-comments-and-markdown.md": 0` to `scripts/fixtures/check-case-citations-baseline.json` in the same commit.
 
 ---
 
@@ -1863,10 +1867,10 @@ DONE line: `DONE task/mcp-e-2-comment-events <sha40>`.
 **Files:**
 - Modify: `packages/mcp-server/src/http-client.ts` (whole file, 68 lines), `session.ts:6-14`, `:63-68`, `lazy-session.ts:61-76`, `src/tools/submit.ts:62-68` (`envelopeFor`'s entity kind), `src/tools/register.ts:1-19`, `:54-80`
 - Modify: `apps/server/src/mcp/in-process-fetch.ts:14-54`, `apps/server/src/routes/mcp-http.ts:43`
-- Create: `packages/mcp-server/src/tools/reply.ts`, `src/tools/preview.ts`, and the eight empty factories `src/tools/comment-tools.ts`, `note-tools.ts`, `attachment-tools.ts`, `ticket-tools.ts`, `discovery-tools.ts`, `member-admin-tools.ts`, `definition-admin-tools.ts`, `trash-tools.ts`
+- Create: `packages/mcp-server/src/tools/reply.ts`, `src/tools/preview.ts`, `src/tools/reads.ts`, `apps/server/test/mcp/helpers/door-matrix.ts`, and the eight empty factories `src/tools/comment-tools.ts`, `note-tools.ts`, `attachment-tools.ts`, `ticket-tools.ts`, `discovery-tools.ts`, `member-admin-tools.ts`, `definition-admin-tools.ts`, `trash-tools.ts`
 - Create: `packages/mcp-server/test/fixtures/tool-names.ts`, `test/fixtures/tool-sweep.ts`, `test/fixtures/fake-session.ts`
 - Modify (tests): `packages/mcp-server/test/register.test.ts:21-101`, `:282-316`, `test/exports.test.ts:21-49`, the seven `Session` literals in `test/{workspace-tools,lazy-session,write-tools,project-tools,read-tools}.test.ts`, `apps/server/test/mcp/mcp-http.test.ts:169-194`, `apps/server/test/mcp/mcp-remote-e2e.test.ts:104-112`
-- Test (new): `packages/mcp-server/test/plumbing.test.ts`, `apps/server/test/mcp/mcp-bytes.test.ts`
+- Test (new): `packages/mcp-server/test/plumbing.test.ts`, `apps/server/test/mcp/mcp-bytes.test.ts`, `apps/server/test/mcp/door-matrix.test.ts`
 - Catalogue: `test-cases/14-mcp-server.md` `### T3 — plumbing`, `Features.md` §14
 
 **Interfaces:**
@@ -1879,6 +1883,9 @@ DONE line: `DONE task/mcp-e-2-comment-events <sha40>`.
   - `envelopeFor(session, workspaceId, entity: { kind: EntityKind; id: string }, type, payload)` (any domain entity kind).
   - `MCP_BODY_LIMIT_BYTES = 16 * 1024 * 1024` (exported from `routes/mcp-http.ts`).
   - Empty factories `commentTools`, `noteTools`, `attachmentTools`, `ticketTools`, `discoveryTools`, `memberAdminTools`, `definitionAdminTools`, `trashTools`, each `(session: Session) => ToolDefinition[]`, already composed into `allTools` in the FINAL order.
+  - `registerToolDefinitions(server: McpServer, session: LazySession, tools: ToolDefinition[], hooks?: RegisterHooks): void` (exported from `register.ts`; `registerTools` = `registerToolDefinitions(server, session, allTools(session), hooks)`), so a test can register a fake `ToolDefinition` through the REAL loop.
+  - `tools/reads.ts`: `readOrNotFound(session: Session, path: string, thing: string): Promise<unknown>` (a 404 becomes `<thing> not found or not visible to you`); `page<T>(items: readonly T[], cursor: string | undefined, limit: number | undefined): { items: T[]; nextCursor: string | null }` (default 50, max 200, opaque offset cursor); `pageArgs = { cursor, limit }` (zod raw shape every list tool spreads); `pageField(body: Record<string, unknown>, key: string, cursor, limit): Record<string, unknown>` (pages the array under `key`, adds `nextCursor`).
+  - Test helper `apps/server/test/mcp/helpers/door-matrix.ts`: `buildDoorWorld(db: TestDatabase, phoneTail: string): Promise<DoorWorld>`, `callTool(app, token, name, args)`, `runDoorMatrix(world: DoorWorld, rows: DoorRow[]): Promise<void>`, `type DoorRow = { tool: string; args: (w: DoorWorld) => Record<string, unknown>; stranger: string | { json: unknown }; forbidden?: { text: string }; allowed?: { caller: 'owner' | 'member'; eventType?: string } }` — spec §8's three callers for every tool (T6–T12 each add one table).
   - Test fixtures: `TOOL_NAMES_BY_MODULE`, `TOOL_NAMES` (`test/fixtures/tool-names.ts`); `SWEEP: Record<string, { args: Record<string, unknown>; session?: Partial<Session> }>` (`test/fixtures/tool-sweep.ts`); `NO_TRANSFER: Pick<Session, 'getBytes' | 'postMultipart'>` (`test/fixtures/fake-session.ts`).
 
 Cases (`### T3 — plumbing`):
@@ -1887,7 +1894,10 @@ Cases (`### T3 — plumbing`):
 - ❌ **14.360 — `encodeMultipart` writes every field part BEFORE the file part, the file's bytes byte-identical (including bytes that are not UTF-8), and a filename's `"`, CR and LF replaced so a name cannot break the header;** control: a plain name passes through. Mutation: write the file part first → the order assertion fails.
 - ❌ **14.361 — through the HOSTED in-process door, `postMultipart('/v1/attachments', {ticketId}, png)` uploads (201, sniffed `image/png`) and `getBytes('/v1/attachments/:id')` returns the SAME bytes;** control: the JSON `get` still works on the same session. Mutation: keep `inProcessFetch` string-only → the upload answers 400 "a multipart file part is required".
 - ❌ **14.362 — `confirmOrPreview` answers `null` only for the exact name; a missing, case-changed or trailing-space name answers a preview (`preview: true`, `nothingChanged: true`, `confirm: 'confirm_name must be "Corner Shop"'`) and calls `describe` once** (Review Focus 5); control: the exact name never calls `describe`. Mutation: `trim()` before comparing → the trailing-space case answers `null`.
-- ❌ **14.363 — a handler answering a `ToolReply` with an image block reaches a REAL MCP client as an `image` content item (`data`, `mimeType`); any other answer is still ONE JSON text block (14.84 unchanged);** control: 14.84. Mutation: `JSON.stringify` every answer → the image arrives as text.
+- ❌ **14.363 — a `ToolDefinition` whose handler answers a `ToolReply` with an image block, registered through the REAL loop (`registerToolDefinitions`), reaches a REAL MCP client as an `image` content item (`data`, `mimeType`); a handler answering a plain object is still ONE JSON text block;** control: the plain-object tool in the same server. Mutation: `JSON.stringify` every answer in the loop → the image arrives as text.
+- ❌ **14.368 — `page` slices from an opaque offset cursor, defaults to 50 and caps at 200, answers `nextCursor: null` on the last page, and refuses a cursor it did not give out;** control: 120 items → 50/50/20. Mutation: no cap → a 500-limit call answers 500.
+- ❌ **14.369 — `readOrNotFound` turns a 404 into `<thing> not found or not visible to you` and rethrows anything else untouched;** control: a 200 passes through. Mutation: map every error → a 500 reads as not-found.
+- ❌ **14.370 — `runDoorMatrix` over three EXISTING tools (`get_project` read, `rename_workspace` write, `archive_project` confirm) passes: the stranger's exact sentence, the member's verbatim refusal, the owner's event with `origin: 'mcp'`;** control: a row expecting the wrong stranger text fails the helper (asserted with `rejects`). Mutation: compare with `toContain` → the wrong-text control passes.
 - ❌ **14.364 — `POST /mcp` accepts a 12 MB JSON body (no 413) and refuses one over 16 MiB with 413;** control: a small body is unchanged. Mutation: drop `bodyLimit` → the 12 MB call answers 413.
 - ❌ **14.365 — the stdio session's `getBytes` and `postMultipart` re-authenticate ONCE on 401, like `get`, and a 403 is thrown without a login;** control: `get`'s 14.300 cases stay green. Mutation: call the client without `withReauth` → the 401 case throws.
 - ❌ **14.366 — the tool list is pinned ONCE (`test/fixtures/tool-names.ts`, one block per module, in `allTools` order); `register.test.ts` and `exports.test.ts` read it; the hosted `tools/list` (`mcp-http.test.ts` 14.262, `mcp-remote-e2e.test.ts`) equals `allTools(stub)` in order;** control: the 24 names of today, unchanged. Mutation: drop a tool from a factory → 14.80 and 14.262 both redden.
@@ -1907,7 +1917,9 @@ import { createSession } from '../src/session.js';
 import { lazySession } from '../src/lazy-session.js';
 import { confirmOrPreview } from '../src/tools/preview.js';
 import { ToolReply } from '../src/tools/reply.js';
-import { registerTools } from '../src/tools/register.js';
+import { registerToolDefinitions } from '../src/tools/register.js';
+import { page, readOrNotFound } from '../src/tools/reads.js';
+import type { ToolDefinition } from '../src/tools/read-tools.js';
 import { envelopeFor } from '../src/tools/submit.js';
 import { NO_TRANSFER } from './fixtures/fake-session.js';
 
@@ -1943,22 +1955,39 @@ describe('14.360–14.367 plumbing', () => {
     expect(described).toBe(3);
   });
 
-  it('14.363 a ToolReply image reaches a real client as an image; other answers stay one JSON text block', async () => {
+  it('14.363 a ToolReply image goes through the REAL registration loop as an image; a plain answer stays one JSON text block', async () => {
     const session = lazySession(async () => ({
-      userId: () => 'u', get: async () => ({ ok: true }), post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER,
+      userId: () => 'u', get: async () => ({}), post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER,
     }));
+    const tools: ToolDefinition[] = [
+      { name: 'picture', description: 'test', inputSchema: {}, handler: async () => new ToolReply([{ type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' }]) },
+      { name: 'plain', description: 'test', inputSchema: {}, handler: async () => ({ ok: true }) },
+    ];
     const server = new McpServer({ name: 't', version: '0' });
-    registerTools(server, session);
-    // A test-only tool beside the real ones, registered through the SAME function's contract.
-    server.registerTool('picture', { description: 'test', inputSchema: {} }, async () => {
-      const reply = new ToolReply([{ type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' }]);
-      return { content: reply.content };
-    });
+    registerToolDefinitions(server, session, tools);
     const client = new Client({ name: 'c', version: '0' });
     const [a, b] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(b), client.connect(a)]);
-    const result = await client.callTool({ name: 'picture', arguments: {} });
-    expect(result.content).toEqual([{ type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' }]);
+    expect((await client.callTool({ name: 'picture', arguments: {} })).content).toEqual([{ type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' }]);
+    expect((await client.callTool({ name: 'plain', arguments: {} })).content).toEqual([{ type: 'text', text: JSON.stringify({ ok: true }, null, 2) }]); // control
+  });
+
+  it('14.368 page: offset cursor, default 50, cap 200, refuses a foreign cursor', () => {
+    const items = Array.from({ length: 120 }, (_, i) => i);
+    const first = page(items, undefined, undefined);
+    const second = page(items, first.nextCursor ?? undefined, undefined);
+    const third = page(items, second.nextCursor ?? undefined, undefined);
+    expect([first.items.length, second.items.length, third.items.length, third.nextCursor]).toEqual([50, 50, 20, null]);
+    expect(page(Array.from({ length: 500 }, (_, i) => i), undefined, 500).items).toHaveLength(200);
+    expect(() => page(items, 'abc', 10)).toThrow('cursor is not one this tool gave out');
+  });
+
+  it('14.369 readOrNotFound maps only a 404', async () => {
+    const s = (error: unknown) => ({ userId: () => 'u', get: async () => { throw error; }, post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER });
+    await expect(readOrNotFound(s(new HttpError(404, null)), '/x', 'ticket')).rejects.toThrow('ticket not found or not visible to you');
+    await expect(readOrNotFound(s(new HttpError(500, null)), '/x', 'ticket')).rejects.toThrow('gisik-nokma answered 500');
+    const okSession = { userId: () => 'u', get: async () => ({ a: 1 }), post: async () => ({}), postEvents: async () => ({}), ...NO_TRANSFER };
+    expect(await readOrNotFound(okSession, '/x', 'ticket')).toEqual({ a: 1 }); // control
   });
 
   it('14.365 getBytes and postMultipart re-authenticate once on 401; 403 is thrown', async () => {
@@ -2278,14 +2307,178 @@ export function allTools(session: Session): ToolDefinition[] {
 }
 ```
 
-and inside `registerTools`' callback:
+and `registerTools` becomes a one-line call into an exported loop, so a test can push a fake `ToolDefinition` through the REAL code (14.363):
 
 ```ts
-          const result = await tool.handler(args);
-          observe('ok');
-          if (result instanceof ToolReply) return { content: result.content };
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+export function registerTools(server: McpServer, session: LazySession, hooks: RegisterHooks = {}): void {
+  registerToolDefinitions(server, session, allTools(session), hooks);
+}
+
+/** The registration loop itself (the docblock above moves here unchanged). */
+export function registerToolDefinitions(server: McpServer, session: LazySession, tools: ToolDefinition[], hooks: RegisterHooks = {}): void {
+  for (const tool of tools) {
+    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.inputSchema }, async (args: Record<string, unknown>) => {
+      const started = Date.now();
+      const observe = (outcome: ToolCallEvent['outcome']): void => hooks.onCall?.({ tool: tool.name, outcome, durationMs: Date.now() - started });
+      try {
+        await session.ready();
+        const result = await tool.handler(args);
+        observe('ok');
+        if (result instanceof ToolReply) return { content: result.content };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        observe('error');
+        return { isError: true, content: [{ type: 'text' as const, text: error instanceof Error ? error.message : String(error) }] };
+      }
+    });
+  }
+}
 ```
+
+`src/tools/reads.ts`:
+
+```ts
+import { z } from 'zod';
+import { HttpError } from '../http-client.js';
+import type { Session } from '../session.js';
+
+/** A GET whose 404 is the product's "you may not know whether this exists" — answered in ONE sentence shape (spec §4). */
+export async function readOrNotFound(session: Session, path: string, thing: string): Promise<unknown> {
+  try {
+    return await session.get(path);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 404) throw new Error(`${thing} not found or not visible to you`);
+    throw error;
+  }
+}
+
+/** Every list tool's paging arguments (spec §4: cursor and limit, default 50, max 200). */
+export const pageArgs = { cursor: z.string().regex(/^\d+$/).optional(), limit: z.number().int().min(1).max(200).optional() };
+
+/** Pages a list the route answered whole. The cursor is an offset, opaque to the caller. */
+export function page<T>(items: readonly T[], cursor: string | undefined, limit: number | undefined): { items: T[]; nextCursor: string | null } {
+  const from = cursor === undefined ? 0 : Number(cursor);
+  if (cursor !== undefined && (!/^\d+$/.test(cursor) || from > items.length)) throw new Error('cursor is not one this tool gave out');
+  const size = Math.min(Math.max(limit ?? 50, 1), 200);
+  return { items: items.slice(from, from + size), nextCursor: from + size < items.length ? String(from + size) : null };
+}
+
+/** `page` over the array a route answers under `key`, keeping the rest of the body. */
+export function pageField(body: Record<string, unknown>, key: string, cursor: string | undefined, limit: number | undefined): Record<string, unknown> {
+  const list = body[key];
+  if (!Array.isArray(list)) return body;
+  const { items, nextCursor } = page(list, cursor, limit);
+  return { ...body, [key]: items, nextCursor };
+}
+```
+
+`apps/server/test/mcp/helpers/door-matrix.ts` (spec §8: for every tool, the event written, a forbidden caller's refusal and the uniform not-found):
+
+```ts
+import { expect } from 'vitest';
+import { newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildOAuthApp, hostedToken } from '../../helpers/oauth.js';
+import type { TestDatabase } from '../../helpers/db.js';
+import { signInWithPhone } from '../../helpers/session.js';
+
+export type Caller = { userId: string; token: string; sessionToken: string };
+export type DoorWorld = {
+  app: FastifyInstance; db: TestDatabase; owner: Caller; member: Caller; stranger: Caller;
+  workspaceId: string; workspaceName: string; projectId: string; ticketId: string; ticketKey: string; secondTicketId: string; secondTicketKey: string;
+  commentId: string; privateNoteId: string; workspaceNoteId: string; memberName: string;
+};
+export type DoorRow = {
+  tool: string;
+  args: (w: DoorWorld) => Record<string, unknown>;
+  /** What a signed-in person with NO role in the workspace is answered: an exact sentence, or (for a per-person list) the empty JSON. */
+  stranger: string | { json: unknown };
+  /** What the MEMBER is answered, verbatim, when the act is not theirs. */
+  forbidden?: { text: string };
+  /** Who may do it, and the event that must then be in the ledger with origin `mcp` and that actor. */
+  allowed?: { caller: 'owner' | 'member'; eventType?: string };
+};
+
+export async function callTool(app: FastifyInstance, token: string, name: string, args: Record<string, unknown>) {
+  const res = await app.inject({
+    method: 'POST', url: '/mcp',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18', authorization: `Bearer ${token}` },
+    payload: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } },
+  });
+  const result = res.json().result as { isError?: boolean; content: Array<{ type: string; text?: string }> };
+  const text = result.content.find((c) => c.type === 'text')?.text ?? '';
+  return { isError: result.isError === true, text, json: result.isError === true ? null : (JSON.parse(text) as unknown) };
+}
+
+/** An owner, a plain member (on the project), a signed-in stranger; one project, two tickets, the owner's comment, a private and a workspace note. */
+export async function buildDoorWorld(db: TestDatabase, phoneTail: string): Promise<DoorWorld> {
+  const { app, otp } = buildOAuthApp(db);
+  await app.ready();
+  const person = async (n: number): Promise<Caller> => {
+    const u = await signInWithPhone(app, otp, `+9111${phoneTail}${n}`);
+    return { userId: u.userId, sessionToken: u.token, token: await hostedToken(app, db.pool, u.userId) };
+  };
+  const owner = await person(1);
+  const member = await person(2);
+  const stranger = await person(3);
+  const workspaceName = 'Door matrix';
+  const workspaceId = (await app.inject({ method: 'POST', url: '/v1/workspaces', headers: { authorization: `Bearer ${owner.sessionToken}` }, payload: { name: workspaceName } })).json<{ workspaceId: string }>().workspaceId;
+  const projectId = newUlid();
+  const ticketId = newUlid();
+  const secondTicketId = newUlid();
+  const commentId = newUlid();
+  const privateNoteId = newUlid();
+  const workspaceNoteId = newUlid();
+  const ev = (entity: { kind: string; id: string }, type: string, payload: unknown, id = newUlid()) =>
+    ({ id, workspaceId, entity, type, version: 1, payload, actorId: owner.userId, origin: 'web', clientTime: new Date().toISOString() });
+  const res = await app.inject({ method: 'POST', url: '/v1/events', headers: { authorization: `Bearer ${owner.sessionToken}` }, payload: { events: [
+    ev({ kind: 'project', id: projectId }, 'project.created', { name: 'Matrix' }),
+    ev({ kind: 'project', id: projectId }, 'project.member_added', { userId: owner.userId, projectAdmin: true }),
+    ev({ kind: 'membership', id: `${workspaceId}:${member.userId}` }, 'membership.granted', { userId: member.userId, role: 'member' }),
+    ev({ kind: 'project', id: projectId }, 'project.member_added', { userId: member.userId, projectAdmin: false }),
+    ev({ kind: 'ticket', id: ticketId }, 'ticket.created', { typeId: 'task', projectId, parentId: null, title: 'Matrix ticket', start: 'backlog' }),
+    ev({ kind: 'ticket', id: secondTicketId }, 'ticket.created', { typeId: 'task', projectId, parentId: null, title: 'Second ticket', start: 'backlog' }),
+    ev({ kind: 'ticket', id: ticketId }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'owner says' }] }] } }, commentId),
+    ev({ kind: 'note', id: privateNoteId }, 'note.created', { title: 'Private matrix note', homeProjectId: '', scope: { mode: 'private' } }),
+    ev({ kind: 'note', id: workspaceNoteId }, 'note.created', { title: 'Matrix note', homeProjectId: '', scope: { mode: 'workspace' } }),
+  ] } });
+  for (const r of res.json<{ results: Array<{ status: string; reason?: string }> }>().results) expect(r.status, r.reason).toBe('committed');
+  const get = (url: string) => app.inject({ method: 'GET', url, headers: { authorization: `Bearer ${owner.sessionToken}` } });
+  const ticketKey = (await get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}`)).json<{ key: string }>().key;
+  const secondTicketKey = (await get(`/v1/workspaces/${workspaceId}/tickets/${secondTicketId}`)).json<{ key: string }>().key;
+  const memberName = (await get(`/v1/workspaces/${workspaceId}/members`)).json<{ members: Array<{ userId: string; displayName: string }> }>()
+    .members.find((m) => m.userId === member.userId)!.displayName;
+  return { app, db, owner, member, stranger, workspaceId, workspaceName, projectId, ticketId, ticketKey, secondTicketId, secondTicketKey, commentId, privateNoteId, workspaceNoteId, memberName };
+}
+
+export async function runDoorMatrix(w: DoorWorld, rows: DoorRow[]): Promise<void> {
+  for (const row of rows) {
+    const s = await callTool(w.app, w.stranger.token, row.tool, row.args(w));
+    if (typeof row.stranger === 'string') {
+      expect(s.isError, `${row.tool}: stranger`).toBe(true);
+      expect(s.text, `${row.tool}: stranger`).toBe(row.stranger); // EXACT: a uniform sentence, never "answered 404"
+    } else {
+      expect(s.json, `${row.tool}: stranger`).toEqual(row.stranger.json);
+    }
+    if (row.forbidden !== undefined) {
+      const m = await callTool(w.app, w.member.token, row.tool, row.args(w));
+      expect(m.isError, `${row.tool}: member`).toBe(true);
+      expect(m.text, `${row.tool}: member`).toBe(row.forbidden.text);
+    }
+    if (row.allowed === undefined) continue;
+    const caller = w[row.allowed.caller];
+    const count = async () =>
+      row.allowed?.eventType === undefined ? 0
+        : (await w.db.pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM events WHERE workspace_id = $1 AND type = $2 AND origin = 'mcp' AND actor_id = $3`, [w.workspaceId, row.allowed.eventType, caller.userId])).rows[0]!.n;
+    const before = await count();
+    const ok = await callTool(w.app, caller.token, row.tool, row.args(w));
+    expect(ok.isError, `${row.tool}: ${row.allowed.caller}: ${ok.text}`).toBe(false);
+    if (row.allowed.eventType !== undefined) expect(await count(), `${row.tool}: ${row.allowed.eventType} with origin mcp`).toBe(before + 1);
+  }
+}
+```
+
+14.370 lives in `apps/server/test/mcp/door-matrix.test.ts` (new): `buildDoorWorld(db, '2370')`, then `runDoorMatrix` over `get_project` (stranger: `'project not found or not visible to you'`, allowed member), `rename_workspace` (stranger: `refused by permission.role: <NOT_A_MEMBER_REASON>`, forbidden member: `refused by permission.role: <WORKSPACE_RENAME_REASON>`, allowed owner `workspace.renamed`) — import both constants from `apps/server/src/permissions/check-permission.ts` — and a control `await expect(runDoorMatrix(w, [{ tool: 'get_project', args: …, stranger: 'wrong sentence' }])).rejects.toThrow()`.
 
 (If the SDK's callback return type rejects the union, type the image member as the SDK's own `ImageContent` from `@modelcontextprotocol/sdk/types.js` — verified against the installed 1.30.0, not recalled.)
 
@@ -2394,12 +2587,12 @@ pnpm --filter @gisik-nokma/server exec vitest run test/mcp > /tmp/mcpe-t3-s.log 
 pnpm --filter @gisik-nokma/mcp-server typecheck && pnpm --filter @gisik-nokma/server typecheck > /tmp/mcpe-t3-tc.log 2>&1; tail -10 /tmp/mcpe-t3-tc.log
 ```
 
-Mutations: string-only `inProcessFetch` (14.361), `trim()` in `confirmOrPreview` (14.362), stringify every answer (14.363), no `bodyLimit` (14.364).
+Mutations: string-only `inProcessFetch` (14.361), `trim()` in `confirmOrPreview` (14.362), stringify every answer in `registerToolDefinitions` (14.363), no `bodyLimit` (14.364), no cap in `page` (14.368), `toContain` in `runDoorMatrix` (14.370).
 
-- [ ] **Step 8: Catalogue + commit.** Flip 14.360–14.366 ✅ (14.367 ✅ with its test). Features.md §14, under the marker:
+- [ ] **Step 8: Catalogue + commit.** Flip 14.360–14.370 ✅. Features.md §14, under the marker:
 
 ```markdown
-- ⚙️ **The MCP can move bytes, answer images, take a large call and preview an admin act** (MCP-everything T3; `packages/mcp-server/src/http-client.ts`, `session.ts`, `tools/reply.ts`, `tools/preview.ts`, `apps/server/src/mcp/in-process-fetch.ts`, `routes/mcp-http.ts`) — every session has `getBytes` and `postMultipart` (fields first, file second; the server sniffs), the hosted in-process door is binary-safe both ways, `POST /mcp` takes up to 16 MiB, a tool can answer an MCP image, and `confirmOrPreview` answers a successful preview for any `confirm_name` but the exact one. `allTools` composes twelve modules in a fixed order; the tool list is pinned once per module (`test/fixtures/tool-names.ts`) and the hosted door is held equal to it. Cases 14.360–14.367.
+- ⚙️ **The MCP can move bytes, answer images, take a large call and preview an admin act** (MCP-everything T3; `packages/mcp-server/src/http-client.ts`, `session.ts`, `tools/reply.ts`, `tools/preview.ts`, `apps/server/src/mcp/in-process-fetch.ts`, `routes/mcp-http.ts`) — every session has `getBytes` and `postMultipart` (fields first, file second; the server sniffs), the hosted in-process door is binary-safe both ways, `POST /mcp` takes up to 16 MiB, a tool can answer an MCP image, and `confirmOrPreview` answers a successful preview for any `confirm_name` but the exact one. Every list pages (`page`, default 50, max 200) and every read of a parent answers one not-found sentence (`readOrNotFound`). `allTools` composes twelve modules in a fixed order; the tool list is pinned once per module (`test/fixtures/tool-names.ts`) and the hosted door is held equal to it; `door-matrix.ts` drives any tool through the hosted door as a stranger, a member and the allowed caller. Cases 14.360–14.370.
 ```
 
 ```bash
@@ -3047,6 +3240,7 @@ Cases (`### T6 — comments in Markdown`):
 - ❌ **14.386 — `edit_comment` emits ONE `comment.edited { commentId, body }` against the given ticket or note (origin `mcp`); editing someone else's comment returns the gate's sentence VERBATIM;** control: the author's edit commits. Mutation: reword the refusal → the verbatim assertion fails.
 - ❌ **14.387 — `delete_comment` emits ONE `comment.deleted { commentId }`; a member deleting another's comment gets the gate's sentence verbatim;** control: the author's delete commits. Mutation: send `comment.edited` with an empty body instead → red.
 - ❌ **14.388 — every description of the four comment tools carries `MARKDOWN_SYNTAX_HELP` (the mention, ref and image forms), so an assistant learns the syntax from the tool list;** control: `list_comments`' description says bodies come back as Markdown. Mutation: drop the help from `add_comment` → red.
+- ❌ **14.389 — the door matrix (hosted): for each of the four tools, a stranger gets the exact uniform not-found sentence (reads) or the product's refusal (writes), the member is refused editing/deleting the owner's comment in the gate's words, and the allowed caller's event is in the ledger with `origin: 'mcp'`; `list_comments` pages (cursor/limit);** control: the allowed calls. Mutation: `session.get` without `readOrNotFound` in `list_comments` → the stranger reads "gisik-nokma answered 404".
 ```
 
 - [ ] **Step 1: Dependency.** Add `"@gisik-nokma/editor": "workspace:*"` to `packages/mcp-server/package.json` `dependencies`; `pnpm install > /tmp/mcpe-t6-i.log 2>&1; tail -5 /tmp/mcpe-t6-i.log`.
@@ -3204,6 +3398,30 @@ Hosted (`apps/server/test/mcp/mcp-comments.test.ts`): copy the bootstrap and `ca
     expect(plain.isError).toBe(false); // control: one paragraph
 ```
 
+The door matrix (14.389, spec §8 — every tool, three callers), in the same hosted file:
+
+```ts
+import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE } from '../../src/permissions/check-permission.js';
+import { COMMENT_DELETE_AUTHORITY_REASON, COMMENT_EDIT_AUTHOR_REASON, COMMENT_PERMISSION_RULE } from '../../src/permissions/check-comment-authority.js';
+import { buildDoorWorld, runDoorMatrix } from './helpers/door-matrix.js';
+
+const NOT_MEMBER = `refused by ${PERMISSION_ROLE_RULE}: ${NOT_A_MEMBER_REASON}`;
+it('14.389 every comment tool: stranger, forbidden member, allowed caller', async () => {
+  const w = await buildDoorWorld(db, '2389');
+  const onTicket = (extra: Record<string, unknown>) => (x: typeof w) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, ...extra });
+  await runDoorMatrix(w, [
+    { tool: 'list_comments', args: onTicket({}), stranger: 'ticket not found or not visible to you', allowed: { caller: 'member' } },
+    { tool: 'add_comment', args: onTicket({ markdown: 'From the matrix' }), stranger: NOT_MEMBER, allowed: { caller: 'member', eventType: 'comment.added' } },
+    { tool: 'edit_comment', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, commentId: x.commentId, markdown: 'edited' }), stranger: NOT_MEMBER,
+      forbidden: { text: `refused by ${COMMENT_PERMISSION_RULE}: ${COMMENT_EDIT_AUTHOR_REASON}` }, allowed: { caller: 'owner', eventType: 'comment.edited' } },
+    { tool: 'delete_comment', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, commentId: x.commentId }), stranger: NOT_MEMBER,
+      forbidden: { text: `refused by ${COMMENT_PERMISSION_RULE}: ${COMMENT_DELETE_AUTHORITY_REASON}` }, allowed: { caller: 'owner', eventType: 'comment.deleted' } },
+  ]);
+});
+```
+
+(If the stranger's write answers a different rule than `NOT_A_MEMBER_REASON` — read `checkRolePermission`'s first branches, `check-permission.ts:655-720` — the row uses that exported constant instead; the assertion stays exact.)
+
 - [ ] **Step 3: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/comment-tools.test.ts > /tmp/mcpe-t6.log 2>&1; tail -30 /tmp/mcpe-t6.log`.
 
 - [ ] **Step 4: Implement.** `packages/mcp-server/src/tools/markdown-io.ts`:
@@ -3301,6 +3519,7 @@ import { z } from 'zod';
 import type { Session } from '../session.js';
 import { bodyAsMarkdown, markdownBody, MARKDOWN_SYNTAX_HELP, parentOf } from './markdown-io.js';
 import type { ToolDefinition } from './read-tools.js';
+import { page, pageArgs, readOrNotFound } from './reads.js';
 import { envelopeFor, submitOne } from './submit.js';
 
 const id = z.string().min(1);
@@ -3314,18 +3533,20 @@ export function commentTools(session: Session): ToolDefinition[] {
       description:
         'The comments on one ticket (ticketId) or one note (noteId), oldest first. Each body comes back as Markdown, ' +
         'with `lossy` naming anything Markdown cannot show, `editedAt` when it was edited, and `deleted: true` (no text) ' +
-        'for a deleted comment. Use the commentId with edit_comment or delete_comment.',
-      inputSchema: parentShape,
+        'for a deleted comment. Pages with cursor/limit (default 50, max 200). Use the commentId with edit_comment or delete_comment.',
+      inputSchema: { ...parentShape, ...pageArgs },
       handler: async (args) => {
-        const a = z.object(parentShape).parse(args);
+        const a = z.object({ ...parentShape, ...pageArgs }).parse(args);
         const parent = parentOf(a, 'list_comments');
         const path =
           parent.kind === 'ticket'
             ? `/v1/workspaces/${encodeURIComponent(a.workspaceId)}/tickets/${encodeURIComponent(parent.id)}/comments`
             : `/v1/notes/${encodeURIComponent(parent.id)}/comments`;
-        const { comments } = (await session.get(path)) as { comments: Row[] };
+        const { comments } = (await readOrNotFound(session, path, parent.kind)) as { comments: Row[] };
+        const { items, nextCursor } = page(comments, a.cursor, a.limit);
         return {
-          comments: comments.map((c) => {
+          nextCursor,
+          comments: items.map((c) => {
             const deleted = c.deletedAt != null;
             const md = deleted ? { markdown: null, lossy: [] as string[] } : bodyAsMarkdown(c.body);
             return { commentId: c.commentId, authorId: c.authorId, recordedAt: c.recordedAt, editedAt: c.editedAt ?? null, deleted, ...md, files: c.files ?? [] };
@@ -3396,16 +3617,16 @@ cd /tmp/mcpe-deploy && node --input-type=module -e "import('@gisik-nokma/editor/
 
 Expected last line: `function undefined`. Paste it into 26.012's evidence and flip it ✅🧪 (manual, evidenced). Mutation: keep `plainTextToDoc` (14.380).
 
-- [ ] **Step 6: Catalogue + commit.** Flip 14.380–14.388. Features.md §14:
+- [ ] **Step 6: Catalogue + commit.** Flip 14.380–14.389. Features.md §14:
 
 ```markdown
-- ✅ **Comments through the assistant are Markdown, on tickets and notes, and can be listed, edited and deleted** (MCP-everything T6; `packages/mcp-server/src/tools/markdown-io.ts`, `comment-tools.ts`, `write-tools.ts`) — `add_comment` (ticketId or noteId; `markdown`, or `text` as its old name) stores headings, lists, mentions (`@[Name](user:<id>)`, which notify), ticket refs (`[[KEY-12]]`, exact key only) and note links (`[[note:<title or id>]]`) as real document nodes — the fix for raw `#`/`-` showing in comments (owner, 2 Oct 13:37); anything unresolvable is refused by name before anything is sent. `list_comments` answers Markdown with `lossy`, `editedAt`, `deleted`; `edit_comment` / `delete_comment` follow the product's rules (writer edits; writer or owner/admin deletes). Cases 14.380–14.388.
+- ✅ **Comments through the assistant are Markdown, on tickets and notes, and can be listed, edited and deleted** (MCP-everything T6; `packages/mcp-server/src/tools/markdown-io.ts`, `comment-tools.ts`, `write-tools.ts`) — `add_comment` (ticketId or noteId; `markdown`, or `text` as its old name) stores headings, lists, mentions (`@[Name](user:<id>)`, which notify), ticket refs (`[[KEY-12]]`, exact key only) and note links (`[[note:<title or id>]]`) as real document nodes — the fix for raw `#`/`-` showing in comments (owner, 2 Oct 13:37); anything unresolvable is refused by name before anything is sent. `list_comments` answers Markdown with `lossy`, `editedAt`, `deleted`; `edit_comment` / `delete_comment` follow the product's rules (writer edits; writer or owner/admin deletes). Cases 14.380–14.389.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-6-comment-tools
 git add packages/mcp-server pnpm-lock.yaml apps/server/test/mcp/mcp-comments.test.ts test-cases Features.md
-git commit -m "MCP everything 6: Markdown comments — add_comment fixed, list/edit/delete_comment (14.380-14.388, 26.012)"
+git commit -m "MCP everything 6: Markdown comments — add_comment fixed, list/edit/delete_comment (14.380-14.389, 26.012)"
 git push -u origin task/mcp-e-6-comment-tools
 ```
 
@@ -3437,6 +3658,7 @@ Cases (`### T7 — notes`):
 - ❌ **14.405 — `link_note` emits `note.attached` / `note.detached { ticketId }`; a refusal (a ticket the caller cannot see) comes back verbatim;** control: attach then detach. Mutation: send `note.attached` for `detach` → red.
 - ❌ **14.406 — `delete_note` without the exact current TITLE answers a preview ("Moves the note … to Deleted items; it can be restored for 15 days.") and sends nothing; with it, ONE `note.deleted {}`; `restore_note` needs no name and sends `note.restored {}`;** control: the exact title commits. Mutation: compare titles case-insensitively → red.
 - ❌ **14.407 — `get_note_history` lists the versions (`eventId`, author, time); with `versionId` it answers that version as Markdown with `lossy`;** control: an unknown version id is "note version not found or not visible to you". Mutation: return the raw body → red.
+- ❌ **14.408 — the door matrix (hosted): every note tool answers a stranger "note not found or not visible to you" (or an empty list, or the product's not-a-member refusal for `create_note`), refuses a non-author member's rename/delete in the gate's words, hides a private note from the member with the same not-found, and writes the allowed caller's event with `origin: 'mcp'`;** control: the allowed calls. Mutation: let `readNote` rethrow the bare 404 → "gisik-nokma answered 404".
 ```
 
 - [ ] **Step 1: Failing tests.** `packages/mcp-server/test/note-tools.test.ts` uses T6's `fake` shape (copy it) with routes for `/v1/notes/<N>` → `{ note: { noteId: N, workspaceId: WS, homeProjectId: '', authorId: ME, title: 'Cold room', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt, updatedAt, body } }`, where `body` holds `h2 "Risks"`, a paragraph and `h2 "Owners"`. Then:
@@ -3472,6 +3694,29 @@ Cases (`### T7 — notes`):
 
 plus 14.400 (query strings asserted from `f.asked`; 120 notes → pages of 50/50/20 with `nextCursor` `'50'`, `'100'`, `null`), 14.401 (no `body` key in the answer; `markdown`, `lossy`, `images`), 14.402 (`parseEvent` ok; scope defaults), 14.405 (types), 14.407 (`/history` then `/history/<V>`), each in the same `fake`/`tool` shape. `fake` here collects `batches` (one array per `postEvents` call) rather than a flat `sent`. Hosted 14.404 (`apps/server/test/mcp/mcp-notes.test.ts`, the `mcp-crud-round-trip` bootstrap): `create_note` with `scope: 'private'` and a body mentioning a second member → no notification row for them (`SELECT … FROM notifications WHERE user_id = $1`); the owner's `update_note` adding a mention of themself is excluded by the self rule, so the control is a `workspace`-scoped note mentioning the member → one row.
 
+The door matrix (14.408) in `apps/server/test/mcp/mcp-notes.test.ts`:
+
+```ts
+const NOT_MEMBER = `refused by ${PERMISSION_ROLE_RULE}: ${NOT_A_MEMBER_REASON}`;
+const NOT_YOURS = 'Only the note’s author, an admin who can read it, or the workspace owner can change it.'; // check-permission.ts:1463-1464 (not exported; copied with its curly apostrophe)
+it('14.408 every note tool: stranger, forbidden member, allowed caller', async () => {
+  const w = await buildDoorWorld(db, '2408');
+  const NOTE_GONE = 'note not found or not visible to you';
+  await runDoorMatrix(w, [
+    { tool: 'list_notes', args: (x) => ({ workspaceId: x.workspaceId }), stranger: { json: { notes: [], nextCursor: null } }, allowed: { caller: 'member' } },
+    { tool: 'get_note', args: (x) => ({ noteId: x.privateNoteId }), stranger: NOTE_GONE, forbidden: { text: NOTE_GONE }, allowed: { caller: 'owner' } },
+    { tool: 'create_note', args: (x) => ({ workspaceId: x.workspaceId, title: 'Member note' }), stranger: NOT_MEMBER, allowed: { caller: 'member', eventType: 'note.created' } },
+    { tool: 'update_note', args: (x) => ({ noteId: x.workspaceNoteId, title: 'Matrix note B' }), stranger: NOTE_GONE,
+      forbidden: { text: `event 0 refused by permission.note: ${NOT_YOURS}` }, allowed: { caller: 'owner', eventType: 'note.renamed' } },
+    { tool: 'link_note', args: (x) => ({ noteId: x.workspaceNoteId, ticketId: x.ticketId, action: 'attach' }), stranger: NOTE_GONE, allowed: { caller: 'member', eventType: 'note.attached' } },
+    { tool: 'delete_note', args: (x) => ({ noteId: x.workspaceNoteId, confirm_name: 'Matrix note B' }), stranger: NOTE_GONE,
+      forbidden: { text: `refused by permission.note: ${NOT_YOURS}` }, allowed: { caller: 'owner', eventType: 'note.deleted' } },
+    { tool: 'restore_note', args: (x) => ({ noteId: x.workspaceNoteId }), stranger: NOTE_GONE, allowed: { caller: 'owner', eventType: 'note.restored' } },
+    { tool: 'get_note_history', args: (x) => ({ noteId: x.privateNoteId }), stranger: NOTE_GONE, forbidden: { text: NOTE_GONE }, allowed: { caller: 'owner' } },
+  ]);
+});
+```
+
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/note-tools.test.ts > /tmp/mcpe-t7.log 2>&1; tail -30 /tmp/mcpe-t7.log`.
 
 - [ ] **Step 3: Implement** `note-tools.ts`:
@@ -3485,6 +3730,7 @@ import type { Session } from '../session.js';
 import { bodyAsMarkdown, markdownBody, MARKDOWN_SYNTAX_HELP } from './markdown-io.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
+import { page, pageArgs } from './reads.js';
 import { envelopeFor, submitBatch, submitOne } from './submit.js';
 
 export type NoteDetailWire = {
@@ -3527,8 +3773,7 @@ export function noteTools(session: Session): ToolDefinition[] {
     authorId: id.optional(),
     scope: z.enum(SCOPES).optional(),
     include: z.array(z.enum(['deleted'])).optional(),
-    cursor: z.string().regex(/^\d+$/).optional(),
-    limit: z.number().int().min(1).max(200).optional(),
+    ...pageArgs,
   };
   const createShape = {
     workspaceId: id, title: z.string().min(1).max(500), markdown: z.string().optional(), projectId: z.string().optional(),
@@ -3554,10 +3799,8 @@ export function noteTools(session: Session): ToolDefinition[] {
         if (a.include?.includes('deleted') === true) q.set('deleted', '1');
         const qs = q.toString();
         const { notes } = (await session.get(`/v1/workspaces/${enc(a.workspaceId)}/notes${qs === '' ? '' : `?${qs}`}`)) as { notes: unknown[] };
-        const from = Number(a.cursor ?? '0');
-        const limit = a.limit ?? 50;
-        const page = notes.slice(from, from + limit);
-        return { notes: page, nextCursor: from + limit < notes.length ? String(from + limit) : null };
+        const { items, nextCursor } = page(notes, a.cursor, a.limit);
+        return { notes: items, nextCursor };
       },
     },
     {
@@ -3686,16 +3929,16 @@ Fixture blocks: `tool-names.ts` `note` → the eight names in the order above; `
 
 - [ ] **Step 4: Pass + battery** (as T6 Step 5, without the deploy check). Mutations: ignore `include` (14.400), always send `note.body_set` (14.403), case-insensitive title (14.406).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.400–14.407. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.400–14.408. Features.md §14:
 
 ```markdown
-- ✅ **The assistant works with notes** (MCP-everything T7; `packages/mcp-server/src/tools/note-tools.ts`) — `list_notes` (by project, author/"me", scope, or deleted; paged), `get_note` (body as Markdown with `lossy`, attached tickets, images), `create_note` (scope defaults to private, or inherit when attached at birth), `update_note` (title, body by replace / append / one section — every other part of the body kept exactly — scope, move), `link_note`, `delete_note` (preview unless the exact title; restorable 15 days) / `restore_note`, `get_note_history`. Mentions in a body notify readers only. Cases 14.400–14.407.
+- ✅ **The assistant works with notes** (MCP-everything T7; `packages/mcp-server/src/tools/note-tools.ts`) — `list_notes` (by project, author/"me", scope, or deleted; paged), `get_note` (body as Markdown with `lossy`, attached tickets, images), `create_note` (scope defaults to private, or inherit when attached at birth), `update_note` (title, body by replace / append / one section — every other part of the body kept exactly — scope, move), `link_note`, `delete_note` (preview unless the exact title; restorable 15 days) / `restore_note`, `get_note_history`. Mentions in a body notify readers only. Cases 14.400–14.408.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-7-note-tools
 git add packages/mcp-server apps/server/test/mcp/mcp-notes.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 7: note tools (14.400-14.407)"
+git commit -m "MCP everything 7: note tools (14.400-14.408)"
 git push -u origin task/mcp-e-7-note-tools
 ```
 
@@ -3725,7 +3968,9 @@ Cases (`### T8 — attachments`):
 - ❌ **14.433 — malformed base64 (`not base64!`) is refused naming the field; `file` is required (there is no `link` — owner ruling Q1: links go in Markdown);** control: valid base64 passes. Mutation: `Buffer.from` without the alphabet check → garbage is uploaded.
 - ❌ **14.434 — an upload refusal comes back in the server's words (`payload-too-large: …`, a 404 for an invisible ticket as "ticket not found or not visible to you");** control: the 201 path. Mutation: rethrow the bare `HttpError` → "gisik-nokma answered 413".
 - ❌ **14.435 — `get_attachment`: `text/*` answers the text; `image/*` answers an MCP image block (plus a text block of name, mime and size); anything else answers its metadata and "open it in the app"; anything over 10,485,760 bytes answers metadata only; an invisible id is "attachment not found or not visible to you";** control: a small PNG round-trips byte-identical (hosted). Mutation: return every file as text → the image case fails.
-- ❌ **14.436 — `list_attachments` lists a ticket's files (`GET …/attachments`); for a note it lists the image ids its body embeds and says a note's files are its body's images;** control: an empty ticket answers `[]`. Mutation: read the ticket route for a note → 404.
+- ❌ **14.436 — `list_attachments` lists a ticket's files (`GET …/attachments`); for a note it lists the image ids its body embeds and says a note's files are its body's images; both page (cursor/limit);** control: an empty ticket answers `[]`. Mutation: read the ticket route for a note → 404.
+- ❌ **14.437 — the door matrix (hosted): a stranger gets "ticket not found or not visible to you" / "note not found or not visible to you" / "attachment not found or not visible to you" — never "answered 404" — and the member's upload writes `attachment.added` with `origin: 'mcp'`;** control: the allowed calls. Mutation: drop `readOrNotFound` from `list_attachments` → red.
+- ❌ **14.438 — the whole hosted path at the limit: exactly 10,485,760 bytes go through `/mcp` (~14 MB JSON), the decode, `inject` and multipart into `/v1/attachments`; one byte more is refused naming "10 MB" and nothing is stored** (Review Focus 3, end to end). Control: the exact-limit upload. Mutation: drop T3's `bodyLimit` → the exact-limit call answers 413.
 ```
 
 - [ ] **Step 1: Failing tests.** `packages/mcp-server/test/attachment-tools.test.ts`:
@@ -3817,7 +4062,21 @@ describe('14.430–14.436 attachments', () => {
 });
 ```
 
-Hosted (`apps/server/test/mcp/mcp-attachments.test.ts`, the `mcp-crud-round-trip` bootstrap): `create_ticket`, `add_attachment` with the 70-byte PNG, `list_attachments` shows it, `get_attachment` answers an `image` content item whose `data` decodes to the same 70 bytes (14.435's control), and the ledger holds `attachment.added` with `origin: 'mcp'`.
+Hosted (`apps/server/test/mcp/mcp-attachments.test.ts`, the `mcp-crud-round-trip` bootstrap): `create_ticket`, `add_attachment` with the 70-byte PNG, `list_attachments` shows it, `get_attachment` answers an `image` content item whose `data` decodes to the same 70 bytes (14.435's control), a STRANGER's `get_attachment` of that id answers "attachment not found or not visible to you", and the ledger holds `attachment.added` with `origin: 'mcp'`. Then the whole real path at the limit (14.438): a PNG padded to exactly 10,485,760 bytes (the 70-byte PNG followed by zero bytes — the sniffer reads the signature) goes through `/mcp` as ~14 MB of JSON, is decoded, crosses `inject` as a Buffer and lands in `/v1/attachments` (`size` 10,485,760 in the answer); the same with one more byte is refused naming "10 MB" and no row is added to `attachments`.
+
+The door matrix (14.437):
+
+```ts
+it('14.437 every attachment tool: stranger, allowed caller', async () => {
+  const w = await buildDoorWorld(db, '2437');
+  const file = { name: 'dot.png', base64: PNG_B64 };
+  await runDoorMatrix(w, [
+    { tool: 'list_attachments', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId }), stranger: 'ticket not found or not visible to you', allowed: { caller: 'member' } },
+    { tool: 'add_attachment', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, file }), stranger: 'ticket not found or not visible to you', allowed: { caller: 'member', eventType: 'attachment.added' } },
+    { tool: 'list_attachments', args: (x) => ({ workspaceId: x.workspaceId, noteId: x.privateNoteId }), stranger: 'note not found or not visible to you', forbidden: { text: 'note not found or not visible to you' }, allowed: { caller: 'owner' } },
+  ]);
+});
+```
 
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/attachment-tools.test.ts > /tmp/mcpe-t8.log 2>&1; tail -30 /tmp/mcpe-t8.log`.
 
@@ -3831,6 +4090,7 @@ import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import { parentOf } from './markdown-io.js';
 import type { ToolDefinition } from './read-tools.js';
+import { page, pageArgs, readOrNotFound } from './reads.js';
 import { ToolReply } from './reply.js';
 import { envelopeFor, submitOne } from './submit.js';
 
@@ -3872,13 +4132,19 @@ export function attachmentTools(session: Session): ToolDefinition[] {
     {
       name: 'list_attachments',
       description: "A ticket's files (ticketId), or the images in a note's body (noteId) — a note's files are the images it shows.",
-      inputSchema: { workspaceId: id, ticketId: id.optional(), noteId: id.optional() },
+      inputSchema: { workspaceId: id, ticketId: id.optional(), noteId: id.optional(), ...pageArgs },
       handler: async (args) => {
-        const a = z.object({ workspaceId: id, ticketId: id.optional(), noteId: id.optional() }).parse(args);
+        const a = z.object({ workspaceId: id, ticketId: id.optional(), noteId: id.optional(), ...pageArgs }).parse(args);
         const parent = parentOf(a, 'list_attachments');
-        if (parent.kind === 'ticket') return session.get(`/v1/workspaces/${encodeURIComponent(a.workspaceId)}/tickets/${encodeURIComponent(parent.id)}/attachments`);
-        const { note } = (await session.get(`/v1/notes/${encodeURIComponent(parent.id)}`)) as { note: { body: unknown } };
-        return { images: collectImageAttachmentIds(note.body).map((attachmentId) => ({ attachmentId })), note: "A note's files are the images in its body." };
+        if (parent.kind === 'ticket') {
+          const path = `/v1/workspaces/${encodeURIComponent(a.workspaceId)}/tickets/${encodeURIComponent(parent.id)}/attachments`;
+          const { attachments } = (await readOrNotFound(session, path, 'ticket')) as { attachments: unknown[] };
+          const { items, nextCursor } = page(attachments, a.cursor, a.limit);
+          return { attachments: items, nextCursor };
+        }
+        const { note } = (await readOrNotFound(session, `/v1/notes/${encodeURIComponent(parent.id)}`, 'note')) as { note: { body: unknown } };
+        const { items, nextCursor } = page(collectImageAttachmentIds(note.body).map((attachmentId) => ({ attachmentId })), a.cursor, a.limit);
+        return { images: items, nextCursor, note: "A note's files are the images in its body." };
       },
     },
     {
@@ -3926,7 +4192,7 @@ export function attachmentTools(session: Session): ToolDefinition[] {
         // The SNIFFED type decides (attachments.ts:132-140): a `.png` that is a PDF is refused here. The uploaded object
         // stays an orphan no row names — the route's own documented residue (`attachments.ts:232-235`).
         if (!isEmbeddableImageMime(up.mime)) throw new Error(NOTE_IMAGES_ONLY);
-        const { note } = (await session.get(`/v1/notes/${encodeURIComponent(parent.id)}`)) as { note: { workspaceId: string; body: unknown } };
+        const { note } = (await readOrNotFound(session, `/v1/notes/${encodeURIComponent(parent.id)}`, 'note')) as { note: { workspaceId: string; body: unknown } };
         const image: DocJson = { type: 'doc', content: [{ type: 'image', attrs: { attachmentId: up.attachmentId, wrap: 'block', alt: up.filename } }] };
         const spliced = spliceDoc(note.body, image, { mode: 'append' });
         if ('problem' in spliced) throw new Error(spliced.problem);
@@ -3941,16 +4207,16 @@ Fixture blocks: names `'list_attachments', 'get_attachment', 'add_attachment',`;
 
 - [ ] **Step 4: Pass + battery** (T6 Step 5 shape, no deploy check). Mutations: mime from filename (14.430), no note mime check (14.431), 25 MiB limit (14.432), bare `HttpError` (14.434).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.430–14.436. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.430–14.438. Features.md §14:
 
 ```markdown
-- ✅ **The assistant attaches and reads files** (MCP-everything T8; `packages/mcp-server/src/tools/attachment-tools.ts`) — `add_attachment` sends a file as base64 (at most 10 MB a call; the length is checked before decoding) through the product's own upload (the server sniffs the type), then records `attachment.added`; on a note it takes images only and adds them to the end of the body. `get_attachment` answers text as text and images as images, up to 10 MB; `list_attachments` lists a ticket's files or a note's images. No link attachments: links go in Markdown (owner ruling Q1). Cases 14.430–14.436.
+- ✅ **The assistant attaches and reads files** (MCP-everything T8; `packages/mcp-server/src/tools/attachment-tools.ts`) — `add_attachment` sends a file as base64 (at most 10 MB a call; the length is checked before decoding) through the product's own upload (the server sniffs the type), then records `attachment.added`; on a note it takes images only and adds them to the end of the body. `get_attachment` answers text as text and images as images, up to 10 MB; `list_attachments` lists a ticket's files or a note's images. No link attachments: links go in Markdown (owner ruling Q1). Cases 14.430–14.438.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-8-attachment-tools
 git add packages/mcp-server apps/server/test/mcp/mcp-attachments.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 8: attachment tools, 10 MB inline, images to notes (14.430-14.436)"
+git commit -m "MCP everything 8: attachment tools, 10 MB inline, images to notes (14.430-14.438)"
 git push -u origin task/mcp-e-8-attachment-tools
 ```
 
@@ -3982,6 +4248,7 @@ Cases (`### T9 — tickets`):
 - ❌ **14.455 — `rank_ticket` places a backlog ticket between `before` and `after` (either or both) with `rankBetween` of their current ranks, ONE `ticket.ranked { rank }`; a neighbour outside the backlog is refused naming it; neither neighbour is refused;** control: `after` only. Mutation: swap the bounds → `rankBetween` throws / the order inverts.
 - ❌ **14.456 — `get_ticket` answers the description as `{ markdown, lossy }` and no raw document; a ticket with no description answers `markdown: ''`;** control: the other fields are unchanged. Mutation: keep the raw value → red.
 - ❌ **14.457 — through the hosted door: update a description section, close with a comment, reopen, delete (preview, then the key), restore — each event `origin: 'mcp'`;** control: the ticket reads back with the new section. Mutation: none (round trip).
+- ❌ **14.458 — the door matrix (hosted): every ticket tool answers a stranger the uniform "ticket not found or not visible to you" (reads, and acts that read the ticket first) or the product's not-a-member refusal (blind writes); a plain member is refused delete/restore in the gate's words; the allowed caller's event is `origin: 'mcp'`;** control: the allowed calls. Mutation: return `get_ticket`'s raw 404 → "gisik-nokma answered 404".
 ```
 
 - [ ] **Step 1: Failing tests.** `packages/mcp-server/test/ticket-tools.test.ts` — the T6 `fake` shape with `batches`, and a route for `/v1/workspaces/<WS>/tickets/<T>` answering `{ key: 'CCSO-4', title: 'Chiller', ticketState: { fields: { description: { value: DESC } }, rank: 'm', workflowId: 'wf' }, rollup: { totalChildren: 2 } }` where `DESC` holds `h2 "Steps"`, a paragraph, `h2 "Notes"`; neighbours `B` (rank `'g'`) and `C` (rank `'t'`); `X` (rank `null`). Then:
@@ -4054,6 +4321,34 @@ Cases (`### T9 — tickets`):
 ```
 
 plus 14.450 (`write-tools.test.ts`: the new arguments' payload, `parseEvent` ok), 14.452 (`close_ticket` with `comment: '**done**'` → one batch `['comment.added', 'ticket.closed']`; a refused result verbatim), 14.456 (`read-tools.test.ts`: `description: { markdown: '## Steps…', lossy: [] }`, no `ticketState.fields.description`). Hosted 14.457 in `apps/server/test/mcp/mcp-tickets.test.ts` (the round-trip bootstrap): the listed sequence, then `SELECT origin FROM events WHERE entity_id = $1 AND type <> 'ticket.created'` all `mcp`.
+
+The door matrix (14.458) in `apps/server/test/mcp/mcp-tickets.test.ts`:
+
+```ts
+import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE, ticketDeleteAuthorityReason } from '../../src/permissions/check-permission.js';
+
+const NOT_MEMBER = `event 0 refused by ${PERMISSION_ROLE_RULE}: ${NOT_A_MEMBER_REASON}`;
+const TICKET_GONE = 'ticket not found or not visible to you';
+it('14.458 every ticket tool: stranger, forbidden member, allowed caller', async () => {
+  const w = await buildDoorWorld(db, '2458');
+  const t = (extra: Record<string, unknown> = {}) => (x: typeof w) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, ...extra });
+  const t2 = (extra: Record<string, unknown> = {}) => (x: typeof w) => ({ workspaceId: x.workspaceId, ticketId: x.secondTicketId, ...extra });
+  await runDoorMatrix(w, [
+    { tool: 'update_ticket', args: t({ title: 'Renamed in the matrix' }), stranger: NOT_MEMBER, allowed: { caller: 'member', eventType: 'ticket.field_set' } },
+    { tool: 'close_ticket', args: t(), stranger: NOT_MEMBER }, // allowed path needs a terminal state: 14.457
+    { tool: 'reopen_ticket', args: t(), stranger: NOT_MEMBER },
+    { tool: 'delete_ticket', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.secondTicketId, confirm_name: x.secondTicketKey }), stranger: TICKET_GONE,
+      forbidden: { text: `event 0 refused by ${PERMISSION_ROLE_RULE}: ${ticketDeleteAuthorityReason('delete')}` }, allowed: { caller: 'owner', eventType: 'ticket.deleted' } },
+    { tool: 'restore_ticket', args: t2(), stranger: NOT_MEMBER,
+      forbidden: { text: `event 0 refused by ${PERMISSION_ROLE_RULE}: ${ticketDeleteAuthorityReason('restore')}` }, allowed: { caller: 'owner', eventType: 'ticket.restored' } },
+    { tool: 'get_ticket_history', args: (x) => ({ ticketId: x.ticketId }), stranger: TICKET_GONE, allowed: { caller: 'member' } },
+    { tool: 'rank_ticket', args: t({ after: w.secondTicketId }), stranger: TICKET_GONE }, // the rank arithmetic is 14.455's
+    { tool: 'get_ticket', args: t(), stranger: TICKET_GONE, allowed: { caller: 'member' } },
+  ]);
+});
+```
+
+(`ticketDeleteAuthorityReason` is `check-permission.ts:224`; if the delete refusal is reported under another rule id, read the `ticket.deleted` branch of `checkVisibilityPermission` and use its constant. `get_ticket`'s stranger sentence requires `get_ticket` to map its 404 — `read-tools.ts:138-143` returns `session.get(...)` raw today, so T9 wraps it in `readOrNotFound(…, 'ticket')`.)
 
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/ticket-tools.test.ts > /tmp/mcpe-t9.log 2>&1; tail -30 /tmp/mcpe-t9.log`.
 
@@ -4245,7 +4540,7 @@ export function ticketTools(session: Session): ToolDefinition[] {
 (`start` explicitly `'focus'` when a `stateId` is named: the domain refuses `backlog` + `stateId`; a caller who names `start: 'backlog'` AND a `stateId` is refused locally with that sentence.) `get_ticket` (`read-tools.ts`) maps the detail answer:
 
 ```ts
-        const detail = (await session.get(`/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`)) as {
+        const detail = (await readOrNotFound(session, `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`, 'ticket')) as {
           ticketState: { fields: Record<string, { value: unknown }> };
         } & Record<string, unknown>;
         const { description, ...fields } = detail.ticketState.fields;
@@ -4256,16 +4551,16 @@ Fixture blocks: the seven names in tool order; sweep entries with `session.get` 
 
 - [ ] **Step 4: Pass + battery** (T6 Step 5 shape). Mutations: every field every time (14.451), two batches for close (14.452), confirm on title (14.453), payload passthrough in history (14.454).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.450–14.457. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.450–14.458. Features.md §14:
 
 ```markdown
-- ✅ **The assistant can do every ticket act** (MCP-everything T9; `packages/mcp-server/src/tools/ticket-tools.ts`, `write-tools.ts`, `read-tools.ts`) — `create_ticket` takes a Markdown description, priority, assignee ("me"), starting status and dates; `update_ticket` changes title, description (whole, append, or one section), priority, dates, custom fields, parent, collaborators and workflow in one change; `close_ticket` / `reopen_ticket` (optionally with a comment); `delete_ticket` (preview unless the exact ticket key; restorable 15 days) / `restore_ticket`; `get_ticket_history` (never repeats comment or description text); `rank_ticket` (between two backlog tickets). `get_ticket` reads the description as Markdown. Cases 14.450–14.457.
+- ✅ **The assistant can do every ticket act** (MCP-everything T9; `packages/mcp-server/src/tools/ticket-tools.ts`, `write-tools.ts`, `read-tools.ts`) — `create_ticket` takes a Markdown description, priority, assignee ("me"), starting status and dates; `update_ticket` changes title, description (whole, append, or one section), priority, dates, custom fields, parent, collaborators and workflow in one change; `close_ticket` / `reopen_ticket` (optionally with a comment); `delete_ticket` (preview unless the exact ticket key; restorable 15 days) / `restore_ticket`; `get_ticket_history` (never repeats comment or description text); `rank_ticket` (between two backlog tickets). `get_ticket` reads the description as Markdown. Cases 14.450–14.458.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-9-ticket-tools
 git add packages/mcp-server apps/server/test/mcp/mcp-tickets.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 9: every ticket act through the MCP (14.450-14.457)"
+git commit -m "MCP everything 9: every ticket act through the MCP (14.450-14.458)"
 git push -u origin task/mcp-e-9-ticket-tools
 ```
 
@@ -4295,6 +4590,7 @@ Cases (`### T10 — discovery and me`):
 - ❌ **14.483 — `mark_notifications_read({ ids })` posts `{ ids, read: true }` to `/v1/me/notifications/read` (1–100 ids) and answers `{ changed }`; `{ all: true }` pages the UNREAD list (at most 10 pages of 100) and posts each page's ids, answering the total; both or neither is refused;** control: an empty unread list answers `{ changed: 0 }` with no POST. Mutation: post `read: false` → red.
 - ❌ **14.484 — `list_my_invitations()` reads `/v1/me/invitations`; `respond_to_invitation({ inviteId, answer: 'accept' | 'decline' })` posts to `/v1/me/invitations/:id/accept` (answers `{ workspaceId }`) or `/decline` (204 → `{ declined: true }`); an invitation that is not the caller's answers the server's own 404 sentence;** control: accept. Mutation: post `decline` for `accept` → red.
 - ❌ **14.485 — through the HOSTED door (a token caller), accept and decline work — they use `requireSession` alone (`my-invitations.ts:220-222`, `:262-264`);** control: `list_my_invitations` lists the pending one first. Mutation: none (proves the assumption the spec made).
+- ❌ **14.486 — the door matrix (hosted): every discovery tool answers a stranger "workspace not found or not visible to you" (or an empty per-person list), an unknown invitation "invitation not found or not yours", and the member's reads succeed; the three lists page;** control: the allowed calls. Mutation: drop the 404 mapping in `respond_to_invitation` → "gisik-nokma answered 404".
 ```
 
 - [ ] **Step 1: Failing tests.** `packages/mcp-server/test/discovery-tools.test.ts` (T6's `fake` with `asked`, plus a `posts` recorder on `post`):
@@ -4317,6 +4613,27 @@ Cases (`### T10 — discovery and me`):
 
 (The fake's `get` looks a path up in `pages` exactly; `post` records `[path, body]` and answers `{ changed: 1 }`.) 14.480–14.482 and 14.484 assert the requested paths from `asked`/`posts` in the same shape; the hosted 14.485 (`mcp-discovery.test.ts`): the owner invites a second phone user through `POST /v1/workspaces/:id/invites` as a session caller, the second user gets a hosted token, `list_my_invitations` lists it, `respond_to_invitation` with `accept` answers the workspace id, and `/v1/me/workspaces` now lists it for them.
 
+The door matrix (14.486) in `apps/server/test/mcp/mcp-discovery.test.ts`:
+
+```ts
+it('14.486 every discovery tool: stranger, allowed caller', async () => {
+  const w = await buildDoorWorld(db, '2486');
+  const WS_GONE = 'workspace not found or not visible to you';
+  const ws = (x: typeof w) => ({ workspaceId: x.workspaceId });
+  await runDoorMatrix(w, [
+    { tool: 'list_ticket_types', args: ws, stranger: WS_GONE, allowed: { caller: 'member' } },
+    { tool: 'list_workflows', args: ws, stranger: WS_GONE, allowed: { caller: 'member' } },
+    { tool: 'my_work', args: ws, stranger: WS_GONE, allowed: { caller: 'member' } },
+    { tool: 'get_attention', args: ws, stranger: WS_GONE, allowed: { caller: 'member' } },
+    { tool: 'list_notifications', args: () => ({}), stranger: { json: { notifications: [], nextCursor: null } }, allowed: { caller: 'member' } },
+    { tool: 'list_my_invitations', args: () => ({}), stranger: { json: { invitations: [], nextCursor: null } }, allowed: { caller: 'member' } },
+    { tool: 'respond_to_invitation', args: () => ({ inviteId: '01J0N0SUCH1NV1TE000000000A', answer: 'accept' }), stranger: 'invitation not found or not yours' },
+  ]);
+});
+```
+
+(Each `stranger` sentence assumes the route 404s a non-member; where `requireMember` answers otherwise — read `my-work.ts:598-610` and `attention.ts:417-420` — the row asserts what the route really answers, and the tool maps it to the sentence.)
+
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/discovery-tools.test.ts > /tmp/mcpe-t10.log 2>&1; tail -30 /tmp/mcpe-t10.log`.
 
 - [ ] **Step 3: Implement** `discovery-tools.ts`:
@@ -4326,6 +4643,7 @@ import { z } from 'zod';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
+import { pageArgs, pageField } from './reads.js';
 import { postJson } from './submit.js';
 
 const id = z.string().min(1);
@@ -4346,18 +4664,22 @@ export function discoveryTools(session: Session): ToolDefinition[] {
     {
       name: 'list_ticket_types',
       description: 'The ticket types of a workspace (id, name, icon, the workflow each uses, custom fields). Use a type id with create_ticket.',
-      inputSchema: { workspaceId: id },
-      handler: async (args) => read(session, `/v1/workspaces/${enc(z.object({ workspaceId: id }).parse(args).workspaceId)}/ticket-types`, 'workspace not found or not visible to you'),
+      inputSchema: { workspaceId: id, ...pageArgs },
+      handler: async (args) => {
+        const a = z.object({ workspaceId: id, ...pageArgs }).parse(args);
+        const body = (await read(session, `/v1/workspaces/${enc(a.workspaceId)}/ticket-types`, 'workspace not found or not visible to you')) as Record<string, unknown>;
+        return pageField(body, 'ticketTypes', a.cursor, a.limit); // `builder-reads.ts:766`
+      },
     },
     {
       name: 'list_workflows',
       description: "A workspace's workflows; with workflowId, that workflow's states and the moves allowed between them (use a state id with transition_ticket).",
-      inputSchema: { workspaceId: id, workflowId: id.optional() },
+      inputSchema: { workspaceId: id, workflowId: id.optional(), ...pageArgs },
       handler: async (args) => {
-        const a = z.object({ workspaceId: id, workflowId: id.optional() }).parse(args);
-        return a.workflowId === undefined
-          ? read(session, `/v1/workspaces/${enc(a.workspaceId)}/workflows`, 'workspace not found or not visible to you')
-          : read(session, `/v1/workspaces/${enc(a.workspaceId)}/workflows/${enc(a.workflowId)}`, 'workflow not found or not visible to you');
+        const a = z.object({ workspaceId: id, workflowId: id.optional(), ...pageArgs }).parse(args);
+        if (a.workflowId !== undefined) return read(session, `/v1/workspaces/${enc(a.workspaceId)}/workflows/${enc(a.workflowId)}`, 'workflow not found or not visible to you');
+        const body = (await read(session, `/v1/workspaces/${enc(a.workspaceId)}/workflows`, 'workspace not found or not visible to you')) as Record<string, unknown>;
+        return pageField(body, 'workflows', a.cursor, a.limit); // `builder-reads.ts:720`
       },
     },
     {
@@ -4412,8 +4734,11 @@ export function discoveryTools(session: Session): ToolDefinition[] {
     {
       name: 'list_my_invitations',
       description: 'Invitations waiting for you to accept or decline, across workspaces.',
-      inputSchema: {},
-      handler: async () => session.get('/v1/me/invitations'),
+      inputSchema: { ...pageArgs },
+      handler: async (args) => {
+        const a = z.object(pageArgs).parse(args);
+        return pageField((await session.get('/v1/me/invitations')) as Record<string, unknown>, 'invitations', a.cursor, a.limit); // `my-invitations.ts:184-200`
+      },
     },
     {
       name: 'respond_to_invitation',
@@ -4421,7 +4746,14 @@ export function discoveryTools(session: Session): ToolDefinition[] {
       inputSchema: { inviteId: id, answer: z.enum(['accept', 'decline']) },
       handler: async (args) => {
         const a = z.object({ inviteId: id, answer: z.enum(['accept', 'decline']) }).parse(args);
-        const out = await postJson(session, `/v1/me/invitations/${enc(a.inviteId)}/${a.answer}`, {});
+        let out: unknown;
+        try {
+          out = await postJson(session, `/v1/me/invitations/${enc(a.inviteId)}/${a.answer}`, {});
+        } catch (error) {
+          // `INVITATION_NOT_YOURS_BODY` is a 404 (`my-invitations.ts:229-236`): one sentence for "no such invitation" and "not yours".
+          if (error instanceof HttpError && error.status === 404) throw new Error('invitation not found or not yours');
+          throw error;
+        }
         return a.answer === 'decline' ? { declined: true } : out;
       },
     },
@@ -4429,20 +4761,20 @@ export function discoveryTools(session: Session): ToolDefinition[] {
 }
 ```
 
-(`changed`'s exact type is `markNotificationsRead`'s return — read `notifications/store.ts`; count accordingly. `postJson` turns a 404 body into its sentence only for 400/422; a 404 here passes through as `HttpError` — wrap it as "invitation not found or not yours" if the hosted case shows the raw "answered 404".) Fixture blocks: the eight names; sweep entries with `session.get` answering `{ notifications: [], nextCursor: null }`.
+(`changed`'s exact type is `markNotificationsRead`'s return — read `notifications/store.ts`; count accordingly.) Fixture blocks: the eight names; sweep entries with `session.get` answering `{ notifications: [], nextCursor: null }`.
 
 - [ ] **Step 4: Pass + battery** (T6 Step 5 shape). Mutations: `read: false` (14.483), `/decline` for accept (14.484).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.480–14.485. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.480–14.486. Features.md §14:
 
 ```markdown
-- ✅ **The assistant can find its way around and act on your inbox** (MCP-everything T10; `packages/mcp-server/src/tools/discovery-tools.ts`) — `list_ticket_types`, `list_workflows` (states and allowed moves), `my_work`, `get_attention`, `list_notifications`, `mark_notifications_read` (ids, or all unread), `list_my_invitations`, `respond_to_invitation` (accept/decline). Cases 14.480–14.485.
+- ✅ **The assistant can find its way around and act on your inbox** (MCP-everything T10; `packages/mcp-server/src/tools/discovery-tools.ts`) — `list_ticket_types`, `list_workflows` (states and allowed moves), `my_work`, `get_attention`, `list_notifications`, `mark_notifications_read` (ids, or all unread), `list_my_invitations`, `respond_to_invitation` (accept/decline). Cases 14.480–14.486.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-10-discovery-tools
 git add packages/mcp-server apps/server/test/mcp/mcp-discovery.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 10: discovery and me tools (14.480-14.485)"
+git commit -m "MCP everything 10: discovery and me tools (14.480-14.486)"
 git push -u origin task/mcp-e-10-discovery-tools
 ```
 
@@ -4483,6 +4815,7 @@ Cases (`### T11 — members, prefix, groups`):
 - ❌ **14.502 — a `confirm_name` with a trailing space (`"Corner Shop "` for a group or workspace named `Corner Shop`) answers a preview naming the exact name and writes nothing** (Review Focus 5). Control: the exact name writes. Mutation: `trim()` → red.
 - ❌ **14.503 — `change_prefix` previews the ticket keys that change (the workspace: every project's ticket count; a project: its own) and sends `workspace.prefix_changed { prefix }` or `project.updated { prefix }`; the server's prefix refusals (`project.prefix-taken`, reserved) come back verbatim;** control: the count. Mutation: count zero → red.
 - ❌ **14.504 — `manage_groups`: `list` reads `/v1/workspaces/:id/groups`; `create` sends `group.created { parentId, level (parent's + 1, or 1), name, rank (after the last sibling) }` against a new group id; `rename` / `reorder` (`rankBetween` of the given neighbours) / `delete` send their events; `file_project` sends `project.updated { groupId }` (null ungroups); `delete`'s preview counts the projects filed in it;** control: `list`. Mutation: level always 1 → the server refuses a child group.
+- ❌ **14.506 — the door matrix (hosted): a stranger gets "workspace not found or not visible to you" for every act (never "answered 404" — the groups and members reads use `readOrNotFound`), a plain member is refused confirmed admin acts in the gate's words, and the owner's event is `origin: 'mcp'`; `manage_groups list` pages;** control: the allowed calls. Mutation: `session.get` for the groups read → the stranger reads "answered 404".
 - ❌ **14.505 — through the HOSTED door, the role matrix holds per tool: a guest and a member are refused (in the product's words) for every write act, an admin may invite/change roles below owner/manage groups, and only the owner may grant `owner`;** control: the owner's confirmed `change_prefix` commits. Mutation: none in the package (the gate is the product's; this proves the MCP added no authority).
 ```
 
@@ -4515,6 +4848,27 @@ Cases (`### T11 — members, prefix, groups`):
 
 and 14.501 / 14.504 asserting each act's single write (type, entity, payload, `parseEvent` ok), in the same shape. Hosted 14.505 (`mcp-admin-roles.test.ts`): four phone users (owner founds; admin, member and guest join through `membership.granted` posted by the owner), each gets a hosted token; for `manage_members change_role` (confirmed), `manage_groups create` (confirmed) and `change_prefix` (confirmed) assert guest and member get `isError` with the product's refusal text and the admin/owner commit; then an admin's `change_role … role: 'owner'` is refused with `WORKSPACE_OWNER_GRANT_REASON` (`check-permission.ts:153`), the owner's commits.
 
+The door matrix (14.506) in `apps/server/test/mcp/mcp-admin-roles.test.ts` (the role matrix 14.505 covers admin/owner/guest; this covers the stranger and a plain member for every act):
+
+```ts
+it('14.506 every admin act: stranger, member, owner', async () => {
+  const w = await buildDoorWorld(db, '2506');
+  const WS_GONE = 'workspace not found or not visible to you';
+  const NOT_ADMIN = `refused by ${PERMISSION_ROLE_RULE}: ${adminOnlyReason('member')}`; // check-permission.ts:297; read the exact reason each act's gate gives and use its constant
+  await runDoorMatrix(w, [
+    { tool: 'manage_groups', args: (x) => ({ workspaceId: x.workspaceId, action: 'list' }), stranger: WS_GONE, allowed: { caller: 'member' } },
+    { tool: 'manage_groups', args: (x) => ({ workspaceId: x.workspaceId, action: 'create', name: 'Front', confirm_name: x.workspaceName }), stranger: WS_GONE,
+      forbidden: { text: NOT_ADMIN }, allowed: { caller: 'owner', eventType: 'group.created' } },
+    { tool: 'change_prefix', args: (x) => ({ workspaceId: x.workspaceId, prefix: 'DM', confirm_name: x.workspaceName }), stranger: WS_GONE,
+      forbidden: { text: NOT_ADMIN }, allowed: { caller: 'owner', eventType: 'workspace.prefix_changed' } },
+    { tool: 'manage_members', args: (x) => ({ workspaceId: x.workspaceId, action: 'add_to_project', userId: x.member.userId, projectId: x.projectId, projectAdmin: true, confirm_name: x.memberName }),
+      stranger: WS_GONE, allowed: { caller: 'owner', eventType: 'project.member_added' } },
+  ]);
+});
+```
+
+(`memberName` is the roster's display name, read by `buildDoorWorld`; a stranger's `readDirectory` finds no workspace, hence `WS_GONE`.)
+
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/member-admin-tools.test.ts > /tmp/mcpe-t11.log 2>&1; tail -30 /tmp/mcpe-t11.log`.
 
 - [ ] **Step 3: Implement** `member-admin-tools.ts`:
@@ -4526,6 +4880,7 @@ import type { Session } from '../session.js';
 import { readDirectory } from './directory.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
+import { page, pageArgs, readOrNotFound } from './reads.js';
 import { envelopeFor, postJson, submitOne } from './submit.js';
 
 const id = z.string().min(1);
@@ -4539,13 +4894,14 @@ async function workspaceOf(session: Session, workspaceId: string) {
   return ws;
 }
 async function memberOf(session: Session, workspaceId: string, userId: string): Promise<Member> {
-  const { members } = (await session.get(`/v1/workspaces/${enc(workspaceId)}/members`)) as { members: Member[] };
+  const { members } = (await readOrNotFound(session, `/v1/workspaces/${enc(workspaceId)}/members`, 'workspace')) as { members: Member[] };
   const m = members.find((x) => x.userId === userId);
   if (m === undefined) throw new Error('person not found in this workspace');
   return m;
 }
 async function groupsOf(session: Session, workspaceId: string): Promise<Group[]> {
-  return ((await session.get(`/v1/workspaces/${enc(workspaceId)}/groups`)) as { groups: Group[] }).groups;
+  // The groups route 404s a GUEST as well as a stranger (`routes/groups.ts:37-39`): one sentence for both.
+  return ((await readOrNotFound(session, `/v1/workspaces/${enc(workspaceId)}/groups`, 'workspace')) as { groups: Group[] }).groups;
 }
 
 const membersShape = {
@@ -4582,7 +4938,7 @@ export function memberAdminTools(session: Session): ToolDefinition[] {
         }
         if (a.action === 'revoke_invite') {
           const inviteId = need(a.inviteId, 'inviteId');
-          const { invites } = (await session.get(`/v1/workspaces/${enc(a.workspaceId)}/invites`)) as { invites: Array<{ inviteId: string; address: string }> };
+          const { invites } = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/invites`, 'workspace')) as { invites: Array<{ inviteId: string; address: string }> };
           const invite = invites.find((i) => i.inviteId === inviteId);
           if (invite === undefined) throw new Error('invitation not found or not visible to you');
           const preview = await confirmOrPreview(invite.address, a.confirm_name, async () => ({ sentence: `Withdraws the invitation to ${invite.address}.` }));
@@ -4651,14 +5007,19 @@ export function memberAdminTools(session: Session): ToolDefinition[] {
       inputSchema: {
         workspaceId: id, action: z.enum(['list', 'create', 'rename', 'reorder', 'delete', 'file_project']), groupId: id.nullable().optional(),
         parentId: id.optional(), name: z.string().min(1).optional(), before: id.optional(), after: id.optional(), projectId: id.optional(), confirm_name: z.string().optional(),
+        ...pageArgs,
       },
       handler: async (args) => {
         const a = z.object({
           workspaceId: id, action: z.enum(['list', 'create', 'rename', 'reorder', 'delete', 'file_project']), groupId: id.nullable().optional(),
           parentId: id.optional(), name: z.string().min(1).optional(), before: id.optional(), after: id.optional(), projectId: id.optional(), confirm_name: z.string().optional(),
+          ...pageArgs,
         }).parse(args);
         const groups = await groupsOf(session, a.workspaceId);
-        if (a.action === 'list') return { groups };
+        if (a.action === 'list') {
+          const { items, nextCursor } = page(groups, a.cursor, a.limit);
+          return { groups: items, nextCursor };
+        }
         const g = (gid: string | null | undefined): Group => {
           const found = groups.find((x) => x.id === gid);
           if (found === undefined) throw new Error('group not found or not visible to you');
@@ -4706,16 +5067,16 @@ export function memberAdminTools(session: Session): ToolDefinition[] {
 
 - [ ] **Step 4: Pass + battery** (T6 Step 5 shape, plus `pnpm --filter @gisik-nokma/server exec vitest run test/mcp/mcp-admin-roles.test.ts`). Mutations: write before confirming (14.500), `trim()` (14.502), level always 1 (14.504).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.500–14.505. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.500–14.506. Features.md §14:
 
 ```markdown
-- ✅ **The assistant can run workspace admin, behind a confirmation** (MCP-everything T11; `packages/mcp-server/src/tools/member-admin-tools.ts`, `tools/preview.ts`) — `manage_members` (invite, withdraw an invitation, change a role, remove someone, add to / remove from a project), `change_prefix` (workspace or project; the preview counts the ticket keys that change), `manage_groups` (list, create, rename, reorder, delete, file a project). Nothing changes until `confirm_name` is exactly the person's name, the address, or the item's current name; without it the answer is a plain preview. Your role still decides; the assistant gains nothing (guest/member/admin/owner matrix). Cases 14.500–14.505.
+- ✅ **The assistant can run workspace admin, behind a confirmation** (MCP-everything T11; `packages/mcp-server/src/tools/member-admin-tools.ts`, `tools/preview.ts`) — `manage_members` (invite, withdraw an invitation, change a role, remove someone, add to / remove from a project), `change_prefix` (workspace or project; the preview counts the ticket keys that change), `manage_groups` (list, create, rename, reorder, delete, file a project). Nothing changes until `confirm_name` is exactly the person's name, the address, or the item's current name; without it the answer is a plain preview. Your role still decides; the assistant gains nothing (guest/member/admin/owner matrix). Cases 14.500–14.506.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-11-member-admin
 git add packages/mcp-server apps/server/test/mcp/mcp-admin-roles.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 11: members, prefix and groups behind a confirmation (14.500-14.505)"
+git commit -m "MCP everything 11: members, prefix and groups behind a confirmation (14.500-14.506)"
 git push -u origin task/mcp-e-11-member-admin
 ```
 
@@ -4745,6 +5106,7 @@ Cases (`### T12 — definitions, migration, visibility, settings`):
 - ❌ **14.533 — `set_visibility` confirms against the ticket KEY, previews the change from the current audience, and sends `visibility.set { ticketId, mode, userIds? }` — `userIds` only with `explicit` (refused locally otherwise, SC12);** control: `mode: 'project'`. Mutation: always send `userIds` → the domain refuses.
 - ❌ **14.534 — `update_workspace_settings` confirms against the workspace name and sends `workspace.settings_set` with only the given settings (`autoCloseAfterDays: null` turns auto-close off; nothing given is refused);** control: one setting. Mutation: send every key → red.
 - ❌ **14.535 — through the hosted door a MEMBER is refused each of the five (in the product's words) and an ADMIN commits each confirmed act;** control: the admin's. Mutation: none (proves no added authority).
+- ❌ **14.536 — the door matrix (hosted): a stranger gets the uniform "workspace … / ticket not found or not visible to you" for each of the five, a plain member is refused the confirmed admin acts verbatim, and the owner's event is `origin: 'mcp'`;** control: the allowed calls. Mutation: read ticket-types with `session.get` → the stranger reads "answered 404".
 ```
 
 - [ ] **Step 1: Failing tests.** `packages/mcp-server/test/definition-admin-tools.test.ts` (T6 `fake` with `batches`/`posts`):
@@ -4778,6 +5140,29 @@ Cases (`### T12 — definitions, migration, visibility, settings`):
 
 (Read `workflowStateSchema` / `transitionSchema` in `packages/domain/src/workflow.ts` and write the fixture's states and transitions in their exact keys — the fixture must PARSE, and the first assertion must fail on `states` alone.) 14.531, 14.532, 14.534 in the same shape; hosted 14.535 in `mcp-definitions.test.ts` with a member and an admin token (as T11's matrix test).
 
+The door matrix (14.536) in `apps/server/test/mcp/mcp-definitions.test.ts`:
+
+```ts
+it('14.536 every definition/visibility/settings act: stranger, member, owner', async () => {
+  const w = await buildDoorWorld(db, '2536');
+  const WS_GONE = 'workspace not found or not visible to you';
+  const NOT_ADMIN = `refused by ${PERMISSION_ROLE_RULE}: ${adminOnlyReason('member')}`; // or the act's own exported reason — exact either way
+  await runDoorMatrix(w, [
+    { tool: 'update_workspace_settings', args: (x) => ({ workspaceId: x.workspaceId, staleDays: 9, confirm_name: x.workspaceName }), stranger: WS_GONE,
+      forbidden: { text: NOT_ADMIN }, allowed: { caller: 'owner', eventType: 'workspace.settings_set' } },
+    { tool: 'set_visibility', args: (x) => ({ workspaceId: x.workspaceId, ticketId: x.ticketId, mode: 'project', confirm_name: x.ticketKey }),
+      stranger: 'ticket not found or not visible to you', allowed: { caller: 'owner', eventType: 'visibility.set' } },
+    { tool: 'define_ticket_type', args: (x) => ({ workspaceId: x.workspaceId, definition: NEW_TYPE, confirm_name: x.workspaceName }), stranger: WS_GONE,
+      forbidden: { text: NOT_ADMIN }, allowed: { caller: 'owner', eventType: 'ticket-type.defined' } },
+    { tool: 'migrate_ticket_type', args: (x) => ({ workspaceId: x.workspaceId, typeId: 'task', fromWorkflowId: 'a', toWorkflowId: 'b', stateMap: {}, confirm_name: 'Task' }), stranger: WS_GONE },
+    { tool: 'define_workflow', args: (x) => ({ workspaceId: x.workspaceId, definition: NEW_WORKFLOW, confirm_name: x.workspaceName }), stranger: WS_GONE,
+      forbidden: { text: NOT_ADMIN }, allowed: { caller: 'owner', eventType: 'workflow.defined' } },
+  ]);
+});
+```
+
+(`NEW_TYPE` / `NEW_WORKFLOW` are the parse-valid fixtures of `test/definition-admin-tools.test.ts`, exported from it or copied into this file.)
+
 - [ ] **Step 2: Run to fail.** `pnpm --filter @gisik-nokma/mcp-server exec vitest run test/definition-admin-tools.test.ts > /tmp/mcpe-t12.log 2>&1; tail -30 /tmp/mcpe-t12.log`.
 
 - [ ] **Step 3: Implement** `definition-admin-tools.ts`:
@@ -4797,6 +5182,7 @@ import type { Session } from '../session.js';
 import { readDirectory } from './directory.js';
 import { confirmOrPreview } from './preview.js';
 import type { ToolDefinition } from './read-tools.js';
+import { readOrNotFound } from './reads.js';
 import { envelopeFor, postJson, submitOne } from './submit.js';
 
 const id = z.string().min(1);
@@ -4851,9 +5237,8 @@ export function definitionAdminTools(session: Session): ToolDefinition[] {
       handler: async (args) => {
         const a = z.object({ workspaceId: id, definition: z.record(z.unknown()), confirm_name: z.string().optional() }).parse(args);
         const def = parsed(ticketTypeDefSchema, a.definition, 'definition');
-        const types = (await session.get(`/v1/workspaces/${enc(a.workspaceId)}/ticket-types`)) as { types?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>;
-        const list = Array.isArray(types) ? types : (types.types ?? []);
-        const existing = list.find((t) => t.id === def.id);
+        const { ticketTypes } = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/ticket-types`, 'workspace')) as { ticketTypes: Array<{ id: string; name: string }> };
+        const existing = ticketTypes.find((t) => t.id === def.id);
         const counts = (await maybe(() => session.get(`/v1/workspaces/${enc(a.workspaceId)}/ticket-counts-by-type`) as Promise<{ counts: Record<string, number> }>))?.counts ?? {};
         const preview = await confirmOrPreview(existing?.name ?? (await workspaceName(session, a.workspaceId)), a.confirm_name, async () => ({
           sentence: existing === undefined ? `Creates the ticket type "${def.name}".` : `Changes the ticket type "${existing.name}".`,
@@ -4870,8 +5255,8 @@ export function definitionAdminTools(session: Session): ToolDefinition[] {
       inputSchema: { workspaceId: id, typeId: id, fromWorkflowId: id, toWorkflowId: id, stateMap: z.record(id), confirm_name: z.string().optional() },
       handler: async (args) => {
         const a = z.object({ workspaceId: id, typeId: id, fromWorkflowId: id, toWorkflowId: id, stateMap: z.record(id), confirm_name: z.string().optional() }).parse(args);
-        const types = (await session.get(`/v1/workspaces/${enc(a.workspaceId)}/ticket-types`)) as { types?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>;
-        const type = (Array.isArray(types) ? types : (types.types ?? [])).find((t) => t.id === a.typeId);
+        const { ticketTypes } = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/ticket-types`, 'workspace')) as { ticketTypes: Array<{ id: string; name: string }> };
+        const type = ticketTypes.find((t) => t.id === a.typeId);
         if (type === undefined) throw new Error('ticket type not found or not visible to you');
         const population = (await maybe(() => session.get(`/v1/workspaces/${enc(a.workspaceId)}/ticket-types/${enc(a.typeId)}/population?workflowId=${enc(a.fromWorkflowId)}`) as Promise<{ count: number }>))?.count ?? 0;
         const preview = await confirmOrPreview(type.name, a.confirm_name, async () => ({
@@ -4889,7 +5274,7 @@ export function definitionAdminTools(session: Session): ToolDefinition[] {
         const a = z.object({ workspaceId: id, ticketId: id, mode: z.enum(VISIBILITY_MODES), userIds: z.array(id).optional(), confirm_name: z.string().optional() }).parse(args);
         if (a.mode === 'explicit' && (a.userIds === undefined || a.userIds.length === 0)) throw new Error('mode "explicit" needs userIds (at least one person)');
         if (a.mode !== 'explicit' && a.userIds !== undefined) throw new Error('userIds go only with mode "explicit"');
-        const detail = (await session.get(`/v1/workspaces/${enc(a.workspaceId)}/tickets/${enc(a.ticketId)}`)) as { key: string | null; ticket?: { visibility?: { mode?: string } } };
+        const detail = (await readOrNotFound(session, `/v1/workspaces/${enc(a.workspaceId)}/tickets/${enc(a.ticketId)}`, 'ticket')) as { key: string | null; ticket?: { visibility?: { mode?: string } } };
         const key = detail.key ?? a.ticketId;
         const preview = await confirmOrPreview(key, a.confirm_name, async () => ({
           sentence: `Changes who can see ${key} from ${detail.ticket?.visibility?.mode ?? 'its current audience'} to ${a.mode}${a.mode === 'explicit' ? ` (${a.userIds?.length ?? 0} people)` : ''}.`,
@@ -4921,20 +5306,20 @@ export function definitionAdminTools(session: Session): ToolDefinition[] {
 }
 ```
 
-(The exact answer shapes of `GET …/workflows/:id`, `…/ticket-types` and the ticket detail's visibility block are read at `builder-reads.ts:708-770` and `routes/tickets.ts:363-420` before the lane relies on them; the code above reads each defensively and the tests pin the shapes the lane finds. `workflowStateSchema` / `transitionSchema` are re-exported by the domain index — if not, add them to `packages/domain/src/index.ts` in this task.) Fixture blocks: the five names; sweep entries with a `get` that answers `{ workspaces: [...], types: [], counts: {}, count: 0, key: 'K-1' }`.
+(`…/ticket-types` answers `{ workspaceId, ticketTypes }` (`builder-reads.ts:766`). The answer shapes of `GET …/workflows/:id` and the ticket detail's visibility block are read at `builder-reads.ts:726-752` and `routes/tickets.ts:363-420` before the lane relies on them; the code above reads each defensively and the tests pin the shapes the lane finds. `workflowStateSchema` / `transitionSchema` are re-exported by the domain index — if not, add them to `packages/domain/src/index.ts` in this task.) Fixture blocks: the five names; sweep entries with a `get` that answers `{ workspaces: [...], types: [], counts: {}, count: 0, key: 'K-1' }`.
 
 - [ ] **Step 4: Pass + battery** (T6 Step 5 shape, plus the hosted file). Mutations: skip the workflow schema (14.530), type id as entity id (14.531), `userIds` always (14.533), every settings key (14.534).
 
-- [ ] **Step 5: Catalogue + commit.** Flip 14.530–14.535. Features.md §14:
+- [ ] **Step 5: Catalogue + commit.** Flip 14.530–14.536. Features.md §14:
 
 ```markdown
-- ✅ **The assistant can define workflows and types, migrate a type, set who sees a ticket and change workspace settings — behind a confirmation** (MCP-everything T12; `packages/mcp-server/src/tools/definition-admin-tools.ts`) — `define_workflow` and `define_ticket_type` are validated with the product's own schemas before anything is sent; `migrate_ticket_type` uses the app's migration route (all-or-nothing pre-flight); `set_visibility` (workspace / project / inherit / explicit people); `update_workspace_settings`. Each previews what would change (tickets in the workflow, of the type, that move) until `confirm_name` is exact. Cases 14.530–14.535.
+- ✅ **The assistant can define workflows and types, migrate a type, set who sees a ticket and change workspace settings — behind a confirmation** (MCP-everything T12; `packages/mcp-server/src/tools/definition-admin-tools.ts`) — `define_workflow` and `define_ticket_type` are validated with the product's own schemas before anything is sent; `migrate_ticket_type` uses the app's migration route (all-or-nothing pre-flight); `set_visibility` (workspace / project / inherit / explicit people); `update_workspace_settings`. Each previews what would change (tickets in the workflow, of the type, that move) until `confirm_name` is exact. Cases 14.530–14.536.
 ```
 
 ```bash
 git branch --show-current   # task/mcp-e-12-definition-admin
 git add packages/mcp-server packages/domain/src/index.ts apps/server/test/mcp/mcp-definitions.test.ts test-cases/14-mcp-server.md Features.md
-git commit -m "MCP everything 12: definitions, migration, visibility, settings behind a confirmation (14.530-14.535)"
+git commit -m "MCP everything 12: definitions, migration, visibility, settings behind a confirmation (14.530-14.536)"
 git push -u origin task/mcp-e-12-definition-admin
 ```
 
@@ -4988,6 +5373,7 @@ describe('14.551 list_deleted', () => {
     expect(((await listDeleted.handler({})) as { items: unknown[] }).items).toHaveLength(3); // control
     expect(await listDeleted.handler({ workspaceId: 'w1', kinds: ['note'] })).toEqual({
       items: [{ ...items[1], restoreWith: 'restore_note' }],
+      nextCursor: null,
     });
   });
 });
@@ -5016,13 +5402,14 @@ import { z } from 'zod';
 import type { Session } from '../session.js';
 import { readDeleted } from './directory.js';
 import type { ToolDefinition } from './read-tools.js';
+import { page, pageArgs } from './reads.js';
 
 const RESTORE_WITH: Record<string, string> = {
   ticket: 'restore_ticket', note: 'restore_note', project: 'undelete_project', workspace: 'undelete_workspace',
 };
 
 export function trashTools(session: Session): ToolDefinition[] {
-  const shape = { workspaceId: z.string().min(1).optional(), kinds: z.array(z.enum(['ticket', 'note', 'project', 'workspace'])).optional() };
+  const shape = { workspaceId: z.string().min(1).optional(), kinds: z.array(z.enum(['ticket', 'note', 'project', 'workspace'])).optional(), ...pageArgs };
   return [
     {
       name: 'list_deleted',
@@ -5033,7 +5420,8 @@ export function trashTools(session: Session): ToolDefinition[] {
         const items = (await readDeleted(session))
           .filter((i) => a.workspaceId === undefined || i.workspaceId === a.workspaceId)
           .filter((i) => a.kinds === undefined || (a.kinds as string[]).includes(i.kind));
-        return { items: items.map((i) => ({ ...i, restoreWith: RESTORE_WITH[i.kind] ?? null })) };
+        const paged = page(items, a.cursor, a.limit);
+        return { items: paged.items.map((i) => ({ ...i, restoreWith: RESTORE_WITH[i.kind] ?? null })), nextCursor: paged.nextCursor };
       },
     },
   ];
@@ -5139,7 +5527,7 @@ Cases (`### T14 — the real client`; each 🧪, evidence = what the owner saw, 
 
 ## Self-review
 
-- **Spec coverage.** §1 defect → T6 (14.380, 26.005). M-E1 notes → T7; comments → T5/T6; attachments → T8; mentions → T2/T6/T7 (14.382, 14.404, 26.054–26.058). M-E2/M-E8 converter → T1 (26.001–26.011), used by T6/T7/T9. M-E3 every gap → T7–T13 (63 tools), exclusions held (Global Constraints). M-E4 confirmation → T3 `confirmOrPreview` + T7 (`delete_note`), T9 (`delete_ticket`), T11, T12. M-E5 → T8 (10 MiB, no URL fetch; Q1/Q2). M-E6 grouped tools → T11 `manage_members`/`manage_groups`, T9 `update_ticket`, T7 `update_note`. M-E7 → T0. M-E9 → T2 (server), T4 (offline), T5 (app), T6 (MCP). §5.1 → T3/T11. §5.2 → T3 (body limit, binary) + T8. §5.3 errors → every task's verbatim cases. §5.4 → T2 fan-out. §6 events/permission/projections/purge/mentions/history/search → T2 (SC5, SC6), history lines T5 (SC16). §7 security: no new route (T3 adds a body limit, not a route), no scopes, no fetch, role matrices T11 (14.505) and T12 (14.535), bounded base64 T8 (14.432). §8 testing → per task; real client → T14. §9 out of scope → Global Constraints.
+- **Spec coverage.** §1 defect → T6 (14.380, 26.005). M-E1 notes → T7; comments → T5/T6; attachments → T8; mentions → T2/T6/T7 (14.382, 14.404, 26.054–26.058). M-E2/M-E8 converter → T1 (26.001–26.011), used by T6/T7/T9. M-E3 every gap → T7–T13 (63 tools), exclusions held (Global Constraints). M-E4 confirmation → T3 `confirmOrPreview` + T7 (`delete_note`), T9 (`delete_ticket`), T11, T12. M-E5 → T8 (10 MiB, no URL fetch; Q1/Q2). M-E6 grouped tools → T11 `manage_members`/`manage_groups`, T9 `update_ticket`, T7 `update_note`. M-E7 → T0. M-E9 → T2 (server), T4 (offline), T5 (app), T6 (MCP). §5.1 → T3/T11. §5.2 → T3 (body limit, binary) + T8. §5.3 errors → every task's verbatim cases. §5.4 → T2 fan-out. §6 events/permission/projections/purge/mentions/history/search → T2 (SC5, SC6), history lines T5 (SC16). §7 security: no new route (T3 adds a body limit, not a route), no scopes, no fetch, role matrices T11 (14.505) and T12 (14.535), bounded base64 T8 (14.432). §8 testing → per task, and every tool through the hosted door with three callers (door matrices 14.370, 14.389, 14.408, 14.437, 14.458, 14.486, 14.506, 14.536); every list pages (T3 `page`); real client → T14 (SC24/Q6). §9 out of scope → Global Constraints.
 - **Placeholders.** None of "TBD/TODO/implement later". Where a step reuses a harness, it names the file and line range to copy and gives the assertions; where an answer shape must be read at execution (detail route, workflow read), the step names the file and lines to read and the tests pin what is found.
 - **Type consistency.** `markdownToDoc(md, resolve) → { doc, problems }`, `docToMarkdown(doc) → { markdown, lossy }`, `scanMarkdownRefs(md) → { userIds, ticketKeys, noteRefs }`, `spliceDoc(current, incoming, BodyEdit)`, `RefResolver.{user,ticket,note}` (T1) are used identically in T6–T9. `commentEditedPayload`/`commentDeletedPayload`/`COMMENT_EVENT_TYPES`/`isCommentEvent` (T2) in T2/T4/T6. `Session.getBytes`/`postMultipart`, `ToolReply`, `confirmOrPreview`, `envelopeFor(…, { kind: EntityKind; id })`, `NO_TRANSFER`, `TOOL_NAMES_BY_MODULE`, `SWEEP` (T3) in T6–T13. `markdownBody`/`bodyAsMarkdown`/`parentOf` (T6) in T7–T9. `CommentActions`, `commentEditedSeed`/`commentDeletedSeed`, `submitLabel` (T5) only in T5.
-- **Review Focus.** 1 → 26.006 (T1); 2 → 26.058 (T2) + 14.404 (T7); 3 → 14.432 (T8); 4 → 26.052 (T2, both parents); 5 → 14.362 (T3) + 14.502 (T11).
+- **Review Focus.** 1 → 26.006 (T1); 2 → 26.058 (T2) + 14.404 (T7); 3 → 14.432 + 14.438 (T8); 4 → 26.052 (T2, both parents); 5 → 14.362 (T3) + 14.502 (T11).
