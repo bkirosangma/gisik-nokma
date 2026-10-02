@@ -730,6 +730,7 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
       expect(scrollIntoView.mock.contexts[0]).toBe(anchor);
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      expect(search).toHaveFocus();
       // Not on later keystrokes while the query stays non-empty, and never a focus move.
       await user.type(search, 's');
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
