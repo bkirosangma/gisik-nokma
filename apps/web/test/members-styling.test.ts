@@ -166,115 +166,76 @@ describe('13.888 the roster table wears the prototype’s four card-and-table tr
   });
 });
 
-describe('13.887 the roster’s zebra, on the rows the prototype actually tints', () => {
-  it('every second row takes --fill4 → --gn-fill-quaternary (desktop.dc.html:671/3077)', () => {
-    const rule = ruleFor(css, /^\.gn-members__row:nth-child\(even\)\s*\{/);
-    expect(rule, `.gn-members__row:nth-child(even) rule: ${String(rule)}`).toBeDefined();
-    expect(rule).toContain('background: var(--gn-fill-quaternary)');
+/**
+ * 13.887 — AMENDED by 23.095 (UX fixes Task 6, audit SET-13): the roster's every-second-row tint (the prototype's zebra,
+ * `desktop.dc.html:671/3077`) read as a SELECTED row, which a roster that opens nothing on click never is. The rows now carry a
+ * `--gn-border` hairline instead. Everything the old claim guarded still holds for the new rule: the value, the absence of a
+ * competing parity rule, and the CASCADE claim (exactly one rule in either stylesheet names the row).
+ */
+describe('13.887 the roster’s rows carry a hairline, not a zebra (amended by 23.095)', () => {
+  it('every row takes a --gn-border bottom border, and paints no tint of its own', () => {
+    const rule = ruleFor(css, /^\.gn-members__row\s*\{/);
+    expect(rule, `.gn-members__row rule: ${String(rule)}`).toBeDefined();
+    expect(rule).toContain('border-bottom: 1px solid var(--gn-border)');
+    // CONTROL — the tint is gone from the row: no background rides on it.
+    expect(rule).not.toMatch(/background/);
   });
 
   /*
-   * THE PARITY IS THE CLAIM, not just the fill. The prototype's `memberRows`
-   * is 0-based, so `i % 2` tints the 1-indexed EVEN rows — and an odd-child rule
-   * beside an even-child rule would tint every row, which is a table with no
-   * zebra and no way to notice. Asserted as an absence for that reason.
+   * THE ABSENCE IS THE CLAIM: neither parity may come back, as the old odd-child absence guarded the old claim. A
+   * `:nth-child` rule on the row would be the zebra again under another spelling.
    */
-  it('and the ODD rows are left alone, so the stripe alternates rather than filling', () => {
-    const odd = ruleFor(css, /^\.gn-members__row:nth-child\(odd\)\s*\{/);
-    expect(odd, `an odd-child rule now exists: ${String(odd)}`).toBeUndefined();
+  it('and no parity rule names the row, even or odd', () => {
+    expect(ruleFor(css, /^\.gn-members__row:nth-child\(even\)\s*\{/), 'the zebra is back (even)').toBeUndefined();
+    expect(ruleFor(css, /^\.gn-members__row:nth-child\(odd\)\s*\{/), 'a zebra is back (odd)').toBeUndefined();
   });
 
   /**
-   * THE CASCADE CLAIM — and it is here because an independent review measured
-   * this case blind to it. Everything above reads DECLARATIONS, and a later rule
-   * can neutralise the one they read while every value assertion stays green.
-   * Measured on this tree before this test existed: appending
-   * `.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }`
-   * left **36/36 passing with the zebra dead in a browser**.
-   *
-   * So the claim is a COUNT over BOTH stylesheets: exactly one rule in the
-   * product NAMES this row at all. A second one — an override, a re-parity, a
-   * duplicate — reddens here whatever specificity it carries and however it is
-   * laid out, because the count is the thing that changed.
-   *
-   * **The first version of this check was defeated twice, and the second review
-   * measured both**: a selector split across two lines, and a selector starting
-   * with `*`. `rowRuleSelectors` above is the answer to both, and the witness
-   * below plants each of them. What remains outside this instrument's reach is a
-   * rule that targets the ELEMENT rather than naming the row, which no
-   * stylesheet in the product does today.
+   * THE CASCADE CLAIM, kept from the zebra: everything above reads DECLARATIONS, and a later rule can neutralise the one they
+   * read while every value assertion stays green. So the claim is a COUNT over BOTH stylesheets: exactly one rule in the product
+   * NAMES this row at all. A second one — an override, a re-parity, a duplicate — reddens here whatever specificity it carries
+   * and however it is laid out. `rowRuleSelectors` above reads selectors, not lines, so a two-line selector and a `*`-prefixed
+   * one are seen (the two evasions an independent review measured against its first version).
    */
   it('exactly ONE rule in either stylesheet names the row, so nothing can silently override it', () => {
     const selectors = rowRuleSelectors(css, uiCss);
     expect(selectors, `row rule selectors found: ${JSON.stringify(selectors)}`).toHaveLength(1);
-    expect(selectors[0]).toContain('.gn-members__row:nth-child(even)');
+    expect(selectors[0]).toBe('.gn-members__row');
   });
 
   /**
-   * MUTATION WITNESS. Four plants, because the case makes four claims:
-   *
-   * 1. the VALUE — the same selector carrying a different role must redden it.
-   *    Each plant is asserted to have LANDED (`replace` matching nothing prints
-   *    success, the trap `checks-that-cannot-fail` records as its own mode), so
-   *    this witness cannot pass by having changed nothing.
-   * 2. the PARITY — the selector itself is what the first test matches on, so a
-   *    rule written `:nth-child(odd)` in place of `even` leaves that test with
-   *    no rule to find and it reddens on `toBeDefined`, not on a value.
-   * 3. the CASCADE — the override above, which the value assertion CANNOT see.
-   *    The plant asserts exactly that: the extracted rule still reads
-   *    `--gn-fill-quaternary` (the old check green), while the count has gone to
-   *    two (the new check red). A witness that only showed the new assertion
-   *    reddening would not prove it is the one covering the gap.
-   * 4. THE TWO EVASIONS the second review measured against the first version of
-   *    this helper — a two-line selector and a `*`-prefixed one — plus a PROSE
-   *    comment naming the selector, which is the false-red direction and must
-   *    stay at one.
+   * MUTATION WITNESS. Each plant is asserted to have LANDED (`replace` matching nothing prints success), so this witness cannot
+   * pass by having changed nothing.
    */
   it('the value, parity and cascade assertions each fail on their own plant', () => {
-    const ANCHOR = '.gn-members__row:nth-child(even) { background: var(--gn-fill-quaternary); }';
-    // The plants below depend on this literal occurring exactly once. Asserted,
-    // so a second copy of the rule surfaces HERE as a named failure rather than
-    // as a confusing false red from a witness that mutated the wrong one.
+    const ANCHOR = '.gn-members__row { border-bottom: 1px solid var(--gn-border); }';
     expect(css.split(ANCHOR).length - 1, 'the witness anchor is not unique in globals.css').toBe(1);
 
-    const plantedValue = css.replace(ANCHOR, '.gn-members__row:nth-child(even) { background: var(--gn-surface-sunken); }');
+    const plantedValue = css.replace(ANCHOR, '.gn-members__row { border-bottom: none; }');
     expect(plantedValue, 'the value plant did not land — the assertion below would be vacuous').not.toBe(css);
-    expect(ruleFor(plantedValue, /^\.gn-members__row:nth-child\(even\)\s*\{/)).not.toContain(
-      'var(--gn-fill-quaternary)',
-    );
+    expect(ruleFor(plantedValue, /^\.gn-members__row\s*\{/)).not.toContain('var(--gn-border)');
 
-    const plantedParity = css.replace(ANCHOR, '.gn-members__row:nth-child(odd) { background: var(--gn-fill-quaternary); }');
-    expect(plantedParity, 'the parity plant did not land — the assertion below would be vacuous').not.toBe(css);
-    expect(ruleFor(plantedParity, /^\.gn-members__row:nth-child\(even\)\s*\{/)).toBeUndefined();
+    const plantedZebra = `${css}\n.gn-members__row:nth-child(even) { background: var(--gn-fill-quaternary); }\n`;
+    expect(plantedZebra, 'the zebra plant did not land').not.toBe(css);
+    expect(ruleFor(plantedZebra, /^\.gn-members__row:nth-child\(even\)\s*\{/)).toBeDefined();
+    expect(rowRuleSelectors(plantedZebra, uiCss)).toHaveLength(2);
 
-    const plantedOverride = `${css}\n.gn-members tbody .gn-members__row:nth-child(even) { background: transparent; }\n`;
+    // The BLIND SPOT, stated as an assertion: a higher-specificity override leaves the hairline rule reading as before
+    // (the declaration check is green) while the count has gone to two (the count check is red).
+    const plantedOverride = `${css}\n.gn-members tbody .gn-members__row { border-bottom: none; }\n`;
     expect(plantedOverride, 'the override plant did not land').not.toBe(css);
-    // The blind spot, stated as an assertion rather than a comment: the check
-    // that existed before this one is GREEN on the override.
-    expect(ruleFor(plantedOverride, /^\.gn-members__row:nth-child\(even\)\s*\{/)).toContain(
-      'var(--gn-fill-quaternary)',
-    );
+    expect(ruleFor(plantedOverride, /^\.gn-members__row\s*\{/)).toContain('var(--gn-border)');
     expect(rowRuleSelectors(plantedOverride, uiCss)).toHaveLength(2);
 
-    // EVASION 1 — the selector split across two lines. The first version of the
-    // helper matched LINES and required the brace on the selector's own line, so
-    // this plant was invisible to it and the zebra died in a browser with the
-    // suite green. The selector-form scan sees it.
-    const twoLine = `${css}\n.gn-members tbody\n.gn-members__row:nth-child(even) { background: transparent; }\n`;
+    const twoLine = `${css}\n.gn-members tbody\n.gn-members__row { border-bottom: none; }\n`;
     expect(twoLine, 'the two-line plant did not land').not.toBe(css);
     expect(rowRuleSelectors(twoLine, uiCss)).toHaveLength(2);
 
-    // EVASION 2 — a `*`-prefixed selector. `*` adds no specificity, so the rule
-    // TIES the shipped one and wins on source order; the first version skipped
-    // it because the line started with `*`, which was meant for comments.
-    const starPrefixed = `${css}\n*.gn-members__row:nth-child(even) { background: transparent; }\n`;
+    const starPrefixed = `${css}\n*.gn-members__row { border-bottom: none; }\n`;
     expect(starPrefixed, 'the star-prefixed plant did not land').not.toBe(css);
     expect(rowRuleSelectors(starPrefixed, uiCss)).toHaveLength(2);
 
-    // THE OTHER DIRECTION, which is the one that reddens a CORRECT tree: prose in
-    // a docblock that quotes the selector. Comments are stripped by context, so
-    // this stays at one — and the first version's line-prefix guard would have
-    // counted it, because prose in `globals.css` starts with bare text.
+    // THE OTHER DIRECTION, which reddens a CORRECT tree: prose that quotes the selector. Comments are stripped by context.
     const proseComment = css.replace(ANCHOR, `${ANCHOR}\n/* A note about .gn-members__row and its one rule. */`);
     expect(proseComment, 'the prose plant did not land').not.toBe(css);
     expect(rowRuleSelectors(proseComment, uiCss)).toHaveLength(1);

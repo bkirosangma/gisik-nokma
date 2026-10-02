@@ -1,6 +1,7 @@
 import { BACKLOG_STATE, universalTransitions, type StateCategory } from '@gisik-nokma/domain';
 import { Chip, type ChipTone } from '@gisik-nokma/ui';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { CATEGORY_LABEL } from '../category-label.js';
 import { ruleCountLabel } from '../summaries.js';
 import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './builder-context.js';
 import { StateInspector } from './state-inspector.js';
@@ -10,7 +11,6 @@ import { TransitionInspector } from './transition-inspector.js';
 export const UNIVERSAL_MOVES_NOTE =
   'Every workflow has these two moves, so they are not part of the count above and cannot be changed.';
 
-const CATEGORY_LABEL: Record<StateCategory, string> = { open: 'Open', active: 'Active', terminal: 'Done' };
 const CATEGORY_TONE: Record<StateCategory, ChipTone> = { open: 'open', active: 'active', terminal: 'terminal' };
 
 /**
