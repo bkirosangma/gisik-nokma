@@ -92,6 +92,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     // claimant's device clock, and the server's stamp on the CONTEST — so a
     // reader cannot mistake the second for when the claim was made.
     expect(
+      // 23.372 (HK-3b): the provenance line reads "by their clock, refused <date>".
       within(contested).getByText(/claimed by Unknown person at .* by their clock, refused /),
     ).toBeInTheDocument();
     // The excluding half, in the same run: no rendered text dates this claim by

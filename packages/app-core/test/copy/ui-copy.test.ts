@@ -265,6 +265,7 @@ const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
   { file: 'packages/domain/src/parse-event.ts', holds: 'every invite event carries the inviteId' },
   { file: 'packages/domain/src/parse-event.ts', holds: "an invite's entity id IS its inviteId" },
   { file: 'packages/domain/src/validate-workflow.ts', holds: 'every workflow has it without declaring it' },
+  // 23.372 (HK-3b): the zod, contest-provenance and create_ticket refusals are read and still hold their sentences.
   { file: 'packages/domain/src/display-name.ts', holds: 'a name of only spaces names nothing' },
   { file: 'packages/domain/src/envelope.ts', holds: 'two ULIDs joined by a colon' },
   { file: 'packages/domain/src/envelope.ts', holds: 'an event with no payload is not a claim' },
