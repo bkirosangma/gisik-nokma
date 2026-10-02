@@ -177,3 +177,25 @@ Smoothness add-on G-6, owner 2026-10-02: *"in the ticket and notes comment edito
 - ✅ **25.388 — the button is a quiet ghost control with the N3 depth: transparent, rests on `--gn-shadow-quiet`, `--gn-shadow-quiet-near` on hover, `--gn-shadow-quiet-press` on `:active` (declared after the hover), no raised shadow and no `[data-style]` block; the strip's 32px tool size on a desktop, a 44px floor on phones in an arm placed AFTER the base rule (same specificity, source order decides), a focus ring.** Control: the Attach rule beside it IS raised. Mutations: the phone floor, the rest shadow, the `:active` rule removed → red.
 - ✅ **25.389 — every comment editor reaches the slot as `mode="comment"` (two in the ticket sheet, two in the note comments), so one toggle covers the composer and the in-place edit on both surfaces.** Control: the note-body host uses no comment mode.
 - ✅ **25.390 — a change made in another tab (the `storage` event for `gn-comment-toolbar`) reaches a mounted comment editor; an event for another key does not.** Mutation: the `storage` listener removed → red.
+
+## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)
+
+<!-- G-9 T1 -->
+<!-- G-9 T2 -->
+Collision and snapping as pure modules (G-9 T2, owner 2026-10-03). Tests: `packages/app-core/test/workflow-builder/collision.test.ts`, `snap.test.ts`. Block 25.500–25.559 (G-9 only); 25.505–25.516 used here.
+
+- ✅ **25.505 — a free target comes back unchanged (`clampToAvoidOverlap` fast path).** Mutation: the fast path returns `lastValid` instead of `target` → red.
+- ✅ **25.506 — overlap honours the 8 px gap: a rect 7 px from another counts as overlapping, 9 px apart does not.** Mutation: the gap dropped from any one of the four overlap clauses (or ignored altogether) → red.
+- ✅ **25.507 — dragging into an obstacle from the left stops at its left edge minus the gap (x 92) and slides, it does not jump past.** Mutation: the fast path returns `target` always → red.
+- ✅ **25.508 — the nearest valid candidate wins: approaching from above stops above the obstacle (y −68), not beside it.** Mutation: the winner is the farthest free candidate, not the nearest → red.
+- ✅ **25.509 — a corner between two obstacles picks the closest free spot (x 92) and clears both.** Mutation: `best` chosen by first free candidate, not nearest → red.
+- ✅ **25.510 — a target inside a stack of obstacles still lands on a spot that clears all three.** Mutation: the `free(p)` check removed from the candidate loop (an overlapping spot returned) → red.
+- ✅ **25.511 — an off-guide position snaps to the 16 px grid (37, 9 → 32, 16).** Mutation: the grid rounding removed on either axis → red.
+- ✅ **25.512 — a centre within 6 SCREEN px of another centre snaps to it and reports a guide; at zoom 0.25 the flow threshold is 24 px (control: the same 20 px at zoom 1 falls to the grid).** Mutation: threshold not divided by zoom → red.
+- ✅ **25.513 — a guide beats the grid on its own axis only: the guided axis lands off-grid (165), the other axis still snaps to the grid (32).** Mutation: the y guide ignored (the grid alone gives 160, not 165) → red; the grid removed on the unguided x axis → red.
+- ✅ **25.514 — the collision clamp runs last and hides a guide it moved off; the other axis keeps its guide.** Mutation: guide filtering removed → red.
+- ✅ **25.515 — Alt skips guides and grid; the clamp still applies.** Mutation: `alt` ignored → red.
+- ✅ **25.516 — `target` is the snapped pre-clamp point, for the dashed outline; unblocked, `target` equals `position` and `blocked` is false.** Mutation: `target` returned as the clamped position → red.
+<!-- G-9 T3 -->
+<!-- G-9 T4 -->
+<!-- G-9 T5 -->

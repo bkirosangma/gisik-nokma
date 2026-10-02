@@ -9,9 +9,17 @@ describe('collision (spec §3.1)', () => {
     expect(clampToAvoidOverlap({ x: 0, y: 200 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 0, y: 200 });
   });
 
-  it('25.506 overlap honours the gap: touching within 8 px counts, 9 px apart does not', () => {
-    expect(rectsOverlap({ x: 0, y: 0, ...size }, { ...ob, x: 107 }, NODE_GAP)).toBe(true);
-    expect(rectsOverlap({ x: 0, y: 0, ...size }, { ...ob, x: 109 }, NODE_GAP)).toBe(false);
+  it('25.506 overlap honours the gap on all four sides: touching within 8 px counts, 9 px apart does not', () => {
+    const a = { x: 0, y: 0, ...size };
+    // right of a, left of a, below a, above a (a is 100 x 60)
+    expect(rectsOverlap(a, { ...ob, x: 107 }, NODE_GAP)).toBe(true);
+    expect(rectsOverlap(a, { ...ob, x: 109 }, NODE_GAP)).toBe(false);
+    expect(rectsOverlap(a, { ...ob, x: -107 }, NODE_GAP)).toBe(true);
+    expect(rectsOverlap(a, { ...ob, x: -109 }, NODE_GAP)).toBe(false);
+    expect(rectsOverlap(a, { ...ob, x: 0, y: 67 }, NODE_GAP)).toBe(true);
+    expect(rectsOverlap(a, { ...ob, x: 0, y: 69 }, NODE_GAP)).toBe(false);
+    expect(rectsOverlap(a, { ...ob, x: 0, y: -67 }, NODE_GAP)).toBe(true);
+    expect(rectsOverlap(a, { ...ob, x: 0, y: -69 }, NODE_GAP)).toBe(false);
   });
 
   it('25.507 dragging into an obstacle from the left stops at its left edge minus the gap (slides, does not jump past)', () => {
