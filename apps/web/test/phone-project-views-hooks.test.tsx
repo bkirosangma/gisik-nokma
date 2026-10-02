@@ -39,7 +39,7 @@ beforeEach(() => {
   clearWorkspaceProjectsCache();
 });
 
-// New ticket is offered only once the type ladder and the project's rows have answered (`createRegion`).
+// Create ticket is offered only once the type ladder and the project's rows have answered (`createRegion`).
 const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand', fields: [] }] as unknown as TicketTypeDef[];
 
 const world = (overrides: Parameters<typeof stubServices>[0] = {}) =>
@@ -62,7 +62,7 @@ const world = (overrides: Parameters<typeof stubServices>[0] = {}) =>
   });
 
 describe('21.110 the project header carries the classes its phone rules key on', () => {
-  it('21.110 the view tabs are `.gn-project__rail`, the search is `.gn-project__search`, Filters is `.gn-project__filters` and New ticket is the header’s one direct-child primary', async () => {
+  it('21.110 the view tabs are `.gn-project__rail`, the search is `.gn-project__search`, Filters is `.gn-project__filters` and Create ticket is the header’s one direct-child primary', async () => {
     render(
       <Providers services={world()}>
         <ProjectPage />
@@ -80,7 +80,7 @@ describe('21.110 the project header carries the classes its phone rules key on',
     expect(filters.parentElement).toBe(header);
 
     // The CSS selector is `.gn-project__header > .gn-button--primary`: the primary must be a DIRECT child.
-    const create = await screen.findByRole('button', { name: 'New ticket' });
+    const create = await screen.findByRole('button', { name: 'Create ticket' });
     expect(create).toHaveClass('gn-button--primary');
     expect(create.parentElement).toBe(header);
     // …and it is the ONLY primary in the header, so "the one primary at full width" names one button.

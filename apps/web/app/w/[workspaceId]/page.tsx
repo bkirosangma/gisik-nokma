@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { newUlid, type GroupRow, type IngestResult } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, SegmentedControl } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, Dialog, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
 import {
   ARCHIVE_LABEL,
   DELETE_TRIGGER_LABEL,
@@ -224,6 +224,13 @@ export default function WorkspaceHomePage() {
   const [failure, setFailure] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * Whether the Create project dialog is open. LIFTED to the page because the page's own
+   * refusal line sits behind a modal scrim: while the dialog is open the refusal is drawn
+   * INSIDE it (so the person who just pressed Create reads it, with their typing intact)
+   * and this page's copy is withheld, so one refusal is never announced twice.
+   */
+  const [createOpen, setCreateOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   /** The project the delete dialog is open on (trash Plan 4, spec §6.2). */
   const [deleting, setDeleting] = useState<ProjectRef | null>(null);
@@ -335,7 +342,7 @@ export default function WorkspaceHomePage() {
             reload();
             return;
           }
-          // The authority's own words, exactly as the mint, the founding form
+          // The authority's own words, exactly as the mint, the Create workspace dialog
           // and the invitation banner carry them.
           setRefusal(
             bad.status === 'refused'
@@ -415,6 +422,13 @@ export default function WorkspaceHomePage() {
           groups={groups}
           onGrouping={chooseGrouping}
           onSubmit={submit}
+          refusal={refusal}
+          createOpen={createOpen}
+          onCreateOpenChange={(open) => {
+            // A new opening starts clean: an earlier archive's refusal is not this form's.
+            if (open) setRefusal(null);
+            setCreateOpen(open);
+          }}
           onDelete={(project) => {
             setNotice(null);
             setDeleting(project);
@@ -445,7 +459,7 @@ export default function WorkspaceHomePage() {
           }}
         />
       ) : null}
-      {refusal !== null ? (
+      {refusal !== null && !createOpen ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {refusal}
         </p>
@@ -838,6 +852,9 @@ function WorkspaceHome({
   groups,
   onGrouping,
   onSubmit,
+  refusal,
+  createOpen,
+  onCreateOpenChange,
   onDelete,
 }: {
   workspace: WorkspaceRef;
@@ -849,6 +866,9 @@ function WorkspaceHome({
   groups: GroupRow[] | 'failed' | null;
   onGrouping: (choice: ProjectGrouping) => void;
   onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  refusal: string | null;
+  createOpen: boolean;
+  onCreateOpenChange: (open: boolean) => void;
   onDelete: (project: ProjectRef) => void;
 }) {
   const viewer = viewerOf(workspace.role);
@@ -1135,8 +1155,8 @@ function WorkspaceHome({
             `aria-label` carries the workspace for the same reason the archive
             buttons carry the project. */}
         {/* The heading row's controls (case 22.121), in order: the archived toggle, the Grouped/Plain
-            choice, and the slot the Create project button mounts into (prefixes and groups Task 8). The
-            slot is for an owner or admin only, the same people who may create a project. */}
+            choice, and the Projects section's Create project button (prefixes and groups Task 8, 22.152).
+            The button is for an owner or admin only, the same people who may create a project. */}
         <div className="gn-workspace-home__projects-actions">
           {archived.length > 0 ? (
             <Button
@@ -1159,7 +1179,19 @@ function WorkspaceHome({
               onChange={onGrouping}
             />
           )}
-          {isAdmin ? <span data-slot="create-project" /> : null}
+          {/* The Projects section's one primary (prefixes/groups Task 8, case 22.152): a
+              verb + object with its icon, in the heading row it acts under. An owner or
+              admin only — everyone else reads the refusal line below instead. */}
+          {isAdmin ? (
+            <CreateProjectButton
+              workspaceId={workspace.id}
+              busy={busy}
+              onSubmit={onSubmit}
+              refusal={refusal}
+              open={createOpen}
+              onOpenChange={onCreateOpenChange}
+            />
+          ) : null}
         </div>
       </div>
       {groupsFailed ? (
@@ -1176,15 +1208,15 @@ function WorkspaceHome({
         // 2026-09-21).** The sentence presupposes projects the reader cannot
         // open — *"no projects YOU can open"* — which is exactly right for the
         // excluded member and exactly wrong for the person who founded this
-        // workspace seconds ago and is looking at the New-project form below,
-        // having created nothing yet. Two different facts reach this one arm and
+        // workspace seconds ago and is looking at the Create project button in
+        // the heading above, having created nothing yet. Two different facts reach this one arm and
         // `shown.length === 0` cannot tell them apart on its own; `isAdmin`
         // together with the SERVED count can. The founder's sentence names the
-        // form below rather than an absence, because the form is the way out and
+        // action rather than an absence, because the button is the way out and
         // it is already on screen.
         isAdmin && workspace.projects.length === 0 ? (
           <p className="gn-workspace-home__empty">
-            No projects yet — create the first one below.
+            No projects yet. Create the first one.
           </p>
         ) : (
           <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
@@ -1213,49 +1245,16 @@ function WorkspaceHome({
         <p className="gn-workspace-card__restricted gn-workspace-home__restricted">{restricted}</p>
       ) : null}
 
-      {/* Non-admins get the reference's refusal NOTE where the form would be,
-          rather than nothing — the same rule the member sentence above keeps:
-          a caller is told what they cannot do here, not left to wonder why the
-          form is absent. ONE sentence for every non-admin role (member and
-          guest alike); the prototype's guest-specific wording asserts a
-          visibility rule ("you can only see tickets that name you") this round
-          does not verify anywhere else, so it is not transcribed. */}
-      {/*
-        ⚠ THE SENTENCE NAMED ONE ROLE OF TWO, AND THAT WAS FALSE — not merely
-        narrower than the gate. `isAdmin` above is `mayAdminister(role)`, which
-        is `role === 'owner' || role === 'admin'` (`workspace-viewer.ts:90-92`),
-        so an OWNER takes the form arm and can create a project in every
-        workspace — while the sentence a member or guest reads says that only an
-        admin can. `apps/server/src/permissions/check-permission.ts`'s own
-        `ADMIN_ONLY_TYPES` agrees the two roles are one door, so the client and
-        the server were never in dispute; only the copy was wrong.
-
-        IT SURVIVED THREE REVIEW PASSES because "unreachable for owners" and
-        "false for its readers" are compatible facts and each looked like the
-        answer: the sentence renders only in the `!isAdmin` arm, so no owner
-        ever reads it — and its audience is exactly the people for whom "ask an
-        admin" is the right move, so nothing a user did ever surfaced it. The
-        claim is about WHO MAY CREATE, though, not about who reads it, and the
-        restriction as stated is wrong in every workspace.
-
-        IT WAS TRANSCRIBED VERBATIM FROM THE PROTOTYPE —
-        `design-system/interactive/desktop.dc.html:2694` and the mobile
-        drawing's `addProjectRefusal` both say "an admin" — which is why it read
-        as authoritative. A drawing is not a requirement: the roles exist in the
-        shipped product and the drawing's wording did not keep up. Corrected
-        here rather than in the drawing, which is the design authority and not
-        this product's copy.
-
-        The documents that QUOTE this sentence (`README.md`, `docs/manual.md`,
-        `docs/faq.md`) each marked it "the app's own wording, which names only
-        the admin"; they are corrected in the same change set, because a
-        quotation of a string that no longer exists is a citation that still
-        resolves and still misleads. */}
-      {isAdmin ? (
-        <NewProjectForm workspaceId={workspace.id} busy={busy} onSubmit={onSubmit} />
-      ) : (
+      {/* Non-admins get a refusal NOTE where the Create project button would be, rather than
+          nothing: a caller is told what they cannot do here, not left to wonder why the
+          control is absent. ONE sentence for every non-admin role (member and guest alike).
+          It names BOTH roles that may create ("an owner or admin"): the sentence once named
+          only the admin while an owner could create a project too, and `isAdmin` is
+          `mayAdminister(role)` (`workspace-viewer.ts`), the same door
+          `ADMIN_ONLY_TYPES` holds on the server. */}
+      {isAdmin ? null : (
         <p className="gn-workspace-home__founding-refusal">
-          Only an owner or an admin can create a project in this workspace.
+          Only an owner or admin can create a project.
         </p>
       )}
 
@@ -1264,22 +1263,68 @@ function WorkspaceHome({
 }
 
 /**
- * No `<h2>` heading here, unlike `/workspaces`' "New workspace" form
- * (`FoundingForm`, which keeps both a heading AND a "Name" label) —
- * transcribed asymmetry, not a dropped one. The prototype's own two blocks
- * differ the same way: the workspace-list block carries a separate `<h2>New
- * workspace</h2>` above a field labelled "Name"; this row's field label IS
- * "New project", with nothing above it. Flagged by review as unexplained;
- * this comment is the explanation.
+ * "Create project" — the Projects heading row's primary button and the dialog it
+ * opens (prefixes/groups Task 8, case 22.152). It replaced the always-visible
+ * "New project" row (`.gn-project-founding`, a raised card with an inline
+ * field+button row): founding a project is an act the person chooses to begin, and
+ * the form now has room for the group picker Task 9 puts in it.
+ *
+ * The form is mounted ONLY while the dialog is open, so each opening starts from
+ * empty fields — the reset the old form did by hand on success. A refusal from the
+ * door is drawn INSIDE the dialog (`refusal`, from the page), where the person who
+ * just pressed Create is looking and their typing is still there to correct.
  */
-function NewProjectForm({
+function CreateProjectButton({
   workspaceId,
   busy,
   onSubmit,
+  refusal,
+  open,
+  onOpenChange,
 }: {
   workspaceId: string;
   busy: boolean;
   onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  refusal: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <>
+      <Button variant="primary" onClick={() => onOpenChange(true)}>
+        <PlusIcon />
+        Create project
+      </Button>
+      {open ? (
+        <Dialog open title="Create project" onClose={() => onOpenChange(false)}>
+          <NewProjectForm
+            workspaceId={workspaceId}
+            busy={busy}
+            onSubmit={onSubmit}
+            refusal={refusal}
+            onCancel={() => onOpenChange(false)}
+            onDone={() => onOpenChange(false)}
+          />
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+function NewProjectForm({
+  workspaceId,
+  busy,
+  onSubmit,
+  refusal,
+  onCancel,
+  onDone,
+}: {
+  workspaceId: string;
+  busy: boolean;
+  onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  refusal: string | null;
+  onCancel: () => void;
+  onDone: () => void;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -1304,7 +1349,7 @@ function NewProjectForm({
     //
     // The name goes AS TYPED. `displayName` refuses a blank one at the domain
     // schema, and trimming here would silently repair a claim the admin made
-    // while making that refusal unreachable — the founding form on
+    // while making that refusal unreachable — the Create workspace dialog on
     // `/workspaces` states the same choice about the same door.
     //
     // The ULID is minted per SUBMISSION, inside the builder: a retry after a
@@ -1333,18 +1378,16 @@ function NewProjectForm({
           // is a key whose half is derived from the name.
           prefix === '' ? undefined : prefix,
         ),
-      () => {
-        setName('');
-        setDescription('');
-        setPrefix('');
-      },
+      // The dialog closes on a COMMITTED answer only; the form unmounts with it, so
+      // there is nothing to clear by hand.
+      onDone,
     );
   };
 
   return (
-    <form className="gn-project-founding" onSubmit={send}>
-      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-name">
-        <span className="gn-field__label">New project</span>
+    <form className="gn-project-create" onSubmit={send}>
+      <label className="gn-field" htmlFor="gn-new-project-name">
+        <span className="gn-field__label">Name</span>
         <input
           id="gn-new-project-name"
           className="gn-field__input"
@@ -1354,12 +1397,12 @@ function NewProjectForm({
         />
       </label>
       {/* The owner's ruling of 2026-09-19 — *"New-project form gains an optional
-          description input"* — and it is the ONLY place a description is
+          description input"* (the form is the Create project dialog since Task 8) — and it is the ONLY place a description is
           authored: the prototype's `addProject` takes a name and hard-codes
           `desc`, so without this control the column would be written only by
           events the product never sends.
 
-          `New project` stays the row's primary label and this one says
+          `Name` is the dialog's first label and this one says
           "(optional)": the name is required and the schema refuses a blank one,
           so a reader who did not know which box they could skip would find out
           by being refused.
@@ -1367,10 +1410,7 @@ function NewProjectForm({
           No `maxLength` here, matching the name input beside it: the domain
           schema owns the 500-character bound, and an attribute that silently
           stopped the typing would make that refusal unreachable from the form. */}
-      <label
-        className="gn-field gn-project-founding__field"
-        htmlFor="gn-new-project-description"
-      >
+      <label className="gn-field" htmlFor="gn-new-project-description">
         <span className="gn-field__label">Description (optional)</span>
         <input
           id="gn-new-project-description"
@@ -1390,7 +1430,7 @@ function NewProjectForm({
           No `maxLength`, matching the two inputs above: the domain schema owns
           the bound, and an attribute that silently stopped the typing would
           make that refusal unreachable from the form that can produce it. */}
-      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-prefix">
+      <label className="gn-field" htmlFor="gn-new-project-prefix">
         <span className="gn-field__label">Prefix (optional)</span>
         <input
           id="gn-new-project-prefix"
@@ -1400,9 +1440,22 @@ function NewProjectForm({
           onChange={(event) => setPrefix(event.target.value.toUpperCase())}
         />
       </label>
-      <Button variant="primary" type="submit" disabled={busy}>
-        Create project
-      </Button>
+      {/* Task 9 puts the four-level group picker here (R6). Until then this is an
+          EMPTY marker — no label, no control — so it cannot read as a dead affordance. */}
+      <div data-slot="group-picker" />
+      {refusal !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {refusal}
+        </p>
+      ) : null}
+      <div className="gn-project-create__actions">
+        <Button type="button" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" type="submit" disabled={busy}>
+          Create project
+        </Button>
+      </div>
     </form>
   );
 }

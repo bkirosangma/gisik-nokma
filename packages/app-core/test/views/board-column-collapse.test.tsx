@@ -255,13 +255,13 @@ describe('20.117 a non-terminal column collapses exactly as Done does', () => {
     const { onMoved, source } = setup(boardOf(errand()));
     await settled();
     const todo = columnIn('Errand', 'todo');
-    expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    expect(within(todo).getByRole('button', { name: /^Create ticket in / })).toBeInTheDocument();
 
     await user.click(collapseButton(todo, 'To do'));
     expect(within(columnIn('Errand', 'todo')).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
       'Expand To do, 0 tickets',
     ]);
-    expect(within(columnIn('Errand', 'todo')).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    expect(within(columnIn('Errand', 'todo')).queryByRole('button', { name: /^Create ticket in / })).toBeNull();
 
     await user.click(collapseButton(columnIn('Errand', 'doing'), 'Doing'));
     expect(within(columnIn('Errand', 'doing')).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([

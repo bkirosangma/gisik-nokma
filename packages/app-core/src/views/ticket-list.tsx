@@ -1285,7 +1285,7 @@ export type TicketListState = {
    * Whether the list has EVER answered, over this hook's whole lifetime.
    *
    * `rows === null` is the right test for "do I have rows to render". It is the
-   * wrong test for "does the New ticket control exist", because a filter change
+   * wrong test for "does the Create ticket control exist", because a filter change
    * re-keys the query and nulls `rows` on every toggle — which retracted the
    * button and flickered the project header. Gate controls on this instead.
    */

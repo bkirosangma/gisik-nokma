@@ -186,7 +186,7 @@ function flowSource(
 }
 
 async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.click(screen.getByRole('button', { name: 'New ticket' }));
+  await user.click(screen.getByRole('button', { name: 'Create ticket' }));
   await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
   // The Parent picker is the shared searchable `Select` now, so it is opened and clicked rather
   // than `selectOptions`'d: its trigger is an `<input role="combobox">` with no `<option>`
@@ -198,7 +198,7 @@ async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>)
   await user.click(
     within(await screen.findByRole('listbox')).getByRole('option', { name: 'Registrations' }),
   );
-  await user.click(screen.getByRole('button', { name: 'Create' }));
+  await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 }
 
 function renderFlow(
@@ -585,9 +585,9 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -621,7 +621,7 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const onCreated = renderFlow(source, {
       parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Order the tent');
     // The picker must be OPENED first: it is the shared searchable `Select`, so
     // its options exist only while the panel is up and are portal-rendered into
@@ -639,7 +639,7 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     expect(birthState).toBeChecked();
     await user.click(birthState);
 
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -663,12 +663,12 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
     await user.click(
       within(screen.getByRole('tablist', { name: 'Priority' })).getByRole('tab', { name: 'P1' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -692,13 +692,13 @@ describe('V10 two presses on Create file ONE ticket, not two', () => {
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
 
     // Both clicks land in ONE React batch, which is the case a committed
     // `disabled` cannot guard — see the dialog's own case for the measurement
     // that pins the discrimination.
-    const create = screen.getByRole('button', { name: 'Create' });
+    const create = within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' });
     await act(async () => {
       create.click();
       create.click();
@@ -992,7 +992,7 @@ describe('E2-34 the reopen offer is the ONLY modal on screen', () => {
     // The offer is up — and it is the only modal.
     expect(await screen.findByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    expect(screen.queryByRole('dialog', { name: 'New ticket' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Create ticket' })).toBeNull();
   });
 });
 

@@ -829,7 +829,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     render(
       <Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
     );
-    const button = screen.getByRole('button', { name: 'Create a ticket' });
+    const button = screen.getByRole('button', { name: 'Create ticket' });
     await userEvent.setup().click(button);
     expect(clicks).toEqual([1]);
   });
@@ -844,7 +844,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
     // A no-op button here would look like a way out of an empty project and
     // would not be one.
-    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).toBeNull();
   });
 
   /**
@@ -916,19 +916,19 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
     expect(within(todo).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
   });
 
-  it('13.465 offers "Add a ticket" only when the shell handed a create handler down, both arms', async () => {
+  it('13.465 offers "Create ticket" only when the shell handed a create handler down, both arms', async () => {
     const user = userEvent.setup();
     const clicks: number[] = [];
     const { rerender } = render(
       <Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
     );
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(clicks).toEqual([1]);
 
     rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
     const todoAgain = screen.getByRole('region', { name: 'To do' });
-    expect(within(todoAgain).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    expect(within(todoAgain).queryByRole('button', { name: /^Create ticket in / })).toBeNull();
     // The words stay even with no handler — a no-op button here would look
     // like a way out of an empty column and would not be one, the same
     // "control that lies" discipline `emptyBanner`'s own docblock already
@@ -984,8 +984,8 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
  * `isCreatableState` derivation would produce — so these cases exercise the
  * gate directly rather than inventing a parallel fixture.
  */
-describe('Board — "Add a ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
-  it('13.1431 a creatable empty column shows "Add a ticket", and the click passes the column\'s own selection', async () => {
+describe('Board — "Create ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
+  it('13.1431 a creatable empty column shows "Create ticket", and the click passes the column\'s own selection', async () => {
     const user = userEvent.setup();
     const selections: Array<{ workflowId: string; stateId: string } | undefined> = [];
     render(
@@ -996,7 +996,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
       />,
     );
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(selections).toEqual([{ workflowId: 'wf-errand', stateId: 'todo' }]);
   });
 
@@ -1004,15 +1004,15 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     render(<Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     const done = screen.getByRole('region', { name: 'Done' });
     expect(within(done).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
-    expect(within(done).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    expect(within(done).queryByRole('button', { name: /^Create ticket in / })).toBeNull();
     // The control, same render: 'To do' is empty too, `creatable: true`, and
     // still shows the button — so the absence above is `creatable`'s doing,
     // not a blanket regression of the empty-column action.
     const todo = screen.getByRole('region', { name: 'To do' });
-    expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    expect(within(todo).getByRole('button', { name: /^Create ticket in / })).toBeInTheDocument();
   });
 
-  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
+  it('13.1433 the empty-board "Create ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
     const user = userEvent.setup();
     const calls: Array<Array<{ workflowId: string; stateId: string } | undefined>> = [];
     // `errandBoard()` (this file's own fixture, above): one group, `totalCards
@@ -1028,7 +1028,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
         onCreateTicket={(...args) => calls.push(args)}
       />,
     );
-    await user.click(screen.getByRole('button', { name: 'Create a ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     // NOT `[undefined]` — the handler is called with ZERO arguments, so a
     // regression that hands the click event through as `selection` (`onClick=
     // {onCreateTicket}`) shows as `calls[0]` holding React's synthetic click
@@ -1045,7 +1045,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     // vacuously true of a handler that never receives an argument at all.
     calls.length = 0;
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(calls).toEqual([[{ workflowId: 'wf-errand', stateId: 'todo' }]]);
   });
 });
@@ -1245,7 +1245,7 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
     render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).toBeNull();
     // The glyph is the one part of an empty column that reads as a control.
     expect(document.querySelector('.gn-board__column-empty-icon')).toBeNull();
   });
@@ -1273,9 +1273,9 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
       />,
     );
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
-    // Both affordances: the banner's, and the empty COLUMN's own "Add a ticket".
-    expect(screen.getByRole('button', { name: 'Create a ticket' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    // Both affordances: the banner's, and the empty COLUMN's own "Create ticket".
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Create ticket in / })).toBeInTheDocument();
     // And the glyph accompanies the control rather than replacing one.
     expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
   });

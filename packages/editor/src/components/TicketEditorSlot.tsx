@@ -197,7 +197,7 @@ export type EditorSlotProps = {
   submit?: (submission: EditorSubmission) => Promise<boolean>;
   /**
    * The document as it stands, reported on every edit — transcribed from
-   * app-core's half, which carries the full reasoning (the New ticket dialog
+   * app-core's half, which carries the full reasoning (the Create ticket dialog
    * needs the document BEFORE any submit, because the ticket it describes does
    * not exist until `Create` is pressed). The two declarations move together:
    * `test/ticket-editor-slot.test.tsx` compares their field-name sets, so a
@@ -242,7 +242,7 @@ export type TicketEditorSlotProps = EditorSlotProps & {
    *
    * ## Why a caller needs it at all
    *
-   * The New ticket dialog's description. Its `Create` control is the one act
+   * The Create ticket dialog's description. Its `Create` control is the one act
    * that files the ticket, and the composer's own "Submit" would sit inside the
    * same form offering a SECOND, differently-shaped act — one that sends a
    * `ticket.field_set` for a ticket that does not exist yet. Two submit controls

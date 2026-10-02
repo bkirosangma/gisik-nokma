@@ -997,7 +997,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   the screen; the pairing's own measured margin (4.539, `packages/ui/src/tokens.ts`'s `textAccentLight`
   docblock) already covers it in every style and theme. —
   (`app-nav.test.tsx`)
-- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column,
+- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column, **AMENDED 2026-10-02 (prefixes/groups Task 8): `.gn-project-founding` is deleted; the workspace-home half now reads "the New-project form is the Create-project dialog's `.gn-project-create` form" and the `/workspaces` half "`.gn-workspace-founding` is the dialog's form column, mounted only while open". Both ride the new buttons (22.151, 22.152).**
   max-width 420px, no card) for `/workspaces`' "New workspace" block, and `.gn-project-founding` (a
   raised card, an inline field+button row) for the home's "New project" row. Both asserted by className
   on the real `<form>` element, positively (carries its own class) and negatively (does not carry the
@@ -2361,7 +2361,7 @@ the route's half; `13.983` witnesses the mapper's.
 - **13.983** ✅ The mapper **refuses** a project row that omits the key, naming its path *and* the guard's own sentence.
 - **13.984** ✅ The project card draws the description **inside its own door**.
 - **13.985** ✅ A project nobody described draws **no element at all** — not an empty one.
-- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused).
+- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused). **AMENDED 2026-10-02 (prefixes/groups Task 8): the form is the Create-project dialog (22.152); the description is still sent as typed and omitted when untouched.**
 - **13.987** ✅ End to end through the REAL door: a description authored over the wire reaches the exact served body — the full `project.created` → projection → read → route path in one assertion.
 
 **Mutation witnesses, run and recorded rather than predicted.** `13.978` — changing the projection's
@@ -2602,7 +2602,7 @@ a member only the projects they may see (`visible-projects.ts`), so "outside eve
 workspace" and "a workspace with none" both reach this arm as `projects: []`; the count cannot separate
 them and the ROLE can.
 
-- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and
+- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and **AMENDED 2026-10-02 (prefixes/groups Task 8): the sentence is now "No projects yet. Create the first one." — "below" is gone because the button is in the heading row (22.153).**
   not the member's sentence, and the form the sentence names really is on screen); a member with the
   SAME empty list keeps the member's sentence. —
   (`apps/web/test/workspace-home.test.tsx`)
