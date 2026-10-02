@@ -381,3 +381,54 @@ describe('9.426 restoredAt and discardDraft', () => {
     expect(ingest).not.toHaveBeenCalled();
   });
 });
+
+describe('25.161 the draft write is coalesced with the autosave timer (smoothness T9; audit SM-07)', () => {
+  /**
+   * Five keystrokes inside the window used to be five synchronous `localStorage` writes (a JSON.stringify of the whole document
+   * each). The draft is now written when a save is sent (the 2 s pause, a blur-save, `beforeunload`, unmount), before the
+   * `ingest`, so a refused or unanswered save still leaves it behind (18.207) and a reload still recovers it.
+   * Mutation: the `setItem` back in `onDraft` → five writes before the timer, red.
+   */
+  it('25.161 five onDraft calls write the draft ONCE, at the flush, before the ingest; CONTROL: beforeunload with a pending draft writes it too', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const order: string[] = [];
+    setItem.mockImplementation(function (this: Storage, key: string, value: string) {
+      order.push('write');
+      return Object.getPrototypeOf(Storage.prototype).setItem?.call(this, key, value);
+    });
+    const { dataSource, ingest } = fakeDataSource((events) => {
+      order.push('ingest');
+      return committed();
+    });
+    const hook = renderHook(() =>
+      useNoteAutosave({ dataSource, userId: USER, workspaceId: WORKSPACE, noteId: NOTE, note: noteDetail('2026-09-23T08:00:00.000Z') }),
+    );
+    for (const text of ['a', 'ab', 'abc', 'abcd', 'abcde']) {
+      act(() => {
+        hook.result.current.onDraft(doc(text));
+        vi.advanceTimersByTime(200);
+      });
+    }
+    expect(setItem).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(setItem.mock.calls[0]![0]).toBe(draftKey(USER, NOTE));
+    expect(String(setItem.mock.calls[0]![1])).toContain('abcde');
+    expect(order).toEqual(['write', 'ingest']);
+
+    // CONTROL: a tab closing inside the window flushes the pending draft, and the flush writes it first.
+    setItem.mockClear();
+    order.length = 0;
+    act(() => hook.result.current.onDraft(doc('closing')));
+    expect(setItem).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(new Event('beforeunload'));
+    });
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['write', 'ingest']);
+    setItem.mockRestore();
+  });
+});

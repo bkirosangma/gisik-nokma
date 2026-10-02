@@ -71,6 +71,27 @@ Spec D5, S1, P10; amendment S-R1 (the skeleton is the page's real container plus
 - 🧪 **25.059 — route hop on a lane port (dev server :3114 from this worktree, Chrome, 1440 wide, CDP throttle 300 ms latency and 250 kB/s down; Members ⇄ My work, four hops, the first includes the dev compile):** AFTER (T5 + FIX 1): the pending hint paints 11–58 ms after the click, the shell at ~343–355 ms, the content at ~658–677 ms. BEFORE (the pre-T5 tree at 4d418760 for every file T5 touched — the empty `<main>` fallbacks, no `loading.tsx`, no `NavPending` — same script, port and throttle): no hint and no shell, the old page simply stays until the content lands at ~662–674 ms. So the content is not earlier; the click is acknowledged in ~11–58 ms instead of never, and the new page's own frame is up ~320 ms before its content. The real `.gn-nav` is 69.6px at 1440, 768 and 1025 and 52px at 390, equal to `--app-nav-offset`; the workspace and project names still truncate with the wrapper in place (frame `t5-nav-1440.png`). The notes shell at ≤60rem hides its tree as the real page does (25.060, jsdom). Evidence: `/Users/kiro/my_projects/gisik-nokma-lanes/evidence-smoothness-t5/` (`t5hop.mjs`, `lib.mjs`, `hop-after2-1440.log`, `hop-before2-1440.log`, `t5-nav-1440.png`, `t5-nav-390.png`). Measured in browser scripts, not asserted by a suite.
 - ✅ **25.060 — the notes shell's tree is the real CLOSED drawer: `nav.gn-notes__tree.gn-notes__tree--drawer` with `data-open="false"`, so the ≤60rem arm hides it and the body is one column exactly as on the real page (no 8-row stack above the document on a tablet or phone, no jump on arrival);** control: the class list equals the real page's tree in `notes-page.tsx`. Mutation: drop `gn-notes__tree--drawer` → red. (`route-shells.test.tsx`)
 
+## 25.15 Notes: cheap remount, parallel resolve, the reserved band, a quiet keystroke (T9)
+
+Spec D5/S1/S4/S7, amendment S-R1; audit SM-07, NP-03. Tests: `apps/web/test/notes-smoothness.test.tsx`, `apps/web/test/use-note-autosave.test.tsx` (25.161). The block is 25.150–25.169; 25.163–25.165 are the T10 carry items (step 4), 25.166–25.169 unused.
+
+- ❌ **25.150 — `/notes` reads the workspaces through the shared read: a remount inside 30 s makes no extra `getMyWorkspaces` call and paints the tree on the first frame (audit SM-05, SM-07).** Control: a remount past the stale window makes exactly one.
+- ❌ **25.151 — opening a note asks every workspace in parallel and reads the found note once (audit SM-07).** Control: all three workspaces are asked before the first answers.
+- ❌ **25.152 — a switch to a note not seen yet keeps the tree on screen from the cache and draws the document band as the editor slot's own box, busy, with no well fill (S-R1; audit SM-07).** Control: when the read lands, the document replaces the band.
+- ❌ **25.153 — the comment composer's editor mounts on click, not on open (audit SM-07).** Control: the open page holds exactly one editor.
+- ❌ **25.154 — the signed-out note URL says how to sign in instead of "Loading…" (audit NP-03).**
+- ❌ **25.155 — one workspace whose read fails does not sink the resolve.** Control: every workspace failing says the note is not shared.
+- ❌ **25.156 — the editor band is ONE number: the field floor and the page shell's document skeleton read `--gn-notes-editor-min`, declared once.** Control: the value is still the 23.162 floor.
+- ❌ **25.157 — a keystroke that changes the headings re-renders the page but not the tree sections (audit SM-07).** Control: the title filter does re-render them.
+- ❌ **25.158 — while a search is running with no result yet, the list shows skeleton note rows and never "No notes match" (S-R1; audit SM-07).** Control: the answered empty search does say it.
+- ❌ **25.159 — while the workspaces read is pending the tree is the notes list item's own container with parts, busy and named once (S-R1).** Control: answered, there is none.
+- ❌ **25.160 — a keystroke inside the note does not re-render the byline, the comments or the rest of the document (audit SM-07).** Control: leaving edit mode does.
+- ❌ **25.161 — the draft write to `localStorage` is coalesced with the autosave timer: five keystrokes write it once, at the flush, before the ingest (audit SM-07).** Control: `beforeunload` with a pending draft writes it too.
+- ❌ **25.162 — a note opened before paints from the cache on its next mount while its read is in flight (S4).**
+- ❌ **25.163 — the notes document reaches the editor only through the dynamic editor slot (T10 carry; step 4).**
+- ❌ **25.164 — the notes list prefetches the editor chunk before a note opens (T10 carry; step 4).**
+- ❌ **25.165 — the notes band stays reserved while the purged-chips read is pending (S1; audit SM-07).**
+
 ## 25.12 Server: one rollup pass per page, compressed answers (T11)
 
 Spec D7; audit SM-06. Tests: `apps/server/test/{read/ticket-cards-batch,visibility/rollup,http/compression,http/compression-real-routes}.test.ts`; the frozen "before" is `apps/server/test/helpers/legacy-rollup-for.ts`. The case block is 25.190–25.199, all used.
