@@ -1295,6 +1295,29 @@ describe('G-3 the note opens to read; Edit and Done switch to the editor and bac
     expect(await screen.findByRole('button', { name: 'Edit note' })).toBeInTheDocument();
   });
 
+  it('25.355 headings are reported when the editor paints AFTER the note loaded, with no draft change (the read-only editor never emits one)', async () => {
+    const reported: string[][] = [];
+    const { container } = render(
+      <Providers services={world({})}>
+        <NoteDocument
+          noteId={NOTE}
+          workspaces={[{ ...WS_A_REF, role: 'owner' }]}
+          onHeadingsChange={(headings) => reported.push(headings.map((heading) => heading.text))}
+        />
+      </Providers>,
+    );
+    await screen.findByRole('button', { name: 'Edit note' });
+    await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+    // CONTROL, same it(): what was reported so far does not hold the late heading.
+    expect(reported.flat()).not.toContain('Late heading');
+    // A real browser mounts the editor a frame after the effect that reads the headings has run; model that by
+    // adding the heading to the editor's wrapper afterwards. Nothing edits, so `draft` never changes.
+    const late = document.createElement('h2');
+    late.textContent = 'Late heading';
+    screen.getByTestId('note-editor').appendChild(late);
+    await waitFor(() => expect(reported.at(-1)).toContain('Late heading'));
+  });
+
   it('25.345 a note link in the reading view is still a link: clicking it opens that note', async () => {
     const linked = noteDetail({
       body: {

@@ -414,12 +414,33 @@ function NoteDocumentBody({
   // each paint that a draft changed. The headings are reported UP to
   // `NotesPage` — its `<aside>` column is a sibling of this component, not a
   // descendant, so it cannot read this ref itself.
+  //
+  // A read-only editor never emits a draft, and a browser paints the editor a frame after this effect first ran,
+  // so the root is also watched: whatever the editor draws (or redraws) afterwards is read again, once per frame,
+  // and reported only when the headings actually differ (stamping ids is an attribute write, which is not observed).
   useEffect(() => {
     const root = editorRoot.current;
     if (root === null) return;
-    const meta = extractReadingMeta(root);
-    setWordCount(meta.wordCount);
-    onHeadingsChange?.(meta.headings);
+    let reported = '';
+    const read = (): void => {
+      const meta = extractReadingMeta(root);
+      setWordCount(meta.wordCount);
+      const key = JSON.stringify(meta.headings);
+      if (key === reported) return;
+      reported = key;
+      onHeadingsChange?.(meta.headings);
+    };
+    read();
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(read);
+    });
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
 
   // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
