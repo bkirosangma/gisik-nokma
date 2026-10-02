@@ -275,7 +275,7 @@ const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
   { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a field claim with no value' },
   { file: 'packages/domain/src/events/ticket-events.ts', holds: 'nothing sorts below it' },
   { file: 'packages/domain/src/filter-spec.ts', holds: 'Postgres text cannot carry a NUL byte' },
-  { file: 'packages/domain/src/events/contest-events.ts', holds: 'was refused by rule' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'refused by rule' },
   { file: 'packages/domain/src/events/contest-events.ts', holds: 'by their clock, refused' },
   { file: 'packages/mcp-server/src/tools/write-tools.ts', holds: 'a backlog ticket has no starting status' },
 ];
@@ -283,7 +283,8 @@ const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
 /**
  * Strings under `packages/domain/src` that keep " — ": thrown developer errors that name the function
  * (`applyTicketEvent: ...`) and are never drawn in the UI or returned to a client. Every string a client can
- * print, the zod refusals and the contest copy included, was rewritten (HK-3 and HK-3b). Each entry carries
+ * print was rewritten (HK-3 and HK-3b), the one exception being the contest note text, frozen by ruling P39
+ * because it is written into append-only comment bodies. Each entry carries
  * its reason, and an entry whose string is gone fails `no allow-list entry is stale`.
  */
 const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
@@ -295,6 +296,7 @@ const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
   { file: 'ticket-state.ts', contains: '— state "', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
   { file: 'note-state.ts', contains: 'refused —', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
   { file: 'ist-day.ts', contains: 'a day claim is not an instant', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'frozen by ruling P39 (contest-events.ts): this text is written into append-only comment bodies on convert-to-comment, so re-wording it splits one sentence into two spellings in the ledger' },
 ];
 
 describe('23.370 the domain refusal messages hold no " — "', () => {
