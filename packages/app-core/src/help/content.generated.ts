@@ -6833,7 +6833,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Needed by 2026-08-30 — due within 7 days.\""
+                    "text": "\"due 30 Aug (in 4 days)\""
                   }
                 ]
               },
