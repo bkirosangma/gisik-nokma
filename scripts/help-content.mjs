@@ -410,7 +410,62 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
 const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
 
 /**
+ * Source text with its COMMENTS removed (U-T11b addendum, reviewer B 13:18).
+ *
+ * The haystack used to include every comment, so a docblock that quoted a string once
+ * (`rollup-text.ts`: "5 of 8 done · 2 restricted") satisfied a manual heading that quotes it
+ * still, long after the product changed to a comma: a comment is not something a person
+ * reads in the product. Measured on the tree at 4f86b959: 13 quoted strings were found ONLY
+ * in comments.
+ *
+ * A single pass over code / '…' / "…" / `…` / `//` / `/* *​/`. JSX text is "code", so an
+ * apostrophe in it (`can't`) would open a string that never closes: a quote that meets a
+ * newline ends, which bounds that mistake to its own line (a template literal is the one
+ * string that may span lines, and is exempt from the rule). `lineComments` is false for
+ * CSS, where `//` is an ordinary character in a url.
+ *
+ * @param {string} text
+ * @param {{lineComments?: boolean}} [options]
+ * @returns {string}
+ */
+export function stripComments(text, { lineComments = true } = {}) {
+  let out = '';
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (c === '/' && next === '*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end === -1 ? n : end + 2;
+      out += ' ';
+    } else if (lineComments && c === '/' && next === '/') {
+      const end = text.indexOf('\n', i);
+      i = end === -1 ? n : end;
+    } else if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < n && text[j] !== c) {
+        if (text[j] === '\\') j += 1;
+        else if (text[j] === '\n' && c !== '`') break;
+        j += 1;
+      }
+      const end = Math.min(j + 1, n);
+      out += text.slice(i, end);
+      i = end;
+    } else {
+      out += c;
+      i += 1;
+    }
+  }
+  return out;
+}
+
+const COMMENTED_EXT = /\.(ts|tsx|js|jsx|mjs|css)$/;
+
+/**
  * Every product file's text, joined — the haystack a quoted string is looked for in.
+ * Comments are removed from source and stylesheets (see `stripComments`); JSON and
+ * Markdown are read whole.
  *
  * @param {string} root
  * @returns {string}
@@ -423,7 +478,8 @@ export function productText(root) {
       const p = join(dir, entry.name);
       if (entry.isDirectory()) walk(p);
       else if (PRODUCT_EXT.test(entry.name) && !p.endsWith(GENERATED_COPY)) {
-        parts.push(readFileSync(p, 'utf8'));
+        const raw = readFileSync(p, 'utf8');
+        parts.push(COMMENTED_EXT.test(entry.name) ? stripComments(raw, { lineComments: !entry.name.endsWith('.css') }) : raw);
       }
     }
   };
