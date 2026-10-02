@@ -136,6 +136,8 @@ export interface RollupView {
 }
 
 type ChildRow = {
+  /** Which parent of the page this child belongs to (the batch groups on it). */
+  parent_id: string;
   ticket_id: string;
   workspace_id: string;
   project_id: string;
@@ -146,16 +148,22 @@ type ChildRow = {
 };
 
 /**
- * One parent's rollup for one viewer, or `null` if it has no direct children.
+ * The rollups of MANY parents for one viewer, in one pass (smoothness T11, spec D7, audit SM-06):
+ * a `Map` keyed by parent id, holding exactly the parents that have direct children. Asking for a
+ * page of fifty cards is one children query, one role resolve per distinct workspace and one
+ * assignee-arm query — not fifty of each — and every number it holds is the number `rollupFor`
+ * gave for that parent before the batch existed (case 25.190 holds the two together against the
+ * frozen per-ticket function). The rules below were written for one parent and apply to each parent
+ * of the batch unchanged; "its answer" reads "its entry".
  *
- * ## `null` means "no children", and a nonexistent ticket answers it too
+ * ## An ABSENT key means "no children", and a nonexistent ticket answers it too
  *
- * A leaf and a ticket that never existed are the same `null` here, deliberately
+ * A leaf and a ticket that never existed are the same absence here, deliberately
  * and for the reason `canSee` gives at the same spot: giving them different
  * answers would put an existence oracle one layer down from the 404 Task 8
  * spent a commit removing. It also matches what Plan 3 Task 11 stores —
  * childless parents are ABSENT from `proj_rollups`, not zeroed (Plan 3 case
- * 5.17) — so `null` will keep meaning the same thing when the table lands.
+ * 5.17) — so absence will keep meaning the same thing when the table lands.
  *
  * A `{ total: 0, restrictedCount: 0 }` would be worse than
  * uninformative: it asserts a parent-with-no-children where the system has no
@@ -169,10 +177,11 @@ type ChildRow = {
  *
  * **It has TWO call sites and they govern SIX read paths, not one.** This
  * sentence used to say "its one caller is the single-ticket read", and Plan 5
- * Task 7 falsified it without touching it: `routes/tickets.ts` still asks after
- * both of that route's guards, but `read/ticket-cards.ts`'s `assembleTicketCards`
- * now asks once per card, and board, list, search, My Work and the attention
- * strip all call that. **Every one of the five passes a bound
+ * Task 7 falsified it without touching it: `routes/tickets.ts` still asks (as
+ * `rollupFor`) after both of that route's guards, but `read/ticket-cards.ts`'s
+ * `assembleTicketCards` asks once per PAGE (`rollupsFor`, since smoothness T11;
+ * it asked once per card before), and board, list, search, My Work and the
+ * attention strip all call that. **Every one of the five passes a bound
  * `t.workspace_id` clause AND `visibleTicketsWhere` before a row reaches the
  * assembler**, so no parent is counted that its viewer may not see — checked at
  * all five sites, not assumed. The constraint below is therefore a constraint on
@@ -221,11 +230,17 @@ type ChildRow = {
  * which is the one number this task exists to keep honest. A child in the wrong
  * workspace is a corruption to refuse upstream, not a row to quietly not count.
  */
-export async function rollupFor(
+export async function rollupsFor(
   db: Queryable,
   viewerId: string,
-  ticketId: string,
-): Promise<RollupView | null> {
+  ticketIds: readonly string[],
+): Promise<Map<string, RollupView>> {
+  const out = new Map<string, RollupView>();
+  // An empty page asks the database nothing (case 25.195).
+  if (ticketIds.length === 0) {
+    return out;
+  }
+
   // LEFT, and joined on ticket_id ALONE. The child set is proj_visibility's and
   // this join may only ANNOTATE it, never shrink it — an inner join would
   // silently drop a child out of a TRUE TOTAL. ticket_id is globally unique in
@@ -267,47 +282,56 @@ export async function rollupFor(
     // which is NULL on the same join-miss row `t.ticket_id IS NULL` answers
     // for, so `NOT EXISTS` against a NULL project id matches no row and is
     // TRUE — it does not fight the join-miss escape, it is simply moot there.
-    `SELECT v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
+    `SELECT v.parent_id, v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
             t.state_category
      FROM proj_visibility v
      LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
-     WHERE v.parent_id = $1
+     WHERE v.parent_id = ANY($1::text[])
        AND ((t.deleted_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL))
             OR t.ticket_id IS NULL)
-     ORDER BY v.ticket_id`,
-    [ticketId],
+     ORDER BY v.parent_id, v.ticket_id`,
+    [[...ticketIds]],
   );
   if (rows.length === 0) {
-    return null;
+    return out;
   }
 
-  // One resolve per distinct workspace, not one per child: the children of a
-  // parent are nearly always in one workspace, and a per-child resolve would be
-  // N round-trips for an answer that cannot differ within a workspace.
+  // One resolve per distinct workspace, not one per child and not one per parent: the children of a
+  // parent are nearly always in one workspace, and so are the parents of a page (the board and list
+  // routes bind one), so a page costs one resolve. A per-child resolve would be N round-trips for an
+  // answer that cannot differ within a workspace.
   const roleByWorkspace = new Map<string, EffectiveRole>();
-  let terminal = 0;
-  let uncategorized = 0;
-  // Children the AUDIENCE does not admit, and the subset of them the assignee arm may still open.
-  let notAdmitted = 0;
-  const armCandidates: string[] = [];
+  for (const child of rows) {
+    if (!roleByWorkspace.has(child.workspace_id)) {
+      roleByWorkspace.set(child.workspace_id, await resolveEffectiveRole(db, viewerId, child.workspace_id));
+    }
+  }
+
+  // The running tally of ONE parent. `notAdmitted` counts the children the AUDIENCE does not admit,
+  // `candidates` the subset of them the assignee arm may still open.
+  type Tally = { total: number; terminal: number; uncategorized: number; notAdmitted: number; candidates: string[] };
+  const tallies = new Map<string, Tally>();
 
   for (const child of rows) {
+    let tally = tallies.get(child.parent_id);
+    if (tally === undefined) {
+      tally = { total: 0, terminal: 0, uncategorized: 0, notAdmitted: 0, candidates: [] };
+      tallies.set(child.parent_id, tally);
+    }
+    tally.total += 1;
     // Counted BEFORE the audience question and never inside it: the category
     // half is a fact about the parent's children, the restriction half is a
     // fact about the viewer, and the whole point of this file is that the two
     // are not computed from one another.
     if (child.state_category === null) {
-      uncategorized += 1;
+      tally.uncategorized += 1;
     } else if (child.state_category === 'terminal') {
-      terminal += 1;
+      tally.terminal += 1;
     }
 
-    let eff = roleByWorkspace.get(child.workspace_id);
-    if (eff === undefined) {
-      eff = await resolveEffectiveRole(db, viewerId, child.workspace_id);
-      roleByWorkspace.set(child.workspace_id, eff);
-    }
+    // Set by the loop above for every workspace among `rows`.
+    const eff = roleByWorkspace.get(child.workspace_id)!;
     // The audience question is `canSeeResolved`'s, exactly as everywhere else —
     // no SQL and no branch here restates who may see what.
     const visible = canSeeResolved(eff, viewerId, {
@@ -317,20 +341,46 @@ export async function rollupFor(
       resolvedUserIds: child.resolved_user_ids,
     });
     if (!visible) {
-      notAdmitted += 1;
+      tally.notAdmitted += 1;
       // A viewer with NO workspace role reaches nothing by assignment (case 6.276): such a child
       // stays restricted and is never put to the arm.
-      if (eff.workspaceRole !== null) armCandidates.push(child.ticket_id);
+      if (eff.workspaceRole !== null) tally.candidates.push(child.ticket_id);
     }
   }
   // The per-viewer half follows `canSee`, including the assignee arm (R1, FD1 of the access follow-ups
   // plan): a child the viewer can open — a ticket assigned to them, or one inheriting from such a
-  // ticket — is not "restricted".
-  const armReach = await assigneeArmTickets(db, viewerId, armCandidates);
-  const restrictedCount = notAdmitted - armReach.size;
+  // ticket — is not "restricted". ONE arm query for the whole page; a child has exactly one parent, so
+  // the reached ids split back to their parents without overlap.
+  const armReach = await assigneeArmTickets(
+    db,
+    viewerId,
+    [...tallies.values()].flatMap((tally) => tally.candidates),
+  );
+  for (const [parentId, tally] of tallies) {
+    const reached = tally.candidates.filter((id) => armReach.has(id)).length;
+    // `tally.total`, and the loop above never reconstructs it from the per-viewer pass: the total is a
+    // fact about the PARENT, and the one thing that must not be reconstructed from the per-viewer pass —
+    // that reconstruction IS the defect this task is named for.
+    out.set(parentId, {
+      total: tally.total,
+      terminal: tally.terminal,
+      uncategorized: tally.uncategorized,
+      restrictedCount: tally.notAdmitted - reached,
+    });
+  }
+  return out;
+}
 
-  // `rows.length`, and the loop above never touches it: the total is a fact
-  // about the PARENT, and the one thing that must not be reconstructed from the
-  // per-viewer pass — that reconstruction IS the defect this task is named for.
-  return { total: rows.length, terminal, uncategorized, restrictedCount };
+/**
+ * One parent's rollup for one viewer, or `null` if it has no direct children: `rollupsFor` asked about
+ * a single parent. Its signature and its answers are what they were before the batch existed (smoothness
+ * T11), and every rule in `rollupsFor`'s docblock — no visibility check on the parent, the role per
+ * child workspace, true totals with the restriction named — governs this call too.
+ */
+export async function rollupFor(
+  db: Queryable,
+  viewerId: string,
+  ticketId: string,
+): Promise<RollupView | null> {
+  return (await rollupsFor(db, viewerId, [ticketId])).get(ticketId) ?? null;
 }
