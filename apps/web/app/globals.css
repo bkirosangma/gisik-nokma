@@ -971,7 +971,15 @@ input, textarea, select { font-family: inherit; }
    trailing edge, while a switch in a form field wants its control beside its
    own label. Both are correct for their screen, so the edge-alignment lives
    HERE, on the account row, rather than in the shared component. */
-.gn-account__notification-row { justify-content: space-between; }
+/* G-4 (25.360, 25.361): a switch row is ONE line of layout. The shared base rule above wraps, which a session row needs
+   (its button drops under its text) and a switch row must not: a label that wrapped to two lines let the switch
+   fall BELOW it at the left while one-line rows kept it at the right (measured at 390: the switch's right edge was
+   346 on one-line rows and 95 on a wrapped one). So the row never wraps, the label takes the column and wraps INSIDE
+   it (`min-width: 0` is the shared label's), and `.gn-switch` is already `flex: none` and `order: 2`, so it is always
+   the row's last item at its trailing edge. The shared `.gn-switch-row` and `.gn-switch__label` stay untouched: the
+   Settings → Workspace switch wants its control beside its own label. */
+.gn-account__notification-row { justify-content: space-between; flex-wrap: nowrap; }
+.gn-account__notification-row .gn-switch__label { flex: 1 1 auto; }
 
 /* ── Your workspaces — the row is a door. ──────────────────────────────────
    The prototype's row is a control that opens the workspace, with an accent
@@ -4559,6 +4567,29 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
 }
 
+/* G-3 (25.340): the note's header row — the breadcrumb on the left, the Edit / Done button top right at every width.
+   The button is a plain `.gn-button` (the 44px floor comes from it); this rule only places it. */
+.gn-note-document__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.gn-note-document__head .gn-breadcrumb {
+  min-width: 0;
+}
+.gn-note-document__mode {
+  flex: none;
+}
+
+/* G-3 (25.346): the phone panel's Contents list borrows /help's classes (`.gn-help__nav-link` and its list), so
+   the only rule of its own is the indent a deeper heading level needs — /help's list is flat. Keyed on the
+   `data-heading-level` attribute rather than a class: no new class name for the 18.226 render/style sets to track. */
+.gn-help__group-items > li[data-heading-level='3'] > .gn-help__nav-link { padding-left: 1.25rem; }
+.gn-help__group-items > li[data-heading-level='4'] > .gn-help__nav-link,
+.gn-help__group-items > li[data-heading-level='5'] > .gn-help__nav-link,
+.gn-help__group-items > li[data-heading-level='6'] > .gn-help__nav-link { padding-left: 2rem; }
+
 /* The crumb row. A list because the trail is ordered, with the separators drawn
    by the stylesheet so they are not read out as text. */
 .gn-breadcrumb__list {
@@ -5797,4 +5828,37 @@ input, textarea, select { font-family: inherit; }
   .gn-groups__heading,
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
+}
+
+/* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
+   The room comes from `--gn-shadow-reach` (`tokens.ts`; neo only) — see the block at the foot of `packages/ui/src/ui.css` for the why.
+   Each scroller below is padded by the reach and handed the same box back with the equal negative margin, so its neighbours do not
+   move. All under `[data-style="neo"]`: hig and minimal are byte-identical. */
+[data-style="neo"] .gn-groups__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The tree's padded top edge reaches back over the toolbar's bottom (the 0.75rem gap is smaller than the reach); a positioned toolbar
+   paints, and takes the pointer, above that transparent strip, so the Add group button stays whole. */
+[data-style="neo"] .gn-groups__toolbar {
+  position: relative;
+}
+/* The same, for the bar above the notes body: "Create note" and the drawer toggle lost their bottom edge to the padded tree below. Above
+   60rem the tree is itself positioned (and later in the DOM), so a bare `position: relative` ties and loses: the bar takes `z-index: 1`. */
+[data-style="neo"] .gn-notes__bar {
+  position: relative;
+  z-index: 1;
+}
+/* The notes tree scrolls only above 60rem (the drawer arm hides it below); its Restore buttons sat flush with the right edge. */
+[data-style="neo"] .gn-notes__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The phone chip row: the unscoped rule above gave it 0.25rem, which is less than a chip's lift. In neo the padding is the reach and
+   the negative margin returns the row to where it sat (its 1.4rem top margin is kept, the sides and foot are handed back). */
+@media (max-width: 40rem) {
+  [data-style="neo"] .gn-workspace-home__links {
+    padding: var(--gn-shadow-reach);
+    margin: calc(1.4rem - var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach));
+  }
 }
