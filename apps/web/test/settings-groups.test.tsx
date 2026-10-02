@@ -688,16 +688,16 @@ describe('22.244 the tree spine runs from the first child\'s centre to the last 
     const base = ruleExactly(css, piece);
     expect(valueOf(base, 'background')).toBe('var(--gn-border)');
     expect(valueOf(base, 'width')).toBe('2px');
-    // the first child starts at ITS centre (the elbow's line is 2px, centred on 1.375rem), a middle child spans its row
-    expect(valueOf(ruleExactly(css, `${piece.replace('::after', '')}:first-child::after`), 'top')).toBe('calc(1.375rem - 1px)');
+    // the first child starts at ITS centre (the elbow's line is 2px, centred on 1.625rem, the middle of a 52px box), a middle child spans its row
+    expect(valueOf(ruleExactly(css, `${piece.replace('::after', '')}:first-child::after`), 'top')).toBe('calc(1.625rem - 1px)');
     expect(valueOf(base, 'top')).toBe('-0.5rem');
     expect(valueOf(base, 'bottom')).toBe('-0.5rem');
     // the last child ends at ITS centre: the gap above it plus half a box (and the line's own half)
     const last = ruleExactly(css, `${piece.replace('::after', '')}:last-child::after`);
     expect(valueOf(last, 'bottom')).toBe('auto');
-    expect(valueOf(last, 'height')).toBe('calc(0.5rem + 1.375rem + 1px)');
+    expect(valueOf(last, 'height')).toBe('calc(0.5rem + 1.625rem + 1px)');
     // the elbow is centred on the same line, and the phone arm draws no spine
-    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before'), 'margin-top')).toBe('calc(1.375rem - 1px)');
+    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before'), 'margin-top')).toBe('calc(1.625rem - 1px)');
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::after', '@media (max-width: 40rem)'), 'display')).toBe('none');
   });
 });

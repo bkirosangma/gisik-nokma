@@ -1540,8 +1540,10 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__node { display: flex; align-items: flex-start; gap: 1rem; }
 /* The joining lines. The children column's left edge is the SPINE; a short horizontal line leaves the parent's box
    to the spine (`::before` of the column) and another runs from the spine to each child's box (`::before` of the
-   child). 1.375rem is the middle of a 2.75rem box; each horizontal line is 2px, so it starts a pixel above that
-   middle and is centred ON it.
+   child). 1.625rem is the middle of the box's first row — the box's 0.25rem padding plus half of its 2.75rem
+   controls, so a 52px box's own centre; a name that wraps grows the box downwards and leaves the elbow on that first
+   row, as it is for every box, so a parent's and a child's lines always meet. Each horizontal line is 2px, so it
+   starts a pixel above that middle and is centred ON it (P-T13 measured the old 1.375rem 4px above the centre).
 
    THE SPINE IS DRAWN PER CHILD, not as the column's border (P-T13, 22.244): a border runs the column's whole
    height, so it overshot the first child's centre above and, when the last child had children of its own, the last
@@ -1559,7 +1561,7 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__children::before {
   content: '';
   position: absolute;
-  top: calc(1.375rem - 1px);
+  top: calc(1.625rem - 1px);
   left: -1rem;
   width: 1rem;
   border-top: 2px solid var(--gn-border);
@@ -1574,10 +1576,10 @@ input, textarea, select { font-family: inherit; }
   bottom: -0.5rem;
   background: var(--gn-border);
 }
-.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after { top: calc(1.375rem - 1px); }
+.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after { top: calc(1.625rem - 1px); }
 .gn-groups__children > .gn-groups__node:not(:only-child):last-child::after {
   bottom: auto;
-  height: calc(0.5rem + 1.375rem + 1px);
+  height: calc(0.5rem + 1.625rem + 1px);
 }
 .gn-groups__children > .gn-groups__node { gap: 0; }
 /* `gap: 0` above puts the child's stub flush against its box, but it also removed the gap between that child's box
@@ -1588,7 +1590,7 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__children > .gn-groups__node::before {
   content: '';
   flex: 0 0 1rem;
-  margin-top: calc(1.375rem - 1px);
+  margin-top: calc(1.625rem - 1px);
   border-top: 2px solid var(--gn-border);
 }
 /* A FIXED width, so every box of one level shares one x whatever its name's length: a long name wraps (the name
