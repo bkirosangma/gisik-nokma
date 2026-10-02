@@ -35,8 +35,8 @@ export function rankImplications(
 export function rankImplicationsCopy(implications: RankImplications): string {
   const names = implications.parents.map((parent) => parent.name).join(', ');
   if (implications.mustHaveParent) {
-    return `Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: ${names}.`;
+    return `Must sit under a parent. This is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: ${names}.`;
   }
-  if (implications.parents.length === 0) return 'Top of the hierarchy — sits at the project root.';
-  return `Can sit under: ${names} · or at the project root.`;
+  if (implications.parents.length === 0) return 'Top of the hierarchy. It sits at the project root.';
+  return `Can sit under: ${names}, or at the project root.`;
 }

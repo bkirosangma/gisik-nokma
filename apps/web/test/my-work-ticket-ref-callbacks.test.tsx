@@ -9,11 +9,11 @@ import { stubServices } from './helpers/stub-services.js';
 /**
  * 18.287 — a final-review finding (2026-09-23): the project page's
  * `TicketSheet` mount supplies `queryTickets`/`resolveTicketHref` (Plan 7
- * Task 4, case 18.274), but My Work's own mount
+ * Task 4, case 18.274), but My work's own mount
  * (`app/w/[workspaceId]/my-work/page.tsx`) never did — so a `:ticket` picker
  * opened from a comment or description on THIS page falsely reported "No
  * tickets match" instead of searching, and a `ticketRef` chip in a rendered
- * comment here rendered as a plain span instead of a link. My Work spans
+ * comment here rendered as a plain span instead of a link. My work spans
  * projects, so there is no single "current project" the way the project
  * page has one — the open ticket's OWN project (`openTicketProjectId`) is
  * used for the ordering partition instead (mirrors `buildProjectPageQueryTickets`'s
@@ -143,7 +143,7 @@ function mount(): { services: AppServices } {
   return { services };
 }
 
-describe('18.287 My Work supplies queryTickets/resolveTicketHref to the open ticket’s sheet', () => {
+describe('18.287 My work supplies queryTickets/resolveTicketHref to the open ticket’s sheet', () => {
   it('18.287 both EditorSlot mounts get a working queryTickets and resolveTicketHref, keyed on the OPEN TICKET’s own project', async () => {
     capturedSlotProps = [];
     searchParams = new URLSearchParams({ ticket: TICKET });

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { IST_TIME_ZONE } from '@gisik-nokma/domain';
+import { formatDay } from '@gisik-nokma/app-core';
 import { Avatar, Button, Card, Chip, Dialog, PlusIcon } from '@gisik-nokma/ui';
 import { FoundingError, InvitationActionError, type PendingInvitation } from '@gisik-nokma/app-core/online';
 import {
@@ -24,6 +24,7 @@ import {
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
+import { istToday } from '../../src/ist-today.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
@@ -116,7 +117,7 @@ export default function WorkspacesPage() {
               for them, and answers `''` for someone with neither — and a
               heading must not end in an em dash for that person either. */}
           <h1 className="gn-page-title">
-            Workspaces{user !== null && displayLabelOf(user) !== '' ? ` — ${displayLabelOf(user)}` : ''}
+            Workspaces{user !== null && displayLabelOf(user) !== '' ? `: ${displayLabelOf(user)}` : ''}
           </h1>
           {/* `workspaces !== null` FIRST, and it stays load-bearing: a REFUSED
               read is also `null` here, and short-circuiting on this term before
@@ -161,7 +162,7 @@ export default function WorkspacesPage() {
           // The second sentence this always needed (Plan 6 Task 15b, item 1). A
           // person with a session and no workspace used to be told only to wait
           // for somebody else, which was the last hole in the founding path.
-          <p>No workspaces yet. Ask an admin for an invite link — or create your own.</p>
+          <p>No workspaces yet. Ask an admin for an invite link, or create your own.</p>
         ) : (
           <>
             {live.length > 0 ? (
@@ -517,22 +518,14 @@ function WorkspaceCard({
 /**
  * The date this invitation lapses, in the PRODUCT's timezone.
  *
- * `IST_TIME_ZONE` imported rather than the literal re-spelled — `packages/domain/
- * src/ist-day.ts` is the one declaration site and `reporting-scope-guard.test.ts`
- * scans for the literal. The zone is explicit and not the viewer's locale
- * default for the reason `/mcp/tokens` states at the same call: a ledger whose
- * owner decided on one timezone should not tell one person an invitation lapses
- * today and another that it lapsed yesterday.
+ * `formatDay` is the one day renderer (23.193) and reads the IST day, not the
+ * viewer's locale default, for the reason `/mcp/tokens` states at the same call: a
+ * ledger whose owner decided on one timezone should not tell one person an
+ * invitation lapses today and another that it lapsed yesterday.
  */
 function onDay(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return 'an unknown date';
-  return at.toLocaleDateString('en-IN', {
-    timeZone: IST_TIME_ZONE,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (Number.isNaN(new Date(iso).getTime())) return 'an unknown date';
+  return formatDay(iso, istToday());
 }
 
 /**
@@ -706,7 +699,7 @@ function InvitationBanner() {
                     `getByText` that looks for it — the failure that caught this
                     the first time it was written. */}
                 <p className="gn-invitations__when">
-                  {`Invited ${onDay(invitation.invitedAt)} · lapses ${onDay(invitation.expiresAt)}`}
+                  {`Invited ${onDay(invitation.invitedAt)}. Lapses ${onDay(invitation.expiresAt)}.`}
                 </p>
                 <div className="gn-invitations__actions">
                   {/* The accessible names carry the workspace, so two waiting

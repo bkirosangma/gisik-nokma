@@ -192,14 +192,14 @@ describe('Board Close button — the refusal/transport split (backlog/closed spe
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveClass('gn-refusal--server');
     expect(alert).toHaveTextContent(
-      'Refused by the server — close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
+      'Refused by the server: close-requires-terminal: A ticket can only be closed from a terminal state; "Done" is not one.',
     );
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Move to previous state — Doing or To do' })).not.toBeDisabled(),
+      expect(screen.getByRole('button', { name: 'Move to previous state: Doing or To do' })).not.toBeDisabled(),
     );
     expect(screen.getByRole('button', { name: `Close ${card.title}` })).not.toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Move to next state — unavailable' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move to next state: unavailable' })).toBeDisabled();
   });
 
   /**
@@ -224,11 +224,11 @@ describe('Board Close button — the refusal/transport split (backlog/closed spe
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveClass('gn-refusal--transport');
     expect(alert).not.toHaveClass('gn-refusal--server');
-    expect(alert).toHaveTextContent('We could not reach the server for this close — network unreachable');
+    expect(alert).toHaveTextContent('We could not reach the server for this close: network unreachable');
     expect(document.body.textContent).not.toContain('Refused by the server');
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Move to previous state — Doing or To do' })).not.toBeDisabled(),
+      expect(screen.getByRole('button', { name: 'Move to previous state: Doing or To do' })).not.toBeDisabled(),
     );
     expect(screen.getByRole('button', { name: `Close ${card.title}` })).not.toBeDisabled();
   });
@@ -444,7 +444,7 @@ describe('Board Close all (N) — a terminal column’s bulk close (spec §8.3, 
     // "Per-ticket refusals … stay listed"
     const stillOpen = await screen.findByRole('dialog', { name: 'Close 2 tickets' });
     expect(within(stillOpen).getByText('Could not close')).toBeInTheDocument();
-    expect(within(stillOpen).getByText('Beta — Not in a terminal state.')).toBeInTheDocument();
+    expect(within(stillOpen).getByText('Beta: Not in a terminal state.')).toBeInTheDocument();
     // Alpha committed, so it is no longer pending, and nothing is left to try.
     expect(within(stillOpen).queryByText('Alpha')).not.toBeInTheDocument();
     expect(within(stillOpen).queryByRole('button', { name: 'Close 1 ticket' })).not.toBeInTheDocument();
@@ -537,7 +537,7 @@ describe('Board Close all (N) — a terminal column’s bulk close (spec §8.3, 
     const unchanged = screen.getByRole('dialog');
     expect(unchanged).toHaveAccessibleName('Close 2 tickets');
     expect(within(unchanged).getByText('Could not close')).toBeInTheDocument();
-    expect(within(unchanged).getByText('Beta — Not in a terminal state.')).toBeInTheDocument();
+    expect(within(unchanged).getByText('Beta: Not in a terminal state.')).toBeInTheDocument();
     expect(within(unchanged).queryByText('Gamma')).not.toBeInTheDocument();
 
     // ...and the refusal did not WEDGE the surface: dismissing and opening the

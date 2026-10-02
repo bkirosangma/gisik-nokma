@@ -762,7 +762,7 @@ describe('13.553 excluding an assignee drops that card from the board and shows 
     await userEvent.keyboard('{Escape}');
     await screen.findByText('1 of 2 shown');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove filter — Not assignee: Uma One' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove filter: Not assignee: Uma One' }));
 
     expect(await screen.findByText('Carve the new workflow')).toBeInTheDocument();
     expect(screen.queryByTestId('board-narrowing')).not.toBeInTheDocument();

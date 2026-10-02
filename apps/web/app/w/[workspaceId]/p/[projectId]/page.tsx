@@ -202,8 +202,8 @@ export const BUILTIN_LADDER_NOTICE =
  * whether or not anything was behind it. `TicketList` may draw a backlog that is
  * empty for a reason, and this is that reason named.
  */
-export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
-export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog. Tickets you add land here.';
+export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog. Epics appear in the List.';
 export const BACKLOG_EMPTY_ACTIVE_ONLY_COPY =
   'The backlog is hidden while “Only tickets in progress” is on.';
 
@@ -1080,7 +1080,7 @@ function ProjectBoard() {
           );
         }
         setDeleteNotice({
-          message: `The ticket could not be restored — ${outcome.reason}`,
+          message: `The ticket could not be restored: ${outcome.reason}`,
           undoFor: null,
           permanent: false,
         });
@@ -1175,7 +1175,7 @@ function ProjectBoard() {
    *
    * ✅ **THE RESIDUAL IS CLOSED (owner ruling, 2026-09-20).** It used to be that a
    * backlog holding only epics reached this memo's empty answer and `TicketList`
-   * rendered *"Nothing in the backlog — new tickets land here."* over a backlog
+   * rendered *"Nothing in the backlog. Tickets you add land here."* over a backlog
    * that holds one — a claim about the backlog SET that denied a member of it.
    * `epicsOnly` below is the fact this memo is the only place to compute: it is
    * `true` exactly when there WERE rows here and every one was an epic, and the
@@ -1271,7 +1271,7 @@ function ProjectBoard() {
           onRanked: list.reload,
         });
         if (outcome.status === 'refused') {
-          setRankNotice({ channel: 'server', text: `Refused by the server — ${outcome.rule}: ${outcome.reason}` });
+          setRankNotice({ channel: 'server', text: `Refused by the server: ${outcome.rule}: ${outcome.reason}` });
         } else if (outcome.status === 'unreachable' || outcome.status === 'partial') {
           // `partial` rides the transport channel on purpose: part of the
           // batch DID commit, so it is not a verdict, and the refusal class is
@@ -1423,7 +1423,7 @@ function ProjectBoard() {
         if (location === null) {
           setParentOpenNotice({
             channel: 'server',
-            text: 'That ticket cannot be opened from here — the server will not place it for you.',
+            text: 'That ticket cannot be opened from here. The server will not place it for you.',
           });
           return;
         }
@@ -2635,7 +2635,7 @@ function ProjectBoard() {
               className="gn-project__scope-note gn-project__scope-row"
               data-testid="list-filter-note"
             >
-              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
+              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress. Not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
             </p>
 
             {/*
@@ -2945,7 +2945,7 @@ function ProjectBoard() {
                         type="button"
                         className="gn-project__filter-chip-remove"
                         onClick={chip.onRemove}
-                        aria-label={`Remove filter — ${chip.label}`}
+                        aria-label={`Remove filter: ${chip.label}`}
                       >
                         ×
                       </button>
@@ -4219,7 +4219,7 @@ function FiltersSheet({
           {personSection(
             'Collaborators',
             'collaboratorIds',
-            'No view narrows by this yet — you can set it and the filter keeps it, but nothing is filtered by it.',
+            'No view narrows by this yet. You can set it and the filter keeps it, but nothing is filtered by it.',
           )}
 
           <fieldset className="gn-filters__section">

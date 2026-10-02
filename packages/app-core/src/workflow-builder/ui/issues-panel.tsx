@@ -57,7 +57,7 @@ export function IssuesPanel() {
     <>
       {anchoredIssues.length === 0 ? (
         <section className="issues-panel issues-panel--clean">
-          <p className="issues-panel__all-clear">No issues — this workflow can be published.</p>
+          <p className="issues-panel__all-clear">No issues. This workflow can be published.</p>
         </section>
       ) : (
         <section className="issues-panel">
@@ -79,7 +79,7 @@ export function IssuesPanel() {
       )}
       {anchoredAdvisories.length > 0 ? (
         <section className="advisories-panel">
-          <h3 className="advisories-panel__title">Worth a look — none of these block publishing</h3>
+          <h3 className="advisories-panel__title">Worth a look (none of these block publishing)</h3>
           <ul className="advisories-panel__list">
             {anchoredAdvisories.map((advisory, at) => (
               <li className="advisories-panel__item" key={`${advisory.code}:${at}`}>

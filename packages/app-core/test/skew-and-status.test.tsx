@@ -71,11 +71,11 @@ describe('sync status bar', () => {
   it('12.215 — says how many claims wait, and that offline search is the offline copy story', () => {
     expect(syncStatusLabel('live', 0)).toBe('Live');
     expect(syncStatusLabel('live', 3)).toBe('3 claims waiting to send');
-    expect(syncStatusLabel('offline', 3)).toBe('Offline — 3 claims waiting to send');
-    expect(syncStatusLabel('offline', 1)).toBe('Offline — 1 claim waiting to send');
+    expect(syncStatusLabel('offline', 3)).toBe('Offline: 3 claims waiting to send');
+    expect(syncStatusLabel('offline', 1)).toBe('Offline: 1 claim waiting to send');
     expect(syncStatusLabel('catching-up', 0)).toBe('Catching up…');
     render(<SyncStatusBar status="offline" queued={2} failed={1} />);
-    expect(screen.getByRole('status').textContent).toContain('Offline — 2 claims waiting to send');
+    expect(screen.getByRole('status').textContent).toContain('Offline: 2 claims waiting to send');
     expect(screen.getByRole('status').textContent).toContain('1 needs attention');
   });
 

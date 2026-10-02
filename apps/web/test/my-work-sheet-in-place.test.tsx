@@ -30,7 +30,7 @@ import { stubServices } from './helpers/stub-services.js';
  *    mock, which is the only instrument in jsdom that can tell "opened in place"
  *    from "navigated away and opened there".
  * 2. **Which project's names and files the sheet is given** (13.1394, 13.1396) —
- *    My Work spans projects, so every project-scoped prop has to come from the
+ *    My work spans projects, so every project-scoped prop has to come from the
  *    OPEN TICKET, and a wrong answer here is not a layout bug: it is another
  *    project's name over this ticket's history.
  * 3. **The state that survives a reload** (13.1392) — the whole reason the open
@@ -362,8 +362,8 @@ afterEach(() => {
   clearWorkspaceNameCache();
 });
 
-describe('13.1391 opening a ticket from My Work opens the sheet THERE', () => {
-  it('13.1391 the click keeps the reader on My Work, and the sheet opens on the page under them', async () => {
+describe('13.1391 opening a ticket from My work opens the sheet THERE', () => {
+  it('13.1391 the click keeps the reader on My work, and the sheet opens on the page under them', async () => {
     const { services } = mount();
     const view = render(
       <Providers services={services}>
@@ -406,9 +406,9 @@ describe('13.1391 opening a ticket from My Work opens the sheet THERE', () => {
     // is an `<input>` carrying the title as its value, so `getByText` fails
     // against a perfectly open sheet.
     expect(await openedTicketTitle(sheet)).toBe(ASSIGNED_TITLE);
-    // …and the reader is still on My Work, which is the whole request: the page
+    // …and the reader is still on My work, which is the whole request: the page
     // they were on is still the page they are on.
-    expect(screen.getByRole('heading', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'My work' })).toBeInTheDocument();
   });
 
   /**
@@ -427,7 +427,7 @@ describe('13.1391 opening a ticket from My Work opens the sheet THERE', () => {
     // The page has LOADED — asserted on what it certainly renders — so the
     // absence below is a page that chose not to draw a sheet, not one that had
     // not rendered yet.
-    await screen.findByRole('heading', { name: 'My Work' });
+    await screen.findByRole('heading', { name: 'My work' });
     await screen.findByRole('region', { name: 'Assigned to me' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -454,7 +454,7 @@ describe('13.1392 the open ticket lives in the URL, so a reload opens the same s
     expect(push).not.toHaveBeenCalled();
   });
 
-  it('13.1395 closing the sheet is the param’s removal, and it stays on My Work', async () => {
+  it('13.1395 closing the sheet is the param’s removal, and it stays on My work', async () => {
     searchParams = new URLSearchParams({ ticket: ASSIGNED });
     const { services } = mount();
     render(
@@ -478,7 +478,7 @@ describe('13.1392 the open ticket lives in the URL, so a reload opens the same s
 
 describe('13.1394 the sheet’s project-scoped props come from the OPEN TICKET', () => {
   it('13.1394 a ticket in another project gets THAT project’s name and href, not the page’s first row', async () => {
-    // Two rows, two projects, and the second one clicked. My Work spans
+    // Two rows, two projects, and the second one clicked. My work spans
     // projects, so a page that resolved "the project" once — from the first
     // section, or from the row it happened to find first — would put the WRONG
     // project's name over this ticket and link the crumb into a board the ticket
@@ -530,7 +530,7 @@ describe('13.1396 the open ticket’s files are keyed per ticket', () => {
   it('13.1396 swapping ?ticket= in place re-asks for the files, and the previous ticket’s do not survive', async () => {
     // The project page's own mount records this as a ruling (P17): the key
     // carries the ticket id so the next ticket refetches rather than showing the
-    // previous one's files under its heading. On My Work the swap is REACHABLE
+    // previous one's files under its heading. On My work the swap is REACHABLE
     // WITHOUT LEAVING THE PAGE — the sheet's parent chip does it in place — so
     // the page never unmounts to hide the mistake.
     searchParams = new URLSearchParams({ ticket: ASSIGNED });
@@ -599,7 +599,7 @@ describe('13.1397 the sheet’s parent chip opens the parent HERE', () => {
     // page the chip goes through the page's own `openTicket`, so the reader
     // stays where they are and the same resolver that places a contested claim
     // places the parent — which is what makes a CROSS-PROJECT parent work
-    // without leaving My Work.
+    // without leaving My work.
     const locate = vi.fn(async (workspaceId: string) => ({ workspaceId, projectId: OTHER_PROJECT }));
     const { services } = mount({
       // The two tickets are given DIFFERENT titles and different projects, so
@@ -718,7 +718,7 @@ describe('13.1399 an ended session mounts no sheet', () => {
   });
 });
 
-describe('13.1400 a My Work deletion leaves the view', () => {
+describe('13.1400 a My work deletion leaves the view', () => {
   it('13.1400 the sheet’s committed delete re-asks BOTH of this page’s reads', async () => {
     // `TicketSheet` emits `ticket.deleted`, closes itself, and hands the
     // committed fact to its host. The host owns the CORRECTION, and the reason

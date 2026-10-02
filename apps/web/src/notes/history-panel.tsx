@@ -130,7 +130,7 @@ export function HistoryPanel({
                   data-testid={`history-row-${version.eventId}`}
                   onClick={() => setViewing(version)}
                 >
-                  {relativeLabel(version.recordedAt)} · {nameOf(version.authorId)}
+                  {relativeLabel(version.recordedAt)} by {nameOf(version.authorId)}
                 </button>
               </li>
             ))

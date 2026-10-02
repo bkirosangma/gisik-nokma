@@ -3670,7 +3670,6 @@ input, textarea, select { font-family: inherit; }
   /* The code is read aloud and typed in two groups of four; a little tracking
      makes a mistyped character findable without turning it into a novelty. */
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .gn-mcp-authorize__input:focus-visible {

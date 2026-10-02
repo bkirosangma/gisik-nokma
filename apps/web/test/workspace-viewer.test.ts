@@ -30,17 +30,17 @@ describe('projectLine — names joined, then truncated', () => {
   const four = ['Delivery', 'Site readiness', 'Winter stock', 'Payroll'];
 
   it('joins every name when there are no more than the cap', () => {
-    expect(projectLine(['Delivery', 'Site readiness'], false)).toBe('Delivery · Site readiness');
+    expect(projectLine(['Delivery', 'Site readiness'], false)).toBe('Delivery, Site readiness');
   });
 
   it('joins exactly the cap without a suffix — the boundary a cap-off-by-one gets wrong', () => {
     expect(projectLine(four.slice(0, PROJECT_LINE_CAP), false)).toBe(
-      'Delivery · Site readiness · Winter stock',
+      'Delivery, Site readiness, Winter stock',
     );
   });
 
   it('truncates past the cap and COUNTS the remainder', () => {
-    expect(projectLine(four, false)).toBe('Delivery · Site readiness · Winter stock · +1 more');
+    expect(projectLine(four, false)).toBe('Delivery, Site readiness, Winter stock, +1 more');
   });
 
   /**
@@ -50,7 +50,7 @@ describe('projectLine — names joined, then truncated', () => {
    * them by name; it is the NUMBERS that are withheld.
    */
   it('drops the number from the suffix when counts are withheld', () => {
-    expect(projectLine(four, true)).toBe('Delivery · Site readiness · Winter stock · and more');
+    expect(projectLine(four, true)).toBe('Delivery, Site readiness, Winter stock, and more');
   });
 
   it('is unaffected by withholding when nothing is truncated', () => {

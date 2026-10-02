@@ -154,7 +154,7 @@ export function BuilderPanels() {
         {def.transitions.length === 0 ? (
           <p className="builder-panel__empty">
             {canAuthor
-              ? 'No transitions yet — draw one on the canvas, from one state to another.'
+              ? 'No transitions yet. Draw one on the canvas, from one state to another.'
               : 'No transitions yet.'}
           </p>
         ) : (

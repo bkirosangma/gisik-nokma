@@ -113,7 +113,7 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
       />,
     );
     expect(screen.getByTestId('parent-narrowing')).toHaveTextContent(
-      'showing only tickets in progress — a ticket outside that is not offered here',
+      'showing only tickets in progress, so a ticket outside that is not offered here',
     );
     // The note's placement, pinned STRUCTURALLY rather than through a side effect.
     //

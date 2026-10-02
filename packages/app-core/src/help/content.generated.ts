@@ -90,21 +90,21 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You can put a job on a person only on the website."
+                  "text": "You can put a ticket on a person only on the website."
                 },
                 {
                   "kind": "text",
-                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. (§5)"
+                  "text": " The website's ticket panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a ticket is on nor set it. (§5)"
                 }
               ],
               [
                 {
                   "kind": "bold",
-                  "text": "You can leave a comment on a job now, on the website and on the phone."
+                  "text": "You can leave a comment on a ticket now, on the website and on the phone."
                 },
                 {
                   "kind": "text",
-                  "text": " The job screen shows the description, lets you write one, and carries a comment thread with its own box at the end of it. A move carrying a \"require a comment\" rule still puts a box on the Move dialog, and what you type there is recorded on the move. (§5)"
+                  "text": " The ticket screen shows the description, lets you write one, and carries a comment thread with its own box at the end of it. A move carrying a \"require a comment\" rule still puts a box on the Move dialog, and what you type there is recorded on the move. (§5)"
                 }
               ],
               [
@@ -185,7 +185,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "A bucket of work inside a workspace. \"Shop operations\". \"Residential jobs\"."
+                    "text": "A bucket of work inside a workspace. \"Shop operations\". \"Residential repairs\"."
                   }
                 ]
               ],
@@ -199,7 +199,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "One job. This manual mostly says \"job\"."
+                    "text": "One piece of work."
                   }
                 ]
               ],
@@ -213,7 +213,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "The four built-in kinds of job, biggest to smallest. An admin can rename these."
+                    "text": "The four built-in kinds of ticket, biggest to smallest. An admin can rename these."
                   }
                 ]
               ],
@@ -227,7 +227,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "Your set of stages that work moves through, and the allowed moves between them."
+                    "text": "Your set of states that work moves through, and the allowed moves between them."
                   }
                 ]
               ],
@@ -241,7 +241,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "One stage. A column on the board."
+                    "text": "One step in a workflow. Each state is a column on the board."
                   }
                 ]
               ],
@@ -255,7 +255,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "One allowed move from one stage to another."
+                    "text": "One allowed move from one state to another."
                   }
                 ]
               ],
@@ -269,7 +269,7 @@ export const HELP_CONTENT: HelpContent = [
                 [
                   {
                     "kind": "text",
-                    "text": "A stage that counts as finished."
+                    "text": "A state that counts as finished."
                   }
                 ]
               ],
@@ -543,7 +543,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The same is true if you click a link (an invitation, or a link to a job) while signed out: it remembers where you were headed and sends you there afterwards."
+                    "text": "The same is true if you click a link (an invitation, or a link to a ticket) while signed out: it remembers where you were headed and sends you there afterwards."
                   }
                 ]
               },
@@ -688,11 +688,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "My Work"
+                  "text": "My work"
                 },
                 {
                   "kind": "text",
-                  "text": " — the jobs assigned to you."
+                  "text": " — the tickets assigned to you."
                 }
               ],
               [
@@ -796,7 +796,7 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "bold",
-                "text": "My Work, Members and Settings appear only once a workspace is open"
+                "text": "My work, Members and Settings appear only once a workspace is open"
               },
               {
                 "kind": "text",
@@ -804,7 +804,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "italic",
-                "text": "\"No workspace selected — pick one to reach its board, members and settings.\""
+                "text": "\"No workspace selected. Pick one to reach its board, members and settings.\""
               },
               {
                 "kind": "text",
@@ -1246,7 +1246,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ": one to three letters, which become the front of every job's number in this workspace (the "
+                      "text": ": one to three letters, which become the front of every ticket's number in this workspace (the "
                     },
                     {
                       "kind": "bold",
@@ -1325,13 +1325,13 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "A basic set of stages for work to move through — a simple to-do / doing / done arrangement."
+                      "text": "A basic set of states for work to move through — a simple to-do / doing / done arrangement."
                     }
                   ],
                   [
                     {
                       "kind": "text",
-                      "text": "Four built-in kinds of job: "
+                      "text": "Four built-in kinds of ticket: "
                     },
                     {
                       "kind": "bold",
@@ -1424,7 +1424,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Jobs live inside projects. So a workspace with no projects has nowhere to put work."
+                    "text": "Tickets live inside projects. So a workspace with no projects has nowhere to put work."
                   }
                 ]
               },
@@ -1852,7 +1852,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " carries the plus sign too, and inside an empty stage on the Board (that one is a plainer button under a plus sign, and says "
+                      "text": " carries the plus sign too, and inside an empty column on the Board (that one is a plainer button under a plus sign, and says "
                     },
                     {
                       "kind": "bold",
@@ -1860,7 +1860,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " too; its full name for a screen reader adds the stage). The window is described in §5."
+                      "text": " too; its full name for a screen reader adds the column's state). The window is described in §5."
                     }
                   ]
                 ]
@@ -1885,7 +1885,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A job's number has two halves. The "
+                    "text": "A ticket's number has two halves. The "
                   },
                   {
                     "kind": "bold",
@@ -2045,7 +2045,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " tells you what will happen — every job's number is rewritten with the new letters, and the old ones still work. It has two buttons: "
+                    "text": " tells you what will happen — every ticket's number is rewritten with the new letters, and the old ones still work. It has two buttons: "
                   },
                   {
                     "kind": "bold",
@@ -2089,11 +2089,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "Every job's number is rewritten at once"
+                      "text": "Every ticket's number is rewritten at once"
                     },
                     {
                       "kind": "text",
-                      "text": ", everywhere it is shown. A job that was "
+                      "text": ", everywhere it is shown. A ticket that was "
                     },
                     {
                       "kind": "bold",
@@ -2131,11 +2131,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "Old numbers still find the job."
+                      "text": "Old numbers still find the ticket."
                     },
                     {
                       "kind": "text",
-                      "text": " Where you search for a job by its number — the picker that links a job into a note (§15), and your assistant's search (§16) — typing "
+                      "text": " Where you search for a ticket by its number — the picker that links a ticket into a note (§15), and your assistant's search (§16) — typing "
                     },
                     {
                       "kind": "bold",
@@ -2169,7 +2169,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and the mention still opens the job."
+                      "text": ", and the mention still opens the ticket."
                     }
                   ],
                   [
@@ -2417,7 +2417,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " on your Account page: the workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived, and who deleted it and when. A deleted workspace or project also says how many things are inside it — they come back with it, and are not listed separately."
+                    "text": " on your Account page: the workspaces you own, the projects in workspaces you run, the tickets in projects you administer, and your own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived, and who deleted it and when. A deleted workspace or project also says how many things are inside it — they come back with it, and are not listed separately."
                   }
                 ]
               },
@@ -2609,7 +2609,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "italic",
-                      "text": "\"Copy it now — it is not stored and cannot be shown again.\""
+                      "text": "\"Copy it now: it is not stored and cannot be shown again.\""
                     }
                   ]
                 ]
@@ -2665,7 +2665,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Admins and members now see every project in their workspace, so there is nothing to choose. A guest still sees only the jobs shared with them or assigned to them."
+                    "text": " Admins and members now see every project in their workspace, so there is nothing to choose. A guest still sees only the tickets shared with them or assigned to them."
                   }
                 ]
               }
@@ -2702,7 +2702,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "You, if you created the workspace. Sees absolutely everything in the workspace, including jobs shared with only a few named people. There is no way to hide anything from the owner. No way to hand ownership to somebody else was found on any screen, so plan on the founder staying the owner."
+                        "text": "You, if you created the workspace. Sees absolutely everything in the workspace, including tickets shared with only a few named people. There is no way to hide anything from the owner. No way to hand ownership to somebody else was found on any screen, so plan on the founder staying the owner."
                       }
                     ]
                   ],
@@ -2716,7 +2716,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Can invite people and set up stages and job types, and sees every project in the workspace."
+                        "text": "Can invite people and set up states and ticket types, and sees every project in the workspace."
                       }
                     ]
                   ],
@@ -2730,7 +2730,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the stages work."
+                        "text": "Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the states work."
                       }
                     ]
                   ],
@@ -2744,7 +2744,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "An outsider — a client, your accountant. Sees only the jobs somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create jobs."
+                        "text": "An outsider — a client, your accountant. Sees only the tickets somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create tickets."
                       }
                     ]
                   ]
@@ -3033,13 +3033,13 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "5-adding-a-job-and-what-you-can-change-about-it",
-        "title": "§5 — Adding a job, and what you can change about it",
+        "id": "5-adding-a-ticket-and-what-you-can-change-about-it",
+        "title": "§5 — Adding a ticket, and what you can change about it",
         "intro": [],
         "entries": [
           {
-            "id": "adding-a-job",
-            "title": "Adding a job",
+            "id": "adding-a-ticket",
+            "title": "Adding a ticket",
             "blocks": [
               {
                 "kind": "list",
@@ -3048,7 +3048,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Open the project you want the job in."
+                      "text": "Open the project you want the ticket in."
                     }
                   ],
                   [
@@ -3070,7 +3070,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " in an empty stage on the Board, which starts the job in THAT stage instead (see \"Starting status\" below)."
+                      "text": " in an empty column on the Board, which starts the ticket in THAT state instead (see \"Starting status\" below)."
                     }
                   ],
                   [
@@ -3084,7 +3084,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — what the job is. \"Fix Mrs. Patel's leaking pipe.\" - "
+                      "text": " — what the ticket is. \"Fix Mrs. Patel's leaking pipe.\" - "
                     },
                     {
                       "kind": "bold",
@@ -3092,7 +3092,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — a switch, remembered from your last answer. On means the job waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a stage. - "
+                      "text": " — a switch, remembered from your last answer. On means the ticket waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a state. - "
                     },
                     {
                       "kind": "bold",
@@ -3100,7 +3100,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — what kind of job this is, from your workspace's list. - "
+                      "text": " — what kind of ticket this is, from your workspace's list. - "
                     },
                     {
                       "kind": "bold",
@@ -3108,7 +3108,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — which stage of the workflow the job is born in, defaulting to the workflow's own first stage. Disabled, with a note explaining where the job will actually start, while \"Starts in the backlog?\" is switched on — a backlog job has no starting stage. - "
+                      "text": " — which state of the workflow the ticket is born in, defaulting to the workflow's own first state. Disabled, with a note explaining where the ticket will actually start, while \"Starts in the backlog?\" is switched on — a backlog ticket has no starting state. - "
                     },
                     {
                       "kind": "bold",
@@ -3132,7 +3132,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5). - "
+                      "text": " — P1, P2 or P3; starts at P2. Every ticket has one, and you can change it later (§5). - "
                     },
                     {
                       "kind": "bold",
@@ -3140,7 +3140,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — the same editor a job's own description box uses (§5, below). - "
+                      "text": " — the same editor a ticket's own description box uses (§5, below). - "
                     },
                     {
                       "kind": "bold",
@@ -3148,7 +3148,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — which bigger job this sits under. It defaults to "
+                      "text": " — which bigger ticket this sits under. It defaults to "
                     },
                     {
                       "kind": "bold",
@@ -3156,7 +3156,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". Leave it alone unless this job is part of a bigger one (§6). - "
+                      "text": ". Leave it alone unless this ticket is part of a bigger one (§6). - "
                     },
                     {
                       "kind": "bold",
@@ -3164,7 +3164,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — who the job is on, or leave it unassigned."
+                      "text": " — who the ticket is on, or leave it unassigned."
                     }
                   ],
                   [
@@ -3178,7 +3178,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the job needs a title)."
+                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the ticket needs a title)."
                     }
                   ]
                 ]
@@ -3205,7 +3205,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " see §8 on the 2,000-job ceiling."
+                    "text": " see §8 on the 2,000-ticket ceiling."
                   }
                 ]
               }
@@ -3220,7 +3220,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with three tabs: "
+                    "text": "Open a ticket by clicking it on any of the ticket tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with three tabs: "
                   },
                   {
                     "kind": "bold",
@@ -3272,7 +3272,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "Move it to another stage"
+                      "text": "Move it to another state"
                     },
                     {
                       "kind": "text",
@@ -3338,7 +3338,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " control, P1 / P2 / P3. Every job has one; new jobs start at P2. A job cannot be left without one, so there is nothing to clear. (§5)"
+                      "text": " control, P1 / P2 / P3. Every ticket has one; new tickets start at P2. A ticket cannot be left without one, so there is nothing to clear. (§5)"
                     }
                   ],
                   [
@@ -3395,7 +3395,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a "
+                    "text": "Under the ticket's title, above the tabs, there is a short line of chips: the state it is in, a "
                   },
                   {
                     "kind": "bold",
@@ -3411,7 +3411,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " chip once it is closed. Directly below that line is where the job sits: "
+                    "text": " chip once it is closed. Directly below that line is where the ticket sits: "
                   },
                   {
                     "kind": "italic",
@@ -3427,7 +3427,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " chip that opens the job above it, or "
+                    "text": " chip that opens the ticket above it, or "
                   },
                   {
                     "kind": "italic",
@@ -3537,7 +3537,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It shows the stage, who moved the job there and when, and the "
+                    "text": " It shows the state, who moved the ticket there and when, and the "
                   },
                   {
                     "kind": "bold",
@@ -3545,7 +3545,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button. A stage change has to go through the rules on the move (§7), and a dropdown would step around them. "
+                    "text": " button. A state change has to go through the rules on the move (§7), and a dropdown would step around them. "
                   },
                   {
                     "kind": "bold",
@@ -3665,7 +3665,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", and they join the workspace as a guest who sees only that job. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says "
+                    "text": ", and they join the workspace as a guest who sees only that ticket. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says "
                   },
                   {
                     "kind": "bold",
@@ -3673,15 +3673,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Anyone who can assign a job can do this."
+                    "text": " Anyone who can assign a ticket can do this."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "the-things-you-cannot-do-to-a-job",
-            "title": "The things you cannot do to a job",
+            "id": "the-things-you-cannot-do-to-a-ticket",
+            "title": "The things you cannot do to a ticket",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -3699,7 +3699,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot put a job on a person on the phone or desktop apps — on the website you now can."
+                      "text": "You cannot put a ticket on a person on the phone or desktop apps — on the website you now can."
                     },
                     {
                       "kind": "text",
@@ -3719,7 +3719,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " to take the job off somebody. It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not loaded, or the job is on a person outside the roster you can see. "
+                      "text": " to take the ticket off somebody. It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not loaded, or the ticket is on a person outside the roster you can see. "
                     },
                     {
                       "kind": "bold",
@@ -3727,7 +3727,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", so there a job's assignee can be neither read nor set."
+                      "text": ", so there a ticket's assignee can be neither read nor set."
                     }
                   ],
                   [
@@ -3737,7 +3737,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job panel's "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The ticket panel's "
                     },
                     {
                       "kind": "bold",
@@ -3761,7 +3761,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — see the row above for the precedent — because the website can now set one: the job panel's "
+                      "text": " — see the row above for the precedent — because the website can now set one: the ticket panel's "
                     },
                     {
                       "kind": "bold",
@@ -3779,21 +3779,21 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Type into the description on the job panel and save it; the panel reads back who set it and when. The same box handles formatting and mentions; dropping a file into it is refused rather than quietly lost."
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Type into the description on the ticket panel and save it; the panel reads back who set it and when. The same box handles formatting and mentions; dropping a file into it is refused rather than quietly lost."
                     }
                   ],
                   [
                     {
                       "kind": "bold",
-                      "text": "You can leave a comment on a job now."
+                      "text": "You can leave a comment on a ticket now."
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet carries a comment thread, with a box at the end of it reading "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The ticket sheet carries a comment thread, with a box at the end of it reading "
                     },
                     {
                       "kind": "italic",
-                      "text": "\"Add a comment — @ to mention someone\""
+                      "text": "\"Add a comment, or type @ to mention someone\""
                     },
                     {
                       "kind": "text",
@@ -3819,11 +3819,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You can attach a file to a job now."
+                      "text": "You can attach a file to a ticket now."
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet's "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The ticket sheet's "
                     },
                     {
                       "kind": "bold",
@@ -3831,7 +3831,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " tab lists the job's files and has its own "
+                      "text": " tab lists the ticket's files and has its own "
                     },
                     {
                       "kind": "bold",
@@ -3861,11 +3861,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You can rename a job now."
+                      "text": "You can rename a ticket now."
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the job and type into the title at the top of the sheet: "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the ticket and type into the title at the top of the sheet: "
                     },
                     {
                       "kind": "bold",
@@ -3887,11 +3887,11 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You can delete a job now."
+                      "text": "You can delete a ticket now."
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the job and press "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the ticket and press "
                     },
                     {
                       "kind": "bold",
@@ -3899,7 +3899,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " in the sheet's footer. A confirmation opens first: it names the job, has a "
+                      "text": " in the sheet's footer. A confirmation opens first: it names the ticket, has a "
                     },
                     {
                       "kind": "bold",
@@ -3923,7 +3923,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " and the job stops appearing in every view — boards, lists, search, My Work — while "
+                      "text": " and the ticket stops appearing in every view — boards, lists, search, My work — while "
                     },
                     {
                       "kind": "bold",
@@ -3947,7 +3947,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " for about fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After that the job is still listed under "
+                      "text": " for about fifteen seconds, and a line on the page keeps an Undo until you delete another ticket or reload. After that the ticket is still listed under "
                     },
                     {
                       "kind": "bold",
@@ -3977,7 +3977,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " does all of that and also marks the job to be erased for good after the waiting period the confirmation states. Until then the "
+                    "text": " does all of that and also marks the ticket to be erased for good after the waiting period the confirmation states. Until then the "
                   },
                   {
                     "kind": "bold",
@@ -4002,11 +4002,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "A job deleted from My Work has no Undo there."
+                    "text": "A ticket deleted from My work has no Undo there."
                   },
                   {
                     "kind": "text",
-                    "text": " The message and the Undo belong to the job's own project page, and My Work opens the sheet in place without them. The job still stops appearing in every view, its history is still kept, and it is still in "
+                    "text": " The message and the Undo belong to the ticket's own project page, and My work opens the sheet in place without them. The ticket still stops appearing in every view, its history is still kept, and it is still in "
                   },
                   {
                     "kind": "bold",
@@ -4023,7 +4023,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                    "text": "If you would rather not lose it, a \"won't do\" or \"cancelled\" state in your workflow remains the alternative."
                   }
                 ]
               },
@@ -4034,7 +4034,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot move a job to a different project."
+                      "text": "You cannot move a ticket to a different project."
                     }
                   ]
                 ]
@@ -4080,7 +4080,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " (You can still set both dates properly — as a real date box, no typing — when you create the job, or afterwards on its own panel; §5.)  "
+                    "text": " (You can still set both dates properly — as a real date box, no typing — when you create the ticket, or afterwards on its own panel; §5.)  "
                   },
                   {
                     "kind": "bold",
@@ -4128,7 +4128,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is deliberate and it runs all the way through. Nothing on screen is a property the job just happens to have; it is always somebody's claim, with their name and the time on it. It is a little more to read. It also means you are never left guessing who is responsible for a number."
+                    "text": "That is deliberate and it runs all the way through. Nothing on screen is a property the ticket just happens to have; it is always somebody's claim, with their name and the time on it. It is a little more to read. It also means you are never left guessing who is responsible for a number."
                   }
                 ]
               }
@@ -4143,7 +4143,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Every change ever made to that job, in order, each one saying who did it and when."
+                    "text": "Every change ever made to that ticket, in order, each one saying who did it and when."
                   }
                 ]
               },
@@ -4177,7 +4177,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", saying so at the top. There is no way to page further back. For a job with a very long history, the older part is currently unreachable."
+                      "text": ", saying so at the top. There is no way to page further back. For a ticket with a very long history, the older part is currently unreachable."
                     }
                   ]
                 ]
@@ -4187,15 +4187,15 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "6-jobs-inside-jobs",
-        "title": "§6 — Jobs inside jobs",
+        "id": "6-tickets-inside-tickets",
+        "title": "§6 — Tickets inside tickets",
         "intro": [
           {
             "kind": "paragraph",
             "spans": [
               {
                 "kind": "text",
-                "text": "You can put a job underneath a bigger job. \"Rebrand for Kalita Tea\" as one big item, with \"Logo drafts\", \"Colour palette\" and \"Print proofs\" underneath it."
+                "text": "You can put a ticket underneath a bigger ticket. \"Rebrand for Kalita Tea\" as one big item, with \"Logo drafts\", \"Colour palette\" and \"Print proofs\" underneath it."
               }
             ]
           },
@@ -4204,7 +4204,7 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "text",
-                "text": "To do it: pick the bigger job in the "
+                "text": "To do it: pick the bigger ticket in the "
               },
               {
                 "kind": "bold",
@@ -4212,7 +4212,7 @@ export const HELP_CONTENT: HelpContent = [
               },
               {
                 "kind": "text",
-                "text": " dropdown when you create the new one. A job can have only one parent."
+                "text": " dropdown when you create the new one. A ticket can have only one parent."
               }
             ]
           },
@@ -4236,15 +4236,15 @@ export const HELP_CONTENT: HelpContent = [
         ],
         "entries": [
           {
-            "id": "the-rule-about-which-job-can-go-under-which",
-            "title": "The rule about which job can go under which",
+            "id": "the-rule-about-which-ticket-can-go-under-which",
+            "title": "The rule about which ticket can go under which",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A job's type has to be a "
+                    "text": "A ticket's type has to be a "
                   },
                   {
                     "kind": "italic",
@@ -4293,7 +4293,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Any job type at the very bottom rank "
+                    "text": "Any ticket type at the very bottom rank "
                   },
                   {
                     "kind": "bold",
@@ -4310,7 +4310,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you want standalone jobs, use a type that is not at the bottom."
+                    "text": "If you want standalone tickets, use a type that is not at the bottom."
                   }
                 ]
               },
@@ -4360,7 +4360,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " All of them have to be done first. This is the one rule that sits above every workflow and cannot be turned off — you will see it named in the stage editor as a fixed system rule."
+                      "text": " All of them have to be done first. This is the one rule that sits above every workflow and cannot be turned off — you will see it named in the workflow editor as a fixed system rule."
                     }
                   ]
                 ]
@@ -4393,7 +4393,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The product could have quietly said \"5 of 6\" and made the job look nearly finished. It gives you the true total and tells you part of it is not yours to see. If nothing is hidden, it does not print the \"restricted\" part at all. If a job has no children at all, no progress number shows — not \"0 of 0\", just nothing."
+                    "text": "The product could have quietly said \"5 of 6\" and made the ticket look nearly finished. It gives you the true total and tells you part of it is not yours to see. If nothing is hidden, it does not print the \"restricted\" part at all. If a ticket has no children at all, no progress number shows — not \"0 of 0\", just nothing."
                   }
                 ]
               }
@@ -4408,7 +4408,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "This means the job really does belong to a bigger job, and you are not allowed to see what that bigger job is — not even its title. The product deliberately tells you a parent "
+                    "text": "This means the ticket really does belong to a bigger ticket, and you are not allowed to see what that bigger ticket is — not even its title. The product deliberately tells you a parent "
                   },
                   {
                     "kind": "italic",
@@ -4416,7 +4416,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than making the job look like it has none, because those are two different truths."
+                    "text": " rather than making the ticket look like it has none, because those are two different truths."
                   }
                 ]
               },
@@ -4425,7 +4425,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If a job genuinely has no parent, it says "
+                    "text": "If a ticket genuinely has no parent, it says "
                   },
                   {
                     "kind": "bold",
@@ -4440,15 +4440,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "seeing-a-job-s-children-from-its-panel",
-            "title": "Seeing a job's children from its panel",
+            "id": "seeing-a-ticket-s-children-from-its-panel",
+            "title": "Seeing a ticket's children from its panel",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open a job and its panel carries a "
+                    "text": "Open a ticket and its panel carries a "
                   },
                   {
                     "kind": "bold",
@@ -4469,7 +4469,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " reads \"Subtasks\", and when the job has children it carries their progress on the same line — "
+                    "text": " reads \"Subtasks\", and when the ticket has children it carries their progress on the same line — "
                   },
                   {
                     "kind": "bold",
@@ -4502,7 +4502,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "each child's own stage"
+                    "text": "each child's own state"
                   },
                   {
                     "kind": "text",
@@ -4514,7 +4514,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". A subtask is a job in its own right — it gets a stage, an assignee, a date and a history of its own. If a job has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
+                    "text": ". A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
                   }
                 ]
               },
@@ -4523,7 +4523,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "When a job is itself a subtask"
+                    "text": "When a ticket is itself a subtask"
                   },
                   {
                     "kind": "text",
@@ -4564,7 +4564,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and files the new child under the job you are looking at. It is the ordinary \"adding a job\" you already know (§5) with the parent filled in for you, so the new child starts in the first stage of its workflow and its title is held to the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you correct it rather than retype it."
+                    "text": " and files the new child under the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent filled in for you, so the new child starts in the first state of its workflow and its title is held to the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you correct it rather than retype it."
                   }
                 ]
               },
@@ -4577,7 +4577,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " A subtask is a job of its own and every job has a type, so the row picks one: "
+                    "text": " A subtask is a ticket of its own and every ticket has a type, so the row picks one: "
                   },
                   {
                     "kind": "bold",
@@ -4585,7 +4585,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " wherever a Task can sit under the job you are looking at, and otherwise the nearest kind below that job which your own list of types allows. That is the same rank rule as above — a child's rank has to be strictly bigger than its parent's — read against "
+                    "text": " wherever a Task can sit under the ticket you are looking at, and otherwise the nearest kind below that ticket which your own list of types allows. That is the same rank rule as above — a child's rank has to be strictly bigger than its parent's — read against "
                   },
                   {
                     "kind": "italic",
@@ -4593,7 +4593,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " types rather than the built-in ones, so a kind you defined yourself is weighed exactly as the standard ones are. Two jobs at the same rank cannot nest, which is why an "
+                    "text": " types rather than the built-in ones, so a kind you defined yourself is weighed exactly as the standard ones are. Two tickets at the same rank cannot nest, which is why an "
                   },
                   {
                     "kind": "bold",
@@ -4666,15 +4666,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "adding-work-under-a-job-that-is-already-finished",
-            "title": "Adding work under a job that is already finished",
+            "id": "adding-work-under-a-ticket-that-is-already-finished",
+            "title": "Adding work under a ticket that is already finished",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The product will not quietly tack an unfinished step onto a finished job. Instead it does the best thing in the whole product:"
+                    "text": "The product will not quietly tack an unfinished step onto a finished ticket. Instead it does the best thing in the whole product:"
                   }
                 ]
               },
@@ -4685,7 +4685,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "It tells you the parent is in a finished stage, and "
+                      "text": "It tells you the parent is in a finished state, and "
                     },
                     {
                       "kind": "bold",
@@ -4701,13 +4701,13 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " naming the finished job and its state."
+                      "text": " naming the finished ticket and its state."
                     }
                   ],
                   [
                     {
                       "kind": "text",
-                      "text": "It gives you a picker of the stages you could reopen it into — only ones that are genuinely reachable from where it is and genuinely not finished. You will never be offered \"reopen into Done\"."
+                      "text": "It gives you a picker of the states you could reopen it into — only ones that are genuinely reachable from where it is and genuinely not finished. You will never be offered \"reopen into Done\"."
                     }
                   ],
                   [
@@ -4721,7 +4721,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". The parent is reopened first, then your new job is filed under it."
+                      "text": ". The parent is reopened first, then your new ticket is filed under it."
                     }
                   ],
                   [
@@ -4756,7 +4756,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "If the reopen itself is refused (you are not allowed, or a comment is required), your new job is "
+                      "text": "If the reopen itself is refused (you are not allowed, or a comment is required), your new ticket is "
                     },
                     {
                       "kind": "bold",
@@ -4770,7 +4770,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "If the reopen works but your job is still refused for some other reason, you are told "
+                      "text": "If the reopen works but your ticket is still refused for some other reason, you are told "
                     },
                     {
                       "kind": "bold",
@@ -4786,13 +4786,13 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " why the job was refused. Nothing is quietly undone behind your back."
+                      "text": " why the ticket was refused. Nothing is quietly undone behind your back."
                     }
                   ],
                   [
                     {
                       "kind": "text",
-                      "text": "If your stages declare no way out of that finished stage at all, it says so plainly with the button greyed out — not an empty dropdown you have to interpret."
+                      "text": "If your states declare no way out of that finished state at all, it says so plainly with the button greyed out — not an empty dropdown you have to interpret."
                     }
                   ]
                 ]
@@ -4802,8 +4802,8 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "7-moving-a-job-through-its-stages",
-        "title": "§7 — Moving a job through its stages",
+        "id": "7-moving-a-ticket-through-its-states",
+        "title": "§7 — Moving a ticket through its states",
         "intro": [
           {
             "kind": "list",
@@ -4812,7 +4812,7 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "text",
-                  "text": "Open the job."
+                  "text": "Open the ticket."
                 }
               ],
               [
@@ -4826,7 +4826,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " next to the current stage."
+                  "text": " next to the current state."
                 }
               ],
               [
@@ -4840,7 +4840,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": ", with a picker of stages."
+                  "text": ", with a picker of states."
                 }
               ],
               [
@@ -4852,7 +4852,7 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "text",
-                  "text": "Depending on the stage, you may be asked for more before it will let you go ahead. See below."
+                  "text": "Depending on the state, you may be asked for more before it will let you go ahead. See below."
                 }
               ],
               [
@@ -4874,15 +4874,15 @@ export const HELP_CONTENT: HelpContent = [
         ],
         "entries": [
           {
-            "id": "why-the-picker-only-shows-some-stages",
-            "title": "Why the picker only shows some stages",
+            "id": "why-the-picker-only-shows-some-states",
+            "title": "Why the picker only shows some states",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Because your workflow decides which moves are allowed. A job can only go where an arrow leads from where it currently is. If \"Draft\" only has an arrow to \"With client\", that is the only option you get. It will not show you a move that would be refused anyway."
+                    "text": "Because your workflow decides which moves are allowed. A ticket can only go where an arrow leads from where it currently is. If \"Draft\" only has an arrow to \"With client\", that is the only option you get. It will not show you a move that would be refused anyway."
                   }
                 ]
               }
@@ -4990,7 +4990,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Somebody has put a \"restrict who may move it\" rule on that step — limited to a role, to whoever the job is assigned to, or to specific named people. The refusal names who "
+                    "text": " Somebody has put a \"restrict who may move it\" rule on that step — limited to a role, to whoever the ticket is assigned to, or to specific named people. The refusal names who "
                   },
                   {
                     "kind": "italic",
@@ -5028,7 +5028,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Whoever made the earlier move cannot be the one who makes the approving move. Somebody else has to do it. If nobody has ever made that move on this job, there is nobody to compare against and it does not block the first time."
+                    "text": ". Whoever made the earlier move cannot be the one who makes the approving move. Somebody else has to do it. If nobody has ever made that move on this ticket, there is nobody to compare against and it does not block the first time."
                   }
                 ]
               }
@@ -5047,7 +5047,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"instant check — \""
+                    "text": "\"instant check: \""
                   },
                   {
                     "kind": "text",
@@ -5055,7 +5055,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Refused by the server — \""
+                    "text": "\"Refused by the server: \""
                   },
                   {
                     "kind": "text",
@@ -5125,7 +5125,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " stage — usually a \"reopen\" of some kind. If there is no direct move from where your job is to where you want it, but a \"from anywhere\" move to the same place exists, the product uses that automatically. Its rules are still enforced in full; it is not a back door."
+                    "text": " state — usually a \"reopen\" of some kind. If there is no direct move from where your ticket is to where you want it, but a \"from anywhere\" move to the same place exists, the product uses that automatically. Its rules are still enforced in full; it is not a back door."
                   }
                 ]
               }
@@ -5140,7 +5140,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If it goes through, the box closes, the job shows its new stage, and any earlier refusal message is cleared. If the system answers with nothing at all, it says so — "
+                    "text": "If it goes through, the box closes, the ticket shows its new state, and any earlier refusal message is cleared. If the system answers with nothing at all, it says so — "
                   },
                   {
                     "kind": "italic",
@@ -5155,15 +5155,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "somebody-changed-the-stages-after-my-job-was-created",
-            "title": "Somebody changed the stages after my job was created",
+            "id": "somebody-changed-the-states-after-my-ticket-was-created",
+            "title": "Somebody changed the states after my ticket was created",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Your job stays on the version of the workflow it was pinned to when it was created. It is not silently rewritten to follow a new one."
+                    "text": "Your ticket stays on the version of the workflow it was pinned to when it was created. It is not silently rewritten to follow a new one."
                   }
                 ]
               },
@@ -5172,7 +5172,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If a stage your job is sitting in gets removed in a later version, whoever removed it had to say where those jobs go, and yours follows that. If nobody said, your job refuses to move rather than the product guessing, and it tells you it is stranded."
+                    "text": "If a state your ticket is sitting in gets removed in a later version, whoever removed it had to say where those tickets go, and yours follows that. If nobody said, your ticket refuses to move rather than the product guessing, and it tells you it is stranded."
                   }
                 ]
               }
@@ -5244,7 +5244,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The first tab, and where a new job starts its life. It lists the jobs that have not begun, in an order you arrange — drag a row, or use the "
+                    "text": "The first tab, and where a new ticket starts its life. It lists the tickets that have not begun, in an order you arrange — drag a row, or use the "
                   },
                   {
                     "kind": "bold",
@@ -5260,7 +5260,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " buttons on it. Those buttons move a job in the order of the whole backlog, not only within the group it is listed under, and they stay visible when the backlog is grouped; hover one and it says so. Each row also has a "
+                    "text": " buttons on it. Those buttons move a ticket in the order of the whole backlog, not only within the group it is listed under, and they stay visible when the backlog is grouped; hover one and it says so. Each row also has a "
                   },
                   {
                     "kind": "bold",
@@ -5268,7 +5268,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button that moves that job into its workflow."
+                    "text": " button that moves that ticket into its workflow."
                   }
                 ]
               },
@@ -5277,11 +5277,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says so: "
+                    "text": "It does not leave closed tickets out, unlike the Calendar and the Timeline below. When it is empty it says so: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Nothing in the backlog — new tickets land here.\""
+                    "text": "\"Nothing in the backlog. Tickets you add land here.\""
                   },
                   {
                     "kind": "text",
@@ -5289,7 +5289,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Nothing in the backlog — epics appear in the List.\""
+                    "text": "\"Nothing in the backlog. Epics appear in the List.\""
                   }
                 ]
               }
@@ -5304,7 +5304,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a column, press the "
+                    "text": "Columns, one per state, with cards in them. There are three ways to move a ticket on: drag its card to a column, press the "
                   },
                   {
                     "kind": "bold",
@@ -5366,7 +5366,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " arrows that carry it to the stages it may move to, and a one-line note of what happened last: "
+                    "text": " arrows that carry it to the states it may move to, and a one-line note of what happened last: "
                   },
                   {
                     "kind": "italic",
@@ -5391,7 +5391,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " on the card's own top line, above the title, when the job belongs to one — press it to open that epic. A "
+                    "text": " on the card's own top line, above the title, when the ticket belongs to one — press it to open that epic. A "
                   },
                   {
                     "kind": "bold",
@@ -5399,7 +5399,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " beside the job's own key, when it sits under a job that is not already named by the epic chip — press it to open that parent. And every card carries its "
+                    "text": " beside the ticket's own key, when it sits under a ticket that is not already named by the epic chip — press it to open that parent. And every card carries its "
                   },
                   {
                     "kind": "bold",
@@ -5437,7 +5437,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Columns are grouped by which set of stages they belong to, so if two job types use different arrangements you get two clearly separated groups rather than one confusing mess."
+                    "text": "Columns are grouped by the workflow they belong to, so if two ticket types use different arrangements you get two clearly separated groups rather than one confusing mess."
                   }
                 ]
               },
@@ -5446,7 +5446,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "An empty column's own Create ticket button starts the job there."
+                    "text": "An empty column's own Create ticket button starts the ticket there."
                   },
                   {
                     "kind": "text",
@@ -5458,7 +5458,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in an empty column and the Create ticket window opens with that column's status already chosen, the backlog switch off, and a job type from that workflow pre-picked. A column whose stage does not allow a job to start there — your admin can turn this off per stage (§11) — shows no Create ticket button at all, even empty."
+                    "text": " in an empty column and the Create ticket window opens with that column's status already chosen, the backlog switch off, and a ticket type from that workflow pre-picked. A column whose state does not allow a ticket to start there — your admin can turn this off per state (§11) — shows no Create ticket button at all, even empty."
                   }
                 ]
               },
@@ -5467,11 +5467,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "\"Blocked\" is a property of the column, not of one job."
+                    "text": "\"Blocked\" is a property of the column, not of one ticket."
                   },
                   {
                     "kind": "text",
-                    "text": " Whoever built your workflow can mark a stage as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every job in that column is in that state by definition. There is no switch you flip on an individual job to say it is stuck; you need a stage built for it."
+                    "text": " Whoever built your workflow can mark a state as a waiting or blocked one — \"Waiting on parts\", \"Waiting on customer\". Every ticket in that column is in that state by definition. There is no switch you flip on an individual ticket to say it is stuck; you need a state built for it."
                   }
                 ]
               },
@@ -5496,7 +5496,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No tickets here yet — create one.\""
+                    "text": "\"No tickets here yet. Create one.\""
                   },
                   {
                     "kind": "text",
@@ -5504,7 +5504,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No tickets in this view — epics appear in the List.\""
+                    "text": "\"No tickets in this view. Epics appear in the List.\""
                   },
                   {
                     "kind": "text",
@@ -5600,7 +5600,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top (\"4 tickets · 1 done\") stays the same however you regroup or collapse. Things with nothing to group under get an honest bucket: "
+                    "text": "Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top (\"4 tickets, 1 done\") stays the same however you regroup or collapse. Things with nothing to group under get an honest bucket: "
                   },
                   {
                     "kind": "bold",
@@ -5637,7 +5637,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " recorded them so a wrong laptop clock cannot jumble it. A job in that strip also appears in its normal place further down, so you will see it twice. That is intended."
+                    "text": " recorded them so a wrong laptop clock cannot jumble it. A ticket in that strip also appears in its normal place further down, so you will see it twice. That is intended."
                   }
                 ]
               },
@@ -5646,7 +5646,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "\"default arrangement — you have not arranged this project\""
+                    "text": "\"default arrangement. You have not arranged this project\""
                   },
                   {
                     "kind": "text",
@@ -5729,7 +5729,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A marker reads the job's key and title — so you can tell which job it is without opening it — and the claim behind it (who said the date, and which one) is in its hover text. On a phone a marker is one line, cut with an ellipsis if the title is long."
+                    "text": "A marker reads the ticket's key and title — so you can tell which ticket it is without opening it — and the claim behind it (who said the date, and which one) is in its hover text. On a phone a marker is one line, cut with an ellipsis if the title is long."
                   }
                 ]
               },
@@ -5747,7 +5747,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is a legend with one switch per custom date field that actually claimed a day in the month you are looking at. Switching one off only hides it from view; it changes nothing about the job."
+                    "text": "There is a legend with one switch per custom date field that actually claimed a day in the month you are looking at. Switching one off only hides it from view; it changes nothing about the ticket."
                   }
                 ]
               },
@@ -5756,7 +5756,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Closed jobs are hidden here until you ask for them."
+                    "text": "Closed tickets are hidden here until you ask for them."
                   },
                   {
                     "kind": "text",
@@ -5833,7 +5833,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " only undoes your own setting — the default takes over again and closed jobs stay hidden. "
+                    "text": " only undoes your own setting — the default takes over again and closed tickets stay hidden. "
                   },
                   {
                     "kind": "italic",
@@ -5870,7 +5870,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", the sentence NAMES what can hide a claim: your filter, closed jobs being hidden, a date field you switched off in the legend, or an epic, which is drawn in the List and not here. It goes on to say "
+                    "text": ", the sentence NAMES what can hide a claim: your filter, closed tickets being hidden, a date field you switched off in the legend, or an epic, which is drawn in the List and not here. It goes on to say "
                   },
                   {
                     "kind": "italic",
@@ -5878,7 +5878,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — the calendar draws only what someone claimed, and an undated job is not estimated onto a day nobody gave it."
+                    "text": " — the calendar draws only what someone claimed, and an undated ticket is not estimated onto a day nobody gave it."
                   }
                 ]
               },
@@ -5907,7 +5907,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " If closed jobs, or work your filter removed, also have claims in this month, switching the field back on will not bring those back. "
+                    "text": " If closed tickets, or work your filter removed, also have claims in this month, switching the field back on will not bring those back. "
                   },
                   {
                     "kind": "italic",
@@ -5987,7 +5987,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button opens the job so you can set them."
+                    "text": " button opens the ticket so you can set them."
                   }
                 ]
               },
@@ -5996,7 +5996,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Closed jobs are hidden here too, on the same terms as the Calendar"
+                    "text": "Closed tickets are hidden here too, on the same terms as the Calendar"
                   },
                   {
                     "kind": "text",
@@ -6044,7 +6044,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress. Not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
                   }
                 ]
               },
@@ -6161,7 +6161,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words in a job's comment box or in a note (§15), which opens a picker over its results. There is still nowhere you type a query and read this engine's own results directly."
+                    "text": " followed by a few words in a ticket's comment box or in a note (§15), which opens a picker over its results. There is still nowhere you type a query and read this engine's own results directly."
                   }
                 ]
               }
@@ -6236,7 +6236,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — the job types your workspace has set up."
+                      "text": " — the ticket types your workspace has set up."
                     }
                   ],
                   [
@@ -6246,7 +6246,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — the stages this project's board is built from."
+                      "text": " — the states this project's board is built from."
                     }
                   ],
                   [
@@ -6256,7 +6256,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — one control, for jobs that are closed."
+                      "text": " — one control, for tickets that are closed."
                     }
                   ],
                   [
@@ -6353,7 +6353,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "only jobs with this value"
+                        "text": "only tickets with this value"
                       }
                     ]
                   ],
@@ -6375,7 +6375,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "jobs with this value are hidden"
+                        "text": "tickets with this value are hidden"
                       }
                     ]
                   ]
@@ -6468,7 +6468,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is not enough to get closed jobs back — those two tabs hide them until you either remove the "
+                    "text": " is not enough to get closed tickets back — those two tabs hide them until you either remove the "
                   },
                   {
                     "kind": "bold",
@@ -6551,7 +6551,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", in the strip that counts how many jobs are showing, as a chip. Each chip carries an "
+                    "text": ", in the strip that counts how many tickets are showing, as a chip. Each chip carries an "
                   },
                   {
                     "kind": "bold",
@@ -6600,7 +6600,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", because the Board never shows closed jobs in the first place: there the sentence reads "
+                    "text": ", because the Board never shows closed tickets in the first place: there the sentence reads "
                   },
                   {
                     "kind": "italic",
@@ -6627,7 +6627,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "2,000 jobs in a project"
+                    "text": "2,000 tickets in a project"
                   },
                   {
                     "kind": "text",
@@ -6719,7 +6719,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A row at the top of My Work, headed "
+                    "text": "A row at the top of My work, headed "
                   },
                   {
                     "kind": "italic",
@@ -6752,7 +6752,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — sitting in a stage somebody flagged as blocked."
+                      "text": " — sitting in a state somebody flagged as blocked."
                     }
                   ],
                   [
@@ -6762,7 +6762,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — has been sitting in the same stage too long."
+                      "text": " — has been sitting in the same state too long."
                     }
                   ],
                   [
@@ -6792,11 +6792,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Each job appears once"
+                    "text": "Each ticket appears once"
                   },
                   {
                     "kind": "text",
-                    "text": ", with its strongest reason — a job that is both overdue and blocked is one Overdue row. The strip shows the first five; if there are more, "
+                    "text": ", with its strongest reason — a ticket that is both overdue and blocked is one Overdue row. The strip shows the first five; if there are more, "
                   },
                   {
                     "kind": "bold",
@@ -6903,7 +6903,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)"
+                      "text": ", in a ticket's comment or description, or in a note or one of its comments. The row names the ticket or the note, and clicking it opens that ticket or note (for a note's comment, scrolled to that comment)"
                     }
                   ],
                   [
@@ -6925,7 +6925,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Something has been sitting in one stage too long — "
+                      "text": "Something has been sitting in one state too long — "
                     },
                     {
                       "kind": "italic",
@@ -6943,7 +6943,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " If the marking fails, it reloads to show you the truth rather than leaving a fake \"read\" mark. Clicking also takes you to the job it is about."
+                    "text": " If the marking fails, it reloads to show you the truth rather than leaving a fake \"read\" mark. Clicking also takes you to the ticket it is about."
                   }
                 ]
               },
@@ -7094,7 +7094,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "If you click a message and the job will not open:"
+                    "text": "If you click a message and the ticket will not open:"
                   },
                   {
                     "kind": "text",
@@ -7102,7 +7102,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
+                    "text": "\"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
                   },
                   {
                     "kind": "text",
@@ -7155,15 +7155,15 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "setting-who-can-see-a-job",
-            "title": "Setting who can see a job",
+            "id": "setting-who-can-see-a-ticket",
+            "title": "Setting who can see a ticket",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open the job. On the Details tab, the "
+                    "text": "Open the ticket. On the Details tab, the "
                   },
                   {
                     "kind": "bold",
@@ -7171,7 +7171,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " row holds a pill showing who can see the job right now — click it. A menu opens with four choices:"
+                    "text": " row holds a pill showing who can see the ticket right now — click it. A menu opens with four choices:"
                   }
                 ]
               },
@@ -7208,7 +7208,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — whatever the job above it decided."
+                      "text": " — whatever the ticket above it decided."
                     }
                   ]
                 ]
@@ -7239,7 +7239,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Visible to: these people — and the workspace owner, always.\""
+                    "text": "\"Visible to: these people, and the workspace owner, always.\""
                   }
                 ]
               },
@@ -7252,7 +7252,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "The workspace owner can always see every job, whatever you set here."
+                    "text": "The workspace owner can always see every ticket, whatever you set here."
                   },
                   {
                     "kind": "text",
@@ -7275,11 +7275,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "of that job's project"
+                    "text": "of that ticket's project"
                   },
                   {
                     "kind": "text",
-                    "text": ", or whoever created the job. Being an admin of a different project does not help. If you are not one of those, the product will let you fill the form in and the server will refuse it, telling you why."
+                    "text": ", or whoever created the ticket. Being an admin of a different project does not help. If you are not one of those, the product will let you fill the form in and the server will refuse it, telling you why."
                   }
                 ]
               }
@@ -7294,7 +7294,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you set a big job to \"only the people I name\", the smaller jobs under it follow "
+                    "text": "If you set a big ticket to \"only the people I name\", the smaller tickets under it follow "
                   },
                   {
                     "kind": "bold",
@@ -7311,7 +7311,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Move a job to a new parent and it takes the new parent's audience, along with everything under it. Move it up to the top and it falls back to the project default. Set it back to inheriting and it and everything below re-attach."
+                    "text": "Move a ticket to a new parent and it takes the new parent's audience, along with everything under it. Move it up to the top and it falls back to the project default. Set it back to inheriting and it and everything below re-attach."
                   }
                 ]
               }
@@ -7335,7 +7335,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "italic",
-                    "text": "\"You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.\""
+                    "text": "\"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it.\""
                   }
                 ]
               },
@@ -7363,7 +7363,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "You can set who sees a job, and the screen reads it back to you."
+                    "text": "You can set who sees a ticket, and the screen reads it back to you."
                   },
                   {
                     "kind": "text",
@@ -7400,7 +7400,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If somebody goes looking for it directly, they get exactly the same \"not found\" as they would for a made-up reference. That is deliberately identical, so that nobody can work out what exists by watching which refusals they get. The same is true of a job's history and of trying to change one."
+                    "text": "If somebody goes looking for it directly, they get exactly the same \"not found\" as they would for a made-up reference. That is deliberately identical, so that nobody can work out what exists by watching which refusals they get. The same is true of a ticket's history and of trying to change one."
                   }
                 ]
               },
@@ -7409,7 +7409,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you have access to no jobs in a project at all, the list just looks empty to you — indistinguishable from a genuinely empty project."
+                    "text": "If you have access to no tickets in a project at all, the list just looks empty to you — indistinguishable from a genuinely empty project."
                   }
                 ]
               }
@@ -7424,7 +7424,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A guest sees only the specific jobs somebody explicitly shared with them. Not the project, not the workspace's other work. They see the workspace's name and an empty project list — which is intended, not broken."
+                    "text": "A guest sees only the specific tickets somebody explicitly shared with them. Not the project, not the workspace's other work. They see the workspace's name and an empty project list — which is intended, not broken."
                   }
                 ]
               },
@@ -7441,7 +7441,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " see a child of something shared with them, if that child inherits. They cannot open the people list. They cannot create jobs. If a guest is looking at a job that somebody else is assigned to, that person shows up as an identifier rather than a name — not blank, just not a name. Slightly ugly, and better than leaking your staff list to an outsider."
+                    "text": " see a child of something shared with them, if that child inherits. They cannot open the people list. They cannot create tickets. If a guest is looking at a ticket that somebody else is assigned to, that person shows up as an identifier rather than a name — not blank, just not a name. Slightly ugly, and better than leaking your staff list to an outsider."
                   }
                 ]
               }
@@ -7460,7 +7460,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " History always shows who acted and when, untouched, to anybody entitled to see the job — even when that person shares no project with you. You can hide the "
+                    "text": " History always shows who acted and when, untouched, to anybody entitled to see the ticket — even when that person shares no project with you. You can hide the "
                   },
                   {
                     "kind": "italic",
@@ -7494,8 +7494,8 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "11-setting-up-your-own-stages-owners-and-admins",
-        "title": "§11 — Setting up your own stages (owners and admins)",
+        "id": "11-setting-up-your-own-states-owners-and-admins",
+        "title": "§11 — Setting up your own states (owners and admins)",
         "intro": [],
         "entries": [
           {
@@ -7519,7 +7519,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " link in the top bar; it appears once a workspace is open, and it opens that workspace's settings, where the stage builder, the job-type editor and the project-group tree live."
+                    "text": " link in the top bar; it appears once a workspace is open, and it opens that workspace's settings, where the workflow editor, the ticket-type editor and the project-group tree live."
                   }
                 ]
               },
@@ -7605,7 +7605,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "To do, doing, done. No rules — anything moves along the arrows. "
+                        "text": "To do, doing, done. No rules: anything moves along the arrows. "
                       },
                       {
                         "kind": "bold",
@@ -7623,7 +7623,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Draft, submit, approve — with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off."
+                        "text": "Draft, submit, approve, with four eyes: whoever submitted cannot be the one who approves. Good for anything a client signs off."
                       }
                     ]
                   ],
@@ -7637,7 +7637,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Has a \"Waiting\" stage marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods."
+                        "text": "Has a \"Waiting\" state marked as blocked, for when you are stuck on somebody else. Useful if your work has waiting periods."
                       }
                     ]
                   ],
@@ -7651,7 +7651,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "An empty canvas with one starting stage called \"New\"."
+                        "text": "An empty canvas with one starting state called \"New\"."
                       }
                     ]
                   ]
@@ -7710,7 +7710,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It is a drawing canvas. Each stage is a box. "
+                    "text": "It is a drawing canvas. Each state is a box. "
                   },
                   {
                     "kind": "bold",
@@ -7743,7 +7743,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " dropdown — whether that stage counts as "
+                      "text": " dropdown — whether that state counts as "
                     },
                     {
                       "kind": "italic",
@@ -7777,7 +7777,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — for stages that mean \"we are stuck waiting on someone\"."
+                      "text": " — for states that mean \"we are stuck waiting on someone\"."
                     }
                   ],
                   [
@@ -7787,7 +7787,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — which stage new jobs begin in."
+                      "text": " — which state new tickets begin in."
                     }
                   ],
                   [
@@ -7797,7 +7797,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — on by default; untick it to stop a job being born straight into that stage (the Starting status picker on the Create ticket window will not offer it, §5). Greyed out and stuck on for the stage your start marker points to, with the note "
+                      "text": " — on by default; untick it to stop a ticket being born straight into that state (the Starting status picker on the Create ticket window will not offer it, §5). Greyed out and stuck on for the state your start marker points to, with the note "
                     },
                     {
                       "kind": "italic",
@@ -7805,7 +7805,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and for a finished stage, with the note "
+                      "text": ", and for a finished state, with the note "
                     },
                     {
                       "kind": "italic",
@@ -7823,11 +7823,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "To connect two stages, drag from the edge of one box to the edge of another."
+                    "text": "To connect two states, drag from the edge of one box to the edge of another."
                   },
                   {
                     "kind": "text",
-                    "text": " That makes an arrow, which means \"a job can go this way\"."
+                    "text": " That makes an arrow, which means \"a ticket can go this way\"."
                   }
                 ]
               },
@@ -7848,7 +7848,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button at the bottom left brings the whole drawing back. The tick boxes on a stage are big enough to tap, and when one is stuck on, the reason is written under it rather than hidden in a hover."
+                    "text": " button at the bottom left brings the whole drawing back. The tick boxes on a state are big enough to tap, and when one is stuck on, the reason is written under it rather than hidden in a hover."
                   }
                 ]
               },
@@ -7877,7 +7877,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " list, each with a count. Press a row and it opens right there to show its settings: for a stage, its name, "
+                    "text": " list, each with a count. Press a row and it opens right there to show its settings: for a state, its name, "
                   },
                   {
                     "kind": "bold",
@@ -7955,7 +7955,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It is the one bit of setup where getting it wrong quietly breaks things elsewhere. The rest of the product needs to know which of your stages mean \"finished\" — that is how it knows a parent job can be closed, how progress counts work, and what \"Only tickets in progress\" filters. A stage with the wrong category makes everything downstream guess wrong."
+                    "text": " It is the one bit of setup where getting it wrong quietly breaks things elsewhere. The rest of the product needs to know which of your states mean \"finished\" — that is how it knows a parent ticket can be closed, how progress counts work, and what \"Only tickets in progress\" filters. A state with the wrong category makes everything downstream guess wrong."
                   }
                 ]
               },
@@ -8161,7 +8161,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — must attach a file. The person moving the job picks the file on the job screen; the move stays blocked until the server has stored it. (See §7. "
+                      "text": " — must attach a file. The person moving the ticket picks the file on the ticket screen; the move stays blocked until the server has stored it. (See §7. "
                     },
                     {
                       "kind": "bold",
@@ -8216,15 +8216,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "deleting-a-stage-while-you-are-editing",
-            "title": "Deleting a stage while you are editing",
+            "id": "deleting-a-state-while-you-are-editing",
+            "title": "Deleting a state while you are editing",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Deleting a stage removes every arrow connected to it. If that stage happened to be the starting stage, or was named by a four-eyes rule, "
+                    "text": "Deleting a state removes every arrow connected to it. If that state happened to be the starting state, or was named by a four-eyes rule, "
                   },
                   {
                     "kind": "bold",
@@ -8232,7 +8232,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than quietly picking a new starting stage for you. The problem checker below will flag it and make you fix it yourself."
+                    "text": " rather than quietly picking a new starting state for you. The problem checker below will flag it and make you fix it yourself."
                   }
                 ]
               }
@@ -8247,7 +8247,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is a live checklist that refuses to let you publish if, for example: there are no stages at all; there is no finished stage; an arrow points at a stage that does not exist; a stage nothing can reach; a finished stage with no way in; two identical arrows; or a \"who may move it\" rule that names nobody."
+                    "text": "There is a live checklist that refuses to let you publish if, for example: there are no states at all; there is no finished state; an arrow points at a state that does not exist; a state nothing can reach; a finished state with no way in; two identical arrows; or a \"who may move it\" rule that names nobody."
                   }
                 ]
               },
@@ -8287,19 +8287,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Worth a look — none of these block publishing\""
+                    "text": "\"Worth a look (none of these block publishing)\""
                   },
                   {
                     "kind": "text",
-                    "text": ". These are advice, not errors. Typically: you have put a guard on one route into a stage, but there is another route in without the same guard, so the guard can be walked around. It publishes anyway; it is just telling you."
+                    "text": ". These are advice, not errors. Typically: you have put a guard on one route into a state, but there is another route in without the same guard, so the guard can be walked around. It publishes anyway; it is just telling you."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "publishing-and-what-happens-to-existing-jobs",
-            "title": "Publishing, and what happens to existing jobs",
+            "id": "publishing-and-what-happens-to-existing-tickets",
+            "title": "Publishing, and what happens to existing tickets",
             "blocks": [
               {
                 "kind": "list",
@@ -8326,11 +8326,11 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "drops a stage that jobs are currently sitting in"
+                      "text": "drops a state that tickets are currently sitting in"
                     },
                     {
                       "kind": "text",
-                      "text": ", a dialog stops you and lists every dropped stage with how many jobs are in it and a picker for where they should go."
+                      "text": ", a dialog stops you and lists every dropped state with how many tickets are in it and a picker for where they should go."
                     }
                   ],
                   [
@@ -8344,7 +8344,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " dropped stage. Leave one out and it names the one you missed: "
+                      "text": " dropped state. Leave one out and it names the one you missed: "
                     },
                     {
                       "kind": "italic",
@@ -8352,7 +8352,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " If it cannot even count how many jobs are in a stage it says \"unavailable\" next to the count and "
+                      "text": " If it cannot even count how many tickets are in a state it says \"unavailable\" next to the count and "
                     },
                     {
                       "kind": "bold",
@@ -8380,11 +8380,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "jobs created under version 1 stay on version 1"
+                    "text": "tickets created under version 1 stay on version 1"
                   },
                   {
                     "kind": "text",
-                    "text": " unless they are moved across. Renaming a stage without removing it publishes with none of this extra step."
+                    "text": " unless they are moved across. Renaming a state without removing it publishes with none of this extra step."
                   }
                 ]
               },
@@ -8421,8 +8421,8 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "12-setting-up-your-own-job-types-owners-and-admins",
-        "title": "§12 — Setting up your own job types (owners and admins)",
+        "id": "12-setting-up-your-own-ticket-types-owners-and-admins",
+        "title": "§12 — Setting up your own ticket types (owners and admins)",
         "intro": [
           {
             "kind": "paragraph",
@@ -8516,7 +8516,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — call it what your business calls it. \"Callout\". \"Quote\". \"Job\"."
+                      "text": " — call it what your business calls it. \"Callout\". \"Quote\". \"Ticket\"."
                     }
                   ],
                   [
@@ -8544,7 +8544,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " (a whole client project); bigger numbers are smaller pieces. A job can only sit under a job with a smaller rank number."
+                      "text": " (a whole client project); bigger numbers are smaller pieces. A ticket can only sit under a ticket with a smaller rank number."
                     }
                   ],
                   [
@@ -8554,7 +8554,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — which of your published stage sets this kind of job uses."
+                      "text": " — which of your published workflows this kind of ticket uses."
                     }
                   ],
                   [
@@ -8574,7 +8574,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you put a type at the very bottom rank, the screen tells you straight away that jobs of that type will always need a parent. If it is higher up, it says nothing of the sort. That is useful — it tells you the consequence at the moment you are choosing."
+                    "text": "If you put a type at the very bottom rank, the screen tells you straight away that tickets of that type will always need a parent. If it is higher up, it says nothing of the sort. That is useful — it tells you the consequence at the moment you are choosing."
                   }
                 ]
               },
@@ -8610,7 +8610,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rename epic, story, task and sub-task, change their icons, and change which stage set they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
+                    "text": " rename epic, story, task and sub-task, change their icons, and change which workflow they use. Do it — \"Epic\" and \"Story\" mean nothing in a plumbing business or a design studio."
                   }
                 ]
               },
@@ -8631,7 +8631,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Built-in type — its place in the hierarchy is fixed.\""
+                    "text": "\"Built-in type. Its place in the hierarchy is fixed.\""
                   },
                   {
                     "kind": "text",
@@ -8642,15 +8642,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "pointing-a-type-at-a-different-stage-set",
-            "title": "Pointing a type at a different stage set",
+            "id": "pointing-a-type-at-a-different-workflow",
+            "title": "Pointing a type at a different workflow",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Existing jobs stay where they are, on the stages they were created under. New jobs of that type get the new set."
+                    "text": "Existing tickets stay where they are, on the states they were created under. New tickets of that type get the new workflow."
                   }
                 ]
               },
@@ -8667,7 +8667,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " stage currently in use onto a stage in the new set — the same discipline as dropping a stage. Miss one and it moves nothing and names what you missed."
+                    "text": " state currently in use onto a state in the new workflow — the same discipline as dropping a state. Miss one and it moves nothing and names what you missed."
                   }
                 ]
               }
@@ -8713,7 +8713,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ": a board, and a job. That is the whole app."
+                      "text": ": a board, and a ticket. That is the whole app."
                     }
                   ],
                   [
@@ -8747,7 +8747,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It has no offline queue at all. Offline is the phone and desktop apps' job."
+                    "text": " It has no offline queue at all. Offline is the phone and desktop apps' ticket."
                   }
                 ]
               }
@@ -8766,7 +8766,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " On a device that already has a copy, you can open the job list, open a job, see the board, read a job's full history, see the job types and stages, and see your assigned work — all from the copy on the device."
+                    "text": " On a device that already has a copy, you can open the ticket list, open a ticket, see the board, read a ticket's full history, see the ticket types and states, and see your assigned work — all from the copy on the device."
                   }
                 ]
               },
@@ -8779,7 +8779,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The queue underneath will happily carry a new job, a field value, a stage move or a reopen, and hold them until you reconnect. But a change these apps cannot make on screen is one they cannot make online either — the queue accepting a kind of change is not the same as a screen offering it, and the phone app is two screens deep. In practice, offline you can create a job, move one between stages, reopen one, post a comment, and deal with a disputed claim. "
+                    "text": " The queue underneath will happily carry a new ticket, a field value, a state move or a reopen, and hold them until you reconnect. But a change these apps cannot make on screen is one they cannot make online either — the queue accepting a kind of change is not the same as a screen offering it, and the phone app is two screens deep. In practice, offline you can create a ticket, move one between states, reopen one, post a comment, and deal with a disputed claim. "
                   },
                   {
                     "kind": "bold",
@@ -8817,7 +8817,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " a job you create "
+                    "text": " a ticket you create "
                   },
                   {
                     "kind": "italic",
@@ -8825,7 +8825,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " while offline will not show up on the board or the job list until the server has confirmed it. Do not panic — search for it by name in the offline search and it will turn up."
+                    "text": " while offline will not show up on the board or the ticket list until the server has confirmed it. Do not panic — search for it by name in the offline search and it will turn up."
                   }
                 ]
               },
@@ -8838,7 +8838,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each one names what is missing rather than showing you an empty screen."
+                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each one names what is missing rather than showing you an empty screen."
                   }
                 ]
               },
@@ -8920,7 +8920,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "\"Offline — 3 claims waiting to send\""
+                      "text": "\"Offline: 3 claims waiting to send\""
                     }
                   ],
                   [
@@ -8998,7 +8998,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " badge appears on a job, both on the board and in job lists, for something you changed that the server has not confirmed yet. The job screen shows your unconfirmed change alongside the last confirmed version, so you can see both."
+                    "text": " badge appears on a ticket, both on the board and in ticket lists, for something you changed that the server has not confirmed yet. The ticket screen shows your unconfirmed change alongside the last confirmed version, so you can see both."
                   }
                 ]
               }
@@ -9030,7 +9030,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", so a job never gets edited on the server before it has been created there."
+                    "text": ", so a ticket never gets edited on the server before it has been created there."
                   }
                 ]
               },
@@ -9047,7 +9047,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " filing a job under it both work offline, where filing the job alone would not."
+                    "text": " filing a ticket under it both work offline, where filing the ticket alone would not."
                   }
                 ]
               },
@@ -9096,7 +9096,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The later one wins. The earlier one survives in the job's history. "
+                    "text": " The later one wins. The earlier one survives in the ticket's history. "
                   },
                   {
                     "kind": "bold",
@@ -9126,7 +9126,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — the job got reassigned, or the stages changed, or it got un-shared from you. Then it is refused and recorded as a "
+                    "text": " — the ticket got reassigned, or the states changed, or it got un-shared from you. Then it is refused and recorded as a "
                   },
                   {
                     "kind": "bold",
@@ -9191,7 +9191,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — turn what you tried to do into a permanent comment on the job, carrying your words, your name, the rule and the time. "
+                      "text": " — turn what you tried to do into a permanent comment on the ticket, carrying your words, your name, the rule and the time. "
                     },
                     {
                       "kind": "bold",
@@ -9366,7 +9366,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "A job you file at 11pm your time may already be labelled tomorrow."
+                      "text": "A ticket you file at 11pm your time may already be labelled tomorrow."
                     }
                   ],
                   [
@@ -9404,7 +9404,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is a footnote naming the time zone at the bottom of a job's history. That is the only place in the product that acknowledges it."
+                    "text": "There is a footnote naming the time zone at the bottom of a ticket's history. That is the only place in the product that acknowledges it."
                   }
                 ]
               }
@@ -9501,7 +9501,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — the notification destination ships blank, so unless somebody set it up, a failing backup is invisible. And the weekly export loads the whole history into memory before writing anything, which is the job that will break first as the history grows."
+                    "text": " — the notification destination ships blank, so unless somebody set it up, a failing backup is invisible. And the weekly export loads the whole history into memory before writing anything, which is the ticket that will break first as the history grows."
                   }
                 ]
               },
@@ -9532,7 +9532,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a job. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the job it came from is closed. A note can be attached to a job as well, but it does not have to be, and attaching it does not make it that job's property."
+                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a ticket. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the ticket it came from is closed. A note can be attached to a ticket as well, but it does not have to be, and attaching it does not make it that ticket's property."
                   }
                 ]
               },
@@ -9726,7 +9726,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — visible to whoever can see any one of the jobs the note is attached to. This choice only appears when the note has a job to inherit from."
+                      "text": " — visible to whoever can see any one of the tickets the note is attached to. This choice only appears when the note has a ticket to inherit from."
                     }
                   ],
                   [
@@ -9779,7 +9779,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " An admin reads a note under the exact same rule as anyone else: their own notes, anything scoped to the whole workspace, anything on a project they are actually a member of, anything naming them by name, or anything shared the same way as a job they can already see. Being an admin gives no extra reach into notes."
+                      "text": " An admin reads a note under the exact same rule as anyone else: their own notes, anything scoped to the whole workspace, anything on a project they are actually a member of, anything naming them by name, or anything shared the same way as a ticket they can already see. Being an admin gives no extra reach into notes."
                     }
                   ]
                 ]
@@ -10103,7 +10103,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Only the note page has this; the comment box and the job sheet do not."
+                    "text": ". Only the note page has this; the comment box and the ticket sheet do not."
                   }
                 ]
               },
@@ -10216,15 +10216,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "a-job-s-own-notes",
-            "title": "A job's own notes",
+            "id": "a-ticket-s-own-notes",
+            "title": "A ticket's own notes",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A job's panel has its own "
+                    "text": "A ticket's panel has its own "
                   },
                   {
                     "kind": "bold",
@@ -10274,7 +10274,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Each attached note is a badge with an × on it (if you can edit the job) that detaches it — the note itself is not deleted, only unlinked from this job. Detaching shows a toast you can undo."
+                    "text": "Each attached note is a badge with an × on it (if you can edit the ticket) that detaches it — the note itself is not deleted, only unlinked from this ticket. Detaching shows a toast you can undo."
                   }
                 ]
               },
@@ -10283,7 +10283,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It works the other way too: an attached job appears as a badge in the note's own byline. Click it and the job's own panel opens right there, over the note — you are not taken to the job's page. Deleting the job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on this)."
+                    "text": "It works the other way too: an attached ticket appears as a badge in the note's own byline. Click it and the ticket's own panel opens right there, over the note — you are not taken to the ticket's page. Deleting the ticket from that panel does not remove the badge; a deleted ticket stays attached (see the Notes FAQ entry on this)."
                   }
                 ]
               }
@@ -10306,7 +10306,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and start a person's name, in a note or in its comments: the same list of people the job editors offer appears, and picking one drops a mention at the cursor. "
+                    "text": " and start a person's name, in a note or in its comments: the same list of people the ticket editors offer appears, and picking one drops a mention at the cursor. "
                   },
                   {
                     "kind": "bold",
@@ -10330,15 +10330,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " message, naming the note, and follows your Mentions setting under Account → Notifications, exactly like a mention on a job."
+                    "text": " message, naming the note, and follows your Mentions setting under Account → Notifications, exactly like a mention on a ticket."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "linking-to-a-job-or-another-note",
-            "title": "Linking to a job or another note",
+            "id": "linking-to-a-ticket-or-another-note",
+            "title": "Linking to a ticket or another note",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -10353,7 +10353,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type."
+                    "text": " followed by a few words, in a comment or in a note, opens a picker over the tickets you can see; pick one and it inserts a chip showing the ticket's key and title, which opens that ticket. Typed with nothing after it, the picker lists the most recently created tickets you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a ticket's own comment), so you can browse before you type."
                   }
                 ]
               },
@@ -10400,7 +10400,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Tagging a note in a job's own comment attaches that note to the job"
+                    "text": "Tagging a note in a ticket's own comment attaches that note to the ticket"
                   },
                   {
                     "kind": "text",
@@ -10464,7 +10464,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its "
+                    "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a ticket's delete uses opens, with its "
                   },
                   {
                     "kind": "bold",
@@ -10497,7 +10497,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If a note you have open stops being shared with you — someone narrowed its scope, or detached the last job it inherited from — you are taken back to the Notes list with a message: "
+                    "text": "If a note you have open stops being shared with you — someone narrowed its scope, or detached the last ticket it inherited from — you are taken back to the Notes list with a message: "
                   },
                   {
                     "kind": "bold",
@@ -10555,7 +10555,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "There is no list on a note or a job showing what else links to it."
+                      "text": "There is no list on a note or a ticket showing what else links to it."
                     }
                   ]
                 ]
@@ -10598,7 +10598,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "add a job to the Shop floor project"
+                    "text": "add a ticket to the Shop floor project"
                   },
                   {
                     "kind": "text",
@@ -10606,7 +10606,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "move the chiller job to Done"
+                    "text": "move the chiller ticket to Done"
                   },
                   {
                     "kind": "text",
@@ -10659,7 +10659,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It can see and change everything you can, in every workspace you belong to: read jobs, create them, move them through their stages, comment and assign, and create, rename, archive or delete workspaces and projects — see "
+                      "text": " It can see and change everything you can, in every workspace you belong to: read tickets, create them, move them through their states, comment and assign, and create, rename, archive or delete workspaces and projects — see "
                     },
                     {
                       "kind": "bold",
@@ -10677,7 +10677,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " A job you cannot see, it cannot see. A move your role does not allow is refused for the assistant in the same words it would be refused for you."
+                      "text": " A ticket you cannot see, it cannot see. A move your role does not allow is refused for the assistant in the same words it would be refused for you."
                     }
                   ],
                   [
@@ -10687,7 +10687,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", like any other change in the job's history."
+                      "text": ", like any other change in the ticket's history."
                     }
                   ]
                 ]
@@ -10738,13 +10738,13 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " See who is in a workspace. If you are a guest, you are shown only the people on the jobs shared with you — never the full list, and never anyone's email address."
+                      "text": " See who is in a workspace. If you are a guest, you are shown only the people on the tickets shared with you — never the full list, and never anyone's email address."
                     }
                   ],
                   [
                     {
                       "kind": "bold",
-                      "text": "Jobs."
+                      "text": "Tickets."
                     },
                     {
                       "kind": "text",
@@ -11415,8 +11415,8 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "kind": "link",
-            "text": "Jobs",
-            "href": "#jobs"
+            "text": "Tickets",
+            "href": "#tickets"
           },
           {
             "kind": "text",
@@ -11424,8 +11424,8 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "kind": "link",
-            "text": "Stages and moves",
-            "href": "#stages-and-moves"
+            "text": "States and moves",
+            "href": "#states-and-moves"
           },
           {
             "kind": "text",
@@ -11708,7 +11708,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A workspace is your whole business — everybody in it and all the work underneath. A project is a bucket of work inside it: \"Residential jobs\", \"Shop operations\". Jobs live inside projects."
+                    "text": "A workspace is your whole business — everybody in it and all the work underneath. A project is a bucket of work inside it: \"Residential repairs\", \"Shop operations\". Tickets live inside projects."
                   }
                 ]
               }
@@ -11743,7 +11743,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " For anyone, there is no button on the Workspaces page, in settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in the product, and it sits right at the start of the journey."
+                    "text": " For anyone, there is no button on the Workspaces page, in settings, or in the top bar. A brand-new workspace has states, ticket types and you as its owner, and nowhere to put a ticket until an owner or admin adds one. For a member this is still the biggest hole in the product, and it sits right at the start of the journey."
                   }
                 ]
               }
@@ -11773,8 +11773,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "where-do-i-create-a-workspace-a-project-or-a-job",
-            "title": "Where do I create a workspace, a project or a job?",
+            "id": "where-do-i-create-a-workspace-a-project-or-a-ticket",
+            "title": "Where do I create a workspace, a project or a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -11813,7 +11813,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is in a project, near the top by the view tabs, on a project's empty Board and inside an empty stage on the Board. "
+                    "text": " is in a project, near the top by the view tabs, on a project's empty Board and inside an empty column on the Board. "
                   },
                   {
                     "kind": "bold",
@@ -11891,15 +11891,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "what-happens-to-the-old-job-numbers-when-a-prefix-changes",
-            "title": "What happens to the old job numbers when a prefix changes?",
+            "id": "what-happens-to-the-old-ticket-numbers-when-a-prefix-changes",
+            "title": "What happens to the old ticket numbers when a prefix changes?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Every job's number is rewritten at once: "
+                    "text": "Every ticket's number is rewritten at once: "
                   },
                   {
                     "kind": "bold",
@@ -11931,7 +11931,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", with the same count. The old number still finds the job — in the picker that links a job into a note, and in your assistant's search — and puts it first. A note that mentioned "
+                    "text": ", with the same count. The old number still finds the ticket — in the picker that links a ticket into a note, and in your assistant's search — and puts it first. A note that mentioned "
                   },
                   {
                     "kind": "bold",
@@ -11947,7 +11947,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", and the mention still opens the job."
+                    "text": ", and the mention still opens the ticket."
                   }
                 ]
               }
@@ -11970,7 +11970,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", no other project in the workspace can take it, so one number never names two jobs. The project that gave it up can take it back. A prefix another project uses right now is refused too. The form shows the reason and stays open."
+                    "text": ", no other project in the workspace can take it, so one number never names two tickets. The project that gave it up can take it back. A prefix another project uses right now is refused too. The form shows the reason and stays open."
                   }
                 ]
               }
@@ -11985,7 +11985,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. It can read and search by job numbers, but changing a prefix is done in the app by an owner or admin."
+                    "text": "No. It can read and search by ticket numbers, but changing a prefix is done in the app by an owner or admin."
                   }
                 ]
               }
@@ -12241,7 +12241,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "My Work"
+                    "text": "My work"
                   },
                   {
                     "kind": "text",
@@ -12261,7 +12261,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " join them, with the workspace's name and your inbox and avatar at the right-hand end. The settings screens for stages and job types are behind "
+                    "text": " join them, with the workspace's name and your inbox and avatar at the right-hand end. The settings screens for states and ticket types are behind "
                   },
                   {
                     "kind": "bold",
@@ -12273,8 +12273,8 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "link",
-                    "text": "Stages and moves",
-                    "href": "#stages-and-moves"
+                    "text": "States and moves",
+                    "href": "#states-and-moves"
                   },
                   {
                     "kind": "text",
@@ -12393,7 +12393,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "copy-it-now-it-is-not-stored-and-cannot-be-shown-again-does-",
-            "title": "\"Copy it now — it is not stored and cannot be shown again.\" Does it mean that?",
+            "title": "\"Copy it now: it is not stored and cannot be shown again.\" Does it mean that?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -12438,15 +12438,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those."
+                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a ticket shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-assign-a-job-to-somebody-who-is-not-in-the-workspace",
-            "title": "Can I assign a job to somebody who is not in the workspace?",
+            "id": "can-i-assign-a-ticket-to-somebody-who-is-not-in-the-workspac",
+            "title": "Can I assign a ticket to somebody who is not in the workspace?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -12485,7 +12485,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email."
+                    "text": ", and they join as a guest who sees only that ticket; nothing is listed or suggested, so you have to know the email."
                   }
                 ]
               }
@@ -12693,7 +12693,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. Guests cannot open the people list at all. If a guest is looking at a job somebody else is assigned to, that person shows as an identifier rather than a name — not blank, just not a name. Slightly ugly, and better than leaking your staff list to an outsider."
+                    "text": "No. Guests cannot open the people list at all. If a guest is looking at a ticket somebody else is assigned to, that person shows as an identifier rather than a name — not blank, just not a name. Slightly ugly, and better than leaking your staff list to an outsider."
                   }
                 ]
               }
@@ -12717,13 +12717,13 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "jobs",
-        "title": "Jobs",
+        "id": "tickets",
+        "title": "Tickets",
         "intro": [],
         "entries": [
           {
-            "id": "can-i-assign-a-job-to-somebody",
-            "title": "Can I assign a job to somebody?",
+            "id": "can-i-assign-a-ticket-to-somebody",
+            "title": "Can I assign a ticket to somebody?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -12734,7 +12734,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The website's job panel has an \"Assignee\" picker — choose a person, or choose "
+                    "text": " The website's ticket panel has an \"Assignee\" picker — choose a person, or choose "
                   },
                   {
                     "kind": "bold",
@@ -12742,7 +12742,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " to take the job off somebody. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. The board shows who a job is on, the Inbox tells you when you have been assigned something, My Work is built around it and the list can group by it."
+                    "text": " to take the ticket off somebody. The phone and desktop apps have no Assignee row at all, so there you can neither see who a ticket is on nor set it. The board shows who a ticket is on, the Inbox tells you when you have been assigned something, My work is built around it and the list can group by it."
                   }
                 ]
               }
@@ -12757,11 +12757,11 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Yes — on the website's job panel."
+                    "text": "Yes — on the website's ticket panel."
                   },
                   {
                     "kind": "text",
-                    "text": " Open a job and its "
+                    "text": " Open a ticket and its "
                   },
                   {
                     "kind": "bold",
@@ -12856,8 +12856,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "can-i-set-the-dates-when-i-create-the-job-instead-of-afterwa",
-            "title": "Can I set the dates when I create the job, instead of afterwards?",
+            "id": "can-i-set-the-dates-when-i-create-the-ticket-instead-of-afte",
+            "title": "Can I set the dates when I create the ticket, instead of afterwards?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -12880,15 +12880,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " boxes — real date pickers, empty by default, not the typing box above. Leave either blank to create the job with no claim on that date."
+                    "text": " boxes — real date pickers, empty by default, not the typing box above. Leave either blank to create the ticket with no claim on that date."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-choose-which-stage-a-new-job-starts-in",
-            "title": "Can I choose which stage a new job starts in?",
+            "id": "can-i-choose-which-state-a-new-ticket-starts-in",
+            "title": "Can I choose which state a new ticket starts in?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -12903,7 +12903,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " picker, defaulting to the workflow's first stage; it is disabled while "
+                    "text": " picker, defaulting to the workflow's first state; it is disabled while "
                   },
                   {
                     "kind": "bold",
@@ -12911,22 +12911,22 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is on, since a backlog job has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered."
+                    "text": " is on, since a backlog ticket has no starting state yet. A state your admin marked as not allowing new tickets is never offered."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-rename-a-job",
-            "title": "Can I rename a job?",
+            "id": "can-i-rename-a-ticket",
+            "title": "Can I rename a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. Open the job and type into the title at the top of the sheet. "
+                    "text": "Yes. Open the ticket and type into the title at the top of the sheet. "
                   },
                   {
                     "kind": "bold",
@@ -12949,15 +12949,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "can-i-delete-a-job-i-created-by-mistake",
-            "title": "Can I delete a job I created by mistake?",
+            "id": "can-i-delete-a-ticket-i-created-by-mistake",
+            "title": "Can I delete a ticket I created by mistake?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, if you are a project admin. Open the job and press "
+                    "text": "Yes, if you are a project admin. Open the ticket and press "
                   },
                   {
                     "kind": "bold",
@@ -12965,7 +12965,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in the sheet's footer, then confirm. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. An "
+                    "text": " in the sheet's footer, then confirm. The ticket stops appearing in every view — boards, lists, search, My work — and its history is kept, because other events cite it. An "
                   },
                   {
                     "kind": "bold",
@@ -12973,7 +12973,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " follows for about fifteen seconds, and after that the job is still under "
+                    "text": " follows for about fifteen seconds, and after that the ticket is still under "
                   },
                   {
                     "kind": "bold",
@@ -13005,30 +13005,30 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in Deleted items takes that back until then. If you would rather not lose it at all, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                    "text": " in Deleted items takes that back until then. If you would rather not lose it at all, a \"won't do\" or \"cancelled\" state in your workflow remains the alternative."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-move-a-job-to-a-different-project",
-            "title": "Can I move a job to a different project?",
+            "id": "can-i-move-a-ticket-to-a-different-project",
+            "title": "Can I move a ticket to a different project?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. Parents have to be in the same project, and no way to move a job across projects was found."
+                    "text": "No. Parents have to be in the same project, and no way to move a ticket across projects was found."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-move-a-job-to-a-different-parent-after-creating-it",
-            "title": "Can I move a job to a different parent after creating it?",
+            "id": "can-i-move-a-ticket-to-a-different-parent-after-creating-it",
+            "title": "Can I move a ticket to a different parent after creating it?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13042,15 +13042,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "why-won-t-it-let-me-put-one-job-under-another",
-            "title": "Why won't it let me put one job under another?",
+            "id": "why-won-t-it-let-me-put-one-ticket-under-another",
+            "title": "Why won't it let me put one ticket under another?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A job's type has to be a "
+                    "text": "A ticket's type has to be a "
                   },
                   {
                     "kind": "italic",
@@ -13081,7 +13081,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Any type at the very bottom rank must have a parent — that is what the bottom rank means. Use a type that is not at the bottom for standalone jobs. The message tells you this using your own type's name."
+                    "text": "Any type at the very bottom rank must have a parent — that is what the bottom rank means. Use a type that is not at the bottom for standalone tickets. The message tells you this using your own type's name."
                   }
                 ]
               }
@@ -13119,7 +13119,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — not from everybody. The product gives you the true total and tells you part of it is not yours to see, rather than quietly showing \"5 of 6\" and making the job look nearly finished. If nothing is hidden, it does not print the restricted part at all."
+                    "text": " — not from everybody. The product gives you the true total and tells you part of it is not yours to see, rather than quietly showing \"5 of 6\" and making the ticket look nearly finished. If nothing is hidden, it does not print the restricted part at all."
                   }
                 ]
               }
@@ -13134,22 +13134,22 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No — only direct children. Grandchildren count toward whichever job is directly above them."
+                    "text": "No — only direct children. Grandchildren count toward whichever ticket is directly above them."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "a-job-has-no-progress-number-at-all",
-            "title": "A job has no progress number at all.",
+            "id": "a-ticket-has-no-progress-number-at-all",
+            "title": "A ticket has no progress number at all.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It has no children. It shows nothing rather than \"0 of 0\". Likewise, if moving a job away leaves its old parent with no children, that parent's progress number disappears rather than showing a fake zero."
+                    "text": "It has no children. It shows nothing rather than \"0 of 0\". Likewise, if moving a ticket away leaves its old parent with no children, that parent's progress number disappears rather than showing a fake zero."
                   }
                 ]
               }
@@ -13179,7 +13179,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The job does belong to a bigger job, and you are not allowed to see what that bigger job is — not even its title. The product deliberately tells you a parent exists rather than letting the job look like it has none. If a job genuinely has no parent it says "
+                    "text": "The ticket does belong to a bigger ticket, and you are not allowed to see what that bigger ticket is — not even its title. The product deliberately tells you a parent exists rather than letting the ticket look like it has none. If a ticket genuinely has no parent it says "
                   },
                   {
                     "kind": "bold",
@@ -13194,15 +13194,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "can-i-finish-a-big-job-while-bits-of-it-are-still-open",
-            "title": "Can I finish a big job while bits of it are still open?",
+            "id": "can-i-finish-a-big-ticket-while-bits-of-it-are-still-open",
+            "title": "Can I finish a big ticket while bits of it are still open?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. A parent cannot be marked finished while any direct child is still going — whether that child is not started or in progress, both count as unfinished. This is the one rule above every workflow and it cannot be turned off. It cascades: a middle job needs its own children settled before it can close, which is what then frees the job above it."
+                    "text": "No. A parent cannot be marked finished while any direct child is still going — whether that child is not started or in progress, both count as unfinished. This is the one rule above every workflow and it cannot be turned off. It cascades: a middle ticket needs its own children settled before it can close, which is what then frees the ticket above it."
                   }
                 ]
               }
@@ -13225,7 +13225,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". You get a box headed \"Reopen parent?\" naming the job and its state, and a picker of the unfinished stages you could reopen it into. Press \"Reopen and proceed\" and it reopens the parent first, then files your new job. Cancel submits nothing."
+                    "text": ". You get a box headed \"Reopen parent?\" naming the ticket and its state, and a picker of the unfinished states you could reopen it into. Press \"Reopen and proceed\" and it reopens the parent first, then files your new ticket. Cancel submits nothing."
                   }
                 ]
               },
@@ -13234,7 +13234,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If half of it works, it tells you both halves: that the parent really was reopened and that is permanent history, and separately why your job was refused. Nothing is quietly undone."
+                    "text": "If half of it works, it tells you both halves: that the parent really was reopened and that is permanent history, and separately why your ticket was refused. Nothing is quietly undone."
                   }
                 ]
               }
@@ -13294,23 +13294,23 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "can-i-see-the-whole-history-of-a-job",
-            "title": "Can I see the whole history of a job?",
+            "id": "can-i-see-the-whole-history-of-a-ticket",
+            "title": "Can I see the whole history of a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Up to 200 entries. It says so at the top and there is no way to page further back, so on a long-running job the earliest history is currently unreachable."
+                    "text": "Up to 200 entries. It says so at the top and there is no way to page further back, so on a long-running ticket the earliest history is currently unreachable."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "two-of-my-staff-opened-the-same-job-at-once-what-happens",
-            "title": "Two of my staff opened the same job at once. What happens?",
+            "id": "two-of-my-staff-opened-the-same-ticket-at-once-what-happens",
+            "title": "Two of my staff opened the same ticket at once. What happens?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13335,8 +13335,8 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
-        "id": "stages-and-moves",
-        "title": "Stages and moves",
+        "id": "states-and-moves",
+        "title": "States and moves",
         "intro": [],
         "entries": [
           {
@@ -13364,7 +13364,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " arrow on the card, or open the job, press "
+                    "text": " arrow on the card, or open the ticket, press "
                   },
                   {
                     "kind": "bold",
@@ -13372,22 +13372,22 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", pick the stage, press Move."
+                    "text": ", pick the state, press Move."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "why-does-the-picker-only-show-some-of-the-stages",
-            "title": "Why does the picker only show some of the stages?",
+            "id": "why-does-the-picker-only-show-some-of-the-states",
+            "title": "Why does the picker only show some of the states?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Because your workflow decides which moves are allowed. A job can only go where an arrow leads from where it is. It will not show you a move that would be refused anyway."
+                    "text": "Because your workflow decides which moves are allowed. A ticket can only go where an arrow leads from where it is. It will not show you a move that would be refused anyway."
                   }
                 ]
               }
@@ -13484,7 +13484,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Somebody put a \"restrict who may move it\" rule on that step, limited to a role, to whoever the job is assigned to, or to named people. The refusal names who "
+                    "text": "Somebody put a \"restrict who may move it\" rule on that step, limited to a role, to whoever the ticket is assigned to, or to named people. The refusal names who "
                   },
                   {
                     "kind": "italic",
@@ -13507,7 +13507,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The \"four eyes\" rule: whoever made the earlier move cannot make the approving one. Somebody else has to. It is cleverer than it looks — if you later reorganise and rename your stages, it still works out correctly who did what under the old arrangement. And if it genuinely cannot read the history, it refuses the move rather than waving it through, telling you to ask an admin about the stage history."
+                    "text": "The \"four eyes\" rule: whoever made the earlier move cannot make the approving one. Somebody else has to. It is cleverer than it looks — if you later reorganise and rename your states, it still works out correctly who did what under the old arrangement. And if it genuinely cannot read the history, it refuses the move rather than waving it through, telling you to ask an admin about the state history."
                   }
                 ]
               }
@@ -13522,7 +13522,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "One starts \"instant check — \" and one starts \"Refused by the server — \". The first is your own computer having a quick guess from what it has locally; the second is the actual answer. When they disagree, "
+                    "text": "One starts \"instant check: \" and one starts \"Refused by the server: \". The first is your own computer having a quick guess from what it has locally; the second is the actual answer. When they disagree, "
                   },
                   {
                     "kind": "bold",
@@ -13558,49 +13558,49 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "stage"
+                    "text": "state"
                   },
                   {
                     "kind": "text",
-                    "text": ", not of any one job. Whoever built your workflow marked that column as a waiting state — \"Waiting on parts\", \"Waiting on customer\". Every job in it is in that state by definition. "
+                    "text": ", not of any one ticket. Whoever built your workflow marked that column as a waiting state — \"Waiting on parts\", \"Waiting on customer\". Every ticket in it is in that state by definition. "
                   },
                   {
                     "kind": "bold",
-                    "text": "There is no switch you flip on an individual job to say it is stuck"
+                    "text": "There is no switch you flip on an individual ticket to say it is stuck"
                   },
                   {
                     "kind": "text",
-                    "text": "; you need a stage built for the purpose."
+                    "text": "; you need a state built for the purpose."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "there-s-a-move-that-seems-to-work-from-any-stage",
-            "title": "There's a move that seems to work from any stage.",
+            "id": "there-s-a-move-that-seems-to-work-from-any-state",
+            "title": "There's a move that seems to work from any state.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Some workflows have a move set up to work from anywhere, normally for \"reopen it, whatever state it is in\". If no direct move exists from where your job is, but a from-anywhere move to the same place does, the product uses it automatically. Its rules are still fully enforced — it is not a back door."
+                    "text": "Some workflows have a move set up to work from anywhere, normally for \"reopen it, whatever state it is in\". If no direct move exists from where your ticket is, but a from-anywhere move to the same place does, the product uses it automatically. Its rules are still fully enforced — it is not a back door."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "somebody-changed-the-stages-after-my-job-was-created-which-s",
-            "title": "Somebody changed the stages after my job was created. Which set applies?",
+            "id": "somebody-changed-the-states-after-my-ticket-was-created-whic",
+            "title": "Somebody changed the states after my ticket was created. Which set applies?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The set your job was pinned to when it was created, not the newest. If a stage it was sitting in gets removed later, whoever removed it had to say where those jobs go, and yours follows that. If nobody said, your job refuses to move rather than the product guessing, and it tells you it is stranded."
+                    "text": "The set your ticket was pinned to when it was created, not the newest. If a state it was sitting in gets removed later, whoever removed it had to say where those tickets go, and yours follows that. If nobody said, your ticket refuses to move rather than the product guessing, and it tells you it is stranded."
                   }
                 ]
               }
@@ -13638,7 +13638,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". It appears once a workspace is open, and it opens that workspace's own screens — ticket types, workflows, and the workspace itself — where the stage builder and the job-type editor live. Nothing to bookmark."
+                    "text": ". It appears once a workspace is open, and it opens that workspace's own screens — ticket types, workflows, and the workspace itself — where the workflow editor and the ticket-type editor live. Nothing to bookmark."
                   }
                 ]
               }
@@ -13653,15 +13653,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. An admin can rename all four built-in types, change their icons, and change which stage set they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
+                    "text": "Yes. An admin can rename all four built-in types, change their icons, and change which workflow they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-put-my-job-types-in-a-different-order",
-            "title": "Can I put my job types in a different order?",
+            "id": "can-i-put-my-ticket-types-in-a-different-order",
+            "title": "Can I put my ticket types in a different order?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13707,15 +13707,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "do-my-existing-jobs-break-when-i-publish-a-new-version-of-a-",
-            "title": "Do my existing jobs break when I publish a new version of a workflow?",
+            "id": "do-my-existing-tickets-break-when-i-publish-a-new-version-of",
+            "title": "Do my existing tickets break when I publish a new version of a workflow?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. Publishing again makes a new version and jobs created under the old one stay on it unless they are moved across. If your new version "
+                    "text": "No. Publishing again makes a new version and tickets created under the old one stay on it unless they are moved across. If your new version "
                   },
                   {
                     "kind": "bold",
@@ -13723,7 +13723,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " a stage that jobs are sitting in, publishing stops and makes you say where each of those jobs goes, showing how many are in each. If it cannot get a count it says \"unavailable\" and "
+                    "text": " a state that tickets are sitting in, publishing stops and makes you say where each of those tickets goes, showing how many are in each. If it cannot get a count it says \"unavailable\" and "
                   },
                   {
                     "kind": "italic",
@@ -13731,22 +13731,22 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " makes you decide. Leave one out and it names the stage you missed."
+                    "text": " makes you decide. Leave one out and it names the state you missed."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "i-deleted-a-stage-that-was-the-starting-stage-will-it-pick-a",
-            "title": "I deleted a stage that was the starting stage. Will it pick a new one for me?",
+            "id": "i-deleted-a-state-that-was-the-starting-state-will-it-pick-a",
+            "title": "I deleted a state that was the starting state. Will it pick a new one for me?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No, on purpose. Deleting a stage removes every move connected to it, and if it was the starting stage (or was named by a four-eyes rule) the builder leaves the reference dangling so the problem checker flags it and makes you fix it — rather than quietly guessing what you meant."
+                    "text": "No, on purpose. Deleting a state removes every move connected to it, and if it was the starting state (or was named by a four-eyes rule) the builder leaves the reference dangling so the problem checker flags it and makes you fix it — rather than quietly guessing what you meant."
                   }
                 ]
               }
@@ -13769,14 +13769,14 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-s-the-list-headed-worth-a-look-none-of-these-block-publ",
-            "title": "What's the list headed \"Worth a look — none of these block publishing\"?",
+            "title": "What's the list headed \"Worth a look (none of these block publishing)\"?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Advice, not errors. Typically: you have put a guard on one route into a stage, but another route in has no matching guard, so the guard can be walked around. It publishes anyway. The \"Errand with waits\" template deliberately trips this twice, because it is modelled on a real shop's real process, warts included — so do not panic when a template warns about itself."
+                    "text": "Advice, not errors. Typically: you have put a guard on one route into a state, but another route in has no matching guard, so the guard can be walked around. It publishes anyway. The \"Errand with waits\" template deliberately trips this twice, because it is modelled on a real shop's real process, warts included — so do not panic when a template warns about itself."
                   }
                 ]
               }
@@ -13798,15 +13798,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "why-do-i-have-to-pick-a-category-for-each-stage",
-            "title": "Why do I have to pick a \"Category\" for each stage?",
+            "id": "why-do-i-have-to-pick-a-category-for-each-state",
+            "title": "Why do I have to pick a \"Category\" for each state?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Because the rest of the product needs to know which of your stages mean \"finished\". That is how it knows a parent job can be closed, how progress counts work, and what the \"Only tickets in progress\" switch filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of setup where a mistake does damage somewhere else."
+                    "text": "Because the rest of the product needs to know which of your states mean \"finished\". That is how it knows a parent ticket can be closed, how progress counts work, and what the \"Only tickets in progress\" switch filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of setup where a mistake does damage somewhere else."
                   }
                 ]
               }
@@ -13835,15 +13835,15 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "how-do-i-write-a-description-for-a-job",
-            "title": "How do I write a description for a job?",
+            "id": "how-do-i-write-a-description-for-a-ticket",
+            "title": "How do I write a description for a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Type it into the description on the job screen and save it. It is written the same way everything else about a job is, so the panel reads back who set it and when, and the job's history keeps a line for each time it changed."
+                    "text": "Type it into the description on the ticket screen and save it. It is written the same way everything else about a ticket is, so the panel reads back who set it and when, and the ticket's history keeps a line for each time it changed."
                   }
                 ]
               }
@@ -13858,7 +13858,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, on a job. The job screen ends with the job's comments and a box under them: what you post is recorded against the job as an event citing you, so the thread reads back who wrote each comment and when. You can mention somebody by typing "
+                    "text": "Yes, on a ticket. The ticket screen ends with the ticket's comments and a box under them: what you post is recorded against the ticket as an event citing you, so the thread reads back who wrote each comment and when. You can mention somebody by typing "
                   },
                   {
                     "kind": "code",
@@ -13866,7 +13866,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — the mention is recorded on the comment and tells them, if they can see the job."
+                    "text": " — the mention is recorded on the comment and tells them, if they can see the ticket."
                   }
                 ]
               },
@@ -13888,7 +13888,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "It used to be that the phone app had a Comment button on a job and the website did not."
+                    "text": "It used to be that the phone app had a Comment button on a ticket and the website did not."
                   },
                   {
                     "kind": "text",
@@ -13899,8 +13899,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "can-i-attach-a-photo-or-a-file-to-a-job",
-            "title": "Can I attach a photo or a file to a job?",
+            "id": "can-i-attach-a-photo-or-a-file-to-a-ticket",
+            "title": "Can I attach a photo or a file to a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13923,7 +13923,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with. The "
+                    "text": " — it is stored against the ticket instead and appears in the ticket's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with. The "
                   },
                   {
                     "kind": "bold",
@@ -14296,15 +14296,15 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "what-is-a-note-and-how-is-it-different-from-a-job",
-            "title": "What is a note, and how is it different from a job?",
+            "id": "what-is-a-note-and-how-is-it-different-from-a-ticket",
+            "title": "What is a note, and how is it different from a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything that is not one piece of work — a log, a parts list, something you want to keep after the job it came from closes. Find it at "
+                    "text": "A note is a page of writing that belongs to a workspace or a project, not to a ticket. Use it for anything that is not one piece of work — a log, a parts list, something you want to keep after the ticket it came from closes. Find it at "
                   },
                   {
                     "kind": "bold",
@@ -14475,7 +14475,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " means whoever can see any job it is attached to, and "
+                    "text": " means whoever can see any ticket it is attached to, and "
                   },
                   {
                     "kind": "bold",
@@ -14513,7 +14513,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No, not by virtue of being an admin. An admin reads a note under the same rule as anyone else: their own, anything workspace-wide, anything on a project they are actually a member of, anything naming them, or anything shared the way a job they can see is. Being an admin gives no extra reach into notes — only the owner gets that."
+                    "text": "No, not by virtue of being an admin. An admin reads a note under the same rule as anyone else: their own, anything workspace-wide, anything on a project they are actually a member of, anything naming them, or anything shared the way a ticket they can see is. Being an admin gives no extra reach into notes — only the owner gets that."
                   }
                 ]
               }
@@ -14550,15 +14550,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "what-happens-to-a-note-when-i-delete-the-job-it-is-on",
-            "title": "What happens to a note when I delete the job it is on?",
+            "id": "what-happens-to-a-note-when-i-delete-the-ticket-it-is-on",
+            "title": "What happens to a note when I delete the ticket it is on?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The note stays attached — deleting a job does not detach anything. But a deleted job no longer counts as active work, so if the note's Scope is "
+                    "text": "The note stays attached — deleting a ticket does not detach anything. But a deleted ticket no longer counts as active work, so if the note's Scope is "
                   },
                   {
                     "kind": "bold",
@@ -14566,7 +14566,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and this was its only attached job, nobody but you (its author) and the workspace owner can read it until it is detached or restored. Restoring the job restores that reach automatically, with nothing to redo."
+                    "text": " and this was its only attached ticket, nobody but you (its author) and the workspace owner can read it until it is detached or restored. Restoring the ticket restores that reach automatically, with nothing to redo."
                   }
                 ]
               }
@@ -14612,7 +14612,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Because the chip shows the title the note (or job) had when the link was written, even to someone who cannot open it. That is today's behaviour; whether it should instead hide the title is an open question the product owner is still deciding."
+                    "text": "Because the chip shows the title the note (or ticket) had when the link was written, even to someone who cannot open it. That is today's behaviour; whether it should instead hide the title is an open question the product owner is still deciding."
                   }
                 ]
               }
@@ -14704,8 +14704,8 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "can-a-new-job-start-in-a-column-other-than-the-first",
-            "title": "Can a new job start in a column other than the first?",
+            "id": "can-a-new-ticket-start-in-a-column-other-than-the-first",
+            "title": "Can a new ticket start in a column other than the first?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -14728,7 +14728,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button, and the window opens with that column's stage already chosen and the backlog switch off."
+                    "text": " button, and the window opens with that column's state already chosen and the backlog switch off."
                   }
                 ]
               }
@@ -14743,7 +14743,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Your admin turned off \"Tickets can start here\" for that stage (the manual's stage-setup section) — a job cannot be born there, so the column offers no way to try. It can still receive jobs moved into it from elsewhere; only starting a brand new one there is blocked."
+                    "text": "Your admin turned off \"Tickets can start here\" for that state (the manual's state-setup section) — a ticket cannot be born there, so the column offers no way to try. It can still receive tickets moved into it from elsewhere; only starting a brand new one there is blocked."
                   }
                 ]
               }
@@ -14782,7 +14782,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " beside the job's key names its immediate parent, if that parent is not already the epic chip's own job."
+                    "text": " beside the ticket's key names its immediate parent, if that parent is not already the epic chip's own ticket."
                   }
                 ]
               }
@@ -14884,7 +14884,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " (only their jobs), twice for "
+                    "text": " (only their tickets), twice for "
                   },
                   {
                     "kind": "italic",
@@ -14908,7 +14908,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " shows no chip on the Board, which never shows closed jobs in the first place."
+                    "text": " shows no chip on the Board, which never shows closed tickets in the first place."
                   }
                 ]
               }
@@ -14954,7 +14954,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-s-the-default-arrangement-you-have-not-arranged-this-pr",
-            "title": "What's the \"default arrangement — you have not arranged this project\" note?",
+            "title": "What's the \"default arrangement. You have not arranged this project\" note?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -14968,8 +14968,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "why-does-the-same-job-appear-twice-in-the-list",
-            "title": "Why does the same job appear twice in the list?",
+            "id": "why-does-the-same-ticket-appear-twice-in-the-list",
+            "title": "Why does the same ticket appear twice in the list?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -15010,7 +15010,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "2,000 jobs"
+                    "text": "2,000 tickets"
                   },
                   {
                     "kind": "text",
@@ -15046,7 +15046,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The sentence names what can hide a claim: your filter, closed jobs being hidden, a date field you switched off with the legend switch, or an epic, which is drawn in the List and not here. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
+                    "text": "The sentence names what can hide a claim: your filter, closed tickets being hidden, a date field you switched off with the legend switch, or an epic, which is drawn in the List and not here. It also says \"Undated work is absent, not estimated\" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different sentence says so, and it claims "
                   },
                   {
                     "kind": "bold",
@@ -15054,15 +15054,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " of the month's claims — so treat that one carefully: the calendar only knows about the claims it was given, and closed or filtered-away jobs are not among them. The count in the strip tells you what the filters left behind; it cannot see the legend switches, which live only in this view."
+                    "text": " of the month's claims — so treat that one carefully: the calendar only knows about the claims it was given, and closed or filtered-away tickets are not among them. The count in the strip tells you what the filters left behind; it cannot see the legend switches, which live only in this view."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "a-job-s-start-date-is-after-its-due-date-and-the-calendar-lo",
-            "title": "A job's start date is after its due date and the calendar looks odd.",
+            "id": "a-ticket-s-start-date-is-after-its-due-date-and-the-calendar",
+            "title": "A ticket's start date is after its due date and the calendar looks odd.",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -15084,7 +15084,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four weeks at a time. Both draw a bar only when a job has "
+                    "text": "The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four weeks at a time. Both draw a bar only when a ticket has "
                   },
                   {
                     "kind": "bold",
@@ -15100,7 +15100,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " with a count, saying what is missing for each job. Its "
+                    "text": " with a count, saying what is missing for each ticket. Its "
                   },
                   {
                     "kind": "bold",
@@ -15108,15 +15108,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button opens the job so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day."
+                    "text": " button opens the ticket so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "does-the-calendar-show-closed-jobs",
-            "title": "Does the Calendar show closed jobs?",
+            "id": "does-the-calendar-show-closed-tickets",
+            "title": "Does the Calendar show closed tickets?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -15187,7 +15187,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " only clears your own setting, so the closed jobs stay hidden. There is also one case where the calendar's own empty-month note gets this wrong — see the manual's Calendar section."
+                    "text": " only clears your own setting, so the closed tickets stay hidden. There is also one case where the calendar's own empty-month note gets this wrong — see the manual's Calendar section."
                   }
                 ]
               }
@@ -15431,7 +15431,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Each job appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and the strip shows the first five. If there are more, "
+                    "text": "Each ticket appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and the strip shows the first five. If there are more, "
                   },
                   {
                     "kind": "bold",
@@ -15469,15 +15469,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "i-clicked-an-inbox-message-and-the-job-wouldn-t-open",
-            "title": "I clicked an Inbox message and the job wouldn't open.",
+            "id": "i-clicked-an-inbox-message-and-the-ticket-wouldn-t-open",
+            "title": "I clicked an Inbox message and the ticket wouldn't open.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "italic",
-                    "text": "\"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
+                    "text": "\"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays.\""
                   },
                   {
                     "kind": "text",
@@ -15510,15 +15510,15 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
-            "id": "can-i-keep-a-job-private-from-most-of-the-team",
-            "title": "Can I keep a job private from most of the team?",
+            "id": "can-i-keep-a-ticket-private-from-most-of-the-team",
+            "title": "Can I keep a ticket private from most of the team?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. Every job has a \"Who can see this\" setting with four options: everyone in the workspace, everyone on the project, only the people you name, or inherited from the parent."
+                    "text": "Yes. Every ticket has a \"Who can see this\" setting with four options: everyone in the workspace, everyone on the project, only the people you name, or inherited from the parent."
                   }
                 ]
               }
@@ -15545,7 +15545,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Visible to: these people — and the workspace owner, always.\""
+                    "text": "\"Visible to: these people, and the workspace owner, always.\""
                   },
                   {
                     "kind": "text",
@@ -15556,15 +15556,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "if-i-set-a-big-job-to-only-the-people-i-name-do-the-smaller-",
-            "title": "If I set a big job to \"only the people I name\", do the smaller jobs under it follow?",
+            "id": "if-i-set-a-big-ticket-to-only-the-people-i-name-do-the-small",
+            "title": "If I set a big ticket to \"only the people I name\", do the smaller tickets under it follow?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, as long as they are set to inherit. Anything that has set its own audience keeps it, and everything under that keeps it too. Move a job to a new parent and it takes the new parent's audience, along with everything under it. Move it to the top and it falls back to the project default. Set it back to inheriting and it and everything below re-attach."
+                    "text": "Yes, as long as they are set to inherit. Anything that has set its own audience keeps it, and everything under that keeps it too. Move a ticket to a new parent and it takes the new parent's audience, along with everything under it. Move it to the top and it falls back to the project default. Set it back to inheriting and it and everything below re-attach."
                   }
                 ]
               }
@@ -15583,7 +15583,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.\""
+                    "text": "\"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it.\""
                   },
                   {
                     "kind": "text",
@@ -15602,8 +15602,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "who-is-allowed-to-change-who-sees-a-job",
-            "title": "Who is allowed to change who sees a job?",
+            "id": "who-is-allowed-to-change-who-sees-a-ticket",
+            "title": "Who is allowed to change who sees a ticket?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -15614,19 +15614,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "of that job's project"
+                    "text": "of that ticket's project"
                   },
                   {
                     "kind": "text",
-                    "text": ", or whoever created the job. Being an admin of a different project does not help. If you are not one of those, the product will let you fill the form in and the server will refuse it, saying why."
+                    "text": ", or whoever created the ticket. Being an admin of a different project does not help. If you are not one of those, the product will let you fill the form in and the server will refuse it, saying why."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "can-i-see-who-a-job-is-currently-shared-with",
-            "title": "Can I see who a job is currently shared with?",
+            "id": "can-i-see-who-a-ticket-is-currently-shared-with",
+            "title": "Can I see who a ticket is currently shared with?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -15661,15 +15661,15 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "if-i-share-a-job-with-somebody-can-they-see-who-else-it-s-sh",
-            "title": "If I share a job with somebody, can they see who else it's shared with?",
+            "id": "if-i-share-a-ticket-with-somebody-can-they-see-who-else-it-s",
+            "title": "If I share a ticket with somebody, can they see who else it's shared with?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. The job's page does not disclose the list, or which parent it inherited its audience from."
+                    "text": "No. The ticket's page does not disclose the list, or which parent it inherited its audience from."
                   }
                 ]
               }
@@ -15684,7 +15684,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nothing. It simply is not there. There is no \"you don't have permission\" screen for hidden work — hidden means invisible. If they go looking for it directly they get exactly the same \"not found\" as a made-up reference, deliberately identical, so that nobody can work out what exists by watching which refusals they get. The same is true of a job's history and of trying to change one."
+                    "text": "Nothing. It simply is not there. There is no \"you don't have permission\" screen for hidden work — hidden means invisible. If they go looking for it directly they get exactly the same \"not found\" as a made-up reference, deliberately identical, so that nobody can work out what exists by watching which refusals they get. The same is true of a ticket's history and of trying to change one."
                   }
                 ]
               }
@@ -15699,7 +15699,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs."
+                    "text": "Only the tickets somebody explicitly shared with them, and any ticket assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create tickets."
                   }
                 ]
               }
@@ -15714,7 +15714,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. History always shows who did what and when, untouched, to anybody entitled to see the job — even when that person shares no project with you. "
+                    "text": "No. History always shows who did what and when, untouched, to anybody entitled to see the ticket — even when that person shares no project with you. "
                   },
                   {
                     "kind": "bold",
@@ -15800,7 +15800,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words, in a job's comment box or in a note, and a picker opens over this same engine's results. There is still no general search screen of its own — nowhere you type a query and read this engine's results directly, the way the two narrowing boxes let you read theirs."
+                    "text": " followed by a few words, in a ticket's comment box or in a note, and a picker opens over this same engine's results. There is still no general search screen of its own — nowhere you type a query and read this engine's results directly, the way the two narrowing boxes let you read theirs."
                   }
                 ]
               }
@@ -15839,7 +15839,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " picker reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes. The "
+                    "text": " picker reaches the deep search described just above, narrowed to tickets and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes. The "
                   },
                   {
                     "kind": "bold",
@@ -15966,7 +15966,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — a board and a job. That is the whole app. And "
+                    "text": " — a board and a ticket. That is the whole app. And "
                   },
                   {
                     "kind": "bold",
@@ -15989,7 +15989,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "On the phone or desktop app, yes — for reading. You can open the job list, open a job, see the board, read a job's full history, see the job types and stages, and see your assigned work, all from the copy on the device."
+                    "text": "On the phone or desktop app, yes — for reading. You can open the ticket list, open a ticket, see the board, read a ticket's full history, see the ticket types and states, and see your assigned work, all from the copy on the device."
                   }
                 ]
               },
@@ -15998,7 +15998,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "For changing things, you get whatever the two screens offer, which is not much: create a job, move one between stages, reopen one, post a comment, deal with a disputed claim. The queue underneath will carry more kinds of change than that — but "
+                    "text": "For changing things, you get whatever the two screens offer, which is not much: create a ticket, move one between states, reopen one, post a comment, deal with a disputed claim. The queue underneath will carry more kinds of change than that — but "
                   },
                   {
                     "kind": "bold",
@@ -16035,7 +16035,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It has no offline queue at all — which is why its \"claims waiting to send\" section is always empty on the web. Offline is the apps' job."
+                    "text": " It has no offline queue at all — which is why its \"claims waiting to send\" section is always empty on the web. Offline is the apps' responsibility."
                   }
                 ]
               },
@@ -16048,22 +16048,22 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My Work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each names what is missing rather than showing an empty screen."
+                    "text": " rather than making something up: your list of workspaces, the people list, the ordinary search, the standard My work view, the \"Needs your attention\" strip, and both reading and saving your preferences. Each names what is missing rather than showing an empty screen."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "i-made-a-job-offline-and-it-vanished-from-the-board",
-            "title": "I made a job offline and it vanished from the board.",
+            "id": "i-made-a-ticket-offline-and-it-vanished-from-the-board",
+            "title": "I made a ticket offline and it vanished from the board.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Expected, and narrow: a job created "
+                    "text": "Expected, and narrow: a ticket created "
                   },
                   {
                     "kind": "italic",
@@ -16071,7 +16071,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " offline — one the server has never seen — will not appear on the board or the job list until the server confirms it. Search for it by name in the offline search and it will turn up."
+                    "text": " offline — one the server has never seen — will not appear on the board or the ticket list until the server confirms it. Search for it by name in the offline search and it will turn up."
                   }
                 ]
               }
@@ -16086,7 +16086,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Something you changed that the server has not confirmed yet. It is on its way, not yet locked in. You get a small badge on that job, both on the board and in job lists, so you always know when you are looking at something unconfirmed versus something saved for good. The job screen shows your unconfirmed change alongside the last confirmed version."
+                    "text": "Something you changed that the server has not confirmed yet. It is on its way, not yet locked in. You get a small badge on that ticket, both on the board and in ticket lists, so you always know when you are looking at something unconfirmed versus something saved for good. The ticket screen shows your unconfirmed change alongside the last confirmed version."
                   }
                 ]
               }
@@ -16101,7 +16101,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nothing you have to do. Your changes go up in the order you made them, so a job is never edited on the server before it has been created there. The status label moves through \"Offline — n claims waiting to send\", then \"Catching up…\", then \"Live\"."
+                    "text": "Nothing you have to do. Your changes go up in the order you made them, so a ticket is never edited on the server before it has been created there. The status label moves through \"Offline: n claims waiting to send\", then \"Catching up…\", then \"Live\"."
                   }
                 ]
               }
@@ -16131,8 +16131,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "two-of-us-edited-the-same-job-while-i-was-offline-who-wins",
-            "title": "Two of us edited the same job while I was offline. Who wins?",
+            "id": "two-of-us-edited-the-same-ticket-while-i-was-offline-who-win",
+            "title": "Two of us edited the same ticket while I was offline. Who wins?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -16152,7 +16152,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " The later one wins. The earlier one survives in the job's history. "
+                    "text": " The later one wins. The earlier one survives in the ticket's history. "
                   },
                   {
                     "kind": "bold",
@@ -16182,7 +16182,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — the job got reassigned, the stages changed, or it got un-shared from you. Then it is refused, recorded as a "
+                    "text": " — the ticket got reassigned, the states changed, or it got un-shared from you. Then it is refused, recorded as a "
                   },
                   {
                     "kind": "bold",
@@ -16247,7 +16247,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — turn what you tried to do into a permanent comment on the job, carrying your words, your name, the rule and the time. "
+                      "text": " — turn what you tried to do into a permanent comment on the ticket, carrying your words, your name, the rule and the time. "
                     },
                     {
                       "kind": "bold",
@@ -16358,7 +16358,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "cut off at 200 jobs"
+                      "text": "cut off at 200 tickets"
                     },
                     {
                       "kind": "text",
@@ -16374,7 +16374,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "There is one rare, still-open case: if the stages in a workflow change while your device is holding old information, reconnecting can sometimes cause an error that does not recover on its own."
+                      "text": "There is one rare, still-open case: if the states in a workflow change while your device is holding old information, reconnecting can sometimes cause an error that does not recover on its own."
                     }
                   ]
                 ]
@@ -16494,7 +16494,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "A job you file at 11pm your time may already be labelled tomorrow."
+                      "text": "A ticket you file at 11pm your time may already be labelled tomorrow."
                     }
                   ],
                   [
@@ -16510,7 +16510,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The reasoning is that everyone reading the same record sees the same day for the same moment, which is defensible. If you are running a business in Manchester, \"due today\" is still going to mean something odd. The only place in the product that acknowledges this is a footnote at the bottom of a job's history."
+                    "text": "The reasoning is that everyone reading the same record sees the same day for the same moment, which is defensible. If you are running a business in Manchester, \"due today\" is still going to mean something odd. The only place in the product that acknowledges this is a footnote at the bottom of a ticket's history."
                   }
                 ]
               }
@@ -16596,7 +16596,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is also a known limit: the weekly export loads the entire history into memory before writing anything, on a small machine. As the history grows, that is the job that breaks first."
+                    "text": "There is also a known limit: the weekly export loads the entire history into memory before writing anything, on a small machine. As the history grows, that is the ticket that breaks first."
                   }
                 ]
               }
@@ -16739,7 +16739,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, and properly. Twenty-three real errands from a real shop's own operations tracker are loaded in, plus the product's own build plans as projects and jobs."
+                    "text": "Yes, and properly. Twenty-three real errands from a real shop's own operations tracker are loaded in, plus the product's own build plans as projects and tickets."
                   }
                 ]
               },
@@ -16795,7 +16795,7 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "Whether a job can be moved to a different project."
+                  "text": "Whether a ticket can be moved to a different project."
                 },
                 {
                   "kind": "text",

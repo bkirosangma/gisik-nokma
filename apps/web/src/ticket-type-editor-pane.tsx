@@ -172,7 +172,8 @@ export function NewTicketTypePane({
           </div>
           <ReadOnlyBanner />
           <p>
-            <a href={listHref}>Back to the ticket types</a> — you can read every one of them.
+            <a href={listHref}>Back to the ticket types</a>
+            {'. '}You can read every one of them.
           </p>
         </>
       ) : (

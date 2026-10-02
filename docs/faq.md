@@ -6,7 +6,7 @@ other half: the "can I do X?" questions, the odd screens, and the things that lo
 Answers here say "I don't know" where nobody knows. That is on purpose.
 
 **Jump to:** [Signing in](#signing-in) · [Workspaces and projects](#workspaces-and-projects) ·
-[People and roles](#people-and-roles) · [Jobs](#jobs) · [Stages and moves](#stages-and-moves) ·
+[People and roles](#people-and-roles) · [Tickets](#tickets) · [States and moves](#states-and-moves) ·
 [Writing, comments and files](#writing-comments-and-files) · [Notes](#notes) ·
 [Boards, lists and dates](#boards-lists-and-dates) ·
 [Being told things](#being-told-things) · [Privacy](#privacy) ·
@@ -68,25 +68,25 @@ true of any link, not just invitations.
 
 **What's the difference between a workspace and a project?**
 A workspace is your whole business — everybody in it and all the work underneath. A project is a
-bucket of work inside it: "Residential jobs", "Shop operations". Jobs live inside projects.
+bucket of work inside it: "Residential repairs", "Shop operations". Tickets live inside projects.
 
 **Can I create a project?**
 **Only if you are an owner or an admin.** Those two roles get a **Create project** button on the
 workspace page; everybody else gets a sentence saying so instead of a button that fails: *"Only an owner
 or admin can create a project."* For anyone, there is no button on the Workspaces page, in
-settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
-nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
+settings, or in the top bar. A brand-new workspace has states, ticket types and you as its owner, and
+nowhere to put a ticket until an owner or admin adds one. For a member this is still the biggest hole in
 the product, and it sits right at the start of the journey.
 
 **Then how does anybody have projects?**
 An owner or admin creates one, with the **Create project** button on the workspace page. Any that were
 already there when you arrived were put there when the system was set up.
 
-**Where do I create a workspace, a project or a job?**
+**Where do I create a workspace, a project or a ticket?**
 Each has a button that says **Create**; the ones in the page headers are bright, with a plus sign. **Create workspace**
 is at the top of the Workspaces page. **Create project** is on a workspace's page, in the Projects
 heading row — owners and admins only. **Create ticket** is in a project, near the top by the view tabs,
-on a project's empty Board and inside an empty stage on the Board. **Create project** also takes an optional
+on a project's empty Board and inside an empty column on the Board. **Create project** also takes an optional
 group, and one press never makes more than one project. Each opens a window; nothing is made until you press the button
 inside it.
 
@@ -96,19 +96,19 @@ Yes, if you are an owner or an admin. For a project, press **Edit** on its card 
 are asked first, in a window called **Change prefix**, and the cursor starts on the safe answer, **Keep**.
 A prefix is one to three letters.
 
-**What happens to the old job numbers when a prefix changes?**
-Every job's number is rewritten at once: **CCSO-12** becomes **CCSH-12** when the project goes from **SO**
-to **SH**, with the same count. The old number still finds the job — in the picker that links a job into
+**What happens to the old ticket numbers when a prefix changes?**
+Every ticket's number is rewritten at once: **CCSO-12** becomes **CCSH-12** when the project goes from **SO**
+to **SH**, with the same count. The old number still finds the ticket — in the picker that links a ticket into
 a note, and in your assistant's search — and puts it first. A note that mentioned **CCSO-12** keeps saying
-**CCSO-12**, and the mention still opens the job.
+**CCSO-12**, and the mention still opens the ticket.
 
 **Why can't I use a prefix a project used to have?**
 Because the old numbers still point at that project. Once a project has moved off **SO**, no other project
-in the workspace can take it, so one number never names two jobs. The project that gave it up can take it
+in the workspace can take it, so one number never names two tickets. The project that gave it up can take it
 back. A prefix another project uses right now is refused too. The form shows the reason and stays open.
 
 **Can my assistant change a prefix?**
-No. It can read and search by job numbers, but changing a prefix is done in the app by an owner or admin.
+No. It can read and search by ticket numbers, but changing a prefix is done in the app by an owner or admin.
 
 **How do I put my projects into groups?**
 An owner or admin presses **Edit** on a project and uses **Group (optional)**: four boxes, **Level 1
@@ -146,10 +146,10 @@ Correct — "A workspace needs a name." Note that it does *not* trim spaces off 
 
 **Where's the rest of the menu? I only see a few links.**
 The bar is short on purpose, and what it carries depends on where you are. Signed out it offers
-**Workspaces**, **Help** and **Account**; once a workspace is open, **My Work**, **Members** and
+**Workspaces**, **Help** and **Account**; once a workspace is open, **My work**, **Members** and
 **Settings** join them, with the workspace's name and your inbox and avatar at the right-hand end. The
-settings screens for stages and job types are behind **Settings**. See
-[Stages and moves](#stages-and-moves).
+settings screens for states and ticket types are behind **Settings**. See
+[States and moves](#states-and-moves).
 
 On a phone, a tablet or any window up to about 1024 pixels wide the links are in a **bar along the
 bottom** instead, with **More** at its right-hand end holding the rest, plus **Settings**, **Account** and
@@ -162,7 +162,7 @@ bottom** instead, with **More** at its right-hand end holding the rest, plus **S
 **Does the invitation get sent for me?**
 **By email, yes.** Pick **email** and the product sends it, and the screen tells you whether it went. **Phone (SMS)** is not sent for you: copy the link and send it yourself.
 
-**"Copy it now — it is not stored and cannot be shown again." Does it mean that?**
+**"Copy it now: it is not stored and cannot be shown again." Does it mean that?**
 Absolutely. That link appears once, on that screen, at that moment. It is not in the pending list. It
 is nowhere else. Close the tab and you have to withdraw the invitation and start over. **Paste it into
 your email before you do anything else.**
@@ -171,10 +171,10 @@ your email before you do anything else.**
 Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace.
 
 **Is an admin the same as "sees everything"?**
-**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those.
+**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a ticket shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those.
 
-**Can I assign a job to somebody who is not in the workspace?**
-Yes. In the **Assignee** picker choose **Assign someone outside this workspace…**, type their exact email and press **Find**. If an account has that email you can press **Assign**, and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email.
+**Can I assign a ticket to somebody who is not in the workspace?**
+Yes. In the **Assignee** picker choose **Assign someone outside this workspace…**, type their exact email and press **Find**. If an account has that email you can press **Assign**, and they join as a guest who sees only that ticket; nothing is listed or suggested, so you have to know the email.
 
 **Can I make somebody else an owner, or a co-owner?**
 No. "Owner" is never offered in the invitation dropdown, it is refused if forced, and no way was found
@@ -225,7 +225,7 @@ shows as withdrawn and the person is inside. There is no protection against that
 withdrawing something urgently, check the People list afterwards.
 
 **Can a guest see who's in the workspace?**
-No. Guests cannot open the people list at all. If a guest is looking at a job somebody else is
+No. Guests cannot open the people list at all. If a guest is looking at a ticket somebody else is
 assigned to, that person shows as an identifier rather than a name — not blank, just not a name.
 Slightly ugly, and better than leaking your staff list to an outsider.
 
@@ -234,17 +234,17 @@ No. That is refused outright, even for the owner, and it is checked before anyth
 
 ---
 
-## Jobs
+## Tickets
 
-**Can I assign a job to somebody?**
-**Yes on the website, no on the apps.** The website's job panel has an "Assignee" picker — choose a
-person, or choose **Unassigned** to take the job off somebody. The phone and desktop apps have no
-Assignee row at all, so there you can neither see who a job is on nor set it. The board shows who a job
-is on, the Inbox tells you when you have been assigned something, My Work is built around it and the
+**Can I assign a ticket to somebody?**
+**Yes on the website, no on the apps.** The website's ticket panel has an "Assignee" picker — choose a
+person, or choose **Unassigned** to take the ticket off somebody. The phone and desktop apps have no
+Assignee row at all, so there you can neither see who a ticket is on nor set it. The board shows who a ticket
+is on, the Inbox tells you when you have been assigned something, My work is built around it and the
 list can group by it.
 
 **Can I set a due date?**
-**Yes — on the website's job panel.** Open a job and its **Due** row is a date box: pick a day and it
+**Yes — on the website's ticket panel.** Open a ticket and its **Due** row is a date box: pick a day and it
 is claimed under your name, with the row reading back who set it and when. **Clear the box to take the
 claim off** — that is recorded as a clearing rather than as a blank date. The calendar, the timeline,
 the list's due column and the "due soon" notice all read the same claim, so the date you set here is
@@ -266,43 +266,43 @@ ever look at the built-in due date. So it will put a day on a calendar and it wi
 Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how
 you set the built-in due date.
 
-**Can I set the dates when I create the job, instead of afterwards?**
+**Can I set the dates when I create the ticket, instead of afterwards?**
 Yes. The Create ticket window has its own **Start date** and **Due date** boxes — real date pickers, empty
-by default, not the typing box above. Leave either blank to create the job with no claim on that date.
+by default, not the typing box above. Leave either blank to create the ticket with no claim on that date.
 
-**Can I choose which stage a new job starts in?**
+**Can I choose which state a new ticket starts in?**
 Yes, if your workflow allows it. The Create ticket window has a **Starting status** picker, defaulting to
-the workflow's first stage; it is disabled while **Starts in the backlog?** is on, since a backlog job
-has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered.
+the workflow's first state; it is disabled while **Starts in the backlog?** is on, since a backlog ticket
+has no starting state yet. A state your admin marked as not allowing new tickets is never offered.
 
-**Can I rename a job?**
-Yes. Open the job and type into the title at the top of the sheet. **Enter** or clicking away saves it;
+**Can I rename a ticket?**
+Yes. Open the ticket and type into the title at the top of the sheet. **Enter** or clicking away saves it;
 **Escape** abandons the change.
 
-**Can I delete a job I created by mistake?**
-Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer, then confirm.
-The job stops appearing in every view — boards, lists, search, My Work — and its history is kept,
-because other events cite it. An **Undo** follows for about fifteen seconds, and after that the job is
+**Can I delete a ticket I created by mistake?**
+Yes, if you are a project admin. Open the ticket and press **Delete** in the sheet's footer, then confirm.
+The ticket stops appearing in every view — boards, lists, search, My work — and its history is kept,
+because other events cite it. An **Undo** follows for about fifteen seconds, and after that the ticket is
 still under **Deleted items** on your Account page, where **Restore** brings it back. Turning on
 **Delete permanently** in the confirmation also marks it to be erased for good after the waiting period
 the confirmation states; **Unmark** in Deleted items takes that back until then. If you would rather
-not lose it at all, a "won't do" or "cancelled" stage in your workflow remains the alternative.
+not lose it at all, a "won't do" or "cancelled" state in your workflow remains the alternative.
 
-**Can I move a job to a different project?**
-No. Parents have to be in the same project, and no way to move a job across projects was found.
+**Can I move a ticket to a different project?**
+No. Parents have to be in the same project, and no way to move a ticket across projects was found.
 
-**Can I move a job to a different parent after creating it?**
+**Can I move a ticket to a different parent after creating it?**
 The rules for it exist and are enforced — loops refused, ranks checked, cross-project refused — but no
 control on any screen was found that does it. Treat it as "not today".
 
-**Why won't it let me put one job under another?**
-A job's type has to be a *smaller* kind of thing than its parent's. Ranks: **1 is the biggest**, bigger
+**Why won't it let me put one ticket under another?**
+A ticket's type has to be a *smaller* kind of thing than its parent's. Ranks: **1 is the biggest**, bigger
 numbers are smaller. A child's rank must be strictly bigger than its parent's. You cannot put an epic
 under a story, and you cannot nest two things of the same rank.
 
 **It's demanding a parent for something I want on its own.**
 Any type at the very bottom rank must have a parent — that is what the bottom rank means. Use a type
-that is not at the bottom for standalone jobs. The message tells you this using your own type's name.
+that is not at the bottom for standalone tickets. The message tells you this using your own type's name.
 
 **Can I accidentally make a loop — A under B under A?**
 No. Refused, including the clever cases where somebody has changed the ranks around to try to make it
@@ -311,14 +311,14 @@ legal.
 **What does "5 of 8 done · 2 restricted" mean?**
 Five of its eight direct children are finished, and two of the eight are hidden **from you** — not from
 everybody. The product gives you the true total and tells you part of it is not yours to see, rather
-than quietly showing "5 of 6" and making the job look nearly finished. If nothing is hidden, it does
+than quietly showing "5 of 6" and making the ticket look nearly finished. If nothing is hidden, it does
 not print the restricted part at all.
 
 **Does that count grandchildren?**
-No — only direct children. Grandchildren count toward whichever job is directly above them.
+No — only direct children. Grandchildren count toward whichever ticket is directly above them.
 
-**A job has no progress number at all.**
-It has no children. It shows nothing rather than "0 of 0". Likewise, if moving a job away leaves its
+**A ticket has no progress number at all.**
+It has no children. It shows nothing rather than "0 of 0". Likewise, if moving a ticket away leaves its
 old parent with no children, that parent's progress number disappears rather than showing a fake zero.
 
 **Does the restricted count break down by finished and unfinished?**
@@ -326,25 +326,25 @@ Unconfirmed. The total and the restricted count are certain; whether the restric
 broken down is not.
 
 **"Restricted parent — exists, but you can't see it." What is that?**
-The job does belong to a bigger job, and you are not allowed to see what that bigger job is — not even
-its title. The product deliberately tells you a parent exists rather than letting the job look like it
-has none. If a job genuinely has no parent it says **"At project root"** — a different sentence on
+The ticket does belong to a bigger ticket, and you are not allowed to see what that bigger ticket is — not even
+its title. The product deliberately tells you a parent exists rather than letting the ticket look like it
+has none. If a ticket genuinely has no parent it says **"At project root"** — a different sentence on
 purpose. If there is a chain of hidden parents above, you are only told about the one directly above.
 
-**Can I finish a big job while bits of it are still open?**
+**Can I finish a big ticket while bits of it are still open?**
 No. A parent cannot be marked finished while any direct child is still going — whether that child is
 not started or in progress, both count as unfinished. This is the one rule above every workflow and it
-cannot be turned off. It cascades: a middle job needs its own children settled before it can close,
-which is what then frees the job above it.
+cannot be turned off. It cascades: a middle ticket needs its own children settled before it can close,
+which is what then frees the ticket above it.
 
 **What if I need to add work to something I already marked finished?**
 It refuses, and then **offers to reopen the finished one for you**. You get a box headed "Reopen
-parent?" naming the job and its state, and a picker of the unfinished stages you could reopen it into.
-Press "Reopen and proceed" and it reopens the parent first, then files your new job. Cancel submits
+parent?" naming the ticket and its state, and a picker of the unfinished states you could reopen it into.
+Press "Reopen and proceed" and it reopens the parent first, then files your new ticket. Cancel submits
 nothing.
 
 If half of it works, it tells you both halves: that the parent really was reopened and that is
-permanent history, and separately why your job was refused. Nothing is quietly undone.
+permanent history, and separately why your ticket was refused. Nothing is quietly undone.
 
 **Why do I only see one column of the board on my phone?**
 That is how the board works on a phone: one column at a time, chosen from the row of buttons above it
@@ -362,25 +362,25 @@ was. The other is what the system recorded when it received it. Usually they mat
 do not — a wrong clock, or a change made offline that arrived hours later — you see both, labelled, so
 neither misleads you alone.
 
-**Can I see the whole history of a job?**
+**Can I see the whole history of a ticket?**
 Up to 200 entries. It says so at the top and there is no way to page further back, so on a long-running
-job the earliest history is currently unreachable.
+ticket the earliest history is currently unreachable.
 
-**Two of my staff opened the same job at once. What happens?**
+**Two of my staff opened the same ticket at once. What happens?**
 A value that is clearly wrong for its field — text in a number field, an option not on the list — is
 refused straight away, naming the field. A genuine race between two people is covered under
 [Offline](#offline-phone-and-desktop): later wins, earlier survives in history, nobody is told.
 
 ---
 
-## Stages and moves
+## States and moves
 
 **How do I mark something done?**
-Drag the card to a column, press the **‹** or **›** arrow on the card, or open the job, press
-**Move…**, pick the stage, press Move.
+Drag the card to a column, press the **‹** or **›** arrow on the card, or open the ticket, press
+**Move…**, pick the state, press Move.
 
-**Why does the picker only show some of the stages?**
-Because your workflow decides which moves are allowed. A job can only go where an arrow leads from
+**Why does the picker only show some of the states?**
+Because your workflow decides which moves are allowed. A ticket can only go where an arrow leads from
 where it is. It will not show you a move that would be refused anyway.
 
 **It's asking for a comment before it will let me move.**
@@ -402,19 +402,19 @@ size ceiling, or a kind it will not take. The move stays blocked until a file it
 > this rule is blocked until somebody attaches a file, so put it only where that is what you mean.
 
 **It won't let *me* make a move, but my colleague can.**
-Somebody put a "restrict who may move it" rule on that step, limited to a role, to whoever the job is
+Somebody put a "restrict who may move it" rule on that step, limited to a role, to whoever the ticket is
 assigned to, or to named people. The refusal names who *is* allowed and says you are not among them.
 The product does not guess in advance — it shows the option and lets the server answer, so you find out
 by trying. Never wrong, occasionally annoying.
 
 **It says I can't approve this because I submitted it.**
 The "four eyes" rule: whoever made the earlier move cannot make the approving one. Somebody else has
-to. It is cleverer than it looks — if you later reorganise and rename your stages, it still works out
+to. It is cleverer than it looks — if you later reorganise and rename your states, it still works out
 correctly who did what under the old arrangement. And if it genuinely cannot read the history, it
-refuses the move rather than waving it through, telling you to ask an admin about the stage history.
+refuses the move rather than waving it through, telling you to ask an admin about the state history.
 
 **Two refusal messages appeared and they disagree.**
-One starts "instant check — " and one starts "Refused by the server — ". The first is your own computer
+One starts "instant check: " and one starts "Refused by the server: ". The first is your own computer
 having a quick guess from what it has locally; the second is the actual answer. When they disagree,
 **both stay on screen** rather than one being tidied away.
 
@@ -422,20 +422,20 @@ Confusing the first time. The alternative is worse — your own machine saying "
 answer being no. Read them as "the quick guess" and "the real answer".
 
 **What does it mean when a whole column is marked "Blocked"?**
-That is a property of the **stage**, not of any one job. Whoever built your workflow marked that
-column as a waiting state — "Waiting on parts", "Waiting on customer". Every job in it is in that
-state by definition. **There is no switch you flip on an individual job to say it is stuck**; you need
-a stage built for the purpose.
+That is a property of the **state**, not of any one ticket. Whoever built your workflow marked that
+column as a waiting state — "Waiting on parts", "Waiting on customer". Every ticket in it is in that
+state by definition. **There is no switch you flip on an individual ticket to say it is stuck**; you need
+a state built for the purpose.
 
-**There's a move that seems to work from any stage.**
+**There's a move that seems to work from any state.**
 Some workflows have a move set up to work from anywhere, normally for "reopen it, whatever state it is
-in". If no direct move exists from where your job is, but a from-anywhere move to the same place does,
+in". If no direct move exists from where your ticket is, but a from-anywhere move to the same place does,
 the product uses it automatically. Its rules are still fully enforced — it is not a back door.
 
-**Somebody changed the stages after my job was created. Which set applies?**
-The set your job was pinned to when it was created, not the newest. If a stage it was sitting in gets
-removed later, whoever removed it had to say where those jobs go, and yours follows that. If nobody
-said, your job refuses to move rather than the product guessing, and it tells you it is stranded.
+**Somebody changed the states after my ticket was created. Which set applies?**
+The set your ticket was pinned to when it was created, not the newest. If a state it was sitting in gets
+removed later, whoever removed it had to say where those tickets go, and yours follows that. If nobody
+said, your ticket refuses to move rather than the product guessing, and it tells you it is stranded.
 
 **Can a regular member edit our workflow?**
 No. They get "You can look, not touch — only a workspace owner or admin can change workflows and
@@ -444,27 +444,27 @@ for a non-admin to accidentally publish something.
 
 **Where are the settings screens?**
 In the top bar: **Settings**. It appears once a workspace is open, and it opens that workspace's own
-screens — ticket types, workflows, and the workspace itself — where the stage builder and the job-type
+screens — ticket types, workflows, and the workspace itself — where the workflow editor and the ticket-type
 editor live. Nothing to bookmark.
 
 **Can I rename "Epic" and "Story" to something that makes sense to me?**
-Yes. An admin can rename all four built-in types, change their icons, and change which stage set they
+Yes. An admin can rename all four built-in types, change their icons, and change which workflow they
 use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will
 still always need a parent. Custom types you create yourself can be re-ranked either way later.
 
-**Can I put my job types in a different order?**
+**Can I put my ticket types in a different order?**
 Your own types, yes: each one has a **Reorder** button with **Move up**, **Move down** and **Move to top**
 (an item that cannot apply is greyed out and says why). The four built-in types have no such button — they
 keep their rank.
 
-**Do my existing jobs break when I publish a new version of a workflow?**
-No. Publishing again makes a new version and jobs created under the old one stay on it unless they are
-moved across. If your new version **drops** a stage that jobs are sitting in, publishing stops and
-makes you say where each of those jobs goes, showing how many are in each. If it cannot get a count it
-says "unavailable" and *still* makes you decide. Leave one out and it names the stage you missed.
+**Do my existing tickets break when I publish a new version of a workflow?**
+No. Publishing again makes a new version and tickets created under the old one stay on it unless they are
+moved across. If your new version **drops** a state that tickets are sitting in, publishing stops and
+makes you say where each of those tickets goes, showing how many are in each. If it cannot get a count it
+says "unavailable" and *still* makes you decide. Leave one out and it names the state you missed.
 
-**I deleted a stage that was the starting stage. Will it pick a new one for me?**
-No, on purpose. Deleting a stage removes every move connected to it, and if it was the starting stage
+**I deleted a state that was the starting state. Will it pick a new one for me?**
+No, on purpose. Deleting a state removes every move connected to it, and if it was the starting state
 (or was named by a four-eyes rule) the builder leaves the reference dangling so the problem checker
 flags it and makes you fix it — rather than quietly guessing what you meant.
 
@@ -472,8 +472,8 @@ flags it and makes you fix it — rather than quietly guessing what you meant.
 No. Layout is for this session only. Come back tomorrow and it will have laid itself out again. Known
 and deliberate for now — do not spend twenty minutes tidying.
 
-**What's the list headed "Worth a look — none of these block publishing"?**
-Advice, not errors. Typically: you have put a guard on one route into a stage, but another route in has
+**What's the list headed "Worth a look (none of these block publishing)"?**
+Advice, not errors. Typically: you have put a guard on one route into a state, but another route in has
 no matching guard, so the guard can be walked around. It publishes anyway. The "Errand with waits"
 template deliberately trips this twice, because it is modelled on a real shop's real process, warts
 included — so do not panic when a template warns about itself.
@@ -482,9 +482,9 @@ included — so do not panic when a template warns about itself.
 You are shown the exact message the server sent, in its own words. A common cause is somebody else
 publishing a newer version of the same workflow while you were still editing yours.
 
-**Why do I have to pick a "Category" for each stage?**
-Because the rest of the product needs to know which of your stages mean "finished". That is how it
-knows a parent job can be closed, how progress counts work, and what the "Only tickets in progress"
+**Why do I have to pick a "Category" for each state?**
+Because the rest of the product needs to know which of your states mean "finished". That is how it
+knows a parent ticket can be closed, how progress counts work, and what the "Only tickets in progress"
 switch filters. Get it wrong and everything downstream guesses wrong, quietly. It is the one bit of
 setup where a mistake does damage somewhere else.
 
@@ -496,29 +496,29 @@ options to a field that is not a dropdown, or reuse a field name.
 
 ## Writing, comments and files
 
-**How do I write a description for a job?**
-Type it into the description on the job screen and save it. It is written the same way everything else
-about a job is, so the panel reads back who set it and when, and the job's history keeps a line for
+**How do I write a description for a ticket?**
+Type it into the description on the ticket screen and save it. It is written the same way everything else
+about a ticket is, so the panel reads back who set it and when, and the ticket's history keeps a line for
 each time it changed.
 
 **Is there a comment box?**
-Yes, on a job. The job screen ends with the job's comments and a box under them: what you post is
-recorded against the job as an event citing you, so the thread reads back who wrote each comment and
+Yes, on a ticket. The ticket screen ends with the ticket's comments and a box under them: what you post is
+recorded against the ticket as an event citing you, so the thread reads back who wrote each comment and
 when. You can mention somebody by typing `@` — the mention is recorded on the comment and tells them,
-if they can see the job.
+if they can see the ticket.
 
 **There is a second comment box on the website, and it belongs to a Move:** if the move carries a
 "require a comment" rule, its dialog takes one, and what you type is recorded on the move.
 
-**It used to be that the phone app had a Comment button on a job and the website did not.** That is
+**It used to be that the phone app had a Comment button on a ticket and the website did not.** That is
 settled — the website has one now, and the two record the same thing.
 
-**Can I attach a photo or a file to a job?**
+**Can I attach a photo or a file to a ticket?**
 Through a comment, and the file travels with the comment that carries it. Drop an image into the comment
 box, paste it, or press the paperclip **Attach** button in the comment box's own footer, and it is
 stored and put inside what you are writing; the comment then names it, and the chip under the comment
 is how you reach it. **A file that is not an image cannot be put inside a comment** — it is stored
-against the job instead and appears in the job's list of files, not in your comment. That split is the
+against the ticket instead and appears in the ticket's list of files, not in your comment. That split is the
 product's own rule rather than a limitation of the box: a comment's files are the ones its own text
 carries, so a comment can never be missing a file it was written with. The **Attachments** tab has its
 own **Attach a file** button too, for a file that has no comment to travel with.
@@ -603,9 +603,9 @@ already inside a table, because a table cannot go inside another one.
 
 ## Notes
 
-**What is a note, and how is it different from a job?**
-A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything
-that is not one piece of work — a log, a parts list, something you want to keep after the job it came
+**What is a note, and how is it different from a ticket?**
+A note is a page of writing that belongs to a workspace or a project, not to a ticket. Use it for anything
+that is not one piece of work — a log, a parts list, something you want to keep after the ticket it came
 from closes. Find it at **Notes** in the nav, left of Inbox.
 
 **What is the thin line at the top of a note?**
@@ -637,7 +637,7 @@ not shown that. Muting Mentions under Account → Notifications hides these too.
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the
-ticket** means whoever can see any job it is attached to, and **Specific people** means exactly the
+ticket** means whoever can see any ticket it is attached to, and **Specific people** means exactly the
 people you chose. You, as its author, always read your own note whatever its Scope.
 
 **Can the workspace owner read my private note?**
@@ -647,7 +647,7 @@ turn off from the note's side.
 **Can an admin read notes I haven't shared with them?**
 No, not by virtue of being an admin. An admin reads a note under the same rule as anyone else: their
 own, anything workspace-wide, anything on a project they are actually a member of, anything naming them,
-or anything shared the way a job they can see is. Being an admin gives no extra reach into notes — only
+or anything shared the way a ticket they can see is. Being an admin gives no extra reach into notes — only
 the owner gets that.
 
 **Why can't I find a note I know exists?**
@@ -660,18 +660,18 @@ the wrong workspace or project section of the tree.
 Word-based search does — including its near-miss spelling correction. Meaning-based search is an
 English-only model today; a Garo-tuned one is a planned follow-up, not built.
 
-**What happens to a note when I delete the job it is on?**
-The note stays attached — deleting a job does not detach anything. But a deleted job no longer counts
-as active work, so if the note's Scope is **Same as the ticket** and this was its only attached job, nobody but
+**What happens to a note when I delete the ticket it is on?**
+The note stays attached — deleting a ticket does not detach anything. But a deleted ticket no longer counts
+as active work, so if the note's Scope is **Same as the ticket** and this was its only attached ticket, nobody but
 you (its author) and the workspace owner can read it until it is detached or restored. Restoring the
-job restores that reach automatically, with nothing to redo.
+ticket restores that reach automatically, with nothing to redo.
 
 **Can I get back an old version of a note?**
 Yes. Open **History** from the note's byline, pick a version, and press **Restore** — if you can edit
 the note. A reader can open History and look, but not put an old version back.
 
 **Why does a link in a comment show a title I can't open?**
-Because the chip shows the title the note (or job) had when the link was written, even to someone who
+Because the chip shows the title the note (or ticket) had when the link was written, even to someone who
 cannot open it. That is today's behaviour; whether it should instead hide the title is an open question
 the product owner is still deciding.
 
@@ -687,20 +687,20 @@ You are taken back to the Notes list with a message: "That note is no longer sha
 
 ## Boards, lists and dates
 
-**Can a new job start in a column other than the first?**
+**Can a new ticket start in a column other than the first?**
 Yes — press **Create ticket** in the empty column you want, rather than the top-level **Create ticket**
-button, and the window opens with that column's stage already chosen and the backlog switch off.
+button, and the window opens with that column's state already chosen and the backlog switch off.
 
 **Why is there no Add button on this column?**
-Your admin turned off "Tickets can start here" for that stage (the manual's stage-setup section) — a
-job cannot be born there, so the column offers no way to try. It can still receive jobs moved into it
+Your admin turned off "Tickets can start here" for that state (the manual's state-setup section) — a
+ticket cannot be born there, so the column offers no way to try. It can still receive tickets moved into it
 from elsewhere; only starting a brand new one there is blocked.
 
 **What do the coloured badges on a card mean?**
 Three, when they apply. The **priority badge** — a coloured icon and P1/P2/P3, tinting the whole card
 — is always there: red fire for P1, green leaf for P2, frozen-blue snowflake for P3. An **epic chip**
-on the card's top line names the epic it belongs to, if any. A **parent-key badge** beside the job's key
-names its immediate parent, if that parent is not already the epic chip's own job.
+on the card's top line names the epic it belongs to, if any. A **parent-key badge** beside the ticket's key
+names its immediate parent, if that parent is not already the epic chip's own ticket.
 
 **Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
@@ -719,12 +719,12 @@ The date-range and custom-field filtering the engine can do has no control eithe
 
 **How do I narrow a project down to one person?**
 Open the **Filters** button beside the "Only tickets in progress" switch and click **Assignee** — you
-get one row per person, with their picture. Click once for *included* (only their jobs), twice for
+get one row per person, with their picture. Click once for *included* (only their tickets), twice for
 *excluded* (everything except theirs), and a third time to clear it. It takes effect at once; there is
 no Apply. The same sheet sets collaborators, type, state, closed and category the same way, and each one
 turns into a removable chip under the tabs — except two, and both say so in words on screen rather than
 pretending otherwise. **Collaborators** is applied by no tab at all, and **closed** shows no chip on the
-Board, which never shows closed jobs in the first place.
+Board, which never shows closed tickets in the first place.
 
 **Can I sort a list how I like?**
 Not by choosing. Lists come back in a fixed, repeatable order. You can choose the *grouping* (epic,
@@ -735,12 +735,12 @@ No. Grouping only rearranges. It never hides a row and never changes the counts 
 top stays the same however you regroup or collapse. Things with nothing to group under get an honest
 bucket: "No epic", "Unassigned".
 
-**What's the "default arrangement — you have not arranged this project" note?**
+**What's the "default arrangement. You have not arranged this project" note?**
 It is telling you that what you are looking at is the default, not something you chose. Once you pick
 your own grouping or columns it goes away. If you have only chosen one of the two, it says so about
 just that half. Small thing, and it stops you thinking you set something up when you did not.
 
-**Why does the same job appear twice in the list?**
+**Why does the same ticket appear twice in the list?**
 If it is in the "Recently assigned" strip at the top, it also appears in its normal place further
 down. That is on purpose.
 
@@ -749,7 +749,7 @@ They come in pages of fifty with a "load more" that picks up exactly where the l
 repeats, no gaps.
 
 **What happens on a really big project?**
-There is a ceiling of **2,000 jobs**. Past it the Backlog, List, Calendar and Timeline all refuse rather than
+There is a ceiling of **2,000 tickets**. Past it the Backlog, List, Calendar and Timeline all refuse rather than
 showing you part of a project pretending to be the whole one — and **the "Create ticket" button
 disappears too**, because it reads from the same place. So a project that grows past the ceiling
 becomes one you cannot add to.
@@ -758,26 +758,26 @@ The way out is the "Only tickets in progress" switch, which is deliberately plac
 still reach it from the refusing screen. The Board keeps working throughout.
 
 **My calendar is empty. Is it broken?**
-The sentence names what can hide a claim: your filter, closed jobs being hidden, a date field you
+The sentence names what can hide a claim: your filter, closed tickets being hidden, a date field you
 switched off with the legend switch, or an epic, which is drawn in the List and not here. It also says
 "Undated work is absent, not estimated" — the calendar draws only what someone claimed. When a date field you switched off is hiding claims here, a different
 sentence says so, and it claims **ALL** of the month's claims — so treat that one carefully: the calendar
-only knows about the claims it was given, and closed or filtered-away jobs are not among them. The count
+only knows about the claims it was given, and closed or filtered-away tickets are not among them. The count
 in the strip tells you what the filters left behind; it cannot see the legend switches, which live only
 in this view.
 
-**A job's start date is after its due date and the calendar looks odd.**
+**A ticket's start date is after its due date and the calendar looks odd.**
 It is showing you the contradiction rather than quietly fixing it — two separate markers and no bar
 connecting them. That is your cue to go and fix the dates.
 
 **What's the difference between the Calendar and the Timeline?**
 The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four
-weeks at a time. Both draw a bar only when a job has **both** a start and a needed-by claim. On the
+weeks at a time. Both draw a bar only when a ticket has **both** a start and a needed-by claim. On the
 Timeline, anything with only one date, no dates, or a contradiction goes into a list headed *"Not on
-the timeline yet"* with a count, saying what is missing for each job. Its **Add dates** button opens the
-job so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day.
+the timeline yet"* with a count, saying what is missing for each ticket. Its **Add dates** button opens the
+ticket so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day.
 
-**Does the Calendar show closed jobs?**
+**Does the Calendar show closed tickets?**
 Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List
 and the Backlog do not, and the Board never shows them at all. There are two ways to get them back, and
 only two. You can set Closed to *closed only* in the Filters sheet, or you can leave Closed alone and
@@ -785,7 +785,7 @@ remove the chip the strip is showing that says **Closed: hidden** — that is th
 and here is the way back". Setting Closed to *everything* does *not* do it, because *everything* and
 *never touched it* are the same setting, which is the whole reason the chip is there. And be careful with
 it: set Closed to *not closed* and you get a chip with the same name whose **×** only clears your own
-setting, so the closed jobs stay hidden. There is also one case where the calendar's own empty-month note
+setting, so the closed tickets stay hidden. There is also one case where the calendar's own empty-month note
 gets this wrong — see the manual's Calendar section.
 
 **Where's the burndown chart? The velocity? Sprint reports?**
@@ -850,7 +850,7 @@ nothing. That is deliberate: an empty box headed "Needs your attention" reads li
 earn. A blank space there is the normal way of saying "nothing needs you right now".
 
 **The strip only shows five rows. Where's the rest?**
-Each job appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and
+Each ticket appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and
 the strip shows the first five. If there are more, **Show all** and the number is under them; **Show
 fewer** folds it back.
 
@@ -860,8 +860,8 @@ or an admin, and the lists update to match. Seven days is the default for both, 
 them the screen says nobody set them rather than pretending seven was a choice. Blocked is not affected
 by either number: blocked is blocked.
 
-**I clicked an Inbox message and the job wouldn't open.**
-*"That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you.
+**I clicked an Inbox message and the ticket wouldn't open.**
+*"That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you.
 The message itself is yours and stays."* That last part matters — the message does not disappear just
 because you lost access to what it was about. It was sent to you, so it is yours. The notice clears
 itself next time something opens successfully.
@@ -875,54 +875,52 @@ lookup has not been built for it yet.
 
 ## Privacy
 
-**Can I keep a job private from most of the team?**
-Yes. Every job has a "Who can see this" setting with four options: everyone in the workspace, everyone
+**Can I keep a ticket private from most of the team?**
+Yes. Every ticket has a "Who can see this" setting with four options: everyone in the workspace, everyone
 on the project, only the people you name, or inherited from the parent.
 
 **Does the owner see everything, even the private ones?**
-Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people —
-and the workspace owner, always."* It shows that line even when you have picked "everyone in the
+Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people, and the workspace owner, always."* It shows that line even when you have picked "everyone in the
 workspace" and even to somebody who cannot change the setting. Showing it only on the private option
 would let people assume the other options exclude the owner.
 
-**If I set a big job to "only the people I name", do the smaller jobs under it follow?**
+**If I set a big ticket to "only the people I name", do the smaller tickets under it follow?**
 Yes, as long as they are set to inherit. Anything that has set its own audience keeps it, and
-everything under that keeps it too. Move a job to a new parent and it takes the new parent's audience,
+everything under that keeps it too. Move a ticket to a new parent and it takes the new parent's audience,
 along with everything under it. Move it to the top and it falls back to the project default. Set it
 back to inheriting and it and everything below re-attach.
 
 **What if I accidentally leave myself off the list?**
-You get a warning: *"You are about to lose access to this ticket. A project admin — or the workspace
-owner, who always sees — can restore it."* **And then it does exactly what you told it to.** It does
+You get a warning: *"You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it."* **And then it does exactly what you told it to.** It does
 not quietly add you back behind the warning — silently adding you would file a claim in your name that
 you never made. So read the warning. You cannot apply an empty list; the button stays off.
 
-**Who is allowed to change who sees a job?**
-A project admin **of that job's project**, or whoever created the job. Being an admin of a different
+**Who is allowed to change who sees a ticket?**
+A project admin **of that ticket's project**, or whoever created the ticket. Being an admin of a different
 project does not help. If you are not one of those, the product will let you fill the form in and the
 server will refuse it, saying why.
 
-**Can I see who a job is currently shared with?**
+**Can I see who a ticket is currently shared with?**
 **No — and this is a real gap.** The setting cannot be read back. On the one screen whose entire
 subject is who can see what, the current audience shows as unavailable rather than a guess.
 
 Guessing would be much worse, so the behaviour is right and the hole is still real. **Keep your own
 note of what you set**, because the screen will not remind you.
 
-**If I share a job with somebody, can they see who else it's shared with?**
-No. The job's page does not disclose the list, or which parent it inherited its audience from.
+**If I share a ticket with somebody, can they see who else it's shared with?**
+No. The ticket's page does not disclose the list, or which parent it inherited its audience from.
 
 **When I hide something, what does the other person see?**
 Nothing. It simply is not there. There is no "you don't have permission" screen for hidden work —
 hidden means invisible. If they go looking for it directly they get exactly the same "not found" as a
 made-up reference, deliberately identical, so that nobody can work out what exists by watching which
-refusals they get. The same is true of a job's history and of trying to change one.
+refusals they get. The same is true of a ticket's history and of trying to change one.
 
 **What can a guest see?**
-Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs.
+Only the tickets somebody explicitly shared with them, and any ticket assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create tickets.
 
 **Can somebody hide who they are?**
-No. History always shows who did what and when, untouched, to anybody entitled to see the job — even
+No. History always shows who did what and when, untouched, to anybody entitled to see the ticket — even
 when that person shares no project with you. **You can hide the work; you cannot hide who acted.**
 
 ---
@@ -940,7 +938,7 @@ project in the workspace at once, bolds the matching words in a snippet, ranks t
 comment matches, only ever returns things you are allowed to see, and counts its fifty results *after*
 removing the hidden ones — so you get fifty things you can actually open, not a padded list.
 
-**It is reachable now, but only narrowly.** Type `:ticket ` followed by a few words, in a job's comment
+**It is reachable now, but only narrowly.** Type `:ticket ` followed by a few words, in a ticket's comment
 box or in a note, and a picker opens over this same engine's results. There is still no general search
 screen of its own — nowhere you type a query and read this engine's results directly, the way the two
 narrowing boxes let you read theirs.
@@ -949,7 +947,7 @@ narrowing boxes let you read theirs.
 Three places now, and only one of them is the deep search. On the **phone app's board screen** — where,
 offline, it says "searching offline copy" underneath, so you know the results might be a little out of
 date — and on the **website's project board**, in the box above the tabs, both only narrow something
-already on screen. The `:ticket ` picker reaches the deep search described just above, narrowed to jobs
+already on screen. The `:ticket ` picker reaches the deep search described just above, narrowed to tickets
 and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own.
 Notes have a separate search again, on the Notes page: its own engine, and it only searches notes. The
 **Help** page has its own search too, over the manual and this FAQ only (below).
@@ -978,45 +976,45 @@ Two things, on the ticket-search half at least — the picker inherits the engin
 There is a real desktop app and a real phone app, each keeping its own copy of your work on the
 device. They are not just the website in a frame.
 
-But: **the phone app is two screens** — a board and a job. That is the whole app. And **the desktop
+But: **the phone app is two screens** — a board and a ticket. That is the whole app. And **the desktop
 app currently tells you to sign in on the website, then paste something across into its settings by
 hand.** That is described as a temporary arrangement and it is not something to ask a nervous
 colleague to do. Neither app has been tested on an actual phone or an actual computer in the field —
 only the pieces underneath have.
 
 **Can I use it on the train with no signal?**
-On the phone or desktop app, yes — for reading. You can open the job list, open a job, see the board,
-read a job's full history, see the job types and stages, and see your assigned work, all from the copy
+On the phone or desktop app, yes — for reading. You can open the ticket list, open a ticket, see the board,
+read a ticket's full history, see the ticket types and states, and see your assigned work, all from the copy
 on the device.
 
-For changing things, you get whatever the two screens offer, which is not much: create a job, move one
-between stages, reopen one, post a comment, deal with a disputed claim. The queue underneath will
+For changing things, you get whatever the two screens offer, which is not much: create a ticket, move one
+between states, reopen one, post a comment, deal with a disputed claim. The queue underneath will
 carry more kinds of change than that — but **a queue accepting a kind of change is not a screen
 offering it**, and offline you still cannot assign anybody or set a due date. **That is a property of
 these apps rather than of being offline:** they have no Assignee row in either state. The website's
 panel *can* set one, and it is online-only — there is no offline queue there to carry it.
 
 **The browser version is online-only.** It has no offline queue at all — which is why its "claims
-waiting to send" section is always empty on the web. Offline is the apps' job.
+waiting to send" section is always empty on the web. Offline is the apps' responsibility.
 
 **Seven things flatly refuse offline** rather than making something up: your list of workspaces, the
-people list, the ordinary search, the standard My Work view, the "Needs your attention" strip, and both
+people list, the ordinary search, the standard My work view, the "Needs your attention" strip, and both
 reading and saving your preferences. Each names what is missing rather than showing an empty screen.
 
-**I made a job offline and it vanished from the board.**
-Expected, and narrow: a job created *entirely* offline — one the server has never seen — will not
-appear on the board or the job list until the server confirms it. Search for it by name in the offline
+**I made a ticket offline and it vanished from the board.**
+Expected, and narrow: a ticket created *entirely* offline — one the server has never seen — will not
+appear on the board or the ticket list until the server confirms it. Search for it by name in the offline
 search and it will turn up.
 
 **What does "claim in transit" mean?**
 Something you changed that the server has not confirmed yet. It is on its way, not yet locked in. You
-get a small badge on that job, both on the board and in job lists, so you always know when you are
-looking at something unconfirmed versus something saved for good. The job screen shows your
+get a small badge on that ticket, both on the board and in ticket lists, so you always know when you are
+looking at something unconfirmed versus something saved for good. The ticket screen shows your
 unconfirmed change alongside the last confirmed version.
 
 **What happens when I get signal back?**
-Nothing you have to do. Your changes go up in the order you made them, so a job is never edited on the
-server before it has been created there. The status label moves through "Offline — n claims waiting to
+Nothing you have to do. Your changes go up in the order you made them, so a ticket is never edited on the
+server before it has been created there. The status label moves through "Offline: n claims waiting to
 send", then "Catching up…", then "Live".
 
 **What if the network fails halfway through sending?**
@@ -1024,18 +1022,18 @@ Treated as temporary. Your change stays queued and is retried with a growing gap
 second, then two, then four, up to about a minute. It is **never** marked as failed for a network
 problem. Only a genuine "no, that breaks a rule" answer is final.
 
-**Two of us edited the same job while I was offline. Who wins?**
+**Two of us edited the same ticket while I was offline. Who wins?**
 It depends which of two things happened, and they are treated very differently.
 
 **A plain race — you both just typed different things.** The later one wins. The earlier one survives
-in the job's history. **Nobody is told.** No banner, no warning, no record of a dispute — a race is not
+in the ticket's history. **Nobody is told.** No banner, no warning, no record of a dispute — a race is not
 a rule violation.
 
 Be aware of this. If two of you change the same brief while one is on a train, one gets quietly
 overwritten and neither of you finds out. The history has it; nobody is going to go looking.
 
-**Your change had become against the rules by the time it arrived** — the job got reassigned, the
-stages changed, or it got un-shared from you. Then it is refused, recorded as a **disputed claim**, and
+**Your change had become against the rules by the time it arrived** — the ticket got reassigned, the
+states changed, or it got un-shared from you. Then it is refused, recorded as a **disputed claim**, and
 you get a banner.
 
 **What does the disputed-claim banner tell me?**
@@ -1045,7 +1043,7 @@ and when you made it — in Indian time, like *"21 Aug 2026, 00:00 IST"*.
 Three buttons:
 
 1. **Discard it** — throw it away, with an optional short note explaining why.
-2. **Convert to comment** — turn what you tried to do into a permanent comment on the job, carrying
+2. **Convert to comment** — turn what you tried to do into a permanent comment on the ticket, carrying
    your words, your name, the rule and the time. **Usually the one to use** — the attempt stays on the
    record even though the change did not land.
 3. **Redo legally** — send it fresh, properly, linked as the replacement. You cannot just resend the
@@ -1068,10 +1066,10 @@ accepted it until the server actually has.
 **Can anything quietly disappear?**
 A few named things, and to the product's credit they are written down rather than hidden:
 
-- A very large share is **cut off at 200 jobs**, silently. There is no "there was more" signal.
+- A very large share is **cut off at 200 tickets**, silently. There is no "there was more" signal.
 - If something is shared with you and then restricted again before your device fetches it, it is
   dropped and never fetched again.
-- There is one rare, still-open case: if the stages in a workflow change while your device is holding
+- There is one rare, still-open case: if the states in a workflow change while your device is holding
   old information, reconnecting can sometimes cause an error that does not recover on its own.
 
 What is *not* lost: your queued changes survive closing the app, ordering is kept, and your record of
@@ -1102,12 +1100,12 @@ India — not midnight where you are, and not midnight in universal time.
 
 - In London, the product's "today" flips over at about half past six in the evening.
 - In Los Angeles, in the late morning.
-- A job you file at 11pm your time may already be labelled tomorrow.
+- A ticket you file at 11pm your time may already be labelled tomorrow.
 - Every due date, every "today" ring on the calendar, and every day boundary means India's day.
 
 The reasoning is that everyone reading the same record sees the same day for the same moment, which is
 defensible. If you are running a business in Manchester, "due today" is still going to mean something
-odd. The only place in the product that acknowledges this is a footnote at the bottom of a job's
+odd. The only place in the product that acknowledges this is a footnote at the bottom of a ticket's
 history.
 
 **Is my work backed up?**
@@ -1131,7 +1129,7 @@ to a notification destination — and **that destination ships blank**. Unless s
 failing backup is invisible.
 
 There is also a known limit: the weekly export loads the entire history into memory before writing
-anything, on a small machine. As the history grows, that is the job that breaks first.
+anything, on a small machine. As the history grows, that is the ticket that breaks first.
 
 **Could I end up restoring a broken backup by accident?**
 Not any more. A copy that died halfway through used to leave a truncated file with a perfectly
@@ -1171,7 +1169,7 @@ No. There is no feedback button, no "beta" marker, and nothing on screen identif
 
 **Does the team actually use this themselves?**
 Yes, and properly. Twenty-three real errands from a real shop's own operations tracker are loaded in,
-plus the product's own build plans as projects and jobs.
+plus the product's own build plans as projects and tickets.
 
 The loading is careful in a way that says something: it refuses to run at all if the owner has never
 signed in, so no person is invented. It refuses anything marked finished, so it never claims work was
@@ -1188,7 +1186,7 @@ That is a team that means it about not inventing facts, and it shows up everywhe
 Honest blanks. Nobody has an answer to these yet, and none of them is invented here.
 
 - **How long an emailed sign-in link stays valid.** Not written down anywhere.
-- **Whether a job can be moved to a different project.** No evidence either way.
+- **Whether a ticket can be moved to a different project.** No evidence either way.
 - **Whether a comment or description can be edited or deleted after posting.** The append-only design
   hints not; nothing confirms it.
 - **Whether the restricted-children count breaks down by finished and unfinished**, or is a raw total.

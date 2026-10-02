@@ -38,7 +38,7 @@ import {
  * token, so a UI implying a re-read exists would be promising something nothing
  * can deliver.
  */
-export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown again';
+export const COPY_IT_NOW = 'Copy it now: it is not stored and cannot be shown again';
 
 /**
  * R5 (access follow-ups, owner ruling 2026-09-29) — the row action and its
@@ -845,7 +845,7 @@ function memberSummary(members: readonly RosterMember[], workspaceName: string |
   const counted = `You can see ${people} ${people === 1 ? 'person' : 'people'}${
     workspaceName === null ? '' : ` in ${workspaceName}`
   }`;
-  return `${counted} · ${owners} ${owners === 1 ? 'owner' : 'owners'}, ${admins} ${
+  return `${counted}: ${owners} ${owners === 1 ? 'owner' : 'owners'}, ${admins} ${
     admins === 1 ? 'admin' : 'admins'
   }. Membership and roles are per workspace.`;
 }
@@ -1132,7 +1132,7 @@ function PendingList({
 }) {
   return (
     <>
-      <h2 className="gn-invite-pending__heading">{`Pending invitations · ${rows.length}`}</h2>
+      <h2 className="gn-invite-pending__heading">{`Pending invitations (${rows.length})`}</h2>
       {rows.length === 0 ? (
         <p className="gn-invite-pending__empty">No invitations are outstanding.</p>
       ) : (
@@ -1142,12 +1142,9 @@ function PendingList({
               <span className="gn-invite-pending__address">{row.address}</span>
               <span className="gn-invite-pending__meta">
                 <span className="gn-invite-pending__role">{row.role}</span>
-                <span className="gn-invite-pending__sep" aria-hidden="true">
-                  ·
-                </span>
                 <span className="gn-invite-pending__expiry">
                   {row.expiresAt === null
-                    ? 'No link behind this one — withdraw it and invite again.'
+                    ? 'No link behind this one. Withdraw it and invite again.'
                     : `Lapses ${formatDateTime(row.expiresAt)}`}
                 </span>
               </span>

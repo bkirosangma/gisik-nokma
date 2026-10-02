@@ -1285,7 +1285,7 @@ export function NewTicketDialog({
       */}
       {parentCandidatesUnavailable === undefined && parentCandidatesNarrowing !== undefined ? (
         <span className="gn-new-ticket__parent-narrowing" data-testid="parent-narrowing">
-          showing only {parentCandidatesNarrowing} — a ticket outside that is not offered here
+          showing only {parentCandidatesNarrowing}, so a ticket outside that is not offered here
         </span>
       ) : null}
       {/*

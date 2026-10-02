@@ -203,16 +203,16 @@ describe('3.184 history copy — the attachment and resolution sentences', () =>
   it('reads the resolution through as the server wrote it, including a value this build does not enumerate', () => {
     expect(
       describeEvent(withPayload('claim.contested_resolved', { resolution: 'redone' })),
-    ).toBe('Conflicting claim resolved — redone');
+    ).toBe('Conflicting claim resolved: redone');
     expect(
       describeEvent(withPayload('claim.contested_resolved', { resolution: 'discarded' })),
-    ).toBe('Conflicting claim resolved — discarded');
+    ).toBe('Conflicting claim resolved: discarded');
     // A FOURTH resolution — added to the domain later — reads as itself rather
     // than as a missing case. Same discipline the publish banner keeps for rule
     // names it has never heard of.
     expect(
       describeEvent(withPayload('claim.contested_resolved', { resolution: 'escalated-to-owner' })),
-    ).toBe('Conflicting claim resolved — escalated-to-owner');
+    ).toBe('Conflicting claim resolved: escalated-to-owner');
   });
 });
 

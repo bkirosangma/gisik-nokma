@@ -67,14 +67,14 @@ export function WorkflowRebindDialog(props: {
                 options={props.toWorkflow.states.map((target) => ({ value: target.id, label: target.name }))}
                 value={stateMap[state.id] ?? null}
                 onChange={(next) => setStateMap((current) => ({ ...current, [state.id]: next }))}
-                aria-label={`Send them to — ${state.name}`}
+                aria-label={`Send tickets from ${state.name} to`}
               />
             </div>
           </li>
         ))}
       </ul>
       <p className="workflow-rebind-dialog__footer">
-        Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under
+        Leaving them is a real choice: a type can have tickets on two workflows, and the board shows each ticket under
         its own workflow&apos;s states.
       </p>
       {/* The transport's own channel, and NOT the screen's server-refusal slot:

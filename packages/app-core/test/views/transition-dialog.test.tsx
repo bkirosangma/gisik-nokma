@@ -325,7 +325,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     await user.click(screen.getByRole('button', { name: /Move to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     const serverBox = screen.getByRole('alert');
-    expect(serverBox).toHaveTextContent('Refused by the server — restrict-to');
+    expect(serverBox).toHaveTextContent('Refused by the server: restrict-to');
     expect(serverBox).toHaveTextContent(
       'Only Anselma Marak may perform "Doing → Done" on this ticket.',
     );
@@ -507,7 +507,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     });
     await user.click(screen.getByRole('button', { name: /Move to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
-    expect(await screen.findByText(/instant check — require-evidence/)).toBeInTheDocument();
+    expect(await screen.findByText(/instant check: require-evidence/)).toBeInTheDocument();
 
     await user.upload(
       screen.getByLabelText('Evidence (required by this transition)'),
@@ -612,7 +612,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     // a dropped connection and a refusal in one sentence.
     expect(
       await screen.findByText(
-        'The server would not store that file — That file is larger than the 25 MiB ceiling.',
+        'The server would not store that file: That file is larger than the 25 MiB ceiling.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
@@ -638,7 +638,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
       new File(['bytes'], 'receipt.pdf', { type: 'application/pdf' }),
     );
 
-    expect(await screen.findByText('That file could not be uploaded — Failed to fetch')).toBeInTheDocument();
+    expect(await screen.findByText('That file could not be uploaded: Failed to fetch')).toBeInTheDocument();
     // Nobody adjudicated, so the sentence must not be the one a verdict wears.
     expect(screen.queryByText(/The server would not store/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Move' })).toBeDisabled();
@@ -723,7 +723,7 @@ describe('3.72 TransitionDialog — prompts driven by the workflow definition', 
     await user.click(screen.getByRole('button', { name: /Move to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(
-      screen.getByText(/This transition carries restrict-to rules — the server decides/),
+      screen.getByText(/This transition carries restrict-to rules. The server decides/),
     ).toBeInTheDocument();
   });
 

@@ -447,6 +447,6 @@ describe('18.11 The Notes page — the shell', () => {
 
     // The topic itself, so a layout that named some OTHER route would fail here
     // rather than at the suffix.
-    expect(documentTitleFor('Notes')).toBe('Notes · Gisik Nokma');
+    expect(documentTitleFor('Notes')).toBe('Notes | Gisik Nokma');
   });
 });

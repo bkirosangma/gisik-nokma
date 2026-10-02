@@ -12,7 +12,7 @@ export const SYNC_NOTICE_DISMISS = 'Dismiss';
 
 /** A refused change's line: the server's own `rule: reason`, verbatim, as the strip's error line is. */
 export function failedClaimNotice(lastError: string | null): string {
-  return lastError === null || lastError === '' ? 'A change could not be saved.' : `A change could not be saved — ${lastError}`;
+  return lastError === null || lastError === '' ? 'A change could not be saved.' : `A change could not be saved: ${lastError}`;
 }
 
 /**

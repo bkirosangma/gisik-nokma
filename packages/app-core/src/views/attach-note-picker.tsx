@@ -201,7 +201,7 @@ export function AttachNotePicker({
             onClick={() => void chooseExisting(candidate)}
           >
             <span className="gn-attach-note-picker__option-title">{candidate.title}</span>
-            <span className="gn-attach-note-picker__option-meta">{` · ${candidate.homeProjectId}`}</span>
+            <span className="gn-attach-note-picker__option-meta">{`(${candidate.homeProjectId})`}</span>
           </button>
         ))}
         <button

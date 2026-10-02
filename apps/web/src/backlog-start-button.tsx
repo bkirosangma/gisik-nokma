@@ -117,7 +117,7 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
       // own sentence. E5-25: the 401 arm joins it through the one author.
       if (mountedRef.current) {
         setTransportError(
-          writeFailureCopy(cause, (message) => `We could not reach the server for this start — ${message}`),
+          writeFailureCopy(cause, (message) => `We could not reach the server for this start: ${message}`),
         );
       }
     } finally {
@@ -138,7 +138,7 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
       </button>
       {serverRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
       {transportError !== null ? (

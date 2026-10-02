@@ -34,7 +34,7 @@
 export function ReadOnlyBanner() {
   return (
     <p className="read-only-banner" role="status">
-      You can look, not touch — only a workspace owner or admin can change workflows and ticket types.
+      You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.
     </p>
   );
 }

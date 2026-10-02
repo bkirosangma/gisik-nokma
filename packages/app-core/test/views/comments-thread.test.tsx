@@ -28,7 +28,7 @@ import {
  *  1. **A failed read must not render as an empty thread.** `[]` draws *"No
  *     comments yet."* — a sentence about the TICKET — so `commentsUnavailable`
  *     draws a different thing, and the HEADING drops its count, because
- *     `Comments · 0` over a read that failed is a count nobody measured.
+ *     `Comments (0)` over a read that failed is a count nobody measured.
  *  2. **A comment's files are never dropped.** The body renders through
  *     `docToPlainText`, which draws an `image` node as NOTHING, so the chip row
  *     is the only trace of a comment's file. The last case here is the one that
@@ -86,7 +86,7 @@ describe('CommentsThread', () => {
   it('draws the heading with its count, the author, and the body as text', () => {
     render(<CommentsThread comments={[PLAIN, WITH_FILE]} nameOf={nameOf} />);
 
-    expect(screen.getByText('Comments · 2')).toBeInTheDocument();
+    expect(screen.getByText('Comments (2)')).toBeInTheDocument();
     // The name is the one the roster resolved, and the avatar carries its
     // INITIALS — the prototype's `{{ c.who }}` mark. ⚠ BOTH SHAPES ARE HERE ON
     // PURPOSE: a one-word name yields ONE initial (`Kiro` → `K`) and a two-word
@@ -113,7 +113,7 @@ describe('CommentsThread', () => {
 
   it('says "No comments yet." for an ANSWERED empty thread', () => {
     render(<CommentsThread comments={[]} nameOf={nameOf} />);
-    expect(screen.getByText('Comments · 0')).toBeInTheDocument();
+    expect(screen.getByText('Comments (0)')).toBeInTheDocument();
     expect(screen.getByText('No comments yet.')).toBeInTheDocument();
   });
 
@@ -130,10 +130,10 @@ describe('CommentsThread', () => {
     // The reason travels VERBATIM inside the sentence — a paraphrase would be a
     // second story about why the read failed.
     expect(failure).toHaveTextContent('the server said 404');
-    // `Comments · 0` over a failed read is a count nobody measured, so the
+    // `Comments (0)` over a failed read is a count nobody measured, so the
     // heading loses it. Asserted as an absence of the string, so a heading that
     // grew a count back would redden here.
-    expect(screen.queryByText('Comments · 0')).toBeNull();
+    expect(screen.queryByText('Comments (0)')).toBeNull();
     expect(screen.getByText('Comments')).toBeInTheDocument();
   });
 
@@ -246,7 +246,7 @@ describe('CommentsThread', () => {
    *
    * `useLiveQuery` initialises `data` to `null` and leaves it there while the
    * request is in flight. The sheet collapsed it — `comments={comments.data ??
-   * []}` — so during the load window the thread rendered `Comments · 0` and
+   * []}` — so during the load window the thread rendered `Comments (0)` and
    * *"No comments yet."*. Both are claims about the TICKET, and this component's
    * own docblock names *"No comments yet."* as exactly such a claim: it was
    * written to prevent it, and the collapse on the last hop reintroduced it.
@@ -259,7 +259,7 @@ describe('CommentsThread', () => {
    * Case `17.022` — minted in §17, same file and same reason as the link arm
    * above. The §16 door is the comment thread's empty/failed/loading split.
    */
-  it('V4: a read still in flight draws a WAIT, never “Comments · 0” and never “No comments yet.”', () => {
+  it('V4: a read still in flight draws a WAIT, never “Comments (0)” and never “No comments yet.”', () => {
     render(<CommentsThread comments={null} nameOf={nameOf} />);
 
     // A count nobody has measured is not printed…
@@ -277,7 +277,7 @@ describe('CommentsThread', () => {
     render(<CommentsThread comments={[]} nameOf={nameOf} />);
     // The wait arm must not have swallowed the real empty state — that would be
     // the same defect in the opposite direction.
-    expect(screen.getByText('Comments · 0')).toBeInTheDocument();
+    expect(screen.getByText('Comments (0)')).toBeInTheDocument();
     expect(screen.getByText('No comments yet.')).toBeInTheDocument();
     expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
   });

@@ -13,7 +13,7 @@ import { PURGE_DELAY_DAYS, type LifecycleKind } from '@gisik-nokma/domain';
  */
 
 // ── The delete dialog (spec §6.1) ──────────────────────────────────────────
-export const DELETE_NOTE = `Deleted items sit in Deleted items on your Account page, where you can restore them. Deleting permanently marks the item to be purged for good after ${PURGE_DELAY_DAYS} days — you can unmark it there any time before then.`;
+export const DELETE_NOTE = `Deleted items sit in Deleted items on your Account page, where you can restore them. Deleting permanently marks the item to be purged for good after ${PURGE_DELAY_DAYS} days. You can unmark it there any time before then.`;
 export const DELETE_PERMANENTLY_LABEL = 'Delete permanently';
 export const DELETE_CONFIRM_LABEL = 'Delete';
 export const DELETE_CANCEL_LABEL = 'Cancel';
@@ -46,11 +46,11 @@ export function typeNameLabel(name: string): string {
 
 /** D10 — the delete committed and the mark did not. `reason` is the server's own sentence, which ends in a full stop. */
 export function deletedNotMarkedLine(kind: LifecycleKind, reason: string): string {
-  return `This ${kind} was deleted, but not marked for permanent deletion — ${reason} You can mark it from Deleted items on your Account page.`;
+  return `This ${kind} was deleted, but not marked for permanent deletion: ${reason} You can mark it from Deleted items on your Account page.`;
 }
 
 export function batchMixedLine(reason: string): string {
-  return `Only part of this went through — ${reason} Check Deleted items on your Account page.`;
+  return `Only part of this went through: ${reason} Check Deleted items on your Account page.`;
 }
 
 /** The workspace home's own sentence for a short answer (`app/w/[workspaceId]/page.tsx:258-260`), shared now. */
@@ -59,11 +59,11 @@ export function unansweredLine(answered: number, sent: number): string {
 }
 
 export function deleteUnreachableLine(message: string): string {
-  return `We could not reach the server for this delete — ${message}`;
+  return `We could not reach the server for this delete: ${message}`;
 }
 
 export function changeUnreachableLine(message: string): string {
-  return `We could not reach the server for this change — ${message}`;
+  return `We could not reach the server for this change: ${message}`;
 }
 
 /** What a card page says once its dialog closed on a committed delete. */
@@ -76,8 +76,8 @@ export function deletedNotice(kind: LifecycleKind, name: string, permanent: bool
 /** The project page's toast. The soft sentence is the 2026-09-20/E2-30 one, unchanged. */
 export function ticketDeletedToast(name: string, permanent: boolean): string {
   return permanent
-    ? `${name} marked for permanent deletion · you can also undo this on the page`
-    : `${name} deleted · you can also undo this on the page`;
+    ? `${name} marked for permanent deletion. You can also undo this on the page`
+    : `${name} deleted. You can also undo this on the page`;
 }
 
 /** The project page's durable strip (E2-30). The soft sentence is unchanged. */
@@ -98,7 +98,7 @@ export function deletedItemsAsOf(when: string): string {
   return `Deleted items as of ${when}, saved on this device. Restoring and marking need a connection.`;
 }
 export function deletedItemsFailed(message: string): string {
-  return `Deleted items could not be loaded — ${message}`;
+  return `Deleted items could not be loaded: ${message}`;
 }
 export const RESTORE_LABEL = 'Restore';
 export const MARK_LABEL = 'Mark for permanent deletion';
@@ -122,13 +122,13 @@ export function containedLine(count: number): string | null {
   return `and ${count} ${count === 1 ? 'item' : 'items'} inside`;
 }
 export function deletedByLine(who: string, day: string): string {
-  return `Deleted by ${who} · ${day}`;
+  return `Deleted by ${who}, ${day}`;
 }
 export function restoreItemName(label: string): string {
   return `${RESTORE_LABEL} ${label}`;
 }
 export function markItemName(label: string): string {
-  return `${MARK_LABEL} — ${label}`;
+  return `${MARK_LABEL}: ${label}`;
 }
 export function unmarkItemName(label: string): string {
   return `${UNMARK_LABEL} ${label}`;
@@ -149,14 +149,14 @@ export function deleteItemName(name: string): string {
   return `${DELETE_CONFIRM_LABEL} ${name}`;
 }
 export function restoreUnreachableLine(message: string): string {
-  return `We could not reach the server to restore it — ${message}`;
+  return `We could not reach the server to restore it: ${message}`;
 }
 export function moreActionsFor(name: string): string {
   return `More actions for ${name}`;
 }
 /** The workspace home's archived-projects toggle wording (`app/w/[workspaceId]/page.tsx:935-943`), for workspaces. */
 export function archivedToggleText(count: number, open: boolean): string {
-  return open ? 'Hide archived' : `${count} archived · show`;
+  return open ? 'Hide archived' : `${count} archived (show)`;
 }
 export function archivedToggleName(open: boolean): string {
   return `${open ? 'Hide' : 'Show'} archived workspaces`;

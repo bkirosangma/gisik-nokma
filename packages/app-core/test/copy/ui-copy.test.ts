@@ -1,0 +1,256 @@
+// @vitest-environment node
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import ts from 'typescript';
+import { describe, expect, it } from 'vitest';
+import { HELP_CONTENT } from '../../src/help/content.generated.js';
+import { formatCardProvenance, formatDay } from '../../src/provenance.js';
+import {
+  type AllowEntry,
+  REPO_ROOT,
+  UI_SOURCE_ROOTS,
+  cssFiles,
+  describeHit,
+  sourceFiles,
+  stringsIn,
+  uiStringsMatching,
+  withoutAllowed,
+} from './ui-copy-scan.js';
+
+/**
+ * UX fixes T11 (spec §3.3, audit SYS-11, SYS-19): one glossary, no template tells in
+ * UI copy, one date format, "My work" in sentence case, an empty state that points
+ * somewhere. Cases 23.190-23.195 and 23.202 (`test-cases/23-ux-fixes.md`).
+ *
+ * Every scan here is proven first on a planted defect (the control runs before the
+ * sweep, in the same `it` where the sweep is one test), because a scan that reads
+ * nothing reports "clean" exactly as a clean tree does. Every allow-list entry
+ * carries its reason; an entry without one fails `reasons are written` below.
+ */
+
+const read = (path: string): string => readFileSync(resolve(REPO_ROOT, path), 'utf8');
+
+/** A phrase that is allowed to stay, and why. Compared case-insensitively, as a literal. */
+type AllowedPhrase = { phrase: string; reason: string };
+
+// ---------------------------------------------------------------------------------------------
+// 23.190 — one glossary: ticket (never "job"), state (never "stage")
+// ---------------------------------------------------------------------------------------------
+
+/** "job" / "stage" in the manual and FAQ that do NOT name a product thing. Empty means none. */
+const DOC_ALLOWED: readonly AllowedPhrase[] = [];
+
+/** "job" / "stage" in UI source strings that do not name a product thing. */
+const UI_GLOSSARY_ALLOWED: readonly AllowEntry[] = [];
+
+const GLOSSARY = /\b(jobs?|stages?)\b/i;
+
+function glossaryHits(text: string, allowed: readonly AllowedPhrase[]): string[] {
+  let scrubbed = text;
+  for (const { phrase } of allowed) scrubbed = scrubbed.split(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')).join(' ');
+  return scrubbed
+    .split('\n')
+    .map((line, index) => ({ line: index + 1, text: line }))
+    .filter(({ text: line }) => GLOSSARY.test(line))
+    .map(({ line, text: raw }) => `${line}: ${raw.trim().slice(0, 100)}`);
+}
+
+describe('23.190 the manual, FAQ and UI say ticket and state, never job and stage', () => {
+  it('control: the matcher finds each old word and lets an allowed phrase through', () => {
+    expect(glossaryHits('Move the job to the next stage.', [])).toHaveLength(1);
+    expect(glossaryHits('Two jobs, three stages', [])).toHaveLength(1);
+    expect(glossaryHits("the job's owner", [])).toHaveLength(1);
+    expect(glossaryHits('Move the ticket to the next state.', [])).toHaveLength(0);
+    expect(glossaryHits('a nightly backup job runs', [{ phrase: 'backup job', reason: 'control' }])).toHaveLength(0);
+    expect(GLOSSARY.test('jobless')).toBe(false);
+  });
+
+  it.each(['docs/manual.md', 'docs/faq.md'])('%s has no "job" or "stage" outside the allow-list', (path) => {
+    expect(glossaryHits(read(path), DOC_ALLOWED)).toEqual([]);
+  });
+
+  it('the shipped help module (headings, ids, text) has none either', () => {
+    expect(glossaryHits(JSON.stringify(HELP_CONTENT, null, 1), DOC_ALLOWED)).toEqual([]);
+  });
+
+  it('no UI source string says "job" or "stage"', () => {
+    const hits = withoutAllowed(uiStringsMatching(GLOSSARY), UI_GLOSSARY_ALLOWED);
+    expect(hits.map(describeHit)).toEqual([]);
+  });
+
+  it('reasons are written: every allow-list entry says why it stays', () => {
+    for (const entry of DOC_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
+    for (const entry of UI_GLOSSARY_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.191 — no middle-dot meta strings and no spaced em dashes in UI strings
+// ---------------------------------------------------------------------------------------------
+
+/** Strings that keep " · " or " — " because they are not UI copy. Each carries its reason. */
+const TELL_ALLOWED: readonly AllowEntry[] = [];
+
+const MIDDLE_DOT_OR_DASH = / · | — /;
+
+describe('23.191 no " · " and no " — " in the strings a person reads', () => {
+  it('control: the scan reads JSX text, literals and template chunks, and never a comment', () => {
+    const planted = [
+      "// a · b and c — d in a line comment",
+      '/* e · f */',
+      "const a = 'g · h';",
+      'const b = `i — ${1} j`;',
+      'export const c = <p>k · l</p>;',
+      "const d = 'clean';",
+    ].join('\n');
+    const hits = stringsIn('planted.tsx', planted).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
+    expect(hits.map((hit) => hit.text)).toEqual(['g · h', 'i — ', 'k · l']);
+  });
+
+  it('control: the allow-list filter removes exactly the entry it names', () => {
+    const hits = [
+      { file: 'apps/web/a.tsx', line: 1, text: 'x · y' },
+      { file: 'apps/web/b.tsx', line: 2, text: 'x · y' },
+    ];
+    expect(withoutAllowed(hits, [{ file: 'a.tsx', contains: 'x · y', reason: 'control' }])).toEqual([hits[1]]);
+  });
+
+  it('the UI roots hold none, apart from the reasoned allow-list', () => {
+    const hits = withoutAllowed(uiStringsMatching(MIDDLE_DOT_OR_DASH), TELL_ALLOWED);
+    expect(hits.map(describeHit)).toEqual([]);
+  });
+
+  it('reasons are written: every allow-list entry says why it stays', () => {
+    for (const entry of TELL_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.192 — no all-caps text
+// ---------------------------------------------------------------------------------------------
+
+const UPPERCASE_RULE = /text-transform\s*:\s*uppercase/i;
+const stripCssComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+describe('23.192 no stylesheet or inline style sets text-transform: uppercase', () => {
+  it('control: the matcher finds a rule, ignores one inside a comment, and finds the inline form', () => {
+    expect(UPPERCASE_RULE.test(stripCssComments('.a { text-transform: uppercase; }'))).toBe(true);
+    expect(UPPERCASE_RULE.test(stripCssComments('.a { text-transform:uppercase }'))).toBe(true);
+    expect(UPPERCASE_RULE.test(stripCssComments('/* text-transform: uppercase */ .a { color: red }'))).toBe(false);
+    expect(UPPERCASE_RULE.test(stripCssComments('.a { text-transform: none; }'))).toBe(false);
+  });
+
+  it('no .css file under the UI roots has the rule', () => {
+    const offenders = cssFiles()
+      .filter((file) => UPPERCASE_RULE.test(stripCssComments(readFileSync(file, 'utf8'))))
+      .map((file) => file.replace(`${REPO_ROOT}/`, ''));
+    expect(offenders).toEqual([]);
+  });
+
+  it('no UI source string sets it inline', () => {
+    const hits = uiStringsMatching(UPPERCASE_RULE);
+    expect(hits.map(describeHit)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.193 — one date format: "17 Aug", plus the year when it is not the current one
+// ---------------------------------------------------------------------------------------------
+
+describe('23.193 formatDay is the one day renderer', () => {
+  it('a day this year drops the year; another year keeps it', () => {
+    expect(formatDay('2026-08-17T10:00:00.000Z', '2026-10-02')).toBe('17 Aug');
+    expect(formatDay('2025-08-17T10:00:00.000Z', '2026-10-02')).toBe('17 Aug 2025');
+    expect(formatDay('2027-02-08T10:00:00.000Z', '2026-10-02')).toBe('8 Feb 2027');
+  });
+
+  it('a day claim is a day already and is never shifted', () => {
+    expect(formatDay('2026-08-17', '2026-10-02')).toBe('17 Aug');
+    expect(formatDay('2025-08-17', '2026-10-02')).toBe('17 Aug 2025');
+  });
+
+  it('the year is the IST year: 20:00 UTC on 31 Dec is already 1 Jan in India', () => {
+    expect(formatDay('2025-12-31T20:00:00.000Z', '2026-01-05')).toBe('1 Jan');
+    expect(formatDay('2025-12-31T20:00:00.000Z', '2025-12-31')).toBe('1 Jan 2026');
+  });
+
+  it('with no reference day the year stays, because nothing here reads the clock', () => {
+    expect(formatDay('2026-08-17T10:00:00.000Z')).toBe('17 Aug 2026');
+  });
+
+  it('a value it cannot read comes back as given', () => {
+    expect(formatDay('not a date', '2026-10-02')).toBe('not a date');
+    expect(formatDay('2026-02-30', '2026-10-02')).toBe('2026-02-30');
+  });
+
+  it("the card's provenance line renders its day through it (23.123 keeps its own cases)", () => {
+    const claim = { actorId: 'u1', actorName: 'Anselma Marak', clientTime: '2025-08-19T10:00:00.000Z', serverTime: '2025-08-19T10:00:00.000Z' };
+    expect(formatCardProvenance('Doing', claim, '2026-10-02')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2025');
+    const thisYear = { ...claim, serverTime: '2026-08-19T10:00:00.000Z' };
+    expect(formatCardProvenance('Doing', thisYear, '2026-10-02')).toBe('Moved to Doing by Anselma Marak on 19 Aug');
+    expect(formatCardProvenance('Doing', thisYear, '2026-10-02', true)).toBe('Moved to Doing by Anselma Marak on 19 Aug 2026');
+  });
+
+  /** A call named `toLocaleDateString` anywhere in a UI source file (comments are not nodes). */
+  function localeDateCalls(file: string, source: string): string[] {
+    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const found: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isPropertyAccessExpression(node) && node.name.text === 'toLocaleDateString') {
+        found.push(`${file}:${sf.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return found;
+  }
+
+  it('control: the call scan finds a call and ignores a comment that names it', () => {
+    expect(localeDateCalls('p.ts', 'const s = at.toLocaleDateString("en-IN");')).toHaveLength(1);
+    expect(localeDateCalls('p.ts', '// never toLocaleDateString()\nconst s = 1;')).toHaveLength(0);
+  });
+
+  it('no UI source renders a day with toLocaleDateString', () => {
+    const offenders = UI_SOURCE_ROOTS.flatMap((root) =>
+      sourceFiles(root).flatMap((file) => localeDateCalls(file.replace(`${REPO_ROOT}/`, ''), readFileSync(file, 'utf8'))),
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.194 — "My work" in sentence case
+// ---------------------------------------------------------------------------------------------
+
+describe('23.194 "My work" is sentence case at every site', () => {
+  it('control: the scan finds the old casing in a literal and in JSX text', () => {
+    const planted = "const a = 'My Work'; export const b = <a>My Work</a>; const c = 'My work';";
+    expect(stringsIn('p.tsx', planted).filter((hit) => /My Work/.test(hit.text))).toHaveLength(2);
+  });
+
+  it('no UI source string says "My Work"', () => {
+    expect(uiStringsMatching(/My Work/).map(describeHit)).toEqual([]);
+  });
+
+  it.each(['docs/manual.md', 'docs/faq.md'])('%s does not either', (path) => {
+    expect(read(path)).not.toMatch(/My Work/);
+  });
+
+  it('the shipped help module does not either', () => {
+    expect(JSON.stringify(HELP_CONTENT)).not.toMatch(/My Work/);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.202 — the help check passes over the renamed manual
+// ---------------------------------------------------------------------------------------------
+
+describe('23.202 the help check passes after the renames', () => {
+  it('node scripts/help-content.mjs --check exits 0, its self-test included', () => {
+    const out = execFileSync('node', ['scripts/help-content.mjs', '--check'], { cwd: REPO_ROOT, encoding: 'utf8' });
+    expect(out).toContain('self-test passed');
+    expect(out).toContain('generated copy matches source');
+    expect(out).toMatch(/quoted string\(s\) checked against the product/);
+  });
+});

@@ -53,8 +53,8 @@ export default function NewWorkflowPage() {
         <>
           <ReadOnlyBanner />
           <p>
-            <a href={`/w/${workspaceId}/settings/workflows`}>Back to the workflows</a> — you can read
-            every one of them.
+            <a href={`/w/${workspaceId}/settings/workflows`}>Back to the workflows</a>
+            {'. '}You can read every one of them.
           </p>
         </>
       ) : draft === null ? (

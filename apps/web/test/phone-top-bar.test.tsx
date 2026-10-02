@@ -74,13 +74,13 @@ describe('21.010 the switcher with no workspace chosen', () => {
     expect(within(sheet).getByRole('link', { name: 'All workspaces' }).getAttribute('href')).toBe('/workspaces');
     // CONTROL — 13.391's subject still renders for the desktop bar (CSS hides it at ≤40rem), and the
     // switcher does not carry the sentence.
-    expect(screen.getByText(/No workspace selected — pick one/)).toBeTruthy();
+    expect(screen.getByText(/No workspace selected. Pick one/)).toBeTruthy();
     expect(button.textContent).not.toMatch(/No workspace selected/);
   });
 });
 
 describe('21.011 the switcher inside a project', () => {
-  it('21.011 reads "<project> — <workspace>"; its sheet marks the current project aria-current and omits an archived one', async () => {
+  it('21.011 reads "<project>, <workspace>"; its sheet marks the current project aria-current and omits an archived one', async () => {
     const user = userEvent.setup();
     currentPath = '/w/w1/p/p1';
     currentParams = { workspaceId: 'w1', projectId: 'p1' };
@@ -93,9 +93,9 @@ describe('21.011 the switcher inside a project', () => {
         <AppNav workspaceId="w1" />
       </Providers>,
     );
-    const button = await screen.findByRole('button', { name: 'Shop operations — Convenience Corner' });
+    const button = await screen.findByRole('button', { name: 'Shop operations, Convenience Corner' });
     await user.click(button);
-    const sheet = await screen.findByRole('dialog', { name: 'Shop operations — Convenience Corner' });
+    const sheet = await screen.findByRole('dialog', { name: 'Shop operations, Convenience Corner' });
     const current = within(sheet).getByRole('link', { name: 'Shop operations' });
     expect(current.getAttribute('aria-current')).toBe('page');
     expect(current.getAttribute('href')).toBe('/w/w1/p/p1');

@@ -61,11 +61,11 @@
  *
  * It names the action now — *"reload to try again"* — which is the same advice the
  * sibling load-error sentences in `packages/app-core` already give
- * (`Could not load workflows — reload to try again.`). Hoisted to a function so a
+ * (`Could not load workflows. Reload to try again.`). Hoisted to a function so a
  * caller's spec asserts the string that RENDERS rather than re-typing it.
  */
 export function shellRefusalCopy(what: string): string {
-  return `${what} could not be loaded — reload to try again.`;
+  return `${what} could not be loaded. Reload to try again.`;
 }
 
 export function ShellRefusal({ what, message }: { what: string; message: string }) {

@@ -71,7 +71,7 @@ describe('11.84 the headline is the claim, attributed — never invented urgency
     // Pinned once, consumed twice: the same function the month grid prints.
     expect(notificationHeadline(notification, userName)).toBe(dueClaimLabel(claim, userName));
     // And the shape that function is specified to have.
-    expect(notificationHeadline(notification, userName)).toBe("needed by 30 Aug — Kiro's claim");
+    expect(notificationHeadline(notification, userName)).toBe("needed by 30 Aug, Kiro's claim");
   });
 
   it('assignment and mention name the actor through userName, not by id', () => {
@@ -104,7 +104,7 @@ describe('11.84 the headline is the claim, attributed — never invented urgency
 
   it('a stale ticket says since when and who moved it there', () => {
     expect(notificationHeadline(notificationOf('stale-ticket'), userName)).toBe(
-      'In Doing since 1 Aug — moved there by Kiro',
+      'In Doing since 1 Aug, moved there by Kiro',
     );
   });
 
@@ -114,13 +114,13 @@ describe('11.84 the headline is the claim, attributed — never invented urgency
     // the nameless case and fails nothing.
     const nameless = notificationOf('stale-ticket', { payload: { stateName: null } });
     expect(notificationHeadline(nameless, userName)).toBe(
-      'In doing since 1 Aug — moved there by Kiro',
+      'In doing since 1 Aug, moved there by Kiro',
     );
     const named = notificationOf('stale-ticket', {
       payload: { stateName: 'Awaiting evidence', stateId: 'doing' },
     });
     expect(notificationHeadline(named, userName)).toBe(
-      'In Awaiting evidence since 1 Aug — moved there by Kiro',
+      'In Awaiting evidence since 1 Aug, moved there by Kiro',
     );
   });
 });
@@ -134,7 +134,7 @@ describe('11.85 PLANTED DEFECT: "since" is the IST day of the instant, not a UTC
       payload: { enteredAt: '2026-08-01T19:00:00.000Z' },
     });
     expect(notificationHeadline(crossing, userName)).toBe(
-      'In Doing since 2 Aug — moved there by Kiro',
+      'In Doing since 2 Aug, moved there by Kiro',
     );
     // The control the assertion above needs: the last instant that is still
     // 1 Aug in IST stays 1 Aug, so the fix is a day BOUNDARY and not a
@@ -143,7 +143,7 @@ describe('11.85 PLANTED DEFECT: "since" is the IST day of the instant, not a UTC
       payload: { enteredAt: '2026-08-01T18:29:59.999Z' },
     });
     expect(notificationHeadline(stillFirst, userName)).toBe(
-      'In Doing since 1 Aug — moved there by Kiro',
+      'In Doing since 1 Aug, moved there by Kiro',
     );
     // And the two really are one millisecond either side of the same wall of
     // the domain's own boundary — stated here so the literals above are
@@ -161,7 +161,7 @@ describe('11.85 PLANTED DEFECT: "since" is the IST day of the instant, not a UTC
     const broken = notificationOf('stale-ticket', { payload: { enteredAt: 'yesterday' } });
     expect(() => istDayOf('yesterday')).toThrow(RangeError);
     expect(notificationHeadline(broken, userName)).toBe(
-      'In Doing since yesterday — moved there by Kiro',
+      'In Doing since yesterday, moved there by Kiro',
     );
   });
 
@@ -182,7 +182,7 @@ describe('11.85 PLANTED DEFECT: "since" is the IST day of the instant, not a UTC
     });
     expect(() => istDayOf('2026-13-45T99:99:99Z')).toThrow(RangeError);
     expect(notificationHeadline(shaped, userName)).toBe(
-      'In Doing since 2026-13-45T99:99:99Z — moved there by Kiro',
+      'In Doing since 2026-13-45T99:99:99Z, moved there by Kiro',
     );
     // Stated as its own assertion so the failure names the defect rather than
     // showing two long strings to diff: whatever the arm returns, it is not

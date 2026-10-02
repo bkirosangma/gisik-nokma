@@ -164,8 +164,8 @@ export function WiringNotReady({
   if (wiring.kind === 'signed-out') {
     return (
       <p>
-        <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in to open settings</Link>{' '}
-        — you land back here.
+        <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in to open settings</Link>
+        {'. '}You land back here.
       </p>
     );
   }

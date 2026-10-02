@@ -501,7 +501,7 @@ describe('13.583 precheckEvent mirrors checks/close.ts for ticket.closed / ticke
     expect(await precheckEvent(transitionTo('doing'), cache)).toEqual({
       kind: 'refused',
       rule: REFUSAL_RULES.closedTicket,
-      reason: 'This ticket is closed — reopen it first.',
+      reason: 'This ticket is closed. Reopen it first.',
     });
   });
 

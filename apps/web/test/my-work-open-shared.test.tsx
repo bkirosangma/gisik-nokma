@@ -8,7 +8,7 @@ import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * 3.162 — the My Work page can OPEN a ticket from the "Shared with me" section.
+ * 3.162 — the My work page can OPEN a ticket from the "Shared with me" section.
  *
  * ## Why this file exists rather than a component-level case
  *
@@ -229,7 +229,7 @@ afterEach(() => {
   clearWorkspaceNameCache();
 });
 
-describe('3.162 My Work opens a ticket from the Shared with me section', () => {
+describe('3.162 My work opens a ticket from the Shared with me section', () => {
   it('3.162 the shared ticket’s OWN project reaches the sheet — the id resolves through `shared`, not only `assigned`', async () => {
     const shared = item({});
     const assignedOne = item({
@@ -347,7 +347,7 @@ describe('3.162 My Work opens a ticket from the Shared with me section', () => {
  * so the assertion is that no sheet follows and no project page is navigated to,
  * rather than that the router was never called.
  */
-describe('V5 My Work opens a contested claim, or says why it cannot', () => {
+describe('V5 My work opens a contested claim, or says why it cannot', () => {
   const contestedView = (): MyWorkView => ({
     assigned: [],
     inTransit: [],

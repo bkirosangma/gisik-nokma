@@ -411,7 +411,7 @@ function SignInForm() {
               />
             </label>
             {emailSent ? (
-              <p>Check your inbox — the link signs you in.</p>
+              <p>Check your inbox. The link signs you in.</p>
             ) : (
               <>
                 <p className="gn-sign-in__hint">

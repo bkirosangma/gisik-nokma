@@ -26,7 +26,7 @@ import { useWorkspaceLookup } from "./use-workspace-name.js";
  * (`workspaceId` undefined — `/workspaces`, `/inbox`, `/help`, `/account`,
  * `/settings`, `/mcp/*`) only the four ALWAYS items render (Workspaces, Inbox,
  * Help, Account) plus a scope note. With one, the workspace's own served name,
- * My Work, Members and Settings join them.
+ * My work, Members and Settings join them.
  *
  * ## There is NO Board item, and the `projectId` prop went with it (Round 23,
  * ## owner: "the board on the nav bar doesn't work. lets remove it")
@@ -101,7 +101,7 @@ import { useWorkspaceLookup } from "./use-workspace-name.js";
  *
  * ## Inbox sits with the global links, not the workspace ones (Round 21)
  *
- * It was beside My Work from Round 19b; the owner moved it to just before Help.
+ * It was beside My work from Round 19b; the owner moved it to just before Help.
  * It stays unconditional — the inbox is global and always has been — so this is
  * a position change only, and it puts the three person-scoped destinations
  * (Inbox, Help, Account) together at the bar's end.
@@ -254,7 +254,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
     pathname === target ? "page" : undefined;
   /**
    * "Where am I" for a SECTION (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): lit on the route itself and on
-   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Settings, My Work and
+   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Settings, My work and
    * Members use it — the same rule the phone bottom bar applies to its workspace destinations, so the two surfaces
    * light the same item on the same page. Settings needs it most: its link points at `/settings?workspaceId=…` but the
    * workflow and ticket-type editors live at `/w/<id>/settings/…`, so an exact match left the bar dark on the very
@@ -345,7 +345,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             project you were last in, opening on hover into a dropdown of the
             workspace's other non-archived projects.
 
-            It is gated on `!noWorkspace` exactly as My Work, Members and
+            It is gated on `!noWorkspace` exactly as My work, Members and
             Settings are, and `effectiveWorkspaceId` is the same value they
             read, so there is one answer to "which workspace is this bar about".
             The component renders NOTHING of its own when the workspace has no
@@ -363,7 +363,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             href={`/w/${effectiveWorkspaceId}/my-work`}
             aria-current={currentSection(`/w/${effectiveWorkspaceId}/my-work`)}
           >
-            My Work
+            My work
           </Link>
         ) : null}
         {!noWorkspace ? (
@@ -483,7 +483,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             the positive session that the sentence presupposes. */}
         {showScopeNote && user !== null ? (
           <span className="gn-nav__scope">
-            No workspace selected — pick one to reach its board, members and settings.
+            No workspace selected. Pick one to reach its board, members and settings.
           </span>
         ) : null}
         <span className="gn-nav__spacer" />
@@ -518,7 +518,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
-          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings, My Work and Members joined it in UX fixes Task 3).
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings, My work and Members joined it in UX fixes Task 3).
               The workspace link is measured by `current()` above, which is exact
               equality — and that is right for it: `/w/<id>` is not "inside"
               `/w/<id>/members`. (The sections are `currentSection()`.) A note is different in kind. `/notes/<id>` is

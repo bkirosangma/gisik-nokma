@@ -73,7 +73,7 @@ function loadDef(store: DraftStore, def: WorkflowDef): void {
 describe('IssuesPanel planted defects — every validateWorkflowDef code', () => {
   it('shows the all-clear on a clean def', () => {
     renderIssues(kanbanStore());
-    expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
+    expect(screen.getByText('No issues. This workflow can be published.')).toBeInTheDocument();
   });
 
   /**
@@ -258,7 +258,7 @@ describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
     expect(validateWorkflowDef(def)).toEqual([]);
 
     renderIssues(store);
-    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(screen.getByText('Worth a look (none of these block publishing)')).toBeInTheDocument();
     expect(
       screen.getByText('Advisories describe a workflow that is legal but may not do what you meant.'),
     ).toBeInTheDocument();
@@ -269,7 +269,7 @@ describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
     expect(expectAdvisoriesMatchAdviser(store)).toEqual(['rdu-bypassable', 'rule-bypassable']);
     // and the issues half still says the workflow can go out: neither advisory
     // ever entered validateWorkflowDef's array
-    expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
+    expect(screen.getByText('No issues. This workflow can be published.')).toBeInTheDocument();
   });
 
   /**
@@ -280,9 +280,9 @@ describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
     expect(validateWorkflowDef(store.getState().def)).toEqual([]);
 
     renderIssues(store);
-    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(screen.getByText('Worth a look (none of these block publishing)')).toBeInTheDocument();
     expect(expectAdvisoriesMatchAdviser(store)).toEqual(['rule-bypassable']);
-    expect(screen.getByText('No issues — this workflow can be published.')).toBeInTheDocument();
+    expect(screen.getByText('No issues. This workflow can be published.')).toBeInTheDocument();
   });
 
   it('anchors an advisory to its transition, click-to-select, like any issue', async () => {
@@ -312,7 +312,7 @@ describe('IssuesPanel advisories — a second tier that blocks nothing', () => {
     expect(adviseWorkflowDef(store.getState().def)).toEqual([]);
     renderIssues(store);
     expect(
-      screen.queryByText('Worth a look — none of these block publishing'),
+      screen.queryByText('Worth a look (none of these block publishing)'),
     ).not.toBeInTheDocument();
     expect(document.querySelectorAll('.advisories-panel__item')).toHaveLength(0);
   });
@@ -343,11 +343,11 @@ describe('IssuesPanel anchoring', () => {
 
 describe('SystemRulesPanel', () => {
   /**
-   * 10.49 — the system-rules panel names provenance and the parent-terminal refusal, citing spec §4.
+   * 10.49 — the system-rules panel names provenance and the parent-terminal refusal. It used to cite "spec §4" to the reader; UX fixes T11 (23.191) took the citation out.
    */
-  it('names the two invariants no workflow can author away, citing the spec', () => {
+  it('names the two invariants no workflow can author away, in plain words with no spec citation', () => {
     render(<SystemRulesPanel />);
-    expect(screen.getByText('System rules — in every workflow')).toBeInTheDocument();
+    expect(screen.getByText('System rules in every workflow')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Provenance on everything: every move records who made it and when. "Done" always unfolds to "marked done by X on a date".',
@@ -358,8 +358,8 @@ describe('SystemRulesPanel', () => {
         'Parents cannot outrun children: no ticket can enter a terminal state while any of its children is still open.',
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('These two sit above all workflows and cannot be authored away (product design, §4).'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('These two sit above all workflows and cannot be authored away.')).toBeInTheDocument();
+    // CONTROL: the panel prints no section sign and no "product design" citation anywhere.
+    expect(document.body.textContent).not.toMatch(/§|product design/);
   });
 });

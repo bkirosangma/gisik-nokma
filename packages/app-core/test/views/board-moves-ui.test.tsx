@@ -57,7 +57,7 @@ function movesFor(
  * The board is fully painted with arrows only once the workflow read has
  * resolved. `getAllByRole` (not `getByRole`) on purpose: a card in `todo`
  * renders TWO buttons whose accessible names both start with "Move to" (the
- * disabled previous arrow says "Move to previous state — unavailable"), so
+ * disabled previous arrow says "Move to previous state: unavailable"), so
  * the singular query would throw on ambiguity before there was anything
  * wrong to report.
  */
@@ -108,7 +108,7 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
     render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
     await settled();
 
-    const previous = screen.getByRole('button', { name: 'Move to previous state — unavailable' });
+    const previous = screen.getByRole('button', { name: 'Move to previous state: unavailable' });
     expect(previous).toBeDisabled();
     previous.click();
     expect(source.ingested).toHaveLength(0);
@@ -133,7 +133,7 @@ describe('Board move arrows — the positive control (declared, rules-free edge)
    *
    * - BEFORE: `expect(screen.getByRole('alert')).toHaveTextContent('network
    *   unreachable')` — one substring check. It PASSED under the pre-Ruling-27
-   *   code, which rendered "Refused by the server — transport: network
+   *   code, which rendered "Refused by the server: transport: network
    *   unreachable" (a transport failure dressed as the server's own verdict —
    *   exactly Ruling 27's defect), because that sentence also contains the
    *   substring "network unreachable". Measured, not assumed: running this
@@ -315,7 +315,7 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
     const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
 
     // Scoped to `dialog`: the two arrow buttons' own accessible names ("Move
-    // to Doing", "Move to previous state — unavailable") also CONTAIN "Move
+    // to Doing", "Move to previous state: unavailable") also CONTAIN "Move
     // to", but neither one is inside the dialog's own subtree, so scoping
     // (not an exact-vs-regex match — the trigger's real accessible name is
     // "Choose a state Move to", react-aria's own `aria-labelledby` combining
@@ -354,7 +354,7 @@ describe('Board move arrows — needs-dialog opens TransitionDialog on the right
    * - BEFORE: `expect(within(dialog).getByRole('alert')).toHaveTextContent(
    *   'network unreachable')` — passed under the pre-Ruling-27 code, which
    *   routed this failure through `TransitionDialog`'s `serverRefusal` prop
-   *   and rendered "Refused by the server — transport: network unreachable".
+   *   and rendered "Refused by the server: transport: network unreachable".
    *   Measured, not assumed: this case also stayed GREEN against the
    *   pre-amendment source (see `13.504`'s own note; same suite run,
    *   `PASS (29) FAIL (0)`).
@@ -441,7 +441,7 @@ describe('Board move arrows — the refusal path names the real alternatives', (
     expect(notice).toHaveTextContent('Doing');
     expect(notice).not.toHaveTextContent('Backlog');
     expect(notice).not.toHaveTextContent('doing,'); // no raw, untranslated id leaking through
-    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there — try Doing.");
+    expect(refusalCopy(WF_ERRAND, outcome.available)).toBe("Can't move there. Try Doing.");
   });
 
   /**
@@ -513,7 +513,7 @@ describe('Board move arrows — several declared targets one way open a picker (
     await settled();
 
     const next = screen.getByRole('button', {
-      name: 'Move to next state — Waiting on counterparty or Done',
+      name: 'Move to next state: Waiting on counterparty or Done',
     });
     expect(next).toBeEnabled();
     await user.click(next);
@@ -560,7 +560,7 @@ describe('Board move arrows — several declared targets one way open a picker (
     render(<Board board={errandBoardWithCardIn('waiting')} onOpenTicket={() => {}} moves={moves} />);
     await settled();
 
-    await user.click(screen.getByRole('button', { name: 'Move to previous state — Doing or To do' }));
+    await user.click(screen.getByRole('button', { name: 'Move to previous state: Doing or To do' }));
     const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
     await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
     const listbox = await screen.findByRole('listbox');
@@ -624,7 +624,7 @@ describe('Board move arrows — several declared targets one way open a picker (
     await settled();
 
     const next = screen.getByRole('button', {
-      name: 'Move to next state — Waiting on counterparty or Done',
+      name: 'Move to next state: Waiting on counterparty or Done',
     });
     await user.click(next);
     let dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
@@ -644,7 +644,7 @@ describe('Board move arrows — several declared targets one way open a picker (
    * the server could not be reached for.
    *
    * The shipped catch painted every thrown cause as *"We could not reach the
-   * server for this move — HTTP 401 for /v1/events"*: the server was reached and
+   * server for this move: HTTP 401 for /v1/events"*: the server was reached and
    * answered the one thing this product treats as its own category, and the
    * person was given neither the true sentence nor the way back in. The cause
    * arrives here as `SessionExpiredError` — a view may not import `HttpError`

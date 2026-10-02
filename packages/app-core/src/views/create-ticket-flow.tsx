@@ -123,7 +123,7 @@ type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigi
  *    paraphrase of the authority.
  *  - A local refusal is not dressed as the server's word. On the instant path
  *    NOTHING is submitted, and the reopen offer carries `refusalOrigin:
- *    'instant'`, which `ReopenDialog` renders as "instant check — " under the
+ *    'instant'`, which `ReopenDialog` renders as "instant check: " under the
  *    preview class. Only an answer that came back through `DataSource.ingest`
  *    is ever labelled "Refused by the server".
  *
@@ -251,7 +251,7 @@ export function CreateTicketFlow({
       setFailure({
         headline:
           'The reopen offer needs the parent’s current state and its workflow, and this build could not read them' +
-          (gap === null ? '.' : ` — ${gap}`),
+          (gap === null ? '.' : `: ${gap}`),
         refusal,
         origin: refusalOrigin,
       });
@@ -464,7 +464,7 @@ export function CreateTicketFlow({
     if (outcome.kind === 'child-refused-after-reopen') {
       setReopenPrompt(null);
       setFailure({
-        headline: `${reopenPrompt.parentTitle} was reopened — that is now recorded history.`,
+        headline: `${reopenPrompt.parentTitle} was reopened. That is now recorded history.`,
         refusal: outcome.refusal,
         origin: 'server',
       });
@@ -569,7 +569,7 @@ export function CreateTicketFlow({
           }
         >
           {failure.headline !== null ? `${failure.headline} ` : ''}
-          {failure.origin === 'server' ? 'Refused by the server — ' : 'instant check — '}
+          {failure.origin === 'server' ? 'Refused by the server: ' : 'instant check: '}
           {failure.refusal.rule}: {failure.refusal.reason}
         </p>
       ) : null}

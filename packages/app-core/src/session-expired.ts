@@ -45,7 +45,7 @@ export class SessionExpiredError extends Error {
   readonly path: string;
 
   constructor(path: string, options?: { cause?: unknown }) {
-    super(`the session ended — ${path} answered 401`);
+    super(`the session ended: ${path} answered 401`);
     this.name = 'SessionExpiredError';
     this.path = path;
     if (options?.cause !== undefined) this.cause = options.cause;

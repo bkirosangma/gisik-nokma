@@ -229,7 +229,7 @@ cites, and the first draft cited a line it had not read.*
 
 - ✅ **13.301 — the reopen cause chip renders for a card whose `cause` is not null.** Witness: renders
   a card seeded `cause: { kind: 'reopened-for-child', childTicketId: 't_child' }` and asserts
-  `getByText('reopened — live work added')`. The plan's own mutation — delete the `card.cause !== null`
+  `getByText('reopened, live work added')`. The plan's own mutation — delete the `card.cause !== null`
   branch — reddens it, which is what makes it a guard rather than a screenshot. **Stated because a
   reader will assume both arms: this case has only one.** Every card in the render carries a cause, so
   nothing asserts the chip is ABSENT when `cause` is null; the `!== null` guard is witnessed from the
@@ -246,7 +246,7 @@ cites, and the first draft cited a line it had not read.*
   *time* half is witnessed against the domain's formatter rather than the machine's zone.
   (`packages/app-core/test/views/board.test.tsx`)
 
-- ✅ **13.303 — an empty project renders `No tickets here yet — create one.`** Witness: asserts
+- ✅ **13.303 — an empty project renders `No tickets here yet. Create one.`** Witness: asserts
   `getByText(EMPTY_BOARD_COPY)` **and** `expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create
   one.')` in the same case, so the rendered text is tied to the literal rather than to whatever the
   constant happens to hold — a re-export of an empty string would fail. Same case asserts
@@ -434,7 +434,7 @@ cites, and the first draft cited a line it had not read.*
   assumed:** `You have not been told this project’s name.` appears in exactly ONE SOURCE file repo-wide —
   every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`.
   **A SECOND withheld-name treatment does exist, and it is on TWO of the three surfaces, not three:**
-  `nameRestrictedProjectCount` and its `N projects · name restricted` line, consumed in exactly two files
+  `nameRestrictedProjectCount` and its `N projects, name restricted` line, consumed in exactly two files
   (`apps/web/app/workspaces/page.tsx:250`, `apps/web/app/w/[workspaceId]/page.tsx:628`), and IS asserted
   (`apps/web/test/workspaces-cards.test.tsx:257`, `:363`). **The members page carries NO withheld-name
   treatment at all** — it names no `nameRestrictedProjectCount`, draws no restricted line, and its only

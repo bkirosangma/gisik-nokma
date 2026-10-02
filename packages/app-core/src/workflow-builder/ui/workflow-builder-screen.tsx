@@ -176,7 +176,7 @@ export function WorkflowBuilderScreen(props: {
   if (loadFailed) {
     return (
       <p className="workflow-builder-screen__load-error">
-        Could not load workspace people and types — reload to try again.
+        Could not load workspace people and types. Reload to try again.
       </p>
     );
   }

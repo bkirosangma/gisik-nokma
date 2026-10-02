@@ -31,18 +31,18 @@ export function formatClaimDate(isoDay: string): string {
 export type AttributedDate = { date: string; actorId: string; note?: string };
 export type UserNameFn = (userId: string) => string;
 
-/** Spec §7's exact shape: "needed by 30 Aug — Kiro's claim". */
+/** Spec §7's exact shape: "needed by 30 Aug, Kiro's claim". */
 export function dueClaimLabel(claim: AttributedDate, userName: UserNameFn): string {
-  return `needed by ${formatClaimDate(claim.date)} — ${userName(claim.actorId)}'s claim`;
+  return `needed by ${formatClaimDate(claim.date)}, ${userName(claim.actorId)}'s claim`;
 }
 
 export function startClaimLabel(claim: AttributedDate, userName: UserNameFn): string {
-  return `starts ${formatClaimDate(claim.date)} — ${userName(claim.actorId)}'s claim`;
+  return `starts ${formatClaimDate(claim.date)}, ${userName(claim.actorId)}'s claim`;
 }
 
 /**
  * A custom date claim, labelled with the FIELD'S OWN NAME (owner sign-off
- * 2026-08-20). "Filed on: 30 Aug — Kiro's claim". The name is user-authored
+ * 2026-08-20). "Filed on: 30 Aug, Kiro's claim". The name is user-authored
  * and arbitrary, so it is placed verbatim ahead of a colon rather than
  * inflected into a sentence: we cannot know whether "Inspection date" wants
  * "on", "by" or nothing, and guessing grammar around someone's own words is
@@ -50,20 +50,20 @@ export function startClaimLabel(claim: AttributedDate, userName: UserNameFn): st
  * the name carries the meaning.
  */
 export function customClaimLabel(claim: CustomDateClaimView, userName: UserNameFn): string {
-  return `${claim.fieldName}: ${formatClaimDate(claim.date)} — ${userName(claim.actorId)}'s claim`;
+  return `${claim.fieldName}: ${formatClaimDate(claim.date)}, ${userName(claim.actorId)}'s claim`;
 }
 
 /** The note travels quoted, never paraphrased. */
 export function claimTooltip(label: string, claim: AttributedDate): string {
-  return claim.note === undefined ? label : `${label} · "${claim.note}"`;
+  return claim.note === undefined ? label : `${label}. "${claim.note}"`;
 }
 
 export function barProvenance(start: AttributedDate, due: AttributedDate, userName: UserNameFn): string {
-  return `${startClaimLabel(start, userName)} · ${dueClaimLabel(due, userName)}`;
+  return `${startClaimLabel(start, userName)}; ${dueClaimLabel(due, userName)}`;
 }
 
 export function contradictionCopy(start: AttributedDate, due: AttributedDate): string {
-  return `start ${formatClaimDate(start.date)} is after needed-by ${formatClaimDate(due.date)} — both claims shown, no bar drawn`;
+  return `start ${formatClaimDate(start.date)} is after needed-by ${formatClaimDate(due.date)}. Both claims shown, no bar drawn`;
 }
 
 /**
@@ -120,7 +120,7 @@ export function contradictionCopy(start: AttributedDate, due: AttributedDate): s
  * copy"*), so this arm is now the one that has to be honest about all of them.
  */
 export const CALENDAR_EMPTY_MONTH_COPY =
-  'No claimed dates are drawn in this month. Undated work is absent, not estimated — the calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed jobs being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.';
+  'No claimed dates are drawn in this month. Undated work is absent, not estimated. The calendar draws only what someone claimed. If a claim is here and not drawn, a narrowing kept it off this grid without dropping it: your filter, closed tickets being hidden, a field you switched off in the legend, or an epic, which is drawn in the List and not here.';
 
 /**
  * The SECOND empty month, and it is a different fact.
@@ -163,7 +163,7 @@ export const CALENDAR_EMPTY_MONTH_COPY =
  * statements of one condition are free to drift.
  */
 export const CALENDAR_ALL_HIDDEN_COPY =
-  'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped — switch a field back on in the legend to see its claims again.';
+  'Every claimed date in this month belongs to a field you have hidden. Nothing was dropped. Switch a field back on in the legend to see its claims again.';
 
 /**
  * The side-list sentence when EVERY entry is a ticket with no start and no due date at all (UX fixes T8, 23.143,
@@ -236,7 +236,7 @@ export const TIMELINE_SIDE_LIST_UNDRAWABLE_COPY =
  * `timeline-view.test.tsx`'s "names only controls the TIMELINE has".
  */
 export const TIMELINE_EMPTY_COPY =
-  'No claimed dates are here to draw. Undated work is absent, not estimated — the timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed jobs being hidden, or an epic, which is drawn in the List and not here.';
+  'No claimed dates are here to draw. Undated work is absent, not estimated. The timeline draws only the periods someone claimed. If a claim is here and not drawn, a narrowing kept it off these weeks without dropping it: your filter, closed tickets being hidden, or an epic, which is drawn in the List and not here.';
 
 /**
  * The THIRD empty timeline, and the ONE case the component cannot reconstruct
@@ -256,7 +256,7 @@ export const TIMELINE_EMPTY_COPY =
  * stated is true either way.
  */
 export const TIMELINE_OUT_OF_WINDOW_COPY =
-  'Dated work here sits outside the weeks in view. Nothing was dropped — move the window Earlier or Later to reach it.';
+  'Dated work here sits outside the weeks in view. Nothing was dropped. Move the window Earlier or Later to reach it.';
 
 /**
  * A claimed day that no calendar has, named rather than silently dropped.
@@ -294,5 +294,5 @@ export function unplaceableDayCopy(days: readonly string[]): string {
   const distinct = [...new Set(days.map((day) => formatClaimDate(day)))];
   const named = distinct.join(' and ');
   const verb = distinct.length > 1 ? 'are not days' : 'is not a day';
-  return `${named} ${verb} on the calendar — the claim is shown as recorded, and no bar is drawn`;
+  return `${named} ${verb} on the calendar. The claim is shown as recorded, and no bar is drawn`;
 }

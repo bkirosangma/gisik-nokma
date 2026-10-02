@@ -300,7 +300,7 @@ describe('22.204 a name is renamed in place', () => {
   });
 
   it('22.204 a refused rename shows the server\'s reason and keeps the field open', async () => {
-    const reason = 'Refused by the server — group-name-unique: a group named "Beta" already exists here.';
+    const reason = 'Refused by the server: group-name-unique: a group named "Beta" already exists here.';
     renderTree({ result: { ok: false, message: reason } });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Alpha' }));
@@ -554,7 +554,7 @@ describe('22.215 the page reports what the server said', () => {
     await user.click(screen.getByRole('button', { name: 'Add group' }));
     await user.type(screen.getByRole('textbox', { name: 'Group name' }), 'Platform{Enter}');
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — group.name-taken: A group named "Platform" already exists here.',
+      'Refused by the server: group.name-taken: A group named "Platform" already exists here.',
     );
     // The refused field stays open and nothing was drawn.
     expect(screen.queryByRole('treeitem', { name: 'Platform' })).toBeNull();

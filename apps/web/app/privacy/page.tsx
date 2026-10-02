@@ -82,11 +82,11 @@ const SECTIONS: readonly LegalSection[] = [
         <ul>
           <li>
             <strong>Your identity.</strong> An email address, or a Google account, or a passkey
-            registered from your device. <strong>We never store a password</strong> — the product
+            registered from your device. <strong>We never store a password</strong>. The product
             does not have passwords.
           </li>
           <li>
-            <strong>The work you record.</strong> Jobs, stages, comments, dates, and who was
+            <strong>The work you record.</strong> Tickets, states, comments, dates, and who was
             assigned what. This is the content you and your colleagues put in deliberately.
           </li>
           <li>
@@ -108,8 +108,8 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           On servers in <strong>India</strong>, with attachments in object storage in the same
-          region. The product&rsquo;s clock is India Standard Time for every user in every country
-          — a day boundary means India&rsquo;s day. That is a product decision with a privacy
+          region. The product&rsquo;s clock is India Standard Time for every user in every country.
+          A day boundary means India&rsquo;s day. That is a product decision with a privacy
           consequence worth stating: timestamps we show you are in IST, not your local time.
         </p>
       </>
@@ -121,7 +121,7 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           Gisik Nokma records work as an <strong>append-only history</strong>. Changes are added;
-          they are not overwritten. That is the whole point of the product — it is what lets it
+          they are not overwritten. That is the whole point of the product: it is what lets it
           answer &ldquo;who said this, and when&rdquo; a year later.
         </p>
         <p className="gn-legal__flag">
@@ -130,7 +130,7 @@ const SECTIONS: readonly LegalSection[] = [
           account removes your ability to sign in and your personal details; what it does{' '}
           <em>not</em> currently do is remove your name from changes you made to work that your
           colleagues still rely on. <strong>[ENTITY NAME] must decide, with legal advice, how to
-          reconcile this before handling real user data</strong> — for example by replacing an
+          reconcile this before handling real user data</strong>, for example by replacing an
           identity with an anonymous marker while keeping the sequence of events intact.
         </p>
       </>
@@ -147,8 +147,8 @@ const SECTIONS: readonly LegalSection[] = [
           Google, Google knows you did.
         </p>
         <p>
-          <strong>Within your workspace, visibility is set per job</strong>, and colleagues see what
-          those settings allow. The product will tell somebody that a job is restricted; it will not
+          <strong>Within your workspace, visibility is set per ticket</strong>, and colleagues see what
+          those settings allow. The product will tell somebody that a ticket is restricted; it will not
           tell them what is in it.
         </p>
       </>
@@ -160,7 +160,7 @@ const SECTIONS: readonly LegalSection[] = [
       <>
         <p>
           One thing: your sign-in link. Gisik Nokma sends no notification emails, no text messages
-          and no push notifications — notifications appear only inside the product. We do not send
+          and no push notifications. Notifications appear only inside the product. We do not send
           marketing.
         </p>
       </>
@@ -206,8 +206,8 @@ export default function PrivacyPolicy() {
           not yet filled in.
         </p>
         <p className="gn-legal__meta">
-          Last updated <strong>[DATE]</strong> · Operated by <strong>[ENTITY NAME]</strong> ·
-          Governed by the laws of <strong>[JURISDICTION]</strong>
+          Last updated <strong>[DATE]</strong>. Operated by <strong>[ENTITY NAME]</strong>.
+          Governed by the laws of <strong>[JURISDICTION]</strong>.
         </p>
         <LegalToc sections={SECTIONS} />
 

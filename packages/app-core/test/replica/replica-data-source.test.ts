@@ -563,7 +563,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         // work keeps the property; hard-coding any one of them would have made
         // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`.
         expect(absence.owner, `${name}: ${absence.field}`).toMatch(
-          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan) — /,
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan): /,
         );
       }
       names.push(name);
@@ -595,7 +595,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     const { ds } = await fixture();
     await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);
     const err = (await ds.query.getDeletedItems().catch((e: unknown) => e)) as ReplicaGapError;
-    expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] — until one online read is cached on this device']);
+    expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] (until one online read is cached on this device)']);
 
     // CONTROL, same fixture: a method this replica actually answers.
     await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
@@ -856,7 +856,7 @@ describe('12.187 the three doors an offline-born ticket reaches', () => {
     // this assertion pinning the stale half. An owner-less gap gets dropped
     // rather than deferred, and a gap owned by a task that cannot discharge it
     // is the same thing wearing a name.
-    expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Lane A, closure 2b \(ruling P34\) — /);
+    expect(OFFLINE_BORN_ABSENCE.owner).toMatch(/^Lane A, closure 2b \(ruling P34\): /);
     // Non-vacuity in the same run: the field is a real sentence naming the
     // remedy, not just a prefix that satisfies the regex above.
     expect(OFFLINE_BORN_ABSENCE.owner).toContain('unions getTickets with listTicketSummaries');
@@ -1399,7 +1399,7 @@ describe('16.56 the attachments read refuses although the local ledger holds the
     // dropped rather than deferred.
     expect(absence?.field).toContain('AttachmentListEntry');
     expect(absence?.because).toContain('attachments table');
-    expect(absence?.owner).toMatch(/^Plan 10 — /);
+    expect(absence?.owner).toMatch(/^Plan 10: /);
   });
 });
 

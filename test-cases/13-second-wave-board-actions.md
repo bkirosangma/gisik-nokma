@@ -97,7 +97,7 @@ were never in scope for a client whose route cannot serve them.
   prototype's own string (`:3032`) hardcodes "one owner"; the port counts owners and admins from the
   roster instead, and it counts the people THIS viewer may be told about rather than the workspace's
   membership, because `readMembers` hides guests from a non-admin caller. The sentence is therefore
-  `You can see N people · O owner(s), A admin(s). Membership and roles are per workspace.` The case
+  `You can see N people: O owner(s), A admin(s). Membership and roles are per workspace.` The case
   mounts TWICE over two different rosters — two people, one owner; then three people, one owner, one
   admin, with a guest riding along in the total and in neither count. A constant, or a summary counted
   from a fixture, passes the first mount and fails the second, which is the pair's entire job.
@@ -619,7 +619,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   immediately would let the reload land first and make "the row moved optimistically" indistinguishable
   from "the row moved". The refusal case asserts the optimistic position FIRST and then the snap-back, so a
   component that never moved at all cannot satisfy it, and it asserts the Ruling-27 sentence shape
-  (`Refused by the server — <rule>: <reason>`) rather than merely that something was rendered.
+  (`Refused by the server: <rule>: <reason>`) rather than merely that something was rendered.
   `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:850`, `:351`,
   `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:334`
 
@@ -2114,7 +2114,7 @@ not see are one answer and a client that told them apart would be inventing the 
 server refused to provide. The sheet gated its whole body on `data === null` and drew `Loading…` — a
 server refusal rendered as a wait that never ends, measured on a live page at 2.5 s, 8.5 s, 18.5 s and 61 s.
 
-- **13.1112** ✅ A ticket the server answers 404 for renders *"This ticket is not here — it may have been
+- **13.1112** ✅ A ticket the server answers 404 for renders *"This ticket is not here. It may have been
   deleted, or you may not be able to see it."*, and `Loading…` is NOT on the screen. Asserted on the pair,
   because the two states shared one branch: a case asserting only the sentence passes on a sheet drawing
   both. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)

@@ -254,7 +254,7 @@ function WorkItemCard({
       {pending ? <Chip tone="pending">claim in transit</Chip> : null}
       {item.dueDate !== null ? (
         <span className="gn-my-work__due">
-          {`needed by ${formatDate(item.dueDate.date)} — ${actorLabel(item.dueDate.claim.actorId, item.dueDate.claim.actorName)}'s claim`}
+          {`needed by ${formatDate(item.dueDate.date)}, ${actorLabel(item.dueDate.claim.actorId, item.dueDate.claim.actorName)}'s claim`}
         </span>
       ) : null}
     </Card>

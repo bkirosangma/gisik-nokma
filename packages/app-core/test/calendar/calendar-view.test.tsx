@@ -115,7 +115,7 @@ describe('11.61 a marker is a claim, attributed, and it opens its ticket', () =>
       fields: { title: claimField('DLT'), dueDate: claimField({ date: '2026-08-30' }) },
     });
     const onOpenTicket = renderCalendar([input]);
-    const marker = markerBy("needed by 30 Aug — Kiro's claim");
+    const marker = markerBy("needed by 30 Aug, Kiro's claim");
     fireEvent.click(marker);
     expect(onOpenTicket).toHaveBeenCalledWith(input.state.id);
   });
@@ -131,7 +131,7 @@ describe('11.61 a marker is a claim, attributed, and it opens its ticket', () =>
     ]);
     expect(markerBy(/needed by 30 Aug/)).toHaveAttribute(
       'title',
-      'needed by 30 Aug — Anselma\'s claim · "after the bank account opens"',
+      'needed by 30 Aug, Anselma\'s claim. "after the bank account opens"',
     );
   });
 });
@@ -150,7 +150,7 @@ describe('11.62 a bar is drawn only from a claimed pair, and it spans the days i
     const bar = screen.getByRole('button', { name: 'Span' });
     expect(bar).toHaveAttribute(
       'title',
-      "starts 24 Aug — Kiro's claim · needed by 30 Aug — Kiro's claim",
+      "starts 24 Aug, Kiro's claim; needed by 30 Aug, Kiro's claim",
     );
     // The week 2026-08-24 … 2026-08-30 is exactly the fifth grid row, so the
     // bar covers all seven columns: grid lines 1 through 8.
@@ -401,7 +401,7 @@ describe('11.68 a custom date claim renders under its own field name', () => {
       [{ id: 'filed-on', name: 'Filed on' }],
     );
     const onOpenTicket = renderCalendar([input]);
-    const marker = markerBy("Filed on: 30 Aug — Kiro's claim");
+    const marker = markerBy("Filed on: 30 Aug, Kiro's claim");
     expect(marker).toHaveAttribute('data-field-id', 'filed-on');
     fireEvent.click(marker);
     expect(onOpenTicket).toHaveBeenCalledWith(input.state.id);
@@ -619,11 +619,11 @@ describe('11.71 the grid says which days belong to the month it is headed by', (
       ticket({ fields: { title: claimField('September'), dueDate: claimField({ date: '2026-09-01' }) } }),
     ]);
     // 2026-07-31 is the Friday of the leading row (27 Jul – 2 Aug).
-    const july = markerBy("needed by 31 Jul — Kiro's claim");
+    const july = markerBy("needed by 31 Jul, Kiro's claim");
     expect(july.closest('li')).toHaveStyle({ gridColumn: '5 / 6' });
     expect(july.closest('[data-week]')).toHaveAttribute('data-week', '2026-07-27');
     // 2026-09-01 is the Tuesday of the trailing row (31 Aug – 6 Sep).
-    const september = markerBy("needed by 1 Sep — Kiro's claim");
+    const september = markerBy("needed by 1 Sep, Kiro's claim");
     expect(september.closest('li')).toHaveStyle({ gridColumn: '2 / 3' });
     expect(september.closest('[data-week]')).toHaveAttribute('data-week', '2026-08-31');
     // Neither is the honesty note's business: the month is not empty.
@@ -721,7 +721,7 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
  * title alone — the date span lives only in the `title` attribute, which is
  * not reliably read by assistive tech (it requires hover, which touch/mobile
  * AT has no equivalent for). A marker's own accessible name already carries
- * its date (`item.label`, e.g. "needed by 30 Aug — Kiro's claim" —
+ * its date (`item.label`, e.g. "needed by 30 Aug, Kiro's claim" —
  * `itemClassName`'s sibling docblock: "the accessible name is the claim and
  * nothing else"), so this fix does not touch markers.
  */
@@ -765,7 +765,7 @@ describe("11.222 a bar's date span is a linked DESCRIPTION, not folded into its 
     expect(describedById).not.toBeNull();
     const description = document.getElementById(describedById!);
     expect(description).not.toBeNull();
-    expect(description).toHaveTextContent("starts 24 Aug — Kiro's claim · needed by 30 Aug — Kiro's claim");
+    expect(description).toHaveTextContent("starts 24 Aug, Kiro's claim; needed by 30 Aug, Kiro's claim");
     // Not a second, competing statement of the same text: the attribute the
     // hover-only title carried is unchanged, and the description is the SAME
     // string linked a second, AT-reachable way — not a duplicate invention.
@@ -778,11 +778,11 @@ describe("11.222 a bar's date span is a linked DESCRIPTION, not folded into its 
         fields: { title: claimField('DLT'), dueDate: claimField({ date: '2026-08-30' }) },
       }),
     ]);
-    const marker = markerBy("needed by 30 Aug — Kiro's claim");
+    const marker = markerBy("needed by 30 Aug, Kiro's claim");
     expect(marker).toHaveAccessibleName('DLT');
     const describedById = marker.getAttribute('aria-describedby');
     expect(describedById).not.toBeNull();
-    expect(document.getElementById(describedById!)).toHaveTextContent("needed by 30 Aug — Kiro's claim");
+    expect(document.getElementById(describedById!)).toHaveTextContent("needed by 30 Aug, Kiro's claim");
   });
 });
 
@@ -842,10 +842,10 @@ describe('23.140 a calendar marker names its ticket (audit PV-05)', () => {
     expect(chip).toHaveTextContent('CCSO-4 Which GST scheme is the firm on');
     expect(chip.textContent).not.toContain('needed by');
     // The claim is still said — as the hover tooltip AND as a description a touch reader hears.
-    expect(chip.getAttribute('title')).toContain("needed by 28 Aug — Kiro's claim");
+    expect(chip.getAttribute('title')).toContain("needed by 28 Aug, Kiro's claim");
     const describedBy = chip.getAttribute('aria-describedby');
     expect(describedBy).not.toBeNull();
-    expect(document.getElementById(describedBy ?? '')?.textContent).toContain("needed by 28 Aug — Kiro's claim");
+    expect(document.getElementById(describedBy ?? '')?.textContent).toContain("needed by 28 Aug, Kiro's claim");
 
     // CONTROL — an unkeyed (offline) ticket shows the title only: no "null", no leading space, no invented key.
     document.body.innerHTML = '';

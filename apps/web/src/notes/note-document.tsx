@@ -51,7 +51,7 @@ import { useNoteAutosave } from './use-note-autosave.js';
  * or "not yours" must not guess which of the two it was.
  */
 const NOT_PLACEABLE =
-  'That ticket cannot be opened from here — the server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
+  'That ticket cannot be opened from here. The server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
 
 /**
  * What the locator said about the currently open ticket — keyed by the
@@ -242,7 +242,7 @@ function NoteDocumentBody({
         setPlacement({
           ticketId: openTicketId,
           projectId: null,
-          notice: `That ticket could not be opened — ${cause instanceof Error ? cause.message : String(cause)}`,
+          notice: `That ticket could not be opened: ${cause instanceof Error ? cause.message : String(cause)}`,
         });
       },
     );
