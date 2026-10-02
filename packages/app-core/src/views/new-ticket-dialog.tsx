@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useId, useRef, useState } from 'react';
 import {
   DEFAULT_PRIORITY,
   DEEPEST_RANK,
@@ -907,8 +907,49 @@ export function NewTicketDialog({
     });
   };
 
+  // Why Create is disabled, said in the footer (23.124) — the first reason that holds. `submitting` is not one: a
+  // request already on the wire needs no hint, only the disabled look.
+  const hintId = useId();
+  const disabledHint =
+    title.trim() === ''
+      ? 'Add a title to create the ticket'
+      : typeId === '' || !typeOptions.some((option) => option.id === typeId)
+        ? 'Choose a type to create the ticket'
+        : startDateInvalid || dueDateInvalid
+          ? 'Fix the dates to create the ticket'
+          : null;
+
   return (
-    <Dialog open={open} title="Create ticket" onClose={onClose}>
+    <Dialog
+      open={open}
+      title="Create ticket"
+      onClose={onClose}
+      // UX fixes T7 (BRD-09, case 23.124): the actions live in the dialog's footer, outside the scrolling body, so
+      // "Create ticket" is in view at any height; while it is disabled the footer says why.
+      footer={
+        <>
+          {disabledHint === null ? null : (
+            <p id={hintId} className="gn-dialog__footer-hint">
+              {disabledHint}
+            </p>
+          )}
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="primary"
+            // `submitting` is the render half of the duplicate-submit guard (the ref is what actually stops one):
+            // a control that looks pressable while a request is on the wire is a lie. The other terms are the
+            // three reasons `disabledHint` names. The type term is MEMBERSHIP, not emptiness (E2-33a): `typeId ===
+            // ''` passes for an id the list no longer offers, and a payload may only carry a type the picker offers.
+            // The two date inputs (addendum, 2026-09-23): a submit must carry a real day or nothing.
+            disabled={disabledHint !== null || submitting}
+            aria-describedby={disabledHint === null ? undefined : hintId}
+            onClick={create}
+          >
+            Create ticket
+          </Button>
+        </>
+      }
+    >
       <label className="gn-new-ticket__field">
         Title
         {/* `gn-field__input` — the product's own field treatment, and the one
@@ -1337,38 +1378,6 @@ export function NewTicketDialog({
               }}
             />
           ) : null}
-      <div className="gn-new-ticket__actions">
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          variant="primary"
-          // `submitting` is the third term and it is the RENDER half of the guard
-          // above: the ref is what actually stops a duplicate, and this is what
-          // tells the person a request is already on the wire. A control that
-          // looks pressable while it is not is the same lie in the other
-          // direction.
-          //
-          // The last term is MEMBERSHIP, not emptiness (E2-33a): `typeId === ''`
-          // is a string test, and it passes for an id the list no longer offers.
-          // The effect above re-seeds that case already, so this term is the
-          // belt to its braces — a payload may only ever carry a type the picker
-          // is offering, whatever a future seed does.
-          disabled={
-            title.trim() === '' ||
-            typeId === '' ||
-            !typeOptions.some((option) => option.id === typeId) ||
-            submitting ||
-            // The two date inputs (addendum, 2026-09-23): a submit this
-            // handler reaches must carry a real day or nothing, since there
-            // is no precheck branch to catch a malformed one server-side
-            // before it reaches the payload door.
-            startDateInvalid ||
-            dueDateInvalid
-          }
-          onClick={create}
-        >
-          Create ticket
-        </Button>
-      </div>
     </Dialog>
   );
 }

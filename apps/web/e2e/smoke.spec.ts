@@ -362,8 +362,8 @@ test('the board renders a card, its restricted-count line, and its attributed pr
   await page.goto(`/w/${WS}/p/${PRJ}`);
   await expect(page.getByRole('region', { name: 'Doing' })).toBeVisible();
   await expect(page.getByText('5 of 8 done · 2 restricted')).toBeVisible();
-  await page.getByRole('button', { name: 'who · when' }).click();
-  await expect(page.getByText('marked Doing by Anselma Marak on 19 Aug 2026')).toBeVisible();
+  await page.getByRole('button', { name: /^Moved to Doing by/ }).click();
+  await expect(page.getByText('Moved to Doing by Anselma Marak on 19 Aug 2026')).toBeVisible();
 });
 
 test('an invite link names the workspace and offers the join', async ({ page }) => {
