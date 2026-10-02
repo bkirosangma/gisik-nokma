@@ -8,8 +8,11 @@ import {
   type ResolveContestInput,
 } from '@gisik-nokma/app-core';
 import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaimText } from '@gisik-nokma/domain';
-import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
+import { EDITOR_MIN_HEIGHT } from '../editor/editor-band.js';
+import { loadEditorHtml } from '../editor/editor-html-loader.js';
+import { EDITOR_LOAD_FAILURE_MESSAGE } from '../editor/editor-refusals.js';
+import { SkeletonBlock, TicketSkeleton } from '../components/skeleton.js';
 import { loadTicket } from './ticket-read.js';
 import { buildCommentEvent, COMMENTING_AVAILABLE, COMMENTING_WITHHELD_MESSAGE } from './ticket-comment.js';
 import { queryWorkspaceMembers } from './mention-query.js';
@@ -24,6 +27,23 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   const [draft, setDraft] = useState<EditorDoc>(plainTextToDoc('') as EditorDoc);
   const [error, setError] = useState<string | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
+  // The editor page arrives by a lazy import on the first open (spec §3.3); the slot is a skeleton until it is here.
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    loadEditorHtml().then(
+      (page) => {
+        if (live) setHtml(page);
+      },
+      () => {
+        if (live) setError(EDITOR_LOAD_FAILURE_MESSAGE);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (ds === null) return;
@@ -41,9 +61,9 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
     return ds.subscribe('', 0, refresh);
   }, [ds, ticketId]);
 
-  if (ds === null) return <Text>Opening…</Text>;
+  if (ds === null) return <TicketSkeleton />;
   if (readError !== null) return <Text accessibilityRole="alert">{readError}</Text>;
-  if (ticket === null) return <Text>Opening…</Text>;
+  if (ticket === null) return <TicketSkeleton />;
   const state = ticket.pending?.pending ?? ticket.confirmed;
   const openContests = ticket.contests.filter((c) => !c.resolved);
   const title = String((state?.fields.title?.value as string | undefined) ?? '');
@@ -131,15 +151,19 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
       ))}
       {COMMENTING_AVAILABLE ? (
         <>
-          <EditorWebView
-            initialDoc={draft}
-            onChange={setDraft}
-            html={EDITOR_HTML}
-            onMentionQuery={(query) =>
-              queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })
-            }
-            onEditorError={setError}
-          />
+          {html === null ? (
+            <SkeletonBlock height={EDITOR_MIN_HEIGHT} />
+          ) : (
+            <EditorWebView
+              initialDoc={draft}
+              onChange={setDraft}
+              html={html}
+              onMentionQuery={(query) =>
+                queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })
+              }
+              onEditorError={setError}
+            />
+          )}
           {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
           <Text accessibilityRole="text">
             Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.

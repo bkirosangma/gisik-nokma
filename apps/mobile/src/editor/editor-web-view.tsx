@@ -9,6 +9,8 @@ import {
   EDITOR_READY_TIMEOUT_MS,
   readyTimedOut,
 } from './editor-refusals.js';
+import { EDITOR_FRAME_STYLE, EDITOR_MIN_HEIGHT } from './editor-band.js';
+import { SkeletonBlock } from '../components/skeleton.js';
 
 type LoadDocMessage = Extract<HostToEditorMessage, { kind: 'loadDoc' }>;
 type ChangeMessage = Extract<EditorToHostMessage, { kind: 'change' }>;
@@ -153,6 +155,10 @@ export function EditorWebView(props: EditorWebViewProps) {
       ref={ref}
       originWhitelist={['about:*']}
       source={source}
+      style={EDITOR_FRAME_STYLE}
+      // The page is loading: a skeleton of the editor's own height, so the ScrollView keeps its band (spec §3.3).
+      startInLoadingState
+      renderLoading={() => <SkeletonBlock height={EDITOR_MIN_HEIGHT} />}
       onMessage={onMessage}
       javaScriptEnabled
       // Door (b): the WebView itself failing to load used to render a blank
