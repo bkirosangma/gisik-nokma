@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { useAppServices, useSessionStatus } from './providers.js';
 
 /**
@@ -52,7 +53,24 @@ export function clearWorkspaceNameCache(): void {
   nameCache.clear();
 }
 
-export function useWorkspaceName(workspaceId: string | undefined): string | null {
+/**
+ * The name AND the nav dropdown's rows out of the ONE `getMyWorkspaces` read (U-T14, cases 23.254–23.257).
+ *
+ * `others` is the viewer's other workspaces for the nav's workspace-name dropdown: **live only** (an archived one is not
+ * somewhere `/workspaces` lists among the open ones — the rule Last project's dropdown follows for projects), **never
+ * the one the bar is about** (the name beside it is that workspace; the list is where ELSE to go), served order kept,
+ * neither sorted nor re-derived. `[]` is what the caller renders no dropdown for, so a pending read, a refused one and a
+ * viewer with a single workspace all give the same answer: the name stays a plain link.
+ *
+ * It rides this hook rather than making a second request because the name's `.then` already holds the rows: one bar
+ * mount sends ONE request, which case 23.254 counts. `others` is not cached across mounts, unlike the name: the only
+ * cost of a cold start is the dropdown appearing a tick after the name, whereas a cached list could offer a workspace
+ * the viewer has since left. The name's own semantics are exactly the ones documented above.
+ */
+export function useWorkspaceLookup(workspaceId: string | undefined): {
+  name: string | null;
+  others: readonly WorkspaceRef[];
+} {
   const { dataSource } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
@@ -60,10 +78,12 @@ export function useWorkspaceName(workspaceId: string | undefined): string | null
     // The remount's head start; `useState`'s initialiser runs once per mount.
     () => (workspaceId === undefined ? null : (nameCache.get(workspaceId) ?? null)),
   );
+  const [others, setOthers] = useState<readonly WorkspaceRef[]>([]);
 
   useEffect(() => {
     if (workspaceId === undefined || !signedIn) {
       setName(null);
+      setOthers([]);
       return;
     }
     let cancelled = false;
@@ -79,9 +99,12 @@ export function useWorkspaceName(workspaceId: string | undefined): string | null
         if (found === null) nameCache.delete(workspaceId);
         else nameCache.set(workspaceId, found);
         setName(found);
+        setOthers(rows.filter((row) => !row.archived && row.id !== workspaceId));
       },
       () => {
-        if (!cancelled) setName(null);
+        if (cancelled) return;
+        setName(null);
+        setOthers([]);
       },
     );
     return () => {
@@ -89,5 +112,9 @@ export function useWorkspaceName(workspaceId: string | undefined): string | null
     };
   }, [dataSource, workspaceId, signedIn]);
 
-  return name;
+  return { name, others };
+}
+
+export function useWorkspaceName(workspaceId: string | undefined): string | null {
+  return useWorkspaceLookup(workspaceId).name;
 }
