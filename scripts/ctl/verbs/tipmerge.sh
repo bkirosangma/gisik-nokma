@@ -4,7 +4,7 @@
 # pushes it to <branch> with a plain (fast-forward-only) push. CLEAN → the new sha is printed and the caller gates it. CONFLICTED → the paths are printed, exit 3,
 # nothing is pushed: that case still goes to a lane (and a reviewer fast path for the hand-resolved files). Nothing in any checkout is read or written.
 # --expect <sha> is REQUIRED (7-40 hex): the branch tip the caller saw as READY; a branch that has moved since is refused, never merged under the caller's feet.
-# <branch> can never be main or release/<name> (a push there is a release or a deploy, not a task's tip merge). The push is never forced.
+# <branch> can never be main or any release/* name (a push there is a release or a deploy, not a task's tip merge). The push is never forced.
 set -u
 . "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
 ctl_parse_common "$@" || exit 1
@@ -23,7 +23,7 @@ done
 [ "$have_base" = 1 ] || ctl_fail tipmerge "--base is required ($usage)"
 [[ "$expect" =~ ^[0-9a-f]{7,40}$ ]] || ctl_fail tipmerge "--expect needs the READY sha, 7-40 hex characters (got '${expect}') — $usage"
 # The branch is what gets pushed to: never an integration branch, never a name git would read as something else.
-if ctl_base_valid "$branch" || [ "$branch" = HEAD ] || [[ "$branch" == refs/* ]] || [[ "$branch" == -* ]] || ! /usr/bin/git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+if ctl_base_valid "$branch" || [[ "$branch" == release/* ]] || [ "$branch" = HEAD ] || [[ "$branch" == refs/* ]] || [[ "$branch" == -* ]] || ! /usr/bin/git check-ref-format --branch "$branch" >/dev/null 2>&1; then
   ctl_fail tipmerge "'$branch' is not a task branch — main, release/<name>, HEAD and invalid ref names are refused (a push there is a release, not a tip merge)"
 fi
 cd "$CTL_REPO" || exit 1
@@ -67,4 +67,4 @@ log="$(ctl_log tipmerge)"
 # Positive proof: origin itself says the branch is now the commit we made (an accepted push can still be rewound by a hook).
 got="$(/usr/bin/git ls-remote origin "refs/heads/$branch" 2>/dev/null | awk '{print $1}')"
 [ "$got" = "$new" ] || ctl_fail tipmerge "origin/$branch is ${got:-unreadable}, not the pushed ${new:0:12} (log $log)"
-ctl_ok tipmerge "$branch $new merged origin/$CTL_BASE ${btip:0:12} into ${tip:0:12}, tree ${tree:0:12} = the auto-merge tree, pushed — gate it from a checkout of $branch (git pull --ff-only): ctl gate $new --base $CTL_BASE"
+ctl_ok tipmerge "$branch $new merged origin/$CTL_BASE ${btip:0:12} into ${tip:0:12}, tree ${tree:0:12} = the auto-merge tree, pushed — gate it from the gate checkout at the new sha (git fetch origin && git checkout --detach $new): ctl gate $new --base $CTL_BASE; the lane's local $branch is now behind origin — a lane that commits on it again must git pull --ff-only in its OWN worktree first"

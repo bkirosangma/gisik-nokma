@@ -59,13 +59,14 @@ refuse_branch() { # refuse_branch NAME MSG — the verb refuses NAME with MSG be
 }
 check "13.1775 refuses main as the branch (a push there deploys production)" 'refuse_branch main "not a task branch"'
 check "13.1775 refuses release/<name> as the branch (the integration branch moves by PR, not by this verb)" 'refuse_branch release/2026-10-99 "not a task branch" && refuse_branch release/other "not a task branch"'
+check "13.1775 refuses ANY release/* name, also ones ctl_base_valid rejects as a base (a valid ref name that is no valid integration-branch name)" 'refuse_branch release/-x "not a task branch" && refuse_branch release/x/-y "not a task branch" && refuse_branch release/a_b "not a task branch"'
 check "13.1775 refuses HEAD, an empty name, a leading dash and an invalid ref name" 'refuse_branch HEAD "not a task branch" && refuse_branch "task/a..b" "not a task branch" && refuse_branch "task/a b" "not a task branch" && refuse_branch refs/heads/task/x "not a task branch" && refuse_branch "" usage && refuse_branch -x "unknown arg"'
 check "13.1775 CONTROL — an ordinary task/* branch is accepted (the refusals above are the validation, not a broken fixture)" 'mk clean; run; [ $rc -eq 0 ]'
 check "13.1775 refuses a branch that is not on origin" 'mk clean; out=$("$HERE/ctl" tipmerge task/nope --base "$BASE" --expect "$exp" --repo "$w" 2>&1); [ $? -eq 1 ] && printf "%s\n" "$out" | tail -1 | grep -q "^FAIL tipmerge.*cannot fetch"'
 
 # --- 13.1776: arguments ---------------------------------------------------------------------------------------------------
 argfail() { local m="$1"; shift; out=$("$HERE/ctl" tipmerge "$@" --repo "$w" 2>&1); rc=$?; [ $rc -eq 1 ] && printf '%s\n' "$out" | tail -1 | grep -q "^FAIL tipmerge.*$m"; }
-check "13.1776 --base is required, and must be main or release/<name>" 'mk clean; argfail "--base is required" task/x --expect "$exp" && argfail "main or release/" task/x --base feat/y --expect "$exp" && argfail "needs a value" task/x --base "" --expect "$exp" && out=$("$HERE/ctl" tipmerge task/x --base feat/y --expect "$exp" --repo "$w" 2>&1); printf "%s\n" "$out" | grep -q "main or release/"'
+check "13.1776 --base is required, and must be main or release/<name>" 'mk clean; argfail "--base is required" task/x --expect "$exp" && argfail "main or release/" task/x --base feat/y --expect "$exp" && argfail "needs a value" task/x --base "" --expect "$exp"'
 check "13.1776 --expect is required, and must be 7-40 hex characters" 'mk clean; argfail "needs the READY sha" task/x --base "$BASE" && argfail "needs the READY sha" task/x --base "$BASE" --expect zzzzzzz && argfail "needs the READY sha" task/x --base "$BASE" --expect abc12 && argfail "needs the READY sha" task/x --base "$BASE" --expect ""'
 check "13.1776 no branch, an extra positional and an unknown flag all refuse" 'mk clean; argfail "usage" --base "$BASE" --expect "$exp" && argfail "unexpected argument" task/x extra --base "$BASE" --expect "$exp" && argfail "unknown arg" task/x --base "$BASE" --expect "$exp" --force'
 
@@ -78,6 +79,7 @@ check "13.1777 clean: base is now an ancestor of the branch (what ctl gate --bas
 check "13.1777 clean: no other ref on origin moved" 'mk clean; before=$(refs_but task/x); run; [ $rc -eq 0 ] && [ "$(refs_but task/x)" = "$before" ] && [ -n "$before" ]'
 check "13.1777 clean: the commit message names the base and the branch" 'mk clean; run; $G -C "$bare" log -1 --format=%s "$(okline_sha)" | grep -q "^Merge origin/$BASE .*into task/x"'
 check "13.1777 clean: the OK line prints the gate command for the new sha" 'mk clean; run; printf "%s\n" "$last" | grep -q "ctl gate $(okline_sha) --base $BASE"'
+check "13.1777 clean: the OK line sends the gate to a detached checkout at the new sha (not a pull in the lane worktree) and says a lane must pull in its OWN worktree" 'mk clean; run; printf "%s\n" "$last" | grep -q "git fetch origin && git checkout --detach $(okline_sha)" && printf "%s\n" "$last" | grep -q "OWN worktree" && ! printf "%s\n" "$last" | grep -q "gate it from a checkout of"'
 check "13.1778 clean (one file, distant hunks): exit 0 and the tree equals the independent merge's" 'mk text; run; [ $rc -eq 0 ] && [ "$($G -C "$bare" rev-parse "$(okline_sha)^{tree}")" = "$itree" ] && $G -C "$bare" show "$(okline_sha):a.txt" | sed -n "2p;28p" | tr "\n" " " | grep -q "^task release $"'
 
 # --- 13.1779: no working tree is touched ------------------------------------------------------------------------------------
@@ -121,6 +123,11 @@ check "13.1787 the push names exactly refs/heads/\$branch" 'pushes "$V" | /usr/b
 
 # --- 13.1788: wiring ---------------------------------------------------------------------------------------------------------
 check "13.1788 ctl help lists tipmerge" '"$HERE/ctl" help | grep -q "^  tipmerge "'
-check "13.1788 selftest.sh runs this suite and a tipmerge refusal step" '/usr/bin/grep -q "tipmerge.test.sh" "$HERE/verbs/selftest.sh" && /usr/bin/grep -q "tipmerge.*refuses" "$HERE/verbs/selftest.sh"'
+SUITE_STEP='^step .*tipmerge\.test\.sh'; REFUSE_STEP='^step "tipmerge.*refuses'
+check "13.1788 selftest.sh runs this suite and a tipmerge refusal step, as live (uncommented) steps" '/usr/bin/grep -Eq "$SUITE_STEP" "$HERE/verbs/selftest.sh" && /usr/bin/grep -Eq "$REFUSE_STEP" "$HERE/verbs/selftest.sh"'
+check "13.1788 CONTROL — the step patterns reject a commented-out step and accept a live one" 'for p in "$SUITE_STEP" "$REFUSE_STEP"; do ! printf "%s\n" "# step \"tipmerge refuses x\" \"bash tipmerge.test.sh\"" | /usr/bin/grep -Eq "$p" || exit 1; done; printf "%s\n" "step \"tipmerge suite\" \"bash x/tipmerge.test.sh\"" | /usr/bin/grep -Eq "$SUITE_STEP" && printf "%s\n" "step \"tipmerge refuses main\" \"x\"" | /usr/bin/grep -Eq "$REFUSE_STEP"'
+
+# --- 13.1789: the live witness, re-derived offline -----------------------------------------------------------------------------
+check "13.1789 the live witness re-derives: git merge-tree --write-tree of release/smoothness dfe7afe3 into task/sm-t13-native-loading 9a76ca1f is tree ef15dfb07a1e (says so and skips where those commits are not in this clone)" 'if $G -C "$HERE" cat-file -e 9a76ca1f^{commit} 2>/dev/null && $G -C "$HERE" cat-file -e dfe7afe3^{commit} 2>/dev/null; then t=$($G -C "$HERE" merge-tree --write-tree 9a76ca1f dfe7afe3 2>/dev/null | sed -n 1p); [ "${t:0:12}" = ef15dfb07a1e ]; else echo "       (13.1789 skipped: 9a76ca1f / dfe7afe3 are not in this clone)"; fi'
 
 [ "$fails" -eq 0 ] && echo "tipmerge.test.sh: ok" || { echo "tipmerge.test.sh: $fails FAILED"; exit 1; }
