@@ -580,7 +580,7 @@ function comparableHeaders(response: InjectResponse): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored', () => {
-  it('7.28 computes blocked, stale and due-soon at the injected clock, under the DEFAULTS nobody claimed', async () => {
+  it('7.28 and 23.355 computes blocked, stale and due-soon at the injected clock, under the DEFAULTS nobody claimed (the blocked reason is a sentence with no spaced em dash)', async () => {
     // DECLARED FIRST ON PURPOSE: no `workspace.settings_set` exists yet, so this
     // is the only place `provenance: null` — "the defaults are in force because
     // nobody has chosen" — can be observed. Every later case makes a claim.
@@ -600,7 +600,8 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(idsOf(response, 'blocked')).toEqual([read.world.sharedTaskId, fx.openBlockedId].sort());
     const blocked = onlyOfKind(response, 'blocked', read.world.sharedTaskId);
     expect(blocked.stateName).toBe('Waiting on counterparty');
-    expect(blocked.reason).toBe('In "Waiting on counterparty" — a blocked state.');
+    expect(blocked.reason).toBe('In the blocked state "Waiting on counterparty".');
+    expect(blocked.reason).not.toContain(' — ');
 
     // stale — 19 Indian days for the seeded child, 7 for the IST fixture. The
     // 6-day one is inside the window and is NOT here; 7.42 is where that pair
@@ -1029,7 +1030,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     const item = onlyOfKind(response, 'blocked', fx.openBlockedId);
     expect(item.card.stateCategory).toBe('open');
     expect(item.stateName).toBe('Queued');
-    expect(item.reason).toBe('In "Queued" — a blocked state.');
+    expect(item.reason).toBe('In the blocked state "Queued".');
     // The flag came from `wf-second` v2 — v1 flagged nothing at all — so this
     // OBSERVES that the current definition is what the strip reads. That is
     // behaviour inherited from `latestWorkflowDefs`, not a decision anybody has
