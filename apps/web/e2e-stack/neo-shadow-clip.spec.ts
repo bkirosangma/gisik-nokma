@@ -347,6 +347,37 @@ async function ensureGroupNodes(page: Page): Promise<void> {
   expect(await boxes.count(), 'control: the tree carries group nodes, so the sweep is not of an empty tree').toBeGreaterThan(0);
 }
 
+/**
+ * The home view that G-1 added (group sections, level guides) only draws a group that holds a project, and the seeded workspace files
+ * none (a project's group is set through an Edit that the e2e owner is refused: HTTP 403 on /v1/events, measured 2026-10-02). Without a
+ * group the sweep would measure the ungrouped list and pass. So the page's own project list is wrapped, in the page, in the two-level
+ * section markup `grouped-projects.tsx` renders (same classes and attributes), and the REAL CSS paints it. The control is that the
+ * section, its toggle and its head are on the page.
+ */
+async function plantGroupedHome(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const list = document.querySelector('.gn-workspace-home__projects');
+    if (list === null) throw new Error('the home has no project list to wrap');
+    const section = (level: number, name: string, body: Element[]): HTMLElement => {
+      const el = document.createElement('section');
+      el.className = 'gn-group-section';
+      el.dataset['level'] = String(level);
+      el.innerHTML =
+        `<div class="gn-group-section__head"><button type="button" class="gn-group-section__toggle" aria-expanded="true" aria-label="Collapse ${name}">` +
+        `<span class="gn-group-section__caret" aria-hidden="true"></span></button><h${2 + level} class="gn-group-section__name">${name}</h${2 + level}></div>` +
+        `<div class="gn-group-section__body"></div>`;
+      el.querySelector('.gn-group-section__body')!.append(...body);
+      return el;
+    };
+    const wrap = document.createElement('div');
+    wrap.className = 'gn-grouped-projects';
+    const inner = section(2, 'Dairy', [list.cloneNode(true) as Element]);
+    wrap.append(section(1, 'Animal Husbandry', [list.cloneNode(true) as Element, inner]));
+    list.replaceWith(wrap);
+  });
+  await expect(page.locator('.gn-group-section .gn-group-section__toggle'), 'control: the planted group sections are on the home').toHaveCount(2);
+}
+
 /** Scrolls every scrollable box to its far end (`end`) or back to its start, so the leading and the trailing edge are each measured. */
 async function scrollAll(page: Page, where: 'start' | 'end'): Promise<void> {
   await page.evaluate((w) => {
@@ -398,6 +429,13 @@ for (const viewport of VIEWPORTS) {
       }
       const screens: Screen[] = [
         { name: 'workspace home', reach: () => visit(`/w/${workspaceId}`) },
+        {
+          name: 'workspace home (grouped)',
+          reach: async () => {
+            await visit(`/w/${workspaceId}`);
+            await plantGroupedHome(page);
+          },
+        },
         {
           name: 'board',
           reach: async () => {
