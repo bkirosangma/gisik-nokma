@@ -9,6 +9,7 @@ import { createDraftStore } from '../../src/workflow-builder/draft-store.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider } from '../../src/workflow-builder/ui/builder-context.js';
+import { COLUMN_WIDTH } from '../../src/workflow-builder/layout.js';
 import { PHONE_OPEN_ZOOM, phoneOpeningView } from '../../src/workflow-builder/ui/flow-graph.js';
 import { WorkflowCanvas } from '../../src/workflow-builder/ui/workflow-canvas.js';
 import { ruleExactly, valueOf, readUiCss } from '../../../ui/test/helpers/css-rules.js';
@@ -70,6 +71,16 @@ describe('F-5 the workflow canvas on a phone opens readable, not fitted', () => 
     (seen.props?.onInit as (instance: unknown) => void)({ setCenter, getNode: () => undefined });
     expect(setCenter).toHaveBeenCalledTimes(1);
     const [cx, cy, options] = setCenter.mock.calls[0] as [number, number, { zoom: number }];
+    // The WIRING of the measured size: React Flow's own measurement of the start node (`s:<id>`) reaches the centre,
+    // and any other node's measurement is ignored. (Passing `undefined` instead of the measurement leaves the 208×120 centre.)
+    const measuredCenter = vi.fn();
+    const startNodeId = `s:${draft.def.initialStateId}`;
+    (seen.props?.onInit as (instance: unknown) => void)({
+      setCenter: measuredCenter,
+      getNode: (id: string) => (id === startNodeId ? { measured: { width: 200, height: 100 } } : undefined),
+    });
+    expect(measuredCenter).toHaveBeenCalledTimes(1);
+    expect(measuredCenter.mock.calls[0]!.slice(0, 2)).toEqual([start.x + 100, start.y + 50]);
     expect(options.zoom).toBe(0.8);
     // The centre is the START node's, not the first node's or the graph's: it sits to the right of its top-left corner.
     const view = phoneOpeningView(draft);
@@ -95,6 +106,26 @@ describe('F-5 the workflow canvas on a phone opens readable, not fitted', () => 
     expect(untouched).not.toHaveBeenCalled();
   });
 
+  it('23.275 the phone opening centres on the INITIAL state, not the first position, when the author made another state the start', () => {
+    stubViewport(true);
+    const store = createDraftStore(draftFromTemplate(errand));
+    const states = store.getState().def.states;
+    const later = states[states.length - 1]!.id;
+    store.actions.setInitialState(later);
+    mount(store);
+    const draft = store.getState();
+    const start = draft.positions[draft.def.initialStateId]!;
+    // CONTROL — the initial state's position is NOT the first entry's, so "first position" and "start" cannot be confused.
+    expect(draft.def.initialStateId).toBe(later);
+    expect(start).not.toEqual(Object.values(draft.positions)[0]);
+    const setCenter = vi.fn();
+    (seen.props?.onInit as (instance: unknown) => void)({ setCenter, getNode: () => undefined });
+    const view = phoneOpeningView(draft);
+    expect(setCenter.mock.calls[0]!.slice(0, 2)).toEqual([view.center.x, view.center.y]);
+    expect(view.center.x).toBeGreaterThan(start.x);
+    expect(view.center.y).toBeGreaterThan(start.y);
+  });
+
   it('23.278 "Fit to screen" still fits the WHOLE graph on a phone: the same floored options as desktop, a 44px target', () => {
     stubViewport(true);
     mount();
@@ -112,11 +143,19 @@ describe('F-5 a state node stays inside its column (N3)', () => {
   it('23.276 .gn-state-node caps its width at 13rem so the reason line wraps; the 170px floor stays', () => {
     const rule = ruleExactly(readUiCss(), '.gn-state-node');
     expect(valueOf(rule, 'max-width')).toBe('13rem');
-    // CONTROL — the floor is untouched, and 13rem (208px) is wider than it, so no node is squeezed below its content.
+    // CONTROL — the floor is untouched, and the cap is above it, so no node is squeezed below its content.
     expect(valueOf(rule, 'min-width')).toBe('170px');
-    expect(13 * 16).toBeGreaterThan(170);
-    // The cap is below COLUMN_WIDTH (260) minus the gap an edge needs, so a node can no longer reach the next column.
-    expect(13 * 16).toBeLessThan(260 - 40);
+    const toPx = (value: string | null | undefined): number => {
+      const m = /^([0-9.]+)(rem|px)$/.exec(value ?? '');
+      if (m === null) throw new Error(`not a rem/px length: ${String(value)}`);
+      return Number(m[1]) * (m[2] === 'rem' ? 16 : 1);
+    };
+    const minPx = toPx(valueOf(rule, 'min-width'));
+    const maxPx = toPx(valueOf(rule, 'max-width'));
+    expect(minPx).toBeLessThan(maxPx);
+    // The cap is below COLUMN_WIDTH minus the 40px gap an edge needs (arrow head and a readable run), so a node can
+    // no longer reach the next column. Both values are read from the rule.
+    expect(maxPx).toBeLessThan(COLUMN_WIDTH - 40);
   });
 });
 
