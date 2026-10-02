@@ -60,7 +60,7 @@ function onlyInPhoneArm(css: string, selector: string): void {
   expect(parseRules(css).filter((rule) => rule.atRule === null && rule.selectors.includes(selector))).toEqual([]);
 }
 
-describe('21.110 the project header: tabs scroll in their own track, search and Filters share a row, New ticket is full width', () => {
+describe('21.110 the project header: tabs scroll in their own track, search and Filters share a row, Create ticket is full width', () => {
   it('21.110 the view tabs are a deliberate horizontal scroller with scroll-snap (never wrapped) at ≤40rem; above 40rem the rail still wraps and does not scroll', () => {
     const rail = ruleExactly(globals, '.gn-project__rail', PHONE);
     expect(valueOf(rail, 'flex-wrap')).toBe('nowrap');
@@ -83,7 +83,7 @@ describe('21.110 the project header: tabs scroll in their own track, search and 
     expect(valueOf(base, 'scroll-snap-type')).toBeNull();
   });
 
-  it('21.110 the header row is full width; search takes the first row with Filters beside it; New ticket is the one full-width primary; above 40rem the controls row is unchanged', () => {
+  it('21.110 the header row is full width; search takes the first row with Filters beside it; Create ticket is the one full-width primary; above 40rem the controls row is unchanged', () => {
     const header = ruleExactly(ui, '.gn-project__header', PHONE);
     expect(valueOf(header, 'flex')).toBe('1 1 100%');
     const search = ruleExactly(ui, '.gn-project__search', PHONE);
@@ -93,7 +93,7 @@ describe('21.110 the project header: tabs scroll in their own track, search and 
     const filters = ruleExactly(ui, '.gn-project__filters', PHONE);
     expect(valueOf(filters, 'order')).toBe('-1');
     expect(valueOf(filters, 'flex')).toBe('none');
-    // New ticket is the header's one primary button: it takes a row of its own, at full width.
+    // Create ticket is the header's one primary button: it takes a row of its own, at full width.
     expect(valueOf(ruleExactly(ui, '.gn-project__header > .gn-button--primary', PHONE), 'flex')).toBe('1 1 100%');
     after(ui, ['.gn-project__header']);
     after(ui, ['.gn-project__search']);

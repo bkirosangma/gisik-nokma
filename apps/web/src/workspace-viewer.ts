@@ -128,7 +128,7 @@ export function restrictedLine(count: number): string | null {
  * being told about withholding, and this line carries no withholding at all.
  * What `null` bought instead was a founder's fresh workspace card — avatar, name,
  * chips, *"You're an owner here."* — with no mention of projects and no pointer to
- * the **New project** form, which `docs/manual.md:174` already sends an owner to
+ * the **Create project** button, which `docs/manual.md:174` already sends an owner to
  * as the only control that makes a workspace usable. So the card now says the
  * absence, which is the manual's own convention for one.
  *
