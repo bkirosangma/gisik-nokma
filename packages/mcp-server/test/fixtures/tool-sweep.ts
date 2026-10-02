@@ -42,6 +42,12 @@ export const SWEEP: Record<string, SweepEntry> = {
   // note begin (T7)
   // note end
   // attachment begin (T8)
+  list_attachments: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async () => ({ attachments: [] }) } },
+  get_attachment: { args: { attachmentId: 'a' }, session: { getBytes: async () => ({ bytes: new TextEncoder().encode('hi'), contentType: 'text/plain', filename: 'a.txt' }) } },
+  add_attachment: {
+    args: { workspaceId: 'w', ticketId: 't', file: { name: 'a.txt', base64: 'aGk=' } },
+    session: { postMultipart: async () => ({ attachmentId: 'a', url: '/v1/attachments/a', mime: 'text/plain', filename: 'a.txt', size: 2, sha256: 'a'.repeat(64) }) },
+  },
   // attachment end
   // ticket begin (T9)
   // ticket end

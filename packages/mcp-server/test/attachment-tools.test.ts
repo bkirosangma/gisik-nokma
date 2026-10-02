@@ -102,6 +102,9 @@ describe('14.432 the 10 MB limit', () => {
     expect(MAX_BASE64_CHARS).toBe(13_981_016);
     expect(MCP_ATTACHMENT_MAX_BYTES).toBe(10_485_760);
     await expect(call('A'.repeat(MAX_BASE64_CHARS + 4))).rejects.toThrow(/10 MB/);
+    // The length is checked BEFORE the alphabet and before any decoding: an over-long string that is not even base64 is
+    // answered as too big, so the check cannot be a by-product of decoding.
+    await expect(call('!'.repeat(MAX_BASE64_CHARS + 1))).rejects.toThrow(/10 MB/);
     // 10,485,761 bytes encode to the SAME 13,981,016 characters as the limit: only the decoded size can refuse it.
     const plusOne = Buffer.alloc(MCP_ATTACHMENT_MAX_BYTES + 1).toString('base64');
     expect(plusOne.length).toBe(MAX_BASE64_CHARS);
