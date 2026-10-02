@@ -186,6 +186,9 @@ describe('14.454 get_ticket_history', () => {
           line(ulid('D5'), 'comment.deleted', { commentId: ulid('C1') }, 'web', 5),
           line(ulid('M7'), 'ticket.transitioned', { to: 'done', comment: { text: 'secret five' } }, 'mcp', 7),
           line(ulid('K6'), 'ticket.created', { typeId: 'task', title: 'Chiller', description: { type: 'doc', content: [text('secret four')] } }, 'web', 6),
+          // a claim the server refused carries the refused event WHOLE: the contest keeps WHAT was refused, never its text
+          line(ulid('X8'), 'claim.contested', { rule: 'deleted-ticket', reason: 'ticket is deleted', originalEvent: { id: ulid('C9'), type: 'comment.added', payload: { body: { type: 'doc', content: [text('secret six')] } } } }, 'server', 8),
+          line(ulid('X9'), 'claim.contested', { rule: 'deleted-ticket', reason: 'ticket is deleted', originalEvent: { id: ulid('F9'), type: 'ticket.field_set', payload: { fieldId: 'description', value: { type: 'doc', content: [text('secret seven')] } } } }, 'server', 9),
         ],
       },
     });
@@ -198,8 +201,10 @@ describe('14.454 get_ticket_history', () => {
       { commentId: ulid('C1') },
       { to: 'done' }, // a transition keeps its move, not the words that came with it
       { typeId: 'task', title: 'Chiller' },
+      { rule: 'deleted-ticket', reason: 'ticket is deleted', originalEvent: { id: ulid('C9'), type: 'comment.added', payload: { commentId: ulid('C9') } } },
+      { rule: 'deleted-ticket', reason: 'ticket is deleted', originalEvent: { id: ulid('F9'), type: 'ticket.field_set', payload: { fieldId: 'description' } } },
     ]);
-    expect(out.events.map((e) => e.origin)).toEqual(['web', 'mcp', 'web', 'web', 'web', 'mcp', 'web']);
+    expect(out.events.map((e) => e.origin)).toEqual(['web', 'mcp', 'web', 'web', 'web', 'mcp', 'web', 'server', 'server']);
     expect(JSON.stringify(out)).not.toContain('secret');
   });
 
