@@ -32,6 +32,10 @@ import { ruleFor } from './helpers/css-rule-scan.js';
  * sidebar reuses `.gn-nav`'s pattern "rather than inventing a second one" and be
  * describing a divergence rather than a decision. 13.908 restores the
  * prototype's second treatment; 13.909 is the value that stays a token.
+ *
+ * AMENDED 2026-10-02 (UX fixes T2, owner U1, case 23.020): the accent is for the action only, so 13.908's current item
+ * is now the quiet track + weight 600 + the main text colour, and the solid-accent treatment it restored is what its
+ * mutation witnesses plant. The paragraph above is the history of why the rule was tested at all.
  */
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
@@ -103,9 +107,14 @@ const SIDEBAR = /\.gn-settings__sidebar\s*\{/;
 const SIDEBAR_ITEM = /^\.gn-settings__sidebar a,$/;
 const SIDEBAR_ACTIVE = /\.gn-settings__sidebar a\[aria-current='page'\]\s*\{/;
 
-/** The prototype's active pair, as `:3145` spells it, in product token names. */
-const ITEM_ACTIVE_BG = 'var(--gn-accent)';
-const ITEM_ACTIVE_FG = 'var(--gn-accent-text)';
+/**
+ * The current item's pair. AMENDED 2026-10-02 (UX fixes T2, owner U1, case 23.020): it WAS the prototype's accent pair
+ * (`:3145`, `--gn-accent` / `--gn-accent-text`); the accent is now for the action only, so a selection is the quiet
+ * track with the main text colour and a 600 weight. The accent pair is what 13.908's witnesses now plant as the mutant.
+ */
+const ITEM_ACTIVE_BG = 'var(--gn-surface-track)';
+const ITEM_ACTIVE_FG = 'var(--gn-text)';
+const ACCENT_BG = 'var(--gn-accent)';
 
 describe("13.907 — the settings sidebar is the prototype's 248px, not the 192px it shipped", () => {
   it("resolves the sidebar's flex-basis to the prototype's 248px", () => {
@@ -139,19 +148,20 @@ describe("13.907 — the settings sidebar is the prototype's 248px, not the 192p
   });
 });
 
-describe("13.908 — the current sidebar item is the prototype's SOLID accent, not the top nav's tint", () => {
+describe("13.908 — the current sidebar item is the quiet track + weight 600 (AMENDED 2026-10-02, 23.020: was the prototype's solid accent), never the accent fill and never the top nav's tint", () => {
   const rule = ruleFor(css, SIDEBAR_ACTIVE);
 
-  it('paints the current item with the accent PAIR the prototype names at :3145', () => {
+  it('paints the current item with the track + main-text pair (U1); CONTROL: the accent is not on it', () => {
     expect(rule, "no rule for .gn-settings__sidebar a[aria-current='page']").toBeDefined();
     const decls = declarations(rule!);
     expect(decls.get('background'), `background, from: ${String(rule)}`).toBe(ITEM_ACTIVE_BG);
     expect(decls.get('color')).toBe(ITEM_ACTIVE_FG);
+    expect(decls.get('background')).not.toBe(ACCENT_BG);
   });
 
   /*
    * The pair is not a new guarantee: `tokens.ts`'s `CONTRAST_PAIRS` already
-   * declares `{ fg: 'accentText', bg: 'accent', minimum: 4.5 }`, and
+   * declares `{ fg: 'text', bg: 'surfaceTrack', minimum: 4.5 }`, and
    * `packages/ui/test/tokens.test.ts` measures it against every style and theme.
    * This case is the other half — that the RULE actually uses that pair.
    */
@@ -160,20 +170,20 @@ describe("13.908 — the current sidebar item is the prototype's SOLID accent, n
     expect(rule?.includes('--gn-text-accent')).toBe(false);
   });
 
-  it("adds no declaration the prototype's active delta does not carry", () => {
-    // The prototype's active state is `:3145`'s base string with exactly two
-    // declarations appended. `font-weight: 700` was the product's own addition,
-    // and under a solid fill it is the kind of invented emphasis this repo
-    // records rather than keeps.
+  it('adds exactly ONE declaration beyond the pair: font-weight 600 (the weight is what carries "current" now the fill is quiet)', () => {
+    // AMENDED 2026-10-02 (23.020): this was "adds no declaration" (the prototype's two-declaration delta, and the
+    // product's `700` was recorded as invented emphasis under a solid fill). Under the quiet track the weight is the
+    // load-bearing half of the signal, so it is required, at 600 (the product's semibold), not 700.
     const extra = [...declarations(rule!).keys()].filter((n) => n !== 'background' && n !== 'color');
-    expect(extra, `extra declarations in: ${String(rule)}`).toEqual([]);
+    expect(extra, `extra declarations in: ${String(rule)}`).toEqual(['font-weight']);
+    expect(declarations(rule!).get('font-weight')).toBe('600');
   });
 
   /*
    * MUTATION WITNESSES — one per claim above, each planted into the SAME rule
    * the case reads, each aimed so a survivor would identify its own site.
    */
-  it('a planted tint pair is caught by all three claims', () => {
+  it('a planted tint pair (and a planted accent fill) is caught by the claims', () => {
     const mutated = withRule(
       css,
       SIDEBAR_ACTIVE,
@@ -187,19 +197,23 @@ describe("13.908 — the current sidebar item is the prototype's SOLID accent, n
     expect(
       [...decls.keys()].filter((n) => n !== 'background' && n !== 'color'),
     ).toEqual(['font-weight']);
+    // The accent fill put back (the pre-U1 rule) is caught by the new not-accent claim.
+    const accent = withRule(css, SIDEBAR_ACTIVE, `.gn-settings__sidebar a[aria-current='page'] {\n  background: ${ACCENT_BG};\n  color: var(--gn-accent-text);\n}`);
+    expect(declarations(ruleFor(accent, SIDEBAR_ACTIVE)!).get('background')).toBe(ACCENT_BG);
+    expect(declarations(ruleFor(accent, SIDEBAR_ACTIVE)!).get('background')).not.toBe(ITEM_ACTIVE_BG);
   });
 
-  it('a font-weight planted ALONE is caught, by the extra-declaration claim alone', () => {
+  it('a font-weight of 700 planted instead of 600 is caught, by the weight claim alone', () => {
     const mutated = withRule(
       css,
       SIDEBAR_ACTIVE,
       `.gn-settings__sidebar a[aria-current='page'] {\n  background: var(${ITEM_ACTIVE_BG.slice(4, -1)});\n  color: var(${ITEM_ACTIVE_FG.slice(4, -1)});\n  font-weight: 700;\n}`,
     );
     const decls = declarations(ruleFor(mutated, SIDEBAR_ACTIVE)!);
-    // The pair claims stay green — this plant changes only the extra claim.
+    // The pair claims stay green — this plant changes only the weight claim.
     expect(decls.get('background')).toBe(ITEM_ACTIVE_BG);
     expect(decls.get('color')).toBe(ITEM_ACTIVE_FG);
-    expect([...decls.keys()].filter((n) => n !== 'background' && n !== 'color')).toEqual(['font-weight']);
+    expect(decls.get('font-weight')).not.toBe('600');
   });
 });
 
