@@ -373,7 +373,7 @@ describe('validateWorkflowDef — the reserved backlog id', () => {
     const d = def({ states: [...def({}).states, { id: 'backlog', name: 'Mine', category: 'open' }] });
     expect(validateWorkflowDef(d)).toContainEqual({
       code: 'reserved-state-id',
-      message: '`backlog` is reserved — every workflow has it without declaring it.',
+      message: '`backlog` is reserved: every workflow has it without declaring it.',
     });
   });
 

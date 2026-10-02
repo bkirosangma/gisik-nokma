@@ -155,7 +155,7 @@ export const ticketCreatedPayload = z
     // starting status. The client's own form disables the status picker
     // while "Starts in the backlog?" is on and never sends both; this refusal
     // is the domain's own door for a payload built some other way.
-    message: 'a backlog ticket has no starting status — a ticket.created cannot carry both start: "backlog" and stateId',
+    message: 'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
     path: ['stateId'],
   });
 

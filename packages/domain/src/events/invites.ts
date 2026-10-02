@@ -63,7 +63,7 @@ export type InviteRole = (typeof INVITE_ROLES)[number];
 
 const inviteRoleSchema = z.enum(INVITE_ROLES, {
   errorMap: () => ({
-    message: "requires role 'admin'|'member'|'guest' — an invite cannot confer ownership",
+    message: "requires role 'admin'|'member'|'guest': an invite cannot confer ownership",
   }),
 });
 

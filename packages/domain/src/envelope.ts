@@ -170,7 +170,7 @@ function refuseMisfiledMembership(
   ctx.addIssue({
     code: z.ZodIssueCode.custom,
     path: ['entity', 'id'],
-    message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+    message: "must name this event's own workspace: a membership entity id is workspaceId:userId",
   });
 }
 

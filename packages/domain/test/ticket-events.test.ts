@@ -222,7 +222,7 @@ describe('ticket event vocabulary', () => {
         'invalid-payload',
       );
       expect(refusalMessage('ticket.created', { ...BASE, start: 'backlog', stateId: 'doing' })).toContain(
-        'a backlog ticket has no starting status',
+        'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
       );
     });
 

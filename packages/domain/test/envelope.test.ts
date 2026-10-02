@@ -267,7 +267,7 @@ describe('entity id, kind by kind', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'id'],
-      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+      message: "must name this event's own workspace: a membership entity id is workspaceId:userId",
     });
   });
 
@@ -281,7 +281,7 @@ describe('entity id, kind by kind', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'id'],
-      message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+      message: "must name this event's own workspace: a membership entity id is workspaceId:userId",
     });
   });
 });

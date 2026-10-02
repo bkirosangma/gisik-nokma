@@ -49,7 +49,7 @@ export function parseEvent(
     return {
       ok: false,
       code: 'unknown-event-type',
-      message: `unknown event type '${type}' — the ledger accepts only what it can later replay`,
+      message: `unknown event type '${type}': the ledger accepts only what it can later replay`,
       eventId: envelope.data.id,
     };
   }
@@ -136,7 +136,7 @@ export function parseEvent(
       return {
         ok: false,
         code: 'malformed-envelope',
-        message: `This membership event is filed at entity '${entity.id}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
+        message: `This membership event is filed at entity '${entity.id}' but its payload names no user: a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
         eventId: envelope.data.id,
       };
     }
@@ -144,7 +144,7 @@ export function parseEvent(
       return {
         ok: false,
         code: 'malformed-envelope',
-        message: `This membership event is filed at entity '${entity.id}', but it is about user '${userId}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+        message: `This membership event is filed at entity '${entity.id}', but it is about user '${userId}' in workspace '${workspaceId}': a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
         eventId: envelope.data.id,
       };
     }
@@ -175,7 +175,7 @@ export function parseEvent(
       return {
         ok: false,
         code: 'malformed-envelope',
-        message: `This invite event is filed at entity '${entity.id}' but its payload names no invite — every invite event carries the inviteId it is about.`,
+        message: `This invite event is filed at entity '${entity.id}' but its payload names no invite: every invite event carries the inviteId it is about.`,
         eventId: envelope.data.id,
       };
     }
@@ -183,7 +183,7 @@ export function parseEvent(
       return {
         ok: false,
         code: 'malformed-envelope',
-        message: `This invite event is filed at entity '${entity.id}', but it is about invite '${inviteId}' — an invite's entity id IS its inviteId. Filing it anywhere else splits one invitation into two histories.`,
+        message: `This invite event is filed at entity '${entity.id}', but it is about invite '${inviteId}': an invite's entity id IS its inviteId. Filing it anywhere else splits one invitation into two histories.`,
         eventId: envelope.data.id,
       };
     }

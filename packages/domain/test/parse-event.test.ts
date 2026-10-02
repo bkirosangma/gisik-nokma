@@ -39,7 +39,7 @@ describe('parseEvent', () => {
     expect(result).toEqual({
       ok: false,
       code: 'unknown-event-type',
-      message: "unknown event type 'shop.opened' — the ledger accepts only what it can later replay",
+      message: "unknown event type 'shop.opened': the ledger accepts only what it can later replay",
       eventId: raw['id'],
     });
   });
@@ -198,7 +198,7 @@ describe('parseEvent — a membership event must be filed at its own (workspace,
     expect(result).toEqual({
       ok: false,
       code: 'malformed-envelope',
-      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${grantedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${grantedUser}' in workspace '${workspaceId}': a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
       eventId: raw['id'],
     });
   });
@@ -217,7 +217,7 @@ describe('parseEvent — a membership event must be filed at its own (workspace,
     expect(result).toEqual({
       ok: false,
       code: 'malformed-envelope',
-      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${revokedUser}' in workspace '${workspaceId}' — a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
+      message: `This membership event is filed at entity '${workspaceId}:${otherUser}', but it is about user '${revokedUser}' in workspace '${workspaceId}': a membership's entity id is workspaceId:userId. Filing it anywhere else starts a second stream for the same person.`,
       eventId: raw['id'],
     });
   });
@@ -247,7 +247,7 @@ describe('parseEvent — a membership event must be filed at its own (workspace,
     expect(result).toEqual({
       ok: false,
       code: 'malformed-envelope',
-      message: `This membership event is filed at entity '${entityId}' but its payload names no user — a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
+      message: `This membership event is filed at entity '${entityId}' but its payload names no user: a membership's entity id is workspaceId:userId, so an event that does not say who it is about cannot be addressed at all.`,
       eventId: raw['id'],
     });
   });

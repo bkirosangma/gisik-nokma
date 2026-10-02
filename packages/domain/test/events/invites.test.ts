@@ -108,7 +108,7 @@ describe('inviteSentPayload', () => {
     for (const role of ['owner', 'superuser']) {
       expect(rejectionIssues(inviteSentPayload.safeParse(sent({ role })))).toContainEqual({
         path: ['role'],
-        message: "requires role 'admin'|'member'|'guest' — an invite cannot confer ownership",
+        message: "requires role 'admin'|'member'|'guest': an invite cannot confer ownership",
       });
     }
   });
