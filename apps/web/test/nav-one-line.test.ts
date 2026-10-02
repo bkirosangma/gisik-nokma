@@ -78,7 +78,7 @@ describe('13.1530–13.1534 the wide bar is one line; the narrow bar hands off t
     expect(fixed).toContain('white-space: nowrap');
     expect(fixed).toContain('flex: none');
     // The truncating items are the ONLY ones allowed to shrink.
-    const names = decls(WIDE, '.gn-nav__more > a.gn-nav__workspace,\n  .gn-nav__more > .gn-nav__project');
+    const names = decls(WIDE, '.gn-nav__more > .gn-nav__workspace-group,\n  .gn-nav__more > .gn-nav__project');
     expect(names).toContain('flex: 0 1 auto');
     expect(names).toContain('max-width: 16rem');
   });

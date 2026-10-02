@@ -2322,16 +2322,17 @@ input, textarea, select { font-family: inherit; }
   .gn-nav .gn-nav__links a { padding-inline: 0.5rem; }
   .gn-nav__links > a,
   .gn-nav__more > a { white-space: nowrap; flex: none; }
-  .gn-nav__more > a.gn-nav__workspace,
+  .gn-nav__more > .gn-nav__workspace-group,
   .gn-nav__more > .gn-nav__project {
     flex: 0 1 auto;
     max-width: 16rem;
   }
   .gn-nav__more > .gn-nav__project > a { max-width: 100%; min-width: 0; }
+  .gn-nav__more > .gn-nav__workspace-group > a { max-width: 100%; min-width: 0; }
   /* The floor a name may be squeezed to: 4.5rem is the 0.875rem padding twice plus ~2.75rem of label (five characters and
      an ellipsis). It is a floor, not a size, and it is small enough not to pad a short name much (a four-letter project
      name is 66px; the floor is 72). */
-  .gn-nav__more > a.gn-nav__workspace { min-width: 4.5rem; }
+  .gn-nav__more > .gn-nav__workspace-group { min-width: 4.5rem; }
   /* The project group also holds the "Last project:" label (visible again here, Task 4 carry-over, case 23.044), so its
      floor is the hairline, padding and the link's own floor (6.25rem), with no room kept for the label. The label gives
      way FIRST (shrink factor 8, ellipsis) so a long name keeps its link readable instead of collapsing under the label
@@ -2655,6 +2656,14 @@ input, textarea, select { font-family: inherit; }
   border-inline-start: 1px solid var(--gn-border);
 }
 .gn-nav__project-label { font-size: 0.8125rem; color: var(--gn-text-muted); white-space: nowrap; }
+/* The workspace name's wrapper (U-T14, owner 2026-10-02): the name link plus its dropdown of the other workspaces, so it
+   needs `position: relative` for the same reason `.gn-nav__project` does (the absolutely positioned list anchors to it).
+   It wraps the link ALWAYS, with or without a list, so the link is never re-parented when the list of workspaces arrives. */
+.gn-nav__workspace-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
 .gn-nav__avatar-button {
   border-radius: 999px;
   padding: 0;
@@ -2695,6 +2704,37 @@ input, textarea, select { font-family: inherit; }
   /* Above page content. The nav is the topmost chrome and this hangs off it. */
   z-index: 50;
 }
+/* THE HOVER-OPENED LISTS (U-T14, owner 2026-10-02: Last project's and the workspace name's — `nav-hover-menu.tsx`; the
+   account menu is click-driven and keeps the plain `.gn-nav__menu` above).
+   (1) THE HOVER BRIDGE. The list used to sit `top: calc(100% + 0.5rem)`: that strip belonged to neither the trigger nor the
+   list, so a pointer crossing it left the wrapper and the menu closed before it got there. Now the strip is the menu's OWN
+   padding-top — the box is anchored at `top: 100%`, transparent, and the visible card is the inner panel, so the card sits
+   exactly where it did and the pointer never leaves the item. (A `::before` over the strip would have been clipped by the
+   panel's overflow, which is why the scroller is the INNER box.)
+   (2) A FIXED HEIGHT THAT SCROLLS: 8 rows of 2.75rem plus the panel's own padding (22.75rem), and never taller than the window
+   (`100dvh` less the bar and 1rem). A short list is its own height. The wheel, the trackpad and the scrollbar are all
+   inside the wrapper, so scrolling never closes it; `overscroll-behavior: contain` keeps a list's end from scrolling the page. */
+.gn-nav__menu--hover {
+  top: 100%;
+  padding: 0.5rem 0 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  max-height: min(23.25rem, calc(100dvh - var(--app-nav-offset, 0px) - 1rem));
+}
+.gn-nav__menu-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.375rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-lift-near);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.gn-nav__menu-panel > * { flex: none; }
 .gn-nav__menu-header {
   display: flex;
   flex-direction: column;

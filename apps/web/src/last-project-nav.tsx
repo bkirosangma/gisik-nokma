@@ -1,9 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { Chip } from '@gisik-nokma/ui';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ProjectRef } from '@gisik-nokma/app-core';
 import {
   DEFAULT_PROJECT_TAB,
@@ -12,6 +10,7 @@ import {
   rememberProjectTab,
   useLastProject,
 } from './use-last-project.js';
+import { NavHoverMenu } from './nav-hover-menu.js';
 import { useWorkspaceProjects } from './use-workspace-projects.js';
 
 /**
@@ -59,23 +58,13 @@ import { useWorkspaceProjects } from './use-workspace-projects.js';
  * client can tell, and a remembered id resolved against all served projects
  * would name a project the workspaces page no longer lists.
  *
- * ## Focus opens it, and that is what makes Escape interesting
+ * ## Focus opens it, hover opens it, and none of that is written here
  *
- * The owner asked for hover AND focus/click, so this follows
- * `account-menu.tsx`'s menu pattern with one deliberate divergence, and the
- * divergence is load-bearing:
- *
- * **Focus is NOT pulled into the menu on open.** The account menu does move it,
- * and its docblock explains why — it opens on CLICK, so "Escape returns focus
- * to the trigger" would otherwise be trivially true and unmeasurable. This item
- * opens on FOCUS, so moving focus would make tabbing *through* the nav swallow
- * you into the menu every time you passed it.
- *
- * The consequence is that Escape and focus-open pull against each other:
- * Escape returns focus to the trigger, and focusing the trigger opens the menu.
- * A `suppressNextFocusOpen` ref breaks that loop — set for exactly the focus
- * call this component makes itself, and for nothing else. Without it Escape
- * appears not to work at all, which is what case 13.871 measures.
+ * The hover and focus behaviour — the 0.5rem hover bridge, the close delay, the capped scrolling list, Escape, Arrow
+ * keys, the focus guard — lives in `nav-hover-menu.tsx`, which the workspace name's dropdown shares (U-T14, 2026-10-02).
+ * This file decides WHAT is listed and what a click remembers; `NavHoverMenu` decides how the list opens and closes, so
+ * a fix to one is a fix to both. Case 13.871 (Escape does not reopen the menu) is that component's, measured through
+ * this item.
  */
 export function LastProjectNav({
   workspaceId,
@@ -145,62 +134,6 @@ export function LastProjectNav({
       : (projects.find((p) => p.id === routeProjectId) ?? null);
   const shown: ProjectRef | null = routeProject ?? rememberedLive ?? live?.[0] ?? null;
 
-  const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const triggerRef = useRef<HTMLAnchorElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const menuId = useId();
-  /** See the docblock: breaks the Escape -> focus -> open loop. */
-  const suppressNextFocusOpen = useRef(false);
-
-  const close = useCallback((returnFocus: boolean) => {
-    setOpen(false);
-    if (returnFocus) {
-      suppressNextFocusOpen.current = true;
-      triggerRef.current?.focus();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        close(true);
-        return;
-      }
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-
-      const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
-      if (items.length === 0) return;
-      // Wraps at both ends, which is the menu pattern's own behaviour and
-      // spares a keyboard user a dead end at the last item.
-      const at = items.indexOf(document.activeElement as HTMLElement);
-      const step = event.key === 'ArrowDown' ? 1 : -1;
-      const next = at === -1 ? 0 : (at + step + items.length) % items.length;
-      // The page would otherwise scroll under the open menu.
-      event.preventDefault();
-      items[next]?.focus();
-    };
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target as Node | null;
-      if (target === null) return;
-      // The whole WRAPPER is excluded, trigger and menu alike: without this a
-      // click on the trigger would close here and reopen in its own handler,
-      // and the menu would appear never to close.
-      if (wrapperRef.current?.contains(target) === true) return;
-      close(false);
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [open, close]);
-
   if (shown === null) return null;
 
   const projectHref = `/w/${workspaceId}/p/${shown.id}`;
@@ -224,116 +157,82 @@ export function LastProjectNav({
     rememberProjectTab(projectId, readProjectTab(projectId, userId) ?? DEFAULT_PROJECT_TAB, userId);
   };
 
+  /* ## The name says WHICH DOOR THIS IS, because the card's name is the
+   * ## project's and this item's would otherwise be a second copy of it
+   *
+   * The home's card carries the archived half of this string for exactly
+   * this state — one convention for "this project is archived", two
+   * surfaces. **The trailing `projects menu` is not that convention and is
+   * a different fix: it is what keeps the two doors distinguishable.**
+   *
+   * MEASURED on the deployed stack at the desktop viewport the stack suite
+   * runs at (2026-09-22): on `/w/0TZSS5W6ATCTF2YBPMWGGP9JF5` there are
+   * exactly TWO links to `/w/…/p/0XB92YA4CGEBF9S285AH4SDXR1` — this item
+   * (`a.gn-nav__project`, 148×44) and the project card's door
+   * (`a.gn-project-card__door`, 363×63) — and with no qualifier both carry
+   * the accessible name `Shop operations`.
+   * `getByRole('link', { name: 'Shop operations', exact: true }).count()`
+   * reads **2** at 1280×720 and 1 at 390 (where this item is behind the
+   * phone nav and out of the accessible tree). That count is why
+   * `e2e-stack/helpers/board.ts`'s `openSeededBoard` refused with "found no
+   * single project link".
+   *
+   * **The qualifier belongs HERE and not on the card.** The card door is
+   * the project list's own subject: its name is the project's, it is what
+   * `within(card).getByRole('link', …)` and every workspace-home case
+   * address, and the exact-name query the stack suite builds is aimed at
+   * it. This item is a SECOND, contextual door to the same project — the
+   * only surface where the bar names one — so it is the one that has to say
+   * which it is. The alternative was tried on paper and rejected: renaming
+   * the card would leave `{ name: 'Shop operations', exact: true }` matching
+   * THIS item, whose project is `routeProject ?? rememberedLive ?? live[0]`
+   * — a POSITION, which is the silent wrong-board pick that helper's own
+   * docblock exists to remove.
+   *
+   * The visible text is unchanged (`{shown.name}`, below): the owner asked
+   * for the last open project's NAME in the bar, and WCAG 2.5.3 wants the
+   * accessible name to contain the visible label, which this does. */
   return (
-    <div
-      ref={wrapperRef}
+    <NavHoverMenu
       className="gn-nav__project"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => {
-        // A pointer leaving must not close a menu a KEYBOARD user is inside:
-        // hovering past an item you have focused is not a dismissal.
-        if (wrapperRef.current?.contains(document.activeElement) === true) return;
-        close(false);
+      /* The visible "Last project:" label (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): this item is the
+         project you were last in, not a destination like its neighbours, and the bar now says so. It is a SIBLING before
+         the link, not text inside it, on purpose: the link's accessible name (the `ariaLabel` below, which the
+         workspace home and the stack suite query by exact name) is unchanged, and WCAG 2.5.3 — a control's name
+         contains its visible label — is not in play because the label is not part of the control. */
+      before={<span className="gn-nav__project-label">Last project: </span>}
+      menuLabel="Projects"
+      items={(live ?? []).map((project) => {
+        const href = `/w/${workspaceId}/p/${project.id}`;
+        return {
+          id: project.id,
+          href,
+          label: project.name,
+          current: pathname === href,
+          onSelect: () => openProject(project.id),
+        };
+      })}
+      trigger={{
+        href: projectHref,
+        current: pathname === projectHref,
+        ariaLabel: `${shown.name}${shown.archived ? ', archived' : ''}, projects menu`,
+        onClick: () => openProject(shown.id),
+        children: (
+          <>
+            <span className="gn-nav__label">{shown.name}</span>
+            {/* E5-34: named as archived in the item itself, the way the workspace
+                home's card names it ("<name>, archived") — so the one route where
+                the bar names an archived project says so rather than looking like
+                every live one. The chip is the VISIBLE half; the name carries the
+                state through `ariaLabel` above rather than through content
+                concatenation, because the accessible-name algorithm inserts a
+                synthetic separator between sibling nodes (`tri-state-choice.tsx`
+                records that measurement) and a second visible string would be a
+                second thing to keep in step. */}
+            {shown.archived ? <Chip tone="neutral">Archived</Chip> : null}
+          </>
+        ),
       }}
-      onBlur={(event) => {
-        // React's `onBlur` is `focusout`, which bubbles, so this ONE handler
-        // covers the trigger and every menuitem. `relatedTarget` is where focus
-        // went; if that is outside the item, the menu closes.
-        const next = event.relatedTarget as Node | null;
-        if (next === null || wrapperRef.current?.contains(next) !== true) close(false);
-      }}
-    >
-      {/* The visible "Last project:" label (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): this item is the
-          project you were last in, not a destination like its neighbours, and the bar now says so. It is a SIBLING before
-          the link, not text inside it, on purpose: the link's accessible name (the `aria-label` below, which the
-          workspace home and the stack suite query by exact name) is unchanged, and WCAG 2.5.3 — a control's name
-          contains its visible label — is not in play because the label is not part of the control. */}
-      <span className="gn-nav__project-label">Last project: </span>
-      <Link
-        ref={triggerRef}
-        href={projectHref}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        aria-current={pathname === projectHref ? 'page' : undefined}
-        /* ## The name says WHICH DOOR THIS IS, because the card's name is the
-         * ## project's and this item's would otherwise be a second copy of it
-         *
-         * The home's card carries the archived half of this string for exactly
-         * this state — one convention for "this project is archived", two
-         * surfaces. **The trailing `projects menu` is not that convention and is
-         * a different fix: it is what keeps the two doors distinguishable.**
-         *
-         * MEASURED on the deployed stack at the desktop viewport the stack suite
-         * runs at (2026-09-22): on `/w/0TZSS5W6ATCTF2YBPMWGGP9JF5` there are
-         * exactly TWO links to `/w/…/p/0XB92YA4CGEBF9S285AH4SDXR1` — this item
-         * (`a.gn-nav__project`, 148×44) and the project card's door
-         * (`a.gn-project-card__door`, 363×63) — and with no qualifier both carry
-         * the accessible name `Shop operations`.
-         * `getByRole('link', { name: 'Shop operations', exact: true }).count()`
-         * reads **2** at 1280×720 and 1 at 390 (where this item is behind the
-         * phone nav and out of the accessible tree). That count is why
-         * `e2e-stack/helpers/board.ts`'s `openSeededBoard` refused with "found no
-         * single project link".
-         *
-         * **The qualifier belongs HERE and not on the card.** The card door is
-         * the project list's own subject: its name is the project's, it is what
-         * `within(card).getByRole('link', …)` and every workspace-home case
-         * address, and the exact-name query the stack suite builds is aimed at
-         * it. This item is a SECOND, contextual door to the same project — the
-         * only surface where the bar names one — so it is the one that has to say
-         * which it is. The alternative was tried on paper and rejected: renaming
-         * the card would leave `{ name: 'Shop operations', exact: true }` matching
-         * THIS item, whose project is `routeProject ?? rememberedLive ?? live[0]`
-         * — a POSITION, which is the silent wrong-board pick that helper's own
-         * docblock exists to remove.
-         *
-         * The visible text is unchanged (`{shown.name}`, below): the owner asked
-         * for the last open project's NAME in the bar, and WCAG 2.5.3 wants the
-         * accessible name to contain the visible label, which this does. */
-        aria-label={`${shown.name}${shown.archived ? ', archived' : ''}, projects menu`}
-        onFocus={() => {
-          // See the docblock: exactly the focus call `close(true)` makes is
-          // ignored, so Escape does not immediately reopen the menu.
-          if (suppressNextFocusOpen.current) {
-            suppressNextFocusOpen.current = false;
-            return;
-          }
-          setOpen(true);
-        }}
-        onClick={() => openProject(shown.id)}
-      >
-        <span className="gn-nav__label">{shown.name}</span>
-        {/* E5-34: named as archived in the item itself, the way the workspace
-            home's card names it ("<name>, archived") — so the one route where
-            the bar names an archived project says so rather than looking like
-            every live one. The chip is the VISIBLE half; the name carries the
-            state through `aria-label` below rather than through content
-            concatenation, because the accessible-name algorithm inserts a
-            synthetic separator between sibling nodes (`tri-state-choice.tsx`
-            records that measurement) and a second visible string would be a
-            second thing to keep in step. */}
-        {shown.archived ? <Chip tone="neutral">Archived</Chip> : null}
-      </Link>
-      {open ? (
-        <div ref={menuRef} id={menuId} role="menu" aria-label="Projects" className="gn-nav__menu">
-          {live?.map((project) => {
-            const href = `/w/${workspaceId}/p/${project.id}`;
-            return (
-              <Link
-                key={project.id}
-                href={href}
-                role="menuitem"
-                className="gn-nav__menu-item"
-                aria-current={pathname === href ? 'page' : undefined}
-                onClick={() => openProject(project.id)}
-              >
-                {project.name}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+    />
   );
 }

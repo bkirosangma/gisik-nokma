@@ -12,6 +12,8 @@ import { PhoneSwitcher } from "./phone-switcher.js";
 import { useSessionStatus } from "./providers.js";
 import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
+import { NavHoverMenu } from "./nav-hover-menu.js";
+import { useOtherWorkspaces } from "./use-other-workspaces.js";
 import { isWithin } from "./path-within.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
@@ -220,6 +222,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const fromMemory = workspaceId === undefined && remembered.status === "remembered";
 
   const workspaceName = useWorkspaceName(effectiveWorkspaceId);
+  const otherWorkspaces = useOtherWorkspaces(effectiveWorkspaceId);
 
   /**
    * **A REMEMBERED workspace must prove itself; a ROUTED one need not.**
@@ -318,13 +321,26 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             a second derivation. Omitted (not id, not a placeholder) until the
             name arrives or if the read fails; see `useWorkspaceName` above. */}
         {!noWorkspace && workspaceName !== null ? (
-          <Link
-            href={`/w/${effectiveWorkspaceId}`}
-            aria-current={current(`/w/${effectiveWorkspaceId}`)}
-            className="gn-nav__workspace"
-          >
-            <span className="gn-nav__label">{workspaceName}</span>
-          </Link>
+          /* A click goes to the workspace home, as it always did. Hover or focus (U-T14, owner 2026-10-02) opens the list
+             of the viewer's OTHER workspaces through the same `NavHoverMenu` Last project uses; with none, `enabled` is
+             false and this is the plain link it was (no `aria-haspopup`). The separate Workspaces link is untouched. */
+          <NavHoverMenu
+            className="gn-nav__workspace-group"
+            menuLabel="Workspaces"
+            enabled={otherWorkspaces.length > 0}
+            items={otherWorkspaces.map((workspace) => ({
+              id: workspace.id,
+              href: `/w/${workspace.id}`,
+              label: workspace.name,
+              current: pathname === `/w/${workspace.id}`,
+            }))}
+            trigger={{
+              href: `/w/${effectiveWorkspaceId}`,
+              className: "gn-nav__workspace",
+              current: current(`/w/${effectiveWorkspaceId}`) === "page",
+              children: <span className="gn-nav__label">{workspaceName}</span>,
+            }}
+          />
         ) : null}
         {/* IMMEDIATELY RIGHT OF THE WORKSPACE NAME (owner, 2026-09-18) — the
             project you were last in, opening on hover into a dropdown of the
