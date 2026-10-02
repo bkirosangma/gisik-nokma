@@ -317,6 +317,14 @@ export {
   type BarDestination,
 } from './preferences/bottom-bar.js';
 export {
+  DEFAULT_PROJECT_GROUPING,
+  PROJECT_GROUPING_KEY_PREFIX,
+  projectGroupingKey,
+  readProjectGrouping,
+  rememberProjectGrouping,
+  type ProjectGrouping,
+} from './preferences/project-grouping.js';
+export {
   MAX_SAVED_FILTERS,
   SavedFilterRefused,
   deleteSavedFilter,
