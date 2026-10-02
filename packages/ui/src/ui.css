@@ -1105,18 +1105,20 @@ a.gn-ticket-sheet__crumb--link {
     padding: 0;
     height: calc((var(--gh-h0) + (var(--gh-h1) - var(--gh-h0)) * var(--p, 0)) * 1px);
   }
-  /* The hairline under the compact header is drawn by a pseudo-element whose opacity follows `--p`, so the header's box
-     (and everything in the flow) is the same size at every scroll position. */
+  /* The hairline under the compact header is a pseudo-element placed by TRANSFORM (the header's own bottom edge is the one
+     thing here whose layout follows `--p`, and an element anchored to that edge would register as a layout shift); its
+     opacity follows `--p` too, so it appears as the header settles. */
   .gn-sheet[data-compact] .gn-sheet__header::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 0;
+    top: 0;
     height: 1px;
     background: var(--gn-border);
     opacity: var(--p, 0);
     pointer-events: none;
+    transform: translateY(calc((var(--gh-h0) + (var(--gh-h1) - var(--gh-h0)) * var(--p, 0) - 1) * 1px));
   }
   /* The heading's box goes away: its children are placed against the header. */
   .gn-sheet[data-compact] .gn-sheet__heading { display: contents; }

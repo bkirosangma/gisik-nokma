@@ -119,12 +119,23 @@ test.describe('25.431 the phone header compacts without jitter', () => {
     await ensureScrollable(page);
     await page.mouse.move(195, 500);
     await page.evaluate(() => {
-      const w = window as unknown as { __cls: number };
+      const w = window as unknown as { __cls: number; __clsWho: string[] };
       w.__cls = 0;
+      w.__clsWho = [];
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          const shift = entry as unknown as { value: number; hadRecentInput: boolean };
-          if (!shift.hadRecentInput) w.__cls += shift.value;
+          const shift = entry as unknown as {
+            value: number;
+            hadRecentInput: boolean;
+            sources?: { node: Element | null; previousRect: DOMRect; currentRect: DOMRect }[];
+          };
+          if (shift.hadRecentInput) continue;
+          w.__cls += shift.value;
+          for (const src of shift.sources ?? []) {
+            const el = src.node;
+            const name = el === null ? 'detached' : `${el.tagName.toLowerCase()}.${String((el as HTMLElement).className).slice(0, 60)}`;
+            w.__clsWho.push(`${name} ${Math.round(src.previousRect.top)}->${Math.round(src.currentRect.top)} (${shift.value})`);
+          }
         }
       }).observe({ type: 'layout-shift', buffered: false });
     });
@@ -159,7 +170,8 @@ test.describe('25.431 the phone header compacts without jitter', () => {
     // CONTROL: the header itself did change over the same scroll — the test would pass for a header that never compacts.
     expect(start.headerHeight - bottomOfRange.headerHeight, 'the header shrank').toBeGreaterThan(40);
     const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
-    expect(cls).toBe(0);
+    const who = await page.evaluate(() => (window as unknown as { __clsWho: string[] }).__clsWho);
+    expect(cls, `layout shifts: ${who.join(' | ')}`).toBe(0);
   });
 });
 
