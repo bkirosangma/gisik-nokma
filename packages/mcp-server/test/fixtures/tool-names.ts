@@ -42,6 +42,11 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   definitionAdmin: [
     // definition-admin begin (T12)
+    'define_workflow',
+    'define_ticket_type',
+    'migrate_ticket_type',
+    'set_visibility',
+    'update_workspace_settings',
     // definition-admin end
   ],
   trash: [
