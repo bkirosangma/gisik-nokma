@@ -396,6 +396,15 @@ export type NewTicketDialogProps = {
    */
   stateRefusal?: string;
   /**
+   * The draft to open WITH, once (smoothness T7). The flow closes the dialog the moment a create goes on the wire
+   * (the board shows a ghost card) and, if the server then says no, reopens it with the draft the person typed,
+   * under the SAME ticket id. Absent is every ordinary open: a closed dialog holds nothing (E2-37). The flow
+   * clears it on Cancel and on its own Create button, so only the open that FOLLOWS a take-back is restored. An
+   * outsider assignee is not restored (the finder's pick is not an option the picker holds): that field opens as
+   * Unassigned.
+   */
+  restoreDraft?: NewTicketDraft;
+  /**
    * The claim, handed up. May be ASYNCHRONOUS, and the dialog waits on it: that
    * returning promise is the only thing that can tell the Create control when
    * the attempt has settled, and without that this dialog cannot state the
@@ -436,6 +445,7 @@ export function NewTicketDialog({
   workflowStates,
   initialSelection,
   stateRefusal,
+  restoreDraft,
   onCreate,
   onClose,
 }: NewTicketDialogProps) {
@@ -592,6 +602,25 @@ export function NewTicketDialog({
    */
   useEffect(() => {
     if (!open) return;
+    if (restoreDraft !== undefined) {
+      // The take-back of a create the server did not accept (smoothness T7): hand the person their draft, under
+      // the id it was filed with. Nothing is reset, so nothing is lost; every field the draft carries is restored.
+      setTitle(restoreDraft.title);
+      setParentId(restoreDraft.parentId ?? '');
+      setTypeId(restoreDraft.typeId);
+      setStartInBacklog(restoreDraft.start === 'backlog');
+      setStateId(
+        restoreDraft.stateId ??
+          seedStateIdFor(typeOptions.find((option) => option.id === restoreDraft.typeId)?.workflowId, undefined),
+      );
+      setStartDate(restoreDraft.startDate ?? '');
+      setDueDate(restoreDraft.dueDate ?? '');
+      setDraftTicketId(restoreDraft.ticketId);
+      setDescription(restoreDraft.description);
+      setAssigneeId(restoreDraft.assigneeId === null || restoreDraft.assigneeIsOutsider === true ? UNASSIGNED : restoreDraft.assigneeId);
+      setPriority(restoreDraft.priority);
+      return;
+    }
     setTitle('');
     setParentId('');
     /**

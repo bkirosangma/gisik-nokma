@@ -28,6 +28,7 @@ import {
   memberLabel,
   sortByRank,
   useBoard,
+  usePendingCreates,
   useActorNames,
   useLiveQuery,
   useTicketList,
@@ -459,6 +460,8 @@ function ProjectBoard() {
   );
 
   const board = useBoard(dataSource, workspaceId, projectId);
+  // Tickets whose create is in flight, drawn on the board as ghost cards (smoothness T7, spec S5).
+  const pendingCreates = usePendingCreates(board.data);
   const list = useTicketList(dataSource, workspaceId, projectId, currentUserId, listFilter);
 
   /**
@@ -2271,7 +2274,14 @@ function ProjectBoard() {
           {...(membersRefusal === null ? {} : { assigneeCandidatesUnavailable: membersRefusal })}
           workflowStates={workflowStatesFor}
           {...(createSelection === null ? {} : { initialSelection: createSelection })}
-          onCreated={openTicket}
+          onPending={pendingCreates.add}
+          onRefused={pendingCreates.remove}
+          onCreated={(ticketId) => {
+            // The server committed: the ghost stays until the read shows the id, so ask for the read now.
+            pendingCreates.settle(ticketId);
+            board.reload();
+            openTicket(ticketId);
+          }}
         />
         {ticketTypes.data === null ? (
           <p role="status" className="gn-new-ticket__fallback">
@@ -3163,6 +3173,7 @@ function ProjectBoard() {
                 // one" for both — see `Board`'s own `isNarrowed` docblock.
                 <Board
                   board={boardNarrowing.view}
+                  pendingCreates={pendingCreates.creates}
                   onOpenTicket={openTicket}
                   /*
                     WHO the board remembers its collapse choices for. The

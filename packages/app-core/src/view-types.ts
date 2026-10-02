@@ -309,6 +309,13 @@ export type BoardCard = {
   /** True only between submit and the server's answer (web is online-only). */
   pending: boolean;
   /**
+   * Set ONLY on the ghost the board draws for a ticket whose `ticket.created` has not been answered yet
+   * (smoothness T7, `applyPendingCreates` in `views/board-move-state.ts`). The mappers never set it. A ghost
+   * has no key, no provenance and no arrows, and it cannot be opened: the ticket does not exist until the
+   * server says so.
+   */
+  pendingCreate?: true;
+  /**
    * The IMMEDIATE parent's key badge (owner request, 2026-09-23), or `null`
    * for a root ticket OR one whose parent this viewer may not see.
    *
