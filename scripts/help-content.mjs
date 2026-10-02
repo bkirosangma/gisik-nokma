@@ -359,7 +359,19 @@ export const HELP_CONTENT: HelpContent = ${JSON.stringify(content, null, 2)} as 
 // open; this closes the half that is a literal.
 
 /**
- * Every string a help document puts in double quotes, deduped.
+ * A double-quoted span, which may WRAP onto the next line once (U-T11b, 2026-10-02). The first version
+ * matched `"[^"\n]+"`, so a quotation that the document's own line width broke in two was never looked
+ * up in the product: reviewer B's probe found 14 such strings absent from the product, four of them
+ * U-T11 copy a reader sees in /help. ONE newline, not any number: a stray `"` (an inch mark, an
+ * unclosed quote) would otherwise pair with a distant one and swallow a paragraph.
+ */
+const QUOTED_SPAN = /"[^"\n]+(?:\n[^"\n]+)?"/g;
+/** The seam of a wrapped span: the newline, the indent or `>` of the continuation line, and the padding either side. */
+const WRAP_JOINT = /[ \t]*\n[ \t>]*/g;
+
+/**
+ * Every string a help document puts in double quotes, deduped. A span wrapped over two lines is joined
+ * with ONE space, so it is compared as the person reads it.
  *
  * A span whose CONTENT carries `*` is dropped: those are artefacts of emphasis
  * beside a quotation mark, not product strings, and two of them are in the
@@ -369,8 +381,8 @@ export const HELP_CONTENT: HelpContent = ${JSON.stringify(content, null, 2)} as 
 export function quotedSpans(text) {
   return [
     ...new Set(
-      (text.match(/"[^"\n]+"/g) ?? [])
-        .map((s) => s.slice(1, -1))
+      (text.match(QUOTED_SPAN) ?? [])
+        .map((s) => s.slice(1, -1).replace(WRAP_JOINT, ' '))
         .filter((s) => !s.includes('*') && !s.includes('`')),
     ),
   ];
@@ -398,7 +410,46 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
 const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
 
 /**
+ * Source text with its COMMENTS removed (U-T11b addendum, reviewer B 13:18).
+ *
+ * The haystack used to include every comment, so a docblock that quoted a string once
+ * (`rollup-text.ts`: "5 of 8 done · 2 restricted") satisfied a manual heading that quotes it
+ * still, long after the product changed to a comma: a comment is not something a person
+ * reads in the product. Measured on the tree at 4f86b959: 13 quoted strings were found ONLY
+ * in comments.
+ *
+ * A single pass over code / '…' / "…" / `…` / `//` / `/* *​/`. JSX text is "code", so an
+ * apostrophe in it (`can't`) would open a string that never closes: a quote that meets a
+ * newline ends, which bounds that mistake to its own line (a template literal is the one
+ * string that may span lines, and is exempt from the rule). `lineComments` is false for
+ * CSS, where `//` is an ordinary character in a url.
+ *
+ * @param {string} text
+ * @param {{lineComments?: boolean}} [options]
+ * @returns {string}
+ */
+export function stripComments(text, { lineComments = true } = {}) {
+  if (!text.includes('/')) return text;
+  const tokens = lineComments ? COMMENT_TOKENS : BLOCK_COMMENT_TOKENS;
+  return text.replace(tokens, (token) => {
+    if (token.startsWith('/*')) return ' ';
+    if (token.startsWith('//')) return '';
+    return token;
+  });
+}
+
+// One native pass instead of a character loop (the loop added ~3 s to a tree walk of ~10 000 files). Strings are
+// matched so a `//` or `/*` inside one is text; a '…' or "…" that meets a newline ends there; a `…` may span lines.
+const COMMENT_TOKENS =
+  /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?|`(?:\\[\s\S]|[^`\\])*`?/g;
+const BLOCK_COMMENT_TOKENS = /\/\*[\s\S]*?(?:\*\/|$)|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?|`(?:\\[\s\S]|[^`\\])*`?/g;
+
+const COMMENTED_EXT = /\.(ts|tsx|js|jsx|mjs|css)$/;
+
+/**
  * Every product file's text, joined — the haystack a quoted string is looked for in.
+ * Comments are removed from source and stylesheets (see `stripComments`); JSON and
+ * Markdown are read whole.
  *
  * @param {string} root
  * @returns {string}
@@ -411,7 +462,8 @@ export function productText(root) {
       const p = join(dir, entry.name);
       if (entry.isDirectory()) walk(p);
       else if (PRODUCT_EXT.test(entry.name) && !p.endsWith(GENERATED_COPY)) {
-        parts.push(readFileSync(p, 'utf8'));
+        const raw = readFileSync(p, 'utf8');
+        parts.push(COMMENTED_EXT.test(entry.name) ? stripComments(raw, { lineComments: !entry.name.endsWith('.css') }) : raw);
       }
     }
   };
@@ -616,6 +668,48 @@ const CASES = [
       // string anyone put in the product. Two of these are live in the manual,
       // and treating them as claims would redden the gate on prose.
       return quotedSpans('a " — an epic * is real work" b').length === 0;
+    },
+  },
+  {
+    name: 'PLANTED: a quote WRAPPED over two lines is still checked; a wrapped CORRECT one stays green',
+    run: () => {
+      // U-T11b. The stale quote wraps exactly as the manual's do; before the fix it matched no span at all.
+      const stale = [{ id: 'd', source: 'docs/d.md', text: 'It says "No such\nthing here" now.' }];
+      const right = [{ id: 'd', source: 'docs/d.md', text: 'It says "Sign\n  out" now.' }];
+      const bare = { absent: [] };
+      const a = compareAbsent({ documents: stale, product: 'Sign out', baseline: bare });
+      const b = compareAbsent({ documents: right, product: 'Sign out', baseline: bare });
+      // The bound: ONE newline. A stray quote must not pair with one a paragraph away.
+      const stray = quotedSpans('a "stray\n\nb" c');
+      return (
+        a.undeclared.length === 1 &&
+        a.undeclared[0].span === 'No such thing here' &&
+        b.checked === 1 &&
+        b.undeclared.length === 0 &&
+        stray.length === 0
+      );
+    },
+  },
+  {
+    name: 'PLANTED: a stale quote that survives only inside a COMMENT is reported; the same text in a string stays found',
+    run: () => {
+      // U-T11b addendum. A docblock quoted the old "5 of 8 done · 2 restricted" and kept the stale manual heading green.
+      const doc = [{ id: 'd', source: 'docs/d.md', text: 'It reads "5 of 8 done · 2 restricted" now.' }];
+      const bare = { absent: [] };
+      const commented = '/** "5 of 8 done · 2 restricted" */\nconst a = 1; // "5 of 8 done · 2 restricted"\n';
+      const literal = "const a = '5 of 8 done · 2 restricted';\n";
+      const red = compareAbsent({ documents: doc, product: stripComments(commented), baseline: bare });
+      // CONTROL 1: the same text as a string literal is still the product's, so the red above is the comment being dropped.
+      const green = compareAbsent({ documents: doc, product: stripComments(literal), baseline: bare });
+      // CONTROL 2: `//` inside a string is text, and a JSX apostrophe does not swallow the line after it.
+      const url = stripComments("const u = 'http://x'; // gone\n");
+      const jsx = stripComments("<p>can't</p>\n/* gone */ const keep = 1;\n");
+      return (
+        red.undeclared.length === 1 &&
+        green.undeclared.length === 0 &&
+        url.includes('http://x') && !url.includes('gone') &&
+        jsx.includes('const keep = 1;') && !jsx.includes('gone')
+      );
     },
   },
   {
