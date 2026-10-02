@@ -80,6 +80,8 @@ interface Sides {
 interface Clipper {
   readonly sel: string;
   readonly clip: Sides;
+  /** Per side: the scroller has MORE content beyond that edge at this scroll position, so a cut there is the scroll, not a missing margin. */
+  readonly more: { readonly left: boolean; readonly top: boolean; readonly right: boolean; readonly bottom: boolean };
 }
 
 interface Shadowed {
@@ -188,6 +190,12 @@ async function sweep(page: Page): Promise<Shadowed[]> {
             const inf = Number.POSITIVE_INFINITY;
             clippers.push({
               sel: describe(p),
+              more: {
+                left: clipsX && p.scrollLeft > 1,
+                top: clipsY && p.scrollTop > 1,
+                right: clipsX && p.scrollLeft + p.clientWidth < p.scrollWidth - 1,
+                bottom: clipsY && p.scrollTop + p.clientHeight < p.scrollHeight - 1,
+              },
               clip: sides(
                 clipsX ? l - mx : -inf,
                 clipsY ? t - my : -inf,
@@ -219,11 +227,12 @@ function findCuts(population: readonly Shadowed[]): Finding[] {
   for (const item of population) {
     const reach = reachOf(item.boxShadow);
     for (const c of item.clippers) {
-      // A side counts only where the element's own edge is inside the clip rect (otherwise it is scrolled out, not under-padded).
-      const left = item.box.left >= c.clip.left - TOLERANCE_PX ? Math.max(0, c.clip.left - (item.box.left - reach.left)) : 0;
-      const top = item.box.top >= c.clip.top - TOLERANCE_PX ? Math.max(0, c.clip.top - (item.box.top - reach.top)) : 0;
-      const right = item.box.right <= c.clip.right + TOLERANCE_PX ? Math.max(0, item.box.right + reach.right - c.clip.right) : 0;
-      const bottom = item.box.bottom <= c.clip.bottom + TOLERANCE_PX ? Math.max(0, item.box.bottom + reach.bottom - c.clip.bottom) : 0;
+      // A side counts only where the element's own edge is inside the clip rect (otherwise it is scrolled out, not under-padded) and
+      // the scroller has nothing more beyond that edge (a card cut by the edge of a row that continues is the scroll, not a margin).
+      const left = !c.more.left && item.box.left >= c.clip.left - TOLERANCE_PX ? Math.max(0, c.clip.left - (item.box.left - reach.left)) : 0;
+      const top = !c.more.top && item.box.top >= c.clip.top - TOLERANCE_PX ? Math.max(0, c.clip.top - (item.box.top - reach.top)) : 0;
+      const right = !c.more.right && item.box.right <= c.clip.right + TOLERANCE_PX ? Math.max(0, item.box.right + reach.right - c.clip.right) : 0;
+      const bottom = !c.more.bottom && item.box.bottom <= c.clip.bottom + TOLERANCE_PX ? Math.max(0, item.box.bottom + reach.bottom - c.clip.bottom) : 0;
       if (Math.max(left, top, right, bottom) > TOLERANCE_PX) {
         found.push({ id: item.id, element: item.sel, clipper: c.sel, text: item.text, clipped: { left, top, right, bottom } });
       }
@@ -284,10 +293,29 @@ async function ensureGroupNodes(page: Page): Promise<void> {
   expect(await boxes.count(), 'control: the tree carries group nodes, so the sweep is not of an empty tree').toBeGreaterThan(0);
 }
 
+/** Scrolls every scrollable box to its far end (`end`) or back to its start, so the leading and the trailing edge are each measured. */
+async function scrollAll(page: Page, where: 'start' | 'end'): Promise<void> {
+  await page.evaluate((w) => {
+    for (const el of document.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+      const scrolls = (v: string): boolean => v === 'auto' || v === 'scroll';
+      if (!scrolls(cs.overflowX) && !scrolls(cs.overflowY)) continue;
+      el.scrollTo(w === 'end' ? el.scrollWidth : 0, w === 'end' ? el.scrollHeight : 0);
+    }
+  }, where);
+  await page.waitForTimeout(150);
+}
+
+/** The cuts on a screen at BOTH scroll extremes: the start measures the leading padding, the end the trailing padding. */
 async function sweepScreen(page: Page, theme: Theme): Promise<{ population: Shadowed[]; cuts: Finding[] }> {
   await applyNeo(page, theme);
+  await scrollAll(page, 'start');
   const population = await sweep(page);
-  return { population, cuts: findCuts(population) };
+  const cuts = findCuts(population);
+  await scrollAll(page, 'end');
+  cuts.push(...findCuts(await sweep(page)));
+  await scrollAll(page, 'start');
+  return { population, cuts };
 }
 
 for (const viewport of VIEWPORTS) {
@@ -354,8 +382,11 @@ for (const viewport of VIEWPORTS) {
           reach: async () => {
             await visit(boardPath);
             await openView('Board');
-            await page.locator('.gn-board-card').first().click();
-            await expect(page.getByRole('dialog').first(), 'clicking a board card did not open the ticket sheet').toBeVisible();
+            // A click before hydration does nothing (measured on a cold `next dev`); retry until the sheet is up.
+            await expect(async () => {
+              await page.locator('.gn-board-card').first().click();
+              await expect(page.getByRole('dialog').first(), 'clicking a board card did not open the ticket sheet').toBeVisible({ timeout: 3000 });
+            }).toPass({ timeout: 30_000 });
             await page.waitForTimeout(600);
           },
         },
@@ -386,7 +417,13 @@ for (const viewport of VIEWPORTS) {
         const { population, cuts } = await sweepScreen(page, theme);
         expect(population.length, `${screen.name}: no element with a box-shadow was found, so the sweep measured nothing`).toBeGreaterThan(0);
         const allowed = (f: Finding): boolean => ALLOW.some((a) => a.element.test(f.element) && a.clipper.test(f.clipper));
-        const real = cuts.filter((f) => !allowed(f));
+        const seen = new Set<string>();
+        const real = cuts.filter((f) => !allowed(f)).filter((f) => {
+          const key = `${f.element}|${f.clipper}|${f.text}|${sidesText(f.clipped)}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
         console.log(`[neo-shadow-clip] ${viewport.key} neo-${theme} ${screen.name}: ${population.length} shadowed, ${real.length} cut`);
         for (const f of real) {
           offenders.push(`${f.element} "${f.text}" in ${f.clipper} | ${screen.name} | ${viewport.key} | neo-${theme} | clipped px ${sidesText(f.clipped)}`);
