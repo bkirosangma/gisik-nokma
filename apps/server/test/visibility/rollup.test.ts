@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { canSee } from '../../src/visibility/can-see.js';
-import { rollupFor, type RollupView } from '../../src/visibility/rollup.js';
+import { rollupFor, rollupsFor, type RollupView } from '../../src/visibility/rollup.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import {
   applyAll,
@@ -425,5 +425,77 @@ describe('rollupFor — the role is resolved in each CHILD’s own workspace', (
     // be written against minted ULIDs: resolving ONE role from the first row
     // restricts all three children if that row is B's and none of them if it is
     // A's, and both differ from the one asserted.
+  });
+});
+
+describe('rollupsFor — one query for many parents (spec D7; audit SM-06)', () => {
+  /** `n` parents in one workspace, each with two workspace-visible children and a third only the owner may see. */
+  async function seedParents(n: number): Promise<{ ws: string; viewer: string; parents: string[] }> {
+    const ws = newUlid();
+    const prj = newUlid();
+    const viewer = newUlid();
+    await seedProject(db.pool, ws, prj);
+    await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
+    const parents: string[] = [];
+    const visibility: ReturnType<typeof setVisibilityEnv>[] = [];
+    for (let i = 0; i < n; i += 1) {
+      const parent = newUlid();
+      await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parent });
+      parents.push(parent);
+      for (let c = 0; c < 3; c += 1) {
+        const id = newUlid();
+        await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: id, parentId: parent });
+        visibility.push(setVisibilityEnv(ws, id, c < 2 ? 'workspace' : 'explicit', c < 2 ? undefined : [newUlid()]));
+      }
+    }
+    await applyAll(db.pool, visibility);
+    return { ws, viewer, parents };
+  }
+
+  /** A pool that counts the queries it is asked. */
+  function counting(): { pool: typeof db.pool; count: () => number; reset: () => void } {
+    let queries = 0;
+    const pool = {
+      query: (...args: unknown[]) => {
+        queries += 1;
+        return (db.pool.query as (...a: unknown[]) => unknown)(...args);
+      },
+    } as unknown as typeof db.pool;
+    return { pool, count: () => queries, reset: () => { queries = 0; } };
+  }
+
+  it('25.191 the batch equals the per-ticket answers for every parent, and a parent with no children is absent', async () => {
+    const { viewer, parents, ws } = await seedParents(2);
+    const childless = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: newUlid(), ticketId: childless });
+    const batch = await rollupsFor(db.pool, viewer, [...parents, childless]);
+    for (const id of parents) {
+      const single = await rollupFor(db.pool, viewer, id);
+      expect(single).not.toBeNull();
+      expect(JSON.stringify(batch.get(id))).toBe(JSON.stringify(single));
+    }
+    // Control: the answers are not all zero, so equality is not two empty objects agreeing.
+    expect(batch.get(parents[0]!)).toEqual({ total: 3, terminal: 0, uncategorized: 0, restrictedCount: 1 });
+    expect(batch.has(childless)).toBe(false);
+    expect(await rollupFor(db.pool, viewer, childless)).toBeNull();
+  });
+
+  it('25.192 fifty parents cost a constant number of queries, not fifty', async () => {
+    const { viewer, parents } = await seedParents(50);
+    const spy = counting();
+    const batch = await rollupsFor(spy.pool, viewer, parents);
+    expect(batch.size).toBe(50);
+    const batched = spy.count();
+    // The children, the viewer's role in the (single) workspace, the arm set: a handful, never per parent.
+    expect(batched).toBeLessThanOrEqual(6);
+    // Control: the per-ticket path costs at least one query per parent.
+    spy.reset();
+    for (const id of parents) await rollupFor(spy.pool, viewer, id);
+    // `rollupFor` delegates, so this measures the delegation: one parent at a time is one batch of one.
+    expect(spy.count()).toBeGreaterThanOrEqual(50);
+    // And the page is the SAME size at five parents as at fifty (a constant, not a slope).
+    const five = counting();
+    await rollupsFor(five.pool, viewer, parents.slice(0, 5));
+    expect(five.count()).toBe(batched);
   });
 });
