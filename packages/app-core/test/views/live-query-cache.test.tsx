@@ -10,6 +10,7 @@ import {
   liveQueryStoreKey,
   recallLiveQuery,
   rememberLiveQuery,
+  staleWorkspaces,
 } from '../../src/views/live-query-cache.js';
 
 /**
@@ -259,5 +260,17 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     const after = renderHook(() => useLiveQuery(source, 'ws', 'prj', async () => ({ groups: ['second'] }), { cacheKey: 'board:prj' }));
     await waitFor(() => expect(after.result.current.data).toEqual({ groups: ['second'] }));
     expect(recallLiveQuery(key('board:prj'))).toEqual({ groups: ['second'] });
+  });
+
+  it('25.048 staleWorkspaces names each workspace with an entry older than the limit once, and none that is fresh or has no workspace prefix', () => {
+    rememberLiveQuery(liveQueryStoreKey('old', 'board:a'), 1, 0);
+    rememberLiveQuery(liveQueryStoreKey('old', 'list:a'), 1, 0);
+    rememberLiveQuery(liveQueryStoreKey('mixed', 'board:a'), 1, 0);
+    rememberLiveQuery(liveQueryStoreKey('mixed', 'list:a'), 1, 90_000);
+    rememberLiveQuery(liveQueryStoreKey('fresh', 'board:a'), 1, 95_000);
+    rememberLiveQuery('no-workspace-prefix', 1, 0);
+    expect(staleWorkspaces(30_000, 100_000).sort()).toEqual(['mixed', 'old']);
+    // Control: the limit is strict, an entry exactly that old is not stale yet.
+    expect(staleWorkspaces(100_000, 100_000)).toEqual([]);
   });
 });

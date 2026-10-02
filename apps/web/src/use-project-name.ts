@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useProjectsVersion } from './projects-version.js';
-import { useAppServices, useSessionStatus } from './providers.js';
+import { useSessionStatus } from './providers.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 
 /**
  * The current project's own SERVED name (board-prototype-port Task 2, fix
@@ -23,7 +22,7 @@ import { useAppServices, useSessionStatus } from './providers.js';
  * stale guess." The same rule applies here, unchanged: a project this viewer
  * has not yet been told the name of is not licence to print its id instead.
  *
- * **Deliberately NOT module-cached, unlike `useWorkspaceName`.** Round 26 gave
+ * **Keeps no cache of its own, unlike `useWorkspaceName`** (the rows it narrows come from the module-scoped shared read, `use-my-workspaces.ts`, since smoothness T4; this is about a name cache here). Round 26 gave
  * that hook a module-scoped cache because `AppNav` is rendered per PAGE (not
  * by the root layout) and therefore remounts on every client-side navigation
  * — the cache is what stopped its workspace-name nav item flickering out and
@@ -34,7 +33,7 @@ import { useAppServices, useSessionStatus } from './providers.js';
  * only a second stale-entry-eviction story to keep in sync with the first.
  * Stated as a decision, not an oversight.
  *
- * **It re-asks when `projects-version.ts` is bumped** (MCP CRUD plan Task 2): a
+ * **It re-asks when `projects-version.ts` is bumped** (MCP CRUD plan Task 2; since smoothness T4 the shared read does the re-asking): a
  * committed project write — an Edit's rename above all — would otherwise leave
  * this page's title on the old name until the next page load.
  */
@@ -42,36 +41,15 @@ export function useProjectName(
   workspaceId: string | undefined,
   projectId: string | undefined,
 ): string | null {
-  const { dataSource } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
-  const [name, setName] = useState<string | null>(null);
-  // Re-asks after a committed project write (an Edit's new name), see `projects-version.ts`.
-  const version = useProjectsVersion();
-
-  useEffect(() => {
-    if (workspaceId === undefined || projectId === undefined || !signedIn) {
-      setName(null);
-      return;
-    }
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        const found =
-          rows.find((row) => row.id === workspaceId)?.projects.find(
-            (project) => project.id === projectId,
-          )?.name ?? null;
-        setName(found);
-      },
-      () => {
-        if (!cancelled) setName(null);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, workspaceId, projectId, signedIn, version]);
-
-  return name;
+  // The ONE shared read (`use-my-workspaces.ts`), which re-asks when `projects-version.ts` is bumped, so
+  // an Edit's new name reaches the title without a page load (this hook used to subscribe for itself).
+  const { rows, error } = useMyWorkspaces(workspaceId !== undefined && projectId !== undefined);
+  if (workspaceId === undefined || projectId === undefined || !signedIn || error !== null || rows === null) {
+    return null;
+  }
+  return (
+    rows.find((row) => row.id === workspaceId)?.projects.find((project) => project.id === projectId)?.name ?? null
+  );
 }
