@@ -15,6 +15,7 @@ export const TOOL_NAMES_BY_MODULE = {
   project: ['list_projects', 'get_project', 'create_project', 'update_project', 'archive_project', 'restore_project', 'delete_project', 'undelete_project'],
   comment: [
     // comment begin (T6)
+    'list_comments', 'edit_comment', 'delete_comment',
     // comment end
   ],
   note: [
@@ -27,6 +28,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   ticket: [
     // ticket begin (T9)
+    'update_ticket', 'close_ticket', 'reopen_ticket', 'delete_ticket', 'restore_ticket', 'get_ticket_history', 'rank_ticket',
     // ticket end
   ],
   discovery: [
