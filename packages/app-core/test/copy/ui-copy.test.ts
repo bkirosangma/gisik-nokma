@@ -293,7 +293,7 @@ const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
   { file: 'events/ticket-events.ts', contains: 'a field claim with no value', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
   { file: 'events/ticket-events.ts', contains: 'nothing sorts below it', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
   { file: 'filter-spec.ts', contains: 'Postgres text cannot carry a NUL byte', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'the contest note\'s rule refusal, composed for the contest card a person reads (HK-3b)' },
+  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'frozen by ruling P39 (contest-events.ts): this text is written into append-only comment bodies on convert-to-comment, so re-wording it splits one sentence into two spellings in the ledger' },
   { file: 'events/contest-events.ts', contains: 'by their clock —', reason: 'the contest provenance line a person reads (HK-3b)' },
 ];
 
