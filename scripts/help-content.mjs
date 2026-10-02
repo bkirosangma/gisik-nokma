@@ -359,7 +359,19 @@ export const HELP_CONTENT: HelpContent = ${JSON.stringify(content, null, 2)} as 
 // open; this closes the half that is a literal.
 
 /**
- * Every string a help document puts in double quotes, deduped.
+ * A double-quoted span, which may WRAP onto the next line once (U-T11b, 2026-10-02). The first version
+ * matched `"[^"\n]+"`, so a quotation that the document's own line width broke in two was never looked
+ * up in the product: reviewer B's probe found 14 such strings absent from the product, four of them
+ * U-T11 copy a reader sees in /help. ONE newline, not any number: a stray `"` (an inch mark, an
+ * unclosed quote) would otherwise pair with a distant one and swallow a paragraph.
+ */
+const QUOTED_SPAN = /"[^"\n]+(?:\n[^"\n]+)?"/g;
+/** The seam of a wrapped span: the newline, the indent or `>` of the continuation line, and the padding either side. */
+const WRAP_JOINT = /[ \t]*\n[ \t>]*/g;
+
+/**
+ * Every string a help document puts in double quotes, deduped. A span wrapped over two lines is joined
+ * with ONE space, so it is compared as the person reads it.
  *
  * A span whose CONTENT carries `*` is dropped: those are artefacts of emphasis
  * beside a quotation mark, not product strings, and two of them are in the
@@ -369,8 +381,8 @@ export const HELP_CONTENT: HelpContent = ${JSON.stringify(content, null, 2)} as 
 export function quotedSpans(text) {
   return [
     ...new Set(
-      (text.match(/"[^"\n]+"/g) ?? [])
-        .map((s) => s.slice(1, -1))
+      (text.match(QUOTED_SPAN) ?? [])
+        .map((s) => s.slice(1, -1).replace(WRAP_JOINT, ' '))
         .filter((s) => !s.includes('*') && !s.includes('`')),
     ),
   ];
@@ -616,6 +628,26 @@ const CASES = [
       // string anyone put in the product. Two of these are live in the manual,
       // and treating them as claims would redden the gate on prose.
       return quotedSpans('a " — an epic * is real work" b').length === 0;
+    },
+  },
+  {
+    name: 'PLANTED: a quote WRAPPED over two lines is still checked; a wrapped CORRECT one stays green',
+    run: () => {
+      // U-T11b. The stale quote wraps exactly as the manual's do; before the fix it matched no span at all.
+      const stale = [{ id: 'd', source: 'docs/d.md', text: 'It says "No such\nthing here" now.' }];
+      const right = [{ id: 'd', source: 'docs/d.md', text: 'It says "Sign\n  out" now.' }];
+      const bare = { absent: [] };
+      const a = compareAbsent({ documents: stale, product: 'Sign out', baseline: bare });
+      const b = compareAbsent({ documents: right, product: 'Sign out', baseline: bare });
+      // The bound: ONE newline. A stray quote must not pair with one a paragraph away.
+      const stray = quotedSpans('a "stray\n\nb" c');
+      return (
+        a.undeclared.length === 1 &&
+        a.undeclared[0].span === 'No such thing here' &&
+        b.checked === 1 &&
+        b.undeclared.length === 0 &&
+        stray.length === 0
+      );
     },
   },
   {

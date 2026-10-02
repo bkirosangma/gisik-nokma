@@ -95,6 +95,31 @@ describe('15.35 the help corpus against the product', () => {
    * not strings anyone put in the product. Reading them as claims would redden
    * the gate on prose, which is how a check earns the right to be ignored.
    */
+  /**
+   * 23.196 (U-T11b). A quotation the document's own line width broke in two used to match nothing, so it was
+   * never looked up in the product. The stale sentence below wraps exactly as the manual's do.
+   */
+  it('23.196 — a quotation WRAPPED over a line is checked; a wrapped correct one stays green; the bound is one newline', () => {
+    const baseline = { absent: [] };
+    const stale = compareAbsent({
+      documents: [{ id: 'd', source: 'docs/d.md', text: 'It says *"No such\nthing here"* now.' }],
+      product: 'Sign out',
+      baseline,
+    });
+    expect(stale.undeclared.map((u) => u.span)).toEqual(['No such thing here']);
+    // CONTROL: the same wrap over a string the product HAS (indented continuation, as in a list item) is silent,
+    // so the red above is the wrap being read and not a rule that fires on every wrapped span.
+    const right = compareAbsent({
+      documents: [{ id: 'd', source: 'docs/d.md', text: 'It says *"Sign\n   out"* now.' }],
+      product: 'Sign out',
+      baseline,
+    });
+    expect(right.checked).toBe(1);
+    expect(right.undeclared).toEqual([]);
+    // The bound: a blank line ends the search, so a stray quote cannot swallow a paragraph.
+    expect(quotedSpans('a "stray\n\nb" c')).toEqual([]);
+  });
+
   it('15.35 — an emphasis ARTEFACT whose content carries * is not read as a product string', () => {
     expect(quotedSpans('a " — an epic * is real work" b')).toEqual([]);
     // Control: the same call DOES find a plain span, so the empty above is the

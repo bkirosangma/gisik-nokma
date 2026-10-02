@@ -257,8 +257,8 @@ count and — once it has any projects — a line naming them.
   workspace's name first, because it removes the workspace from every member at once; it then sits
   under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
-If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
-— or create your own."* Both of those are real options.
+If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link, or
+create your own."* Both of those are real options.
 
 If you have been given a limited role, you may see a workspace's name with no projects listed under
 it. **That is deliberate, not broken** — you are being shown your share.
@@ -787,7 +787,7 @@ weighed exactly as the standard ones are. Two tickets at the same rank cannot ne
 **Sub-task**.
 
 **Where nothing at all is smaller, the row is not drawn.** You get a sentence instead — *"This is a
-Sub-task — nothing smaller can sit under it."* — rather than a box and a button that could only end in
+Sub-task. Nothing smaller can sit under it."* — rather than a box and a button that could only end in
 a refusal. And if your list of types cannot be read at all, the section says *that* rather than showing
 you an empty row and letting you conclude there is nothing below.
 
@@ -1214,7 +1214,7 @@ a sixth kind.
 2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a ticket's comment or description, or in a note or one of its comments. The row names the ticket or the note, and clicking it opens that ticket or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
-5. Something has been sitting in one state too long — *"In Doing since 21 Aug — moved there by
+5. Something has been sitting in one state too long — *"In Doing since 21 Aug, moved there by
    Anselma Marak"*
 
 **To mark one thing read: click the row.** If the marking fails, it reloads to show you the truth
@@ -1377,7 +1377,7 @@ the list. Reaching it through the link never has this problem.
 
 ### Who can use it
 
-Owners and admins only. If a member goes there they get: *"You can look, not touch — only a workspace
+Owners and admins only. If a member goes there they get: *"You can look, but not change anything. Only a workspace
 owner or admin can change workflows and ticket types."* No "New workflow" button, all the boxes
 switched off. They can look, they cannot break anything, and there is no way to accidentally publish.
 
@@ -1500,8 +1500,8 @@ there is no finished state; an arrow points at a state that does not exist; a st
 a finished state with no way in; two identical arrows; or a "who may move it" rule that names nobody.
 
 Each issue is clickable and jumps you to the offending box or arrow. **The Publish button stays off,
-with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues
-— this workflow can be published."*
+with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues.
+This workflow can be published."*
 
 ### Advisories
 

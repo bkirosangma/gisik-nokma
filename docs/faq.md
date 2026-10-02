@@ -438,7 +438,7 @@ removed later, whoever removed it had to say where those tickets go, and yours f
 said, your ticket refuses to move rather than the product guessing, and it tells you it is stranded.
 
 **Can a regular member edit our workflow?**
-No. They get "You can look, not touch — only a workspace owner or admin can change workflows and
+No. They get "You can look, but not change anything. Only a workspace owner or admin can change workflows and
 ticket types", with no New workflow button and every box switched off. They can look. There is no way
 for a non-admin to accidentally publish something.
 

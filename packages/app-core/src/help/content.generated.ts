@@ -1553,7 +1553,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No workspaces yet. Ask an admin for an invite link — or create your own.\""
+                    "text": "\"No workspaces yet. Ask an admin for an invite link, or create your own.\""
                   },
                   {
                     "kind": "text",
@@ -4626,7 +4626,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This is a Sub-task — nothing smaller can sit under it.\""
+                    "text": "\"This is a Sub-task. Nothing smaller can sit under it.\""
                   },
                   {
                     "kind": "text",
@@ -6929,7 +6929,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "italic",
-                      "text": "\"In Doing since 21 Aug — moved there by Anselma Marak\""
+                      "text": "\"In Doing since 21 Aug, moved there by Anselma Marak\""
                     }
                   ]
                 ]
@@ -7555,7 +7555,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"You can look, not touch — only a workspace owner or admin can change workflows and ticket types.\""
+                    "text": "\"You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.\""
                   },
                   {
                     "kind": "text",
@@ -8268,7 +8268,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No issues — this workflow can be published.\""
+                    "text": "\"No issues. This workflow can be published.\""
                   }
                 ]
               }
@@ -13615,7 +13615,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. They get \"You can look, not touch — only a workspace owner or admin can change workflows and ticket types\", with no New workflow button and every box switched off. They can look. There is no way for a non-admin to accidentally publish something."
+                    "text": "No. They get \"You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types\", with no New workflow button and every box switched off. They can look. There is no way for a non-admin to accidentally publish something."
                   }
                 ]
               }
