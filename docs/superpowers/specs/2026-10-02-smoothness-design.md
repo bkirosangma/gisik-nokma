@@ -87,13 +87,13 @@ Each is numbered, with the recommendation the plan was written against. A differ
 ### 4.1 Shapes
 *(Superseded in part by Amendment S-R1, appended at the end of this spec: the frame is the real component's own container and `Skeleton`'s shapes are its parts.)*
 
-`Skeleton` renders a `<span class="gn-skeleton gn-skeleton--<shape>" aria-hidden="true">` with inline `--gn-skeleton-w`/`-h` from props. Shapes: `line` (height `1em`, radius `--gn-radius-control`, default width 60%), `block` (any size, radius `--gn-radius-card`), `circle` (avatar), `card` (a card's padding with two lines and a chip row, matching `.gn-board__card`'s padding and minimum height). `rows={n}` repeats with the list's own gap. A skeleton region is a container with `aria-busy="true"` and a visually hidden "Loading <what>" sentence rendered once, not per block (Nord's pattern, RESEARCH §5).
+`Skeleton` renders a `<span class="gn-skeleton gn-skeleton--<shape>" aria-hidden="true">` with inline `--gn-skeleton-w`/`-h` from props. Shapes: `line` (height `1em`, radius `--gn-radius-control`, default width 60%), `block` (any size, radius `--gn-radius-card`), `circle` (avatar), `card` (a card's padding with two lines and a chip row, matching `.gn-board-card`'s padding (`packages/app-core/src/views/board.tsx:2155`, `packages/ui/src/ui.css:1495`) and minimum height). `rows={n}` repeats with the list's own gap. A skeleton region is a container with `aria-busy="true"` and a visually hidden "Loading <what>" sentence rendered once, not per block (Nord's pattern, RESEARCH §5).
 
 ### 4.2 Motion
 One keyframe, `gnPulse` (`opacity: 1 → 0.6 → 1`, 1,600 ms, `--gn-motion-ease-out`, infinite), with its own `prefers-reduced-motion: reduce` arm setting `animation: none` and a static `opacity: 0.8`. Content replaces a skeleton in place with no entrance; a region that arrives late (a strip, a banner) fades in over `--gn-motion-feedback` only when it replaces its reserved band (never when it inserts). Pending controls dim to `--gn-disabled-opacity` after the wait, with no transition.
 
 ### 4.3 Across the styles and themes (hig / minimal / neo × light / dark), and beside the neo refresh
-*(The Fill line is superseded by Amendment S-R1: the fill is the new `surfacePlaceholder` role, never the neo well; the rest of this section stands.)*
+*(Two items here are superseded by Amendment S-R1: the Fill line (the fill is the new `surfacePlaceholder` role, never the neo well) and the "Nothing new in `tokens.ts`" bullet (S-R1 adds that role; the wait durations' "two exported constants in `use-wait.ts`" part still stands). The other bullets stand.)*
 - Fill: `var(--gn-surface-track)` in every combination (the quiet track, already contrast-paired for text in UX fixes T1); no border, no shadow, no gradient. In neo this is the flat surface, which U7 defines as "not interactive"; in hig/minimal it is the existing track grey. Dark themes use the same role (the neo refresh may re-value `surfaceTrack`; the skeleton follows the token and needs no change).
 - Nothing new in `tokens.ts`: the wait durations are two exported constants in `packages/ui/src/use-wait.ts` (`WAIT_BEFORE_MS = 150`, `WAIT_HOLD_MS = 350`), one place, pinned by fake-timer tests; CSS needs no delay of its own (plan FD1).
 - All skeleton CSS is one contiguous block appended after `ui.css`'s last rule (line 8904 at `4f86b959`), with its keyframe beside it (one consumer, the header's own rule for keyframes), so no line the neo refresh edits (96–99, 1168–1178, 7176–7180, 7252–7258, 8097–8153) moves. `globals.css` gains only the `loading.tsx` shells' rules, appended likewise (neo edits 169 and 2942–2945).
@@ -136,7 +136,7 @@ Request counts: a board paint ≤ 6 requests after the session (board, list page
 - Project-scoped stream rooms and ETags (D8).
 - Virtualization (D12) and any change to drag-and-drop behaviour.
 - The replica's IPC costs and the mobile WebView reuse (D11).
-- Any change to tokens, surfaces or shadows (the neo refresh's), any copy rename that the manual quotes, new features, MCP tools.
+- Any change to tokens, surfaces or shadows (the neo refresh's) *(exception: Amendment S-R1's `surfacePlaceholder` role is the one token change, and it is owner-ruled)*, any copy rename that the manual quotes, new features, MCP tools.
 
 ## Amendment S-R1: structural skeletons (2026-10-02)
 
