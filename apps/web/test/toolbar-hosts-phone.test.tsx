@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import { NewTicketDialog, TicketSheet, type TicketRead } from '@gisik-nokma/app-core';
 import { PHONE_TOOLBAR_QUERY, TicketEditorSlot } from '@gisik-nokma/editor';
-import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf, type CssRule } from '../../../packages/ui/test/helpers/css-rules.js';
 import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns.js';
 import { stubServices } from './helpers/stub-services.js';
 import { PHONE, SELECT_WIDTH, pack, packingRules, px, readEditorCss, type PackingRules } from './helpers/toolbar-packing.js';
@@ -212,7 +212,7 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     // placed after its own base rule, which sits below the strip's rules in the file.
     // The editor SKELETON's own phone rules (smoothness T10 FIX 2, 25.182) live in the same breakpoint block, after the editor's: they
     // draw the web app's loading placeholder in the real bar's phone boxes and are the only other rules the arm may hold.
-    const isSkeletonRule = (rule: { selectors: string[] }) => rule.selectors.every((selector) => selector.includes('gn-editor-skeleton__'));
+    const isSkeletonRule = (rule: Pick<CssRule, 'selectors'>) => rule.selectors.every((selector) => selector.includes('gn-editor-skeleton__'));
     const skeletonArm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && isSkeletonRule(rule));
     expect(skeletonArm.map((rule) => rule.selectors.join(', '))).toEqual([
       '.gn-editor-skeleton__set--desktop',

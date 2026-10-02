@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -12,19 +13,21 @@ const ALIASES: Record<string, string> = {
   '@gisik-nokma/app-core': join(PKGS, 'app-core/src/index.ts'),
   '@gisik-nokma/editor/upload': join(PKGS, 'editor/src/upload.ts'),
   '@gisik-nokma/editor/comment-toolbar-pref': join(PKGS, 'editor/src/comment-toolbar-pref.ts'),
+  '@gisik-nokma/editor/markdown-hint': join(PKGS, 'editor/src/markdown-hint.ts'),
   '@gisik-nokma/editor': join(PKGS, 'editor/src/index.ts'),
   '@gisik-nokma/ui': join(PKGS, 'ui/src/index.ts'),
 };
 
 /**
- * Static imports only (`import … from`, `export … from`), following the repo's `.js` → `.ts(x)` convention.
+ * Static imports only (`import … from`, `export … from`, and the side-effect form `import '…'`, which has no `from` and no bindings
+ * but still pulls the module into the route), following the repo's `.js` → `.ts(x)` convention.
  * `import()` and type-only imports are not edges: they are the point of the split.
  */
 function staticGraph(entry: string, seen = new Set<string>()): Set<string> {
   if (seen.has(entry)) return seen;
   seen.add(entry);
   const src = readFileSync(entry, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  for (const m of src.matchAll(/^(?:import|export)\s+(?!type\b)[^'"]*?from\s+['"]([^'"]+)['"]/gm)) {
+  for (const m of src.matchAll(/^(?:(?:import|export)\s+(?!type\b)[^'"]*?from\s+|import\s+)['"]([^'"]+)['"]/gm)) {
     const spec = m[1]!;
     let target: string | null = null;
     if (spec.startsWith('.')) target = resolve(dirname(entry), spec).replace(/\.js$/, '');
@@ -40,14 +43,15 @@ function staticGraph(entry: string, seen = new Set<string>()): Set<string> {
       }
     }
   }
-  for (const m of src.matchAll(/from\s+['"]((?:@tiptap|@xyflow|prosemirror)[^'"]*)['"]/g)) seen.add(`npm:${m[1]}`);
+  for (const m of src.matchAll(/(?:from|^import)\s+['"]((?:@tiptap|@xyflow|prosemirror)[^'"]*)['"]/gm)) seen.add(`npm:${m[1]}`);
   return seen;
 }
 
-// `editor/src/upload.ts` is the fetch helper's own subpath and `editor/src/comment-toolbar-pref.ts` the stored Format choice's (the
-// editor skeleton reads it before the editor loads, FIX 2 F4); neither imports Tiptap or any other editor file (React only), so a
-// static edge to either is not an edge to the editor. 25.171's control walks both and finds no `npm:@tiptap`.
-const LIGHT_EDITOR_SUBPATHS = ['/editor/src/upload.ts', '/editor/src/comment-toolbar-pref.ts'];
+// `editor/src/upload.ts` is the fetch helper's own subpath, `editor/src/comment-toolbar-pref.ts` the stored Format choice's and
+// `editor/src/markdown-hint.ts` the hint sentence's (the editor skeleton reads the last two before the editor loads, T10 FIX 2);
+// none of the three imports Tiptap or any other editor file (React or nothing), so a static edge to any of them is not an edge to the
+// editor. 25.171's control walks all three and finds no `npm:` module and no other editor file.
+const LIGHT_EDITOR_SUBPATHS = ['/editor/src/upload.ts', '/editor/src/comment-toolbar-pref.ts', '/editor/src/markdown-hint.ts'];
 const reachesEditor = (graph: string[]) =>
   graph.filter((f) => (f.includes('/editor/src/') && !LIGHT_EDITOR_SUBPATHS.some((light) => f.endsWith(light))) || f.startsWith('npm:@tiptap'));
 const reachesCanvas = (graph: string[]) => graph.filter((f) => f.includes('workflow-builder/ui/workflow-canvas') || f.startsWith('npm:@xyflow'));
@@ -69,12 +73,26 @@ describe('route import graphs (spec D6, S9; audit SM-04)', () => {
     // static walk from the slot's own importer still stops at the `import()`; and a file that imports the
     // editor statically (the notes document) does reach it.
     expect(readFileSync(join(WEB, 'src/editor-slot.tsx'), 'utf8')).toMatch(/import\('@gisik-nokma\/editor'\)/);
-    // The two light subpaths are light for real: walked on their own they reach no Tiptap module and no other editor file.
-    for (const light of ['@gisik-nokma/editor/upload', '@gisik-nokma/editor/comment-toolbar-pref']) {
+    // The three light subpaths are light for real: walked on their own they reach no Tiptap module and no other editor file.
+    for (const light of ['@gisik-nokma/editor/upload', '@gisik-nokma/editor/comment-toolbar-pref', '@gisik-nokma/editor/markdown-hint']) {
       const graph = [...staticGraph(ALIASES[light]!)];
       expect(graph.filter((f) => f.startsWith('npm:') || (f.includes('/editor/src/') && f !== ALIASES[light])), light).toEqual([]);
     }
     expect(reachesEditor([...staticGraph(join(WEB, 'src/notes/note-document.tsx'))]).length).toBeGreaterThan(0);
+    // The walker sees every static form: a bare `import '…'` (no bindings, no `from`) is an edge as much as `import { … } from '…'`,
+    // for the root, for a light subpath's own dependency, and for an npm module (a side-effect import of Tiptap).
+    const fixtures = mkdtempSync(join(tmpdir(), 'import-graph-'));
+    const probe = (name: string, source: string) => {
+      const file = join(fixtures, name);
+      writeFileSync(file, source);
+      return [...staticGraph(file)];
+    };
+    expect(reachesEditor(probe('side-effect-root.ts', "import '@gisik-nokma/editor';\n")).length).toBeGreaterThan(0);
+    expect(reachesEditor(probe('named-root.ts', "import { Editor } from '@gisik-nokma/editor';\n")).length).toBeGreaterThan(0);
+    expect(reachesEditor(probe('side-effect-tiptap.ts', "import '@tiptap/react';\n")).length).toBeGreaterThan(0);
+    expect(reachesEditor(probe('type-only.ts', "import type { Editor } from '@gisik-nokma/editor';\n"))).toEqual([]);
+    expect(reachesEditor(probe('dynamic.ts', "export const load = () => import('@gisik-nokma/editor');\n"))).toEqual([]);
+    rmSync(fixtures, { recursive: true, force: true });
   });
 
   it('25.172 app-core and editor declare their side effects, so a bundler may drop what a route does not import', () => {
