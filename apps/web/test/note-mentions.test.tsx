@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Editor } from '@tiptap/core';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -124,6 +124,8 @@ async function bothEditors(container: HTMLElement): Promise<{ body: Editor; comm
 describe('18.401–18.402 the @ picker lists the workspace people in both note editors', () => {
   it('18.401 typing @an in the note BODY lists the people whose label matches — and not the others', async () => {
     const { container } = renderDocument();
+    // G-3: a note opens to READ; typing needs the editor, which "Edit" mounts (25.341).
+    fireEvent.click(await screen.findByTestId('note-edit'));
     const { body } = await bothEditors(container);
     typeInto(body, '@an');
     await waitFor(() => expect(popupNames().length).toBeGreaterThan(0));
