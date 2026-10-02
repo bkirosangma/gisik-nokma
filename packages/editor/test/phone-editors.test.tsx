@@ -14,6 +14,7 @@ import { PHONE_TOOLBAR_QUERY, PHONE_VISIBLE_TOOLS } from '../src/components/Edit
 import type { EditorSubmission } from '../src/attachments/compose-editor-submission.js';
 import type { DocJson } from '../src/doc.js';
 import { ruleExactly, valueOf } from '../../ui/test/helpers/css-rules.js';
+import { SHADOW_REACH_VARIABLE, shadowReachOf } from '../../ui/src/tokens.js';
 
 // Smoothness add-on G-7 (owner 2026-10-02, "all 5 in"): the phone editors. Cases 25.400-25.414.
 //   1 unboxed long text · 2 slimmer comment boxes · 3 one docked toolbar row · 4 reordered tools · 5 More as a sheet.
@@ -148,6 +149,10 @@ const cellNamed = (name: string): HTMLButtonElement => {
   if (hit === undefined) throw new Error(`no sheet cell named ${name}`);
   return hit;
 };
+/** The docked bar's distance above the layout viewport's bottom, carried as a variable (the CSS adds the bottom bar's lift). */
+const dockOffset = (el: HTMLElement): string => el.style.getPropertyValue('--ticket-editor-dock-bottom');
+/** The phone bar's height in px for a given neo shadow reach (0 in hig/minimal/the webview): 44px tool + 2 × max(6px, reach). */
+const barHeightPx = (reach: number): number => 2.75 * 16 + 2 * Math.max(0.375 * 16, reach);
 const focusEditor = (view: View): void => {
   act(() => pm(view).focus());
 };
@@ -271,32 +276,33 @@ describe('G-7 3: one docked toolbar row', () => {
     const { view, vv } = await mountEditor(true, { height: 500 });
     expect(anchor(view)).toHaveAttribute('data-docked', 'false');
     expect(bar(view)).not.toHaveClass('ticket-editor__toolbar--docked');
-    expect(bar(view).style.bottom).toBe('');
+    expect(dockOffset(bar(view))).toBe('');
 
     focusEditor(view);
     expect(anchor(view)).toHaveAttribute('data-docked', 'true');
     expect(bar(view)).toHaveClass('ticket-editor__toolbar--docked');
     // The keyboard is up: the visual viewport is 500 tall in an 844 layout viewport → the bar's bottom edge sits 344px up.
-    expect(bar(view).style.bottom).toBe('344px');
+    expect(dockOffset(bar(view))).toBe('344px');
+    expect(bar(view).style.bottom, 'the bar carries a variable, never an inline bottom (25.421)').toBe('');
 
     // The keyboard grows (visual viewport 400) and the page pans (offsetTop 30): the bar follows both events.
     vv.height = 400;
     act(() => {
       vv.dispatchEvent(new Event('resize'));
     });
-    expect(bar(view).style.bottom).toBe('444px');
+    expect(dockOffset(bar(view))).toBe('444px');
     vv.offsetTop = 30;
     act(() => {
       vv.dispatchEvent(new Event('scroll'));
     });
-    expect(bar(view).style.bottom).toBe('414px');
+    expect(dockOffset(bar(view))).toBe('414px');
 
     // Blur (focus leaves the editor for the page): the bar returns to its place in the flow.
     const outside = document.createElement('button');
     document.body.append(outside);
     act(() => outside.focus());
     expect(anchor(view)).toHaveAttribute('data-docked', 'false');
-    expect(bar(view).style.bottom).toBe('');
+    expect(dockOffset(bar(view))).toBe('');
     view.unmount();
 
     // CONTROL (same `it`): above 40rem there is no anchor and a focused editor draws the same bar, undocked.
@@ -349,7 +355,9 @@ describe('G-7 3: one docked toolbar row', () => {
     const barHeight = valueOf(rule('.ticket-editor__toolbar'), 'height');
     expect(barHeight).toBe('var(--ticket-editor-bar-h)');
     const token = valueOf(rule('.ticket-editor'), '--ticket-editor-bar-h');
-    expect(token).toBe('3.5rem'); // 44px tool + 2 × 6px
+    // 44px tool + 2 × max(6px, the neo shadow reach); with no reach (hig, minimal, the webview) it is 3.5rem = 56px (25.419).
+    expect(token).toBe('calc(2.75rem + 2 * max(0.375rem, var(--ticket-editor-reach)))');
+    expect(barHeightPx(0)).toBe(56);
     // The anchor reserves the bar's place while it floats, and the content clears it.
     expect(valueOf(rule(".ticket-editor__toolbar-anchor[data-docked='true']"), 'min-height')).toBe('var(--ticket-editor-bar-h)');
     const clear = rule(".ticket-editor__toolbar-anchor[data-docked='true'] ~ .ticket-editor__content");
@@ -657,5 +665,117 @@ describe('G-7 5: the sheet keeps its Escape and its clicks from the host around 
     document.removeEventListener('keydown', onDocumentKey, true);
     view.unmount();
     window.localStorage.clear();
+  });
+});
+
+describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom bar and the dialog contract', () => {
+  it('25.419 (F1) in neo the phone scroller is not the clip: it pads the raised tools\' shadow reach and hands the room back with an equal negative margin, and the bar grows to hold it; with no reach (hig) nothing changes', () => {
+    // The reach is the token's own variable, read with a 0 fallback: hig, minimal and the mobile webview (no token) get 0.
+    expect(SHADOW_REACH_VARIABLE).toBe('--gn-shadow-reach');
+    const root = phoneRule('.ticket-editor');
+    expect(valueOf(root, '--ticket-editor-reach')).toBe('var(--gn-shadow-reach, 0px)');
+    const scroll = phoneRule('.ticket-editor__scroll');
+    expect(valueOf(scroll, 'padding')).toBe('var(--ticket-editor-reach)');
+    expect(valueOf(scroll, 'margin')).toBe('calc(-1 * var(--ticket-editor-reach))');
+    expect(valueOf(scroll, 'scroll-padding-inline')).toBe('var(--ticket-editor-reach)');
+    // The last tool's room is not taken from the pinned More cell: More steps one reach further away.
+    expect(valueOf(phoneRule('.ticket-editor__more'), 'margin-left')).toBe('calc(0.25rem + var(--ticket-editor-reach))');
+    // The fade is measured from the PADDED edge, so it still spans 1.5rem of tools.
+    expect(valueOf(scroll, '--ticket-editor-fade-size')).toBe('calc(1.5rem + var(--ticket-editor-reach))');
+    // The bar holds the tool plus the room above and below: neo is taller by exactly 2 × (reach − 6px); hig is the old 56px.
+    const neo = shadowReachOf('neo');
+    expect(neo).toBeGreaterThan(6);
+    expect(barHeightPx(neo)).toBe(44 + 2 * neo);
+    expect(barHeightPx(0)).toBe(56); // CONTROL: hig, minimal and the webview keep the 3.5rem bar
+  });
+
+  it('25.420 (F2) while docked the view keeps the caret above the bar: scrollMargin and scrollThreshold have a bottom of at least the bar plus a gap, and undocking (blur, or a desktop mount) restores ProseMirror\'s default', async () => {
+    const barHeight = 84;
+    const spy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function offsetHeight(this: HTMLElement) {
+      return this.classList.contains('ticket-editor__toolbar') ? barHeight : 0;
+    });
+    try {
+      const { view, editor } = await mountEditor(true, { height: 500 });
+      // CONTROL: not docked → no prop, so ProseMirror's own 5px margin applies.
+      expect(editor.view.someProp('scrollMargin')).toBeUndefined();
+      expect(editor.view.someProp('scrollThreshold')).toBeUndefined();
+      focusEditor(view);
+      const margin = editor.view.someProp('scrollMargin') as { top: number; right: number; bottom: number; left: number };
+      const threshold = editor.view.someProp('scrollThreshold') as { top: number; right: number; bottom: number; left: number };
+      expect(margin.bottom).toBeGreaterThan(barHeight);
+      expect(threshold.bottom).toBe(margin.bottom);
+      // The other three sides keep ProseMirror's defaults (margin 5, threshold 0).
+      expect([margin.top, margin.left, margin.right]).toEqual([5, 5, 5]);
+      expect([threshold.top, threshold.left, threshold.right]).toEqual([0, 0, 0]);
+      // Blur → restored.
+      const outside = document.createElement('button');
+      document.body.append(outside);
+      act(() => outside.focus());
+      expect(editor.view.someProp('scrollMargin')).toBeUndefined();
+      expect(editor.view.someProp('scrollThreshold')).toBeUndefined();
+      view.unmount();
+
+      // CONTROL (same `it`): a desktop mount never docks and never sets it.
+      const desktop = await mountEditor(false, { height: 500 });
+      focusEditor(desktop.view);
+      expect(desktop.editor.view.someProp('scrollMargin')).toBeUndefined();
+      desktop.view.unmount();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('25.421 (F3) the docked bar clears the phone bottom bar when no keyboard is up: its bottom is the dock offset PLUS `--gn-bar-lift`, the offset is a variable the bar carries (0px with no keyboard), and inside a modal dialog or sheet (over the bottom bar) the lift is 0', async () => {
+    const docked = phoneRule('.ticket-editor__toolbar--docked');
+    expect(valueOf(docked, 'bottom')).toBe('calc(var(--ticket-editor-dock-bottom, 0px) + var(--gn-bar-lift, 0px))');
+    // No keyboard: the visual viewport is the layout viewport → the variable is 0px (and the lift alone clears the nav).
+    const { view } = await mountEditor(true, { height: 844 });
+    focusEditor(view);
+    expect(dockOffset(bar(view))).toBe('0px');
+    expect(bar(view).style.bottom).toBe('');
+    // Not inside a dialog: the bar is lifted by the page's variable, it declares none of its own.
+    expect(bar(view).style.getPropertyValue('--gn-bar-lift')).toBe('');
+    view.unmount();
+    // Inside a MODAL dialog or sheet (drawn over the bottom bar) there is nothing to clear: the lift is 0 there.
+    stubPhone(true, { height: 844 });
+    const editorRef: React.MutableRefObject<Editor | null> = { current: null };
+    const ready = vi.fn();
+    const inDialog = render(
+      <div role="dialog" aria-modal="true">
+        <TicketEditor {...editorProps()} editorRef={editorRef} onEditorReady={ready} initialDoc={DOC} />
+      </div>,
+    );
+    await vi.waitFor(() => expect(ready).toHaveBeenCalled());
+    focusEditor(inDialog);
+    expect(bar(inDialog)).toHaveClass('ticket-editor__toolbar--docked');
+    expect(bar(inDialog).style.getPropertyValue('--gn-bar-lift')).toBe('0px');
+    inDialog.unmount();
+    // CONTROL: the base rules (desktop) never mention the lift.
+    expect(CSS.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/^\.ticket-editor__toolbar[^{]*\{[^}]*gn-bar-lift/m);
+  });
+
+  it('25.422 (F4) the sheet is a dialog: focus moves into it on open, Tab from the last cell wraps to the first and Shift+Tab from the first wraps to the last', async () => {
+    const { view } = await mountEditor(true);
+    const user = userEvent.setup();
+    focusEditor(view);
+    await user.click(tool(view, 'More tools'));
+    const panel = sheet() as HTMLElement;
+    // Focus is in the sheet, not still on the More button behind it.
+    expect(panel.contains(document.activeElement), 'focus moved into the sheet on open').toBe(true);
+    expect(tool(view, 'More tools').contains(document.activeElement)).toBe(false);
+    const live = cells().filter((cell) => !cell.disabled);
+    expect(live.length).toBeGreaterThan(2);
+    const first = live[0] as HTMLElement;
+    const last = live[live.length - 1] as HTMLElement;
+    act(() => last.focus());
+    await user.tab();
+    expect(document.activeElement, 'Tab from the last cell wraps to the first').toBe(first);
+    await user.tab({ shift: true });
+    expect(document.activeElement, 'Shift+Tab from the first cell wraps to the last').toBe(last);
+    // CONTROL: a Tab in the middle just moves on (the trap only acts at the ends).
+    act(() => first.focus());
+    await user.tab();
+    expect(document.activeElement).toBe(live[1]);
+    view.unmount();
   });
 });

@@ -1325,8 +1325,13 @@
    keeps the tap target, loses only the dim).
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 40rem) {
+  /* `--gn-shadow-reach` is emitted for neo ONLY (tokens.ts `shadowReachOf`, DERIVED from the shadow table), so hig, minimal and
+     the mobile webview — which defines no token — read 0 here and keep the 56px bar below byte for byte. In neo the raised
+     tools throw a ~14px shadow: the bar grows to hold the tool plus that room on each side (44 + 2 × 14 = 72), and the scroller
+     takes the room as padding with an equal negative margin (G-2's `.gn-board__rail` pattern, ui.css) so it is not the clip. */
   .ticket-editor {
-    --ticket-editor-bar-h: 3.5rem;
+    --ticket-editor-reach: var(--gn-shadow-reach, 0px);
+    --ticket-editor-bar-h: calc(2.75rem + 2 * max(0.375rem, var(--ticket-editor-reach)));
   }
 
   /* 1 · UNBOXED LONG TEXT. The note body and the description lose the field frame — border, ground, shadow, side
@@ -1363,7 +1368,7 @@
      23.092 pattern, `.gn-scroll-fade` in ui.css, restated here because this package cannot import ui), and "More
      tools" is pinned outside the scroll area. */
   .ticket-editor__scroll {
-    --ticket-editor-fade-size: 1.5rem;
+    --ticket-editor-fade-size: calc(1.5rem + var(--ticket-editor-reach));
     --ticket-editor-fade-from: Canvas;
     --ticket-editor-fade-to: Canvas;
     flex: 1 1 auto;
@@ -1373,6 +1378,9 @@
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+    padding: var(--ticket-editor-reach);
+    margin: calc(-1 * var(--ticket-editor-reach));
+    scroll-padding-inline: var(--ticket-editor-reach);
   }
   .ticket-editor__scroll::-webkit-scrollbar {
     display: none;
@@ -1393,7 +1401,7 @@
   }
   .ticket-editor__more {
     flex: none;
-    margin-left: 0.25rem;
+    margin-left: calc(0.25rem + var(--ticket-editor-reach));
     padding-left: 0.25rem;
     border-left: 1px solid var(--gn-border);
   }
@@ -1406,12 +1414,15 @@
   }
   /* DOCKED: fixed to the bottom of the LAYOUT viewport, lifted by an inline `bottom` that `EditorToolbar` computes from
      `window.visualViewport` (innerHeight − offsetTop − height), so it sits just above the on-screen keyboard. Under the
-     sheet and dialog scrims (z-index 40) and over the page. */
+     sheet and dialog scrims (z-index 40) and over the page. The inline value is the VARIABLE `--ticket-editor-dock-bottom`
+     (the keyboard's height); the web app's phone bottom bar, shown while no keyboard is up, declares `--gn-bar-lift` on
+     `body` (its height + the home-indicator inset) and is covered by a bar at the same z-index and spot, so the docked bar
+     rises above it (G-7 FIX 1, F3). The webview defines neither variable, so both read 0 there. */
   .ticket-editor__toolbar--docked {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: calc(var(--ticket-editor-dock-bottom, 0px) + var(--gn-bar-lift, 0px));
     z-index: 30;
     border-top: 1px solid var(--gn-border);
     background: var(--gn-surface-raised, Canvas);

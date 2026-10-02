@@ -380,6 +380,9 @@ function usePhoneToolbar(): boolean {
  * right edge. Every other tool (undo, redo, numbered list, strikethrough, code, quote, code block, collapsible, rule,
  * table) lives in the More sheet. Above 40rem nothing moves.
  */
+/** The room kept between the caret and the docked bar's top edge, in px (G-7 FIX 1, F2). */
+const DOCK_CARET_GAP_PX = 8;
+
 export const PHONE_VISIBLE_TOOLS: readonly string[] = ['bold', 'italic', 'list', 'task', 'link', 'insertTicket', 'insertNote'];
 
 /** The phone bar left to right: `PHONE_VISIBLE_TOOLS` with the heading select after the task list. */
@@ -764,6 +767,10 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
   const [focusWithin, setFocusWithin] = useState(false);
   const docked = phone && editable && (focusWithin || moreOpen);
   const [dockBottom, setDockBottom] = useState<number | null>(null);
+  // A modal dialog or sheet (`role="dialog"` + `aria-modal`) is drawn over the web app's phone bottom bar, so an editor
+  // inside one has no bar to clear: the bar's lift is 0 there (G-7 FIX 1, F3 — measured: the lift left a 56px strip of
+  // page showing under the docked bar in the ticket sheet).
+  const [onModalLayer, setOnModalLayer] = useState(false);
   useEffect(() => {
     if (!phone || !editor) return;
     const root = toolbarRef.current?.closest('.ticket-editor') ?? null;
@@ -787,6 +794,7 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
     }
     // `fixed` is laid out against the LAYOUT viewport, which the keyboard does not shrink (iOS) — so the bar's bottom is
     // how far the visual viewport's bottom edge sits above the layout viewport's.
+    setOnModalLayer(toolbarRef.current?.closest('[role="dialog"][aria-modal="true"]') != null);
     const vv = window.visualViewport ?? null;
     const measure = () => setDockBottom(vv === null ? 0 : Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))));
     measure();
@@ -799,6 +807,19 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
       window.removeEventListener('resize', measure);
     };
   }, [docked]);
+  // CARET (G-7 FIX 1, F2): ProseMirror scrolls a caret into the VISUAL viewport with a 5px margin, and the docked bar covers
+  // the bottom of that viewport — so the last visible line put the caret UNDER the bar. While docked, the view's bottom
+  // margin AND threshold are the bar's height plus a gap: the caret starts scrolling when it enters the bar's zone and
+  // stops a gap above it. The other sides keep ProseMirror's own values (margin 5, threshold 0). Undocking hands back the
+  // default by clearing both props (`someProp` then falls through to 5 and 0).
+  useEffect(() => {
+    if (!docked || !editor || editor.isDestroyed) return;
+    const bottom = (toolbarRef.current?.offsetHeight ?? 0) + DOCK_CARET_GAP_PX;
+    editor.view.setProps({ scrollMargin: { top: 5, right: 5, bottom, left: 5 }, scrollThreshold: { top: 0, right: 0, bottom, left: 0 } });
+    return () => {
+      if (!editor.isDestroyed) editor.view.setProps({ scrollMargin: undefined, scrollThreshold: undefined });
+    };
+  }, [docked, editor]);
   useEffect(() => {
     if (!phone) return;
     measureEdges();
@@ -1124,7 +1145,14 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
       aria-label="Formatting"
       ref={toolbarRef}
       {...(id === undefined ? {} : { id })}
-      {...(docked && dockBottom !== null ? { style: { bottom: dockBottom } } : {})}
+      {...(docked && dockBottom !== null
+        ? {
+            style: {
+              '--ticket-editor-dock-bottom': `${dockBottom}px`,
+              ...(onModalLayer ? { '--gn-bar-lift': '0px' } : {}),
+            } as React.CSSProperties,
+          }
+        : {})}
       {...(onClose === undefined
         ? {}
         : {
