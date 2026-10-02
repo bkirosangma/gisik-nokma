@@ -829,3 +829,27 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.338 — the round trip through the hosted `/mcp`: `create_workspace` → `create_project` → `update_project` → `archive_project` (exact NEW name) → `restore_project` → `delete_project` (exact name) → `undelete_project` → two tickets, one assigned to the caller → `list_tickets {workspaceId, filter: {assigneeId: "me"}}` → `delete_workspace` (exact name) → `undelete_workspace`, every answer asserted, and the ledger holding origin `mcp` on EVERY event the tools wrote plus the founding `workspace.created`;** controls, same `it`: a wrong confirm_name (the OLD name, a wrong case, none; for the workspace a shortened name) is refused naming the real one and the ledger and project are unchanged; the unfiltered list holds both tickets while the `"me"` list holds one; the founding seeds in the same workspace are NOT `mcp`, so "all mcp" is a filtered result. Mutations: `update_project` submits with origin `web` (red), `undelete_workspace` submits with origin `web` (red), `confirmName` accepts anything (red).
 - ✅ **14.339 — dev stack: connect via the hosted door (`MCP_PUBLIC_URL=http://localhost:3000`), run 14.338's steps through `tools/call`, then remove the test workspace (undeleted → deleted, left for the 15-day window) and record the ids;** Evidence: request/response summaries, no tokens. — **Browser/dev-stack pass, 🧪-verified by the planner on 2026-10-01 (not a vitest run), dev stack built from `305a0fd2` with `MCP_PUBLIC_URL=http://localhost:3000`:** a registered client "Planner 14.339 check" (`mcpc_Iv7l69TgJoxIuAAYCqepkg`, redirect `http://127.0.0.1:8765/cb`) went through the Allow page (name + host shown), then the loopback redirect with `code` + `state`, then the token exchange (PKCE S256; Bearer, 3600 s, scope `gisik:act`). `initialize` returned 200 and `tools/list` 24 tools. Then create_workspace → create_project → update_project → archive_project with `p339` (refused: `confirm_name must be "P339"`, nothing sent) → archive_project → restore_project → delete_project → undelete_project → list_tickets {workspaceId, assigneeId:"me"} (`projectId: null`, empty) → delete_workspace → undelete_workspace → delete_workspace: every step committed. Ledger for workspace `01M3VYYS6V9CMV83SGR2288BFX`: all 10 tool events are origin `mcp`; the founding seeds (`membership.granted`, `ticket-type.defined` ×4, `workflow.defined`) are `server` by design (14.313). The workspace is left deleted (15-day window); project `01M3VYYSCQVBJDV0CW29PSK9YV`.
 - ✅ **14.340 — the browser pass of 13.1612 (Edit from the card and header, three styles).** — **Browser/dev-stack pass, 🧪-verified by the planner on 2026-10-01 (not a vitest run), same dev stack as 14.339:** Edit from the workspace-home card and from the project header, in neo, hig and minimal (dark): the form opens prefilled, Save persists a description, and clearing it from the header clears it on the card. One automation artifact, not a product bug: the first mouse click after each full reload never reached the page (an event log captured NO pointer events at all), and a DOM `click()` opened the form first time.
+
+## 14.14 MCP everything (MCP-everything plan; block `14.360`–`14.599`)
+
+*Blocks per task: T3 14.360–14.379 · T6 14.380–14.399 · T7 14.400–14.429 · T8 14.430–14.449 · T9 14.450–14.479 · T10 14.480–14.499 · T11 14.500–14.529 · T12 14.530–14.549 · T13 14.550–14.569 · T14 14.570–14.579 · spare 14.580–14.599. Each task appends its cases under its own `### T<n>` heading below, in task order.*
+
+### T3 — plumbing
+
+### T6 — comments in Markdown
+
+### T7 — notes
+
+### T8 — attachments
+
+### T9 — tickets
+
+### T10 — discovery and me
+
+### T11 — members, prefix, groups
+
+### T12 — definitions, migration, visibility, settings
+
+### T13 — search, trash, text fixes, help, round trip
+
+### T14 — the real client
