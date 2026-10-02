@@ -294,7 +294,7 @@ test('18.257 a semantically related note surfaces in meaning search after the em
 
   await page.getByRole('button', { name: 'Create note' }).click();
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Compressor stopped in the cold room');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   await expect(page.getByTestId('note-title')).toHaveText('Compressor stopped in the cold room');
 

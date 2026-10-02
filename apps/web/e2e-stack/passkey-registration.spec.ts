@@ -66,10 +66,22 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  */
 type AddVirtualAuthenticatorResult = { authenticatorId: string };
 
+/**
+ * 13.1731 — DIAGNOSTICS for the CI-only 90 s hang (run 36972594038: this spec timed out in CI and passes in 1.5 s on a
+ * dev machine). Gated by `GISIK_E2E_DIAG=1` (set on the CI e2e step), silent otherwise. Every line is stamped with
+ * seconds since the spec started, so the log says WHICH step stalled rather than "Test timeout of 90000ms".
+ */
+const DIAG = process.env['GISIK_E2E_DIAG'] === '1';
+const startedAt = Date.now();
+const diag = (message: string): void => {
+  // eslint-disable-next-line no-console
+  if (DIAG) console.log(`[passkey-diag +${((Date.now() - startedAt) / 1000).toFixed(1)}s] ${message}`);
+};
+
 async function attachVirtualAuthenticator(client: CDPSession): Promise<string> {
   await client.send('WebAuthn.enable');
-  const result = (await client.send('WebAuthn.addVirtualAuthenticator', {
-    options: {
+  diag('CDP WebAuthn.enable ok');
+  const options = {
       // `ctap2` + `internal` + a resident key is the platform authenticator a
       // laptop's own fingerprint sensor presents. `isUserVerified: true`
       // auto-approves the ceremony, which is what makes this runnable
@@ -80,8 +92,10 @@ async function attachVirtualAuthenticator(client: CDPSession): Promise<string> {
       hasUserVerification: true,
       isUserVerified: true,
       automaticPresenceSimulation: true,
-    },
-  })) as AddVirtualAuthenticatorResult;
+  } as const;
+  diag(`WebAuthn.addVirtualAuthenticator options ${JSON.stringify(options)}`);
+  const result = (await client.send('WebAuthn.addVirtualAuthenticator', { options })) as AddVirtualAuthenticatorResult;
+  diag(`WebAuthn.addVirtualAuthenticator -> authenticatorId ${result.authenticatorId}`);
   return result.authenticatorId;
 }
 
@@ -99,7 +113,24 @@ test('register a passkey on /account, then sign in with it — no magic link in 
   page,
   context,
 }) => {
+  // 20 s per ACTION in this spec (the config's default is the 90 s test timeout), so a stalled click or fill fails
+  // naming ITSELF instead of as an anonymous test timeout. 13.1731.
+  page.setDefaultTimeout(20_000);
   const client = await context.newCDPSession(page);
+  if (DIAG) {
+    diag(`browser ${context.browser()?.version() ?? 'unknown'}`);
+    page.on('console', (m) => diag(`console.${m.type()} ${m.text().slice(0, 400)}`));
+    page.on('pageerror', (e) => diag(`pageerror ${e.message.slice(0, 400)}`));
+    page.on('requestfailed', (r) => diag(`requestfailed ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`));
+    page.on('response', (r) => {
+      if (/passkey|webauthn|\/api\/auth|\/v1\/me/i.test(r.url())) diag(`response ${r.status()} ${r.request().method()} ${r.url()}`);
+    });
+    page.on('framenavigated', (f) => {
+      if (f === page.mainFrame()) diag(`navigated ${f.url()}`);
+    });
+    client.on('WebAuthn.credentialAdded', () => diag('WebAuthn.credentialAdded'));
+    client.on('WebAuthn.credentialAsserted', () => diag('WebAuthn.credentialAsserted'));
+  }
   const authenticatorId = await attachVirtualAuthenticator(client);
 
   try {
@@ -107,9 +138,12 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     // inbox — the existing helper, unchanged. A passkey cannot be the way in
     // before one exists, and pretending otherwise would be the same "offer a
     // control that cannot work" defect this whole task removes.
+    diag('step: magic-link sign-in');
     await signIn(page, OWNER_EMAIL);
+    diag(`step: signed in, at ${page.url()}`);
 
     await page.goto('/account');
+    diag('step: /account loaded');
 
     /**
      * A PER-RUN-UNIQUE NAME, AND NOT AN EMPTY-LIST PRECONDITION.
@@ -134,12 +168,14 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     const passkeyName = `Test authenticator ${Date.now()}`;
 
     await page.getByLabel('Passkey name').fill(passkeyName);
+    diag('step: clicking Add a passkey');
     await page.getByRole('button', { name: 'Add a passkey' }).click();
     // The row is drawn from a RE-READ of `/passkey/list-user-passkeys`, not from
     // the typed name — `app/account/page.tsx` re-lists rather than pushing
     // locally — so this is the server confirming it stored the credential under
     // the label this run chose.
     await expect(page.getByText(passkeyName)).toBeVisible();
+    diag('step: passkey row visible');
     // The per-row delete control's ACCESSIBLE name carries that same unique
     // label, which is the one assertion that proves the row is a real
     // `PasskeysSection` row rather than the typed text lingering in the field.
@@ -147,18 +183,28 @@ test('register a passkey on /account, then sign in with it — no magic link in 
       page.getByRole('button', { name: `Delete passkey ${passkeyName}` }),
     ).toBeVisible();
 
-    // AppNav's control, addressed by its full accessible name (`Sign out
-    // {name}`). A bare `/sign out/i` would also match every Sessions row's own
-    // revoke button on this very page, which is a different control entirely.
+    // AppNav's control, addressed by its accessible name prefix (`Sign out {name}`). The name part is
+    // NOT required: the e2e owner signs up by email and has `name: ''`, so the label is `Sign out ` and
+    // its accessible name is just `Sign out` (CI run 36976174333: `/^Sign out .+/` waited 20 s for it;
+    // a dev machine's owner had been given a name, so it passed there). 13.1731.
     //
-    // ROUND 24 put it inside the account menu, so the trigger is opened first.
-    // The sign-out control's accessible name did NOT change in that move —
-    // which is why this selector is unchanged below and only gained a step
-    // above it.
+    // A bare `/sign out/i` would also match every Sessions row's own revoke button on this very page,
+    // which is a different control entirely; the `menuitem` role and the `^` anchor keep it to the menu.
+    //
+    // ROUND 24 put the control inside the account menu, so the trigger is opened first. That move did
+    // not change the control's accessible name; the 13.1731 fix loosened the match above, and only
+    // that.
     await page.getByRole('button', { name: /^Account menu for / }).click();
-    await page.getByRole('menuitem', { name: /^Sign out .+/ }).click();
+    await page.getByRole('menuitem', { name: /^Sign out/ }).click();
+    // The click only STARTS the sign-out; the account menu's handler pushes `/sign-in` once the server has
+    // answered. Without waiting for that, `goto('/sign-in')` and the passkey click raced the in-flight
+    // sign-out, which could land after the new passkey session and leave the page on `/sign-in` (seen
+    // locally: `waitForURL` timed out at 20 s on an otherwise green flow). 13.1731.
+    await page.waitForURL((url) => url.pathname.includes('/sign-in'), { timeout: 20_000 });
+    diag('step: signed out');
 
     await page.goto('/sign-in');
+    diag('step: clicking Sign in with a passkey');
     await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
 
     // Signed in again, by the credential registered above and nothing else: no
@@ -167,10 +213,26 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     // only reachable by a completed WebAuthn authentication.
     await page.waitForURL((url) => !url.pathname.includes('/sign-in'), { timeout: 20_000 });
     await expect(page).toHaveURL(/\/workspaces|\/w\//);
+  } catch (error) {
+    if (DIAG) {
+      diag(`FAILED at ${page.url()}: ${String(error).slice(0, 600)}`);
+      try {
+        const creds = await client.send('WebAuthn.getCredentials', { authenticatorId });
+        diag(`authenticator credentials ${JSON.stringify(creds).slice(0, 600)}`);
+        diag(`page text ${(await page.locator('body').innerText({ timeout: 3_000 })).replace(/\s+/g, ' ').slice(0, 700)}`);
+      } catch (probe) {
+        diag(`post-failure probe failed: ${String(probe).slice(0, 200)}`);
+      }
+    }
+    throw error;
   } finally {
     // In a `finally` so a mid-spec failure still detaches it: a leaked virtual
     // authenticator outlives the test and would silently satisfy the NEXT
     // spec's ceremony.
-    await client.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
+    // A closed page (the test already timed out) makes this throw "Target page, context or browser has been closed",
+    // which REPLACED the real failure in run 36972594038's report. Swallow only that.
+    await client.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId }).catch((error: unknown) => {
+      if (!/has been closed/.test(String(error))) throw error;
+    });
   }
 });

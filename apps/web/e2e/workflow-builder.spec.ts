@@ -112,7 +112,7 @@ test.describe('workflow builder smoke — admin', () => {
   test('clone errand-with-waits, publish, and find it in the list', async ({ page }) => {
     await page.goto(url(`/w/${workspaceId}/settings/workflows/new`));
     await page.getByRole('button', { name: 'Use the Errand with waits template' }).click();
-    await expect(page.getByText('No issues — this workflow can be published.')).toBeVisible();
+    await expect(page.getByText('No issues. This workflow can be published.')).toBeVisible();
     // PLAN TEXT WAS WRONG HERE: the plan's snippet asserts 'Waiting on
     // counterparty', a string that appears nowhere in this template.
     // `packages/domain/src/workflows/errand-with-waits.ts` names the
@@ -154,7 +154,7 @@ test.describe('workflow builder smoke — admin', () => {
       .click();
     await page.getByRole('listbox').getByRole('option', { name: 'terminal' }).click();
     await connectNodes(page, 'New', 'New state');
-    await expect(page.getByText('No issues — this workflow can be published.')).toBeVisible();
+    await expect(page.getByText('No issues. This workflow can be published.')).toBeVisible();
     await page.getByRole('button', { name: 'Publish' }).click();
     await expect(page).toHaveURL(/\/settings\/workflows$/);
   });
@@ -168,7 +168,7 @@ test.describe('workflow builder smoke — member is read-only', () => {
     await page.goto(url(`/w/${workspaceId}/settings/workflows`));
     await expect(
       page.getByText(
-        'You can look, not touch — only a workspace owner or admin can change workflows and ticket types.',
+        'You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.',
       ),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'New workflow' })).toHaveCount(0);
