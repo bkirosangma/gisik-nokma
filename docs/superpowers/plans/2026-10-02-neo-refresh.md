@@ -1,6 +1,6 @@
 # Neo refresh (rulings N1–N10) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In this repo, execution is by the orchestrator's lanes (controller → dispatcher → lanes → reviewer → gate). **NEXT release, not tonight's:** cut `release/neo-refresh` from `main` once `release/prefix-groups-ux` has merged. **HELD: do not dispatch until the owner says so.**
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In this repo, execution is by the orchestrator's lanes (controller → dispatcher → lanes → reviewer → gate). **Runs in PARALLEL with the closing release** (owner, 2026-10-02 ~12:30): `release/neo-refresh` was cut from `release/prefix-groups-ux` at `4f86b959`. When that release merges to `main`, `main` is MERGED into `release/neo-refresh` (not rebased: task branches are in flight). The closing release's gates take priority on the shared gate.
 
 **Goal:** Make the neo style read as neumorphic — derived shadow colours, sized pairs, inverted presses, no highlight on coloured fills, box-sized insets, a rim-less neo field and halo clearance — through the token layer, with hig and minimal byte-identical.
 
@@ -11,7 +11,7 @@
 **Spec:** `gisik-nokma-lanes/neo-refresh-docs/2026-10-02-neo-refresh-design.md` (lands in `docs/superpowers/specs/` as the release branch's first PR, beside this plan).
 
 ## Preconditions
-- **P1:** `release/neo-refresh` is cut from `main` after `release/prefix-groups-ux` has merged to `main` (its release PR number is not known yet). Line numbers below are `origin/release/prefix-groups-ux` at `b61d6e5e`; a lane re-greps each cited selector before editing (the selector is the anchor, the line a hint).
+- **P1:** `release/neo-refresh` is cut from `release/prefix-groups-ux` at `4f86b959` (owner, 2026-10-02 ~12:30). When that release merges to `main`, a MERGETIP of `main` into `release/neo-refresh` follows. Line numbers below are `origin/release/prefix-groups-ux` at `b61d6e5e`; a lane re-greps each cited selector before editing (the selector is the anchor, the line a hint).
 - **P2:** the spec and this plan land as the release branch's first PR, with the bucket and Features section opened empty (T9's first commit, done first).
 
 ## Global Constraints

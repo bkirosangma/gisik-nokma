@@ -1,6 +1,6 @@
 # The neo refresh: design
 
-**Status:** owner-approved decisions N1–N10 (2026-10-02, ~12:00–12:10). Ships as **the NEXT release**, not tonight's: base `main` once `release/prefix-groups-ux` has merged. Scope is the `neo` style only; `hig` and `minimal` are untouched except where a rule is shared by construction (§7 names each one).
+**Status:** owner-approved decisions N1–N10 (2026-10-02, ~12:00–12:10). Ships as **the next release**, `release/neo-refresh`, cut in parallel from `release/prefix-groups-ux` at `4f86b959` (owner, 2026-10-02 ~12:30); `main` is merged in once that release lands. Scope is the `neo` style only; `hig` and `minimal` are untouched except where a rule is shared by construction (§7 names each one).
 
 **Sources:**
 - the audit: `gisik-nokma-lanes/NEO-AUDIT-2026-10-02.md` (findings 1–10, §11 rulings log);
