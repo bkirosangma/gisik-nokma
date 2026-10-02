@@ -36,13 +36,15 @@ function readOf(): TicketRead {
   } as unknown as TicketRead;
 }
 
-type Deferred = { promise: Promise<IngestResult[]>; resolve: (results: IngestResult[]) => void };
+type Deferred = { promise: Promise<IngestResult[]>; resolve: (results: IngestResult[]) => void; reject: (cause: unknown) => void };
 function deferred(): Deferred {
   let resolve!: (results: IngestResult[]) => void;
-  const promise = new Promise<IngestResult[]>((res) => {
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<IngestResult[]>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 const committed = { status: 'committed', eventId: 'e', seq: 9, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult;
 const refused = (reason: string) => ({ status: 'refused', eventId: 'e', rule: 'close-requires-terminal', reason }) as IngestResult;
@@ -129,6 +131,22 @@ describe('the sheet shows a write the moment it is made (spec S5)', () => {
     await waitFor(() => expect(stateText()).toContain('Doing'));
     expect(within(screen.getByTestId('field-state')).queryByText(/Waiting on counterparty/)).toBeNull();
     expect(within(screen.getByTestId('field-state')).queryByText('Saving…')).toBeNull();
+  });
+
+  it('25.093 a Move whose connection drops puts the State row back and says the server could not be reached', async () => {
+    const user = userEvent.setup();
+    const { writes } = await mount();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }));
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(stateText()).toContain('Waiting on counterparty');
+    writes[0]!.reject(new Error('socket closed'));
+    expect(await screen.findByText(/We could not reach the server for this move: socket closed/)).toBeInTheDocument();
+    await waitFor(() => expect(stateText()).not.toContain('Waiting on counterparty'));
+    expect(stateText()).toContain('Doing');
+    expect(stateText()).not.toContain('Saving…');
   });
 
   it('25.096 the fields are independent: a refused priority rolls back alone while the title committed in the same breath stays', async () => {
