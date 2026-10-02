@@ -32,6 +32,22 @@ describe('useWait — nothing before 150 ms, then held 350 ms (spec S2, D4)', ()
     expect(hook.result.current).toBe(false);
   });
 
+  it('25.012b going pending again inside the hold does not restart it: the placeholder is gone at the ORIGINAL hold end', () => {
+    const hook = renderHook(({ pending }) => useWait(pending), { initialProps: { pending: true } });
+    act(() => vi.advanceTimersByTime(WAIT_BEFORE_MS));
+    expect(hook.result.current).toBe(true);
+    hook.rerender({ pending: false });
+    act(() => vi.advanceTimersByTime(100));
+    hook.rerender({ pending: true });
+    act(() => vi.advanceTimersByTime(WAIT_HOLD_MS));
+    expect(hook.result.current).toBe(true);
+    // Control: it is still shown while the read is open, and the hold clock kept its first start:
+    // resolving now (hold long spent) clears it at once.
+    hook.rerender({ pending: false });
+    act(() => vi.advanceTimersByTime(1));
+    expect(hook.result.current).toBe(false);
+  });
+
   it('25.013 immediate: a region that never had content shows its placeholder on the first render', () => {
     const hook = renderHook(() => useWait(true, { immediate: true }));
     expect(hook.result.current).toBe(true);
