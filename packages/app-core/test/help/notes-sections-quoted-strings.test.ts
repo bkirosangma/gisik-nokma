@@ -140,7 +140,7 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
       baseline,
     });
     expect(undeclared).toEqual([]);
-  }, 20_000);
+  });
 
   /**
    * The control half: a span that is deliberately NOT product copy (an
@@ -163,5 +163,5 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
       baseline: { absent: [] },
     });
     expect(undeclared).toEqual([{ source: 'control', span: `${half1} ${half2}` }]);
-  }, 20_000);
+  });
 });

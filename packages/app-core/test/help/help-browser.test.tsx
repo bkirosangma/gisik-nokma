@@ -601,7 +601,7 @@ describe('23.232–23.237 Help — the floating menu on a phone', () => {
     await user.clear(search);
     expect(nav.hidden).toBe(false);
     expect(container.querySelector('.gn-help__results')).toBeNull();
-  }, 20_000);
+  });
 
   it('23.235 CONTROL — on desktop the same query renders its results in the main column and not in the sidebar', async () => {
     const user = userEvent.setup();
@@ -610,7 +610,7 @@ describe('23.232–23.237 Help — the floating menu on a phone', () => {
     expect(container.querySelector('.gn-help__column .gn-help__results')).not.toBeNull();
     expect(asideOf(container).querySelector('.gn-help__results')).toBeNull();
     expect(screen.getAllByRole('status')).toHaveLength(1);
-  }, 20_000);
+  });
 
   it('23.236 the Manual/FAQ switch inside the panel swaps the topics and the document and keeps the panel open', async () => {
     mockPhone(true);
@@ -700,7 +700,7 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       if (original !== undefined) Object.defineProperty(window, 'scrollY', original);
       else Reflect.deleteProperty(window, 'scrollY');
     }
-  }, 20_000);
+  });
 
   describe('23.239 the first results of a search from deep in the document are brought into view (fix 1)', () => {
     const scrollIntoView = vi.fn();
@@ -745,7 +745,7 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       y = 0;
       await user.clear(search);
       expect(scrollTo).toHaveBeenCalledWith(0, 1200);
-    }, 20_000);
+    });
 
     it('23.239 CONTROL — a reader at the top, with the results already in view, is not scrolled', async () => {
       Object.defineProperty(window, 'scrollY', { configurable: true, get: () => 0 });
@@ -755,7 +755,7 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       await user.type(screen.getByRole('searchbox'), 'invite');
       expect(document.querySelector('.gn-help__results-anchor')).not.toBeNull();
       expect(scrollIntoView).not.toHaveBeenCalled();
-    }, 20_000);
+    });
 
     it('23.239 CONTROL — on a phone the results are in the panel and nothing is scrolled', async () => {
       mockPhone(true);
@@ -767,7 +767,7 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       await user.type(screen.getByRole('searchbox'), 'invite');
       expect(container.querySelector('.gn-help__results-anchor')).toBeNull();
       expect(scrollIntoView).not.toHaveBeenCalled();
-    }, 20_000);
+    });
 
     it('23.239 the anchor rests below the app bar: it carries the same scroll-margin-top as a section', () => {
       expect(valueOf(ruleExactly(readUiCss(), '.gn-help__results-anchor'), 'scroll-margin-top')).toBe('calc(var(--app-nav-offset, 0px) + 1rem)');

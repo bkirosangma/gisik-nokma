@@ -27,7 +27,7 @@ describe('the surfacePlaceholder role (amendment S-R1, rule 3)', () => {
         expect(colorOf(theme, 'surfacePlaceholder', style), `${style}/${theme}`).toBe(colorOf(theme, 'surfaceTrack', style));
         // The value is the one the pre-T2 fixture recorded for surfaceTrack, not a re-derived near miss.
         expect(colorOf(theme, 'surfacePlaceholder', style), `${style}/${theme} vs the 24.009 fixture`).toBe(
-          before[`${style}/${theme}`].surfaces.surfaceTrack,
+          before[`${style}/${theme}`]?.surfaces.surfaceTrack,
         );
       }
     }

@@ -350,7 +350,9 @@ Grounds (neo): light — `surface` = `surfaceRaised` `#f1eae3`, `surfaceSunken` 
 
 Dark highlight ladder over the page `#1b2340` (the lift that replaced the `#232c50` fill step, N4 = B), composited and measured against the page: 16 % (`#f2e9e129`, raised) **1.58**; 12 % (`#f2e9e11f`, compact) 1.40; 8 % (`#f2e9e114`, sunken) 1.24. Case 24.100 asserts the 16 % row is above 1.5.
 
-Not changed and not re-measured here: `fieldRim` (hig/minimal) on their surfaces; the accent edge on the primary. Nothing in either theme uses the shadow pair as its only state cue; the one place a shadow is the boundary, the neo field, carries a crisp line layer whose ratio is the row above.
+**HK-4 (2026-10-02, cases 24.120–24.123):** the `fieldRim` role, its `--gn-field-rim` variable, the three `neoFieldRim*` primitives and the four `fieldRim` `CONTRAST_PAIRS` rows are retired (no CSS rule read them after N10); the roster is 52. hig/minimal fields still read `border` (`#6c6c70` light, `#98989d` dark), unchanged, and `border` keeps its own rows.
+
+Not changed and not re-measured here: the accent edge on the primary. Nothing in either theme uses the shadow pair as its only state cue; the one place a shadow is the boundary, the neo field, carries a crisp line layer whose ratio is the row above.
 
 
 ## Smoothness T2 — the `surfacePlaceholder` role (appended 2026-10-02; amendment S-R1 rule 3)

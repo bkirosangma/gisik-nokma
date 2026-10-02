@@ -243,28 +243,17 @@ export const primitives = {
    */
   neoTextSubtleDark: '#a3a3a8',
   /**
-   * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
-   *
-   * **U5: a neo text field wears a 1px full ring.** The shadow edge of the sunken field measured 1.18 light and
-   * 1.00 dark, so an empty field carried no boundary a person could find (SYS-05, WS-04, NP-25, TT-14). The ring
-   * is the `fieldRim` role (`--gn-field-rim`). `neoFieldRimLight` is the owner's first light value, measured on
-   * `neoPaper` (3.75); once the light well steps (U8, below) the ring has to clear the well too, and
-   * `neoFieldRimOnWellLight` is that value: 3.75 on `neoPaper`, 3.31 on `neoWellLight`. The role maps to the
-   * on-well value so ONE ring reads on paper and on the well; `neoFieldRimLight` is kept as the recorded
-   * pre-step value and is mapped by no role.
-   *
-   * **`neoFieldRimDark` is `#6f7997`, NOT the owner's `#6b7491`** (planner ruling 03:15, owner reviews in the
-   * morning report). U8 lifts neo-dark `surfaceRaised` to `#232c50`, on which `#6b7491` measures 2.93, under the
-   * 3.0 floor WCAG 1.4.11 sets for a boundary (and 23.001 declares for every surface a field sits on). `#6f7997`
-   * is the smallest hue-preserving lift: 3.14 on raised, 3.57 on surface, 3.96 on the dark well.
+   * ## The well step (owner ruling U8, 2026-10-02; UX fixes T1)
    *
    * **U8: the track and the well step in neo.** `neoWellLight` `#e6dcd2` and `neoWellDark` `#141a33` replace the
    * one-hex `neoPaper`/`neoNavy` those two grounds used, so a recessed well reads as recessed by fill as well as
    * by its shadow. `surfaceSunken` (the field ground) is unchanged.
+   *
+   * **RETIRED 2026-10-02 (housekeeping HK-4, cases 24.120–24.123): the neo field RIM.** U5 gave a neo text field a 1px ring
+   * (`neoFieldRimLight` `#927c6a`, `neoFieldRimOnWellLight` `#897362`, `neoFieldRimDark` `#6f7997`) behind a `fieldRim` role;
+   * N10 (24.040) removed the last rule that read it, so the three primitives, the role, its CSS variable and its four
+   * `CONTRAST_PAIRS` rows are gone. The neo field's boundary is the `field` shadow's line layer (`shadowNeoLine*`).
    */
-  neoFieldRimLight: '#927c6a',
-  neoFieldRimOnWellLight: '#897362',
-  neoFieldRimDark: '#6f7997',
   neoWellLight: '#e6dcd2',
   neoWellDark: '#141a33',
   /**
@@ -791,17 +780,6 @@ export const TOKEN_ROLES = [
    */
   'surfaceTrack',
   'surfaceWell',
-  /**
-   * The 1px RING of a text field (owner ruling U5, 2026-10-02; UX fixes T1) — `--gn-field-rim`. Under `neo` it is
-   * the dedicated ring colour (`neoFieldRimOnWellLight` / `neoFieldRimDark`, ≥ 3:1 on `surface`, `surfaceRaised`,
-   * `surfaceSunken` and `surfaceWell`). Under `hig` and `minimal` it is the field's EXISTING edge (`border`), so
-   * the role is defined in every style and a field rule can read it without a style test. Never text.
-   *
-   * **AMENDED 2026-10-02 (neo refresh N10, case 24.040): the neo field ring is retired.** No `ui.css` or `globals.css` rule reads
-   * `--gn-field-rim` now (only comments name it); the neo field's boundary is the `field` shadow's line layer. The role stays
-   * mapped in every style (hig/minimal = `border`) and the `CONTRAST_PAIRS` rows keep its colours honest.
-   */
-  'fieldRim',
   'text',
   'textMuted',
   /**
@@ -988,7 +966,6 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfacePlaceholder: 'trackWarm',
     surfaceTrack: 'trackWarm',
     surfaceWell: 'wellWarm',
-    fieldRim: 'grayAccessible',
     text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
@@ -1034,7 +1011,6 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfacePlaceholder: 'trackNavy',
     surfaceTrack: 'trackNavy',
     surfaceWell: 'wellNavy',
-    fieldRim: 'grayAccessibleDark',
     text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
@@ -1085,12 +1061,11 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
  * rather than left, because this change adds five more and a wrong count now
  * would be wrong by eleven.
  *
- * **UX fixes T1 (2026-10-02): both arms gain `fieldRim` (the neo ring), and `surfaceTrack`/`surfaceWell` step to
+ * **UX fixes T1 (2026-10-02): both arms gained `fieldRim` (the neo ring; RETIRED by HK-4, 24.120), and `surfaceTrack`/`surfaceWell` step to
  * `neoWellLight`/`neoWellDark`; the dark arm's `surfaceRaised` (`neoNavyRaised`) was then `#232c50`, not `neoNavy`, and
  * its `textSubtle` is `neoTextSubtleDark` so a placeholder still clears 4.5 composited on it.
  * AMENDED 2026-10-02 (neo refresh N4 = B; cases 24.007, 24.100): the `surfaceRaised` step is undone (next paragraph); the arm's
- * `textSubtle` mapping is unchanged. The `fieldRim` role is still mapped in both arms, but no CSS rule reads `--gn-field-rim`
- * any more (N10, 24.040).**
+ * `textSubtle` mapping is unchanged. The `fieldRim` role was left mapped after N10 (24.040) and is removed by HK-4 (24.120).**
  *
  * **Neo refresh T1 (2026-10-02; N2, N4 = B): both arms' `surfaceSunken` step to the well (`neoWellLight`/`neoWellDark`) — a pressed fill
  * is never lighter than its ground — and the dark arm's `surfaceRaised` returns to `neoNavy` (`neoNavyRaised`'s U8 step is retired).
@@ -1123,7 +1098,6 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfacePlaceholder: 'neoPlaceholderLight', // S-R1: flat, never the well
       surfaceTrack: 'neoWellLight',
       surfaceWell: 'neoWellLight',
-      fieldRim: 'neoFieldRimOnWellLight',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
       danger: 'neoLightDanger',
@@ -1141,7 +1115,6 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfacePlaceholder: 'neoPlaceholderDark', // S-R1: flat, never the well
       surfaceTrack: 'neoWellDark',
       surfaceWell: 'neoWellDark',
-      fieldRim: 'neoFieldRimDark',
       textSubtle: 'neoTextSubtleDark',
       fillTertiary: 'fillNavyNeo3',
       fillQuaternary: 'fillNavyNeo4',
@@ -1896,10 +1869,9 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Eight rows, so the
    * roster is 52.
    *
-   * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. Under `hig`
-   *   and `minimal` it is `border`, which already clears these. Neo measures 3.31 (light, on the well) and
-   *   3.14 (dark, on the lifted raised surface; the binding pair that moved `neoFieldRimDark` off the owner's
-   *   `#6b7491`, 2.93 there).
+   * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. **RETIRED by HK-4
+   *   (2026-10-02, 24.121): the four rows are gone with the role, so the roster is 52.** Neo's field boundary is the shadow's
+   *   line layer, measured by 24.044; hig/minimal read `border`, which keeps its own rows.
    * - `textAccent` and `textSubtle` on `surfaceRaised` (4.5) were ALREADY rows (`textAccent`, Round 2d;
    *   `textSubtle`, 2026-09-15), so none is added here. U8's neo-dark raised step to `#232c50` re-clears both (5.40
    *   for neo's `textSubtle`), and 23.006 asserts those neo-dark readings. `accent` on `#232c50` (5.62) is asserted
@@ -1907,10 +1879,6 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
    * - `textAccent` (4.5) and the `accent` FILL (3) on the track and the well, now that neo's steps are real
    *   fills. `text`, `textMuted` and `textSubtle` on both were already rows.
    */
-  { fg: 'fieldRim', bg: 'surface', minimum: 3 },
-  { fg: 'fieldRim', bg: 'surfaceRaised', minimum: 3 },
-  { fg: 'fieldRim', bg: 'surfaceSunken', minimum: 3 },
-  { fg: 'fieldRim', bg: 'surfaceWell', minimum: 3 },
   { fg: 'textAccent', bg: 'surfaceTrack', minimum: 4.5 },
   { fg: 'textAccent', bg: 'surfaceWell', minimum: 4.5 },
   { fg: 'accent', bg: 'surfaceTrack', minimum: 3 },

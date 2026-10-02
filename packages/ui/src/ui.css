@@ -7366,17 +7366,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the owner reversed the waiver for TEXT FIELDS: **"borders on buttons only" became "borders on buttons and text
    fields".** It stays in full for cards, wells, notices and rows, which keep their shadow-only edge.
 
-   (U5, SUPERSEDED for neo by N10 below.) The ring was a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
-   raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
-   `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
-   to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
-   also removes the 1px that a neo field lost to its missing border compared with a hig one.
+   (U5, SUPERSEDED for neo by N10 below, and its role retired by HK-4, 24.120.) The ring was a 1px FULL border in a dedicated ring colour (neo light #897362,
+   neo dark #6f7997; at least 3:1 on surface, raised, sunken and well), kept beside the sunken shadow so the field still reads
+   recessed. `hig` and `minimal` were UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291). Radius is inherited from
+   the base rule; the ring replaced `border: none`, which also removed the 1px that a neo field lost to its missing border
+   compared with a hig one.
 
    OWNER RULING N10 (2026-10-02, "go with B in neumorphic"; case 24.040): a neo text field has NO uniform rim. Its boundary is the
    recess edge — a crisp 1px line at >= 3:1 on one side, as WCAG 1.4.11's partial-edge example allows (light: the dark line
    top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 4.38 against the page).
    The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the base rule's `--gn-border` edge above
-   (13.291; U5's ring was neo-only, so there is no ring for them to keep); `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
+   (13.291; U5's ring was neo-only, so there is no ring for them to keep). The field ground is `surfaceSunken`, which is the well colour since N2. */
 [data-style="neo"] .gn-field__input {
   border: 1px solid transparent;
   background: var(--gn-surface-sunken);

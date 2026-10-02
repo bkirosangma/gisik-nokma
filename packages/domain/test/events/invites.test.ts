@@ -86,7 +86,7 @@ describe('inviteSentPayload', () => {
   it('planted defect: refuses a blank address, which reaches nobody while looking like one', () => {
     expect(rejectionIssues(inviteSentPayload.safeParse(sent({ address: '   ' })))).toContainEqual({
       path: ['address'],
-      message: 'must not be blank — an address of only spaces reaches nobody',
+      message: 'must not be blank: an address of only spaces reaches nobody',
     });
     expect(rejectionIssues(inviteSentPayload.safeParse(sent({ address: '' })))).toContainEqual({
       path: ['address'],
@@ -108,7 +108,8 @@ describe('inviteSentPayload', () => {
     for (const role of ['owner', 'superuser']) {
       expect(rejectionIssues(inviteSentPayload.safeParse(sent({ role })))).toContainEqual({
         path: ['role'],
-        message: "requires role 'admin'|'member'|'guest' — an invite cannot confer ownership",
+        // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
+        message: "requires role 'admin'|'member'|'guest': an invite cannot confer ownership",
       });
     }
   });
