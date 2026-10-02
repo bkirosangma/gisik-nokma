@@ -155,7 +155,8 @@ function renderSheet(
 
 /** The sheet is fully painted only once the workflow read has named the state. */
 async function settled(): Promise<void> {
-  await waitFor(() => expect(screen.getByText(PROVENANCE_LINE)).toBeInTheDocument());
+  // 13.1725 — 4 s, not waitFor's 1 s default: the FIRST test of this 184-test file pays the cold import and render, and on a CI runner under turbo load that missed 1 s (run 36968817666: `Unable to find an element with the text: marked Doing by Anselma Marak`, in a file that took ~102 s against 8 s here). A pass returns the moment the line renders, so the larger budget only changes how long a REAL failure takes to report; it stays under the 5 s per-test default so a hang is still the test's own timeout.
+  await waitFor(() => expect(screen.getByText(PROVENANCE_LINE)).toBeInTheDocument(), { timeout: 4_000 });
 }
 
 /**
@@ -490,7 +491,8 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(batch[0]!.origin).toBe('web');
     // Belt and braces: the plan's key must not be present under any value.
     expect(Object.keys(batch[0]!.payload as Record<string, unknown>)).not.toContain('toStateId');
-  });
+    // 13.1725 — a 20 s budget for THIS test only: four userEvent clicks plus a typed comment through the real engine took 5249 ms in CI against the 5000 ms default (a ~102 s file under turbo load). The assertions above are unchanged, so the budget buys time without weakening the proof.
+  }, 20_000);
 
   it('PLANTED DEFECT: prompted field claims are emitted BEFORE the transition, in one ordered batch', async () => {
     const user = userEvent.setup();

@@ -119,6 +119,9 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
    * time this case was written — not a defect in the prose, a defect in the
    * check, fixed by matching `check:help`'s own ratcheted rule instead.
    */
+  // 20 s (neo main-sync gate, 2026-10-02): the haystack walk over `apps/` + `packages/` is the cost, and under load 41→77 it took
+  // 5328 ms against the 5000 ms default. It asserts a set, never a duration. Same precedent as #898 and #918; the global
+  // `testTimeout` is unchanged. The control below runs the same walk, so it carries the same value.
   it('15.37 no quoted span in the task’s entries is undeclared-absent from apps/ + packages/', () => {
     const text = touchedEntries()
       .map((entry) => entryText(entry))
@@ -135,7 +138,7 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
       baseline,
     });
     expect(undeclared).toEqual([]);
-  });
+  }, 20_000);
 
   /**
    * The control half: a span that is deliberately NOT product copy (an
@@ -158,5 +161,5 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
       baseline: { absent: [] },
     });
     expect(undeclared).toEqual([{ source: 'control', span: `${half1} ${half2}` }]);
-  });
+  }, 20_000);
 });

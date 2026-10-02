@@ -65,8 +65,11 @@ name: ci
 # `describe.skipIf(!pgDumpAvailable())` around the restore-drill suite, and
 # this is what turns a missing pg_dump binary into a loud CI failure instead
 # of a quietly-empty green suite.
-# WHERE THIS RUNS, and why it is not "only on merges to main" (owner, 2026-09-23:
-# *"can we not run CI for the dev PR merges, and only have CI run on merges to main?"*).
+# WHERE THIS RUNS: the release -> `main` PR, and `workflow_dispatch`. Nothing else.
+# (Owner, 2026-09-23: *"can we not run CI for the dev PR merges, and only have CI run on
+# merges to main?"*; narrowed 2026-10-02: *"CI to be run only on merges to main"*, then,
+# choosing between options, "Only the release PR into main" -- CI runs on the release PR,
+# BEFORE the merge deploys, and the push-to-`main` run is dropped.)
 #
 # This repo is PRIVATE, so every minute here is billed, and on 2026-09-22 the account
 # stopped being able to start jobs at all ("recent account payments have failed or your
@@ -74,29 +77,26 @@ name: ci
 # dev PRs are nearly all of it, since the release plan's task branches each ran the full
 # fourteen checks including `e2e` and `viewport`.
 #
-# But "run it on merges to main" would put CI AFTER the thing it is supposed to guard.
-# A merge to `main` fires App Platform's `deploy_on_push` (`deploy/do/app.yaml`, three
-# components), so by the time a `push: main` job starts, production is already
-# deploying. That is a post-mortem, not a gate.
+# But "run it on merges to main" read literally would put CI AFTER the thing it is
+# supposed to guard. A merge to `main` fires App Platform's `deploy_on_push`
+# (`deploy/do/app.yaml`, three components), so by the time a `push: main` job starts,
+# production is already deploying. That is a post-mortem, not a gate -- which is why the
+# owner chose the release PR, and why there is NO `push` trigger below: a push-to-`main`
+# run would be a second run of a tree the PR run already proved, started after the deploy.
 #
-# So the filter is on the PULL REQUEST's BASE, which is the distinction that makes this
-# work: `pull_request.branches` matches the branch a PR is merging INTO, never the one
-# it comes from. A PR from a task branch into `release/<date>` therefore runs nothing,
-# and the release -> `main` PR — the only one that decides a production deploy — runs
-# everything, BEFORE the merge.
+# The filter is on the PULL REQUEST's BASE, which is what makes this work:
+# `pull_request.branches` matches the branch a PR is merging INTO, never the one it comes
+# from. A PR from a task branch into `release/<date>` therefore runs nothing, and the
+# release -> `main` PR -- the only one that decides a production deploy -- runs
+# everything, BEFORE the merge. `main` is unprotected and nothing server-side stops a
+# direct push; that is covered by the repo's rule (never push to `main`), not by a CI run
+# that could only report on a deploy already under way.
 #
-# `push: [main]` stays. It is the second run of the same tree and it is deliberate:
-# `main` is unprotected, this is a free private repo, and nothing on the server stops a
-# direct push. The PR run gates the intended path; this one is the only thing that would
-# ever see an unintended one.
-#
-# `workflow_dispatch` is here so a release branch can still be run on demand — before a
-# release cut, or when a dev PR is big enough to be worth the minutes — without editing
-# this file to get it.
+# `workflow_dispatch` is here so a release branch can still be run on demand -- before a
+# release cut, when a dev PR is big enough to be worth the minutes, or to prove a CI repair
+# on its own branch -- without editing this file to get it.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
   workflow_dispatch:
 
@@ -132,7 +132,9 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base="${{ github.event.pull_request.base.sha }}"
           else
-            base="${{ github.event.before }}"
+            # workflow_dispatch has no base: detection learns nothing and
+            # the full gate runs (the empty-base branch just below).
+            base=""
           fi
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
             echo "no usable base sha -- running the full gate"
@@ -350,8 +352,8 @@ jobs:
   # checkOrder throws at container start -- the exact outage this job exists to
   # prevent. 14 of the last 400 merges here were based on a non-main branch, so
   # the shape is used in this repo, not hypothetical. `github.base_ref` is set
-  # only for `pull_request`; on a `push` to main the fallback is the same ref
-  # being pushed, where the comparison is correctly empty.
+  # only for `pull_request`; on a `workflow_dispatch` the fallback is `main`, so a
+  # manual run of a release branch is checked against what is on `main` today.
   check-migrations:
     runs-on: ubuntu-latest
     steps:
@@ -600,16 +602,42 @@ jobs:
         run: |
           echo "THE COMPOSE STACK FAILED TO START. Container state and logs follow."
           docker compose -f docker-compose.dev.yml ps || true
+          # WHY a container is unhealthy: the healthcheck's own last outputs, and the probe run by hand.
+          for c in $(docker compose -f docker-compose.dev.yml ps -aq); do
+            docker inspect --format '{{.Name}} {{json .State.Health}}' "$c" || true
+          done
+          docker compose -f docker-compose.dev.yml exec -T server wget -S -O- http://localhost:3000/healthz || true
           docker compose -f docker-compose.dev.yml logs --tail=100 || true
 
       # Seeding and user creation happen inside the suite's own globalSetup,
       # which also REFUSES the run unless what is listening is really the stack.
+      # The spec files import `@gisik-nokma/domain` (smoke.spec.ts: `newUlid`), which resolves to
+      # its `dist/`; this job installs but does not build, so without this the run dies with
+      # `Cannot find module '…/domain/dist/index.js'` (run 36971568470). 13.1728.
+      - name: build the workspace packages the E2E specs import
+        run: pnpm turbo run build --filter=@gisik-nokma/domain
+
       - name: run the deployed-stack E2E
+        env:
+          # passkey-registration.spec.ts logs its WebAuthn setup, console and request trail (13.1731).
+          GISIK_E2E_DIAG: "1"
         run: pnpm run test:e2e:stack
 
       - name: stack logs on failure
         if: failure()
-        run: docker compose -f docker-compose.dev.yml logs --tail=200 || true
+        run: |
+          docker compose -f docker-compose.dev.yml logs --tail=200 || true
+          # the registration ceremony's server side, for the passkey hang (13.1731)
+          docker compose -f docker-compose.dev.yml logs --no-color --tail=800 server | grep -i "passkey\|webauthn\|/v1/auth\|error" || true
+
+      - name: upload the E2E traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-stack-test-results
+          path: apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: tear the stack down
         if: always()

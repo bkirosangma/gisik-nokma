@@ -403,7 +403,7 @@ starting-status and board-card-badges in the existing sections. Cases file: this
   under `packages/`, inside the real gate's own haystack, and one draft of this docblock's own prose
   proved the trap by quoting a baselined example and rotting the baseline the moment the file existed.
   Mutation: alter one checked quote to an invented string → red, naming the string; verified and
-  reverted 2026-09-23 — (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
+  reverted 2026-09-23 — (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`) The `it` carries a 20 s timeout (2026-10-02 neo main-sync gate timeout under load, #898/#918 precedent).
 
 Case 15.3 (`test-cases/15-in-app-help.md:21`) was re-witnessed the same way, not re-minted: help-notes
 Unit 4d's `docs/manual.md` edit made the sentence it pins ("It will not get you a due date") read as a

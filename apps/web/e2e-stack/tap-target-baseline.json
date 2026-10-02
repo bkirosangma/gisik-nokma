@@ -1,3 +1,13 @@
 {
-  "stack-phone-390|/my-work": 6
+  "stack-phone-390|/members": 4,
+  "stack-phone-390|/my-work": 6,
+  "stack-phone-390|/p/:projectId": 19,
+  "stack-phone-390|/p/:projectId#backlog": 5,
+  "stack-phone-390|/p/:projectId#calendar": 6,
+  "stack-phone-390|/p/:projectId#list": 49,
+  "stack-phone-390|/p/:projectId#timeline": 37,
+  "stack-phone-390|/settings/ticket-types": 0,
+  "stack-phone-390|/settings/workflows": 0,
+  "stack-phone-390|/w/:workspaceId": 1,
+  "stack-phone-390|/workspaces": 0
 }
