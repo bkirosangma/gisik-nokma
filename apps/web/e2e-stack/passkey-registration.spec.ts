@@ -195,6 +195,11 @@ test('register a passkey on /account, then sign in with it — no magic link in 
     // above it.
     await page.getByRole('button', { name: /^Account menu for / }).click();
     await page.getByRole('menuitem', { name: /^Sign out/ }).click();
+    // The click only STARTS the sign-out; the account menu's handler pushes `/sign-in` once the server has
+    // answered. Without waiting for that, `goto('/sign-in')` and the passkey click raced the in-flight
+    // sign-out, which could land after the new passkey session and leave the page on `/sign-in` (seen
+    // locally: `waitForURL` timed out at 20 s on an otherwise green flow). 13.1731.
+    await page.waitForURL((url) => url.pathname.includes('/sign-in'), { timeout: 20_000 });
     diag('step: signed out');
 
     await page.goto('/sign-in');
