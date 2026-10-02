@@ -22,14 +22,15 @@ const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 describe('9.319-9.320 the suggestion popups draw the house surface, shadow and selected fill', () => {
   const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
 
-  it('9.319 the shared popup rule uses --gn-surface-raised, --gn-shadow-lift-near and --gn-radius-card, the same P-FLOAT set .gn-select__panel uses', () => {
+  it('9.319 the shared popup rule uses --gn-surface-raised, --gn-shadow-near-lg and --gn-radius-card, the same P-FLOAT set .gn-select__panel uses', () => {
     const rule = ruleFor(css, /^\.mention-popup,\s*$/);
     expect(rule, `.mention-popup rule: ${String(rule)}`).toBeDefined();
     expect(rule).toContain('.wikilink-popup');
     expect(rule).toContain('.ticketref-popup');
     expect(rule).toContain('var(--gn-surface-raised)');
     // Amended 2026-09-30 by 20.221 (styling refresh Plan B): P-FLOAT — `lift-near` and the card radius.
-    expect(rule).toContain('var(--gn-shadow-lift-near)');
+    // Amended 2026-10-02 (N7, 24.083): the role is `near-lg` (hig/minimal: = `lift-near`).
+    expect(rule).toContain('var(--gn-shadow-near-lg)');
     expect(rule).toContain('var(--gn-radius-card)');
   });
 

@@ -83,7 +83,8 @@ describe('9.360 the task-list checkbox is centred on the first line and is not t
     // `neo`: the same sunken coat `[data-style="neo"] .gn-field__input` wears.
     const neo = bodyFor(`[data-style='neo'] ${BOX}:not(:checked)`);
     expect(neo).toMatch(/background:\s*var\(--gn-surface-sunken\);/);
-    expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\);/);
+    // amended 2026-10-02 by N9 (case 24.042): the ~1rem box takes the chip-sized inset, not the field-sized one.
+    expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken-compact\);/);
     // …and a BOUNDARY (case 9.481): the sunken coat alone is invisible in neo dark.
     expect(neo).toMatch(/border-color:\s*var\(--gn-border-strong\);/);
   });
