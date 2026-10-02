@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
-import { applyPendingCreates, applyPendingMoves, CREATE_TTL_MS, retireAgreed, usePendingCreates, type PendingCreate } from '../../src/views/board-move-state.js';
+import { applyPendingCreates, applyPendingMoves, CREATE_TTL_MS, PENDING_TTL_MS, retireAgreed, usePendingCreates, type PendingCreate } from '../../src/views/board-move-state.js';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
@@ -111,6 +111,10 @@ describe('the ghost card on the board', () => {
       expect(body).not.toMatch(/background|neo-well|well|surface-track|gn-surface/i);
       expect(body).toMatch(/opacity/);
     }
+    // A card being CLOSED is dimmed by the SAME rule (F2): one opacity rule, never a second one.
+    expect(css.match(/\.gn-board__card-slot--closing > \.gn-board-card[^{]*\{[^}]*opacity/g)).toHaveLength(1);
+    expect(rules.some((body) => /opacity/.test(body))).toBe(true);
+    expect(css).toMatch(/\.gn-board__card-slot--creating > \.gn-board-card,\s*\.gn-board__card-slot--closing > \.gn-board-card \{/);
     // Control: the sweep does find a fill where there is one (the move's waiting wash).
     const waiting = [...css.matchAll(/\.gn-board__card-slot--waiting::after[^{]*\{([^}]*)\}/g)].map((m) => m[1]!).join('');
     expect(waiting).toMatch(/background/);
@@ -178,52 +182,99 @@ describe('the optimistic Close (spec S5)', () => {
     return { source, onMoved, ...utils };
   }
 
-  it('25.097 Close takes the card off the board at once and keeps it off while the write is open; a commit reloads; the refusal puts it back with the reason', async () => {
+  /** The card's own slot: busy, dimmed (by its class) and not draggable while its Close is open. */
+  const slotOf = (ticketId: string) => screen.getByTestId(`ticket-card-${ticketId}`);
+
+  it('25.097 Close DIMS the card in place while the write is open — busy, not draggable, no second Close; the neighbour is untouched; the refusal undims it and shows the reason', async () => {
     const open = deferred<IngestResult[]>();
-    const { onMoved, rerender } = await mount(() => open.promise);
-    const closeButton = screen.getByRole('button', { name: 'Close Ticket tk_x' });
-    expect(screen.getByTestId('ticket-card-tk_x')).toBeInTheDocument();
-    await userEvent.click(closeButton);
-    // Gone this frame; the neighbour stays; the write is still open.
-    expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull();
-    expect(screen.getByTestId('ticket-card-tk_y')).toBeInTheDocument();
+    const ingest = vi.fn(() => open.promise);
+    const { onMoved } = await mount(ingest);
+    // Control: before the click the card is a plain, draggable card with a live Close, and so is its neighbour.
+    expect(slotOf('tk_x')).not.toHaveAttribute('aria-busy');
+    expect(slotOf('tk_x').className).not.toContain('gn-board__card-slot--closing');
+    expect(slotOf('tk_x').getAttribute('draggable')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
+    // Open: the card is STILL on the board, in its place, dimmed and busy; it cannot be dragged and cannot be closed twice.
+    expect(slotOf('tk_x')).toHaveAttribute('aria-busy', 'true');
+    expect(slotOf('tk_x').className).toContain('gn-board__card-slot--closing');
+    expect(slotOf('tk_x').getAttribute('draggable')).not.toBe('true');
+    expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
+    expect(ingest).toHaveBeenCalledTimes(1);
+    // The neighbour is untouched throughout.
+    expect(slotOf('tk_y')).not.toHaveAttribute('aria-busy');
+    expect(slotOf('tk_y').getAttribute('draggable')).toBe('true');
     expect(onMoved).not.toHaveBeenCalled();
-    // The refusal: the card is back where the data says it is, with the server's words.
+    // The refusal: undimmed where it always was, with the server's words.
     open.resolve([{ status: 'refused', eventId: 'e', rule: 'close-requires-terminal', reason: 'Close the subtasks first.' } as IngestResult]);
-    await waitFor(() => expect(screen.getByTestId('ticket-card-tk_x')).toBeInTheDocument());
-    expect(screen.getByText(/Close the subtasks first\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Close the subtasks first\./)).toBeInTheDocument();
+    await waitFor(() => expect(slotOf('tk_x')).not.toHaveAttribute('aria-busy'));
+    expect(slotOf('tk_x').className).not.toContain('gn-board__card-slot--closing');
+    expect(slotOf('tk_x').getAttribute('draggable')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeEnabled();
     expect(onMoved).not.toHaveBeenCalled();
-    rerender(<Board board={TERMINAL} onOpenTicket={() => {}} />);
   });
 
-  it('25.097 a committed Close keeps the card off, reloads the board, and the entry retires when a read no longer holds the card', async () => {
-    const { onMoved, rerender } = await mount(() => [{ status: 'committed', eventId: 'e', seq: 4, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult]);
+  it.each([
+    ['a connection that drops', () => Promise.reject(new Error('offline')), /We could not reach the server for this close/],
+    ['silence (no result)', () => Promise.resolve([] as IngestResult[]), /The server did not answer this close\./],
+  ])('25.097 %s undims the Close and says so; the card never left', async (_name, ingest, sentence) => {
+    await mount(ingest as never);
+    // Control: the card starts plain.
+    expect(slotOf('tk_x')).not.toHaveAttribute('aria-busy');
     await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
-    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull();
-    // A STALE read (still holding the card) does not bring it back.
-    rerender(<Board board={{ ...TERMINAL }} onOpenTicket={() => {}} />);
-    expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull();
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
+    await waitFor(() => expect(slotOf('tk_x')).not.toHaveAttribute('aria-busy'));
+    expect(slotOf('tk_x').className).not.toContain('gn-board__card-slot--closing');
+    expect(screen.getByRole('button', { name: 'Close Ticket tk_x' })).toBeEnabled();
+  });
+
+  it('25.097 a committed Close takes the card off the board, reloads, keeps it off while a stale read still holds it, and gives it back after the TTL', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { onMoved, rerender } = await mount(() => [{ status: 'committed', eventId: 'e', seq: 4, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult]);
+      // Control: the card is on the board until the answer.
+      expect(slotOf('tk_x')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Close Ticket tk_x' }));
+      await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull());
+      expect(slotOf('tk_y')).toBeInTheDocument();
+      // A STALE read (still holding the card) does not bring it back…
+      rerender(<Board board={{ ...TERMINAL }} onOpenTicket={() => {}} />);
+      expect(screen.queryByTestId('ticket-card-tk_x')).toBeNull();
+      // …but a committed close no read ever confirms expires: the data says the card is there.
+      act(() => {
+        vi.advanceTimersByTime(PENDING_TTL_MS + 1);
+      });
+      expect(slotOf('tk_x')).toBeInTheDocument();
+      expect(slotOf('tk_x')).not.toHaveAttribute('aria-busy');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
 describe('the closes arms of the move state (spec S5)', () => {
   const entry = { ticketId: 'tk_x', workflowId: 'wf-errand', fromStateId: 'done', toStateId: 'done', phase: 'writing' as const, closes: true as const };
 
-  it('25.102 a closing entry HIDES the card; it retires when the read no longer holds it, and a read that still holds it retires nothing', () => {
+  it('25.102 a closing entry keeps the card while it is open and HIDES it once committed; it retires when the read no longer holds it, and a read that still holds it retires nothing', () => {
     const held = view({ done: [card('tk_x'), card('tk_y')] });
-    const hidden = applyPendingMoves(held, { tk_x: entry });
+    // Open (`writing`, `awaiting`): nothing is hidden — the slot dims the card — and it is the SAME view.
+    expect(applyPendingMoves(held, { tk_x: entry })).toBe(held);
+    expect(applyPendingMoves(held, { tk_x: { ...entry, phase: 'awaiting' as const } })).toBe(held);
+    const committedEntry = { ...entry, phase: 'committed' as const, settledAt: 0 };
+    const hidden = applyPendingMoves(held, { tk_x: committedEntry });
     expect(hidden.groups[0]!.columns[2]!.cards.map((c) => c.ticketId)).toEqual(['tk_y']);
     expect(held.groups[0]!.columns[2]!.cards).toHaveLength(2);
-    // Control: the same entry WITHOUT `closes` is a no-op (a card already in its target), which is the plan's shape this replaces.
-    const { closes: _closes, ...asMove } = entry;
+    // Control: the same committed entry WITHOUT `closes` is a no-op (a card already in its target), which is the plan's shape this replaces.
+    const { closes: _closes, ...asMove } = committedEntry;
     expect(applyPendingMoves(held, { tk_x: asMove })).toBe(held);
     const pending = { tk_x: entry };
     expect(retireAgreed(held, pending, 0)).toBe(pending);
     expect(retireAgreed(view({ done: [card('tk_y')] }), pending, 0)).toEqual({});
     // A committed close the read never confirms still expires.
-    const committed = { tk_x: { ...entry, phase: 'committed' as const, settledAt: 0 } };
-    expect(retireAgreed(held, committed, 30_000)).toEqual({});
+    expect(retireAgreed(held, { tk_x: committedEntry }, 30_000)).toEqual({});
   });
 });
 

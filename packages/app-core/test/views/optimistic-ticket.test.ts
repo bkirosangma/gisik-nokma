@@ -62,6 +62,9 @@ describe('applyOverlay (spec S5; audit SM-03)', () => {
   });
 });
 
+const TICKET_A = 'ticket-a';
+const TICKET_B = 'ticket-b';
+
 function result(data: TicketRead | null): LiveQueryResult<TicketRead | null> {
   return { data, error: null, settled: true, hasAnswered: true, reload: () => {} };
 }
@@ -72,7 +75,7 @@ describe('useOptimisticTicket (spec S5)', () => {
 
   it('25.095 settle keeps the overlay until a read AGREES, then retires it; a read that merely arrives retires nothing', () => {
     let current = result(readOf());
-    const { result: hook, rerender } = renderHook(() => useOptimisticTicket(current));
+    const { result: hook, rerender } = renderHook(() => useOptimisticTicket(current, TICKET_A));
     act(() => hook.current.begin({ dueDate: '2026-11-01' }));
     expect(hook.current.pendingFields.has('dueDate')).toBe(true);
     expect(hook.current.overlaidFields.has('dueDate')).toBe(true);
@@ -93,7 +96,7 @@ describe('useOptimisticTicket (spec S5)', () => {
 
   it('25.095 a settled overlay no read ever confirms expires after the TTL, so it can never mask a later server change', () => {
     const current = result(readOf());
-    const { result: hook } = renderHook(() => useOptimisticTicket(current));
+    const { result: hook } = renderHook(() => useOptimisticTicket(current, TICKET_A));
     act(() => hook.current.begin({ title: 'New' }));
     act(() => hook.current.settle('title'));
     expect(hook.current.ticket?.title).toBe('New');
@@ -109,7 +112,7 @@ describe('useOptimisticTicket (spec S5)', () => {
   });
 
   it('25.096 drop removes ONE field at once and leaves every other field\'s overlay (and its pending flag) alone', () => {
-    const { result: hook } = renderHook(() => useOptimisticTicket(result(readOf())));
+    const { result: hook } = renderHook(() => useOptimisticTicket(result(readOf()), TICKET_A));
     act(() => hook.current.begin({ title: 'New' }));
     act(() => hook.current.begin({ priority: 'P3' }));
     act(() => hook.current.drop('priority'));
@@ -124,8 +127,64 @@ describe('useOptimisticTicket (spec S5)', () => {
 
   it('25.095 an agreeing read that arrived BEFORE settle retires the overlay at settle (a stream refetch can beat the answer)', () => {
     const current = result(readOf({ title: 'New' }));
-    const { result: hook } = renderHook(() => useOptimisticTicket(current));
+    const { result: hook } = renderHook(() => useOptimisticTicket(current, TICKET_A));
     act(() => hook.current.begin({ title: 'New' }));
+    act(() => hook.current.settle('title'));
+    expect(hook.current.overlaidFields.has('title')).toBe(false);
+  });
+  it('25.103 an overlay is scoped to its ticket: a re-target clears it, and a write started under A that answers after the switch never touches B', () => {
+    const current = result(readOf());
+    let ticketId = TICKET_A;
+    const { result: hook, rerender } = renderHook(() => useOptimisticTicket(current, ticketId));
+    act(() => hook.current.begin({ title: 'A new', priority: 'P3' }));
+    // Control: on the SAME ticket the overlay is drawn and a re-render keeps it.
+    rerender();
+    expect(hook.current.ticket?.title).toBe('A new');
+    // What A's write holds in its hands (the handlers of A's render, answered later).
+    const lateA = hook.current;
+    ticketId = TICKET_B;
+    rerender();
+    expect(hook.current.ticket?.title).toBe('Old'); // B is its read, not A's overlay
+    expect(hook.current.overlaidFields.size).toBe(0);
+    expect(hook.current.pendingFields.size).toBe(0);
+    // B writes its own title; then A's write answers, every way it can.
+    act(() => hook.current.begin({ title: 'B new' }));
+    act(() => lateA.settle('title', 'priority'));
+    expect(hook.current.pendingFields.has('title')).toBe(true); // B's write is still open: A's settle did not close it
+    act(() => lateA.drop('title', 'priority'));
+    expect(hook.current.ticket?.title).toBe('B new');
+    expect(hook.current.pendingFields.has('title')).toBe(true);
+    act(() => lateA.begin({ dueDate: '2026-12-01' }));
+    expect(hook.current.overlaidFields.has('dueDate')).toBe(false);
+    // Back on A the overlay is gone (cleared by the switch, not parked).
+    ticketId = TICKET_A;
+    rerender();
+    expect(hook.current.ticket?.title).toBe('Old');
+    expect(hook.current.overlaidFields.size).toBe(0);
+  });
+
+  it('25.106 a field written AGAIN while its first write waits for a read starts over: the first write\'s TTL and agreeing read never retire the second', () => {
+    let current = result(readOf());
+    const { result: hook, rerender } = renderHook(() => useOptimisticTicket(current, TICKET_A));
+    act(() => hook.current.begin({ title: 'First' }));
+    act(() => hook.current.settle('title'));
+    act(() => {
+      vi.advanceTimersByTime(OVERLAY_TTL_MS - 5_000);
+    });
+    // Control: the settled first value is still there and still waiting for its read.
+    expect(hook.current.ticket?.title).toBe('First');
+    act(() => hook.current.begin({ title: 'Second' }));
+    // Past the FIRST write's TTL, the second is open and keeps its overlay.
+    act(() => {
+      vi.advanceTimersByTime(6_000);
+    });
+    expect(hook.current.ticket?.title).toBe('Second');
+    expect(hook.current.pendingFields.has('title')).toBe(true);
+    // A read that already carries the second value must not retire an UNANSWERED write either…
+    current = result(readOf({ title: 'Second' }));
+    rerender();
+    expect(hook.current.overlaidFields.has('title')).toBe(true);
+    // …and once it is answered, that agreeing read retires it at the settle.
     act(() => hook.current.settle('title'));
     expect(hook.current.overlaidFields.has('title')).toBe(false);
   });

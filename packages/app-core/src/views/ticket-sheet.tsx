@@ -957,7 +957,7 @@ export function TicketSheet({
   );
   // Every edit is shown at once and rolled back honestly (smoothness T7, spec S5; `optimistic-ticket.ts`).
   // `read` stays the DATA (the workflow, the subtasks and the reloads below ask it); what is DRAWN is `optimistic.ticket`.
-  const optimistic = useOptimisticTicket(read);
+  const optimistic = useOptimisticTicket(read, ticketId);
   const ticketState = read.data?.ticket ?? null;
   const workflowKey =
     ticketState === null ? '' : `${ticketState.workflowId}@${ticketState.workflowVersion}`;

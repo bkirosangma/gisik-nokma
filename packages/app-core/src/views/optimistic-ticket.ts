@@ -103,32 +103,55 @@ export function applyOverlay(read: TicketRead, overlay: TicketOverlay): TicketRe
   return { ...read, title, ticket };
 }
 
+type Scoped = {
+  /** The ticket every entry below was written under. */
+  ticketId: string;
+  overlay: TicketOverlay;
+  pending: ReadonlySet<OverlayField>;
+  settledAt: Readonly<Partial<Record<OverlayField, number>>>;
+};
+const emptyScope = (ticketId: string): Scoped => ({ ticketId, overlay: {}, pending: new Set(), settledAt: {} });
+
 /**
  * `begin` lays values over the read the moment the write is made; `settle` keeps them until a read AGREES (so a
  * committed value never flickers back to the old one while the reload is in flight); `drop` removes them at
  * once — the refusal arm. **Fields are independent**: one refusal never drops another field's open overlay.
  *
+ * **The overlay belongs to ONE ticket** (T7 FIX 1, F1). `TicketSheet` is re-targeted in place (the parent crumb,
+ * a subtask row), so what was written under ticket A is cleared the render the id becomes B, and the `begin` /
+ * `settle` / `drop` a render hands out are bound to the id of THAT render: a write started under A that answers
+ * after the switch finds B's state and leaves it alone.
+ *
  * `pendingFields` is the fields whose write is unanswered; `overlaidFields` is those PLUS the settled ones still
  * waiting for their agreeing read (the claim line says "Saving…" for all of them).
  */
-export function useOptimisticTicket(read: LiveQueryResult<TicketRead | null>) {
-  const [overlay, setOverlay] = useState<TicketOverlay>({});
-  const [pending, setPending] = useState<ReadonlySet<OverlayField>>(new Set());
-  const [settledAt, setSettledAt] = useState<Readonly<Partial<Record<OverlayField, number>>>>({});
+export function useOptimisticTicket(read: LiveQueryResult<TicketRead | null>, ticketId: string) {
+  const [scoped, setScoped] = useState<Scoped>(() => emptyScope(ticketId));
+  // The React-sanctioned reset on a changed prop: the stale scope is replaced before anything is drawn from it.
+  if (scoped.ticketId !== ticketId) setScoped(emptyScope(ticketId));
+  const { overlay, pending, settledAt } = scoped.ticketId === ticketId ? scoped : emptyScope(ticketId);
   const data = read.data;
 
-  const retire = useCallback((fields: readonly OverlayField[]) => {
-    setOverlay((current) => {
-      const next = { ...current };
-      for (const field of fields) delete next[field];
-      return next;
-    });
-    setSettledAt((current) => {
-      const next = { ...current };
-      for (const field of fields) delete next[field];
-      return next;
-    });
-  }, []);
+  /** Apply `change` to the scope of `ticketId` only; an answer for any other ticket finds a different scope and does nothing. */
+  const update = useCallback(
+    (change: (scope: Scoped) => Scoped) => setScoped((current) => (current.ticketId === ticketId ? change(current) : current)),
+    [ticketId],
+  );
+
+  const retire = useCallback(
+    (fields: readonly OverlayField[]) => {
+      update((current) => {
+        const overlayNext = { ...current.overlay };
+        const settledNext = { ...current.settledAt };
+        for (const field of fields) {
+          delete overlayNext[field];
+          delete settledNext[field];
+        }
+        return { ...current, overlay: overlayNext, settledAt: settledNext };
+      });
+    },
+    [update],
+  );
 
   // Retire every SETTLED field the read now agrees with. Keyed on the read AND on the settle itself: a stream
   // refetch can land before the write's answer does, and that agreeing read must retire the overlay at settle.
@@ -153,42 +176,45 @@ export function useOptimisticTicket(read: LiveQueryResult<TicketRead | null>) {
     return () => clearTimeout(timer);
   }, [settledAt, retire]);
 
-  const begin = useCallback((patch: TicketOverlay) => {
-    const fields = (Object.keys(patch) as OverlayField[]).filter((field) => patch[field] !== undefined);
-    setOverlay((current) => ({ ...current, ...patch }));
-    setPending((current) => new Set([...current, ...fields]));
-    // A field written again while its last write waits for a read starts over: it is pending, not settled.
-    setSettledAt((current) => {
-      const next = { ...current };
-      for (const field of fields) delete next[field];
-      return next;
-    });
-  }, []);
+  const begin = useCallback(
+    (patch: TicketOverlay) => {
+      const fields = (Object.keys(patch) as OverlayField[]).filter((field) => patch[field] !== undefined);
+      update((current) => {
+        // A field written again while its last write waits for a read starts over: it is pending, not settled.
+        const settledNext = { ...current.settledAt };
+        for (const field of fields) delete settledNext[field];
+        return { ...current, overlay: { ...current.overlay, ...patch }, pending: new Set([...current.pending, ...fields]), settledAt: settledNext };
+      });
+    },
+    [update],
+  );
 
-  const settle = useCallback((...fields: OverlayField[]) => {
-    setPending((current) => {
-      const next = new Set(current);
-      for (const field of fields) next.delete(field);
-      return next;
-    });
-    setSettledAt((current) => {
-      const next = { ...current };
-      const now = Date.now();
-      for (const field of fields) next[field] = now;
-      return next;
-    });
-  }, []);
+  const settle = useCallback(
+    (...fields: OverlayField[]) => {
+      update((current) => {
+        const pendingNext = new Set(current.pending);
+        const settledNext = { ...current.settledAt };
+        const now = Date.now();
+        for (const field of fields) {
+          pendingNext.delete(field);
+          settledNext[field] = now;
+        }
+        return { ...current, pending: pendingNext, settledAt: settledNext };
+      });
+    },
+    [update],
+  );
 
   const drop = useCallback(
     (...fields: OverlayField[]) => {
       retire(fields);
-      setPending((current) => {
-        const next = new Set(current);
-        for (const field of fields) next.delete(field);
-        return next;
+      update((current) => {
+        const pendingNext = new Set(current.pending);
+        for (const field of fields) pendingNext.delete(field);
+        return { ...current, pending: pendingNext };
       });
     },
-    [retire],
+    [retire, update],
   );
 
   const ticket = useMemo(() => (data === null ? null : applyOverlay(data, overlay)), [data, overlay]);

@@ -34,10 +34,12 @@ export type PendingMove = {
   /** `Date.now()` when the server committed; the clock `retireAgreed`'s TTL reads. */
   settledAt?: number;
   /**
-   * A CLOSE, not a move (smoothness T7). The card sits in a terminal column and closing it takes it off the board
-   * (the server's `getBoard` excludes closed tickets, spec §3.2), so the overlay HIDES the card rather than
-   * relocating it, and the entry retires when the read no longer holds the card. `toStateId` is the card's own
-   * state, so nothing that reads it as a target sees a move.
+   * A CLOSE, not a move (smoothness T7; spec `:66`: "optimistic through `beginPending` with the card dimmed"). The
+   * card sits in a terminal column and closing it takes it off the board (the server's `getBoard` excludes closed
+   * tickets, spec §3.2), so the overlay never relocates it: while the write is open (`awaiting` / `writing`) the card
+   * STAYS where it is and the slot dims it (`BoardCardSlot`); once the server has committed (`committed`) the overlay
+   * HIDES it, and the entry retires when the read no longer holds the card (or after the TTL). A refusal drops the
+   * entry, which undims the card. `toStateId` is the card's own state, so nothing that reads it as a target sees a move.
    */
   closes?: true;
 };
@@ -93,6 +95,8 @@ export function applyPendingMoves(view: BoardView, pending: PendingMoves): Board
     const group = current[groupIndex]!;
     const source = group.columns.find((column) => column.cards.some((candidate) => candidate.ticketId === entry.ticketId))!;
     if (entry.closes === true) {
+      // Open: the card stays, dimmed by its slot. Only a COMMITTED close takes it off the board.
+      if (entry.phase !== 'committed') continue;
       const columns = group.columns.map(
         (column): BoardColumn =>
           column.stateId === source.stateId

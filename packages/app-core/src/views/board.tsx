@@ -1910,6 +1910,10 @@ function BoardCardSlot({
   // Where this card flies from, when it has just been drawn in a new place (see the layout effect below).
   const [flight, setFlight] = useState<{ dx: number; dy: number } | null>(null);
   const phase = moveState?.pending[card.ticketId]?.phase;
+  // A Close in flight (T7 F2): the card stays where it is, dimmed and busy, until the answer — it cannot be dragged
+  // (the Move and Close buttons are already disabled by `submitting`). Once committed the overlay hides it instead.
+  const closing = moveState?.pending[card.ticketId]?.closes === true && phase !== 'committed';
+  const movable = arrows !== null && !closing;
 
   // Let the board find this slot by ticket id, to measure where the card is drawn right now.
   const slots = moveState?.slots;
@@ -1987,6 +1991,7 @@ function BoardCardSlot({
     placeholder ? 'gn-board__card-slot--placeholder' : '',
     phase === 'awaiting' ? 'gn-board__card-slot--waiting' : '',
     creating ? 'gn-board__card-slot--creating' : '',
+    closing ? 'gn-board__card-slot--closing' : '',
     flight !== null ? 'gn-board__card-slot--flight' : '',
   ]
     .filter((name) => name !== '')
@@ -2001,12 +2006,12 @@ function BoardCardSlot({
           : ({ '--gn-flip-x': `${flight.dx}px`, '--gn-flip-y': `${flight.dy}px` } as CSSProperties)
       }
       data-move-phase={phase}
-      aria-busy={creating ? 'true' : undefined}
+      aria-busy={creating || closing ? 'true' : undefined}
       onAnimationEnd={flight === null ? undefined : () => setFlight(null)}
       data-testid={`ticket-card-${card.ticketId}`}
-      draggable={arrows !== null}
+      draggable={movable}
       onDragStart={
-        arrows === null
+        !movable
           ? undefined
           : (event) => {
               draggedRef.current = true;
@@ -2036,7 +2041,7 @@ function BoardCardSlot({
       // Fires on a drop, on Esc and on a refused drop. `draggedRef` is NOT touched
       // here: it is cleared on the next `mousedown`, never on `dragend` (docblock above).
       onDragEnd={
-        arrows === null
+        !movable
           ? undefined
           : () => {
               if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
