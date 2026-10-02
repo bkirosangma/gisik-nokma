@@ -126,6 +126,10 @@ export function stubServices(
     // helper asserting the caller has nothing deleted — a claim about the
     // world — and a page under test could pass against a read nobody stubbed.
     getDeletedItems: unstubbed('getDeletedItems'),
+    // UNSTUBBED too (prefixes and groups Task 7): `[]` would claim the workspace has no groups. The home
+    // page treats a rejection as "no tree to show" and falls back to the plain list, so a case that never
+    // asked for the grouped view is unaffected by the rejection.
+    getGroups: unstubbed('getGroups'),
     // Every document render asks this in the background (trash Plan 3); "nothing
     // was purged" is exactly what every page saw before the read existed, so a
     // case that does not care is not made to stub it. A case that does, stubs it.
