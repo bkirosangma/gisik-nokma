@@ -2,6 +2,8 @@ import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TicketEditorSlot as RealTicketEditorSlot } from '@gisik-nokma/editor';
 import { EditorSkeleton } from '../src/skeletons/editor-skeleton.js';
+import { parseRules } from '../../../packages/ui/test/helpers/css-rules.js';
+import { PHONE, readEditorCss } from './helpers/toolbar-packing.js';
 
 /**
  * 25.177 — the editor's skeleton IS the slot's box, per mode (smoothness T10 FIX 1; amendment S-R1 rule 1, spec S1).
@@ -102,6 +104,8 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
 
 describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakpoint, and the hint its own words', () => {
   const tools = (root: Element) => root.querySelectorAll('.ticket-editor__tool').length;
+  const itemOrder = (group: Element, tool: string, select: string) =>
+    [...group.querySelectorAll(`${tool}, ${select}`)].map((item) => (item.matches(select) ? 's' : 't')).join('');
   const skeletonSet = (which: 'desktop' | 'phone') => {
     const view = render(<EditorSkeleton mode="description" />);
     const set = view.container.querySelector(`.gn-editor-skeleton__set--${which}`)!;
@@ -109,6 +113,10 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
       groups: set.querySelectorAll('.ticket-editor__tool-group').length,
       tools: set.querySelectorAll('.gn-editor-skeleton__tool').length,
       selects: set.querySelectorAll('.gn-editor-skeleton__select').length,
+      // The ORDER of the items per group (t tool, s heading select), and G-7's one-row shape: tools in a scrolling group, More pinned after it.
+      order: [...set.querySelectorAll('.ticket-editor__tool-group')].map((group) => itemOrder(group, '.gn-editor-skeleton__tool', '.gn-editor-skeleton__select')),
+      scrolled: set.querySelectorAll('.ticket-editor__scroll > .ticket-editor__tool-group').length,
+      pinned: set.querySelectorAll('.ticket-editor__tool-group.ticket-editor__more').length,
     };
     view.unmount();
     return result;
@@ -125,6 +133,9 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
         groups: bar.querySelectorAll('.ticket-editor__tool-group').length,
         tools: tools(bar),
         selects: bar.querySelectorAll('.ticket-editor__heading-select').length,
+        order: [...bar.querySelectorAll('.ticket-editor__tool-group')].map((group) => itemOrder(group, '.ticket-editor__tool', '.ticket-editor__heading-select')),
+        scrolled: bar.querySelectorAll('.ticket-editor__scroll > .ticket-editor__tool-group').length,
+        pinned: bar.querySelectorAll('.ticket-editor__tool-group.ticket-editor__more').length,
       };
       view.unmount();
       return result;
@@ -139,9 +150,21 @@ describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakp
     const phone = await realBar(true);
     expect(skeletonSet('desktop')).toEqual(desktop);
     expect(skeletonSet('phone')).toEqual(phone);
-    // Control, in the same it(): the two real bars differ and are not degenerate (17 tools on desktop; the eight phone tools plus More).
+    // Control, in the same it(): the two real bars differ and are not degenerate (17 tools on desktop; on a phone, G-7's seven tools plus More).
     expect(desktop.tools).toBe(17);
-    expect(phone.tools).toBe(9);
+    expect(phone.tools).toBe(8);
+    // G-7's ONE row (batch 5): the phone bar is a scrolling group (tools, the heading select after the fourth) and ONE pinned More group, so the
+    // skeleton is two groups too, not the release bar's four. The row's height (--ticket-editor-bar-h, 56px; 84px in neo) comes from the real
+    // bar's own `.ticket-editor__toolbar` rule, which the skeleton's toolbar carries, and no skeleton rule sets a phone height of its own.
+    expect(phone.order).toEqual(['ttttsttt', 't']);
+    expect(phone.scrolled).toBe(1);
+    expect(phone.pinned).toBe(1);
+    expect(desktop.scrolled + desktop.pinned).toBe(0);
+    const phoneRules = parseRules(readEditorCss()).filter((rule) => rule.atRule === PHONE);
+    expect(phoneRules.find((rule) => rule.selectors.join(',') === '.ticket-editor__toolbar' && /height:\s*var\(--ticket-editor-bar-h\)/.test(rule.body)), 'the real one-row bar height rule').toBeDefined();
+    expect(phoneRules.find((rule) => rule.selectors.join(',') === '.ticket-editor' && /--ticket-editor-bar-h:\s*calc\(2\.75rem \+ 2 \* max\(0\.375rem, var\(--ticket-editor-reach\)\)\)/.test(rule.body)), 'the 56px / 84px (neo) bar height').toBeDefined();
+    const skeletonHeights = phoneRules.filter((rule) => rule.selectors.some((selector) => selector.includes('gn-editor-skeleton__set') || selector.includes('gn-editor-skeleton__row')) && /\bheight\s*:/.test(rule.body));
+    expect(skeletonHeights).toEqual([]);
     expect(desktop.selects).toBe(1);
     expect(phone.selects).toBe(1);
     // The hint line is the real sentence (it wraps to the real number of lines, 25.182): description's Markdown hint, a comment's

@@ -17,9 +17,12 @@ export type EditorSkeletonProps = {
 
 /**
  * The formatting strip's items, per breakpoint, in the real bar's own groups and order (`EditorToolbar.tsx`): desktop draws all 17
- * tools plus the heading select in the blocks group; at ≤40rem (`PHONE_VISIBLE_TOOLS`) eight tools, the heading select AFTER the
- * blocks, and the one More button. Both sets are rendered and the stylesheet shows one (`editor.css`, `.gn-editor-skeleton__set`), so
- * the server markup and the first client render agree and no editor module is needed to know which bar is coming.
+ * tools plus the heading select in the blocks group; at ≤40rem it is G-7's ONE row (`PHONE_BAR_ORDER`): seven tools with the heading
+ * select after the fourth (bold, italic, list, task, SELECT, link, insert ticket, insert note) scrolling inside `.ticket-editor__scroll`,
+ * and the one More button pinned after it in its own group (`.ticket-editor__more`). Both sets are rendered and the stylesheet shows
+ * one (`editor.css`, `.gn-editor-skeleton__set`), so the server markup and the first client render agree and no editor module is
+ * needed to know which bar is coming. The phone row takes its height (`--ticket-editor-bar-h`: 56px, 84px in neo) and its nowrap,
+ * its scroller and its pinned More from the real bar's own rules, because it is drawn in the real bar's own classes.
  */
 const DESKTOP_GROUPS = [
   { key: 'history', tools: 2, select: false },
@@ -27,29 +30,38 @@ const DESKTOP_GROUPS = [
   { key: 'blocks', tools: 7, select: 'first' },
   { key: 'insert', tools: 3, select: false },
 ] as const;
-const PHONE_GROUPS = [
-  { key: 'history', tools: 2, select: false },
-  { key: 'marks', tools: 3, select: false },
-  { key: 'blocks', tools: 3, select: 'last' },
-  { key: 'more', tools: 1, select: false },
-] as const;
+/** The phone bar's scrolling group: tools before the heading select, then tools after it (the real `PHONE_BAR_ORDER`). */
+const PHONE_SCROLL = { before: 4, after: 3 } as const;
+const PHONE_MORE_TOOLS = 1;
 
-type Group = { key: string; tools: number; select: false | 'first' | 'last' };
+const skeletonTools = (count: number) => Array.from({ length: count }, (_, tool) => <Skeleton key={tool} shape="block" className="gn-editor-skeleton__tool" />);
+const skeletonSelect = () => <Skeleton shape="block" className="gn-editor-skeleton__select" />;
 
-function StripSet({ groups, which }: { groups: readonly Group[]; which: 'desktop' | 'phone' }) {
-  const select = <Skeleton shape="block" className="gn-editor-skeleton__select" />;
+function DesktopSet() {
   return (
-    <div className={`gn-editor-skeleton__set gn-editor-skeleton__set--${which}`}>
-      {groups.map((group, index) => (
+    <div className="gn-editor-skeleton__set gn-editor-skeleton__set--desktop">
+      {DESKTOP_GROUPS.map((group, index) => (
         <div key={group.key} className="ticket-editor__tool-group">
           {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
-          {group.select === 'first' ? select : null}
-          {Array.from({ length: group.tools }, (_, tool) => (
-            <Skeleton key={tool} shape="block" className="gn-editor-skeleton__tool" />
-          ))}
-          {group.select === 'last' ? select : null}
+          {group.select === 'first' ? skeletonSelect() : null}
+          {skeletonTools(group.tools)}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PhoneSet() {
+  return (
+    <div className="gn-editor-skeleton__set gn-editor-skeleton__set--phone">
+      <div className="ticket-editor__scroll" data-at-start="true" data-at-end="true">
+        <div className="ticket-editor__tool-group">
+          {skeletonTools(PHONE_SCROLL.before)}
+          {skeletonSelect()}
+          {skeletonTools(PHONE_SCROLL.after)}
+        </div>
+      </div>
+      <div className="ticket-editor__tool-group ticket-editor__more">{skeletonTools(PHONE_MORE_TOOLS)}</div>
     </div>
   );
 }
@@ -83,8 +95,8 @@ export function EditorSkeleton({ mode = 'description', attach = false, readOnly 
       <div className="ticket-editor">
         {strip ? (
           <div className="ticket-editor__toolbar">
-            <StripSet groups={DESKTOP_GROUPS} which="desktop" />
-            <StripSet groups={PHONE_GROUPS} which="phone" />
+            <DesktopSet />
+            <PhoneSet />
           </div>
         ) : null}
         <div className="gn-field__input ticket-editor__content">
