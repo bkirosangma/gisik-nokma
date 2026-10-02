@@ -99,9 +99,11 @@ function sectionNameOf(projectId: string): string | null {
   const heading = section?.getAttribute('aria-labelledby');
   return heading === null || heading === undefined ? null : (document.getElementById(heading)?.textContent ?? null);
 }
-/** Every level strip's accessible name, in document order. */
-const stripNames = (): string[] =>
-  [...document.querySelectorAll('[data-level]')].map((strip) => strip.getAttribute('aria-label') ?? '');
+/** Every group section's level and name, in document order (the level guide is CSS; the section carries the level). */
+const sectionLevels = (): string[] =>
+  [...document.querySelectorAll('section[data-level]')].map(
+    (section) => `Level ${section.getAttribute('data-level')} group: ${document.getElementById(section.getAttribute('aria-labelledby') ?? '')?.textContent}`,
+  );
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -163,9 +165,9 @@ describe('22.122 the Grouped choice is remembered per user', () => {
 describe('22.140 the grouped view nests the groups, level by level', () => {
   it('22.140 L1→L4 sections in rank order, each with its level strip, and a project sits in its own group’s section', async () => {
     await showGrouped();
-    await screen.findByRole('img', { name: 'Level 1 group: Retail' });
+    await screen.findByRole('region', { name: 'Retail' });
     // Rank order at every depth, whatever order the wire served: Retail before Operations; Stores before Online.
-    expect(stripNames()).toEqual([
+    expect(sectionLevels()).toEqual([
       'Level 1 group: Retail',
       'Level 2 group: Stores',
       'Level 3 group: Kiosks',
@@ -173,8 +175,7 @@ describe('22.140 the grouped view nests the groups, level by level', () => {
       'Level 2 group: Online',
       'Level 1 group: Operations',
     ]);
-    const strip = screen.getByRole('img', { name: 'Level 3 group: Kiosks' });
-    expect(strip).toHaveAttribute('data-level', '3');
+    expect(screen.getByRole('region', { name: 'Kiosks' })).toHaveAttribute('data-level', '3');
     expect(sectionNameOf('p1')).toBe('Stores');
     expect(sectionNameOf('p6')).toBe('Kiosks');
     expect(sectionNameOf('p4')).toBe('Carts');
@@ -233,16 +234,16 @@ describe('22.142 the plain view is unchanged', () => {
   });
 });
 
-describe('22.143 each level strip uses its own level token', () => {
-  it('22.143 the rule for .gn-group-section__strip[data-level="N"] paints var(--gn-level-N), for N = 1…4', () => {
+describe('22.143 each level guide uses its own level token', () => {
+  it('22.143 the rule for .gn-group-section[data-level="N"]::before paints var(--gn-level-N), for N = 1…4', () => {
     const globals = readGlobalsCss();
     for (const level of [1, 2, 3, 4]) {
-      const rule = ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`);
+      const rule = ruleExactly(globals, `.gn-group-section[data-level="${level}"]::before`);
       expect(valueOf(rule, 'background'), `level ${level}`).toBe(`var(--gn-level-${level})`);
     }
     // CONTROL: the four rules are four rules, not one shared one — a test that cannot fail would pass here too.
     const painted = new Set(
-      [1, 2, 3, 4].map((level) => valueOf(ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`), 'background')),
+      [1, 2, 3, 4].map((level) => valueOf(ruleExactly(globals, `.gn-group-section[data-level="${level}"]::before`), 'background')),
     );
     expect(painted.size).toBe(4);
   });
@@ -395,5 +396,23 @@ describe('22.148 the workspace home header on a phone', () => {
     expect(valueOf(links, 'display')).toBe('grid');
     expect(valueOf(links, 'grid-template-columns')).toContain('auto-fit');
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__projects-heading'), 'flex-wrap')).toBe('wrap');
+  });
+});
+
+describe('25.316 the workspace home page remembers a collapsed group for the signed-in user (G-1 persistence at the real door)', () => {
+  it('25.316 collapsing Stores stores its id under gn-groups-collapsed:<session user>:<workspace>; a remount of the page still has it collapsed, and the sibling Operations stays open', async () => {
+    await showGrouped();
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse Stores' }));
+    expect(JSON.parse(window.localStorage.getItem(`gn-groups-collapsed:${KIRO}:${WORKSPACE}`) ?? 'null')).toEqual(['g-stores']);
+    cleanup();
+    await showGrouped();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Stores' })).toHaveAttribute('aria-expanded', 'false'));
+    // CONTROL (same it): a group nobody collapsed is open, so the page reads the ids, not "everything collapsed".
+    expect(screen.getByRole('button', { name: 'Collapse Operations' })).toHaveAttribute('aria-expanded', 'true');
+    // A different person on the same device does not inherit it.
+    cleanup();
+    session = { data: { user: { id: OTHER, name: 'Other' } }, isPending: false };
+    await showGrouped();
+    expect(screen.getByRole('button', { name: 'Collapse Stores' })).toHaveAttribute('aria-expanded', 'true');
   });
 });

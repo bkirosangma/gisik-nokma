@@ -362,10 +362,10 @@ describe('22.206 Delete shows only on an unused group, and confirms', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Beta' }));
     const dialog = await screen.findByRole('dialog');
     expect(onSubmit).not.toHaveBeenCalled();
-    // CONTROL — Cancel files nothing; the confirm is the filled danger, the in-list button the quiet one.
+    // CONTROL — Cancel files nothing; the confirm is the filled danger, the in-list control the ⊖ icon button (G-1c).
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Delete Beta' })).toHaveClass('gn-button--danger-quiet');
+    expect(screen.getByRole('button', { name: 'Delete Beta' })).toHaveClass('gn-groups__delete');
     await user.click(screen.getByRole('button', { name: 'Delete Beta' }));
     const confirm = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete group' });
     expect(confirm).toHaveClass('gn-button--danger');
@@ -411,7 +411,8 @@ describe('22.208 at 40rem the tree is an indented list', () => {
     expect(valueOf(node, 'display')).toBe('block');
     const children = ruleExactly(css, '.gn-groups__children', PHONE);
     expect(valueOf(children, 'margin-left')).toBe('1rem');
-    expect(valueOf(children, 'border-left')).toBe('0');
+    // The indent's line is the level guide (G-1, 25.307): 2px, no longer 0.
+    expect(valueOf(children, 'border-left')).toBe('2px solid var(--gn-border)');
     // The offset that keeps a non-root column off its box (22.210) is the SAME 1rem: it cannot double the indent here.
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node > .gn-groups__children'), 'margin-left')).toBe(
       valueOf(children, 'margin-left'),
@@ -722,5 +723,21 @@ describe('22.244 the tree spine runs from the first child\'s centre to the last 
     // the elbow is centred on the same line, and the phone arm draws no spine
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before'), 'margin-top')).toBe('calc(1.625rem - 1px)');
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::after', '@media (max-width: 40rem)'), 'display')).toBe('none');
+  });
+});
+
+describe('25.317 Settings → Groups remembers a collapsed node for the signed-in user (G-1 persistence at the real door)', () => {
+  it('25.317 collapsing Alpha stores its id under gn-groups-tree-collapsed:<session user>:<workspace>; a remount of the page still has it collapsed, and Delivery stays open', async () => {
+    window.localStorage.clear();
+    renderPage('admin', []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Collapse Alpha' }));
+    expect(JSON.parse(window.localStorage.getItem(`gn-groups-tree-collapsed:${ME}:${WORKSPACE}`) ?? 'null')).toEqual(['g-alpha']);
+    cleanup();
+    renderPage('admin', []);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Alpha' })).toHaveAttribute('aria-expanded', 'false'));
+    // CONTROL (same it): the parent nobody collapsed is open, and the home's key is untouched.
+    expect(screen.getByRole('button', { name: 'Collapse Delivery' })).toHaveAttribute('aria-expanded', 'true');
+    expect(window.localStorage.getItem(`gn-groups-collapsed:${ME}:${WORKSPACE}`)).toBeNull();
+    window.localStorage.clear();
   });
 });
