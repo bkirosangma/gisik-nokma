@@ -632,12 +632,19 @@ retired override now points at directly (`dockerfile:`, alongside the `target: d
 - 13.1429 🧪 The existing `apps/server/test/deploy/compose-dev-contract.test.ts` cases and
   `pnpm check:runbook` stay green after the `docker-compose.hot.yml` repoint (verified 2026-09-23,
   Node v22.23.2 — see this branch's commit body for the exact run).
-- 13.1430 🧪 Post-deploy App Platform log reading, once this lands and deploys: confirm the fetch layer
+- 13.1430 🟡 Post-deploy App Platform log reading, once this lands and deploys: confirm the fetch layer
   and install step show cache hits, the `dev` stage no longer builds, wall times drop toward the
   13.1428 measurement, and whether the `backup` worker's layers come back CACHED once `server`'s build
   has already primed the registry cache (the two share `apps/server/Dockerfile`). Not yet run — left 🧪
   with this recipe.
   **Reading 2026-09-28 (planner, build log of production deployment 59ccb812 — the notes release, 2026-09-23 21:00Z):** the first build of the new Dockerfiles. `RUN pnpm fetch` had NO cached layer on web, server or backup (3 × "No cached layer found for cmd RUN pnpm fetch"; 5 × "Found cached layer" for earlier layers); backup did not reuse server's layers in the same build. Wall time: web 21:00:41→21:05:21 (4m40s), server 21:00:46→21:04:55 (4m09s). A first build cannot hit a cache for a new step, so this is not yet the verdict: stays 🧪 until the NEXT deploy's build log is read.
+  **Reading 2026-10-02 (HK-1, build logs of production deployment bf9c374b, commit 5485384, the NEXT deploy, read with `doctl apps logs 61d94fe7-… <component> --type build --deployment bf9c374b-…`):**
+  - **The fetch layer IS cached on web, server and backup (3 of 3).** Each log has `Using caching version of cmd: RUN pnpm fetch` and then, at the `RUN pnpm fetch` step, `Found cached layer, extracting to filesystem` (web 14:02:51, server 13:57:00, backup 13:56:53 UTC). The 59ccb812 reading had `No cached layer found for cmd RUN pnpm fetch` on all three.
+  - **`RUN pnpm install --offline --frozen-lockfile` has no cached layer** (`No cached layer found for cmd RUN pnpm install --offline --frozen-lockfile` on all three). That is the design, not a defect: the step follows `COPY . .`, which changes with every commit. It ran in about 5 s after the cached fetch.
+  - **The `dev` stage does not build:** two `Building stage 'node:22-alpine'` lines per log (build and runtime), idx 0 and 1.
+  - **Wall times did NOT drop.** web 14:02:25→14:07:42 (5m17s), server 13:56:37→14:01:57 (5m20s), backup 13:56:29→14:01:47 (5m18s), against 4m40s (web) and 4m09s (server) at 59ccb812. Cause in the log: extracting the cached fetch layer took 155 s on server (`RUN pnpm fetch` 13:57:00 → `COPY . .` 13:59:36), longer than the 114 s the uncached fetch took at 59ccb812 (21:01:08 → 21:03:01). kaniko pulls the layer from the registry and unpacks it, so on App Platform the cache hit costs about what the fetch did.
+  - **Backup reusing server's layers is not shown by this pair.** backup (13:56:29) and server (13:56:37) built in parallel, and both hit the cache the previous deploy had primed; neither primed it for the other.
+  - Verdict: the cache-hit and no-`dev`-stage parts hold; the wall-time part fails, so the case is 🟡, not ✅. Whether the registry cache is worth keeping (or the fetch layer should be dropped) is an owner or planner call, not made here.
 
 ## The gate has two kinds: fresh for `main`, cached for a release branch (`task/gate-speedup`, owner 2026-10-02: *"do the caching and whatever to run the gate faster"*)
 
