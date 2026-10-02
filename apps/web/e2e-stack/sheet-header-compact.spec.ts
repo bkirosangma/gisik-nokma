@@ -175,6 +175,7 @@ test.describe('25.431 the phone header compacts without jitter', () => {
     // The content's first row keeps its position in content coordinates: it moved by exactly the scroll delta.
     const y0 = start.contentY;
     for (const f of all) expect(Math.abs(f.contentY - y0), `contentY at scrollTop ${f.scrollTop}`).toBeLessThan(0.51);
+    console.log(`25.431 ${long ? 'long' : 'seed'}: ${all.length} frames, max |contentY - y0| = ${Math.max(...all.map((f) => Math.abs(f.contentY - y0))).toFixed(2)}px`);
     // No in-flow height changes.
     for (const f of all) {
       expect(f.scrollHeight, `scrollHeight at ${f.scrollTop}`).toBe(start.scrollHeight);
@@ -218,23 +219,14 @@ test.describe('25.436 Move in the title overlay works by touch', () => {
     await page.touchscreen.tap(m.x, m.y);
     await expect(page.getByRole('dialog')).toHaveCount(2);
     await expect(page.getByRole('dialog', { name: /Move/ })).toBeVisible();
-    // Back out of the Move dialog (the overlay, still open under it, may take the first Escape).
-    for (let i = 0; i < 3 && (await page.getByRole('dialog', { name: /Move/ }).count()) > 0; i += 1) {
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(250);
-    }
+    // The first Escape goes to the Move dialog (the overlay, still open under it, stands down), not to the overlay or the sheet.
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: /Move/ })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(1);
+    await expect(peek).toBeVisible();
 
     // CONTROL, in the same test: a tap outside collapses the overlay and Move is inert again.
-    await page.evaluate(() => {
-      document.querySelector<HTMLElement>('.gn-sheet__body')!.scrollTop = 400;
-    });
-    await settle(page);
-    if (!(await peek.isVisible())) {
-      const again = await centre(title);
-      await page.touchscreen.tap(again.x, again.y);
-    }
-    await expect(peek).toBeVisible();
+    await expect(move).not.toHaveAttribute('inert', /.*/);
     await page.touchscreen.tap(195, 700);
     await expect(peek).toBeHidden();
     await expect(move).toHaveAttribute('inert', '');

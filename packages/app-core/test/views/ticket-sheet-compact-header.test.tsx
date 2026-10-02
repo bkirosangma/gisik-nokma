@@ -14,7 +14,7 @@ import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { PARENT, TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 
 /**
- * 25.420–25.431 — G-8: the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same
+ * 25.420–25.431 and 25.435 — G-8: the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same
  * elements (`sheet-header-compact.ts`).
  *
  * jsdom lays nothing out, so the phone is a stubbed `matchMedia`, the scroller's `scrollTop` is a plain
@@ -22,7 +22,7 @@ import { PARENT, TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helper
  * stubbed `getBoundingClientRect` (7px a character for a crumb part, 390 for the header). What these cases
  * hold is the MODE and the MARKUP — `data-compact`, `--p`, `inert`, the "…" button, the overlays. The painted
  * result (no jitter, the three frames, desktop unchanged) is the browser spec
- * `apps/web/e2e-stack/sheet-header-compact.spec.ts` (25.431–25.433).
+ * `apps/web/e2e-stack/sheet-header-compact.spec.ts` (25.431–25.433, 25.436, 25.437).
  */
 
 const PHONE = '(max-width: 40rem)';
@@ -378,7 +378,17 @@ describe('the phone sheet', () => {
     expect(titleGroup()).not.toBeNull();
     expect(panel()).toHaveAttribute('data-peek-state', 'open');
     fireEvent.click(moveButton());
-    expect(await screen.findByRole('dialog', { name: /Move/ })).toBeInTheDocument();
+    const moveDialog = await screen.findByRole('dialog', { name: /Move/ });
+    // The overlay stays open under the Move dialog, so it must not act on what happens INSIDE that dialog: a press in it is not an outside
+    // tap (it would turn Move inert under the dialog, and focus would return to a dead button), and the first Escape goes to the dialog.
+    fireEvent.pointerDown(moveDialog);
+    expect(titleGroup()).not.toBeNull();
+    expect(moveButton()).not.toHaveAttribute('inert');
+    fireEvent.keyDown(moveDialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Move/ })).toBeNull());
+    expect(titleGroup()).not.toBeNull();
+    expect(moveButton()).not.toHaveAttribute('inert');
+    expect(screen.getByRole('dialog', { name: 'File the GST return' })).toBeInTheDocument();
     cleanup();
 
     // The control, in the same it(): a press on the sheet body is an outside tap, and Move goes inert.

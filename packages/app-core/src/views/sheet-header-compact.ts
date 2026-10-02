@@ -463,18 +463,25 @@ export function useSheetHeaderCompact(
   // listener honours `defaultPrevented`, so this one runs first and consumes the key.
   useEffect(() => {
     if (peek === null) return undefined;
+    // The Move dialog opens over the sheet while the title overlay may still be open under it: what happens INSIDE another dialog is
+    // that dialog's own (its Escape closes it first, and a press in it is not an outside tap that would turn Move inert).
+    const inOtherDialog = (target: EventTarget | null): boolean => {
+      const dialog = target instanceof Element ? target.closest('[role="dialog"]') : null;
+      return dialog !== null && !dialog.classList.contains('gn-sheet');
+    };
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || inOtherDialog(event.target)) return;
       event.preventDefault();
       closePeek();
     };
     const onPointer = (event: Event): void => {
       const target = event.target;
+      if (inOtherDialog(target)) return;
       if (target instanceof Element && target.closest('.gn-sheet__peek, [data-peek-opener]') !== null) return;
       // The title overlay exists to bring Move back: pressing Move is not an outside tap. Closing here would turn Move
       // inert (`moveInert`) before the click that follows the press lands, so a finger or a mouse could never use it.
-      // The overlay stays open under the Move dialog (so focus returns to a live Move); it is not an opener, so the
-      // press never opens or toggles anything.
+      // The overlay stays open under the Move dialog, which owns its own Escape and presses (`inOtherDialog`), so focus returns
+      // to a live Move; Move is not an opener, so the press never opens or toggles anything.
       if (peekRef.current?.kind === 'title' && target instanceof Element && target.closest('.gn-sheet__move') !== null) return;
       closePeek();
     };
