@@ -13,6 +13,7 @@ import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import { PHONE_QUERY } from '../src/use-is-phone.js';
+import { TABLET_BAR_QUERY } from '../src/use-tablet-bar.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -47,7 +48,7 @@ function swallowNavigation(): () => void {
 }
 let unswallow: () => void = () => undefined;
 
-/** jsdom has no `matchMedia`; `AppNav` renders the bar only when the viewport query matches. */
+/** jsdom has no `matchMedia`; `AppNav` renders the bar only when the viewport query matches (it answers every query alike). */
 function stubPhoneViewport(matches: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
@@ -422,13 +423,20 @@ describe('21.037 / 21.038 AppNav renders the bar ONLY at phone width, and instea
 });
 
 describe('21.033 the script and the stylesheet name the same phone width', () => {
-  it('21.033 PHONE_QUERY is the stylesheet\'s own 40rem arm, and the bottom bar\'s rules sit under it', () => {
+  // AMENDED 2026-10-02 (UX fixes Task 4, owner ruling U3, case 23.051): the bar's rules moved from the 40rem arm to the 64rem tablet
+  // arm and `AppNav` now gates the bar on `TABLET_BAR_QUERY`, so `PHONE_QUERY` no longer governs the bar. What it still pins, and
+  // what this case now asserts, is that the PHONE top bar's rules (the switcher in place of the link row) sit under it.
+  it('21.033 PHONE_QUERY is the stylesheet\'s own 40rem arm, and the phone top bar\'s rules sit under it (the bar\'s moved to 64rem: 23.051)', () => {
     const css = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
     expect(css).toContain(`@media ${PHONE_QUERY} {`);
-    // CONTROL — the bar's own box rule is drawn under THAT arm (the nearest at-rule above it), not merely under some 40rem arm.
-    const rule = css.indexOf('  .gn-bottom-bar {');
+    // CONTROL — the switcher's own box rule is drawn under THAT arm (the nearest at-rule above it), not merely under some 40rem arm.
+    const rule = css.indexOf('  .gn-phone-switcher {');
     expect(rule).toBeGreaterThan(0);
     expect(css.slice(css.lastIndexOf('@media', rule)).startsWith(`@media ${PHONE_QUERY} {`)).toBe(true);
+    // CONTROL — and the bar's own box rule is NOT under it any more: its nearest at-rule is the 64rem arm (`TABLET_BAR_QUERY`).
+    const bar = css.indexOf('  .gn-bottom-bar {');
+    expect(bar).toBeGreaterThan(0);
+    expect(css.slice(css.lastIndexOf('@media', bar)).startsWith(`@media ${TABLET_BAR_QUERY} {`)).toBe(true);
   });
 });
 
@@ -436,3 +444,84 @@ describe('21.033 the script and the stylesheet name the same phone width', () =>
 const _all: readonly BarDestination[] = ['board', 'my-work', 'notes', 'inbox', 'list', 'calendar', 'timeline', 'backlog', 'members'];
 void _all;
 void fireEvent;
+
+describe('23.044 the bar lights a destination on the same segment-bounded prefix rule as the top nav', () => {
+  it('23.044 My work is current on a route under it, not on a lookalike; the project-tab slot rule is unchanged', async () => {
+    render(bar({ pathname: `/w/${WS}/my-work/anything` }));
+    await waitFor(() => expect(items()).toContain('My work'));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBe('page');
+
+    // CONTROL (same `it`): a lookalike segment is not current (`/w/<id>` lighting nothing in the bar is asserted in the next block).
+    cleanup();
+    render(bar({ pathname: `/w/${WS}/my-workshop` }));
+    await waitFor(() => expect(items()).toContain('My work'));
+    expect(within(phoneNav()).getByRole('link', { name: 'My work' }).getAttribute('aria-current')).toBeNull();
+  });
+});
+
+describe('23.044 the top nav and the bar light My work and Members the same way', () => {
+  function services() {
+    return stubServices(
+      {
+        getMyWorkspaces: async () => [
+          { id: WS, name: 'Convenience Corner', prefix: 'CC', role: 'owner', archived: false, memberCount: 3, nameRestrictedProjectCount: 0, projects: [] } satisfies WorkspaceRef,
+        ],
+      },
+      { notifications: { unreadCount: async () => 0 } },
+    );
+  }
+  /** `AppNav` on a phone viewport mounts the top nav's links AND the bar, both from the one pathname. */
+  async function renderBoth(path: string): Promise<void> {
+    currentPath = path;
+    stubPhoneViewport(true);
+    render(
+      <Providers services={services()}>
+        <AppNav workspaceId={WS} />
+      </Providers>,
+    );
+    await waitFor(() => expect(items()).toContain('My work'));
+  }
+  const lit = (el: HTMLElement): boolean => el.getAttribute('aria-current') === 'page';
+  const topLink = (name: string): HTMLElement =>
+    screen.getAllByRole('link', { name }).find((a) => !phoneNav().contains(a)) as HTMLElement;
+
+  it('23.044 /w/<id>/my-work/x lights My work in BOTH, /w/<id>/members/x lights Members in the top nav; a lookalike lights neither; /w/<id> lights nothing in the bar', async () => {
+    await renderBoth(`/w/${WS}/my-work/x`);
+    expect(lit(topLink('My Work'))).toBe(true);
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(true);
+    expect(lit(topLink('Members'))).toBe(false);
+
+    cleanup();
+    await renderBoth(`/w/${WS}/members/x`);
+    expect(lit(topLink('Members'))).toBe(true);
+    expect(lit(topLink('My Work'))).toBe(false);
+
+    // CONTROL (same `it`): a lookalike segment lights neither surface …
+    cleanup();
+    await renderBoth(`/w/${WS}/my-workshop`);
+    expect(lit(topLink('My Work'))).toBe(false);
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'My work' }))).toBe(false);
+    cleanup();
+    await renderBoth(`/w/${WS}/membersx`);
+    expect(lit(topLink('Members'))).toBe(false);
+
+    // … and on the workspace page itself the bar lights NOTHING (the top nav lights the workspace link, exact: 13.393).
+    cleanup();
+    await renderBoth(`/w/${WS}`);
+    for (const link of within(phoneNav()).getAllByRole('link')) {
+      expect(lit(link), link.getAttribute('aria-label') ?? link.textContent ?? '').toBe(false);
+    }
+    expect(lit(topLink('Convenience Corner'))).toBe(true);
+  });
+
+  it('23.044 the bar lights Notes on /notes and under it, not on a lookalike (the bar half of 18.182)', async () => {
+    render(bar({ pathname: '/notes/n_1' }));
+    await waitFor(() => expect(items()).toContain('Notes'));
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'Notes' }))).toBe(true);
+    cleanup();
+    render(bar({ pathname: '/notesx' }));
+    await waitFor(() => expect(items()).toContain('Notes'));
+    expect(lit(within(phoneNav()).getByRole('link', { name: 'Notes' }))).toBe(false);
+  });
+});
+

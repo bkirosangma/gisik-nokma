@@ -21,7 +21,7 @@ import { NotesPage } from '../../../src/notes/notes-page.js';
 export default function NoteRoute() {
   const { noteId } = useParams<{ noteId: string }>();
   return (
-    <Suspense fallback={<main className="gn-shell gn-shell--wide" />}>
+    <Suspense fallback={<main className="gn-shell gn-shell--wide gn-notes-page" />}>
       <NotesPage noteId={noteId} />
     </Suspense>
   );

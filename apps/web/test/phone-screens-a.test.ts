@@ -16,6 +16,8 @@ import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns
  */
 const PHONE = '@media (max-width: 40rem)';
 const TABLET = '@media (max-width: 60rem)';
+/** The tablet band's stacked tables (UX fixes Task 4, case 23.052): the 64rem arm, not the 60rem two-column one above. */
+const BAND = '@media (max-width: 64rem)';
 const globals = readGlobalsCss();
 const ui = readUiCss();
 
@@ -81,27 +83,27 @@ describe('21.091 the workspace home on a phone', () => {
   });
 });
 
-describe('21.092 Members on a phone', () => {
+describe('21.092 Members on a phone (and, since 2026-10-02, the whole tablet band: 64rem, case 23.052)', () => {
   it('21.092 the table becomes stacked rows (name + email, then role select full width, Remove under it); the zebra and the desktop table are untouched', () => {
-    // The table is not a table at ≤40rem: every level is a block, and the 51.25rem floor — the thing
+    // The table is not a table at ≤64rem (AMENDED 2026-10-02, UX fixes Task 4: was ≤40rem): every level is a block, and the 51.25rem floor — the thing
     // that actually overflowed — is gone. The header band goes with it (each cell names itself).
-    const table = ruleExactly(globals, '.gn-members__table', PHONE);
+    const table = ruleExactly(globals, '.gn-members__table', BAND);
     expect(valueOf(table, 'display')).toBe('block');
     expect(valueOf(table, 'min-width')).toBe('0');
-    expect(valueOf(ruleExactly(globals, '.gn-members__table tbody', PHONE), 'display')).toBe('block');
-    expect(valueOf(ruleExactly(globals, '.gn-members__table tr', PHONE), 'display')).toBe('block');
-    expect(valueOf(ruleExactly(globals, '.gn-members__table thead', PHONE), 'display')).toBe('none');
+    expect(valueOf(ruleExactly(globals, '.gn-members__table tbody', BAND), 'display')).toBe('block');
+    expect(valueOf(ruleExactly(globals, '.gn-members__table tr', BAND), 'display')).toBe('block');
+    expect(valueOf(ruleExactly(globals, '.gn-members__table thead', BAND), 'display')).toBe('none');
     // Each cell is its own line: name + email over the role control.
-    expect(valueOf(ruleExactly(globals, '.gn-members__cell', PHONE), 'display')).toBe('block');
+    expect(valueOf(ruleExactly(globals, '.gn-members__cell', BAND), 'display')).toBe('block');
     // The role cell stacks the Select and Remove; both take the full width, the static chip does not.
-    const roleCell = ruleExactly(globals, '.gn-members__role-cell', PHONE);
+    const roleCell = ruleExactly(globals, '.gn-members__role-cell', BAND);
     expect(valueOf(roleCell, 'flex-direction')).toBe('column');
     expect(valueOf(roleCell, 'align-items')).toBe('stretch');
-    expect(valueOf(ruleExactly(globals, '.gn-members__role', PHONE), 'align-self')).toBe('flex-start');
+    expect(valueOf(ruleExactly(globals, '.gn-members__role', BAND), 'align-self')).toBe('flex-start');
     for (const selector of ['.gn-members__table', '.gn-members__cell', '.gn-members__role-cell', '.gn-members__role']) {
-      expect(after(globals, selector, null), selector).toBe(true);
+      expect(position(globals, selector, null) < position(globals, selector, BAND), selector).toBe(true);
     }
-    expect(position(globals, '.gn-members__table tbody', PHONE)).toBeGreaterThan(position(globals, '.gn-members__table', null));
+    expect(position(globals, '.gn-members__table tbody', BAND)).toBeGreaterThan(position(globals, '.gn-members__table', null));
 
     // CONTROL — the desktop table is a table with its 820px floor; no top-level rule gives it `display`.
     const base = ruleExactly(globals, '.gn-members__table');
@@ -110,7 +112,7 @@ describe('21.092 Members on a phone', () => {
     expect(valueOf(ruleExactly(globals, '.gn-members__cell'), 'display')).toBeNull();
     // CONTROL — nothing here names the zebra row (13.888 counts the rules that do: exactly one).
     expect(rulesNaming(globals, '.gn-members__row:nth-child(even)').filter((r) => r.atRule !== null)).toEqual([]);
-    expect(parseRules(globals).filter((r) => r.atRule === PHONE && r.selectors.some((s) => /\.gn-members__row\b/.test(s)))).toEqual([]);
+    expect(parseRules(globals).filter((r) => r.atRule === BAND && r.selectors.some((s) => /\.gn-members__row\b/.test(s)))).toEqual([]);
   });
 
   it('21.092 the pending list rows wrap (the address takes a line, Withdraw sits left under the meta); the invite form fields and button are full width', () => {

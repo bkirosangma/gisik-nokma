@@ -30,10 +30,10 @@ import { useEffect, useRef } from 'react';
  * ## Paste and drop insert PLAIN TEXT only (owner report, 2026-09-24)
  *
  * *"my title became huge when i pasted. maybe because its a header
- * markdown. Title should always paste format stripped text only."* The `<h1>`
- * had no `onPaste`/`onDrop` of its own, so the browser inserted the
+ * markdown. Title should always paste format stripped text only."* The title
+ * element had no `onPaste`/`onDrop` of its own, so the browser inserted the
  * clipboard's HTML verbatim — a pasted `<h1>` rendering as a giant heading
- * INSIDE this already-`<h1>` heading is exactly the shape the report
+ * INSIDE this already-heading element is exactly the shape the report
  * describes. It looked like it survived a blur because it did not: `commit`
  * reads `textContent`, which is always plain, so the SAVED title was already
  * correct — the giant heading was on screen only until the next blur/Enter
@@ -184,7 +184,7 @@ export function NoteTitle({
   }
 
   return (
-    <h1
+    <h2
       ref={ref}
       className="gn-notes__title gn-page-title"
       data-testid="note-title"
@@ -235,6 +235,6 @@ export function NoteTitle({
       }
     >
       {title}
-    </h1>
+    </h2>
   );
 }

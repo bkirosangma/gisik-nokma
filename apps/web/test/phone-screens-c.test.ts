@@ -155,10 +155,10 @@ describe('21.152 /mcp/tokens on a phone', () => {
 });
 
 describe('21.153 Help, Privacy and Terms on a phone', () => {
-  it('21.153 the legal pages read at full width with 1rem gutters, headings wrap and prose breaks anywhere', () => {
+  it('21.153 the legal pages read at full width inside the shell 24px gutter, headings wrap and prose breaks anywhere', () => {
     const column = ruleExactly(css, '.gn-legal__column', PHONE);
     expect(valueOf(column, 'max-width')).toBe('none');
-    // 0.75rem of shell inset (`.gn-shell` at ≤60rem) + 0.25rem here = the 1rem gutter. Never the
+    // 24px of shell inset (`--gn-space-3`, `.gn-shell` at ≤60rem) + 0.25rem here = a 28px gutter. Never the
     // `padding` shorthand on a `.gn-shell` selector: the bottom bar's `:has()` padding lives there.
     expect(valueOf(column, 'padding-inline')).toBe('0.25rem');
     expect(valueOf(ruleExactly(css, '.gn-legal__title', PHONE), 'overflow-wrap')).toBe('anywhere');
@@ -172,13 +172,13 @@ describe('21.153 Help, Privacy and Terms on a phone', () => {
     expectPhoneAfterBase(['.gn-notfound__title', '.gn-legal__title'], '.gn-legal__title');
 
     // CONTROL — the desktop measure is unchanged and the title does not truncate at any width.
-    expect(valueOf(ruleExactly(css, '.gn-legal__column'), 'max-width')).toBe('72ch');
+    expect(valueOf(ruleExactly(css, '.gn-legal__column'), 'max-width')).toBe('var(--gn-measure)');
     expect(baseValue('.gn-legal__section', 'max-width')).toBe('68ch');
     expect(baseValue('.gn-legal__section', 'overflow-wrap')).toBeNull();
     expect(valueOf(ruleExactly(css, ['.gn-notfound__title', '.gn-legal__title']), 'white-space')).toBeNull();
   });
 
-  it('21.153 Help: the column is full width with the same 1rem gutters and its prose breaks anywhere; the stylesheet order lets this file win over ui.css', () => {
+  it('21.153 Help: the column is full width inside the same 24px gutter and its prose breaks anywhere; the stylesheet order lets this file win over ui.css', () => {
     const main = ruleExactly(css, '.gn-help__main', PHONE);
     expect(valueOf(main, 'padding-inline')).toBe('0.25rem');
     const column = ruleExactly(css, '.gn-help__column', PHONE);
@@ -195,9 +195,9 @@ describe('21.153 Help, Privacy and Terms on a phone', () => {
     expect(layout.indexOf("'@gisik-nokma/ui/ui.css'")).toBeGreaterThan(-1);
     expect(layout.indexOf("'@gisik-nokma/ui/ui.css'")).toBeLessThan(layout.indexOf("'./globals.css'"));
 
-    // CONTROL — `ui.css` still owns the base: the 72ch measure (desktop) and the 2rem side padding are untouched here.
+    // CONTROL — `ui.css` still owns the base: the measure token (desktop) and the 2rem side padding are untouched here.
     const ui = readFileSync(resolve(here, '../../../packages/ui/src/ui.css'), 'utf8');
-    expect(valueOf(ruleExactly(ui, '.gn-help__column'), 'max-width')).toBe('72ch');
+    expect(valueOf(ruleExactly(ui, '.gn-help__column'), 'max-width')).toBe('var(--gn-measure)');
     expect(valueOf(ruleExactly(ui, '.gn-help__main'), 'padding')).toBe('0 2rem 2rem');
   });
 });

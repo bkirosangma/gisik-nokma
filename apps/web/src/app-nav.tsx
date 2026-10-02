@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
-import { useIsPhone } from "./use-is-phone.js";
+import { useTabletBar } from "./use-tablet-bar.js";
 import { NavBrand } from "./nav-brand.js";
 import { NotesNavLink } from "./notes-nav-link.js";
 import { BottomBar } from "./bottom-bar.js";
@@ -13,6 +12,7 @@ import { PhoneSwitcher } from "./phone-switcher.js";
 import { useSessionStatus } from "./providers.js";
 import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
+import { isWithin } from "./path-within.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceName } from "./use-workspace-name.js";
 
@@ -88,10 +88,11 @@ import { useWorkspaceName } from "./use-workspace-name.js";
  *   what makes it safe for MCP tokens to have left its sidebar for `/account`
  *   in the same round — see `app/settings/page.tsx`.
  *
- * `inSettings`, which used to widen the pre-19c workspace-scoped link's
- * `aria-current` to any `/settings/*` sub-route, stays gone: the nav's
- * `Settings` is one literal route (`/settings`, `usePathname()` ignores the
- * query string), and plain equality (`current`, below) is enough.
+ * `inSettings`, which widened the pre-19c workspace-scoped link's
+ * `aria-current` to any `/settings/*` sub-route, was gone for a while and came back as
+ * `currentSection` (UX fixes Task 3, case 23.044): the link's target is the literal route
+ * `/settings` (`usePathname()` ignores the query string) but the editors live under
+ * `/w/<id>/settings/…`, so Settings is lit on a segment-bounded prefix of either root.
  *
  * Members was never part of this and is unchanged: the owner's own reference
  * (screenshots, 2026-09-09) keeps it as its own top-level link beside Settings
@@ -209,7 +210,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const session = useSessionStatus();
   const user = session.kind === "signed-in" ? session.user : null;
   const signedOut = session.kind === "signed-out";
-  const isPhone = useIsPhone();
+  const hasBottomBar = useTabletBar();
   const remembered = useLastWorkspace(workspaceId, user?.id ?? null);
 
   // The workspace this bar is ABOUT, which is no longer only the one in the
@@ -249,31 +250,27 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const showScopeNote = workspaceId === undefined && remembered.status === "none";
   const current = (target: string): "page" | undefined =>
     pathname === target ? "page" : undefined;
+  /**
+   * "Where am I" for a SECTION (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): lit on the route itself and on
+   * every route under it, bounded at a path SEGMENT (`/settingsx` is not under `/settings`). Settings, My Work and
+   * Members use it — the same rule the phone bottom bar applies to its workspace destinations, so the two surfaces
+   * light the same item on the same page. Settings needs it most: its link points at `/settings?workspaceId=…` but the
+   * workflow and ticket-type editors live at `/w/<id>/settings/…`, so an exact match left the bar dark on the very
+   * pages that are Settings. The workspace link stays exact (`current`): `/w/<id>` is not "inside"
+   * `/w/<id>/members` (case 13.393).
+   */
+  const currentSection = (...roots: string[]): "page" | undefined =>
+    roots.some((root) => isWithin(pathname, root)) ? "page" : undefined;
 
   /**
-   * **The phone-width disclosure (E4-11).** At 390 px this bar measured 390×310
-   * — five wrapped 44-px rows, 37 % of an 844-px viewport, with the board's
-   * first card 1105 px below the fold. `flex-wrap: wrap` is what stops a long
-   * signed-in name overflowing the row by 10 px (Item 7 of
-   * `docs/pre-launch-checklist.md`); it was never a ruling that the bar may
-   * take five rows.
-   *
-   * (SUPERSEDED at ≤40rem by the phone shell, mobile-web plan Task 2: from 40rem
-   * down the whole `.gn-nav__links--member` group — Workspaces, the toggle, the
-   * links — is hidden and `PhoneSwitcher` stands in; this disclosure now serves
-   * 40rem–70rem only. The paragraph below describes the mechanism it still is.)
-   *
-   * So below 70rem the workspace-scoped links move behind one disclosure while
-   * `Workspaces`, the toggle and the corner stay on a single line. This is
-   * STATE, but not CONDITIONAL RENDERING: the links are always in the document
-   * and `data-open` only decides whether the stylesheet paints them. A closed
-   * bar is a visual state, not a missing link — and it keeps every route to
-   * My Work / Members / Settings in the accessibility tree from 40rem up. (At
-   * ≤40rem the group is `display: none` and those routes are the phone bottom
-   * bar's (`bottom-bar.tsx`: slots or More), so a painted-away link is
-   * reachable through its replacement rather than missing.)
+   * **There is no Menu disclosure any more (UX fixes Task 4, case 23.042; it was E4-11).** At phone width the five wrapped
+   * link rows measured 390×310 and the links moved behind a `Menu` toggle (`data-open` on `.gn-nav__more`). Task 4 retired it:
+   * from 64rem DOWN the bottom bar (`bottom-bar.tsx`) carries those routes, and above 64rem the one-line link row is
+   * painted directly by `.gn-nav__more`'s `display: contents`. A third affordance between the two — a toggle that opens
+   * links the bar already offers — was the tablet band's duplicate navigation, and at exactly 1024px it showed beside the bar.
+   * The links are still always in the document: `.gn-nav__more` is `display: none` at ≤64rem, and the routes are the bar's
+   * slots or its More sheet (`bottom-bar.tsx`), so a painted-away link is reachable through its replacement.
    */
-  const [moreOpen, setMoreOpen] = useState(false);
 
   return (
     <>
@@ -316,23 +313,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             Workspaces
           </Link>
         ) : null}
-        {/* PHONE-ONLY (E4-11). `display: none` above 40rem, where the links it
-            opens are painted directly by `.gn-nav__more`'s `display: contents`.
-            It renders only when the disclosure it controls has content in it:
-            every child of `.gn-nav__more` is gated on `!noWorkspace`, so that
-            flag is the exact condition, not a proxy for it. */}
-        {!noWorkspace ? (
-          <button
-            type="button"
-            className="gn-nav__more-toggle"
-            aria-expanded={moreOpen}
-            aria-controls="gn-nav-more"
-            onClick={() => setMoreOpen((open) => !open)}
-          >
-            Menu
-          </button>
-        ) : null}
-        <div className="gn-nav__more" id="gn-nav-more" data-open={moreOpen ? "true" : "false"}>
+        <div className="gn-nav__more">
         {/* The workspace's own served name — ONE source, `getMyWorkspaces`, never
             a second derivation. Omitted (not id, not a placeholder) until the
             name arrives or if the read fails; see `useWorkspaceName` above. */}
@@ -365,7 +346,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/w/${effectiveWorkspaceId}/my-work`}
-            aria-current={current(`/w/${effectiveWorkspaceId}/my-work`)}
+            aria-current={currentSection(`/w/${effectiveWorkspaceId}/my-work`)}
           >
             My Work
           </Link>
@@ -373,7 +354,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/w/${effectiveWorkspaceId}/members`}
-            aria-current={current(`/w/${effectiveWorkspaceId}/members`)}
+            aria-current={currentSection(`/w/${effectiveWorkspaceId}/members`)}
           >
             Members
           </Link>
@@ -388,7 +369,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {!noWorkspace ? (
           <Link
             href={`/settings?workspaceId=${effectiveWorkspaceId}`}
-            aria-current={current("/settings")}
+            aria-current={currentSection("/settings", `/w/${effectiveWorkspaceId}/settings`)}
           >
             Settings
           </Link>
@@ -514,7 +495,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
       {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
           both outside `.gn-nav__links` so they stay pinned as a pair at the
           bar's end rather than wrapping into the destination group. (At phone
-          width — `isPhone` — Notes and Inbox are the bottom bar's and the corner
+          width — `hasBottomBar`, ≤64rem — Notes and Inbox are the bottom bar's and the corner
           is the avatar alone.) */}
       {/* E5-31: the whole corner is signed-in only. `AccountMenu` already
           rendered nothing without a session, but `InboxNavLink` did — an
@@ -522,14 +503,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
-          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1).
-              Every other item is measured by `current()` above, which is exact
-              equality — and that is right for them: `/w/<id>` is not "inside"
-              `/w/<id>/members`. A note is different in kind. `/notes/<id>` is
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1; Settings, My Work and Members joined it in UX fixes Task 3).
+              The workspace link is measured by `current()` above, which is exact
+              equality — and that is right for it: `/w/<id>` is not "inside"
+              `/w/<id>/members`. (The sections are `currentSection()`.) A note is different in kind. `/notes/<id>` is
               the SAME view as `/notes`, with a note open, so exact equality
               would leave the link dark on the page the reader is actually on.
               Case 18.182 walks both spellings and the control. */}
-          {!isPhone ? (
+          {!hasBottomBar ? (
             <>
               <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
               <InboxNavLink active={pathname === "/inbox"} />
@@ -542,14 +523,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
     </nav>
     {/* The ONE shell notice for a failed session read (SYS-01) — renders nothing while the read is healthy. */}
     <SessionNotice />
-    {/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.020–21.032). Rendered only at phone
-        width, by script (`useIsPhone`), and INSTEAD of the corner's Notes and Inbox links above — a
+    {/* THE BOTTOM BAR (mobile-web plan Task 3, cases 21.020–21.032; the tablet band's too since UX fixes Task 4, case 23.050).
+        Rendered only at ≤64rem, by script (`useTabletBar`, the stylesheet's own tablet arm — NOT `useIsPhone`, FD3), and INSTEAD of the corner's Notes and Inbox links above — a
         second set of the same links would be a second unread poller and a duplicate for anything that
         reads the DOM rather than the page. It is a sibling of the bar, not a child: a `nav` inside a
         `nav` is a landmark inside a landmark, and the bar's own sticky stacking context is not the
         place for a `position: fixed` thing. The workspace is the EFFECTIVE one (`undefined` while
         `noWorkspace`), so a remembered id that never resolves gets no scoped slot (plan FD5). */}
-    {user !== null && isPhone ? (
+    {user !== null && hasBottomBar ? (
       <BottomBar
         workspaceId={noWorkspace ? undefined : effectiveWorkspaceId}
         projectId={projectIdOf(pathname)}
