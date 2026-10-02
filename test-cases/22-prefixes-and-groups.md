@@ -78,6 +78,14 @@
 - ✅ **22.148 — on a phone (≤40rem) the title takes its own line, the heading-row controls share one row under it, and the section links are a horizontally scrollable row of compact chips (≥2.75rem tall, notes hidden);** control: above 40rem the links are still the card grid and the heading row is a wrapping flex row. (`workspace-home-grouped.test.tsx`; `apps/web/test/phone-screens-a.test.ts`)
 - ✅ **22.149 — a guest never asks for the groups, even with Grouped remembered:** the stored choice for this user and workspace, a guest mounts: `getGroups` is never called, the plain list shows and there is no "could not be loaded" line; control: a member with the same stored value does call it. Mutation: `wantGroups = grouping === 'grouped'` (the `mayGroup` check dropped) → red. (`workspace-home-grouped.test.tsx`)
 
+## 22.5 Note search follows a prefix change
+
+*Task 5. Ids `22.083`–`22.089` are unused.*
+
+- ✅ **22.080 — after `project.updated {prefix:"SH"}`, a note attached to ticket `CCRE-3` has `ticket_text` `ccsh-3 …` and a note search for `CCSH-3` finds it;** control: before the change `ccre-3` was indexed and `CCRE-3` found it, and `CCSH-3` did not. Mutation: ignore `project.updated` in the projection → red. (`apps/server/test/projections/note-search-prefix.test.ts`; `apps/server/src/projections/note-search.ts`)
+- ✅ **22.081 — after `workspace.prefix_changed {prefix:"CD"}` the same note reads `cdsh-4` and is found by `CDSH-4`;** control: before, `ccsh-4` and `CCSH-4` found it. Mutation: ignore `workspace.prefix_changed` → red (also 22.082). (same file)
+- ✅ **22.082 — `verifyProjections` stays clean (`proj_note_search` AND `proj_note_lexemes`) at TWO checkpoints: right after a project prefix change, and again after a workspace prefix change.** Self-contained: the case founds its own project and note and makes both changes itself (it reads nothing 22.080/22.081 left); control: the note's `ticket_text` is re-keyed at each step. Mutations: drop the lexeme re-derivation from the PROJECT path (`reindexNotesAttachedInProject`) → red at checkpoint 1 (the later workspace change would otherwise re-derive the whole vocabulary and hide it); drop it from the WORKSPACE path → red at checkpoint 2; ignore `workspace.prefix_changed` → red. **A missing project-prefix re-index is NOT caught by verify** (measured): the rebuild reads `proj_projects` in its final state, so live and rebuild are stale together; 22.080 pins it. (same file)
+
 ## 22.8 The Create buttons
 
 *Task 8. Ids `22.157`–`22.159` are unused.*

@@ -258,32 +258,40 @@ describe('21.043 scrolling the rail moves the selected option to the column near
     expect(frameCallsDuring(frames, () => { for (let i = 0; i < 3; i += 1) fireEvent.scroll(rail); })).toBe(1);
   });
 
-  /** The `scroll` listeners added to a board rail (whichever rail), spied on the prototype so the count is the whole story. */
+  /**
+   * The `scroll` listeners added to a board rail (whichever rail), spied on the prototype, one entry PER listener and
+   * in DOM order (so the order does not depend on which effect ran first). Every rail carries the 23.092 edge-cue
+   * listener (`useScrollEdges`, passive, asks for no frame); the phone's selection listener is the SECOND one on an
+   * EXPANDED phone rail. So a desktop rail has one, an expanded phone rail two, a collapsed rail one.
+   */
   function railScrollListeners(spy: ReturnType<typeof vi.spyOn>): HTMLElement[] {
     return spy.mock.calls
       .map((call, index) => ({ type: call[0], context: spy.mock.contexts[index] }))
       .filter(({ type, context }) => type === 'scroll' && context instanceof HTMLElement && context.classList.contains('gn-board__rail'))
-      .map(({ context }) => context as HTMLElement);
+      .map(({ context }) => context as HTMLElement)
+      .sort((a, b) => (a === b ? 0 : a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
   }
 
-  it('21.043 above the phone breakpoint the rail gets no scroll listener and a scroll asks for no frame; on a phone the same rail does', async () => {
+  it('21.043 above the phone breakpoint the rail gets only the edge-cue listener and a scroll asks for no frame; on a phone the same rail also gets the selection listener', async () => {
     const listening = vi.spyOn(EventTarget.prototype, 'addEventListener');
     viewport({ phone: false });
     await mount(boardOf(errandGroup()));
     const desktopRail = columnOf('todo').closest<HTMLElement>('.gn-board__rail');
     if (desktopRail === null) throw new Error('no rail');
     const frames = vi.spyOn(window, 'requestAnimationFrame');
-    expect(railScrollListeners(listening)).toEqual([]);
+    // ONE listener: the 23.092 edge cue. The selection listener is not added at desktop width.
+    expect(railScrollListeners(listening)).toEqual([desktopRail]);
     expect(frameCallsDuring(frames, () => fireEvent.scroll(desktopRail))).toBe(0);
     cleanup();
+    listening.mockClear();
 
     viewport({ phone: true });
     await mount(boardOf(errandGroup()));
     const phoneRail = columnOf('todo').closest<HTMLElement>('.gn-board__rail');
-    expect(railScrollListeners(listening)).toEqual([phoneRail]); // CONTROL — same board, phone width: one listener, on the rail
+    expect(railScrollListeners(listening)).toEqual([phoneRail, phoneRail]); // CONTROL — same board, phone width: the edge cue plus the selection listener
   });
 
-  it('21.043 on a phone a COLLAPSED group\'s rail gets no scroll listener; the expanded group\'s does', async () => {
+  it('21.043 a COLLAPSED group\'s rail gets only the edge-cue listener; the expanded phone group\'s rail also gets the selection listener', async () => {
     const listening = vi.spyOn(EventTarget.prototype, 'addEventListener');
     // A second, empty workflow rests collapsed (`Board`'s default for an empty group when there is more than one).
     const other: BoardGroup = {
@@ -299,7 +307,8 @@ describe('21.043 scrolling the rail moves the selected option to the column near
     expect(expandedRail).not.toHaveAttribute('hidden');
     expect(collapsedRail).toHaveAttribute('hidden');
 
-    expect(railScrollListeners(listening)).toEqual([expandedRail]);
+    // Expanded twice (edge cue + selection), collapsed once (edge cue).
+    expect(railScrollListeners(listening)).toEqual([expandedRail, expandedRail, collapsedRail]);
   });
 
   it('21.043 a selected column that no longer exists reads as the FIRST column, not as nothing', async () => {

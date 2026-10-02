@@ -6,6 +6,7 @@ export type ChipTone =
   | 'active'
   | 'terminal'
   | 'blocked'
+  | 'waiting'
   | 'pending'
   | 'restricted'
   | 'contested';

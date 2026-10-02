@@ -12,7 +12,8 @@ const ROWS: RosterRow[] = [
   {
     sheet: 'ui',
     selectors: '.gn-list__section-title',
-    declarations: { background: 'var(--gn-surface-track)', 'box-shadow': 'var(--gn-shadow-track)', 'border-radius': 'var(--gn-radius-card)' },
+    // Amended 2026-10-02 by 23.095 (UX fixes T6, PV-17): a flat tint, not a recessed trough.
+    declarations: { background: 'var(--gn-fill-quaternary)', 'border-radius': 'var(--gn-radius-card)' },
   },
   { sheet: 'ui', selectors: '.gn-list__table-wrap', pattern: 'P-RAISED' },
   { sheet: 'ui', selectors: '.gn-list__table-header', declarations: { background: 'var(--gn-surface-well)' } },

@@ -138,11 +138,11 @@ const VISUALLY_HIDDEN = {
  * construct — `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i`
  * (`desktop.dc.html:3159`), so the tint falls on the **1-indexed EVEN** rows —
  * and this screen's rule takes that parity exactly, `:nth-child(even)` over the
- * rows list, the same shape and the same token `.gn-members__row` already ships
- * (`apps/web/app/globals.css:1524`). **Two other families in this repo ported
+ * rows list, the same shape and the same token the Members roster shipped until UX fixes T6 (23.095) swapped its zebra for
+ * a hairline. **Two other families in this repo ported
  * this same construct to ODD and therefore read inverted against the prototype
  * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2703`) — that
- * inversion is already recorded, with a named owner, at `globals.css:1518-1523`,
+ * inversion is already recorded, with a named owner, in `ui.css`'s `.ticket-type-list__row` zebra block,
  * and harmonising them is not this screen's to do.**
  *
  * The three strings: the action is the prototype's `"New type"` (`:823`), the h2
