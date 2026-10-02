@@ -18,10 +18,6 @@ const shipped = JSON.stringify(HELP_CONTENT);
  */
 describe('22.227 the manual and FAQ describe prefixes, groups, the Create buttons and the UX fixes', () => {
   it.each([
-    ['docs/manual.md', 'The three Create buttons'],
-    ['docs/manual.md', 'Change a prefix'],
-    ['docs/manual.md', 'Group your projects'],
-    ['docs/manual.md', 'The Groups page'],
     ['docs/manual.md', 'Old numbers still find the job'],
     ['docs/manual.md', 'A retired prefix cannot be taken by another project'],
     ['docs/manual.md', 'Notes keep the key they were written with'],
@@ -61,6 +57,28 @@ describe('22.227 the manual and FAQ describe prefixes, groups, the Create button
   ])('%s says "%s" — and so does the shipped copy', (path, words) => {
     expect(read(path)).toContain(words);
     expect(shipped).toContain(words);
+  });
+
+  // The four sections are pinned as HEADINGS: each title is also named in a cross-reference
+  // ("§3, under Change a prefix"), so a phrase check survives deleting the section itself.
+  const HEADINGS = ['The three Create buttons', 'Change a prefix', 'Group your projects', 'The Groups page'];
+  const manualHeading = (source: string, title: string): boolean =>
+    new RegExp(`^### ${title}$`, 'm').test(source);
+  const shippedEntryTitles = (): string[] =>
+    HELP_CONTENT.filter((doc) => doc.id === 'manual').flatMap((doc) =>
+      doc.sections.flatMap((section) => section.entries.map((entry) => entry.title)),
+    );
+
+  it('control: the heading matcher accepts a heading and refuses a cross-reference', () => {
+    expect(manualHeading('text\n### Change a prefix\nmore', 'Change a prefix')).toBe(true);
+    expect(manualHeading('(§3, under Change a prefix)', 'Change a prefix')).toBe(false);
+    expect(manualHeading('#### Change a prefix', 'Change a prefix')).toBe(false);
+    expect(shippedEntryTitles()).toContain('Change a prefix');
+  });
+
+  it.each(HEADINGS)('"%s" is a ### heading in the manual and a titled entry in the shipped help', (title) => {
+    expect(manualHeading(read('docs/manual.md'), title)).toBe(true);
+    expect(shippedEntryTitles()).toContain(title);
   });
 });
 
