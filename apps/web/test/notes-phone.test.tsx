@@ -268,7 +268,9 @@ describe('G-3 Notes on a phone', () => {
         if (panel.getAttribute('data-panel-open') !== 'true') fireEvent.click(launcher);
         expect(panel).toHaveAttribute('data-panel-open', 'true');
       };
-      const closed = (): void => expect(panel).toHaveAttribute('data-panel-open', 'false');
+      const closed = (): void => {
+        expect(panel).toHaveAttribute('data-panel-open', 'false');
+      };
 
       open();
       fireEvent.keyDown(document, { key: 'Escape' });
