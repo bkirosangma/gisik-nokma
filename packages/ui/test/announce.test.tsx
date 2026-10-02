@@ -14,7 +14,7 @@ describe('the one polite region (spec §5, S6)', () => {
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)); });
     expect(region).toHaveTextContent('Saved');
     act(() => result.current('Saved'));
-    expect(region).toHaveTextContent(''); // cleared at once, so a screen reader sees a change when it is set again
+    expect(region).toBeEmptyDOMElement(); // cleared at once, so a screen reader sees a change when it is set again
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)); });
     expect(region).toHaveTextContent('Saved'); // re-set across a frame, so AT re-reads it
     expect(document.querySelectorAll('[aria-live="assertive"], [role="alert"]')).toHaveLength(0);
