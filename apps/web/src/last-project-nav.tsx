@@ -126,7 +126,7 @@ export function LastProjectNav({
   //
   // The route's own project is therefore resolved FIRST, archived or not — and
   // only then the memory, then the served-order fallback. The DROPDOWN stays
-  // live-only (`live.map` below): it offers somewhere to GO, and an archived
+  // live-only (`items` below, built from `live`): it offers somewhere to GO, and an archived
   // project is not somewhere the workspaces page will show you.
   const routeProject =
     projects === null || routeProjectId === undefined
