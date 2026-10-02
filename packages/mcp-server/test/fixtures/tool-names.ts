@@ -37,6 +37,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   memberAdmin: [
     // member-admin begin (T11)
+    'manage_members', 'change_prefix', 'manage_groups',
     // member-admin end
   ],
   definitionAdmin: [
