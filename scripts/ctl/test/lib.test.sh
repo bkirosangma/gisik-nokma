@@ -4,6 +4,8 @@ set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib.sh"
 fails=0
+# `ctl gate` writes a priority marker into the machine-wide semaphore dir: every fixture gate below must write into a temp one.
+export CTL_SEM_DIR="$(mktemp -d)"
 check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
 # node 22
 check "node22 on PATH" '[ "$(ctl_node22 >/dev/null; node --version | cut -c1-4)" = "v22." ]'

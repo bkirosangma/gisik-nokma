@@ -23,6 +23,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   dispatch <window> <file>        two pastes + proof of delivery
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
+  run-tests [--label L] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;

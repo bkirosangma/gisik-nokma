@@ -11,6 +11,9 @@ step "hook self-test"        "python3 '$HERE/hooks/ctl-scripts-only.py' --self-t
 step "lib tests"             "bash '$HERE/test/lib.test.sh'"
 # The cached gate is only as sound as turbo.json's inputs: a changed cross-package reader must change the task hash (a MISS).
 step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.test.sh'"
+step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
+step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
+step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
 # only those two named refusals are accepted here — any other non-zero exit is a red step.
@@ -27,4 +30,4 @@ step "dispatch --dry-run refuses a missing file" "! '$HERE/ctl' dispatch 2 /none
 step "restart --dry-run refuses window 0" "! '$HERE/ctl' restart 0 '$repo' '$HERE/README.md' --dry-run"
 step "rebuild --dry-run"     "'$HERE/ctl' rebuild --dry-run"
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
-[ "$fails" -eq 0 ] && ctl_ok selftest "16 steps" || ctl_fail selftest "$fails steps red"
+[ "$fails" -eq 0 ] && ctl_ok selftest "19 steps" || ctl_fail selftest "$fails steps red"

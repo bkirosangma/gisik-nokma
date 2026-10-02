@@ -98,7 +98,7 @@ TURBO="$fx/turbo.log"; printf '\033[36m@gisik-nokma/ui:test: \033[0m \033[31m FA
 # ---------------- the summary ----------------
 reset; out=$(rt --label v -- cat "$VPASS"); rc=$?
 check "13.1750 a passing run: the whole output goes to a log FILE, stdout stays under 30 lines, and carries the counts, the log path and the exit code" '[ $rc -eq 0 ] && [ "$(nlines "$out")" -le 30 ] && printf "%s" "$out" | grep -q "Tests  6000 passed (6000)" && printf "%s" "$out" | grep -q "exit code: 0" && lg=$(printf "%s\n" "$out" | sed -n "s/^log: //p" | head -1) && [ -f "$lg" ] && [ "$(wc -l < "$lg" | tr -d " ")" -ge 2000 ] && case "$lg" in "$CTL_LOG_DIR"/run-tests-*.log) true;; *) false;; esac && printf "%s" "$out" | tail -1 | grep -q "^OK run-tests"'
-reset; out=$(rt -- cat "$VFAIL"); rc=$?
+reset; out=$(rt -- sh -c 'cat "$1"; exit 1' x "$VFAIL"); rc=$?
 check "13.1751 a failing vitest run: the first failure's test name and its assertion are in the summary, and the last line is FAIL run-tests" 'printf "%s" "$out" | grep -q "first failure: test/a.test.ts > alpha > beta works" && printf "%s" "$out" | grep -q "AssertionError: expected 1 to be 2" && printf "%s" "$out" | grep -q "Test Files  1 failed | 2 passed (3)" && printf "%s" "$out" | grep -q "Tests  1 failed | 11 passed (12)" && printf "%s" "$out" | tail -1 | grep -q "^FAIL run-tests"'
 reset; out=$(rt -- sh -c 'echo hi; exit 3'); rc=$?
 check "13.1752 the exit code is the command's own — 3 stays 3 (not 1), and is printed" '[ $rc -eq 3 ] && printf "%s" "$out" | grep -q "exit code: 3"'
@@ -174,7 +174,8 @@ check "13.1767 two real processes racing for ONE slot (one stale slot to reclaim
 reset
 out=$(rt -- sh -c 'exit 5'); rc=$?
 check "13.1768 the slot is released when the command fails (and the run did happen: rc 5)" '[ $rc -eq 5 ] && printf "%s" "$out" | grep -q "exit code: 5" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
-reset; ( cd "$repo" && PATH="$FB:$PATH" CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30 >/dev/null 2>&1 ) & rp=$!; i=0; while [ $i -lt 40 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
+# exec: $rp is then the verb's own pid, so the TERM reaches its trap
+reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30 >/dev/null 2>&1 ) & rp=$! ; i=0; while [ $i -lt 40 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
 held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null; sleep 1
 check "13.1768 the slot is released when the verb is terminated (SIGTERM), and was held while it ran" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
