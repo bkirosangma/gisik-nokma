@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Avatar } from '@gisik-nokma/ui';
 import { avatarNameOf, displayLabelOf } from './display-label.js';
 import { authClient } from './auth-client.js';
+import { clearReadCaches } from './clear-read-caches.js';
 import { useCurrentUser } from './providers.js';
 
 /**
@@ -254,6 +255,8 @@ export function AccountMenu() {
                     setSignOutFailure('refused');
                     return;
                   }
+                  // The session is gone: so is everything this device read as them (case 25.028).
+                  clearReadCaches();
                   close(false);
                   router.push('/sign-in');
                 },

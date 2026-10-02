@@ -46,6 +46,10 @@ export { Switch, type SwitchProps } from './components/switch.js';
 export { Table, type TableColumn, type TableProps } from './components/table.js';
 export { Select, type SelectOption, type SelectProps } from './select/select.js';
 export { useScrollEdges } from './use-scroll-edges.js';
+export { Skeleton, SkeletonRegion, type SkeletonProps, type SkeletonRegionProps, type SkeletonShape } from './components/skeleton.js';
+export { Pending, type PendingProps } from './components/pending.js';
+export { useWait, WAIT_BEFORE_MS, WAIT_HOLD_MS } from './use-wait.js';
+export { AnnounceRegion, useAnnounce } from './announce.js';
 // ONE glyph, exported on its own terms. `RemoveIcon` is the 12px ✕ the Select's
 // own clear control draws, and `apps/web`'s bulk-close cancel needs the same
 // one beside the button it cancels (owner request, 2026-09-22). The alternative
