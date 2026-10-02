@@ -7,7 +7,6 @@ import {
   liveQueryStoreKey,
   recallLiveQuery,
   rememberLiveQuery,
-  withInflightDedupe,
   type DataSource,
 } from '@gisik-nokma/app-core';
 
@@ -24,8 +23,10 @@ import {
  *   4. the session resolving to somebody else, or to nobody (another tab's
  *      sign-out, an expired cookie, a sign-in as someone else), through
  *      `useCurrentUser`;
- *   5. the shell's composed data source: an identical read in flight across a
- *      sign-out is not shared (`withInflightDedupe` stamped with the epoch).
+ *   5. the shell's own composed data source (`Providers` with no injected services,
+ *      a stubbed `fetch`): identical reads in flight share one request, and a read
+ *      in flight across a sign-out is not shared (`withInflightDedupe` stamped with
+ *      the epoch).
  */
 
 const routerPush = vi.fn();
@@ -49,7 +50,7 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import { AppNav } from '../src/app-nav.js';
-import { Providers, useCurrentUser } from '../src/providers.js';
+import { Providers, useAppServices, useCurrentUser } from '../src/providers.js';
 import { useSignInOnExpiredSession, withSignInOnExpiredWrite } from '../src/expired-session.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -147,29 +148,47 @@ describe('25.028 the read cache is emptied at every door the signed-in person ch
     expect(planted()).toBe(true); // control: nobody to somebody is not a change; the cache was emptied when the last person left
   });
 
-  it("25.028 door 5: the shell's data source does not share an identical read in flight across a sign-out", async () => {
+  it('25.028 door 5: the shell\'s OWN composed data source (Providers, no injected services) shares an identical read in flight, and does not share one across a sign-out', async () => {
     let calls = 0;
     let release!: () => void;
-    const gate = new Promise<void>((r) => {
+    let gate = new Promise<void>((r) => {
       release = r;
     });
-    const raw = {
-      ingest: async () => [],
-      subscribe: () => () => undefined,
-      query: {
-        getMyWorkspaces: async () => {
-          calls += 1;
-          await gate;
-          return [];
-        },
-      },
-    } as unknown as DataSource;
-    const shell = withSignInOnExpiredWrite(withInflightDedupe(raw), () => undefined);
-    const first = shell.query.getMyWorkspaces();
-    clearLiveQueryCache();
-    const second = shell.query.getMyWorkspaces();
-    expect(calls).toBe(2);
-    release();
-    await Promise.all([first, second]);
+    const rearm = () => {
+      gate = new Promise<void>((r) => {
+        release = r;
+      });
+    };
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      if (!String(input).endsWith('/v1/me/workspaces')) return { ok: false, status: 404, json: async () => null };
+      calls += 1;
+      await gate;
+      return { ok: true, status: 200, json: async () => ({ workspaces: [] }) };
+    });
+    try {
+      // No `services`: `Providers` builds the online source and wraps it itself, which is
+      // the composition under test. A shell built by hand here would leave a dropped
+      // `withInflightDedupe` in `providers.tsx` unseen.
+      const { result } = renderHook(() => useAppServices().dataSource, { wrapper: Providers });
+      const ds = result.current;
+
+      // Control: two identical reads in flight, ONE request.
+      const a = ds.query.getMyWorkspaces();
+      const b = ds.query.getMyWorkspaces();
+      expect(calls).toBe(1);
+      release();
+      await Promise.all([a, b]);
+
+      // The epoch: a sign-out between two identical reads in flight splits them.
+      rearm();
+      const c = ds.query.getMyWorkspaces();
+      clearLiveQueryCache();
+      const d = ds.query.getMyWorkspaces();
+      expect(calls).toBe(3);
+      release();
+      await Promise.all([c, d]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

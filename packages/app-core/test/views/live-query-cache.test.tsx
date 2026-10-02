@@ -22,15 +22,23 @@ import {
  * read the workspace back off a key.
  */
 
-function drivable(): { source: DataSource; fire: (item: ClientStreamFrame) => void } {
-  const cbs = new Set<(item: ClientStreamFrame) => void>();
+/**
+ * A stream source that is workspace-aware, like the real one: a frame fired for a
+ * workspace reaches ONLY the subscribers of that workspace (`ws` defaults to `'ws'`,
+ * the workspace most tests here mount on; a frame itself carries no workspace). A source that delivered every frame to every
+ * subscriber could never show a hook reloading for a workspace it is not on.
+ */
+function drivable(): { source: DataSource; fire: (item: ClientStreamFrame, ws?: string) => void } {
+  const byWorkspace = new Map<string, Set<(item: ClientStreamFrame) => void>>();
   const source = {
-    subscribe: (_ws: string, _after: number, next: (item: ClientStreamFrame) => void) => {
-      cbs.add(next);
-      return () => cbs.delete(next);
+    subscribe: (ws: string, _after: number, next: (item: ClientStreamFrame) => void) => {
+      const set = byWorkspace.get(ws) ?? new Set();
+      set.add(next);
+      byWorkspace.set(ws, set);
+      return () => set.delete(next);
     },
   } as unknown as DataSource;
-  return { source, fire: (item) => cbs.forEach((cb) => cb(item)) };
+  return { source, fire: (item, ws = 'ws') => byWorkspace.get(ws)?.forEach((cb) => cb(item)) };
 }
 
 function deferred<T>() {
@@ -76,8 +84,16 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     first.unmount();
 
     const open = deferred<{ rows: string[] }>();
-    const second = renderHook(() => useLiveQuery(source, 'ws', 'prj', () => open.promise, { cacheKey: 'list:prj' }));
-    expect(second.result.current.data).toEqual({ rows: ['a'] }); // first render, no await
+    // `renderHook` flushes effects before it returns, so `result.current` would also be
+    // right if only the key effect served the cache and the FIRST paint were a null
+    // frame (the flash S4 exists to remove). Record what every render returned instead.
+    const seen: unknown[] = [];
+    const second = renderHook(() => {
+      const r = useLiveQuery(source, 'ws', 'prj', () => open.promise, { cacheKey: 'list:prj' });
+      seen.push(r.data);
+      return r;
+    });
+    expect(seen[0]).toEqual({ rows: ['a'] }); // the first render itself, not the one after the effects
     expect(second.result.current.settled).toBe(false);
     act(() => open.resolve({ rows: ['a', 'b'] }));
     await waitFor(() => expect(second.result.current.data).toEqual({ rows: ['a', 'b'] }));
@@ -85,9 +101,14 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     expect(asked).toBe(1);
     // The fresh answer replaced the stale one in the cache too.
     expect(recallLiveQuery(key('list:prj'))).toEqual({ rows: ['a', 'b'] });
-    // Control: without a cacheKey the remount starts from null.
-    const bare = renderHook(() => useLiveQuery(source, 'ws', 'prj', NEVER));
-    expect(bare.result.current.data).toBeNull();
+    // Control, same recorder: without a cacheKey the first render is null.
+    const bareSeen: unknown[] = [];
+    renderHook(() => {
+      const r = useLiveQuery(source, 'ws', 'prj', NEVER);
+      bareSeen.push(r.data);
+      return r;
+    });
+    expect(bareSeen[0]).toBeNull();
   });
 
   it('25.021 the same cacheKey in another workspace is another question: its answer is not served', async () => {
@@ -150,7 +171,22 @@ describe('useLiveQuery with a cacheKey: stale-while-revalidate (spec S4, D1; aud
     expect(counts).toEqual({ a: 2, b: 2 }); // two frames: one wave, not two per hook
   });
 
-  it('25.024 a frame on another workspace reloads nothing here, and an unmounted hook is not reloaded', async () => {
+  it('25.024 a frame on another workspace reloads nothing here', async () => {
+    const d = drivable();
+    const counts = { a: 0, b: 0 };
+    // ws-a first: a scheduler that picked "the first room" instead of the frame's workspace would reload this one.
+    const a = renderHook(() => useLiveQuery(d.source, 'ws-a', 'a', async () => { counts.a += 1; return counts.a; }, 20));
+    const b = renderHook(() => useLiveQuery(d.source, 'ws-b', 'b', async () => { counts.b += 1; return counts.b; }, 20));
+    await waitFor(() => expect(counts).toEqual({ a: 1, b: 1 }));
+    act(() => d.fire(FRAME, 'ws-b'));
+    await waitFor(() => expect(counts.b).toBe(2)); // control: the workspace the frame is on IS reloaded
+    await new Promise((r) => setTimeout(r, 80));
+    expect(counts).toEqual({ a: 1, b: 2 }); // ws-a heard nothing
+    a.unmount();
+    b.unmount();
+  });
+
+  it('25.024 an unmounted hook is not reloaded', async () => {
     const d = drivable();
     const counts = { a: 0, b: 0 };
     const a = renderHook(() => useLiveQuery(d.source, 'ws', 'a', async () => { counts.a += 1; return counts.a; }, 20));
