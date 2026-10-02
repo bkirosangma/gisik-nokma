@@ -9,7 +9,7 @@ import type { Queryable } from '../db/queryable.js';
  * `proj_projects`/`proj_tickets`/`proj_notes` columns), never against the
  * event's payload — none of these payloads carry state to check.
  *
- * Wired into `checkPermission`'s chain after `checkProjectPrefixUnique` and
+ * Wired into `checkPermission`'s chain after `checkPrefixReservation` and
  * before `checkVisibilityPermission`.
  */
 
