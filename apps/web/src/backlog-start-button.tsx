@@ -32,7 +32,7 @@ export type BacklogStartButtonProps = {
    * never `''` while a click can reach it.
    */
   currentUserId: string;
-  /** Called after a `committed` answer. The page's own `list.reload()` — the row leaves this tab on the next read. */
+  /** Called after a `committed` answer. The page's own `list.reload()`; the row has already left the tab (the page hid it on `onBegin`) and stays hidden until a read agrees. */
   onStarted: () => void;
   /**
    * The optimistic arms (smoothness T7, spec S5), all optional so the button still stands alone. The PAGE hides the
@@ -68,10 +68,10 @@ export type BacklogStartButtonProps = {
  * client-side "which arrow target is undeclared" check; a Backlog row's
  * Start target is either known or `null`-and-disabled, never ambiguous
  * between several), and a `committed` answer calls `onStarted` rather than a
- * capability-object `onMoved` — the page's own `list.reload()`, since the
- * server's `getTickets` simply stops returning this row in the backlog once
- * its state moves, the same "the reload is what makes it leave" reasoning
- * `board.tsx`'s `closeCard` docblock gives for the board's own `getBoard`.
+ * capability-object `onMoved` — the page's own `list.reload()`. The reload is no longer what makes the row
+ * leave: the page hides it the moment Start is pressed (`onBegin`, `use-optimistic-starts.ts`) and keeps it
+ * hidden until the server's `getTickets` stops returning it in the backlog, which is what the reload fetches
+ * (the board's `closeCard` does the same since T7: the card is hidden once the close commits).
  */
 export function BacklogStartButton({
   row,

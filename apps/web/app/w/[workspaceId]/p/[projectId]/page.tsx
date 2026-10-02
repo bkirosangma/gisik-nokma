@@ -99,6 +99,7 @@ import {
 import { useCanModerateComments } from '../../../../../src/use-can-moderate-comments.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
+import { ticketSheetHint } from '../../../../../src/ticket-sheet-hint.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -1398,6 +1399,8 @@ function ProjectBoard() {
    * than showing the previous ticket's files under the new one's heading — the
    * failure `useLiveQuery`'s `queryKey` exists to prevent (ruling P17).
    */
+  // The board card's workflow starts the sheet's workflow read before the ticket read lands (T7 F3).
+  const sheetHint = openTicketId === null ? undefined : ticketSheetHint(board.data, openTicketId);
   const openTicketAttachments = useLiveQuery(
     dataSource,
     workspaceId,
@@ -3649,6 +3652,7 @@ function ProjectBoard() {
           cache={cache}
           workspaceId={workspaceId}
           ticketId={openTicketId}
+          {...(sheetHint !== undefined ? { hint: sheetHint } : {})}
           currentUserId={currentUserId}
           canModerateComments={canModerateComments}
           /*

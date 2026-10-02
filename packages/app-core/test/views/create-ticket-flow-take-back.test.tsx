@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
@@ -27,7 +28,10 @@ function deferred() {
   return { promise, resolve };
 }
 
-function mount(options: { states?: typeof STATES | null } = {}) {
+/** Lets a test open the dialog the way the board's own Add buttons do: through the controlled `open` prop, not the Create button. */
+const shell: { open: (next: boolean) => void } = { open: () => undefined };
+
+function mount(options: { states?: typeof STATES | null; controlled?: boolean } = {}) {
   const writes: Array<ReturnType<typeof deferred>> = [];
   const sent: SubmittedEvent[] = [];
   const source = createFakeDataSource({}, (events) => {
@@ -39,8 +43,9 @@ function mount(options: { states?: typeof STATES | null } = {}) {
   const onPending = vi.fn<(create: PendingCreate) => void>();
   const onRefused = vi.fn<(ticketId: string) => void>();
   const onCreated = vi.fn<(ticketId: string) => void>();
-  render(
+  const Flow = (extra: { open?: boolean; onOpenChange?: (next: boolean) => void }) => (
     <CreateTicketFlow
+      {...extra}
       dataSource={source}
       workspaceId={WS}
       projectId="01J9GPRJ000000000000000000"
@@ -52,8 +57,14 @@ function mount(options: { states?: typeof STATES | null } = {}) {
       onCreated={onCreated}
       onPending={onPending}
       onRefused={onRefused}
-    />,
+    />
   );
+  const Controlled = () => {
+    const [open, setOpen] = useState(false);
+    shell.open = setOpen;
+    return <Flow open={open} onOpenChange={setOpen} />;
+  };
+  render(options.controlled === true ? <Controlled /> : <Flow />);
   return { writes, sent, onPending, onRefused, onCreated };
 }
 
@@ -155,5 +166,57 @@ describe('25.100 the create flow takes its draft back', () => {
     writes[0]!.resolve(refusedAnswer);
     expect(await screen.findByText(/A ticket with that title exists\./)).toBeInTheDocument();
     expect(onRefused).not.toHaveBeenCalled();
+  });
+  it('25.111 Cancel on the reopened dialog clears the restored draft: a dialog the shell opens next (a column\'s Add) starts EMPTY', async () => {
+    const { writes, onRefused } = mount({ controlled: true });
+    await fillAndCreate('Buy milk');
+    await waitFor(() => expect(writes).toHaveLength(1));
+    writes[0]!.resolve(refusedAnswer);
+    await waitFor(() => expect(onRefused).toHaveBeenCalled());
+    // Control: the take-back DID hand the draft back.
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Buy milk'));
+    await userEvent.setup().click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(dialog()).toBeNull());
+    act(() => shell.open(true));
+    await waitFor(() => expect(dialog()).not.toBeNull());
+    expect(screen.getByLabelText('Title')).toHaveValue('');
+  });
+
+  it('25.111 the Create button clears a restored draft the earlier dialog left behind (a retry that was sent from the Backlog commits and closes without clearing it)', async () => {
+    const { writes, sent, onRefused } = mount();
+    await fillAndCreate('Buy milk');
+    await waitFor(() => expect(writes).toHaveLength(1));
+    writes[0]!.resolve(refusedAnswer);
+    await waitFor(() => expect(onRefused).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Buy milk'));
+    // Retry it as a Backlog ticket (no ghost, so nothing clears the restored draft), and let it commit.
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Starts in the backlog?'));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
+    await waitFor(() => expect(writes).toHaveLength(2));
+    writes[1]!.resolve([{ status: 'committed', eventId: sent[1]!.id, seq: 5, serverTime: '2026-10-02T09:00:00.000Z' } as IngestResult]);
+    await waitFor(() => expect(dialog()).toBeNull());
+    // A fresh Create is a fresh dialog.
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
+    expect(screen.getByLabelText('Title')).toHaveValue('');
+  });
+
+  it('25.112 the restored draft keeps ITS OWN ticket id even when another dialog was opened while it was pending (a retry is the same ticket, never a second)', async () => {
+    const { writes, sent, onRefused } = mount();
+    await fillAndCreate('Buy milk');
+    await waitFor(() => expect(writes).toHaveLength(1));
+    const firstId = sent[0]!.entity.id;
+    // While the first create is pending the person opens a NEW dialog (which mints an id of its own) and cancels it.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue(''));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(dialog()).toBeNull());
+    writes[0]!.resolve(refusedAnswer);
+    await waitFor(() => expect(onRefused).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Buy milk'));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]!.entity.id).toBe(firstId);
   });
 });

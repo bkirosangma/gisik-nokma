@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { IngestResult } from '@gisik-nokma/domain';
+import type { IngestResult, WorkflowDef } from '@gisik-nokma/domain';
 import type { TicketRead } from '../../src/view-types.js';
 import { TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
@@ -50,14 +50,16 @@ const committed = { status: 'committed', eventId: 'e', seq: 9, serverTime: '2026
 const refused = (reason: string) => ({ status: 'refused', eventId: 'e', rule: 'close-requires-terminal', reason }) as IngestResult;
 
 /** A sheet whose reads keep answering the OLD ticket (the slow-reload case) and whose writes wait to be answered by hand. */
-async function mount() {
-  const read = readOf();
+async function mount(workflow: WorkflowDef = WF_ERRAND, read: TicketRead = readOf()) {
   const writes: Deferred[] = [];
   const source = createFakeDataSource(
     {
       getTicket: async () => read,
-      getWorkflowDef: async () => WF_ERRAND,
-      getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'owner' }],
+      getWorkflowDef: async () => workflow,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+      ],
       getTicketHistory: async () => [],
       getTickets: async (projectId: string) => ({ projectId, rows: [] }),
     },
@@ -167,5 +169,110 @@ describe('the sheet shows a write the moment it is made (spec S5)', () => {
     expect(await screen.findByText(/needs one of P1, P2 or P3/)).toBeInTheDocument();
     // The refusal took NOTHING else with it.
     expect(titleBox()).toHaveValue('New title');
+  });
+  it('25.107 the assignee is shown at once with "Saving…", and a refused assignment puts the row back with the reason', async () => {
+    const user = userEvent.setup();
+    const { writes } = await mount();
+    const row = () => screen.getByTestId('field-assignee');
+    const who = () => within(row()).getByRole('button').textContent;
+    // Control: before the click the control names Anselma, not Kiro, and nothing is saving.
+    expect(who()).toContain('Anselma Marak');
+    expect(row().textContent).not.toContain('Saving…');
+    await user.click(within(row()).getByRole('button'));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Kiro' }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(who()).toContain('Kiro');
+    expect(row().textContent).toContain('Saving…');
+    writes[0]!.resolve([refused('Kiro may not be assigned this ticket.')]);
+    expect(await screen.findByText(/Kiro may not be assigned this ticket\./)).toBeInTheDocument();
+    await waitFor(() => expect(row().textContent).not.toContain('Saving…'));
+    expect(who()).toContain('Anselma Marak');
+    expect(who()).not.toContain('Kiro');
+  });
+
+  it.each([
+    ['due', 'Due date', 'field-due'],
+    ['start', 'Start date', 'field-start'],
+  ])('25.107 a %s date is shown at once with "Saving…" and stays through a stale reload (no flash back to "No date claimed")', async (_name, label, testId) => {
+    const user = userEvent.setup();
+    const { writes } = await mount();
+    const row = () => screen.getByTestId(testId);
+    // Control: the ticket has no such date yet.
+    expect(within(row()).getByLabelText(label)).toHaveValue('');
+    expect(row().textContent).toContain('No date claimed');
+    await user.type(within(row()).getByLabelText(label), '2026-11-01');
+    await user.tab();
+    await waitFor(() => expect(writes).toHaveLength(1));
+    // Open: the day is drawn and the claim line says Saving… (the absent copy is gone).
+    expect(within(row()).getByLabelText(label)).toHaveValue('2026-11-01');
+    expect(row().textContent).toContain('Saving…');
+    expect(row().textContent).not.toContain('No date claimed');
+    writes[0]!.resolve([committed]);
+    // Answered, the reload lands STALE (still no date): the committed day holds and the absent copy does not flash back.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(within(row()).getByLabelText(label)).toHaveValue('2026-11-01');
+    expect(row().textContent).not.toContain('No date claimed');
+  });
+
+  it('25.108 a Move to a terminal state shows the new state\'s CATEGORY at once: the Close button is offered, and goes again with the refusal', async () => {
+    const user = userEvent.setup();
+    const plain: WorkflowDef = { ...WF_ERRAND, transitions: WF_ERRAND.transitions.map((t) => (t.from === 'doing' && t.to === 'done' ? { ...t, rules: [] } : t)) };
+    const { writes } = await mount(plain);
+    const closeButton = () => screen.queryByRole('button', { name: 'Close' });
+    // Control: a ticket in Doing (active) is not offered Close.
+    expect(closeButton()).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(stateText()).toContain('Done');
+    expect(closeButton()).not.toBeNull();
+    writes[0]!.resolve([refused('Only Anselma Marak may perform "Doing → Done" on this ticket.')]);
+    await screen.findByText(/Only Anselma Marak may perform/);
+    await waitFor(() => expect(closeButton()).toBeNull());
+  });
+
+  /** A Move that needs a priority from a ticket with none: the dialog collects it, and the batch is [field claim, transition]. */
+  async function moveCollectingPriority() {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-field', field: 'priority' }] } : transition,
+      ),
+    };
+    const unprioritised = readOf();
+    delete unprioritised.ticket.fields['priority'];
+    const { writes } = await mount(gated, unprioritised);
+    const priority = () => within(screen.getByTestId('field-priority'));
+    // Control: no level is chosen before the Move.
+    expect(priority().getByRole('tab', { name: 'P1' })).toHaveAttribute('aria-selected', 'false');
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('priority (required before this transition)'), 'P1');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    // Open: both the state and the collected priority are drawn.
+    expect(stateText()).toContain('Done');
+    expect(priority().getByRole('tab', { name: 'P1' })).toHaveAttribute('aria-selected', 'true');
+    return { writes, priority };
+  }
+
+  it('25.109 a Move batch whose field claim is REFUSED rolls that field back even though the transition committed', async () => {
+    const { writes, priority } = await moveCollectingPriority();
+    writes[0]!.resolve([refused('"Priority" needs one of P1, P2 or P3.'), committed]);
+    await waitFor(() => expect(priority().getByRole('tab', { name: 'P1' })).toHaveAttribute('aria-selected', 'false'));
+    expect(priority().queryByText('Saving…')).toBeNull();
+  });
+
+  it('25.109 a Move batch whose field claim COMMITTED keeps that field shown (waiting for its read) while the refused transition puts the state back', async () => {
+    const { writes, priority } = await moveCollectingPriority();
+    writes[0]!.resolve([committed, refused('Only Anselma Marak may perform "Doing → Done" on this ticket.')]);
+    await screen.findByText(/Only Anselma Marak may perform/);
+    await waitFor(() => expect(stateText()).toContain('Doing'));
+    expect(priority().getByRole('tab', { name: 'P1' })).toHaveAttribute('aria-selected', 'true');
+    expect(priority().getByText('Saving…')).toBeInTheDocument();
   });
 });

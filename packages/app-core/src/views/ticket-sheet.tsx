@@ -196,6 +196,12 @@ export type TicketSheetProps = {
   cache?: ClientStateCache;
   workspaceId: string;
   ticketId: string;
+  /**
+   * The workflow the opener already knows the ticket is on (the board card's group), so the workflow read starts
+   * with the sheet instead of waiting for the ticket read (smoothness T7 F3, plan Task 7 Step 3). A HINT, never
+   * the truth: once the ticket's own read lands its `workflowId@version` is what the sheet follows.
+   */
+  hint?: { workflowId: string; workflowVersion: number };
   currentUserId: string;
   /**
    * The viewer is a workspace owner or admin (MCP-everything T5): they may DELETE anyone's comment, never edit
@@ -695,6 +701,7 @@ export function TicketSheet({
   cache,
   workspaceId,
   ticketId,
+  hint,
   currentUserId,
   canModerateComments,
   onClose,
@@ -952,21 +959,29 @@ export function TicketSheet({
   >(null);
   const [subtaskParentRefusal, setSubtaskParentRefusal] = useState<Refusal | null>(null);
 
-  const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
-    dataSource.query.getTicket(workspaceId, ticketId),
-  );
+  // `cacheKey`s (T7 F3): reopening a ticket this session shows its last answer at once while the fresh read lands.
+  const read = useLiveQuery(dataSource, workspaceId, ticketId, () => dataSource.query.getTicket(workspaceId, ticketId), {
+    cacheKey: `ticket:${ticketId}`,
+  });
   // Every edit is shown at once and rolled back honestly (smoothness T7, spec S5; `optimistic-ticket.ts`).
   // `read` stays the DATA (the workflow, the subtasks and the reloads below ask it); what is DRAWN is `optimistic.ticket`.
   const optimistic = useOptimisticTicket(read, ticketId);
   const ticketState = read.data?.ticket ?? null;
-  const workflowKey =
-    ticketState === null ? '' : `${ticketState.workflowId}@${ticketState.workflowVersion}`;
-  const workflow = useLiveQuery(dataSource, workspaceId, workflowKey, async () => {
-    const current = read.data?.ticket ?? null;
-    return current === null
-      ? null
-      : dataSource.query.getWorkflowDef(workspaceId, current.workflowId, current.workflowVersion);
-  });
+  // The ticket's own answer wins; until it lands, the opener's hint starts the workflow read (F3).
+  const workflowRef =
+    ticketState !== null
+      ? { id: ticketState.workflowId, version: ticketState.workflowVersion }
+      : hint === undefined
+        ? null
+        : { id: hint.workflowId, version: hint.workflowVersion };
+  const workflowKey = workflowRef === null ? '' : `${workflowRef.id}@${workflowRef.version}`;
+  const workflow = useLiveQuery(
+    dataSource,
+    workspaceId,
+    workflowKey,
+    async () => (workflowRef === null ? null : dataSource.query.getWorkflowDef(workspaceId, workflowRef.id, workflowRef.version)),
+    workflowRef === null ? undefined : { cacheKey: `wf:${workflowKey}` },
+  );
   const members = useLiveQuery(dataSource, workspaceId, workspaceId, () =>
     dataSource.query.getMembers(workspaceId),
   );

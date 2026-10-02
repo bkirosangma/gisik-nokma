@@ -103,6 +103,19 @@ describe('the ghost card on the board', () => {
     expect(screen.queryByTestId('ticket-card-tk_new')).toBeNull();
   });
 
+  it('25.110 a ghost has NO arrows (Move, ‹ ›, Close): they would write against a ticket that does not exist yet; a real card beside it has them', async () => {
+    const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND });
+    const moves: BoardMoveCapability = { dataSource: source, workspaceId: WS, currentUserId: CURRENT_USER, onMoved: vi.fn() };
+    render(<Board board={view({ todo: [card('tk_a')] })} pendingCreates={[GHOST]} onOpenTicket={() => {}} moves={moves} />);
+    // Control: the real card carries its move controls once the workflow has loaded.
+    await waitFor(() => expect(screen.getByTestId('ticket-card-tk_a').querySelector('.gn-board-card__moves')).not.toBeNull());
+    expect(screen.getByTestId('ticket-card-tk_a').getAttribute('draggable')).toBe('true');
+    const ghost = screen.getByTestId('ticket-card-tk_new');
+    expect(ghost.querySelector('.gn-board-card__moves')).toBeNull();
+    expect(ghost.querySelector('.gn-board-card__move')).toBeNull();
+    expect(ghost.getAttribute('draggable')).not.toBe('true');
+  });
+
   it('25.094 S-R1: the ghost names no fill of its own, and none is the well', () => {
     const css = readUiCss();
     const rules = [...css.matchAll(/\.gn-board__card-slot--creating[^{]*\{([^}]*)\}/g)].map((m) => m[1]!);

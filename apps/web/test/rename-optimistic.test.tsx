@@ -1,9 +1,11 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
+import { bumpProjectsVersion } from '../src/projects-version.js';
+import { NAME_TTL_MS, useOptimisticName } from '../src/use-optimistic-name.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -41,15 +43,20 @@ beforeEach(() => {
 afterEach(cleanup);
 
 /** The directory ALWAYS answers the old names: a slow projection, so only an optimistic name can show the new one. */
+const names = { workspace: 'Convenience Corner', project: 'Errand tracking' };
+beforeEach(() => {
+  names.workspace = 'Convenience Corner';
+  names.project = 'Errand tracking';
+});
 const world = (): WorkspaceRef => ({
   id: WORKSPACE,
-  name: 'Convenience Corner',
+  name: names.workspace,
   prefix: 'CC',
   role: 'admin',
   archived: false,
   memberCount: 5,
   nameRestrictedProjectCount: 0,
-  projects: [{ id: PROJECT, name: 'Errand tracking', prefix: 'ET', description: 'Runs', archived: false, ticketCount: 4, blockedCount: 0 }],
+  projects: [{ id: PROJECT, name: names.project, prefix: 'ET', description: 'Runs', archived: false, ticketCount: 4, blockedCount: 0 }],
 });
 
 function mount(page: 'workspace' | 'project') {
@@ -144,5 +151,58 @@ describe('25.099 the project page rename', () => {
     expect(within(screen.getByRole('form', { name: 'Edit project' })).getByLabelText('Name')).toHaveValue('Errands');
     await userEvent.click(within(screen.getByRole('form', { name: 'Edit project' })).getByRole('button', { name: 'Cancel' }));
     expect(await screen.findByRole('heading', { name: 'Errand tracking', level: 1 })).toBeInTheDocument();
+  });
+});
+
+describe('25.113 a held name never masks a later rename by somebody else', () => {
+  it('25.113 the project heading lets go of its name once the read carries it: another member\'s later rename shows', async () => {
+    const { writes } = mount('project');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Errand tracking' }));
+    const form = within(screen.getByRole('form', { name: 'Edit project' }));
+    await userEvent.clear(form.getByLabelText('Name'));
+    await userEvent.type(form.getByLabelText('Name'), 'Errands');
+    await userEvent.click(form.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    writes[0]!.resolve(committed(writes[0]!.events));
+    expect(await screen.findByRole('heading', { name: 'Errands', level: 1 })).toBeInTheDocument();
+    // The directory catches up with OUR name…
+    names.project = 'Errands';
+    act(() => bumpProjectsVersion());
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    // Control: the heading says our name (from the read now).
+    expect(screen.getByRole('heading', { name: 'Errands', level: 1 })).toBeInTheDocument();
+    // …and then somebody else renames the project: the heading follows the data, not our held name.
+    names.project = 'Errands HQ';
+    act(() => bumpProjectsVersion());
+    expect(await screen.findByRole('heading', { name: 'Errands HQ', level: 1 })).toBeInTheDocument();
+  });
+
+  it('25.113 a held name retires when a read carries it (a later read of something else shows), and expires by itself after the TTL', () => {
+    vi.useFakeTimers();
+    try {
+      let readName = 'Old';
+      const { result, rerender } = renderHook(() => useOptimisticName(readName));
+      act(() => result.current.begin('New'));
+      act(() => result.current.settle());
+      // Control: a read that does not carry the name retires nothing.
+      rerender();
+      expect(result.current.name).toBe('New');
+      // The read carries it: retired. Somebody else's later rename then shows.
+      readName = 'New';
+      rerender();
+      expect(result.current.pending).toBe(false);
+      readName = 'Newer';
+      rerender();
+      expect(result.current.name).toBe('Newer');
+      // A settled name that no read ever carries expires.
+      act(() => result.current.begin('Mine'));
+      act(() => result.current.settle());
+      act(() => {
+        vi.advanceTimersByTime(NAME_TTL_MS + 1);
+      });
+      expect(result.current.name).toBe('Newer');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -2671,14 +2671,15 @@ function MoveArrows({
    * `submitDirect` calls, which reaches `board.reload()`. The server's own
    * `getBoard` excludes closed tickets (spec §3.2), so the reload is what ENDS
    * the card's life on the board — but it no longer waits for it to leave
-   * (smoothness T7, spec S5): the card is taken off the board the moment Close
-   * is pressed, as a `closes` pending entry (`board-move-state.ts`, hidden by
-   * `applyPendingMoves`, retired when a read no longer holds the card), and
-   * comes back through `dropPending` when the write is refused. The refusal
+   * (smoothness T7, spec S5): the card is DIMMED in place the moment Close is
+   * pressed (a `closes` pending entry; the slot draws `aria-busy` and the dim),
+   * hidden by `applyPendingMoves` once the server commits, retired when a read
+   * no longer holds the card, and undimmed through `dropPending` when the write
+   * is refused. The refusal
    * lives on the board-level session, so it is still there when the card
    * returns. This test suite asserts the ingest payload and the `onMoved` call
    * (`useBoard`/`board.reload()` are not this component's to fake a refetch
-   * of) and, since T7, the card's absence while the write is open (25.097). The copy strings say "this close",
+   * of) and, since T7, the card's dimming while the write is open (25.097). The copy strings say "this close",
    * never "this move" — the two sentences `submitDirect` uses become "The
    * server did not answer this close." and "We could not reach the server
    * for this close — …", the same word substitution `ticket-sheet.tsx` made
@@ -2701,7 +2702,7 @@ function MoveArrows({
    */
   const closeCard = async (): Promise<void> => {
     setSubmitting(true);
-    // The card leaves the board at once (T7); every arm that is not a commit gives it back.
+    // The card is dimmed in place at once (T7 F2); a commit hides it, every other arm undims it.
     moveState.beginPending(
       { ticketId: card.ticketId, workflowId: workflow.id, fromStateId: displayedStateId, toStateId: displayedStateId, phase: 'writing', closes: true },
       undefined,
