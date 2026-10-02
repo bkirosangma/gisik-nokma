@@ -3,6 +3,7 @@ import {
   CALENDAR_ALL_HIDDEN_COPY,
   CALENDAR_EMPTY_MONTH_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_NO_DATES_COPY,
   barProvenance,
   claimTooltip,
   contradictionCopy,
@@ -159,8 +160,7 @@ describe("11.5 attributed labels (spec §7's exact shape — planted defect: the
   });
 
   it('the timeline side list says what a bar would require', () => {
-    expect(TIMELINE_SIDE_LIST_COPY).toBe(
-      'No bar is invented: work appears here until it carries both a claimed start and a claimed needed-by.',
-    );
+    expect(TIMELINE_SIDE_LIST_COPY).toBe('Add a start and a due date to place a ticket on the timeline.');
+    expect(TIMELINE_SIDE_LIST_NO_DATES_COPY).toBe('These tickets have no dates yet.');
   });
 });
