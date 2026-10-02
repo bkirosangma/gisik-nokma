@@ -210,6 +210,10 @@ export const primitives = {
   /** `neo` dark surface — the export's own value, matching `neoPaper`'s light-mode role: ONE hex for surface/raised/sunken, depth from shadow alone. */
   neoNavy: '#1b2340',
   /**
+   * **RETIRED 2026-10-02 (neo refresh, owner N4 = B; case 24.007): no role maps `neoNavyRaised` any more.** Neo dark's `surfaceRaised` is
+   * `neoNavy` again — extrusion, not elevation; the 16% highlight (`shadowNeoHighlightDark`) carries the lift. Kept as a primitive for
+   * the record; the text below is what it was.
+   *
    * **`neoNavyRaised` steps lighter again: `#1b2340` → `#232c50` (owner ruling U8, 2026-10-02; UX fixes T1).**
    * The raised surface in neo dark used to be the SAME hex as `neoNavy` (the 2026-09-10 revert: "revert to
    * prototype's exact dark hex"), so a raised card in the dark theme had only its shadow to separate it from the
@@ -237,6 +241,13 @@ export const primitives = {
    * and `minimal` dark keep `#a0a0a5` (their floor is 3 and they did not move). Mapped for `neo`/dark only.
    */
   neoTextSubtleDark: '#a3a3a8',
+  /**
+   * `neo` LIGHT `textSubtle` (neo refresh T1, 2026-10-02; found by 18.306 on the first run after N2): the field ground is now the
+   * well (`neoWellLight` `#e6dcd2`) and a placeholder is composited through `fillQuaternary` on it (`#e0d5ca`), where the shared
+   * `textSubtleLight` `#5e5e62` read 4.47 — under the neo floor of 4.5. `#5b5b5f` reads 4.68 there and 5.67 on paper. Same
+   * precedent as `neoTextSubtleDark`. `hig`/`minimal` keep `textSubtleLight`.
+   */
+  neoTextSubtleLight: '#5b5b5f',
   /**
    * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
    *
@@ -372,14 +383,23 @@ export const primitives = {
    */
   shadowHigLight: '#273a6329',
   shadowHigDark: '#060a16a8',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoRaisedDarkLight: '#b098848c',
-  shadowNeoHighlightLight: '#fffffff2',
+  /** Neo refresh (owner N5, 2026-10-02): the highlight is warm white at 70% (N5), not 95% — the lit edge, not a halo. REUSED name, new value; was `#fffffff2`. */
+  shadowNeoHighlightLight: '#fffaf4b3',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoSunkenDarkLight: '#b0988499',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoRaisedDarkDark: '#060a169e',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoRaisedHighlightDark: '#f2e9e11f',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoSunkenDarkDark: '#00000099',
+  /** RETIRED 2026-10-02 (neo refresh N5/N8/N9) — mapped by no role; kept for the record. */
   shadowNeoSunkenHighlightDark: '#ffffff0d',
   /**
+   * RETIRED 2026-10-02 (neo refresh N9: the compact inset reads `shadowNeoDarkDark`, the same `#0000008c`) — mapped by no role.
+   *
    * The ONE new primitive the `sunken-compact` shadow role needed (owner
    * round-3 correction, 2026-09-16: "too much shadow for a small badge").
    * `--chipShadow` (`design-system/interactive/desktop.dc.html:59` light,
@@ -397,6 +417,31 @@ export const primitives = {
    * primitive. `0.55 × 255 = 140.25` → round `140` = `0x8c`.
    */
   shadowNeoSunkenCompactDarkDark: '#0000008c',
+  /** Neo refresh (owner N5, 2026-10-02): the fall is the paper's own hue at lower chroma, 55%. Composites #c9bfb6 on paper (1.52). */
+  shadowNeoDarkLight: '#a89c918c',
+  /** One dark layer for every dark role (finding 8): black at 55%, #0c101d on navy (1.23). */
+  shadowNeoDarkDark: '#0000008c',
+  shadowNeoDarkSunkenLight: '#a89c9199',
+  /** The control-recess band (finding 10): 80% light, 75% dark — the dark band is at its physical cap, 1.18 on #141a33. */
+  shadowNeoBandLight: '#a89c91cc',
+  shadowNeoBandDark: '#000000bf',
+  /** Cream at 16% in dark (N4 = B): the lit edge, not a halo. The light highlight is `shadowNeoHighlightLight` above. */
+  shadowNeoHighlightDark: '#f2e9e129',
+  shadowNeoHighlightCompactLight: '#fffaf480',
+  shadowNeoHighlightCompactDark: '#f2e9e11f',
+  shadowNeoHighlightSunkenLight: '#fffaf480',
+  shadowNeoHighlightSunkenDark: '#f2e9e114',
+  /** The 1px lip on a control recess: 80% light (1.24), 35% dark (2.85). */
+  shadowNeoLipLight: '#fffaf4cc',
+  shadowNeoLipDark: '#f2e9e159',
+  /** The neo field's crisp boundary (N10, one-sided per WCAG 1.4.11): #897362 is 3.31 on #e6dcd2; #7d88a8 is 4.86 on #141a33 and 3.85 on the page. Opaque, written as 8 digits for the shadow sweep. */
+  shadowNeoLineLight: '#897362ff',
+  shadowNeoLineDark: '#7d88a8ff',
+  /** Press shades = the fill x 0.75 (finding 8): blue600 #33629f, blue300 #7fa9e4, neoLightDanger #9e2a20, red300 #ff6961. */
+  shadowNeoAccentPressLight: '#264a77ff',
+  shadowNeoAccentPressDark: '#5f7fabff',
+  shadowNeoDangerPressLight: '#772018ff',
+  shadowNeoDangerPressDark: '#bf4f49ff',
 
   /**
    * ## Round 2d additions (2026-09-09) — the sign-in neo alignment
@@ -1022,6 +1067,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
  * `neoWellLight`/`neoWellDark`; the dark arm's `surfaceRaised` (`neoNavyRaised`) is now `#232c50`, not `neoNavy`, and
  * its `textSubtle` is `neoTextSubtleDark` so a placeholder still clears 4.5 composited on it.**
  *
+ * **Neo refresh T1 (2026-10-02; N2, N4 = B): both arms' `surfaceSunken` step to the well (`neoWellLight`/`neoWellDark`) — a pressed fill
+ * is never lighter than its ground — and the dark arm's `surfaceRaised` returns to `neoNavy` (`neoNavyRaised`'s U8 step is retired).
+ * The light arm gains `textSubtle: neoTextSubtleLight` so a placeholder still clears 4.5 composited on the well.**
+ *
  * **T5 (2026-09-18): the light arm gains the five semantic colours the
  * refreshed export's light-neo block declares.** The mapping is by MEANING,
  * not by variable name — the export names two of them after hues (`--pink`,
@@ -1044,7 +1093,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
     light: {
       surface: 'neoPaper',
       surfaceRaised: 'neoPaper',
-      surfaceSunken: 'neoPaper',
+      surfaceSunken: 'neoWellLight', // N2 (2026-10-02): a pressed fill is never lighter than its ground
+      textSubtle: 'neoTextSubtleLight', // 4.5 on the field's composited placeholder ground (18.306)
       surfaceOverlay: 'overlayWarmNeo',
       surfaceTrack: 'neoWellLight',
       surfaceWell: 'neoWellLight',
@@ -1060,8 +1110,8 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
     },
     dark: {
       surface: 'neoNavy',
-      surfaceRaised: 'neoNavyRaised',
-      surfaceSunken: 'neoNavySunken',
+      surfaceRaised: 'neoNavy', // N4 = B (2026-10-02): extrusion, not elevation; the 16% highlight carries the lift
+      surfaceSunken: 'neoWellDark', // N2
       surfaceOverlay: 'overlayNavyNeo',
       surfaceTrack: 'neoWellDark',
       surfaceWell: 'neoWellDark',
@@ -1306,7 +1356,24 @@ export type ShadowRole =
   | 'action'
   | 'action-near'
   | 'action-press'
-  | 'sheet';
+  | 'sheet'
+  // neo refresh (2026-10-02, N1–N10)
+  | 'raised-lg'
+  | 'near-lg'
+  | 'near'
+  | 'raised-compact'
+  | 'recess'
+  | 'field'
+  | 'quiet'
+  | 'quiet-near'
+  | 'quiet-press'
+  | 'action-filled'
+  | 'action-filled-near'
+  | 'action-filled-press'
+  | 'danger'
+  | 'danger-near'
+  | 'danger-press'
+  | 'knob-on';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
@@ -1318,6 +1385,109 @@ type ShadowLayer = {
   colour: PrimitiveName;
   inset?: boolean;
 };
+
+/** The sixteen roles the neo refresh added (2026-10-02, N1–N10). `hig` and `minimal` carry them too, as aliases or `[]`, so a shared consumer reads one name in every style. */
+type RefreshShadowRole =
+  | 'raised-lg' | 'near-lg' | 'near' | 'raised-compact'
+  | 'recess' | 'field'
+  | 'quiet' | 'quiet-near' | 'quiet-press'
+  | 'action-filled' | 'action-filled-near' | 'action-filled-press'
+  | 'danger' | 'danger-near' | 'danger-press'
+  | 'knob-on';
+
+/** `minimal` draws no shadow, so every refresh role is `[]` there. */
+const NO_REFRESH_SHADOWS: Record<RefreshShadowRole, readonly ShadowLayer[]> = {
+  'raised-lg': [], 'near-lg': [], near: [], 'raised-compact': [],
+  recess: [], field: [],
+  quiet: [], 'quiet-near': [], 'quiet-press': [],
+  'action-filled': [], 'action-filled-near': [], 'action-filled-press': [],
+  danger: [], 'danger-near': [], 'danger-press': [],
+  'knob-on': [],
+};
+
+/**
+ * `hig`'s refresh roles are ALIASES of the roles it already had (neo refresh spec §6–7): a role the refresh renames or splits
+ * resolves, under hig, to the exact layers it painted before, so hig is byte-identical (case 24.002). `recess`, `field` and the
+ * `quiet*` roles are `[]` — hig keeps its field rim and draws no depth on ghost/icon buttons.
+ */
+function higRefresh(base: Record<Exclude<ShadowRole, RefreshShadowRole>, readonly ShadowLayer[]>): Record<ShadowRole, readonly ShadowLayer[]> {
+  return {
+    ...base,
+    'raised-lg': base.raised,
+    'near-lg': base['lift-near'],
+    near: base['lift-near'],
+    'raised-compact': base.lift,
+    recess: [],
+    field: [],
+    quiet: [],
+    'quiet-near': [],
+    'quiet-press': [],
+    'action-filled': base.action,
+    'action-filled-near': base['action-near'],
+    'action-filled-press': base['action-press'],
+    danger: base.lift,
+    'danger-near': base['lift-near'],
+    'danger-press': base['lift-press'],
+    'knob-on': [],
+  };
+}
+
+/**
+ * One lamp per neo theme (neo refresh N4–N10, 2026-10-02): every neo role below is built from these primitives, so light and
+ * dark cannot drift apart. `lineFirst` places the field's crisp line top-left over the band (light) or bottom-right after it (dark).
+ */
+type NeoLamp = {
+  d: PrimitiveName; ds: PrimitiveName; band: PrimitiveName; h: PrimitiveName; hc: PrimitiveName; hs: PrimitiveName;
+  lip: PrimitiveName; line: PrimitiveName; accentPress: PrimitiveName; dangerPress: PrimitiveName; lineFirst: boolean;
+};
+const NEO_LIGHT: NeoLamp = {
+  d: 'shadowNeoDarkLight', ds: 'shadowNeoDarkSunkenLight', band: 'shadowNeoBandLight', h: 'shadowNeoHighlightLight',
+  hc: 'shadowNeoHighlightCompactLight', hs: 'shadowNeoHighlightSunkenLight', lip: 'shadowNeoLipLight', line: 'shadowNeoLineLight',
+  accentPress: 'shadowNeoAccentPressLight', dangerPress: 'shadowNeoDangerPressLight', lineFirst: true,
+};
+const NEO_DARK: NeoLamp = {
+  d: 'shadowNeoDarkDark', ds: 'shadowNeoDarkDark', band: 'shadowNeoBandDark', h: 'shadowNeoHighlightDark',
+  hc: 'shadowNeoHighlightCompactDark', hs: 'shadowNeoHighlightSunkenDark', lip: 'shadowNeoLipDark', line: 'shadowNeoLineDark',
+  accentPress: 'shadowNeoAccentPressDark', dangerPress: 'shadowNeoDangerPressDark', lineFirst: false,
+};
+function pair(o: number, b: number, dark: PrimitiveName, light: PrimitiveName): ShadowLayer[] {
+  return [{ x: o, y: o, blur: b, colour: dark }, { x: -o, y: -o, blur: b, colour: light }];
+}
+function neoShadows(L: NeoLamp): Record<ShadowRole, readonly ShadowLayer[]> {
+  const raisedLg = pair(7, 16, L.d, L.h);
+  const raised = pair(4, 10, L.d, L.h);
+  const raisedCompact = pair(2, 4, L.d, L.hc);
+  const near = pair(6, 14, L.d, L.h);
+  const nearLg = pair(10, 24, L.d, L.h);
+  const sunken: ShadowLayer[] = [
+    { x: 3, y: 3, blur: 6, colour: L.ds, inset: true },
+    { x: -3, y: -3, blur: 5, colour: L.hs, inset: true },
+  ];
+  const band: ShadowLayer = { x: 3, y: 3, blur: 5, colour: L.band, inset: true };
+  const recess: ShadowLayer[] = [band, { x: -1, y: -1, blur: 1, colour: L.lip, inset: true }];
+  const field: ShadowLayer[] = L.lineFirst
+    ? [{ x: 1, y: 1, blur: 0, colour: L.line, inset: true }, ...recess]
+    : [band, { x: -1, y: -1, blur: 0, colour: L.line, inset: true }];
+  const compact: ShadowLayer[] = [
+    { x: 1, y: 1, blur: 3, colour: L.ds, inset: true },
+    { x: -1, y: -1, blur: 2, colour: L.hs, inset: true },
+  ];
+  const filled: ShadowLayer[] = [{ x: 3, y: 4, blur: 10, colour: L.d }];
+  const filledNear: ShadowLayer[] = [{ x: 5, y: 6, blur: 14, colour: L.d }];
+  return {
+    raised, sunken, overlay: raisedLg, 'sunken-compact': compact, selected: recess,
+    lift: raised, 'lift-near': near, 'lift-press': recess, 'lift-drag': pair(14, 32, L.d, L.h), track: sunken,
+    action: raisedCompact, 'action-near': raised, 'action-press': recess, sheet: raisedLg,
+    'raised-lg': raisedLg, 'near-lg': nearLg, near, 'raised-compact': raisedCompact,
+    recess, field,
+    quiet: raisedCompact, 'quiet-near': raised, 'quiet-press': recess,
+    'action-filled': filled, 'action-filled-near': filledNear,
+    'action-filled-press': [{ x: 2, y: 2, blur: 5, colour: L.accentPress, inset: true }],
+    danger: filled, 'danger-near': filledNear,
+    'danger-press': [{ x: 2, y: 2, blur: 5, colour: L.dangerPress, inset: true }],
+    'knob-on': [{ x: 1, y: 2, blur: 4, colour: L.d }],
+  };
+}
 
 /**
  * Every style×theme's raised/sunken/sunken-compact elevation, transcribed
@@ -1342,7 +1512,7 @@ type ShadowLayer = {
  */
 const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
   hig: {
-    light: {
+    light: higRefresh({
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
@@ -1411,8 +1581,8 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 1, y: 0, blur: 0, colour: 'shadowLitLight', inset: true },
         { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowSheetLight' },
       ],
-    },
-    dark: {
+    }),
+    dark: higRefresh({
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
@@ -1464,161 +1634,13 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: 1, y: 0, blur: 0, colour: 'shadowSheetLitDark', inset: true },
         { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowFallDark2' },
       ],
-    },
+    }),
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
-    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [] },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS },
   },
-  neo: {
-    light: {
-      raised: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
-      ],
-      sunken: [
-        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkLight', inset: true },
-        { x: -4, y: -4, blur: 9, colour: 'shadowNeoHighlightLight', inset: true },
-      ],
-      overlay: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
-      ],
-      /** `--chipShadow` light (`desktop.dc.html:59`) — both layers reused, see docblock above. */
-      'sunken-compact': [
-        { x: 2, y: 2, blur: 4, colour: 'shadowNeoRaisedDarkLight', inset: true },
-        { x: -2, y: -2, blur: 4, colour: 'shadowNeoHighlightLight', inset: true },
-      ],
-      /**
-       * `--segOnShadow` neo light (`desktop.dc.html:65`) — same colour pair as
-       * `raised`/`sunken-compact` (`shadowNeoRaisedDarkLight`/
-       * `shadowNeoHighlightLight`), a THIRD geometry (3px/3px/6px, inset) —
-       * see `ShadowRole`'s own docblock for why no existing role could be
-       * reused for this one.
-       */
-      selected: [
-        { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
-        { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
-      ],
-      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
-      lift: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
-      ],
-      /** Toward the user: the same pair, thrown further. */
-      'lift-near': [
-        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -10, y: -10, blur: 24, colour: 'shadowNeoHighlightLight' },
-      ],
-      'lift-press': [
-        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
-      ],
-      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
-      'lift-drag': [
-        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -14, y: -14, blur: 32, colour: 'shadowNeoHighlightLight' },
-      ],
-      /** The track IS neo's `sunken` tray. */
-      track: [
-        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkLight', inset: true },
-        { x: -4, y: -4, blur: 9, colour: 'shadowNeoHighlightLight', inset: true },
-      ],
-      action: [
-        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
-      ],
-      'action-near': [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
-      ],
-      /** Pushed in: neo's own `selected` inset. */
-      'action-press': [
-        { x: 3, y: 3, blur: 6, colour: 'shadowNeoRaisedDarkLight', inset: true },
-        { x: -3, y: -3, blur: 6, colour: 'shadowNeoHighlightLight', inset: true },
-      ],
-      sheet: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkLight' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoHighlightLight' },
-      ],
-    },
-    dark: {
-      raised: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      sunken: [
-        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkDark', inset: true },
-        { x: -4, y: -4, blur: 9, colour: 'shadowNeoSunkenHighlightDark', inset: true },
-      ],
-      overlay: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      /**
-       * `--chipShadow` dark (`desktop.dc.html:71`) — layer 2 reused
-       * (`shadowNeoSunkenHighlightDark`, byte-identical to `--chipShadow`'s
-       * `rgba(255,255,255,0.05)`); layer 1 is the one genuinely new colour
-       * (`shadowNeoSunkenCompactDarkDark`, `rgba(0,0,0,0.55)` — different
-       * alpha than `sunken`'s own dark layer 1, `rgba(0,0,0,0.6)`).
-       */
-      'sunken-compact': [
-        { x: 2, y: 2, blur: 4, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
-        { x: -2, y: -2, blur: 4, colour: 'shadowNeoSunkenHighlightDark', inset: true },
-      ],
-      /**
-       * `--segOnShadow` neo dark (`desktop.dc.html:77`) — same colour pair as
-       * `sunken-compact` (`shadowNeoSunkenCompactDarkDark`/
-       * `shadowNeoSunkenHighlightDark`), the 3px/3px/6px geometry instead of
-       * `sunken-compact`'s 2px/2px/4px.
-       */
-      selected: [
-        { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
-        { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
-      ],
-      /** Styling refresh — neo's own language: the card at rest IS `raised`. */
-      lift: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      /** Toward the user: the same pair, thrown further. */
-      'lift-near': [
-        { x: 10, y: 10, blur: 24, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -10, y: -10, blur: 24, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      'lift-press': [
-        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
-      'lift-drag': [
-        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -14, y: -14, blur: 32, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      /** The track IS neo's `sunken` tray. */
-      track: [
-        { x: 4, y: 4, blur: 9, colour: 'shadowNeoSunkenDarkDark', inset: true },
-        { x: -4, y: -4, blur: 9, colour: 'shadowNeoSunkenHighlightDark', inset: true },
-      ],
-      action: [
-        { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -4, y: -4, blur: 10, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      'action-near': [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-      /** Pushed in: neo's own `selected` inset. */
-      'action-press': [
-        { x: 3, y: 3, blur: 6, colour: 'shadowNeoSunkenCompactDarkDark', inset: true },
-        { x: -3, y: -3, blur: 6, colour: 'shadowNeoSunkenHighlightDark', inset: true },
-      ],
-      sheet: [
-        { x: 7, y: 7, blur: 16, colour: 'shadowNeoRaisedDarkDark' },
-        { x: -7, y: -7, blur: 16, colour: 'shadowNeoRaisedHighlightDark' },
-      ],
-    },
-  },
+  neo: { light: neoShadows(NEO_LIGHT), dark: neoShadows(NEO_DARK) },
 };
 
 function shadowLayerCss(layer: ShadowLayer): string {
@@ -1892,6 +1914,22 @@ export const SHADOW_ROLES: readonly ShadowRole[] = [
   'action-near',
   'action-press',
   'sheet',
+  'raised-lg',
+  'near-lg',
+  'near',
+  'raised-compact',
+  'recess',
+  'field',
+  'quiet',
+  'quiet-near',
+  'quiet-press',
+  'action-filled',
+  'action-filled-near',
+  'action-filled-press',
+  'danger',
+  'danger-near',
+  'danger-press',
+  'knob-on',
 ];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 

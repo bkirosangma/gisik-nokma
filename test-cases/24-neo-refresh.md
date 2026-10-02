@@ -8,14 +8,14 @@
 
 *Task 1. Every case: `packages/ui/test/neo-refresh.test.ts`.*
 
-- ❌ **24.001 — the neo shadow primitives are derived from the surface, one lamp per theme (spec §3.1; N5, N8, N9).** Control: the retired brown/white strings are in no stylesheet.
-- ❌ **24.002 — hig and minimal are byte-identical before and after (spec §6–7).** Control: neo's `raised` did move.
-- ❌ **24.003 — the sized pairs (spec §3.3; N7).** Control: hig's `raised-lg` is its `raised`, minimal's is `none`.
-- ❌ **24.004 — the inset family sized to the box (spec §3.3; N9, N1).** Control: hig's `recess` is `none`, its `lift-press` unchanged.
-- ❌ **24.005 — the neo field role: one crisp line per theme at ≥ 3:1 (spec §3.3, §5; N10).** Control: hig and minimal have no field role.
-- ❌ **24.006 — filled surfaces carry no highlight (spec §4; N8).** Control: hig keeps its `action` / `lift` values.
-- ❌ **24.007 — surfaces: sunken = the well, dark raised = the page hex (N2, N4 = B).** Control: hig's sunken and dark raised did not move.
-- ❌ **24.008 — every new role reaches the stylesheet under every style × theme (13.411 extended).** Control: the sixteen names are counted six times each.
+- ✅ **24.001 — the neo shadow primitives are derived from the surface, one lamp per theme (spec §3.1; N5, N8, N9).** Control: the retired brown/white strings are in no stylesheet. Pinned in `neo-refresh.test.ts`; the ratio 1.52 composites on paper.
+- ✅ **24.002 — hig and minimal are byte-identical before and after (spec §6–7).** Control: neo's `raised` did move. Snapshot `packages/ui/test/fixtures/hig-minimal-shadows.before.json`, taken BEFORE any token edit.
+- ✅ **24.003 — the sized pairs (spec §3.3; N7).** Control: hig's `raised-lg` is its `raised`, minimal's is `none`.
+- ✅ **24.004 — the inset family sized to the box (spec §3.3; N9, N1).** Control: hig's `recess` is `none`, its `lift-press` unchanged.
+- ✅ **24.005 — the neo field role: one crisp line per theme at ≥ 3:1 (spec §3.3, §5; N10).** Control: hig and minimal have no field role.
+- ✅ **24.006 — filled surfaces carry no highlight (spec §4; N8).** Control: hig keeps its `action` / `lift` values. The press shades are the fill × 0.75.
+- ✅ **24.007 — surfaces: sunken = the well, dark raised = the page hex (N2, N4 = B).** Control: hig's sunken and dark raised did not move. Placeholder floor: neo light `textSubtle` is the new `neoTextSubtleLight` `#5b5b5f` (4.68 composited on the well; the shared `#5e5e62` read 4.47, caught by 18.306).
+- ✅ **24.008 — every new role reaches the stylesheet under every style × theme (13.411 extended).** Control: the sixteen names are counted six times each. The stylesheet declares each role as often as `raised` (9 times: six style×theme blocks plus three default blocks), not the plan's six.
 
 ## 24.2 Press inversion and the filled-fill rule (T2)
 

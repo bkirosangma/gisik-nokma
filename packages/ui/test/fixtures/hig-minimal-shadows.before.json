@@ -1,0 +1,98 @@
+{
+  "hig/light": {
+    "raised": "0px 1px 3px #273a6329",
+    "sunken": "none",
+    "overlay": "0px 1px 3px #273a6329",
+    "sunken-compact": "none",
+    "selected": "0px 3px 8px #273a6329, 0px 3px 1px #273a630f",
+    "lift": "inset 0px 1px 0px #ffffffe6, 0px 1px 2px #273a631f, 0px 8px 16px -8px #273a6338",
+    "lift-near": "inset 0px 1px 0px #ffffffff, 0px 2px 4px #273a6314, 0px 12px 24px -6px #273a632e, 0px 28px 48px -16px #273a6347",
+    "lift-press": "inset 0px 1px 0px #ffffffe6, 0px 1px 2px #273a6324, 0px 4px 8px -4px #273a6333",
+    "lift-drag": "inset 0px 1px 0px #ffffffff, 0px 4px 8px #273a631f, 0px 20px 32px -8px #273a6338, 0px 40px 64px -20px #273a6347",
+    "track": "inset 0px 2px 4px #b0988459, inset 0px -1px 0px #ffffff99",
+    "action": "inset 0px 1px 0px #ffffff47, 0px 1px 2px #273a6340, 0px 8px 16px -6px #33629f73",
+    "action-near": "inset 0px 1px 0px #ffffff66, 0px 2px 4px #273a6333, 0px 10px 20px -6px #33629f73, 0px 20px 36px -14px #33629f80",
+    "action-press": "inset 0px 2px 4px #1016254d, 0px 1px 1px #273a6333",
+    "sheet": "inset 1px 0px 0px #ffffffe6, -24px 0px 48px -16px #273a6359",
+    "surfaces": {
+      "surface": "#efe7df",
+      "surfaceRaised": "#fbf7f3",
+      "surfaceSunken": "#e4d8cc",
+      "surfaceTrack": "#e8ded4",
+      "surfaceWell": "#f3ece5",
+      "fieldRim": "#6c6c70"
+    }
+  },
+  "hig/dark": {
+    "raised": "0px 1px 3px #060a16a8",
+    "sunken": "none",
+    "overlay": "0px 1px 3px #060a16a8",
+    "sunken-compact": "none",
+    "selected": "0px 3px 8px #060a16a8",
+    "lift": "inset 0px 1px 0px #f2e9e112, 0px 1px 2px #00000080, 0px 8px 16px -8px #00000099",
+    "lift-near": "inset 0px 1px 0px #f2e9e11f, 0px 2px 4px #00000059, 0px 12px 24px -6px #0000008c, 0px 28px 48px -16px #00000099",
+    "lift-press": "inset 0px 1px 0px #f2e9e112, 0px 1px 2px #0000008c, 0px 4px 8px -4px #00000080",
+    "lift-drag": "inset 0px 1px 0px #f2e9e11f, 0px 4px 8px #00000059, 0px 20px 32px -8px #0000008c, 0px 40px 64px -20px #00000099",
+    "track": "inset 0px 2px 4px #00000073, inset 0px -1px 0px #ffffff0a",
+    "action": "inset 0px 1px 0px #ffffff73, 0px 1px 2px #00000080, 0px 8px 16px -6px #0000008c",
+    "action-near": "inset 0px 1px 0px #ffffff8c, 0px 2px 4px #00000073, 0px 10px 20px -6px #00000099, 0px 20px 36px -14px #000000a6",
+    "action-press": "inset 0px 2px 4px #141a2e73, 0px 1px 1px #00000066",
+    "sheet": "inset 1px 0px 0px #f2e9e114, -24px 0px 48px -16px #00000099",
+    "surfaces": {
+      "surface": "#141a2e",
+      "surfaceRaised": "#20294a",
+      "surfaceSunken": "#2a3560",
+      "surfaceTrack": "#10152a",
+      "surfaceWell": "#1a213b",
+      "fieldRim": "#98989d"
+    }
+  },
+  "minimal/light": {
+    "raised": "none",
+    "sunken": "none",
+    "overlay": "none",
+    "sunken-compact": "none",
+    "selected": "none",
+    "lift": "none",
+    "lift-near": "none",
+    "lift-press": "none",
+    "lift-drag": "none",
+    "track": "none",
+    "action": "none",
+    "action-near": "none",
+    "action-press": "none",
+    "sheet": "none",
+    "surfaces": {
+      "surface": "#efe7df",
+      "surfaceRaised": "#fbf7f3",
+      "surfaceSunken": "#e4d8cc",
+      "surfaceTrack": "#e8ded4",
+      "surfaceWell": "#f3ece5",
+      "fieldRim": "#6c6c70"
+    }
+  },
+  "minimal/dark": {
+    "raised": "none",
+    "sunken": "none",
+    "overlay": "none",
+    "sunken-compact": "none",
+    "selected": "none",
+    "lift": "none",
+    "lift-near": "none",
+    "lift-press": "none",
+    "lift-drag": "none",
+    "track": "none",
+    "action": "none",
+    "action-near": "none",
+    "action-press": "none",
+    "sheet": "none",
+    "surfaces": {
+      "surface": "#141a2e",
+      "surfaceRaised": "#20294a",
+      "surfaceSunken": "#2a3560",
+      "surfaceTrack": "#10152a",
+      "surfaceWell": "#1a213b",
+      "fieldRim": "#98989d"
+    }
+  }
+}

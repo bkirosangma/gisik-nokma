@@ -323,8 +323,9 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // — the whole point of the correction was the geometry, not the colour.
     expect(shadowValueOf('hig', 'light', 'sunken-compact')).toBe('none');
     expect(shadowValueOf('neo', 'light', 'sunken-compact')).toContain('inset');
-    expect(shadowValueOf('neo', 'light', 'sunken-compact')).toContain('2px 2px 4px');
-    expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toContain('2px 2px 4px');
+    // Amended 2026-10-02 (neo refresh N9, 24.004): the chip-sized inset is 1px/1px/3px.
+    expect(shadowValueOf('neo', 'light', 'sunken-compact')).toContain('1px 1px 3px');
+    expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toContain('1px 1px 3px');
     expect(shadowValueOf('neo', 'light', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'light', 'sunken'));
     expect(shadowValueOf('neo', 'dark', 'sunken-compact')).not.toBe(shadowValueOf('neo', 'dark', 'sunken'));
     // Pinned full values, not just shape: the `toContain` checks above would
@@ -335,11 +336,13 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // layer colours the prototype's `--chipShadow` measures to (see
     // `shadowNeoSunkenCompactDarkDark`'s docblock in tokens.ts for the
     // rgba→hex arithmetic).
+    // Amended 2026-10-02 (neo refresh N9, 24.004): were `inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2` and
+    // `inset 2px 2px 4px #0000008c, inset -2px -2px 4px #ffffff0d`.
     expect(shadowValueOf('neo', 'light', 'sunken-compact')).toBe(
-      'inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2',
+      'inset 1px 1px 3px #a89c9199, inset -1px -1px 2px #fffaf480',
     );
     expect(shadowValueOf('neo', 'dark', 'sunken-compact')).toBe(
-      'inset 2px 2px 4px #0000008c, inset -2px -2px 4px #ffffff0d',
+      'inset 1px 1px 3px #0000008c, inset -1px -1px 2px #f2e9e114',
     );
   });
 
@@ -418,7 +421,8 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // point, see the docblock above), so a role added to `SHADOWS`/`ShadowRole`
     // without a matching addition HERE stays uncovered by this case, silently.
     // The nine styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012; lift-drag for Task 5A) — added HERE by hand, which is the point of this literal.
-    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;
+    // The sixteen neo-refresh roles (2026-10-02, 24.008) — added HERE by hand, which is the point of this literal.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet', 'raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on'] as const;
     const stylesheet = themeStylesheet();
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {
@@ -462,11 +466,13 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     expect(shadowValueOf('hig', 'dark', 'selected')).toBe('0px 3px 8px #060a16a8');
     expect(shadowValueOf('minimal', 'light', 'selected')).toBe('none');
     expect(shadowValueOf('minimal', 'dark', 'selected')).toBe('none');
+    // Amended 2026-10-02 (neo refresh N9, 24.004): `selected` is the control recess (3/5 band + 1px lip); was
+    // `inset 3px 3px 6px #b098848c, inset -3px -3px 6px #fffffff2` / `inset 3px 3px 6px #0000008c, inset -3px -3px 6px #ffffff0d`.
     expect(shadowValueOf('neo', 'light', 'selected')).toBe(
-      'inset 3px 3px 6px #b098848c, inset -3px -3px 6px #fffffff2',
+      'inset 3px 3px 5px #a89c91cc, inset -1px -1px 1px #fffaf4cc',
     );
     expect(shadowValueOf('neo', 'dark', 'selected')).toBe(
-      'inset 3px 3px 6px #0000008c, inset -3px -3px 6px #ffffff0d',
+      'inset 3px 3px 5px #000000bf, inset -1px -1px 1px #f2e9e159',
     );
     // Discriminating checks beyond the exact strings above: `hig` is a real
     // (non-'none') drop shadow with no `inset`, `neo` is `inset` and a
@@ -476,10 +482,10 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     expect(shadowValueOf('hig', 'light', 'selected')).not.toContain('inset');
     expect(shadowValueOf('hig', 'light', 'selected')).not.toBe('none');
     expect(shadowValueOf('neo', 'light', 'selected')).toContain('inset');
-    expect(shadowValueOf('neo', 'light', 'selected')).toContain('3px 3px 6px');
+    expect(shadowValueOf('neo', 'light', 'selected')).toContain('3px 3px 5px');
     expect(shadowValueOf('neo', 'light', 'selected')).not.toContain('4px 4px 9px');
     expect(shadowValueOf('neo', 'light', 'selected')).not.toContain('2px 2px 4px');
-    expect(shadowValueOf('neo', 'dark', 'selected')).toContain('3px 3px 6px');
+    expect(shadowValueOf('neo', 'dark', 'selected')).toContain('3px 3px 5px');
     expect(shadowValueOf('neo', 'dark', 'selected')).not.toContain('4px 4px 9px');
     expect(shadowValueOf('neo', 'dark', 'selected')).not.toContain('2px 2px 4px');
   });
@@ -536,13 +542,14 @@ describe('13.341 dark-theme fill separation per style (rule (c))', () => {
     });
   }
 
-  it('neo/dark: surface and surfaceSunken are the SAME hex; surfaceRaised steps to #232c50 (U8, 23.006) — depth is shadow first, fill second', () => {
+  it('neo/dark: surface and surfaceRaised are the SAME hex (N4 = B, 24.007); surfaceSunken is the well — depth is shadow first, fill second', () => {
     const surface = colorOf('dark', 'surface', 'neo');
     const raised = colorOf('dark', 'surfaceRaised', 'neo');
     const sunken = colorOf('dark', 'surfaceSunken', 'neo');
-    expect(raised).toBe('#232c50');
-    expect(raised).not.toBe(surface);
-    expect(sunken).toBe(surface);
+    // AMENDED 2026-10-02 (neo refresh N4 = B / N2, 24.007): was raised `#232c50` (U8, 23.006) and sunken === surface.
+    expect(raised).toBe('#1b2340');
+    expect(raised).toBe(surface);
+    expect(sunken).toBe('#141a33');
   });
 });
 
@@ -1080,10 +1087,12 @@ describe('13.732 — an untinted avatar draws its own boundary in every style, n
     expect(declaredRole('.gn-avatar (planted)', plantedBody, 'background')).toBe('surfaceSunken');
 
     const neoRaised = colorOf('light', cardGround, 'neo');
+    // AMENDED 2026-10-02 (neo refresh N2, 24.007): neo's `surfaceSunken` is now the well, so the planted fill no longer collapses
+    // onto the card in ANY style — the role scan above (`declaredRole(...) === 'surfaceSunken'`) is the witness that remains.
     expect(
       over(colorOf('light', 'surfaceSunken', 'neo'), neoRaised),
-      `neo/light no longer collapses surface-sunken onto ${cardGround} — the roles have diverged, so this witness no longer demonstrates the bug`,
-    ).toBe(neoRaised);
+      `neo/light collapses surface-sunken onto ${cardGround} again — N2 (the sunken = the well) has been reverted`,
+    ).not.toBe(neoRaised);
 
     // THE CONTROL: the same planted fill under `hig`, where the roles differ,
     // does not collapse. Without this line a green witness would also be
@@ -1237,10 +1246,12 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
           // its second one. If that override is ever removed this comparison
           // fails and the third assertion above becomes a real, separate
           // constraint for `neo` too — which is the day it needs its own step.
+          // AMENDED 2026-10-02 (neo refresh N2, 24.007): `surfaceSunken` is now the well, so the third composite IS a separate
+          // constraint for neo — asserted by the `textAccent on fillTertiary over surfaceSunken` check above, not by identity.
           expect(
             sunkenComposite,
-            'neo no longer maps surfaceSunken to surface — the third composite is a new constraint here',
-          ).toBe(composite);
+            'neo maps surfaceSunken to surface again — N2 (24.007) has been reverted',
+          ).not.toBe(composite);
         }
       }
     }
@@ -1441,9 +1452,11 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
   /** 13.679 — T5: the neo light surface and the five semantic colours the export newly declares for it. */
   it('13.679 T5: neo light moves to the refreshed surface and gains five semantic colours that no other style takes', () => {
     expect(primitives.neoPaper).toBe('#f1eae3');
-    for (const role of ['surface', 'surfaceRaised', 'surfaceSunken'] as const) {
+    for (const role of ['surface', 'surfaceRaised'] as const) {
       expect(colorOf('light', role, 'neo'), `neo/light ${role}`).toBe('#f1eae3');
     }
+    // AMENDED 2026-10-02 (neo refresh N2, 24.007): `surfaceSunken` is the well, not paper.
+    expect(colorOf('light', 'surfaceSunken', 'neo'), 'neo/light surfaceSunken').toBe('#e6dcd2');
     // The five, mapped by MEANING: the export's `--pink` is this product's
     // `contested` and its `--purple` is `restricted`. `customMarker` follows
     // `restricted` because it is documented as sharing that primitive.
@@ -1748,10 +1761,11 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
     // the 3:1 a boundary owes, so the shadow is still the chip's boundary and the premise holds in the weaker form
     // asserted for dark below: still no boundary by fill alone.
     const lightCard = colorOf('light', 'surfaceRaised', 'neo');
+    // AMENDED 2026-10-02 (neo refresh N2, 24.007): light too now steps (sunken = the well `#e6dcd2`), by 1.1 — the same weaker form.
     expect(
-      over(colorOf('light', chipFill, 'neo'), lightCard),
-      `neo/light: the chip fill no longer collapses onto the card, so this case's premise has moved`,
-    ).toBe(lightCard);
+      contrastRatio(over(colorOf('light', chipFill, 'neo'), lightCard), lightCard),
+      `neo/light: the chip fill now separates from the card by 3:1 or more, so the shadow is no longer what supplies the boundary`,
+    ).toBeLessThan(3);
     const darkCard = colorOf('dark', 'surfaceRaised', 'neo');
     expect(
       contrastRatio(over(colorOf('dark', chipFill, 'neo'), darkCard), darkCard),
@@ -1947,7 +1961,8 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     expect(measured['minimal/dark']).toBeCloseTo(1.2727, 3);
     expect(measured['neo/light']).toBeCloseTo(1.0757, 3);
     // neo/dark moved 1.1727 -> 1.1684 with UX T1 (owner U8, 2026-10-02): the card the stripe sits on is now `#232c50`.
-    expect(measured['neo/dark']).toBeCloseTo(1.1684, 3);
+    // ...and back 1.1684 -> 1.1727 with the neo refresh (N4 = B, 2026-10-02; 24.007): the card is the page hex `#1b2340` again.
+    expect(measured['neo/dark']).toBeCloseTo(1.1727, 3);
   });
 
   it('the h2 carries the prototype metrics, so the third string is ported and not just relabelled', () => {
