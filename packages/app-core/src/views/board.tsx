@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -1117,6 +1119,14 @@ function BoardGroupSection({
   const depthRef = useRef(new Map<string, number>());
   /** The card being dragged from THIS group, or `null` (another group's drag shows nothing here). */
   const [drag, setDrag] = useState<BoardDrag | null>(null);
+  // The two callbacks every card slot is handed, made referentially stable (smoothness T12, audit SM-10) so a
+  // `memo`'d slot is skipped when the section re-renders for a drag, a drop target or a collapse: `setDrag` is
+  // a state setter (stable), and the page's `onOpenTicket` is a new closure every page render.
+  const stableOpenTicket = useStableCallback(onOpenTicket);
+  const beginCardDrag = useCallback(
+    (ticketId: string, fromStateId: string, height: number) => setDrag({ ticketId, fromStateId, height }),
+    [],
+  );
   /** What a column is to the drag over it: its own column, a legal target, an illegal one, or unknown. */
   const verdictOf = (stateId: string): 'own' | 'legal' | 'refused' | 'unknown' =>
     drag === null || canDropOn === null
@@ -1350,10 +1360,10 @@ function BoardGroupSection({
               key={card.ticketId}
               card={card}
               stateName={column.name}
-              onOpen={() => onOpenTicket(card.ticketId)}
-              onOpenTicket={onOpenTicket}
-              arrows={arrows === null ? null : arrows(card, column.stateId)}
-              onDragBegin={(height) => setDrag({ ticketId: card.ticketId, fromStateId: column.stateId, height })}
+              stateId={column.stateId}
+              onOpenTicket={stableOpenTicket}
+              arrows={arrows}
+              onDragBegin={beginCardDrag}
               today={today}
             />
           ));
@@ -1685,7 +1695,11 @@ function BoardGroupWithMoves({
   // `group.columns` order IS `def.states` order for this pinned version —
   // `arrowTarget`'s own docblock cites the server code that guarantees it —
   // so this is the rendered column list, not a second derivation from `def`.
-  const columnOrder = group.columns.map((column) => column.stateId);
+  // Keyed on the joined ids, not the array: `group` is a new object whenever the board reloads, and `columnOrder`
+  // reaches every `MoveArrows` through the stable `arrows` factory below.
+  const columnOrderKey = group.columns.map((column) => column.stateId).join('\u0000');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columnOrder = useMemo(() => group.columns.map((column) => column.stateId), [columnOrderKey]);
   const workflowDef = workflow.data;
 
   /**
@@ -1698,14 +1712,48 @@ function BoardGroupWithMoves({
    * effect's cleanup after a newer effect's setup for the same ticket id —
    * StrictMode's synthetic double-invoke is exactly this shape.
    */
-  const registerAttempt = (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void): (() => void) => {
-    moveRegistry.current.set(ticketId, attempt);
-    return () => {
-      if (moveRegistry.current.get(ticketId) === attempt) {
-        moveRegistry.current.delete(ticketId);
-      }
-    };
-  };
+  const registerAttempt = useCallback(
+    (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void): (() => void) => {
+      moveRegistry.current.set(ticketId, attempt);
+      return () => {
+        if (moveRegistry.current.get(ticketId) === attempt) {
+          moveRegistry.current.delete(ticketId);
+        }
+      };
+    },
+    [moveRegistry],
+  );
+  // The page builds `moves` afresh on every render. Its identity-bearing fields are what the cards read, so the
+  // capability they are handed is rebuilt only when one of THOSE changes; the two callbacks go through a latest-ref
+  // (their closures are new each render and are only ever called from an event, never in a render).
+  const onMoved = useStableCallback(moves.onMoved);
+  const uploadEvidence = useStableCallback(moves.uploadEvidence ?? NO_UPLOAD);
+  const hasUpload = moves.uploadEvidence !== undefined;
+  // Spread, then override the two callbacks: a field added to `BoardMoveCapability` is forwarded by default (a hand-listed
+  // copy silently dropped it), and only the deps below say which of them may change the capability's identity.
+  const stableMoves = useMemo<BoardMoveCapability>(
+    () => ({ ...moves, onMoved, ...(hasUpload ? { uploadEvidence } : {}) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `moves` itself is new every render; these are the fields a card reads.
+    [moves.dataSource, moves.workspaceId, moves.currentUserId, moves.cache, onMoved, hasUpload, uploadEvidence],
+  );
+  // ONE factory for the whole group — the slot calls it with its own card — so a slot's props do not change
+  // while a drag is in flight. `null` is "capability absent" exactly as before.
+  const arrows = useMemo(
+    () =>
+      workflowDef === null
+        ? null
+        : (card: BoardCardData, fromStateId: string): ReactNode => (
+            <MoveArrows
+              card={card}
+              workflow={workflowDef}
+              fromStateId={fromStateId}
+              columnOrder={columnOrder}
+              moves={stableMoves}
+              registerAttempt={registerAttempt}
+            />
+          ),
+    [workflowDef, columnOrder, stableMoves, registerAttempt],
+  );
 
   /**
    * A column's whole drop contract (board-prototype-port Task 14): read the
@@ -1752,20 +1800,7 @@ function BoardGroupWithMoves({
       onToggleColumn={onToggleColumn}
       onOpenTicket={onOpenTicket}
       onCreateTicket={onCreateTicket}
-      arrows={
-        workflowDef === null
-          ? null
-          : (card, fromStateId) => (
-              <MoveArrows
-                card={card}
-                workflow={workflowDef}
-                fromStateId={fromStateId}
-                columnOrder={columnOrder}
-                moves={moves}
-                registerAttempt={registerAttempt}
-              />
-            )
-      }
+      arrows={arrows}
       onDropCard={handleDrop}
       // `moveOutcome`'s own answer, so a column and an arrow can never disagree; `{}` fields
       // because only `refused` is asked, and refusal never reads them (they split direct from dialog).
@@ -1780,6 +1815,23 @@ function BoardGroupWithMoves({
   );
 }
 
+/** The `uploadEvidence` a capability without one is given by `useStableCallback`; never reached (`hasUpload` gates it). */
+const NO_UPLOAD = (): Promise<{ attachmentId: string }> => Promise.reject(new Error('uploadEvidence is not supplied'));
+
+/**
+ * A function whose identity never changes and which always calls the LATEST one it was given — for a callback
+ * a `memo`'d child receives but only ever calls from an event (never during render), where a page-level closure
+ * that is new every render would otherwise defeat the memo.
+ */
+function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  // After the commit, not in the render: a render React discards (a deferred one) must not leave its closure behind.
+  useHydrationLayoutEffect(() => {
+    latest.current = fn;
+  });
+  return useCallback((...args: A) => latest.current(...args), []);
+}
+
 /**
  * Anything inside the card that is a control of its own, or belongs to the
  * `TransitionDialog` `MoveArrows` mounts INSIDE the card (`Dialog` in
@@ -1788,6 +1840,34 @@ function BoardGroupWithMoves({
  */
 const CARD_CLICK_BAIL_SELECTOR =
   'button, a, input, select, textarea, label, [role="dialog"], .gn-dialog__scrim';
+
+export type BoardCardSlotProps = {
+  card: BoardCardData;
+  stateName: string;
+  /** The column this card is drawn in; `arrows` and `onDragBegin` are keyed on it. */
+  stateId: string;
+  /**
+   * `Board`'s own `onOpenTicket`, referentially stable (`BoardGroupSection` wraps it). The slot binds it to its
+   * own card for the click (`onOpen`) and hands it on raw to the parent badge and the epic chip, which open a
+   * DIFFERENT ticket.
+   */
+  onOpenTicket: (ticketId: string) => void;
+  /**
+   * The group's one arrows factory (smoothness T12), or `null` where the capability is absent. A factory rather
+   * than a ready-made node because a node is a new object every render, and the slot is `memo`'d: with a stable
+   * factory, a render of the section for a drag or a drop target re-renders only the slots whose card changed.
+   */
+  arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
+  /**
+   * Tells the workflow group a drag of THIS card began, with the card's measured
+   * height (board drag fixes D2) — the one thing a target column cannot read
+   * from a `dragover`. Called before the source turns into a placeholder. Takes the card's identity as
+   * arguments so ONE stable function serves every slot.
+   */
+  onDragBegin: (ticketId: string, fromStateId: string, height: number) => void;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
+};
 
 /**
  * The `<li>` around one card — one component per card (as `MoveArrows`
@@ -1855,37 +1935,17 @@ const CARD_CLICK_BAIL_SELECTOR =
  * carries `cursor: pointer` for the read-only path, where a card can be
  * opened but not dragged.
  */
-function BoardCardSlot({
+const BoardCardSlot = memo(function BoardCardSlot({
   card,
   stateName,
-  onOpen,
+  stateId,
   onOpenTicket,
-  arrows,
+  arrows: arrowsOf,
   onDragBegin,
   today,
-}: {
-  card: BoardCardData;
-  stateName: string;
-  onOpen: () => void;
-  /**
-   * `Board`'s own `onOpenTicket`, threaded through UNCHANGED from `onOpen`
-   * above (owner request, 2026-09-23: parent-key badge, epic chip). `onOpen`
-   * opens THIS card's own ticket and is what the `<li>`'s bail-guarded click
-   * handler calls; the parent badge and the epic chip open a DIFFERENT
-   * ticket, which needs the raw function rather than a closure already bound
-   * to `card.ticketId`.
-   */
-  onOpenTicket: (ticketId: string) => void;
-  arrows: ReactNode;
-  /**
-   * Tells the workflow group a drag of THIS card began, with the card's measured
-   * height (board drag fixes D2) — the one thing a target column cannot read
-   * from a `dragover`. Called before the source turns into a placeholder.
-   */
-  onDragBegin: (height: number) => void;
-  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
-  today?: string;
-}) {
+}: BoardCardSlotProps) {
+  const onOpen = () => onOpenTicket(card.ticketId);
+  const arrows = arrowsOf === null ? null : arrowsOf(card, stateId);
   const draggedRef = useRef(false);
   // The placeholder (Task 5A): the source slot, one frame after `dragstart`.
   const [placeholder, setPlaceholder] = useState(false);
@@ -1998,7 +2058,7 @@ function BoardCardSlot({
               event.dataTransfer.setData(DRAG_CARD_MARKER, '');
               const cardElement = event.currentTarget.firstElementChild;
               const cardRect = (cardElement instanceof HTMLElement ? cardElement : event.currentTarget).getBoundingClientRect();
-              onDragBegin(cardRect.height);
+              onDragBegin(card.ticketId, stateId, cardRect.height);
               // Where the pointer took hold of the card, so a drop can be turned back into the card's corner.
               if (moveState !== null) {
                 moveState.grab.current = {
@@ -2047,7 +2107,7 @@ function BoardCardSlot({
       />
     </li>
   );
-}
+});
 
 /**
  * A card never renders a state as a standing fact. It says what happened — "Moved to
