@@ -161,8 +161,8 @@ describe('24.008 every new role reaches the stylesheet under every style x theme
     const NEW = ['raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on'] as const;
     const sheet = themeStylesheet();
     const count = (role: string) => sheet.split(`--gn-shadow-${role}:`).length - 1;
-    // CONTROL: an existing role is declared in all six style x theme blocks (plus the three default blocks, 9 in all);
-    // the plan said "six" and the sheet says nine, so the new roles are held to the existing role's count, not a literal.
+    // CONTROL: an existing role is declared once per block of `themeStylesheet()`: three per style (light, explicit dark,
+    // prefers-color-scheme dark) x hig/minimal/neo = 9. The plan said "six"; the new roles are held to the existing role's count.
     const expected = count('raised');
     expect(expected).toBeGreaterThanOrEqual(6);
     for (const role of NEW) {

@@ -15,7 +15,7 @@
 - ✅ **24.005 — the neo field role: one crisp line per theme at ≥ 3:1 (spec §3.3, §5; N10).** Control: hig and minimal have no field role.
 - ✅ **24.006 — filled surfaces carry no highlight (spec §4; N8).** Control: hig keeps its `action` / `lift` values. The press shades are the fill × 0.75.
 - ✅ **24.007 — surfaces: sunken = the well, dark raised = the page hex (N2, N4 = B).** Control: hig's sunken and dark raised did not move. Placeholder floor: neo light `textSubtle` is the new `neoTextSubtleLight` `#5b5b5f` (4.68 composited on the well; the shared `#5e5e62` read 4.47, caught by 18.306).
-- ✅ **24.008 — every new role reaches the stylesheet under every style × theme (13.411 extended).** Control: the sixteen names are counted six times each. The stylesheet declares each role as often as `raised` (9 times: six style×theme blocks plus three default blocks), not the plan's six.
+- ✅ **24.008 — every new role reaches the stylesheet under every style × theme (13.411 extended).** Control: the sixteen names are counted six times each. The stylesheet declares each role as often as `raised` (9 times: three blocks per style — light, explicit dark, prefers-color-scheme dark — × hig/minimal/neo), not the plan's six.
 
 ## 24.2 Press inversion and the filled-fill rule (T2)
 

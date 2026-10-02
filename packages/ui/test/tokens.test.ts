@@ -1089,10 +1089,14 @@ describe('13.732 — an untinted avatar draws its own boundary in every style, n
     const neoRaised = colorOf('light', cardGround, 'neo');
     // AMENDED 2026-10-02 (neo refresh N2, 24.007): neo's `surfaceSunken` is now the well, so the planted fill no longer collapses
     // onto the card in ANY style — the role scan above (`declaredRole(...) === 'surfaceSunken'`) is the witness that remains.
-    expect(
-      over(colorOf('light', 'surfaceSunken', 'neo'), neoRaised),
-      `neo/light collapses surface-sunken onto ${cardGround} again — N2 (the sunken = the well) has been reverted`,
-    ).not.toBe(neoRaised);
+    // Same weaker form as 13.920: the fill steps off the card but by well under 3:1, so there is still no boundary by fill alone.
+    for (const theme of ['light', 'dark'] as const) {
+      const card = colorOf(theme, cardGround, 'neo');
+      expect(
+        contrastRatio(over(colorOf(theme, 'surfaceSunken', 'neo'), card), card),
+        `neo/${theme}: the planted surface-sunken fill now separates from ${cardGround} by 3:1 or more`,
+      ).toBeLessThan(3);
+    }
 
     // THE CONTROL: the same planted fill under `hig`, where the roles differ,
     // does not collapse. Without this line a green witness would also be
