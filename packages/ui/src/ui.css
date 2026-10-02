@@ -4406,7 +4406,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-select__option-label { flex: 1; }
 
 .ticket-type-list { display: flex; flex-direction: column; gap: 0.9rem; }
-.ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
 /* `wrap`, the same measured reason `.gn-mcp-tokens__row` carries it: at 390px
    the heading column and the New-type button do not share a line. */
 .ticket-type-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
@@ -4558,7 +4557,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .ticket-type-list__meta-sep { font-size: 0.75rem; color: var(--gn-text-muted); }
 
 .ticket-type-editor { display: flex; flex-direction: column; gap: 0.9rem; }
-.ticket-type-editor__loading { margin: 0; color: var(--gn-text-muted); }
 .ticket-type-editor__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1rem; align-items: start; }
 .ticket-type-editor__main,
 .ticket-type-editor__aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
@@ -4832,7 +4830,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (max-width: 40rem) {
   .template-gallery__cards { grid-template-columns: minmax(0, 1fr); }
 }
-.workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
 /* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
    preference. `danger` used as TEXT on `surface` measures **4.40** under
    `hig`/`minimal` light (`neo` light 6.28, both darks 5.47-6.12) — below the
@@ -8130,7 +8127,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    one screen over. The remedy is the one `.ticket-type-list__badge` already
    ships — keep the fill, add the compact sunken shadow under `neo`. */
 .workflow-list { display: flex; flex-direction: column; gap: 0.9rem; }
-.workflow-list__loading { margin: 0; color: var(--gn-text-muted); }
 /* The same `--gn-text` the sibling screen's own load-error uses
    (`.workflow-builder-screen__load-error`), rather than a danger tone: the
    failure here is "we could not read", not "something is wrong with your data". */
@@ -8214,7 +8210,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    reader who cannot see it, and this screen's whole subject is which version
    you are looking at. */
 .workflow-history { display: flex; flex-direction: column; gap: 0.9rem; }
-.workflow-history__loading { margin: 0; color: var(--gn-text-muted); }
 .workflow-history__load-error { margin: 0; color: var(--gn-text); }
 .workflow-history__empty { margin: 0; color: var(--gn-text-muted); }
 /* A hole in the chain is said out loud rather than rendered as a shorter list. */
@@ -9087,7 +9082,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* V4 — the WAIT arm. Deliberately the muted ink of `.gn-comments__empty` and
    not the danger tone of `__error`: a read in flight is a state, not a fault,
    and painting it red would be the same misreading in the other direction. */
-.gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
 /* ⚠ MARGIN ONLY, and the four declarations that used to sit here were the
    composer's CHROME — radius, `--gn-surface` ground, `--gn-shadow-raised` and
    `overflow: hidden`. The chrome moved to `.editor-slot` in `packages/editor`'s

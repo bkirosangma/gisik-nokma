@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
-import { Button, Card, Popover } from '@gisik-nokma/ui';
+import { Button, Card, Popover, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -244,7 +244,15 @@ export function TicketTypeListScreen(props: {
   if (loadFailed) {
     return <p className="ticket-type-list__load-error">Could not load ticket types. Reload to try again.</p>;
   }
-  if (types === null || workflows === null) return <p className="ticket-type-list__loading">Loading ticket types…</p>;
+  if (types === null || workflows === null) {
+    return (
+      <section className="ticket-type-list">
+        <SkeletonRegion label="Loading ticket types">
+          <Skeleton shape="block" height="4rem" rows={4} />
+        </SkeletonRegion>
+      </section>
+    );
+  }
   // The narrowed array, named once. `types` is still `TicketTypeDef[] | null` to
   // TypeScript INSIDE the two closures below — the early return narrows it for
   // this render scope only, and a closure may outlive it. Reading the narrowed

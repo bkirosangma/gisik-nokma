@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
+import { Button, Card, SegmentedControl, Skeleton } from '@gisik-nokma/ui';
 import { authClient } from '../../src/auth-client.js';
 import { BrandMark } from '../../src/brand-mark.js';
 import { FormPageShell } from '../../src/skeletons/page-shells.js';
@@ -127,8 +127,10 @@ function samePathOnly(raw: string | null): string {
  */
 type AuthMethods = { google: boolean; apple: boolean; phone: boolean };
 
-function useAuthMethods(): AuthMethods | null {
+function useAuthMethods(): { methods: AuthMethods | null; settled: boolean } {
   const [available, setAvailable] = useState<AuthMethods | null>(null);
+  /** The read has ANSWERED OR FAILED: `null` alone cannot tell "still asking" from "could not ask" (smoothness T8, case 25.133). */
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => {
     // `/v1/*` is rewritten to the API by `next.config.ts`, so this is
@@ -138,16 +140,19 @@ function useAuthMethods(): AuthMethods | null {
       .then(async (response) => (response.ok ? ((await response.json()) as AuthMethods) : null))
       .then((answer) => {
         if (answer !== null) setAvailable(answer);
+        setSettled(true);
       })
       .catch(() => {
         // Deliberately silent, and deliberately NOT `setError`. A refusal here
         // is not something the person signing in can act on, and the two methods
-        // that need no provider still work. It stays `null`, so nothing renders.
+        // that need no provider still work. It stays `null`, so nothing renders —
+        // but it IS settled, so the methods slot stops drawing its skeleton.
+        if (!controller.signal.aborted) setSettled(true);
       });
     return () => controller.abort();
   }, []);
 
-  return available;
+  return { methods: available, settled };
 }
 
 /**
@@ -177,7 +182,7 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = samePathOnly(searchParams.get('next'));
-  const social = useAuthMethods();
+  const { methods: social, settled: methodsSettled } = useAuthMethods();
 
   /**
    * PHONE IS OFFERED ONLY WHERE A CODE CAN ARRIVE, and `method` is DERIVED
@@ -209,6 +214,30 @@ function SignInForm() {
   const [error, setError] = useState<string | null>(null);
 
   const fail = (message: string | undefined) => setError(message ?? 'Sign-in failed. Try again.');
+
+  /**
+   * WHICH CALL IS IN FLIGHT (smoothness T8, case 25.134; spec S6, audit SM-11). Every submit on this page is a busy button while
+   * its call is open: disabled and `aria-busy`, so a second click sends nothing, and the label says what is happening. It is
+   * cleared in `finally`, so a refusal or a network failure frees the button again; while one call is open every other control on
+   * the card is disabled too, because two sign-in attempts in flight is never what a person meant.
+   */
+  const [sending, setSending] = useState<'none' | 'otp' | 'verify' | 'magic' | 'passkey' | 'social'>('none');
+  const idle = sending === 'none';
+  const run = (
+    kind: Exclude<typeof sending, 'none'>,
+    call: () => Promise<{ error?: { message?: string } | null }>,
+    refusal: (message: string | undefined) => string | undefined,
+    onSuccess: () => void,
+  ): void => {
+    if (!idle) return;
+    setSending(kind);
+    void call()
+      .then(
+        ({ error: failure }) => (failure ? fail(refusal(failure.message)) : onSuccess()),
+        () => fail(undefined),
+      )
+      .finally(() => setSending('none'));
+  };
 
   /**
    * PASSKEY: THE BUTTON IS BACK, BECAUSE REGISTRATION NOW EXISTS — AND IT IS A
@@ -308,17 +337,20 @@ function SignInForm() {
           the `/sign-in` accessible-names baseline falls in this change; that is
           a dead control leaving, not a ratchet going slack.
         */}
-        {phoneAvailable ? (
-          <SegmentedControl
-            aria-label="Sign-in method"
-            value={method}
-            onChange={setChosen}
-            options={[
-              { value: 'phone', label: 'Phone' },
-              { value: 'email', label: 'Email link' },
-            ]}
-          />
-        ) : null}
+        <div className="gn-sign-in__methods-slot" data-state={methodsSettled ? 'ready' : 'pending'}>
+          {!methodsSettled ? <Skeleton shape="block" height="2.5rem" /> : null}
+          {phoneAvailable ? (
+            <SegmentedControl
+              aria-label="Sign-in method"
+              value={method}
+              onChange={setChosen}
+              options={[
+                { value: 'phone', label: 'Phone' },
+                { value: 'email', label: 'Email link' },
+              ]}
+            />
+          ) : null}
+        </div>
 
         {method === 'phone' ? (
           <div className="gn-sign-in__method">
@@ -334,12 +366,11 @@ function SignInForm() {
             {!codeSent ? (
               <Button
                 variant="primary"
+                busy={sending === 'otp'}
+                busyLabel="Sending…"
+                disabled={!idle}
                 onClick={() =>
-                  void authClient.phoneNumber
-                    .sendOtp({ phoneNumber: phone })
-                    .then(({ error: sendError }) =>
-                      sendError ? fail(sendError.message) : setCodeSent(true),
-                    )
+                  run('otp', () => authClient.phoneNumber.sendOtp({ phoneNumber: phone }), (message) => message, () => setCodeSent(true))
                 }
               >
                 Send code
@@ -356,12 +387,11 @@ function SignInForm() {
                 </label>
                 <Button
                   variant="primary"
+                  busy={sending === 'verify'}
+                  busyLabel="Signing in…"
+                  disabled={!idle}
                   onClick={() =>
-                    void authClient.phoneNumber
-                      .verify({ phoneNumber: phone, code })
-                      .then(({ error: verifyError }) =>
-                        verifyError ? fail(verifyError.message) : router.push(next),
-                      )
+                    run('verify', () => authClient.phoneNumber.verify({ phoneNumber: phone, code }), (message) => message, () => router.push(next))
                   }
                 >
                   Verify and sign in
@@ -382,11 +412,12 @@ function SignInForm() {
               className="gn-sign-in__method-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                void authClient.signIn
-                  .magicLink({ email, callbackURL: webOriginCallback(next) })
-                  .then(({ error: linkError }) =>
-                    linkError ? fail(emailRefusalSentence(linkError.message)) : setEmailSent(true),
-                  );
+                run(
+                  'magic',
+                  () => authClient.signIn.magicLink({ email, callbackURL: webOriginCallback(next) }),
+                  emailRefusalSentence,
+                  () => setEmailSent(true),
+                );
               }}
             >
             <label className="gn-field">
@@ -418,7 +449,7 @@ function SignInForm() {
                 <p className="gn-sign-in__hint">
                   We&rsquo;ll email you a link that signs you in. It expires in 15 minutes.
                 </p>
-                <Button variant="primary" type="submit">
+                <Button variant="primary" type="submit" busy={sending === 'magic'} busyLabel="Sending…" disabled={!idle}>
                   Send magic link
                 </Button>
               </>
@@ -445,19 +476,21 @@ function SignInForm() {
             conditional-mediation request the docblock above refuses. */}
         <div className="gn-sign-in__alternatives">
           <Button
+            busy={sending === 'passkey'}
+            busyLabel="Signing in…"
+            disabled={!idle}
             onClick={() =>
-              void authClient.signIn
+              run(
+                'passkey',
                 // `autoFill: false` EXPLICITLY. Omitting it would reach the
                 // same behaviour through a library default, and this argument
                 // is the one thing standing between a click and the
                 // mount-time conditional-mediation request that spends a
                 // shared sign-in budget for every anonymous page load.
-                .passkey({ autoFill: false })
-                .then(({ error: passkeyError }) =>
-                  passkeyError
-                    ? fail(passkeyError.message ?? 'That passkey was not accepted.')
-                    : router.push(next),
-                )
+                () => authClient.signIn.passkey({ autoFill: false }),
+                (message) => message ?? 'That passkey was not accepted.',
+                () => router.push(next),
+              )
             }
           >
             Sign in with a passkey
@@ -484,12 +517,10 @@ function SignInForm() {
                      name: 'Continue with Google' })` resolves — so 13.292's
                      locator still finds this control after the restyle. */
                   aria-label="Continue with Google"
+                  busy={sending === 'social'}
+                  disabled={!idle}
                   onClick={() =>
-                    void authClient.signIn
-                      .social({ provider: 'google', callbackURL: webOriginCallback(next) })
-                      .then(({ error: socialError }) =>
-                        socialError ? fail(socialError.message) : undefined,
-                      )
+                    run('social', () => authClient.signIn.social({ provider: 'google', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
                   }
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -500,12 +531,10 @@ function SignInForm() {
                 <Button
                   className="gn-sign-in__mark"
                   aria-label="Continue with Apple"
+                  busy={sending === 'social'}
+                  disabled={!idle}
                   onClick={() =>
-                    void authClient.signIn
-                      .social({ provider: 'apple', callbackURL: webOriginCallback(next) })
-                      .then(({ error: socialError }) =>
-                        socialError ? fail(socialError.message) : undefined,
-                      )
+                    run('social', () => authClient.signIn.social({ provider: 'apple', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
                   }
                 >
                   <AppleMark />

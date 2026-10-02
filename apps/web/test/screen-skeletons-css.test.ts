@@ -28,7 +28,7 @@ describe('25.136 the T8 skeleton rules lay out and paint nothing', () => {
     const slot = ruleExactly(css, '.gn-sign-in__methods-slot[data-state="pending"]');
     expect(valueOf(slot, 'min-height')).not.toBeNull();
     // Nothing of the project's later CSS follows the block (the placeholder blocks stay last, 25.019).
-    expect(css.lastIndexOf('/* ──')).toBeGreaterThanOrEqual(start);
+    expect(css.lastIndexOf('/* ──'), 'a section header follows the T8 block').toBe(css.lastIndexOf('/* ──', start));
   });
 });
 

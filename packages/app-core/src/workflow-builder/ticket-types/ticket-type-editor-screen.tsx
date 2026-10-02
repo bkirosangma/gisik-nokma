@@ -6,7 +6,7 @@ import {
   type PublishedWorkflowDef,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Card, Select } from '@gisik-nokma/ui';
+import { Button, Card, Select, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -350,7 +350,9 @@ export function TicketTypeEditorScreen(props: {
     return (
       <section className="ticket-type-editor">
         {header}
-        <p className="ticket-type-editor__loading">Loading ticket types…</p>
+        <SkeletonRegion label="Loading ticket types">
+          <Skeleton shape="block" height="3rem" rows={4} />
+        </SkeletonRegion>
       </section>
     );
   }
