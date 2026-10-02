@@ -132,6 +132,13 @@ export type ProjectRef = {
    * sites be enumerated instead of each deciding for itself.
    */
   prefix: string;
+  /**
+   * The project group this project is filed under, `null` when ungrouped (prefixes and groups
+   * plan Task 6). Always present on the wire (the mapper refuses a row without the key) — a null
+   * is an answer, not a withholding. Optional in the TYPE only so hand-built fixtures and
+   * offline rows that predate groups need not name it; read it as `groupId ?? null`.
+   */
+  groupId?: string | null;
   /** null = withheld (guest); a number is a count of what THIS caller may see. */
   ticketCount: number | null;
   /** null = withheld (guest). Counted by the same rule `FilterSpec.blocked` uses. */
@@ -347,7 +354,7 @@ export type BoardColumn = {
    * 2026-09-23) — `isCreatableState(def, stateId)`, carried down from the
    * server's `BoardColumn` (`packages/domain/src/read-models.ts`) exactly as
    * `blocked` already is. `board.tsx`'s empty-column card reads this to decide
-   * whether "Add a ticket" renders at all.
+   * whether "Create ticket" renders at all.
    */
   creatable: boolean;
   cards: BoardCard[];

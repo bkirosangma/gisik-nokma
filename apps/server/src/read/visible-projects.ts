@@ -39,6 +39,8 @@ export type VisibleProject = {
    * the half must be unique within one — see the call below.
    */
   prefix: string;
+  /** The group this project is filed under, `null` when ungrouped (prefixes and groups Task 6). */
+  groupId: string | null;
 };
 
 /**
@@ -219,9 +221,10 @@ export async function visibleProjects(
     archived: boolean;
     description: string | null;
     prefix: string | null;
+    group_id: string | null;
     deleted_at: Date | null;
   }>(
-    `SELECT project_id, name, founding_name, archived, description, prefix, deleted_at FROM proj_projects
+    `SELECT project_id, name, founding_name, archived, description, prefix, group_id, deleted_at FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
@@ -271,6 +274,7 @@ export async function visibleProjects(
       // render.
       description: row.description,
       prefix: resolved[index]!,
+      groupId: row.group_id,
     });
   }
   if (eff.workspaceRole === 'owner') return visible;

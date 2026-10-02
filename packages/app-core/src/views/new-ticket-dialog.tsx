@@ -368,7 +368,7 @@ export type NewTicketDialogProps = {
    * board-column create carries no parent — and an epic created into a
    * column vanishes from every column the board draws (`isEpic`'s filter,
    * owner ruling 2026-09-20), leaving the very column the person clicked
-   * "Add a ticket" in empty. `defaultRootTypeFor` is E5-16's own answer to
+   * "Create ticket" in empty. `defaultRootTypeFor` is E5-16's own answer to
    * "which type by default", asked again here rather than re-decided; see
    * the open effect below for the full argument. Pre-fills the starting
    * status too (that column's `stateId`), and turns "Starts in the
@@ -597,7 +597,7 @@ export function NewTicketDialog({
     /**
      * `initialSelection` (starting-status design, 2026-09-23) — a board
      * column's own identity, present only when THIS open came from a
-     * column's "Add a ticket" rather than the header's unscoped one.
+     * column's "Create ticket" rather than the header's unscoped one.
      *
      * ⚠ **DEVIATES from the design's literal text, and the deviation is
      * measured, not a guess.** The design says "the first is pre-selected" —
@@ -908,7 +908,7 @@ export function NewTicketDialog({
   };
 
   return (
-    <Dialog open={open} title="New ticket" onClose={onClose}>
+    <Dialog open={open} title="Create ticket" onClose={onClose}>
       <label className="gn-new-ticket__field">
         Title
         {/* `gn-field__input` — the product's own field treatment, and the one
@@ -1366,7 +1366,7 @@ export function NewTicketDialog({
           }
           onClick={create}
         >
-          Create
+          Create ticket
         </Button>
       </div>
     </Dialog>

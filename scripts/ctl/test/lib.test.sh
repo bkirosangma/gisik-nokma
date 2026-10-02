@@ -228,6 +228,7 @@ fk=$(mktemp -d); cat > "$fk/tmux" <<'FAKE'
 printf '%s\n' "$*" >> "$FAKE_LOG"
 case "$1" in
   display-message) echo "${FAKE_MODE:-0}";;
+  list-windows) echo 7;;
   send-keys) case "$*" in *" Enter") n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0); echo $((n+1)) > "$FAKE_ENTERS";; esac;;
   capture-pane) esc=$(printf '\033')
     if [ -n "${FAKE_PANE:-}" ]; then case " $* " in *" -e "*) cat "$FAKE_PANE";; *) sed "s/$esc\[[0-9;]*m//g" "$FAKE_PANE";; esac; exit 0; fi
@@ -242,6 +243,16 @@ check "press_enter: not in copy mode → one real Enter, no cancel" 'fake 0 1 "c
 check "press_enter: in copy mode → cancel first, then Enter" 'fake 1 1 "ctl_press_enter gisik:7" >/dev/null; [ "$(grep send-keys "$fk/calls" | tr "\n" " ")" = "send-keys -t gisik:7 -X cancel send-keys -t gisik:7 Enter " ]'
 check "box_text: real text is read" '[ "$(fake 0 1 "ctl_box_text gisik:7")" = "[a brief line]" ]'
 check "box_text: the dim queued hint is not input" '[ -z "$(fake 0 0 "ctl_box_text gisik:7")" ] && fake 0 0 "ctl_box_queued gisik:7"'
+# 13.1640: the prompt suggestion with NO closing reset (real capture, gisik:1 2026-10-02) is not input; control: real text
+# after a CLOSED dim span is still read, and real text before an unclosed one is kept.
+p_ghost="$fk/pane-ghost.txt"; printf '\033[38;5;241m\xe2\x9d\xaf \033[39m\033[2mRead the WHOLE file BRIEF-prefix-t11 and execute it\n  status line\n' > "$p_ghost"
+p_mixed="$fk/pane-mixed.txt"; printf '\033[38;5;241m\xe2\x9d\xaf \033[39m\033[2mhint\033[0m real words \033[2mtrailing ghost\n' > "$p_mixed"
+ghost() { FAKE_LOG="$fk/calls" FAKE_PANE="$1" PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; ctl_box_text gisik:7"; }
+check "13.1640 box_text: an UNCLOSED dim suggestion is not input" '[ -z "$(ghost "$p_ghost")" ]'
+check "13.1640 box_text: control — real text between a closed and an unclosed dim span is read" '[ "$(ghost "$p_mixed")" = "real words" ]'
+sp() { rm -f "$fk/calls" "$fk/enters"; CTL_DRY_RUN=0 FAKE_LOG="$fk/calls" FAKE_ENTERS="$fk/enters" FAKE_NEEDS="${2:-1}" FAKE_PANE="$1" PATH="$fk:$PATH" bash "$HERE/verbs/dispatch.sh" 7 --submit-pending --repo "$HERE/../.." 2>&1; }
+check "13.1641 dispatch --submit-pending: a pasted-but-unsent message is submitted by real Enters, never re-pasted" 'out=$(sp "" 2); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "^OK dispatch gisik:7 submitted its pending text (Enter ×2)" && ! grep -q paste-buffer "$fk/calls"'
+check "13.1642 dispatch --submit-pending: a box with only a ghost suggestion is refused and gets NO Enter" 'out=$(sp "$p_ghost"); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "holds no real text" && ! grep -q "send-keys" "$fk/calls"'
 check "submit: a single-line box empties on the first Enter → 1" '[ "$(fake 0 1 "ctl_submit gisik:7")" = 1 ]'
 check "submit: a multi-line box absorbs the first Enter → 2" '[ "$(fake 0 2 "ctl_submit gisik:7")" = 2 ]'
 check "submit: a box that never empties → exit 1 after 3 Enters" '! fake 0 99 "ctl_submit gisik:7" >/dev/null && [ "$(cat "$fk/enters")" -eq 3 ]'

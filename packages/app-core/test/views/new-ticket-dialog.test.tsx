@@ -223,7 +223,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
           : { parentCandidatesUnavailable: unavailableAfterPick })}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     return onCreate;
   };
 
@@ -355,7 +355,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
     expect(screen.getByRole('combobox', { name: 'Parent' })).toHaveValue('None (project root)');
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
 
     // `''` becomes `null` at the submit boundary — `ticketCreatedPayload` types `parentId` as a
     // nullable ULID and `''` is neither, which is why the translation lives there and not in
@@ -403,7 +403,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
     );
     expect(screen.getByRole('combobox', { name: 'Parent' })).toHaveValue('None (project root)');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Order the tent',
       typeId: 'task',
@@ -552,7 +552,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     fireEvent.click(switchControl());
     expect(switchControl()).not.toBeChecked();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -579,7 +579,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     const onCreate = renderDialog();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -603,7 +603,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     expect(switchControl()).toBeChecked();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
 
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
@@ -637,7 +637,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     expect(switchControl()).toBeChecked();
     await user.click(switchControl());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -671,7 +671,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     await user.click(switchControl());
     expect(switchControl()).toBeChecked();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -703,7 +703,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     // parent could not father a focus child, and that rule is lifted.
     expect(switchControl()).toBeChecked();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -762,7 +762,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     );
     expect(switchControl()).not.toBeChecked();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Renew the trade licence',
       typeId: 'task',
@@ -940,7 +940,7 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
     // `HTMLButtonElement` explicitly: the discrimination pin below reads
     // `.disabled` off the live DOM node, which `HTMLElement` does not carry —
     // and vitest is green either way, so the typecheck is the check.
-    const create = screen.getByRole<HTMLButtonElement>('button', { name: 'Create' });
+    const create = screen.getByRole<HTMLButtonElement>('button', { name: 'Create ticket' });
     expect(create).toBeEnabled();
 
     // Two clicks in ONE React batch — the case a committed `disabled` cannot
@@ -959,25 +959,25 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
 
     // …and while the first one is still in flight the control says so, rather
     // than looking pressable beside a request already on the wire.
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
     release();
   });
 
   it('the guard LIFTS when the create settles, so a refusal does not strand the dialog', async () => {
     const { onCreate, release } = slowDialog();
     await act(async () => {
-      screen.getByRole('button', { name: 'Create' }).click();
+      screen.getByRole('button', { name: 'Create ticket' }).click();
     });
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
 
     // The flow leaves the dialog OPEN on a refusal — nothing landed, nothing is
     // in flight, and the person must be able to press again.
     await act(async () => {
       release();
     });
-    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeEnabled();
     await act(async () => {
-      screen.getByRole('button', { name: 'Create' }).click();
+      screen.getByRole('button', { name: 'Create ticket' }).click();
     });
     expect(onCreate).toHaveBeenCalledTimes(2);
   });
@@ -1042,14 +1042,14 @@ describe('E2-37 a reopened New-ticket dialog is EMPTY', () => {
     rerender(<NewTicketDialog open {...props} onCreate={onCreate} />);
 
     expect(screen.getByLabelText('Title')).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
   });
 
   it('a SUCCESSFUL create leaves no draft behind either — the same close, whichever way it ended', () => {
     const onCreate = vi.fn();
     const { rerender } = render(<NewTicketDialog open {...props} onCreate={onCreate} />);
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
 
     // The flow closes the dialog on `committed` — the very next thing it does.
@@ -1120,7 +1120,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     expect(screen.getByLabelText('Type')).toHaveValue('Task');
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Order the tent',
       typeId: 'task',
@@ -1179,7 +1179,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     );
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     expect(screen.getByLabelText('Type')).toHaveValue('Task');
-    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeEnabled();
 
     // The workspace's own ladder arrives and does not carry the type the seed
     // chose. Nothing re-seeds (`useState` runs once), so `typeId` is now an id
@@ -1201,8 +1201,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     // not in it — so the re-seed asks the same question the initial seed did and
     // the control paints the type the list actually carries.
     expect(screen.getByLabelText('Type')).toHaveValue('Errand');
-    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith({
       title: 'Order the tent',
       typeId: 'errand',
@@ -1279,7 +1279,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     expect(screen.getByLabelText('Type')).toHaveValue('');
     expect(screen.getByLabelText('Type')).toHaveAttribute('placeholder', 'Choose a type');
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
     expect(onCreate).not.toHaveBeenCalled();
   });
 });
@@ -1288,7 +1288,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
  * Case `13.1139` — E4-13 — the Title field wears the product's own field
  * treatment instead of painting as raw user-agent chrome.
  *
- * Opened *New ticket* on the board and measured the first control a person
+ * Opened *New ticket* (now *Create ticket*) on the board and measured the first control a person
  * types into: `getComputedStyle(input)` gave `border: 2px inset rgb(118,118,118)`,
  * `background-color: rgb(255,255,255)`, `border-radius: 0px`,
  * `padding: 1px 2px`, `font-size: 13.33px`, and `getBoundingClientRect` gave
@@ -1407,7 +1407,7 @@ describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () 
     await user.click(
       within(screen.getByRole('tablist', { name: 'Priority' })).getByRole('tab', { name: 'P1' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     // `objectContaining` rather than the whole draft: this case is about the
     // priority travelling, and the other three members are asserted by the
     // describes above — a full `toEqual` here would be a second copy of them
@@ -1523,7 +1523,7 @@ describe('13.1365 the dialog composes a description through the editorSlot seam'
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     await user.click(screen.getByRole('button', { name: 'type the description' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
 
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ description: DOC }));
 
@@ -1555,7 +1555,7 @@ describe('13.1365 the dialog composes a description through the editorSlot seam'
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     await user.click(screen.getByRole('button', { name: 'type the description' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
 
     const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     // The KEY SET, not a value: `description: undefined` would satisfy a
@@ -1583,7 +1583,7 @@ describe('13.1365 the dialog composes a description through the editorSlot seam'
       />,
     );
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(Object.keys(draft)).not.toContain('description');
     expect(draft['title']).toBe('Order the tent');
@@ -1623,7 +1623,7 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
     expect(picker).toHaveValue('Unassigned');
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     // `null`, not absent and not `''`: `ticket.created`'s `assigneeId` is
     // nullable and `TicketState.assigneeId` is `string | null`, so null is the
     // one spelling of "nobody" the whole chain agrees on.
@@ -1642,7 +1642,7 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
     );
     expect(picker).toHaveValue('Balti Sangma');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: 'user_balti' }));
   });
 
@@ -1662,7 +1662,7 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
     expect(screen.getByText(/HTTP 500 for \/v1\/workspaces\/ws_1\/members/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: null }));
   });
 
@@ -1717,7 +1717,7 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
     );
     expect(screen.queryByRole('combobox', { name: 'Assignee' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     // `null`, and asserted on the DRAFT — the sentence on screen was already
     // correct, so a case reading the screen would have passed against the defect
     // (3.157's own lesson, which is why it is repeated here rather than cited).
@@ -1883,7 +1883,7 @@ describe('13.1435–13.1441 the Starting status select', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
 
     // Backlog ON (the default): omitted, whatever the select underneath says.
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('stateId');
 
@@ -1891,7 +1891,7 @@ describe('13.1435–13.1441 the Starting status select', () => {
     // the wire's own absence-means-initial rule, kept minimal.
     onCreate.mockClear();
     await user.click(backlogSwitch());
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('stateId');
 
@@ -1899,7 +1899,7 @@ describe('13.1435–13.1441 the Starting status select', () => {
     onCreate.mockClear();
     await user.click(statusTrigger());
     await user.click(await screen.findByRole('option', { name: 'Doing' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ stateId: 'doing' }));
   });
 
@@ -1965,7 +1965,7 @@ describe('13.1435–13.1441 the Starting status select', () => {
     );
     expect(backlogSwitch()).not.toBeChecked();
 
-    // Closed, then reopened UNSCOPED (the header's own "New ticket") — if the
+    // Closed, then reopened UNSCOPED (the header's own "Create ticket") — if the
     // board-initiated open above had called `rememberNewTicketStart`, this
     // would read 'focus' and the switch would be OFF here too.
     rerender(<NewTicketDialog {...baseProps({ open: false })} />);
@@ -2009,7 +2009,7 @@ describe('13.1443, 13.1445 the birth Start/Due date inputs', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-30' } });
     // Due date left empty.
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
     const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(draft['startDate']).toBe('2026-09-30');
@@ -2028,13 +2028,13 @@ describe('13.1443, 13.1445 the birth Start/Due date inputs', () => {
     // the only value that can actually exercise it.
     fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '99999-01-01' } });
     expect(screen.getByText('Due date must be a real day in YYYY-MM-DD form.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeDisabled();
 
     // Clearing it back to empty removes the refusal and re-enables Create —
     // an EMPTY input is omitted, not invalid, the same distinction the draft
     // itself draws (13.1443).
     fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '' } });
     expect(screen.queryByText('Due date must be a real day in YYYY-MM-DD form.')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Create' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create ticket' })).not.toBeDisabled();
   });
 });

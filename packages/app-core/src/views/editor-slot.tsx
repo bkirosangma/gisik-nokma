@@ -218,7 +218,7 @@ export type EditorSlotProps = {
    * description and its comment thread both write to a ticket that already
    * exists, so a `ticket.field_set`/`comment.added` is exactly the act.
    *
-   * The New ticket dialog is the mount where neither holds. Its description
+   * The Create ticket dialog is the mount where neither holds. Its description
    * belongs to a ticket that **does not exist yet** — `Create` mints the id and
    * writes `ticket.created` — so there is nothing to submit to at the moment the
    * words are typed, and a `ticket.field_set` sent early would name a ticket

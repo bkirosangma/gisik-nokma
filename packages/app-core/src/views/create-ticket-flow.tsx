@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
-import { Button } from '@gisik-nokma/ui';
+import { Button, PlusIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import {
@@ -60,9 +60,9 @@ export type CreateTicketFlowProps = {
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
    *
-   * The board's empty state has a "Create a ticket" button that renders only
+   * The board's empty state has a "Create ticket" button that renders only
    * when `onCreateTicket` is passed down, and the shell had nothing to pass: this
-   * flow owns its dialog's open state and renders its own "New ticket" trigger,
+   * flow owns its dialog's open state and renders its own "Create ticket" trigger,
    * so no caller could open it from anywhere else. A shell that wants the empty
    * board to open this dialog passes `open`/`onOpenChange` and drives it.
    *
@@ -104,7 +104,7 @@ type ReopenPrompt = {
 type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigin };
 
 /**
- * "New ticket", wired through the guarded flow: an instant pre-check preview
+ * "Create ticket", wired through the guarded flow: an instant pre-check preview
  * when the parent is cached, the server's refusal otherwise, and — on
  * `hierarchy.parent-terminal` either way — the reopen offer at the moment it
  * happens (owner decision). Nothing is retried silently; every refusal is
@@ -496,7 +496,8 @@ export function CreateTicketFlow({
   return (
     <>
       <Button variant="primary" onClick={() => setDialogOpen(true)}>
-        New ticket
+        <PlusIcon />
+        Create ticket
       </Button>
       <NewTicketDialog
         /**
