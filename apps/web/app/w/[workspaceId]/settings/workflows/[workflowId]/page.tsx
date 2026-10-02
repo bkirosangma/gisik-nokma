@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { WorkflowBuilderScreen, draftFromPublished, type WorkflowDraft } from '@gisik-nokma/app-core';
+import { draftFromPublished, type WorkflowDraft } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../../../src/shell-refusal.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
+import { WorkflowBuilderScreen } from '../../../../../../src/authoring/workflow-builder-dynamic.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/[workflowId]` — the published definition,
