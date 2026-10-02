@@ -4,6 +4,7 @@ import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
@@ -111,7 +112,7 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
     expect(allRows(m)).toHaveLength(0);
     expect(m.sideList).toHaveLength(1);
     expect(m.sideList[0]!.reason).toBe('due-only');
-    expect(m.sideList[0]!.note).toBe("needed by 28 Aug — Kiro's claim");
+    expect(m.sideList[0]!.note).toBe("needed by 28 Aug, Kiro's claim");
     expect(m.sideList[0]!.startClaim).toBeNull();
     expect(m.sideList[0]!.dueClaim?.date).toBe('2026-08-28');
   });
@@ -124,7 +125,7 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
     ]);
     expect(allRows(m)).toHaveLength(0);
     expect(m.sideList[0]!.reason).toBe('start-only');
-    expect(m.sideList[0]!.note).toBe("starts 24 Aug — Anselma's claim");
+    expect(m.sideList[0]!.note).toBe("starts 24 Aug, Anselma's claim");
     expect(m.sideList[0]!.dueClaim).toBeNull();
   });
 
@@ -133,7 +134,9 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
     expect(allRows(m)).toHaveLength(0);
     expect(m.sideList[0]!.reason).toBe('no-dates');
     expect(m.sideList[0]!.note).toBe(NO_DATES_NOTE);
-    expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_COPY);
+    // 23.143: a list of ONLY undated tickets says so, instead of asking for a start AND a due date they may not need.
+    expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_NO_DATES_COPY);
+    expect(m.sideListCopy).not.toBe(TIMELINE_SIDE_LIST_COPY);
   });
 
   it('start after due is shown as the contradiction it is — no bar, both claims named', () => {
@@ -149,7 +152,7 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
     expect(allRows(m)).toHaveLength(0);
     expect(m.sideList[0]!.reason).toBe('start-after-due');
     expect(m.sideList[0]!.note).toBe(
-      'start 30 Aug is after needed-by 24 Aug — both claims shown, no bar drawn',
+      'start 30 Aug is after needed-by 24 Aug. Both claims shown, no bar drawn',
     );
     // Both claims survive on the entry: the contradiction is displayed, not resolved.
     expect(m.sideList[0]!.startClaim?.date).toBe('2026-08-30');
@@ -177,8 +180,8 @@ describe('11.53 the side-list heading is true of every entry under it', () => {
    * THE fixture the plan has no version of: two DIFFERENT reasons in one list.
    * Every side-list case in the plan text holds a single reason, so none of
    * them can see a heading that is true of one entry and false of the next.
-   * "until it carries both a claimed start and a claimed needed-by" states a
-   * leaving condition the contradictory ticket already satisfies.
+   * "Add a start and a due date to place a ticket on the timeline" asks for
+   * something the contradictory ticket already has.
    */
   it('a contradiction in the list retires the plain heading — it carries both and is still here', () => {
     const m = model([
@@ -194,7 +197,7 @@ describe('11.53 the side-list heading is true of every entry under it', () => {
     expect(m.sideList.map((entry) => entry.reason)).toEqual(['no-dates', 'start-after-due']);
     expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_UNDRAWABLE_COPY);
     // Named literally: the plain heading's claim is FALSE of the second entry.
-    expect(TIMELINE_SIDE_LIST_COPY).toContain('until it carries both');
+    expect(TIMELINE_SIDE_LIST_COPY).toContain('Add a start and a due date');
   });
 
   it('an empty side list keeps the plain heading', () => {
@@ -224,7 +227,7 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
     const entry = m.sideList.find((item) => item.ticketId === bad.state.id)!;
     expect(entry.reason).toBe('unplaceable-day');
     expect(entry.note).toBe(
-      '2026-02-30 is not a day on the calendar — the claim is shown as recorded, and no bar is drawn',
+      '2026-02-30 is not a day on the calendar. The claim is shown as recorded, and no bar is drawn',
     );
     // The bad day is printed VERBATIM — never a plausible neighbour like 2 Mar.
     expect(entry.note).not.toContain('Mar');
@@ -251,7 +254,7 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
       }),
     ]);
     expect(m.sideList[0]!.note).toBe(
-      '2026-02-30 is not a day on the calendar — the claim is shown as recorded, and no bar is drawn',
+      '2026-02-30 is not a day on the calendar. The claim is shown as recorded, and no bar is drawn',
     );
     // Both claims still travel: deduping the SENTENCE never dedupes the data.
     expect(m.sideList[0]!.startClaim?.date).toBe('2026-02-30');
@@ -269,7 +272,7 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
       }),
     ]);
     expect(m.sideList[0]!.note).toBe(
-      '2026-02-30 and 2027-04-31 are not days on the calendar — the claim is shown as recorded, and no bar is drawn',
+      '2026-02-30 and 2027-04-31 are not days on the calendar. The claim is shown as recorded, and no bar is drawn',
     );
   });
 
@@ -292,7 +295,7 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
     expect(entry.startClaim?.date).toBe('2026-02-30');
     expect(entry.dueClaim).toBeNull();
     // The claims that ride along ride along here too.
-    expect(entry.customClaims.map((item) => item.label)).toEqual(["Filed on: 26 Aug — Kiro's claim"]);
+    expect(entry.customClaims.map((item) => item.label)).toEqual(["Filed on: 26 Aug, Kiro's claim"]);
   });
 
   /**
@@ -321,7 +324,7 @@ describe('11.54 a claimed day that is not a day is named, and blanks nothing', (
     // The bar is untouched, and the bad day is printed verbatim beside it.
     expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
     expect(row.customClaims.map((item) => item.label)).toEqual([
-      "Filed on: 2026-02-30 — Kiro's claim",
+      "Filed on: 2026-02-30, Kiro's claim",
     ]);
   });
 
@@ -459,7 +462,7 @@ describe('11.56 bars carry exact week indices and their two authors', () => {
     const row = onlyRow(m);
     // weeks: 17 Aug = 0, 24 Aug = 1, 31 Aug = 2
     expect(row.bar).toEqual({ fromWeek: 1, toWeek: 2, clippedStart: false, clippedEnd: false });
-    expect(row.provenance).toBe("starts 24 Aug — Anselma's claim · needed by 4 Sep — Kiro's claim");
+    expect(row.provenance).toBe("starts 24 Aug, Anselma's claim; needed by 4 Sep, Kiro's claim");
     expect(row.startClaim.date).toBe('2026-08-24');
     expect(row.dueClaim.date).toBe('2026-09-04');
     expect(row.pending).toBe(false);
@@ -704,12 +707,12 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
       [{ id: 'filed-on', name: 'Filed on' }],
     );
     const row = onlyRow(model([withCustom]));
-    expect(row.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug — Anselma's claim"]);
+    expect(row.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug, Anselma's claim"]);
     expect(row.customClaims[0]!.claim.fieldId).toBe('filed-on');
     // 24 Aug and 28 Aug are both in the 24-30 week: one column, untouched by
     // the 26 Aug claim.
     expect(row.bar).toEqual({ fromWeek: 1, toWeek: 1, clippedStart: false, clippedEnd: false });
-    expect(row.provenance).toBe("starts 24 Aug — Kiro's claim · needed by 28 Aug — Kiro's claim");
+    expect(row.provenance).toBe("starts 24 Aug, Kiro's claim; needed by 28 Aug, Kiro's claim");
   });
 
   it('a custom claim far outside the window neither extends a bar nor rescues a window miss', () => {
@@ -760,7 +763,7 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
     // NOT "no claimed dates" — it has one.
     expect(filed.note).toBe(NO_DAY_CLAIMS_NOTE);
     expect(filed.note).not.toBe(NO_DATES_NOTE);
-    expect(filed.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug — Kiro's claim"]);
+    expect(filed.customClaims.map((entry) => entry.label)).toEqual(["Filed on: 26 Aug, Kiro's claim"]);
 
     const nothing = m.sideList.find((entry) => entry.ticketId === bare.state.id)!;
     expect(nothing.note).toBe(NO_DATES_NOTE);
@@ -782,7 +785,7 @@ describe('11.58 custom date claims ride along and change no geometry (owner sign
       ),
     ]);
     expect(m.sideList[0]!.reason).toBe('start-only');
-    expect(m.sideList[0]!.note).toBe("starts 24 Aug — Kiro's claim");
+    expect(m.sideList[0]!.note).toBe("starts 24 Aug, Kiro's claim");
     expect(m.sideList[0]!.customClaims).toHaveLength(1);
   });
 });
@@ -1021,7 +1024,7 @@ describe('11.62 the undated-epic skip fires only when the epic has nothing to sa
     expect(m.sideList.map((entry) => [entry.ticketId, entry.reason])).toEqual([
       ['epic_half', 'start-only'],
     ]);
-    expect(m.sideList[0]!.note).toBe("starts 24 Aug — Kiro's claim");
+    expect(m.sideList[0]!.note).toBe("starts 24 Aug, Kiro's claim");
     // Being listed for a missing claim and naming a lane are different jobs.
     expect(m.groups.map((group) => [group.epicId, group.epicTitle])).toEqual([
       ['epic_half', 'Half dated'],
@@ -1156,5 +1159,20 @@ describe('13.1037 hideEpicRows also takes a HALF-dated epic out of the side list
     });
     expect(bare.sideList).toEqual([]);
     expect(bare.groups).toEqual([]);
+  });
+});
+
+describe('23.142 todayDay is an index into THIS window, and null outside it', () => {
+  it('23.142 todayDay is null for a today before the anchor or after the window end, and the right index inside (explicit anchor)', () => {
+    // The window is 17 Aug – 11 Oct (ANCHOR's Monday, eight weeks): day indices 0–55.
+    expect(model([], { today: '2026-08-19' }).todayDay).toBe(2);
+    // The edges are INSIDE: the first day and the last day.
+    expect(model([], { today: WINDOW_START }).todayDay).toBe(0);
+    expect(model([], { today: WINDOW_END }).todayDay).toBe(55);
+    // One day either side is outside — each bound is its own claim (`>= windowStart`, `<= windowEnd`).
+    expect(model([], { today: '2026-08-16' }).todayDay).toBeNull();
+    expect(model([], { today: '2026-10-12' }).todayDay).toBeNull();
+    // No `today` at all: no line.
+    expect(model([]).todayDay).toBeNull();
   });
 });

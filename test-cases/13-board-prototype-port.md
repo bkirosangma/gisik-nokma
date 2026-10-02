@@ -1291,7 +1291,7 @@ mutation-witnessed) and the `mountedRef` guard (code changed, deliberately NOT m
 above for why). Two further points from that same round were left as documented judgment calls rather
 than code changes: `submitFromDialog` still carries no `try/catch` of its OWN distinct from the transport
 fix already applied (moot — the fix IS the catch); and the client-invented `rule: 'transport'`/
-`rule: 'no-response'` values render through the identical `Refused by the server — ${rule}: ${reason}`
+`rule: 'no-response'` values render through the identical `Refused by the server: ${rule}: ${reason}`
 sentence a REAL server refusal uses, which a viewer cannot distinguish from an actual server answer —
 changing that sentence now would redden the `13.504` mutation-witnessed assertion that the alert text
 contains `'network unreachable'`, so it was left as a coordinator-level decision rather than changed
@@ -1311,7 +1311,7 @@ built `{ rule: 'no-response'|'transport', reason }` objects by hand instead, and
 `serverRefusal`, the SAME channel `TransitionDialog`'s own docblock calls "the authority's answer, shown
 VERBATIM whenever present." Neither `no-response` nor `transport` exists in `REFUSAL_RULES`
 (`rule-engine/src/refusal-rules.ts:9-25`, fifteen real entries). A dropped connection or an empty `ingest`
-response rendered through the identical `Refused by the server — ${rule}: ${reason}` sentence a real
+response rendered through the identical `Refused by the server: ${rule}: ${reason}` sentence a real
 refusal uses — indistinguishable from an actual server verdict, and calling for the opposite next action
 (retry, not "fix the thing the server objected to").
 
@@ -1334,7 +1334,7 @@ smaller violation of it.
 
 **Wording:** the "silence" case (`results[0] === undefined`) keeps its exact original sentence, moved to
 the new channel — `"The server did not answer this move."` The "transport failure" case (a rejected
-`ingest`) is new — `` `We could not reach the server for this move — ${message}` ``.
+`ingest`) is new — `` `We could not reach the server for this move: ${message}` ``.
 
 **On `13.504`: amended, and the amendment is quoted, not just described, per the coordinator's own
 instruction.**
@@ -1342,7 +1342,7 @@ instruction.**
 - **BEFORE:** `expect(screen.getByRole('alert')).toHaveTextContent('network unreachable')` — one substring
   check.
 - **Measured, not assumed, that this did NOT organically redden under Ruling 27's fix** (the coordinator
-  expected it would): the new sentence — `"We could not reach the server for this move — network
+  expected it would): the new sentence — `"We could not reach the server for this move: network
   unreachable"` — still CONTAINS the substring `'network unreachable'`, so the old assertion passed under
   BOTH the defective rendering and the fixed one. Running the full affected suite (`board-moves-ui.
   test.tsx` + `transition-dialog.test.tsx`) against the fix with the assertion still in its pre-amendment
@@ -1360,8 +1360,8 @@ instruction.**
   Result: `PASS (27) FAIL (3)` — exactly the three cases touched by this ruling (amended `13.504`, the new
   `13.506` below, amended `13.505`) and nothing else. The failure text is the ruling's own defect, produced
   by the actual reverted code rather than described secondhand: `13.504` and `13.505` both failed with
-  `Received: "Refused by the server — transport: network unreachable"`; the new case failed with `Received:
-  "Refused by the server — no-response: The server did not answer this move."` — direct proof the
+  `Received: "Refused by the server: transport: network unreachable"`; the new case failed with `Received:
+  "Refused by the server: no-response: The server did not answer this move."` — direct proof the
   pre-ruling code fabricated BOTH `rule: 'transport'` and `rule: 'no-response'`, not only the one the
   coordinator's file:line citations named first. Files restored byte-identical afterward (`diff` against a
   pre-revert backup of each, confirmed clean) and the full suite re-confirmed green.
@@ -1770,7 +1770,7 @@ person reaches for rather than as a hard failure.
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
 there is no feature bullet to edit — recorded here rather than left as a silent omission.
 
-## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
+## Every board card's provenance disclosure (the `who · when` button of the time; "Moved to … by … on …" since UX T7, 23.123) meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
 
 **The finding, round 2 `E4-3`, IMPORTANT, scored PARTIAL.** `button.gn-board-card__provenance`
 toggles the state-provenance line on each card. Measured on the board at 1512×900 against the product's
@@ -2357,7 +2357,7 @@ Owner: *"check this input: gn-new-project-name. description, and comment text ar
 same style."* That input is `.gn-field__input`. The parity chrome had put the ground and shadow on the
 `.editor-slot` WRAPPER, so the typing area itself wore no field treatment — no border under `hig`/`minimal`
 — and the Tiptap placeholder had no rule in any stylesheet (zero hits for `data-placeholder` /
-`is-editor-empty` in `ui.css`, `editor.css`, `globals.css`), so "No description yet" and "Add a comment — @
+`is-editor-empty` in `ui.css`, `editor.css`, `globals.css`), so "No description yet" and "Add a comment, or type @
 to mention someone" were configured and never painted. The content node now wears `gn-field__input` beside
 its own class, the wrapper is transparent, and the placeholder is drawn in the input's muted ink.
 `packages/editor/src/components/TicketEditor.tsx`, `packages/editor/src/styles/editor.css`.

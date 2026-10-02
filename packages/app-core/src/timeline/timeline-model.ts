@@ -3,6 +3,7 @@ import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
   barProvenance,
   contradictionCopy,
@@ -54,10 +55,19 @@ export type TimelineSideReason =
   | 'start-after-due'
   | 'unplaceable-day';
 
+/**
+ * The days a bar covers, as 0-based indexes into the window's days (`weeks.length * 7` of them, the first being the
+ * first column's Monday), INCLUSIVE at both ends and clipped to the window (UX fixes T8, 23.142, audit PV-10).
+ * `bar` keeps the WEEK columns the grid places the bar in; this is the day inside them, so a bar that ends on a
+ * Wednesday is drawn ending on that Wednesday and not on the Sunday that closes its week.
+ */
+export type TimelineBarDays = { from: number; to: number };
+
 export type TimelineRow = {
   ticketId: string;
   title: string;
   bar: TimelineBarSpan;
+  days: TimelineBarDays;
   startClaim: DateClaimView;
   dueClaim: DateClaimView;
   pending: boolean;
@@ -95,6 +105,11 @@ type TimelinePlacement =
 
 export type TimelineModel = {
   weeks: TimelineWeekCol[];
+  /**
+   * `today` as a 0-based day index into the window, or `null` when no `today` was passed or it is outside the
+   * window. The line is the view's; the model only says which day (it reads no clock — `today` is an input).
+   */
+  todayDay: number | null;
   groups: TimelineGroup[];
   sideList: TimelineSideEntry[];
   sideListCopy: string;
@@ -130,6 +145,8 @@ export type TimelineModel = {
 };
 
 export type TimelineModelOptions = {
+  /** An IST day, injected like `anchor` — never read from a device. Absent: no today line. */
+  today?: string;
   /**
    * An IST DAY, never an instant and never a clock read. The shell passes the
    * day the domain's `istDayOf` returns for the current instant — exactly as
@@ -264,6 +281,11 @@ export function buildTimelineModel(
     return Math.floor((dateMs(isoDay) - dateMs(windowStart)) / (7 * DAY_MS));
   }
 
+  /** The 0-based day of the window an IST day falls on (the claimed day is a real day by the time it is asked). */
+  function dayIndexOf(isoDay: string): number {
+    return Math.round((dateMs(isoDay) - dateMs(windowStart)) / DAY_MS);
+  }
+
   function groupTitle(epicId: string | null): string {
     if (epicId === null) return NO_EPIC_TITLE;
     const state = byId.get(epicId);
@@ -363,6 +385,10 @@ export function buildTimelineModel(
             toWeek: clippedEnd ? weeksCount - 1 : weekIndexOf(due.date),
             clippedStart,
             clippedEnd,
+          },
+          days: {
+            from: clippedStart ? 0 : dayIndexOf(start.date),
+            to: clippedEnd ? weeksCount * 7 - 1 : dayIndexOf(due.date),
           },
           startClaim: start,
           dueClaim: due,
@@ -472,8 +498,8 @@ export function buildTimelineModel(
   /**
    * The heading must be true of every entry UNDER it.
    *
-   * `TIMELINE_SIDE_LIST_COPY` says work stays here "until it carries both a
-   * claimed start and a claimed needed-by" — a leaving condition that a
+   * `TIMELINE_SIDE_LIST_COPY` says a ticket needs "a start and a due date" to
+   * be placed — a leaving condition that a
    * `start-after-due` entry already satisfies while sitting in the list, and
    * that an `unplaceable-day` entry can satisfy too. So the exhaustive
    * sentence is reached only when every entry really is here for a missing
@@ -484,9 +510,13 @@ export function buildTimelineModel(
    * sentence is reachable while false today.** See `calendar-model.ts`'s
    * precedence note; do not restate the condition here as exclusivity.
    */
-  const sideListCopy = sideList.every((entry) => MISSING_CLAIM_REASONS.has(entry.reason))
-    ? TIMELINE_SIDE_LIST_COPY
-    : TIMELINE_SIDE_LIST_UNDRAWABLE_COPY;
+  // THREE sentences, each true of every entry under it (UX fixes T8, 23.143): "no dates yet" is false of a ticket
+  // that has one date, and the leaving-condition sentence is false of a start-after-due entry.
+  const sideListCopy = !sideList.every((entry) => MISSING_CLAIM_REASONS.has(entry.reason))
+    ? TIMELINE_SIDE_LIST_UNDRAWABLE_COPY
+    : sideList.length > 0 && sideList.every((entry) => entry.reason === 'no-dates')
+      ? TIMELINE_SIDE_LIST_NO_DATES_COPY
+      : TIMELINE_SIDE_LIST_COPY;
 
   const hasContent = groups.length > 0 || sideList.length > 0;
 
@@ -561,5 +591,10 @@ export function buildTimelineModel(
       ? TIMELINE_OUT_OF_WINDOW_COPY
       : TIMELINE_EMPTY_COPY;
 
-  return { weeks, groups, sideList, sideListCopy, emptyCopy };
+  // `today` is a day the shell vetted (`istDayOf`); a malformed or foreign string must not reach `dateMs`, which throws.
+  const todayDay =
+    opts.today !== undefined && isCalendarDay(opts.today) && opts.today >= windowStart && opts.today <= windowEnd
+      ? dayIndexOf(opts.today)
+      : null;
+  return { weeks, todayDay, groups, sideList, sideListCopy, emptyCopy };
 }

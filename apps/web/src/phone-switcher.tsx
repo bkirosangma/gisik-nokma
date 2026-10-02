@@ -62,7 +62,7 @@ export function PhoneSwitcher({
     workspaceId === undefined
       ? 'Choose a workspace'
       : projectName !== null && workspaceName !== null
-        ? `${projectName} — ${workspaceName}`
+        ? `${projectName}, ${workspaceName}`
         : (workspaceName ?? 'Workspace');
 
   const close = (): void => setOpen(false);

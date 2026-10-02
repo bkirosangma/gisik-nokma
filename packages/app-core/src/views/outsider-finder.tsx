@@ -30,7 +30,7 @@ type FinderState =
  * to Assign when someone is found, so Enter-Enter assigns; it stays in the field
  * when nobody is, so the person can correct the address.
  *
- * NOT a `<form>`: this renders inside the New ticket dialog and the ticket
+ * NOT a `<form>`: this renders inside the Create ticket dialog and the ticket
  * sheet, whose own controls must not be submitted by Enter here.
  */
 export function OutsiderFinder({

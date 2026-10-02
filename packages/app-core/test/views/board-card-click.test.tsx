@@ -127,7 +127,7 @@ describe('Board card — clicking anywhere on the card opens the ticket', () => 
     const onOpenTicket = vi.fn();
     render(<Board board={errandBoard()} onOpenTicket={onOpenTicket} />);
 
-    const toggle = screen.getByRole('button', { name: 'who · when' });
+    const toggle = screen.getByRole('button', { name: /^Moved to / });
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -317,7 +317,7 @@ function errandBoardWithCardInDoing(): BoardView {
 async function openPickerDropdown(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
   await settled();
   await user.click(
-    screen.getByRole('button', { name: 'Move to next state — Waiting on counterparty or Done' }),
+    screen.getByRole('button', { name: 'Move to next state: Waiting on counterparty or Done' }),
   );
   const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
   await user.click(within(dialog).getByRole('button', { name: /Move to/ }));

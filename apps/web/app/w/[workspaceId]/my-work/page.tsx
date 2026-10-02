@@ -47,7 +47,7 @@ import {
  * does.
  *
  * **2. The sheet's PROJECT-SCOPED props come from the open TICKET, never from
- * the page** — My Work spans projects, so there is no page-level project to
+ * the page** — My work spans projects, so there is no page-level project to
  * read. Two sources place a ticket, and neither is a guess: the rows this page
  * already holds (`assigned` / `inTransit` / `shared` carry a `projectId`, and so
  * does every `AttentionItem` — the strip is mounted here), and, for a ticket the
@@ -101,7 +101,7 @@ export default function MyWorkPage() {
  * oracle — so the sentence may not guess which of the two it was, and does not.
  */
 const NOT_PLACEABLE =
-  'That ticket cannot be opened from here — the server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
+  'That ticket cannot be opened from here. The server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
 
 /**
  * What the locator said about the currently open ticket — **keyed by the ticket
@@ -145,7 +145,7 @@ function MyWorkBoard() {
   // A 401 on EITHER read is a session that ended, not a refusal to answer, and
   // this page used to say the opposite: `Features.md` and case 3.86 both claimed
   // the redirect for the whole shell while only `app/workspaces/page.tsx` did it,
-  // so an expired session here drew "My Work cannot be shown yet — HTTP 401 for
+  // so an expired session here drew "My work cannot be shown yet — HTTP 401 for
   // /v1/me/work". That names the wrong cause and offers no way out of it.
   const expired = useSignInOnExpiredSession([attention.error, myWork.error]);
 
@@ -260,7 +260,7 @@ function MyWorkBoard() {
         setPlacement({
           ticketId: openTicketId,
           projectId: null,
-          notice: `That ticket could not be opened — ${cause instanceof Error ? cause.message : String(cause)}`,
+          notice: `That ticket could not be opened: ${cause instanceof Error ? cause.message : String(cause)}`,
         });
       },
     );
@@ -310,12 +310,12 @@ function MyWorkBoard() {
   return (
     <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
-      <h1 className="gn-page-title">My Work</h1>
+      <h1 className="gn-page-title">My work</h1>
       <div className="gn-shell__main">
         {/* BOTH reads on this page refuse against the shipped server, and each
             has its own falsehood if the plan's rendering is kept:
             `items={attention.data ?? []}` makes `AttentionStrip` return null,
-            which reads as "nothing needs your attention", and My Work's
+            which reads as "nothing needs your attention", and My work's
             `data !== null ? … : <p>Loading…</p>` spins forever. */}
         {expired ? (
           // ONE notice for the page, not one per failed read: two "your session
@@ -341,7 +341,7 @@ function MyWorkBoard() {
             ) : null}
 
             {myWork.error !== null ? (
-              <ShellRefusal what="My Work" message={myWork.error} />
+              <ShellRefusal what="My work" message={myWork.error} />
             ) : myWork.data !== null ? (
               <MyWork view={myWork.data} onOpenTicket={openTicket} actorLabelOf={actorLabelOf} />
             ) : (
@@ -361,7 +361,7 @@ function MyWorkBoard() {
 
         ⚠ `openTicketProjectId` is what holds a ticket BACK rather than sending
         it somewhere: an unplaceable ticket mounts nothing at all and leaves the
-        sentence above. There is deliberately no fallback project here — My Work
+        sentence above. There is deliberately no fallback project here — My work
         spans projects, so any project this page could name would be a guess
         about where the ticket is, which is precisely the wrong-project answer
         this page's resolver exists to avoid.
@@ -388,7 +388,7 @@ function MyWorkBoard() {
             18.287 (final review, 2026-09-23): the project page's mount
             supplies these (Task 4, case 18.274); this one never did, so a
             `:ticket` picker here falsely reported "No tickets match" and a
-            `ticketRef` chip rendered as a plain span. My Work spans
+            `ticketRef` chip rendered as a plain span. My work spans
             projects — there is no single "current project" the way the
             project page has one — so the OPEN TICKET's own project keys
             the ordering partition instead.
@@ -432,7 +432,7 @@ function MyWorkBoard() {
             leaving. That is the right arm here and not merely the convenient
             one: the resolver above places a parent the view does not carry by
             asking the locator, which is exactly what a parent in another
-            project needs, so the reader never has to leave My Work to follow a
+            project needs, so the reader never has to leave My work to follow a
             subtask's parent.
           */
           onOpenTicket={openTicket}
@@ -453,7 +453,7 @@ function MyWorkBoard() {
             is the extraction this task explicitly excludes, and an Undo offered
             by a page that does not hold the ticket's project would be a control
             this page cannot honour. So the row leaves the view and nothing is
-            promised; making a My Work deletion undoable is owed and named in
+            promised; making a My work deletion undoable is owed and named in
             the PR.
           */
           onDeleted={() => {

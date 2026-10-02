@@ -49,7 +49,14 @@
         "/sign-in",
         "/workspaces"
       ],
-      "citation": "Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavyRaised docblock), not re-measured."
+      "citation": "SUPERSEDED 2026-10-02 (UX fixes T1, owner U5): the neo text field now wears a 1px ring, so this waiver no longer applies to it; kept as the record. Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavySunken, still neoNavy), not re-measured."
+    }
+  ],
+  "exemptions": [
+    {
+      "selector": "nav.gn-bottom-bar",
+      "ratio": 1.12,
+      "reason": "container, not a control; its items carry their own >=3:1 cues (icon, label, current-item bar)"
     }
   ]
 }

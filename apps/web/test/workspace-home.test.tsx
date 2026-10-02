@@ -9,7 +9,6 @@ import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { tintIndexOf } from '@gisik-nokma/ui';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import { Providers } from '../src/providers.js';
-import { ruleFor } from './helpers/css-rule-scan.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -38,12 +37,6 @@ import { stubServices } from './helpers/stub-services.js';
 const WORKSPACE = '01J9WORKSPACE0000000000000';
 const OTHER_WORKSPACE = '01J9WORKSPACE1111111111111';
 const KIRO = '01J9USER000000000000000000';
-
-/** The stylesheet the project card's rules live in, read as SOURCE — see
- * 13.1297 at the foot of this file for why that is the only available
- * instrument here. */
-const TEST_DIR = dirname(fileURLToPath(import.meta.url));
-const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -114,6 +107,18 @@ const COMMITTED = (event: SubmittedEvent): IngestResult => ({
  * thing that actually changed the world, which is invariant to how many
  * components independently ask what the directory currently says.
  */
+/**
+ * The NAME-AS-TRIGGER (13.969): the rename button INSIDE the level-1 heading. Since 23.177 an admin also has
+ * the pencil icon button beside the heading, with the SAME accessible name, so a bare `getByRole('button',
+ * { name: /^Rename / })` is ambiguous by design; the name control is found by where it lives.
+ */
+async function nameTrigger(): Promise<HTMLElement> {
+  // The page paints a loading heading first, so wait for the button INSIDE whichever level-1 heading is current.
+  return waitFor(() =>
+    within(screen.getByRole('heading', { level: 1 })).getByRole('button', { name: /^Rename / }),
+  );
+}
+
 function mount(
   reads: WorkspaceRef[][],
   options: {
@@ -144,6 +149,30 @@ function mount(
 }
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
+
+/**
+ * The project card's acts live in an overflow menu (WS-03, case 22.147): open the card's menu and press
+ * one item. The trigger is named for the PROJECT, so a grid of cards never presents identical buttons.
+ */
+async function pickProjectAct(projectId: string, projectName: string, item: string): Promise<void> {
+  await userEvent.click(within(row(projectId)).getByRole('button', { name: `More actions for ${projectName}` }));
+  await userEvent.click(within(row(projectId)).getByRole('menuitem', { name: item }));
+}
+
+/**
+ * Prefixes/groups Task 8 (22.152): the new-project form is the body of the Create
+ * project DIALOG. A case that drives it opens it from the Projects heading row's
+ * primary, then presses the dialog's own submit (the same words as the opener, so it
+ * is scoped to the dialog rather than found by name across the page).
+ */
+const openCreateProject = async (): Promise<void> => {
+  await userEvent.click(await screen.findByRole('button', { name: 'Create project' }));
+  await screen.findByRole('dialog', { name: 'Create project' });
+};
+const createProjectSubmit = (): HTMLElement =>
+  within(screen.getByRole('dialog', { name: 'Create project' })).getByRole('button', {
+    name: 'Create project',
+  });
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -177,7 +206,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     // fixture's member sees), the role as a CLAUSE from the same `viewerOf`
     // the card reads. ONE text node, the same discipline every other
     // multi-interpolation sentence in this file keeps.
-    expect(screen.getByText("5 members · 2 active projects · you're a member")).toBeInTheDocument();
+    expect(screen.getByText("5 members, 2 active projects, you're a member")).toBeInTheDocument();
 
     // Scoped per row, both ways: the number is IN its own row and NOT in the
     // other's. A page that rendered one project's count everywhere passes a
@@ -196,10 +225,10 @@ describe('13.384 the workspace home lists projects with the caller’s own count
       name: 'Show archived projects in Convenience Corner',
     });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Round 20: the VISIBLE text is the reference's ("1 archived · show"), while
+    // Round 20: the VISIBLE text is the reference's ("Show 1 archived"), while
     // the accessible name above stays the sentence that names the workspace —
     // deliberately two different strings, argued at the control's own call site.
-    expect(toggle).toHaveTextContent('1 archived · show');
+    expect(toggle).toHaveTextContent('Show 1 archived');
     // ...and MARKED once revealed.
     await userEvent.click(toggle);
     expect(within(row('p3')).getByText('Old signage')).toBeInTheDocument();
@@ -210,7 +239,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
 
     // The restricted line, one text node — a three-interpolation version is
     // split across nodes and fails this.
-    const restrictedLine = screen.getByText('2 projects · name restricted');
+    const restrictedLine = screen.getByText('2 projects, name restricted');
     expect(restrictedLine).toBeInTheDocument();
     // IMPORTANT 2 (Task 7 fix round 1): the CSS-scan tests in
     // `workspace-restricted-spacing.test.ts` only prove the STYLESHEET rule
@@ -240,7 +269,7 @@ describe('13.384 the workspace home lists projects with the caller’s own count
     // gone — the name is inside that one link, named by it, rather than plain
     // text beside a second link to the same target.
     expect(within(only).getByText('Shop operations')).toBeInTheDocument();
-    expect(within(only).getByRole('link', { name: 'Shop operations' })).toHaveAttribute(
+    expect(within(only).getByRole('link', { name: 'Open Shop operations' })).toHaveAttribute(
       'href',
       `/w/${WORKSPACE}/p/p1`,
     );
@@ -289,7 +318,11 @@ describe('13.384 the workspace home lists projects with the caller’s own count
  * enforcement" fail at their own sites.
  */
 describe('13.385 every admin affordance is gated on the caller’s served role', () => {
-  const CONTROLS = ['Archive Shop operations', 'Restore Old signage'];
+  // [project id, project name, the menu item the card offers] — WS-03: the acts are an overflow menu now.
+  const CONTROLS: Array<[string, string, string]> = [
+    ['p1', 'Shop operations', 'Archive'],
+    ['p3', 'Old signage', 'Restore'],
+  ];
 
   it.each([
     ['owner', true],
@@ -301,17 +334,22 @@ describe('13.385 every admin affordance is gated on the caller’s served role',
     // Everybody gets the list and the links — the gate is on the mutations
     // alone, and a page that refused the whole screen to a member would fail
     // here rather than passing the absence assertions below by accident.
-    expect(await screen.findByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'My work' })).toBeInTheDocument();
     expect(screen.getByTestId('project-row-p1')).toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Show archived projects in Convenience Corner' }),
     );
 
-    for (const control of CONTROLS) {
-      const found = screen.queryByRole('button', { name: control });
-      if (allowed) expect(found, `${role} should be offered "${control}"`).not.toBeNull();
-      else expect(found, `${role} must not be offered "${control}"`).toBeNull();
+    for (const [id, name, item] of CONTROLS) {
+      const trigger = within(row(id)).queryByRole('button', { name: `More actions for ${name}` });
+      if (allowed) {
+        expect(trigger, `${role} should be offered the menu on ${name}`).not.toBeNull();
+        await userEvent.click(trigger!);
+        expect(within(row(id)).queryByRole('menuitem', { name: item }), `${role} should be offered "${item}"`).not.toBeNull();
+      } else {
+        expect(trigger, `${role} must not be offered the menu on ${name}`).toBeNull();
+      }
     }
     const form = screen.queryByRole('button', { name: 'Create project' });
     if (allowed) expect(form).not.toBeNull();
@@ -367,9 +405,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
       { ingest: (events) => sent.push(events) },
     );
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Archive Shop operations' }),
-    );
+    await screen.findByTestId('project-row-p1');
+    await pickProjectAct('p1', 'Shop operations', 'Archive');
 
     // The claim, before the screen: one event, the right type, the right entity.
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -389,7 +426,7 @@ describe('13.386 archive hides a project and restore returns it — read from th
     );
     expect(within(row('p1')).getByText('Archived')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Restore Shop operations' }));
+    await pickProjectAct('p1', 'Shop operations', 'Restore');
     await waitFor(() => expect(sent).toHaveLength(2));
     expect(sent[1]![0]!.type).toBe('project.restored');
     // Back in the live list, and the disclosure is gone with nothing left
@@ -415,9 +452,8 @@ describe('13.386 archive hides a project and restore returns it — read from th
       }),
     });
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Archive Shop operations' }),
-    );
+    await screen.findByTestId('project-row-p1');
+    await pickProjectAct('p1', 'Shop operations', 'Archive');
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('permission.role: Only a workspace owner or admin can do this.');
@@ -489,11 +525,16 @@ describe('13.386 archive hides a project and restore returns it — read from th
  * `WorkspaceLinks`. The floor holds exactly as it did before this round.
  */
 describe('13.673 the workspace-section links resolve to the real routes', () => {
-  it('carries four links, two workspace-scoped and two query-scoped', async () => {
+  it('carries four links, two workspace-scoped and two query-scoped, ABOVE the Projects heading (22.120)', async () => {
     mount([[workspaceAs('member')]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
+    // 22.120 (prefixes and groups Task 7): the section row moved from the foot of the page to the top —
+    // it now PRECEDES the Projects heading, where Round 20 had put it after the projects and the form.
+    // CONTROL: the four links below keep their names and hrefs, so the move changed nothing but the place.
+    const projectsHeading = screen.getByRole('heading', { name: 'Projects' });
+    expect(nav.compareDocumentPosition(projectsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const expected: Array<[string, string]> = [
-      ['My Work', `/w/${WORKSPACE}/my-work`],
+      ['My work', `/w/${WORKSPACE}/my-work`],
       ['Members', `/w/${WORKSPACE}/members`],
       ['Ticket types', `/settings?workspaceId=${WORKSPACE}&tab=ticket-types`],
       ['Workflows', `/settings?workspaceId=${WORKSPACE}&tab=workflows`],
@@ -531,7 +572,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
       within(nav).getByText('Everything assigned to you across this workspace.'),
     ).toBeInTheDocument();
     expect(
-      within(nav).getByText('5 people · roles and pending invitations.'),
+      within(nav).getByText('5 people: roles and pending invitations.'),
     ).toBeInTheDocument();
     expect(
       within(nav).getByText('Fields and the workflow each type follows.'),
@@ -550,7 +591,7 @@ describe('13.673 the workspace-section links resolve to the real routes', () => 
     mount([[workspaceAs('guest', { memberCount: null })]]);
     const nav = await screen.findByRole('navigation', { name: 'Workspace sections' });
     expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
-    expect(within(nav).queryByText(/\d+ (person|people) ·/)).toBeNull();
+    expect(within(nav).queryByText(/\d+ (person|people):/)).toBeNull();
   });
 });
 
@@ -608,8 +649,8 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         }),
       ],
     ]);
-    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
-    expect(screen.queryByText(/members? ·/)).toBeNull();
+    expect(await screen.findByText('1 active project, you\'re a guest')).toBeInTheDocument();
+    expect(screen.queryByText(/members?,/)).toBeNull();
   });
 
   /**
@@ -636,11 +677,11 @@ describe('13.395 the header reads only served numbers, and its tint is keyed on 
         }),
       ],
     ]);
-    expect(await screen.findByText('1 active project · you\'re a guest')).toBeInTheDocument();
+    expect(await screen.findByText('1 active project, you\'re a guest')).toBeInTheDocument();
     expect(screen.queryByText(/7 members?/)).toBeNull();
     const nav = screen.getByRole('navigation', { name: 'Workspace sections' });
     expect(within(nav).getByText('roles and pending invitations.')).toBeInTheDocument();
-    expect(within(nav).queryByText(/7 (person|people) ·/)).toBeNull();
+    expect(within(nav).queryByText(/7 (person|people):/)).toBeNull();
   });
 });
 
@@ -670,13 +711,13 @@ describe('13.396 archived projects still open, through the same door a live one 
     );
     const archivedRow = row('p3');
     expect(
-      within(archivedRow).getByRole('link', { name: 'Old signage, archived' }),
+      within(archivedRow).getByRole('link', { name: 'Open Old signage, archived' }),
     ).toHaveAttribute('href', `/w/${WORKSPACE}/p/p3`);
     expect(within(archivedRow).queryByText(/read-only/i)).toBeNull();
     // The POSITIVE CONTROL for the name above: a LIVE project in the same
     // render is named WITHOUT the suffix. Asserting only the archived name
     // passes against a page that appended ", archived" to every project.
-    expect(within(row('p1')).getByRole('link', { name: 'Shop operations' })).toBeInTheDocument();
+    expect(within(row('p1')).getByRole('link', { name: 'Open Shop operations' })).toBeInTheDocument();
     expect(within(row('p1')).queryByRole('link', { name: /archived/ })).toBeNull();
   });
 });
@@ -693,9 +734,9 @@ describe('13.396 archived projects still open, through the same door a live one 
  *    arrived at from the other side. An implementation that merely wrapped the
  *    existing row in a link passes every other assertion here and fails this.
  *
- * 2. **Archive/Restore is NOT a descendant of the anchor.** `<a>` may not
- *    contain `<button>`; a nested one is invalid HTML that renders, so nothing
- *    would look wrong. jsdom will not complain either — the containment is
+ * 2. **The admin control (since 22.147, the overflow menu's trigger) is NOT a
+ *    descendant of the anchor.** `<a>` may not contain `<button>`; a nested one
+ *    is invalid HTML that renders, so nothing would look wrong. jsdom will not complain either — the containment is
  *    asserted directly.
  *
  * 3. **The archived cards sort to the END of the disclosed grid** (Round 21,
@@ -729,11 +770,12 @@ describe('13.413 each project card is one door, with the admin control outside t
     expect(within(liveCard).getAllByRole('link')).toHaveLength(1);
     expect(screen.queryByRole('link', { name: 'Open board' })).toBeNull();
 
-    // 2 — the button exists, and the anchor does not contain it.
-    const door = within(liveCard).getByRole('link', { name: 'Shop operations' });
-    const archiveButton = within(liveCard).getByRole('button', { name: 'Archive Shop operations' });
-    expect(door.contains(archiveButton)).toBe(false);
-    expect(archiveButton.closest('a')).toBeNull();
+    // 2 — the overflow button (WS-03: the acts are a menu now, case 22.147) exists, and the anchor does
+    // not contain it.
+    const door = within(liveCard).getByRole('link', { name: 'Open Shop operations' });
+    const menuButton = within(liveCard).getByRole('button', { name: 'More actions for Shop operations' });
+    expect(door.contains(menuButton)).toBe(false);
+    expect(menuButton.closest('a')).toBeNull();
   });
 
   /**
@@ -794,18 +836,24 @@ describe('13.397 no archived projects means no archived control, on the home too
 });
 
 /**
- * 13.394 (home half) — the "New project" form is `.gn-project-founding`, a
- * raised card with an inline row, NOT `.gn-workspace-founding` (the bare
- * column `/workspaces`' "New workspace" form uses, per `founding.test.tsx`).
- * Two class families for two different reference layouts.
+ * 13.394 (home half), AMENDED by Task 8 (22.152) — the "New project" row
+ * (`.gn-project-founding`, a raised card with an inline field+button row) is gone:
+ * the form is the body of the Create project dialog, a `.gn-project-create` column.
+ * What stays true is the contrast with `/workspaces`' founding column: the home's
+ * form is its own class family, and it is mounted only while the dialog is open.
  */
-describe('13.394 the home\'s new-project form is a raised card, not the workspace list\'s bare column', () => {
-  it('carries .gn-project-founding, and not .gn-workspace-founding', async () => {
+describe('13.394 the home\'s project form is the Create project dialog\'s own column', () => {
+  it('is .gn-project-create, absent until opened, and carries neither retired founding class', async () => {
     mount([[workspaceAs('admin')]]);
-    const field = await screen.findByPlaceholderText('e.g. Phase 2 rollout');
-    const form = field.closest('form');
+    await screen.findByRole('button', { name: 'Create project' });
+    // CONTROL: no form (and no retired card) before the press.
+    expect(screen.queryByPlaceholderText('e.g. Phase 2 rollout')).toBeNull();
+    expect(document.querySelector('.gn-project-founding')).toBeNull();
+    await openCreateProject();
+    const form = screen.getByPlaceholderText('e.g. Phase 2 rollout').closest('form');
     expect(form).not.toBeNull();
-    expect(form).toHaveClass('gn-project-founding');
+    expect(form).toHaveClass('gn-project-create');
+    expect(form).not.toHaveClass('gn-project-founding');
     expect(form).not.toHaveClass('gn-workspace-founding');
   });
 });
@@ -905,12 +953,13 @@ describe('13.986 the new-project form authors an optional description', () => {
     const events: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
 
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Delivery');
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Delivery');
     await userEvent.type(
       screen.getByPlaceholderText('e.g. Sprint work for the rollout'),
       'Sprint work for the rollout',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     expect(created(events).payload).toEqual({
@@ -918,11 +967,12 @@ describe('13.986 the new-project form authors an optional description', () => {
       description: 'Sprint work for the rollout',
     });
 
-    // SECOND SUBMISSION — the description box left untouched. The form clears
-    // both fields on success, so only the name is typed this time.
+    // SECOND SUBMISSION — the description box left untouched. The dialog closes on
+    // success and mounts empty when opened again, so only the name is typed this time.
     events.length = 0;
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     const payload = created(events).payload as Record<string, unknown>;
@@ -941,25 +991,27 @@ describe('13.986 the new-project form authors an optional description', () => {
     const events: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (sent) => events.push(...sent) });
 
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Shop operations');
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Shop operations');
     // LOWER CASE TYPED ON PURPOSE. `prefixSchema` REFUSES lower case rather than
     // normalising it, so a form that passed the keystrokes through would earn a
     // refusal whose remedy is "type it again in capitals". The upper-casing is
     // the form's job, and this line is what holds it there — remove it from the
     // `onChange` and this case fails on `so` rather than passing on `SO`.
     await userEvent.type(screen.getByPlaceholderText('e.g. SO'), 'so');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     expect(created(events).payload).toEqual({ name: 'Shop operations', prefix: 'SO' });
 
-    // SECOND SUBMISSION — the prefix box left untouched. The form clears every
-    // field on success, and an untouched optional box makes NO CLAIM: the key
+    // SECOND SUBMISSION — the prefix box left untouched. The dialog closes on
+    // success and mounts empty again, and an untouched optional box makes NO CLAIM: the key
     // must be absent, so that the half is derived from the name rather than the
     // project being founded with an empty prefix.
     events.length = 0;
-    await userEvent.type(await screen.findByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
-    await userEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await openCreateProject();
+    await userEvent.type(screen.getByPlaceholderText('e.g. Phase 2 rollout'), 'Site readiness');
+    await userEvent.click(createProjectSubmit());
     await waitFor(() => expect(events.some((e) => e.type === 'project.created')).toBe(true));
 
     const payload = created(events).payload as Record<string, unknown>;
@@ -1008,7 +1060,7 @@ describe('the rename control (13.962–13.965)', () => {
     for (const role of ['owner', 'admin']) {
       cleanup();
       mount([[workspaceAs(role)]]);
-      expect(await screen.findByRole('button', { name: /^Rename / })).toBeInTheDocument();
+      expect(await nameTrigger()).toBeInTheDocument();
     }
     // The other half, and the reason the loop above is not sufficient alone. It
     // is also the half the ORIGINAL absence was measured on: a guest could
@@ -1029,7 +1081,7 @@ describe('the rename control (13.962–13.965)', () => {
     const sent: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
 
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     const input = screen.getByLabelText('New workspace name');
     await userEvent.clear(input);
     await userEvent.type(input, 'Corner HQ');
@@ -1048,7 +1100,7 @@ describe('the rename control (13.962–13.965)', () => {
     const sent: SubmittedEvent[] = [];
     mount([[workspaceAs('admin')]], { ingest: (events) => void sent.push(...events) });
 
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     await userEvent.clear(screen.getByLabelText('New workspace name'));
 
     // Both halves on purpose: a form that disabled the button but still
@@ -1064,9 +1116,7 @@ describe('the rename control (13.962–13.965)', () => {
 
   it('13.965 the control names the WORKSPACE, so the page is not a column of identical buttons', async () => {
     mount([[workspaceAs('owner')]]);
-    expect(
-      await screen.findByRole('button', { name: 'Rename Convenience Corner' }),
-    ).toBeInTheDocument();
+    expect(await nameTrigger()).toHaveAccessibleName('Rename Convenience Corner');
   });
 });
 
@@ -1099,7 +1149,8 @@ describe('the rename control (13.962–13.965)', () => {
 describe('13.969 the NAME is the rename’s control', () => {
   it('13.969 the control a person clicks IS the workspace name, and it is focusable', async () => {
     mount([[workspaceAs('admin')]]);
-    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+    const control = await nameTrigger();
+    expect(control).toHaveAccessibleName('Rename Convenience Corner');
 
     // THE VISIBLE TEXT IS THE NAME. This is the change: a control whose label
     // were the word "Rename" would satisfy every case above and fail here.
@@ -1111,17 +1162,17 @@ describe('13.969 the NAME is the rename’s control', () => {
     expect(document.activeElement).toBe(control);
   });
 
-  it('13.969 exactly ONE rename control exists in the header — the second button is gone', async () => {
+  it('13.969 exactly ONE rename control lives in the HEADING, and no bare `Rename` button exists (AMENDED 23.177: the icon beside it is outside the h1)', async () => {
     mount([[workspaceAs('admin')]]);
-    await screen.findByRole('button', { name: /^Rename / });
-    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    await nameTrigger();
+    expect(within(screen.getByRole('heading', { level: 1 })).getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     // ...and no bare `Rename` control survives anywhere on the page.
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
 
   it('13.969 ESCAPE cancels the edit, and the name is the heading again', async () => {
     mount([[workspaceAs('admin')]]);
-    await userEvent.click(await screen.findByRole('button', { name: /^Rename / }));
+    await userEvent.click(await nameTrigger());
     const input = screen.getByLabelText('New workspace name');
     await userEvent.clear(input);
     await userEvent.type(input, 'Discarded');
@@ -1131,7 +1182,7 @@ describe('13.969 the NAME is the rename’s control', () => {
     // than committed: nothing was sent, which is the half a "the input closed"
     // assertion would miss.
     expect(screen.queryByLabelText('New workspace name')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Rename Convenience Corner' })).toHaveTextContent(
+    expect(await nameTrigger()).toHaveTextContent(
       'Convenience Corner',
     );
   });
@@ -1177,7 +1228,8 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     // POSITIVE CONTROL FIRST, so a green below cannot be "there was no heading
     // and no control". The control is present and is still the shape 13.969
     // rules on.
-    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+    const control = await nameTrigger();
+    expect(control).toHaveAccessibleName('Rename Convenience Corner');
     const h1 = screen.getByRole('heading', { level: 1 });
 
     // ⚠ WHAT THIS ARM DOES **NOT** WITNESS, stated because its green is
@@ -1214,12 +1266,12 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     // likely to reach for.
     expect(h1).not.toHaveAttribute('aria-label');
 
-    // THE OWNER'S SHAPE IS INTACT — one control, a real button, still inside the
-    // heading, and its own accessible name unchanged. These three are `13.969`'s
+    // THE OWNER'S SHAPE IS INTACT — one control INSIDE the heading (23.177's icon sits
+    // outside it, pinned there), a real button, and its own accessible name unchanged. These three are `13.969`'s
     // arms restated where an E4-5-shaped change would break them, so a future
     // move to the two-element remedy is a deliberate act with a red case rather
     // than a silent one.
-    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    expect(within(h1).getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     expect(h1).toContainElement(control);
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
   });
@@ -1236,8 +1288,8 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
  * workspace."* **Correct for that member.** An owner who founded the workspace
  * seconds ago has an empty live list for the other reason — the workspace has
  * none — and the sentence they read says the opposite: *"you can open"*
- * presupposes projects they cannot, and it sits directly above the New-project
- * form that would fix it.
+ * presupposes projects they cannot, and it sits beside the Create project button
+ * that would fix it.
  *
  * Two different facts reach ONE arm, and `shown.length === 0` cannot separate
  * them on its own. `isAdmin` plus the SERVED project count can.
@@ -1247,13 +1299,13 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
     mount([[workspaceAs('owner', { projects: [] })]]);
 
     expect(
-      await screen.findByText('No projects yet — create the first one below.'),
+      await screen.findByText('No projects yet. Create the first one.'),
     ).toBeInTheDocument();
     // And NOT the member's sentence, which is the claim the ruling is about —
     // asserted as an absence, because a page drawing both would satisfy the
     // assertion above on its own.
     expect(screen.queryByText(/No projects you can open/)).toBeNull();
-    // The form the sentence points at really is on screen: a sentence naming a
+    // The button the sentence points at really is on screen: a sentence naming a
     // control that is not rendered is the same defect one line over.
     expect(screen.getByRole('button', { name: 'Create project' })).toBeInTheDocument();
   });
@@ -1269,7 +1321,7 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
     expect(
       await screen.findByText('No projects you can open are active here.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/create the first one below/)).toBeNull();
+    expect(screen.queryByText(/Create the first one/)).toBeNull();
   });
 });
 
@@ -1278,11 +1330,12 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
  * accessible name, so "the project's link" is a UNIQUE query on this page.
  *
  * `e2e-stack/helpers/board.ts` asks for the seeded project with
- * `getByRole('link', { name: 'Shop operations', exact: true })` and asserts
+ * `getByRole('link', { name: 'Open Shop operations', exact: true })` (WS-03, case
+ * 22.147, renamed the door "Open <project>"; the bar's item keeps the bare name) and asserts
  * `toHaveCount(1)` — deliberately, because that file's docblock records that a
  * positional pick is how it measured the WRONG board once already. The deployed
  * stack answered **2** (`measured 2026-09-22, the desktop viewport the stack
- * suite runs at`): the card's door, which carries the project's name because it
+ * suite runs at`): the card's door, which carried the project's name because it
  * IS the project's row, and the bar's "last open project" item, which carried
  * the same name because nothing had ever needed them to differ.
  *
@@ -1313,75 +1366,71 @@ describe('13.1217 the bar’s project item and the card door do not share one na
     await screen.findByTestId('project-row-p1');
     await screen.findByRole('link', { name: 'Shop operations, projects menu' });
 
-    // The door, pinned to the project's own name and its own href.
-    const door = within(row('p1')).getByRole('link', { name: 'Shop operations' });
+    // The door, pinned to its own name and its own href. WS-03 (case 22.147) renamed it "Open <project>",
+    // so the project's bare name no longer names the card at all — the collision is closed from both sides.
+    const door = within(row('p1')).getByRole('link', { name: 'Open Shop operations' });
     expect(door).toHaveAttribute('href', `/w/${WORKSPACE}/p/p1`);
 
-    // THE WHOLE PAGE, not the row: exactly one link answers to the project's
-    // name, and it is the door. Two would be the defect this case exists for.
-    expect(screen.getAllByRole('link', { name: 'Shop operations' })).toEqual([door]);
+    // THE WHOLE PAGE, not the row: exactly one link answers to the door's name, and it is the door. Two
+    // would be the defect this case exists for.
+    expect(screen.getAllByRole('link', { name: 'Open Shop operations' })).toEqual([door]);
+    // CONTROL: the bar item still answers to ITS own name, and the bare project name matches no link.
+    expect(screen.getAllByRole('link', { name: 'Shop operations, projects menu' })).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Shop operations' })).toBeNull();
   });
 });
 
 /**
- * 13.1297 — the project card's Archive/Restore strip is the BUTTON's size, not
- * the card's width (owner request, 2026-09-22, one screenshot).
- *
- * ## What the owner measured
- *
- * On this page the card's actions container `div.gn-project-card__actions`
- * measured **362.66 × 44** while the Archive button inside it is about **186**
- * wide, and the instruction was *"make the container size be the same as the
- * button size"*. The 176px between them is not cosmetic. `.gn-project-card` is
- * a column flex container, so its default `align-items: stretch` widened every
- * item to the card's inner width — and this strip is the ONE child also raised
- * above the door's stretched `::after` (`position: relative; z-index: 1`, the
- * very lift the control arm below holds). So every pixel of the strip that was
- * NOT the button sat over the door rather than under it: the pointer there hit
- * the strip, not the overlay, and the card neither lit nor navigated. The
- * card's clickable area was a rectangle with a 176px hole in it.
- *
- * ## Why a source scan rather than a render
- *
- * These component tests never load the real stylesheet into jsdom, so nothing
- * rendered here could observe a flex stretch — the same reason
- * `workspace-restricted-spacing.test.ts` (13.408) reads the source. The fix is
- * one declaration, so the source text is the whole claim.
- *
- * ## The control arm, and why it is in the same `it`
- *
- * `align-self: flex-start` is what makes a child of a column container
- * shrink-to-fit. The control asserts `position: relative` and `z-index: 1` are
- * STILL declared, because the shrink only helps while the strip also stays
- * above the door: a "fix" that bought the width by dropping the lift would put
- * the door's transparent overlay back over Archive/Restore and eat the click on
- * exactly the pixels this change rescues. The two are one assertion about one
- * shape — a separate `it` would let the destructive variant report green on the
- * arm that matters.
- *
- * The selector is ANCHORED (`^`) and the rule is a single line, both
- * deliberately: `globals.css:1248`–`:1256` open three further rules beginning
- * with `.gn-project-card__actions ` (then a space and `.gn-button`), so an
- * unanchored substring match would find one of those on a LATER line first —
- * the first-match landmine 3.974 records.
+ * **23.177 (UX fixes Task 10, audit WS-13) — a visible Rename cue beside the name.** The name is the rename's
+ * control (13.969) but looks like plain text, so an admin also gets a pencil icon button, named
+ * `Rename <workspace>`, as a SIBLING of the level-1 heading (inside it, the heading would announce an action:
+ * 13.995). A member or guest gets neither control.
  */
-describe('13.1297 the project card’s actions strip is content-sized', () => {
-  it('13.1297 declares align-self: flex-start, keeping the lift above the door', () => {
-    const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
-    const rule = ruleFor(css, /^\.gn-project-card__actions\s*\{/);
-    expect(rule, 'no rule found for .gn-project-card__actions').toBeDefined();
+describe('23.177 the workspace home has a visible Rename icon button for admins', () => {
+  const iconOf = async (): Promise<HTMLElement> => {
+    await nameTrigger();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    const all = screen.getAllByRole('button', { name: 'Rename Convenience Corner' });
+    const outside = all.filter((button) => !h1.contains(button));
+    expect(outside, 'exactly one Rename button sits OUTSIDE the heading').toHaveLength(1);
+    return outside[0] as HTMLElement;
+  };
 
-    // The fix: shrink-to-fit, so the strip is the button's box, not the card's.
-    expect(rule).toMatch(/align-self:\s*flex-start/);
+  it('23.177 an owner and an admin see the icon button beside the heading, outside it, drawing a pencil', async () => {
+    for (const role of ['owner', 'admin']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      const icon = await iconOf();
+      // A real icon button: the glyph is decorative and the name is the label, with no visible text of its own.
+      expect(icon).toHaveTextContent('');
+      expect(icon.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      // BESIDE the heading: the same row, never inside it.
+      expect(screen.getByRole('heading', { level: 1 }).parentElement).toContainElement(icon);
+      // CONTROL: the name-as-trigger is still there, so the icon is "alongside", not a replacement.
+      await nameTrigger();
+    }
+  });
 
-    // The control: the lift that keeps Archive/Restore above the door is
-    // unmoved. See the docblock — an `align-self` that arrived by deleting
-    // either of these is not a fix.
-    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
-      /position:\s*relative/,
-    );
-    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
-      /z-index:\s*1\b/,
-    );
+  it('23.177 a member and a guest see NEITHER Rename control', async () => {
+    for (const role of ['member', 'guest']) {
+      cleanup();
+      mount([[workspaceAs(role)]]);
+      expect((await screen.findAllByText('Convenience Corner')).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
+    }
+  });
+
+  it('23.177 clicking the icon opens the same in-place field, with the name filled in, and the icon steps aside', async () => {
+    mount([[workspaceAs('admin')]]);
+    await userEvent.click(await iconOf());
+    expect(screen.getByLabelText('New workspace name')).toHaveValue('Convenience Corner');
+    expect(screen.queryByRole('button', { name: /^Rename / })).toBeNull();
+  });
+
+  it('23.177 the icon is a 44px target (the P-GHOST floor), pinned on the stylesheet', () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../app/globals.css'), 'utf8');
+    const rule = /\.gn-workspace-home__rename-icon\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(rule).toMatch(/min-height:\s*2\.75rem/);
+    expect(rule).toMatch(/min-width:\s*2\.75rem/);
   });
 });

@@ -236,7 +236,8 @@ export function AccountMenu() {
               Its accessible name keeps the full `Sign out {name}` sentence the
               old nav button carried — the shell's accessible-name floor is
               ratcheted on that string, and `apps/web/e2e-stack/
-              passkey-registration.spec.ts` addresses the control by it. The
+              passkey-registration.spec.ts` addresses the control by its `Sign out` prefix (a
+              nameless user's label is just `Sign out`). The
               control moved; the name did not. */}
           <button
             type="button"
@@ -280,8 +281,8 @@ export function AccountMenu() {
               data-testid="account-menu-signout-refusal"
             >
               {signOutFailure === 'refused'
-                ? 'The server refused the sign-out — you are still signed in on this device. Try again.'
-                : 'We could not reach the server — you are still signed in on this device. Try again.'}
+                ? 'The server refused the sign-out. You are still signed in on this device. Try again.'
+                : 'We could not reach the server. You are still signed in on this device. Try again.'}
             </p>
           ) : null}
         </div>

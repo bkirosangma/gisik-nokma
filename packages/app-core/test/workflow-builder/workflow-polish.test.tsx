@@ -134,21 +134,27 @@ describe('10.159 the destructive buttons in the well are quiet danger buttons', 
     const remove = screen.getAllByRole('button', { name: 'Remove rule' })[0]!;
     const del = screen.getByRole('button', { name: 'Delete transition' });
     for (const button of [remove, del]) {
+      // The metrics hook, and the ONE quiet destructive treatment (23.022): the outlined variant, never the filled one.
       expect(button).toHaveClass('builder-quiet-danger');
-      // Still the destructive affordance by class as well: the variant is kept, the quiet class overrides its ground.
-      expect(button).toHaveClass('gn-button--danger');
+      expect(button).toHaveClass('gn-button--danger-quiet');
+      expect(button).not.toHaveClass('gn-button--danger');
     }
     // CONTROL — the non-destructive button in the same well does not wear it (the class is not on every button).
     await user.click(screen.getByRole('button', { name: 'Add rule' }));
     expect(screen.getByRole('button', { name: 'Add rule' })).not.toHaveClass('builder-quiet-danger');
+    expect(screen.getByRole('button', { name: 'Add rule' })).not.toHaveClass('gn-button--danger-quiet');
   });
 
   it('10.159 Delete state wears it; Set as start does not', () => {
     const store = createDraftStore(draftFromTemplate(kanban));
     renderPanels(store);
     act(() => store.actions.select({ kind: 'state', stateId: 'doing' }));
-    expect(screen.getByRole('button', { name: 'Delete state' })).toHaveClass('builder-quiet-danger');
+    const del = screen.getByRole('button', { name: 'Delete state' });
+    expect(del).toHaveClass('builder-quiet-danger');
+    expect(del).toHaveClass('gn-button--danger-quiet');
+    expect(del).not.toHaveClass('gn-button--danger');
     expect(screen.getByRole('button', { name: 'Set as start' })).not.toHaveClass('builder-quiet-danger');
+    expect(screen.getByRole('button', { name: 'Set as start' })).not.toHaveClass('gn-button--danger-quiet');
   });
 });
 

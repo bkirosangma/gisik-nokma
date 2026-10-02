@@ -122,9 +122,9 @@ function divergenceCountLine(population: Population): string | null {
 function divergenceBody(population: Population, outgoing: string, incoming: string): string | null {
   if (population === null) return null;
   if (population === 'failed') {
-    return `Existing tickets of this type stay on "${outgoing}" — we could not count how many. New ones will use "${incoming}".`;
+    return `Existing tickets of this type stay on "${outgoing}". We could not count how many. New ones will use "${incoming}".`;
   }
-  if (population.count === 0) return `No tickets of this type are on "${outgoing}" — nothing stays behind.`;
+  if (population.count === 0) return `No tickets of this type are on "${outgoing}". Nothing stays behind.`;
   if (population.count === 1) {
     return `1 existing ticket of this type stays on "${outgoing}". New ones will use "${incoming}".`;
   }
@@ -172,6 +172,8 @@ function EditorHeader(props: {
   canAuthor: boolean;
   cancel?: ReactNode;
   saveDisabled: boolean;
+  /** The form is exactly what was loaded: Save stays quiet (UX fixes T6, 23.094, audit TT-08). */
+  saveQuiet: boolean;
   onSave(): void;
 }) {
   const Heading = props.heading;
@@ -192,10 +194,14 @@ function EditorHeader(props: {
             component does not supply); the paint is `gn-button--primary`'s. */}
         {props.canAuthor ? (
           <Button
-            variant="primary"
+            variant={props.saveQuiet ? 'ghost' : 'primary'}
             className="ticket-type-editor__save"
             disabled={props.saveDisabled}
-            onClick={props.onSave}
+            // QUIET, not `disabled` (UX fixes T6, 23.094): an unchanged form has nothing to save, so the button stops being
+            // the page's one primary and says so (`aria-disabled`), but stays focusable and announced where `disabled`
+            // would drop it from the tab order; the click is inert.
+            aria-disabled={props.saveQuiet ? true : undefined}
+            onClick={props.saveQuiet ? undefined : props.onSave}
           >
             Save ticket type
           </Button>
@@ -308,6 +314,8 @@ export function TicketTypeEditorScreen(props: {
   const heading = props.heading ?? 'h2';
   const untitledLabel = props.untitledLabel ?? 'Untitled type';
   const saveDisabled = !parsed.success || save.phase === 'saving';
+  // An existing type exactly as loaded has nothing to save; a NEW type (no `initialDef`) has no saved state to equal.
+  const saveQuiet = props.initialDef !== null && JSON.stringify(def) === JSON.stringify(props.initialDef);
   const header = (
     <EditorHeader
       name={def.name}
@@ -316,6 +324,7 @@ export function TicketTypeEditorScreen(props: {
       canAuthor={canAuthor}
       cancel={props.cancel}
       saveDisabled={saveDisabled}
+      saveQuiet={saveQuiet}
       onSave={() => void onSave()}
     />
   );
@@ -328,7 +337,7 @@ export function TicketTypeEditorScreen(props: {
     return (
       <section className="ticket-type-editor">
         {header}
-        <p className="ticket-type-editor__load-error">Could not load ticket types — reload to try again.</p>
+        <p className="ticket-type-editor__load-error">Could not load ticket types. Reload to try again.</p>
       </section>
     );
   }
@@ -404,7 +413,7 @@ export function TicketTypeEditorScreen(props: {
       setRebind({
         phase: 'mapping',
         toWorkflowId: target.id,
-        error: `We could not reach the server for this move — ${message}`,
+        error: `We could not reach the server for this move: ${message}`,
       });
     }
   }
@@ -472,11 +481,11 @@ export function TicketTypeEditorScreen(props: {
               />
             </label>
             {isBuiltin ? (
-              <p className="ticket-type-editor__builtin-note">Built-in type — its place in the hierarchy is fixed.</p>
+              <p className="ticket-type-editor__builtin-note">Built-in type. Its place in the hierarchy is fixed.</p>
             ) : null}
             {rankDiverged ? (
               <p className="ticket-type-editor__builtin-note" data-testid="rank-divergence">
-                Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank
+                Tickets already placed keep their place. Re-ranking does not move or re-check them. The new rank
                 applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank
                 no longer allows cannot be put back there.
               </p>
@@ -496,7 +505,7 @@ export function TicketTypeEditorScreen(props: {
             </label>
           </Card>
           <Card className="ticket-type-editor__card">
-            <h3 className="ticket-type-editor__fields-title">{`Fields · ${def.fields.length}`}</h3>
+            <h3 className="ticket-type-editor__fields-title">{`Fields (${def.fields.length})`}</h3>
             <FieldsEditor
               fields={def.fields}
               disabled={!canAuthor}
@@ -655,7 +664,7 @@ export function TicketTypeEditorScreen(props: {
                         </button>
                         {bindingCommitted ? null : (
                           <p className="ticket-type-editor__divergence-hint">
-                            {`Save the ticket type first — until it is saved, new tickets would still go to "${outgoingWorkflow.name}".`}
+                            {`Save the ticket type first. Until it is saved, new tickets would still go to "${outgoingWorkflow.name}".`}
                           </p>
                         )}
                       </div>
@@ -672,7 +681,7 @@ export function TicketTypeEditorScreen(props: {
                           `left` branch above it has already made the decision
                           and the migrated branch has finished making it. */}
                       <p className="ticket-type-editor__divergence-note">
-                        Neither choice is recommended over the other — leaving them is a decision, not a deferral.
+                        Neither choice is recommended over the other. Leaving them is a decision, not a deferral.
                       </p>
                       </>
                     )}
@@ -730,11 +739,11 @@ export function TicketTypeEditorScreen(props: {
               data-testid="rank-implications-list"
             >
               <li>
-                {'Two pickers will re-order: the board’s New ticket menu and MCP’s '}
+                {'Two pickers will re-order: the board’s Create ticket menu and MCP’s '}
                 <code className="ticket-type-editor__code">create_ticket</code>.
               </li>
               <li data-testid="rank-implications">{rankImplicationsCopy(implications)}</li>
-              <li>Published workflows are versioned — nothing already recorded is rewritten.</li>
+              <li>Published workflows are versioned. Nothing already recorded is rewritten.</li>
             </ul>
           </Card>
         </aside>

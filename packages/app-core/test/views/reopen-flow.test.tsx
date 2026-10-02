@@ -186,7 +186,7 @@ function flowSource(
 }
 
 async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.click(screen.getByRole('button', { name: 'New ticket' }));
+  await user.click(screen.getByRole('button', { name: 'Create ticket' }));
   await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
   // The Parent picker is the shared searchable `Select` now, so it is opened and clicked rather
   // than `selectOptions`'d: its trigger is an `<input role="combobox">` with no `<option>`
@@ -198,7 +198,7 @@ async function createTicketUnderParent(user: ReturnType<typeof userEvent.setup>)
   await user.click(
     within(await screen.findByRole('listbox')).getByRole('option', { name: 'Registrations' }),
   );
-  await user.click(screen.getByRole('button', { name: 'Create' }));
+  await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 }
 
 function renderFlow(
@@ -257,7 +257,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     // The dialog names the parent, its terminal state, and the SERVER's reason verbatim.
     const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
     expect(dialog).toHaveTextContent('Registrations is Done.');
-    expect(dialog).toHaveTextContent(`Refused by the server — hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`);
+    expect(dialog).toHaveTextContent(`Refused by the server: hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`);
 
     // The picker offers only structurally reachable non-terminal states. Read from
     // the shared Select's HiddenSelect mirror rather than `getByLabelText('Reopen
@@ -311,7 +311,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — restrict-to: Only Anselma Marak may move this out of Done.',
+      'Refused by the server: restrict-to: Only Anselma Marak may move this out of Done.',
     );
     // create attempt + parent attempt; the child was NEVER resubmitted.
     expect(source.ingested).toHaveLength(2);
@@ -338,9 +338,9 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     await user.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
 
     const alertBox = await screen.findByRole('alert');
-    expect(alertBox).toHaveTextContent('Registrations was reopened — that is now recorded history.');
+    expect(alertBox).toHaveTextContent('Registrations was reopened. That is now recorded history.');
     expect(alertBox).toHaveTextContent(
-      `Refused by the server — hierarchy.rank: ${RANK_REASON}`,
+      `Refused by the server: hierarchy.rank: ${RANK_REASON}`,
     );
     expect(onCreated).not.toHaveBeenCalled();
     // Three claims and no fourth: nothing was sent to compensate the reopen away.
@@ -387,7 +387,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     await createTicketUnderParent(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — restrict-to: Only Anselma Marak may put work in this project.',
+      'Refused by the server: restrict-to: Only Anselma Marak may put work in this project.',
     );
     expect(onCreated).not.toHaveBeenCalled();
     // The optimistic outcome was never shown, and the claim really did round-trip.
@@ -405,7 +405,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
 
     const dialog = await screen.findByRole('dialog', { name: 'Reopen parent?' });
     expect(dialog).toHaveTextContent(
-      `instant check — hierarchy.parent-terminal: ${INSTANT_PARENT_TERMINAL_REASON}`,
+      `instant check: hierarchy.parent-terminal: ${INSTANT_PARENT_TERMINAL_REASON}`,
     );
     expect(dialog).not.toHaveTextContent('Refused by the server');
     // The whole point: the offer arrived with NO round trip behind it.
@@ -450,7 +450,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
 
     const alertBox = await screen.findByRole('alert');
     expect(alertBox).toHaveTextContent(
-      `Refused by the server — hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`,
+      `Refused by the server: hierarchy.parent-terminal: ${SERVER_PARENT_TERMINAL_REASON}`,
     );
     // The gap names its own first absence, read off the register at run time.
     expect(alertBox).toHaveTextContent('response mapping failed at getTicket');
@@ -559,7 +559,7 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
     await createTicketUnderParent(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — invalid-payload: title: must not be blank — a title of only spaces names nothing',
+      'Refused by the server: invalid-payload: title: must not be blank — a title of only spaces names nothing',
     );
     expect(onCreated).not.toHaveBeenCalled();
   });
@@ -585,9 +585,9 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -621,7 +621,7 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const onCreated = renderFlow(source, {
       parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Order the tent');
     // The picker must be OPENED first: it is the shared searchable `Select`, so
     // its options exist only while the panel is up and are portal-rendered into
@@ -639,7 +639,7 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     expect(birthState).toBeChecked();
     await user.click(birthState);
 
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -663,12 +663,12 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     await user.type(screen.getByLabelText('Title'), 'Renew the trade licence');
     await user.click(
       within(screen.getByRole('tablist', { name: 'Priority' })).getByRole('tab', { name: 'P1' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
@@ -692,13 +692,13 @@ describe('V10 two presses on Create file ONE ticket, not two', () => {
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     renderFlow(source, { parentCandidates: [] });
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
 
     // Both clicks land in ONE React batch, which is the case a committed
     // `disabled` cannot guard — see the dialog's own case for the measurement
     // that pins the discrimination.
-    const create = screen.getByRole('button', { name: 'Create' });
+    const create = within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' });
     await act(async () => {
       create.click();
       create.click();
@@ -822,7 +822,7 @@ describe('13.593e retrying a different target after a closed parent\'s reopen ha
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — restrict-to: Only Anselma Marak may move this out of Done.',
+      'Refused by the server: restrict-to: Only Anselma Marak may move this out of Done.',
     );
 
     // Pick a DIFFERENT target and retry, in the SAME dialog session.
@@ -908,7 +908,7 @@ describe('13.593f a not-closed refusal of the reopen itself also unsticks the re
     await waitFor(() => expect(source.ingested).toHaveLength(2));
     expect(screen.getByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server — not-closed: This ticket is not closed.',
+      'Refused by the server: not-closed: This ticket is not closed.',
     );
 
     // Pick a DIFFERENT target and retry, in the SAME dialog session.
@@ -992,7 +992,7 @@ describe('E2-34 the reopen offer is the ONLY modal on screen', () => {
     // The offer is up — and it is the only modal.
     expect(await screen.findByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    expect(screen.queryByRole('dialog', { name: 'New ticket' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Create ticket' })).toBeNull();
   });
 });
 

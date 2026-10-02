@@ -13,6 +13,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
+import { OverflowMenu } from '../../../../src/overflow-menu.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
@@ -37,7 +38,7 @@ import {
  * token, so a UI implying a re-read exists would be promising something nothing
  * can deliver.
  */
-export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown again';
+export const COPY_IT_NOW = 'Copy it now: it is not stored and cannot be shown again';
 
 /**
  * R5 (access follow-ups, owner ruling 2026-09-29) — the row action and its
@@ -618,15 +619,16 @@ export default function MembersPage() {
                         <span className="gn-chip gn-members__role">{member.role}</span>
                       )}
                       {canRemove(member) ? (
-                        // Named by its visible text (a speech user says what they
-                        // read); WHICH person is the description, so a screen reader
-                        // hears "Remove from workspace…, Anselma Marak".
-                        <Button
-                          aria-describedby={`gn-members-name-${member.id}`}
-                          onClick={() => setRemoving({ member, label })}
-                        >
-                          {REMOVE_FROM_WORKSPACE}
-                        </Button>
+                        // UX fixes T2 (SYS-12, SET-04, case 23.023): a REPEATED destructive row action is not a
+                        // button on every row, it is one quiet overflow whose menu holds it. The item keeps its
+                        // visible text, and the trigger names WHICH person ("More actions for Anselma Marak"), so
+                        // a screen reader hears who the menu is for before it hears what is in it.
+                        <OverflowMenu
+                          className="gn-card-menu--inline gn-members__more"
+                          triggerLabel={`More actions for ${label}`}
+                          menuLabel={`Actions for ${label}`}
+                          items={[{ label: REMOVE_FROM_WORKSPACE, onSelect: () => setRemoving({ member, label }) }]}
+                        />
                       ) : null}
                     </div>
                   </td>
@@ -843,7 +845,7 @@ function memberSummary(members: readonly RosterMember[], workspaceName: string |
   const counted = `You can see ${people} ${people === 1 ? 'person' : 'people'}${
     workspaceName === null ? '' : ` in ${workspaceName}`
   }`;
-  return `${counted} · ${owners} ${owners === 1 ? 'owner' : 'owners'}, ${admins} ${
+  return `${counted}: ${owners} ${owners === 1 ? 'owner' : 'owners'}, ${admins} ${
     admins === 1 ? 'admin' : 'admins'
   }. Membership and roles are per workspace.`;
 }
@@ -1130,7 +1132,7 @@ function PendingList({
 }) {
   return (
     <>
-      <h2 className="gn-invite-pending__heading">{`Pending invitations · ${rows.length}`}</h2>
+      <h2 className="gn-invite-pending__heading">{`Pending invitations (${rows.length})`}</h2>
       {rows.length === 0 ? (
         <p className="gn-invite-pending__empty">No invitations are outstanding.</p>
       ) : (
@@ -1140,12 +1142,9 @@ function PendingList({
               <span className="gn-invite-pending__address">{row.address}</span>
               <span className="gn-invite-pending__meta">
                 <span className="gn-invite-pending__role">{row.role}</span>
-                <span className="gn-invite-pending__sep" aria-hidden="true">
-                  ·
-                </span>
                 <span className="gn-invite-pending__expiry">
                   {row.expiresAt === null
-                    ? 'No link behind this one — withdraw it and invite again.'
+                    ? 'No link behind this one. Withdraw it and invite again.'
                     : `Lapses ${formatDateTime(row.expiresAt)}`}
                 </span>
               </span>

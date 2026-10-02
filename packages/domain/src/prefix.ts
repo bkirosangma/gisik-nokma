@@ -12,7 +12,8 @@ import { z } from 'zod';
  * like CCSO-xxxx where the xx are the counter per project."* (2026-09-20.)
  *
  * So a prefix is up to three capital letters, ENTERED by a person at creation
- * time and immutable afterwards, and the number is scoped PER PROJECT.
+ * time (it can be changed later by an explicit event, 2026-10-01 R1/R2: the
+ * old one stays reserved), and the number is scoped PER PROJECT.
  *
  * ## Why a derivation exists at all, when the prefix is entered
  *
@@ -124,6 +125,14 @@ export type PrefixClaim = {
  * creation) rather than a clock, so the answer is the same on the live read and
  * on a rebuild.
  *
+ * ## Reserved prefixes (2026-10-02, owner spec 2026-10-01 R2)
+ *
+ * `reserved` is the set of FORMER prefixes in the workspace — a prefix a project
+ * once held stays that project's, so a derived prefix treats it as already taken
+ * and moves on (`SO` -> `SO2`). It applies to pass 2 ONLY: an ENTERED prefix was
+ * checked at the door, which lets the project that held a reserved prefix take it
+ * back, so pass 1 is unchanged.
+ *
  * ## The suffix
  *
  * A derived prefix that is already taken moves down `collisionCandidates`:
@@ -140,7 +149,10 @@ export type PrefixClaim = {
  * one governs what may be ENTERED and this governs what is DERIVED when nobody
  * entered anything. See `collisionCandidates` below, which says so at the digit.
  */
-export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[] {
+export function resolveProjectPrefixes(
+  claims: readonly PrefixClaim[],
+  reserved: ReadonlySet<string> = new Set(),
+): string[] {
   const assigned: Array<string | null> = claims.map(() => null);
   const taken = new Set<string>();
 
@@ -166,7 +178,7 @@ export function resolveProjectPrefixes(claims: readonly PrefixClaim[]): string[]
     }
     const base = derivePrefix(claim.name);
     for (const candidate of collisionCandidates(base)) {
-      if (!taken.has(candidate)) {
+      if (!taken.has(candidate) && !reserved.has(candidate)) {
         assigned[index] = candidate;
         taken.add(candidate);
         return;
@@ -239,6 +251,36 @@ function* collisionCandidates(base: string): Generator<string> {
     }
     yield word;
   }
+}
+
+/**
+ * A ticket key's two halves, read back from text a person typed — the inverse of `ticketKey`
+ * for the one shape search can recognise (prefixes and groups plan Task 4, FD1).
+ *
+ * `letters` is the WORKSPACE prefix and the PROJECT prefix run together, because the text carries
+ * no marker between them (`CCSO-12` is `CC` + `SO` or `C` + `CSO`): the caller splits it against
+ * the prefixes a workspace actually has, and R2 (project prefixes are unique within a workspace,
+ * former ones stay reserved) is what makes that split unambiguous there. So this only decides
+ * whether the text IS key-shaped: two to six ASCII letters (1–3 + 1–3), optionally ONE trailing digit
+ * 2–9, a hyphen, one to seven digits. Trims and upper-cases first, so `' ccso-12 '` reads as `CCSO-12`.
+ *
+ * The one trailing digit is the collision suffix of a DERIVED project prefix (`collisionCandidates`
+ * yields `SO2`…`SO9`, and `ticketKey` shows it as `CCSO2-3`): the product shows that key, so search
+ * must read it. It can only be the LAST character, and only of the project half — workspace prefixes
+ * are letters only — so a digit anywhere else (`CC1O-12`), `1`, `0` or a second digit (`CCSO22-1`)
+ * is not a key; the split against the workspace's real prefixes rejects the rest.
+ *
+ * Returns `null` for anything else, so a query that is not a key stays an ordinary text search.
+ * `CCSO12` (no hyphen) and `C-1` (too short to be two prefixes) are deliberately not keys.
+ * The letters are matched as ASCII BEFORE they are upper-cased, so a character whose upper case
+ * happens to be an ASCII letter (`ſ` → `S`) does not turn into one.
+ */
+export function parseTicketKey(text: string): { letters: string; number: number } | null {
+  const match = /^([A-Za-z]{2,6}[2-9]?)-([0-9]{1,7})$/.exec(text.trim());
+  if (match === null) {
+    return null;
+  }
+  return { letters: match[1]!.toUpperCase(), number: Number(match[2]) };
 }
 
 /**

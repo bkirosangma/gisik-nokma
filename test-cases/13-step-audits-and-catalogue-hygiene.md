@@ -88,7 +88,7 @@ run's own summary line before it will report anything, which is the same rule th
   target asserts `app/help/page.tsx` exists on disk — "the route exists" was the audit's own reason for
   calling this a bounded addition rather than a wire gap, and if that page is ever removed this reddens
   here rather than shipping a link into a 404. (`apps/web/app/not-found.tsx`)
-- ✅ **13.688 — both headings take the export's 34/41/700/-0.4px at 72ch, and the 404 is a centred
+- ✅ **13.688 — both headings take the export's 34/41/700/-0.4px at 72ch, and the 404 is a centred AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the 34px and the phone 1.35rem are now `var(--gn-title-page)` and `var(--gn-title-page-phone)` (34px / 22px; the phone size moved from 21.6px to 22px).
   520px column.** Read from the CSS SOURCE, because that is where those numbers live and jsdom resolves
   neither an external stylesheet nor `ch` — a computed-style assertion here would measure nothing and
   pass. The positive control is the RETIRED value: `1.6rem` must be absent from the rule, or the
@@ -229,7 +229,7 @@ cites, and the first draft cited a line it had not read.*
 
 - ✅ **13.301 — the reopen cause chip renders for a card whose `cause` is not null.** Witness: renders
   a card seeded `cause: { kind: 'reopened-for-child', childTicketId: 't_child' }` and asserts
-  `getByText('reopened — live work added')`. The plan's own mutation — delete the `card.cause !== null`
+  `getByText('reopened, live work added')`. The plan's own mutation — delete the `card.cause !== null`
   branch — reddens it, which is what makes it a guard rather than a screenshot. **Stated because a
   reader will assume both arms: this case has only one.** Every card in the render carries a cause, so
   nothing asserts the chip is ABSENT when `cause` is null; the `!== null` guard is witnessed from the
@@ -238,14 +238,15 @@ cites, and the first draft cited a line it had not read.*
   have meant writing a test to make a verdict come out (a). (`packages/app-core/test/views/board.test.tsx`)
 
 - ✅ **13.302 — the provenance control unfolds to text carrying BOTH an actor and a time.** Witness:
-  clicks the control whose accessible name is `who · when` and asserts the unfolded string
-  `marked Doing by Anselma Marak on 19 Aug 2026` — one assertion, both halves. A sibling two cases
-  down asserts the nameless-claim arm (`marked Doing by user_anselma on 19 Aug 2026`), so the actor is
+  clicks the control whose accessible name starts `Moved to Doing by` (it was `who · when`, and the string
+  `marked Doing …`, until UX T7 / 23.123 on 2026-10-02) and asserts the unfolded string
+  `Moved to Doing by Anselma Marak on 19 Aug 2026` — one assertion, both halves. A sibling two cases
+  down asserts the nameless-claim arm (`Moved to Doing by Unknown person on 19 Aug 2026`; the floor is `Unknown person` since 6.254), so the actor is
   never dropped for want of a display name. The block below it varies `TZ` over the same unfold, so the
   *time* half is witnessed against the domain's formatter rather than the machine's zone.
   (`packages/app-core/test/views/board.test.tsx`)
 
-- ✅ **13.303 — an empty project renders `No tickets here yet — create one.`** Witness: asserts
+- ✅ **13.303 — an empty project renders `No tickets here yet. Create one.`** Witness: asserts
   `getByText(EMPTY_BOARD_COPY)` **and** `expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create
   one.')` in the same case, so the rendered text is tied to the literal rather than to whatever the
   constant happens to hold — a re-export of an empty string would fail. Same case asserts
@@ -433,7 +434,7 @@ cites, and the first draft cited a line it had not read.*
   assumed:** `You have not been told this project’s name.` appears in exactly ONE SOURCE file repo-wide —
   every `.ts`/`.tsx` searched, with a positive control matched in the same sweep — at `my-work.tsx:220`.
   **A SECOND withheld-name treatment does exist, and it is on TWO of the three surfaces, not three:**
-  `nameRestrictedProjectCount` and its `N projects · name restricted` line, consumed in exactly two files
+  `nameRestrictedProjectCount` and its `N projects, name restricted` line, consumed in exactly two files
   (`apps/web/app/workspaces/page.tsx:250`, `apps/web/app/w/[workspaceId]/page.tsx:628`), and IS asserted
   (`apps/web/test/workspaces-cards.test.tsx:257`, `:363`). **The members page carries NO withheld-name
   treatment at all** — it names no `nameRestrictedProjectCount`, draws no restricted line, and its only

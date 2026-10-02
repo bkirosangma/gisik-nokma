@@ -90,7 +90,7 @@ describe('TicketNotesSection', () => {
     const { rerender } = render(
       <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
     );
-    await screen.findByText('Notes · 0');
+    await screen.findByText('Notes (0)');
     expect(getNotesForTicket).toHaveBeenCalledTimes(1);
     expect(getNotesForTicket).toHaveBeenLastCalledWith(WS, TICKET);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -134,7 +134,7 @@ describe('TicketNotesSection', () => {
         onRefusal={vi.fn()}
       />,
     );
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     const link1 = screen.getByRole('link', { name: 'Compressor log' });
     expect(link1).toHaveAttribute('href', '/notes/note_1');
     expect(link1.closest('.gn-note-badge')).toHaveClass('gn-note-badge--workspace');
@@ -159,7 +159,7 @@ describe('TicketNotesSection', () => {
         onRefusal={vi.fn()}
       />,
     );
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     expect(screen.getByRole('link', { name: 'Compressor log' })).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: /^Detach / })).toHaveLength(0);
     expect(screen.queryByTestId('attach-note')).not.toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('TicketNotesSection', () => {
         onRefusal={vi.fn()}
       />,
     );
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     expect(getNotesForTicket).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Detach Compressor log' }));
     await waitFor(() => expect(getNotesForTicket).toHaveBeenCalledTimes(2));
@@ -212,7 +212,7 @@ describe('TicketNotesSection', () => {
         onRefusal={vi.fn()}
       />,
     );
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     await user.click(screen.getByRole('button', { name: 'Detach Compressor log' }));
     await screen.findByRole('status');
     expect(source.ingested).toHaveLength(1);
@@ -256,7 +256,7 @@ describe('TicketNotesSection', () => {
         onRefusal={onRefusal}
       />,
     );
-    await screen.findByText('Notes · 2');
+    await screen.findByText('Notes (2)');
     await user.click(screen.getByRole('button', { name: 'Detach Compressor log' }));
     await waitFor(() =>
       expect(onRefusal).toHaveBeenCalledWith({ rule: 'note.attachment.locked', reason: 'This note is locked.' }),

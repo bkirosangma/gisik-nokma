@@ -84,6 +84,8 @@ describe('projection registration order (coordination §8)', () => {
       // Plan 4 Task 9 Step 3b. §8 position 4, itself INSERTED rather than
       // appended when it landed: the ticket-creation precondition reads it.
       'proj_projects',
+      // Prefixes and groups Task 6: the group tree, directly after the projects it files.
+      'proj_groups',
       // Plan 3 Chain B Task 10. §8 position 5 — INSERTED between proj_projects
       // and proj_memberships, which is neither end of this array. It must sit
       // BELOW proj_workflows and proj_ticket_types (it resolves a ticket's type
@@ -175,7 +177,12 @@ describe('projection registration order (coordination §8)', () => {
       ['proj_entity_heads', ['proj_entity_heads']],
       ['proj_workflows', ['proj_workflows']],
       ['proj_ticket_types', ['proj_ticket_types']],
-      ['proj_projects', ['proj_projects']],
+      // TWO tables (prefixes and groups plan Task 2). `proj_project_prefixes` — the
+      // former prefixes — is written in the same `apply` as the row; undeclared,
+      // the verifier's shadow replay would resolve it to the LIVE table, empty it and
+      // rebuild it in place, and diff nothing (22.025).
+      ['proj_projects', ['proj_projects', 'proj_project_prefixes']],
+      ['proj_groups', ['proj_groups']],
       ['proj_tickets', ['proj_tickets']],
       ['proj_rollups', ['proj_rollups']],
       ['proj_memberships', ['proj_memberships']],

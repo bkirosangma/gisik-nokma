@@ -141,11 +141,11 @@ describe('18.11 The Notes page — creating a note', () => {
     );
 
     const labels = await optionsOf(user, /Home/);
-    expect(labels).toContain('Garo Hills Logistics — workspace');
+    expect(labels).toContain('Garo Hills Logistics (workspace)');
     expect(labels).toContain('Garo Hills Logistics / Cold room');
     expect(labels).toContain('Garo Hills Logistics / Freezer');
     // CONTROL: the projectless workspace is offered, and contributes no project.
-    expect(labels).toContain('Quiet Corner — workspace');
+    expect(labels).toContain('Quiet Corner (workspace)');
     expect(labels.filter((label) => label.startsWith('Quiet Corner /'))).toHaveLength(0);
 
     // The default is the home it was opened with, shown on the closed trigger.
@@ -348,7 +348,7 @@ describe('18.11 The Notes page — creating a note', () => {
       </Providers>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'New note' }));
+    await user.click(await screen.findByRole('button', { name: 'Create note' }));
     await user.type(await screen.findByLabelText('Title'), 'Cold room audit');
     await user.click(screen.getByRole('button', { name: 'Create' }));
 
@@ -377,8 +377,8 @@ describe('18.11 The Notes page — creating a note', () => {
         <NotesPage />
       </Providers>,
     );
-    // CONTROL — the list's own New note is a named button and is NOT a primary (the dialog's Create is the loud one).
-    const open = await screen.findByRole('button', { name: 'New note' });
+    // CONTROL — the list's own Create note (was New note until UX fixes T9) is a named button and is NOT a primary (the dialog's Create is the loud one).
+    const open = await screen.findByRole('button', { name: 'Create note' });
     expect(open.classList.contains('gn-button--primary')).toBe(false);
     await user.click(open);
     const create = await screen.findByRole('button', { name: 'Create' });

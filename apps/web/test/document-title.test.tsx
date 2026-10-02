@@ -228,8 +228,8 @@ describe('P12 the product names each view', () => {
 
 describe('P12 the mechanism', () => {
   it('documentTitleFor suffixes the topic, and is idempotent on the product name', () => {
-    expect(documentTitleFor('Inbox')).toBe('Inbox · Gisik Nokma');
-    // A route whose topic IS the product must not read `Gisik Nokma · Gisik Nokma`.
+    expect(documentTitleFor('Inbox')).toBe('Inbox | Gisik Nokma');
+    // A route whose topic IS the product must not read `Gisik Nokma | Gisik Nokma`.
     expect(documentTitleFor(APP_NAME)).toBe(APP_NAME);
     // A blank topic is no topic, and must not produce a title that begins with
     // the separator.
@@ -240,13 +240,13 @@ describe('P12 the mechanism', () => {
     document.title = 'whatever the last route left';
     const { rerender } = render(<DocumentTitle title="Inbox" />);
     await waitFor(() => {
-      expect(document.title).toBe('Inbox · Gisik Nokma');
+      expect(document.title).toBe('Inbox | Gisik Nokma');
     });
     // The late-resolving topic arm: a route that reads its name from the server
     // sets a generic title first and the named one when it arrives.
     rerender(<DocumentTitle title="Shop operations" />);
     await waitFor(() => {
-      expect(document.title).toBe('Shop operations · Gisik Nokma');
+      expect(document.title).toBe('Shop operations | Gisik Nokma');
     });
   });
 });

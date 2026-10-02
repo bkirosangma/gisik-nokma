@@ -20,6 +20,8 @@ import { createFakeGateway, type FakeGatewaySeed } from '../../src/workflow-buil
 import { cloneTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import type { BuilderSession } from '../../src/workflow-builder/ui/builder-context.js';
 import { TicketTypeEditorScreen } from '../../src/workflow-builder/ticket-types/ticket-type-editor-screen.js';
+import { IconPicker } from '../../src/workflow-builder/ticket-types/icon-picker.js';
+import { TYPE_ICON_NAMES } from '../../src/workflow-builder/ticket-types/icons.js';
 import { TicketTypeListScreen } from '../../src/workflow-builder/ticket-types/ticket-type-list-screen.js';
 
 // The shared Select's panel is portal-rendered to document.body, so the
@@ -315,8 +317,15 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     );
   }
 
+  /** UX fixes T10 (23.171): a custom row's one door is "Reorder <name>"; the moves live in its menu. */
+  async function openReorder(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+    await user.click(screen.getByRole('button', { name: `Reorder ${name}` }));
+  }
+  const menuItem = (label: 'Move up' | 'Move down' | 'Move to top') => screen.getByRole('button', { name: label });
+
   /**
-   * 13.928 — every row carries both controls, and each is a SIBLING of the row
+   * 13.928 — every CUSTOM row carries the Reorder control (amended 2026-10-02, 23.171: was ↑ and ↓ on every
+   * row), and it is a SIBLING of the row
    * door rather than a child of it.
    *
    * The row is one `<button aria-label="Edit …">` (`:392-421` — and the verb BRANCHES
@@ -325,21 +334,19 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * jsdom will happily render, which is exactly why this is asserted on the
    * DOM containment rather than on the fact that a control exists.
    */
-  it('13.928 every row carries ↑ and ↓ controls, and they are siblings of the row door, not inside it', async () => {
+  it('13.928 every custom row carries a Reorder control, a sibling of the row door, not inside it', async () => {
     const { container } = renderReorderableList();
     await screen.findByText('Invoice');
 
     const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
     expect(rows).toHaveLength(6);
 
-    const up = screen.getByRole('button', { name: 'Move Invoice up' });
-    const down = screen.getByRole('button', { name: 'Move Invoice down' });
-    expect(up.tagName).toBe('BUTTON');
-    expect(down.tagName).toBe('BUTTON');
+    const reorder = screen.getByRole('button', { name: 'Reorder Invoice' });
+    expect(reorder.tagName).toBe('BUTTON');
+    expect(screen.getByRole('button', { name: 'Reorder Errand' }).tagName).toBe('BUTTON');
 
     const door = screen.getByRole('button', { name: 'Edit Invoice' });
-    expect(door).not.toContainElement(up);
-    expect(door).not.toContainElement(down);
+    expect(door).not.toContainElement(reorder);
     // …and the door is still the door: the control did not replace it.
     expect(door).toContainElement(screen.getByText('Invoice'));
   });
@@ -352,21 +359,23 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * would satisfy the first half perfectly, so the pair is what makes this
    * falsifiable — the shape this repo catalogues as a check that cannot fail.
    */
-  it('13.929 the ends are disabled and a movable control is not — asserted on the rendered controls', async () => {
+  it('13.929 the ends are disabled and a movable control is not — asserted on the rendered menu items', async () => {
+    const user = userEvent.setup();
     renderReorderableList();
     await screen.findByText('Invoice');
 
-    // First row: nowhere above it to go.
-    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} up` })).toBeDisabled();
     // Last row: nowhere below it to go.
-    expect(screen.getByRole('button', { name: 'Move Errand down' })).toBeDisabled();
+    await openReorder(user, 'Errand');
+    expect(menuItem('Move down')).toBeDisabled();
+    await user.keyboard('{Escape}');
 
     // The control: Invoice sits between a built-in and Errand, so it can move
     // down. Without this line, "everything is disabled" passes this test.
-    expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeEnabled();
-    // And the first row's ↓ is NOT the disabled one — ends are the assertion,
-    // not the whole control set.
-    expect(screen.getByRole('button', { name: `Move ${builtins[0]!.name} down` })).toBeDisabled();
+    await openReorder(user, 'Invoice');
+    expect(menuItem('Move down')).toBeEnabled();
+    // The first row is a built-in, which now carries no control at all (23.171) — an absent control, not a
+    // permanently disabled one.
+    expect(screen.queryByRole('button', { name: `Reorder ${builtins[0]!.name}` })).toBeNull();
   });
 
   /**
@@ -383,7 +392,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     const { gateway } = renderReorderableList();
     await screen.findByText('Invoice');
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     expect(gateway.submitted).toHaveLength(2);
     const payloads = gateway.submitted.map(
@@ -415,13 +425,16 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * exists to prevent. The control therefore ANTICIPATES the refusal rather
    * than discovering it: the arrow pointing at a built-in is disabled.
    */
-  it('13.931 the arrow that would move a built-in is disabled, on both sides of a built-in', async () => {
+  it('13.931 the move that would displace a built-in is disabled, and a built-in has no control', async () => {
+    const user = userEvent.setup();
     renderReorderableList();
     await screen.findByText('Invoice');
 
-    // Invoice's ↑ would swap it with the built-in directly above it.
-    const up = screen.getByRole('button', { name: 'Move Invoice up' });
+    // Invoice's Move up would swap it with the built-in directly above it.
+    await openReorder(user, 'Invoice');
+    const up = menuItem('Move up');
     expect(up).toBeDisabled();
+    expect(menuItem('Move to top')).toBeDisabled();
     // And the reason is ATTACHED to it, not only hoverable: a disabled button is
     // out of the focus order, so its `title` reaches a mouse user and nobody
     // else. `aria-describedby` must resolve to a node carrying the sentence.
@@ -429,12 +442,13 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     expect(describedBy).not.toBeNull();
     expect(document.getElementById(describedBy!)?.textContent).toBe('Built-in types keep their rank.');
 
-    // The same rule read from the other side: the bottom built-in's ↓ would
-    // move it, so it is disabled — while its ↑, pointing at another built-in,
-    // is also disabled.
-    const lastBuiltin = builtins[builtins.length - 1]!;
-    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} down` })).toBeDisabled();
-    expect(screen.getByRole('button', { name: `Move ${lastBuiltin.name} up` })).toBeDisabled();
+    // The same rule read from the other side: a built-in is rank-locked, so it carries no Reorder control and
+    // no arrow of either direction (23.171).
+    for (const builtin of builtins) {
+      expect(screen.queryByRole('button', { name: `Reorder ${builtin.name}` })).toBeNull();
+      expect(screen.queryByRole('button', { name: `Move ${builtin.name} up` })).toBeNull();
+      expect(screen.queryByRole('button', { name: `Move ${builtin.name} down` })).toBeNull();
+    }
   });
 
   /**
@@ -456,7 +470,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
     const before = renderedOrder(container);
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     // The server's own words reach the reader…
     expect(await screen.findByText(/built-in ranks are fixed/)).toBeInTheDocument();
@@ -486,8 +501,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     expect(screen.queryByRole('button', { name: 'New type' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move Invoice down' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move Invoice up' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reorder Invoice' })).toBeNull();
     // The control on that assertion: the same query on an AUTHOR finds it, so
     // the nulls above are the gate and not a misspelt name. The author here is
     // an OWNER, not an admin, on purpose — `canAuthorRole` is `owner || admin`,
@@ -501,7 +515,7 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
         onOpen={() => {}}
         onNew={() => {}}
       />);
-    expect(await screen.findAllByRole('button', { name: 'Move Invoice down' })).not.toHaveLength(0);
+    expect(await screen.findAllByRole('button', { name: 'Reorder Invoice' })).not.toHaveLength(0);
   });
 
   it('E4-34 a non-author is offered a door that says Open, not Edit', async () => {
@@ -563,10 +577,10 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * exists to prevent — while the screen rendered `rank 5` for a type it had
    * submitted as 6. Against the real door the window is a whole round-trip.
    *
-   * The guard is asserted AS the guard: while a swap is in flight, every arrow
-   * is disabled and a second click submits nothing.
+   * The guard is asserted AS the guard: while a swap is in flight, every Reorder
+   * menu item is disabled and a second click submits nothing.
    */
-  it('13.935 every arrow is disabled while a swap is in flight, and a second click submits nothing', async () => {
+  it('13.935 every Reorder menu item is disabled while a swap is in flight, and a second click submits nothing', async () => {
     const user = userEvent.setup();
     const base = createFakeGateway({
       workflows: [kanbanPublished],
@@ -595,24 +609,24 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     );
     await screen.findByText('Invoice');
 
-    const click = user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
-    // In flight: nothing else may be started. `waitFor` rather than a bare
-    // assertion because the click is deliberately NOT awaited — awaiting it would
-    // wait for the door to close, which is the window under test.
-    //
-    // The condition waited on is `Move Invoice down` ON PURPOSE. An earlier draft
-    // waited on `Move Invoice up`, which is disabled in EVERY state (a built-in
-    // sits above it), so it returned instantly and asserted nothing — this repo's
-    // "check that cannot fail" shape, in the test that exists to catch a
-    // concurrency bug. `Invoice down` is enabled before the click and disabled
-    // only while a swap is in flight, so it discriminates.
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Move Invoice down' })).toBeDisabled();
-    });
-    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Move Errand up' })).toBeDisabled();
+    await openReorder(user, 'Invoice');
+    // CONTROL: before the swap, Invoice's Move down is enabled — so the disabled state below is the guard.
+    expect(menuItem('Move down')).toBeEnabled();
+    const click = user.click(menuItem('Move down'));
+    // In flight: nothing else may be started. The Reorder menu is opened ONCE, outside `waitFor`: a click on the
+    // trigger inside a retry loop would toggle the popover shut on every second attempt. Only the assertion waits,
+    // because the Move down click is deliberately NOT awaited — awaiting it would wait for the door to close,
+    // which is the window under test.
+    await openReorder(user, 'Errand');
+    // The condition waited on is Errand's `Move up`: ON PURPOSE it is enabled before the click (Invoice, a
+    // custom type, sits above it) and disabled only while a swap is in flight, so it discriminates. Invoice's
+    // own `Move up` is disabled in EVERY state (a built-in sits above it) and would return instantly.
+    await waitFor(() => expect(menuItem('Move up')).toBeDisabled());
+    expect(menuItem('Move to top')).toBeDisabled();
+    expect(document.body).toHaveTextContent('A reorder is already in flight.');
+    // The SECOND click, while the first is still in flight: it lands on a disabled item and starts nothing.
+    await user.click(menuItem('Move up'));
 
-    await user.click(screen.getByRole('button', { name: 'Move Errand up' }));
     release!();
     await click;
     // Exactly ONE swap reached the door — the second click submitted nothing.
@@ -633,9 +647,43 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
     expect(renderedOrder(container).slice(4)).toEqual(['Invoice', 'Errand']);
 
-    await user.click(screen.getByRole('button', { name: 'Move Invoice down' }));
+    await openReorder(user, 'Invoice');
+    await user.click(menuItem('Move down'));
 
     expect(renderedOrder(container).slice(4)).toEqual(['Errand', 'Invoice']);
+  });
+
+  /**
+   * 23.171 (SET-03) — ordering is by a "Reorder" menu on CUSTOM types only: Move up / Move down / Move to top.
+   * A built-in's row shows no move arrows at all. CONTROL in the same `it`: a custom type CAN still be moved —
+   * Move to top re-deals the two custom types' ranks through the same `ticket-type.defined` door.
+   */
+  it('23.171 built-in rows carry no arrows; a custom row offers Move up / Move down / Move to top and Move to top moves it', async () => {
+    const user = userEvent.setup();
+    const { gateway, container } = renderReorderableList();
+    await screen.findByText('Invoice');
+
+    // No built-in row carries a move control of any kind, and no row carries an arrow glyph.
+    const rows = Array.from(container.querySelectorAll('.ticket-type-list__rows > li'));
+    for (const row of rows.slice(0, builtins.length)) {
+      expect(row.querySelector('.ticket-type-list__move')).toBeNull();
+    }
+    expect(container.textContent).not.toMatch(/[↑↓]/);
+    expect(screen.queryAllByRole('button', { name: /^Move .* (up|down)$/ })).toHaveLength(0);
+
+    await openReorder(user, 'Errand');
+    expect(menuItem('Move up')).toBeEnabled();
+    expect(menuItem('Move down')).toBeDisabled();
+    expect(menuItem('Move to top')).toBeEnabled();
+
+    // CONTROL — a custom type can still be moved: to the top of the custom run (below the built-ins).
+    await user.click(menuItem('Move to top'));
+    expect(gateway.submitted).toHaveLength(2);
+    const byName = new Map(gateway.submitted.map((event) => [(event.payload as TicketTypeDef).name, event.payload as TicketTypeDef]));
+    expect(byName.get('Errand')?.rank).toBe(5);
+    expect(byName.get('Invoice')?.rank).toBe(6);
+    expect(renderedOrder(container).slice(0, builtins.length)).toEqual(builtins.map((b) => b.name));
+    expect(renderedOrder(container).slice(builtins.length)).toEqual(['Errand', 'Invoice']);
   });
 });
 
@@ -817,7 +865,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
   it('shows rank implications derived from the workspace types', async () => {
     renderEditor(null);
     expect(await screen.findByTestId('rank-implications')).toHaveTextContent(
-      'Can sit under: Epic, Story · or at the project root.',
+      'Can sit under: Epic, Story, or at the project root.',
     );
   });
 
@@ -837,9 +885,9 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     renderEditor(null);
     const list = await screen.findByTestId('rank-implications-list');
     expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'Two pickers will re-order: the board’s New ticket menu and MCP’s create_ticket.',
-      'Can sit under: Epic, Story · or at the project root.',
-      'Published workflows are versioned — nothing already recorded is rewritten.',
+      'Two pickers will re-order: the board’s Create ticket menu and MCP’s create_ticket.',
+      'Can sit under: Epic, Story, or at the project root.',
+      'Published workflows are versioned. Nothing already recorded is rewritten.',
     ]);
   });
 
@@ -883,7 +931,7 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'epic')!);
     const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
     expect(rankField).toBeDisabled();
-    expect(screen.getByText('Built-in type — its place in the hierarchy is fixed.')).toBeInTheDocument();
+    expect(screen.getByText('Built-in type. Its place in the hierarchy is fixed.')).toBeInTheDocument();
   });
 
   /**
@@ -911,7 +959,7 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     fireEvent.change(rankField, { target: { value: '2' } });
     expect(rankField).toHaveValue(2);
     expect(screen.getByTestId('rank-divergence')).toHaveTextContent(
-      'Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there.',
+      'Tickets already placed keep their place. Re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there.',
     );
 
     // Back to the saved rank: nothing diverges, so nothing is said.
@@ -937,6 +985,8 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     renderEditor(builtins.find((builtin) => builtin.id === 'task')!, {
       submitResults: [{ status: 'refused', eventId: 'evt', rule: 'permission.role', reason }],
     });
+    // Save is quiet on an unchanged form (23.094), so the admin changes something first.
+    await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'X');
     await user.click(await screen.findByRole('button', { name: 'Save ticket type' }));
     expect(await screen.findByText('The server refused this ticket type.')).toBeInTheDocument();
     expect(screen.getByText(reason)).toBeInTheDocument();
@@ -1182,13 +1232,13 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
   it('says nothing stays behind when nothing does — no invented population', async () => {
     await rebind({ typePopulation: { task: { [kanbanPublished.id]: 0 } } });
     expect(
-      await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}" — nothing stays behind.`),
+      await screen.findByText(`No tickets of this type are on "${kanbanPublished.name}". Nothing stays behind.`),
     ).toBeInTheDocument();
   });
 
   /**
    * 13.923 — the notice carries the prototype's own sentence about the two
-   * choices: *"Neither choice is recommended over the other — leaving them is a
+   * choices: *"Neither choice is recommended over the other. Leaving them is a
    * decision, not a deferral."* (`desktop.dc.html:937`).
    *
    * The product already HELD that position — the source says "Staying put is a
@@ -1204,7 +1254,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const notice = await screen.findByTestId('workflow-divergence');
     expect(
       within(notice).getByText(
-        'Neither choice is recommended over the other — leaving them is a decision, not a deferral.',
+        'Neither choice is recommended over the other. Leaving them is a decision, not a deferral.',
       ),
     ).toBeInTheDocument();
   });
@@ -1215,7 +1265,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(await within(notice).findByText('ticket count unavailable')).toBeInTheDocument();
     expect(
       within(notice).getByText(
-        `Existing tickets of this type stay on "${kanbanPublished.name}" — we could not count how many. New ones will use "${errandPublished.name}".`,
+        `Existing tickets of this type stay on "${kanbanPublished.name}". We could not count how many. New ones will use "${errandPublished.name}".`,
       ),
     ).toBeInTheDocument();
     // The honesty that matters: it never claims a number it does not have.
@@ -1247,7 +1297,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(move).toBeDisabled();
     expect(
       screen.getByText(
-        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+        `Save the ticket type first. Until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
       ),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
@@ -1283,7 +1333,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     ).toBeInTheDocument();
     expect(
       within(dialog).getByText(
-        "Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.",
+        "Leaving them is a real choice: a type can have tickets on two workflows, and the board shows each ticket under its own workflow's states.",
       ),
     ).toBeInTheDocument();
 
@@ -1292,7 +1342,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const confirm = within(dialog).getByRole('button', { name: 'Move these tickets' });
     expect(confirm).toBeDisabled();
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     expect(confirm).toBeEnabled();
@@ -1341,7 +1391,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     expect(screen.getByRole('button', { name: `Move them to "${approvalPublished.name}"…` })).toBeDisabled();
     expect(
       screen.getByText(
-        `Save the ticket type first — until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
+        `Save the ticket type first. Until it is saved, new tickets would still go to "${kanbanPublished.name}".`,
       ),
     ).toBeInTheDocument();
     // …and nothing on screen claims the selected binding was saved.
@@ -1371,7 +1421,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     const dialog = await screen.findByRole('dialog');
     const target = errandPublished.states[0]!;
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: target.name }));
     }
     await pickFromSearchableSelect(user, combobox, approvalPublished.name);
@@ -1407,7 +1457,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
       name: `Move existing tickets to "${errandPublished.name}"`,
     });
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1439,7 +1489,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1458,7 +1508,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: errandPublished.states[0]!.name }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1486,7 +1536,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
     await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1719,7 +1769,7 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
     await user.click(await screen.findByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
     const dialog = await screen.findByRole('dialog');
     for (const state of kanbanPublished.states) {
-      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send tickets from ${state.name} to`) }));
       await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
     }
     await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
@@ -1794,7 +1844,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
   });
 
@@ -1818,7 +1868,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
         initialDef={task}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
     expect(screen.getByTestId('type-editor-header')).toBeTruthy();
   });
@@ -1860,7 +1910,7 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
         onNew={() => {}}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
     cleanup();
 
@@ -1876,7 +1926,60 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
         initialDef={task}
       />,
     );
-    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
+  });
+});
+
+/**
+ * 23.091 / 23.094 (UX fixes Task 6, audit TT-06, TT-08).
+ */
+describe('23.091 the icon picker names every choice', () => {
+  it('23.091 each choice has an accessible name and a tooltip saying the same, and the chosen one is pressed', () => {
+    const value = TYPE_ICON_NAMES[0]!;
+    render(<IconPicker value={value} onChange={() => {}} />);
+    const choices = screen.getAllByRole('button');
+    expect(choices.length).toBe(TYPE_ICON_NAMES.length);
+    for (const choice of choices) {
+      const name = choice.getAttribute('aria-label') ?? '';
+      expect(name).toMatch(/^Icon: \S/);
+      expect(choice.getAttribute('title')).toBe(name);
+    }
+    expect(new Set(choices.map((choice) => choice.getAttribute('aria-label'))).size).toBe(choices.length);
+    // CONTROL — exactly one choice is pressed, and it is the value.
+    const pressed = choices.filter((choice) => choice.getAttribute('aria-pressed') === 'true');
+    expect(pressed.map((choice) => choice.getAttribute('aria-label'))).toEqual([`Icon: ${value}`]);
+  });
+});
+
+describe('23.094 Save is quiet while the form is unchanged', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  it('23.094 an unchanged type\'s Save is aria-disabled and not the primary; a change lights it, and undoing the change quiets it again', async () => {
+    const user = userEvent.setup();
+    renderEditor(task);
+    const name = await screen.findByRole('textbox', { name: 'Type name' });
+    const save = () => screen.getByRole('button', { name: 'Save ticket type' });
+    expect(save()).toHaveAttribute('aria-disabled', 'true');
+    expect(save().className).not.toContain('gn-button--primary');
+    // CONTROL — a change lights Save: the primary, no aria-disabled.
+    await user.type(name, 'X');
+    expect(save()).not.toHaveAttribute('aria-disabled');
+    expect(save().className).toContain('gn-button--primary');
+    await user.type(name, '{Backspace}');
+    expect(save()).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('23.094 a quiet Save does nothing when pressed, and a NEW type (nothing to compare against) lights its Save once valid', async () => {
+    const user = userEvent.setup();
+    const { onSaved } = renderEditor(task);
+    await screen.findByRole('textbox', { name: 'Type name' });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    expect(onSaved).not.toHaveBeenCalled();
+    // CONTROL — the create form is not "unchanged": it has no saved state to be unchanged from.
+    cleanup();
+    renderEditor(null);
+    await user.type(await screen.findByRole('textbox', { name: 'Type name' }), 'Site inspection');
+    expect(screen.getByRole('button', { name: 'Save ticket type' }).className).toContain('gn-button--primary');
   });
 });

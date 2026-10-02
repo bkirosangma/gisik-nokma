@@ -97,7 +97,7 @@ were never in scope for a client whose route cannot serve them.
   prototype's own string (`:3032`) hardcodes "one owner"; the port counts owners and admins from the
   roster instead, and it counts the people THIS viewer may be told about rather than the workspace's
   membership, because `readMembers` hides guests from a non-admin caller. The sentence is therefore
-  `You can see N people · O owner(s), A admin(s). Membership and roles are per workspace.` The case
+  `You can see N people: O owner(s), A admin(s). Membership and roles are per workspace.` The case
   mounts TWICE over two different rosters — two people, one owner; then three people, one owner, one
   admin, with a guest riding along in the total and in neither count. A constant, or a summary counted
   from a fixture, passes the first mount and fails the second, which is the pair's entire job.
@@ -284,7 +284,7 @@ left column. **The closing quote sits at `:718`, outside the `690-712` range thi
 corrected here, and the range widened rather than the quote moved, because a range that does not contain
 its own quotation is the thing a reader stops trusting.
 
-- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled
+- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the name field's font-size is `var(--gn-title-page)`.
   in two packages, and nothing else ties the spellings.** The instrument is `saved-filters`' —
   harvest the classes the stylesheet names and the classes the component renders, and compare the SETS —
   applied across the `ui`/`app-core` boundary, where a rename on one side is invisible to both packages'
@@ -325,7 +325,7 @@ its own quotation is the thing a reader stops trusting.
   placement refusal and not a deletion.
   (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:392`)
 
-- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1`
+- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1` AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the four title metrics are the page-title rule's own as before; the font-size is spelled `var(--gn-title-page)` in both rules.
   (`desktop.dc.html@6d7b67c0a52c:1016`); the product's name is editable, so the design fit is the
   prototype's TYPOGRAPHY on an `<input>` rather than an `h1` beside it — the name is already on screen
   inside the field the person edits, so a heading would print the same words twice in one header. **The
@@ -377,6 +377,8 @@ its own quotation is the thing a reader stops trusting.
   in the repo green. Asserted by counting: two buttons in the state inspector, exactly one of them
   `--danger` and it is the one whose text is `Delete state`; two danger buttons in the transition
   inspector (`Remove rule`, `Delete transition`). Precedent for the variant is `fields-editor.tsx:64`.
+  AMENDED 2026-10-02 (UX fixes T2 / 23.022): the three destructive buttons wear `--danger-quiet` (the
+  outlined variant), and the test also asserts none of them carries the filled `--danger`.
   (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:497`)
 
 - ✅ **13.772 — the breadcrumb is on every arm of the builder route.** Not an addition to the design: it
@@ -617,7 +619,7 @@ relative-path one, and the by-package-name one tests a stale `dist`. `pnpm --fil
   immediately would let the reload land first and make "the row moved optimistically" indistinguishable
   from "the row moved". The refusal case asserts the optimistic position FIRST and then the snap-back, so a
   component that never moved at all cannot satisfy it, and it asserts the Ruling-27 sentence shape
-  (`Refused by the server — <rule>: <reason>`) rather than merely that something was rendered.
+  (`Refused by the server: <rule>: <reason>`) rather than merely that something was rendered.
   `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:850`, `:351`,
   `apps/web/src/backlog-rank-controls.tsx:115`, `apps/web/test/backlog-tab.test.tsx:334`
 
@@ -2112,7 +2114,7 @@ not see are one answer and a client that told them apart would be inventing the 
 server refused to provide. The sheet gated its whole body on `data === null` and drew `Loading…` — a
 server refusal rendered as a wait that never ends, measured on a live page at 2.5 s, 8.5 s, 18.5 s and 61 s.
 
-- **13.1112** ✅ A ticket the server answers 404 for renders *"This ticket is not here — it may have been
+- **13.1112** ✅ A ticket the server answers 404 for renders *"This ticket is not here. It may have been
   deleted, or you may not be able to see it."*, and `Loading…` is NOT on the screen. Asserted on the pair,
   because the two states shared one branch: a case asserting only the sentence passes on a sheet drawing
   both. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)

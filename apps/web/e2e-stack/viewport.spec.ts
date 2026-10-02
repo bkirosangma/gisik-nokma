@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { sweepBorders } from './helpers/non-text-contrast.js';
+import { splitByExemption } from './helpers/contrast-exemptions.js';
 import {
   RATCHETED,
   readAccessibleBaseline,
@@ -471,13 +472,13 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
    *
    * Task 19's `/w/<id>` is the first entry. Its probes are the three things the
    * workspace home adds that nothing else on this route list has: the sections
-   * nav, an archive control named for its project, and the archived disclosure
+   * nav, a more-actions control named for its project, and the archived disclosure
    * named for its workspace.
    */
   const MUST_NAME: Record<string, Array<{ role: 'navigation' | 'button' | 'link'; name: RegExp }>> = {
     'stack-phone-390|/w/:workspaceId': [
       { role: 'navigation', name: /^Workspace sections$/ },
-      { role: 'button', name: /^Archive / },
+      { role: 'button', name: /^More actions for / },
       { role: 'link', name: /^Ticket types$/ },
     ],
   };
@@ -626,7 +627,7 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
        a floor of the seven: it is the only one carrying admin-gated MUTATION
        controls, so a restyle that dropped an `aria-label` here would leave a
        person with a screen reader unable to tell which project a bare
-       "Archive" button belongs to. Its `MUST_NAME` probes are what give this
+       "More actions" button belongs to. Its `MUST_NAME` probes are what give this
        route's FIRST run teeth — see that map. */
     { path: `/w/${workspaceId}`, key: 'stack-phone-390|/w/:workspaceId' },
   ];
@@ -1098,11 +1099,15 @@ test('records non-text contrast across the signed-in surface, with a positive co
       const computed = getComputedStyle(el);
       return { borderStyle: computed.borderStyle, boxShadow: computed.boxShadow };
     });
+    // AMENDED 2026-10-02 (UX fixes T1, owner U5: "borders on buttons AND text fields"; cases 23.002, 13.339): the neo
+    // field now wears a 1px solid ring in `--gn-field-rim`, so the border is `solid`, not `none`. The 1.18/1.0 waiver
+    // below is SUPERSEDED for text fields: this sweep now composites the ring itself (>= 3:1), and the persisted
+    // roster entry is kept only as the record of what the owner once accepted.
     expect(
       style.borderStyle,
-      `13.356: .gn-field__input on ${routeLabel} has a border (${style.borderStyle}) — the pure-neo ` +
-        `no-border ruling (13.339) no longer holds, so the sanctioned waiver below is unearned.`,
-    ).toBe('none');
+      `13.356: .gn-field__input on ${routeLabel} has no ring (${style.borderStyle}) — the neo field ring ` +
+        `(U5, 23.002) no longer holds.`,
+    ).toBe('solid');
     expect(
       style.boxShadow,
       `13.356: .gn-field__input on ${routeLabel} has no box-shadow — there is no boundary at all here, ` +
@@ -1124,6 +1129,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
   // already covers it; its founding form is the other place the field renders.
   await page.goto('/workspaces', { waitUntil: 'networkidle' });
   absorb('/workspaces', await sweepBorders(page));
+  // The founding form is mounted ONLY while the "Create workspace" dialog is open (workspaces/page.tsx `CreateWorkspaceButton`), so the field this asserts on does not exist until it is opened. 13.1729.
+  await page.getByRole('button', { name: 'Create workspace' }).first().click();
   await assertSunkenNoBorderField('/workspaces');
 
   // `readWorkspaceId` carries the same "could not read a workspace id" refusal and RETURNS a
@@ -1158,6 +1165,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
 
   const roster = [...worst.entries()].sort((a, b) => a[1].ratio - b[1].ratio);
   const below = roster.filter(([, r]) => r.ratio < 3);
+  // 13.1730 — the ONE owner-exempted class (`nav.gn-bottom-bar`, a container); exact-signature match, see helpers/contrast-exemptions.ts.
+  const { failing: failingBelow, exempt: exemptBelow } = splitByExemption(below);
 
   /*
    * 13.356 — the SANCTIONED waiver. Not a `worst` entry (nothing this sweep
@@ -1197,12 +1206,14 @@ test('records non-text contrast across the signed-in surface, with a positive co
       backdrop: 'surface (neo)',
       routes: ['/sign-in', '/workspaces'],
       citation:
+        'SUPERSEDED 2026-10-02 (UX fixes T1, owner U5): the neo text field now wears a 1px ring, so this waiver ' +
+        'no longer applies to it; kept as the record. ' +
         'Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo ' +
         'look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) ' +
         'at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in ' +
         'packages/ui/src/ui.css\'s [data-style="neo"] .gn-field__input docblock and case 13.339. ' +
         'Light confirmed by this run\'s own DOM check; dark is arithmetic (surface === surfaceSunken ' +
-        'post-revert, tokens.ts\'s neoNavyRaised docblock), not re-measured.',
+        'post-revert, tokens.ts\'s neoNavySunken, still neoNavy), not re-measured.',
     },
   ];
 
@@ -1253,7 +1264,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
           'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
           '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
           '`headSha` then names its BASE rather than what was actually swept.',
-        belowCount: below.length,
+        belowCount: failingBelow.length,
+        exemptions: exemptBelow,
         totalClasses: roster.length,
         examined: examinedTotal,
         highestReading: Number(bestSeen.toFixed(2)),
@@ -1309,7 +1321,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
    * stays honest no matter how many borders the product ends up with.
    */
   expect(
-    below.map(([selector, r]) => `${selector} ${r.ratio.toFixed(2)}`),
+    failingBelow.map(([selector, r]) => `${selector} ${r.ratio.toFixed(2)}`),
     'non-text contrast regressed — these classes render below WCAG 1.4.11 3:1',
   ).toEqual([]);
 

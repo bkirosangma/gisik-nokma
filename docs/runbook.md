@@ -591,7 +591,7 @@ unbracketed form counts its own command line):
 
 **Those watchers can silently stop delivering, and a `touch` does not revive them.** Measured 2026-09-18:
 an in-place revert of a token in `packages/ui/src` was never compiled — 80 s later the container's
-`packages/ui/dist/tokens.js` still held the replaced value and the SERVED page still showed it, with all seven
+`/repo/packages/ui/dist/tokens.js` (a build artefact, not a checkout path) still held the replaced value and the SERVED page still showed it, with all seven
 watchers alive, while the same edit an hour earlier had compiled in 6.7 s. A `touch` on the source changed
 nothing. **The reliable recovery is `docker compose … restart web`** (307 again in 10 s, palette correct on
 the first poll). This is the server's failure class on a different watcher — which is why the check for a

@@ -74,7 +74,7 @@ export function parseHome(value: string): HomeRef | null {
 export function homeOptions(workspaces: { id: string; name: string; projects: { id: string; name: string }[] }[]): SelectOption[] {
   const options: SelectOption[] = [];
   for (const workspace of workspaces) {
-    options.push({ value: homeValue({ workspaceId: workspace.id, projectId: '' }), label: `${workspace.name} — workspace` });
+    options.push({ value: homeValue({ workspaceId: workspace.id, projectId: '' }), label: `${workspace.name} (workspace)` });
     for (const project of workspace.projects) {
       options.push({
         value: homeValue({ workspaceId: workspace.id, projectId: project.id }),

@@ -36,7 +36,7 @@ export function TemplateGallery(props: { onPick(template: WorkflowTemplate | nul
             onClick={() => props.onPick(null)}
           >
             <span className="template-gallery__name">Start from a blank workflow</span>
-            <span className="template-gallery__tagline">An empty canvas with one starting stage.</span>
+            <span className="template-gallery__tagline">An empty canvas with one starting state.</span>
           </button>
         </li>
       </ul>

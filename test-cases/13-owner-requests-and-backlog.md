@@ -100,7 +100,7 @@ labels absent, the dialog on "Choose a state" with three options). Node v22.23.2
   the comment box already on screen, Move disabled until it is filled; filling and pressing Move hands
   back `{ toStateId: 'done', comment: 'shipped', fieldValues: {} }`. M5 (`useState('')`) → fails.
 - **13.528b** ✅ The control: neither prop → placeholder and all three options, exactly as before.
-- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state —
+- **13.529** ✅ THROUGH THE BOARD. Card in `doing`; `›` is enabled and named "Move to next state:
   Waiting on counterparty or Done"; the click opens the dialog on "Choose a state"; the select lists
   exactly `[Waiting on counterparty, Done]` and NOT `To do`; picking the rules-free one and pressing Move
   ingests ONE `ticket.transitioned` with the shipped `{ to: 'waiting' }` and calls `onMoved`. M4 → fails
@@ -109,7 +109,7 @@ labels absent, the dialog on "Choose a state" with three options). Node v22.23.2
 - **13.530** ✅ `‹` MIRRORED — on a def built so the negative can fail. From `WF_ERRAND`'s `done` every
   declared target is backward, so "offers only the backward ones" passed under M4 in the first draft of
   this case (measured; a check that could not fail). Rebuilt on `WF_ERRAND` + `waiting → done`, card in
-  `waiting`: `‹` reads "Move to previous state — Doing or To do", the picker offers `Doing`/`To do` and
+  `waiting`: `‹` reads "Move to previous state: Doing or To do", the picker offers `Doing`/`To do` and
   NOT `Done`, which `transitionOptions` does declare from `waiting`. M4 → fails; M6 → fails.
 - **13.531** ✅ ONE gated forward target (`todo → doing` with `require-comment`, `13.501`'s idiom): the
   arrow keeps its plain name "Move to Doing"; the dialog opens with the trigger reading `Doing` and the
@@ -282,6 +282,7 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   fixture needs `fields.dueDate`/`fields.title` as real `FieldClaim`s (`fieldClaim()`), not the top-level
   `ListRow.dueDate` convenience field alone — `dateClaimOf`/`titleOf` read `row.fields` verbatim and never
   look at it. Mutation (`dateInputs` from `list.rows`) kills it.
+  **AMENDED 2026-10-02 (23.140):** "Calendar's own due-only marker does not render the ticket's title at all" is no longer true — since 23.140 the marker's accessible name and text are `<key> <title>`, so Calendar COULD now prove this at ticket level too. The Timeline proof is kept as written: it needs no change, it still reads `entry.title` from the side list, and it is the stricter of the two (a due-only ticket sits in the side list there, so the title check cannot be satisfied by a bar or marker that was drawn for a stale input).
 - **13.559** ✅ Clearing the term restores the row and removes the strip on the List tab.
 - `13.517` FLIPPED 2026-09-17 (see its own bullet above): an assignee picked in the sheet now NARROWS the
   list (the row assigned to someone else drops) and discloses through the strip; the note it asserted is
@@ -476,8 +477,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   is not, reachable through `evaluateEvent`. *Fix round 1 (review, Important 1):* a misfiled entity kind is
   refused `malformed-payload` naming the kind, not silently accepted, mirroring 13.568's mutation —
   (`packages/rule-engine/test/close.test.ts`)
-- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed —
-  reopen it first.") before any edge is looked at — proven not merely against a legal destination but
+- **13.570** ✅ A closed ticket's `ticket.transitioned` is refused `closed-ticket` ("This ticket is closed. Reopen it first.") before any edge is looked at — proven not merely against a legal destination but
   against `move('nowhere')`, a destination that is not even a real state, which still answers
   `closed-ticket` rather than `unknown-state` (fix round 1, review, Minor 3: the earlier case proved the
   closed check beats one legal move, not that it runs before the workflow is consulted at all); after a
@@ -633,7 +633,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
 - **13.586** ✅ A closed ticket shows the header badge — `Closed by <name> on <date>`, the name resolved
   through the SAME `actorLabel`/roster join every other claim in this sheet uses, the date through the one
   IST formatter (`formatDate`) — shows **Reopen** (not **Close**), disables **Move…**
-  (`disabled={closed !== null}`), and shows the sentence "Closed — reopen it first" beside it as a
+  (`disabled={closed !== null}`), and shows the sentence "Closed. Reopen it first" beside it as a
   `<span className="gn-sheet__closed-note">` — TEXT, never a `title=` tooltip (spec §5.3). Clicking Reopen
   ingests exactly one `ticket.reopened` with `payload {}`. The badge reuses `Chip` tone `terminal`
   (`packages/ui/src/components/chip.tsx`) rather than a bespoke swatch. The fixture's `closed.at` is
@@ -692,7 +692,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   (case 13.504, "never claims to be the server's own verdict"): a dropped connection is not an
   adjudication, however the sentence is worded. Proven with a fake data source whose `ingest` throws
   (`socket hung up`): clicking **Close** shows the amber transport notice with the message carried
-  verbatim (`We could not reach the server for this change — socket hung up`), the text "Refused by the
+  verbatim (`We could not reach the server for this change: socket hung up`), the text "Refused by the
   server" is absent from the document, and **Close** re-enables once the rejection settles — the
   `finally` reset does not care which branch ran. `results[0]` (not `results.find(...)`) is THE result,
   since exactly one event is ingested; a `result === undefined` (the door answering nothing) shares the
@@ -704,7 +704,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   branch clears `serverRefusal` too, the same pairing the `catch` branch already carries (13.588b): a
   wording gap in Ruling 33 itself left this one branch setting `transportError` without clearing
   `serverRefusal`, so a REFUSED click followed by a SILENT one rendered BOTH notices at once — the
-  earlier "Refused by the server — …" describing an answer that no longer holds. Proven by sequencing
+  earlier "Refused by the server: …" describing an answer that no longer holds. Proven by sequencing
   two different answers through the fake data source's ordinary per-call closure (no test-helper change
   needed): `refused` (rule `close-requires-terminal`) on the first `ingest`, an empty `[]` on the second.
   First click shows the server notice with the reason; second click shows ONLY the transport notice
@@ -738,7 +738,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `role="alert"`, `.gn-refusal--server`, the rule and reason carried VERBATIM, the same invariant every
   other refusal on this board holds. A REJECTED `ingest` (a transport failure, never a server answer)
   renders instead through `.gn-refusal--transport` with `closeCard`'s own "this close" wording ("We could
-  not reach the server for this close — …"), the words "Refused by the server" absent from the document —
+  not reach the server for this close: …"), the words "Refused by the server" absent from the document —
   mirroring case `13.504`'s two-branch shape and Ruling 27's split exactly, `closeCard` sharing
   `submitDirect`'s identical `serverRefusal`/`transportError` channels rather than inventing its own. Both
   branches leave **Close** and `‹` (a live, two-target picker from `done` — `arrowTargets` finds both
@@ -915,7 +915,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   `ticket.transitioned { to: toStateId }` straight through `dataSource.ingest`, mirroring `board.tsx`'s
   `submitDirect` idiom (`submitting` latch reset in a `finally`, a `committed` answer calling the page's
   `list.reload()`, a real refusal rendered as `role="alert" className="gn-refusal gn-refusal--server"`
-  reading `Refused by the server — <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
+  reading `Refused by the server: <rule>: <reason>`, a silent `results[0] === undefined` or a rejected
   `ingest` rendered as `gn-refusal--transport`, never the word "Refused"). Proven end to end: Start
   ingests `ticket.transitioned` with `to` equal to the fixture workflow's `initialStateId` (the exact
   payload captured and asserted, not merely "an event fired"), and the row leaves the Backlog tab once a
@@ -936,7 +936,7 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   can reach it. Mutation (submitting `to: row.stateId` instead of `toStateId`, `cp`/`sha256sum` restore):
   kills exactly this case's ingest-payload assertion (`PASS (3) FAIL (1)` of the file's 4) and no other —
   (`apps/web/test/backlog-tab.test.tsx`, `apps/web/test/backlog-start.test.ts`)
-- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog — new tickets land here.`,
+- **13.596** ✅ Task 10 — the Backlog tab's empty copy, `Nothing in the backlog. New tickets land here.`,
   passed to `TicketList`'s new `emptyCopy?` prop. **`emptyCopy` defaults to ABSENCE, not a new sentence**:
   before this task `TicketList` rendered NOTHING beneath its controls bar for a zero-row set (`groupRows([],
   DEFAULT_GROUPING, labels)` answers `[]` for every grouping but `flat`, and `sections.map` over `[]`
@@ -1936,7 +1936,7 @@ file rather than shifted by a delta.
   record this view cannot make.
 
 - ✅ **13.668 — progress reads `N of M done`, and its absence is a dash.** `3 of 8 done` and
-  `4 of 8 done · 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
+  `4 of 8 done, 2 restricted` (the restricted count stays in the denominator and is NAMED rather than
   silently dropped), and a row with no rollup rendering `—` — asserted together with the absence of
   `/done/`, so the empty arm cannot pass on a `0 of 0 done` that would be a claim about nothing.
 
@@ -2000,7 +2000,7 @@ declared in `packages/ui/test/tokens.test.ts`.
 
 - ✅ **13.680 — the export's new light-neo SELECTOR is not ported, and the light-neo set is reachable with NO `data-theme` attribute.** The export moved its light-neo block to `body[data-theme="light"][data-style="neo"]`, which matches only when the theme is exactly `light`. This product treats light as the ABSENCE of the attribute, so adopting the selector verbatim would have dropped the entire light-neo token set for every user who has never chosen a theme — the default state. The case is a NEGATIVE one in the strict sense: it asserts the compound selector is absent AND that the bare `[data-style="neo"]` arm is emitted carrying `--gn-surface: #f1eae3`, so the values are reachable with no theme attribute at all. Both dark paths (explicit attribute, and OS preference when unchosen) are asserted still present. (`packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`)
 
-- ✅ **13.681 — every contrast floor clears on the re-derived palette, and the roster was not weakened to reach them.** All `CONTRAST_PAIRS` rows across 3 styles × 2 themes, plus two things a bare pass/fail loop cannot state: the roster's SIZE is unchanged at 33 (a floor removed is a guarantee removed, and it would show here first), and no `minimum` sits below 3. The five roles T5 added are GROUNDS that no `CONTRAST_PAIRS` row names, so their obligation is measured here instead of left unstated — `dangerText`/`warningText`/`successText` on their own colours at 4.5, and `restricted`/`customMarker` against the surface at the 4.5 they actually need. **`contested` is the exception and is recorded rather than blessed:** it has no `*Text` role, but it IS read text today — `.gn-sync-status-bar__failed` sets `color: var(--gn-contested)` on `background: var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA wants 4.5 and not the 3 its `CONTRAST_PAIRS` row declares) — and in `hig`/`minimal` light it measures **4.3746, below 4.5**. PRE-EXISTING and untouched by this change; `neo` light is 6.02, so T5 incidentally fixed it in the one style it touched. The case pins the failing value so a green 3:1 cannot absorb it. Its siblings go with it, measured and equally unblessed: `warning` on surface 4.2485 and `danger` on surface 4.4013 in `hig`/`minimal` light, pairs that **no `CONTRAST_PAIRS` row names at all**. Owner: whoever next touches the sync status bar or the `contested`/`warning`/`danger` roles. (`packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`, `Features.md`) Amended 2026-09-29 by 20.001–20.004 (styling refresh Plan A): the roster is now 44 — eleven rows added for the track/well grounds, the primary's edge and the accessible edge on raised and well grounds; the size check still pins the exact count.
+- ✅ **13.681 — every contrast floor clears on the re-derived palette, and the roster was not weakened to reach them.** All `CONTRAST_PAIRS` rows across 3 styles × 2 themes, plus two things a bare pass/fail loop cannot state: the roster's SIZE is pinned (52 since UX fixes T1; it was 33 until the 2026-09-29 styling refresh added 11 rows, then 44, then T1 added 8, 44 → 52; a floor removed is a guarantee removed, and it would show here first), no two rows share an `fg`+`bg` pair (the uniqueness assertion lives in this case's `it`, UX fixes T1 fix 1, asserted before the count so a duplicate fails by name), and no `minimum` sits below 3. The five roles T5 added are GROUNDS that no `CONTRAST_PAIRS` row names, so their obligation is measured here instead of left unstated — `dangerText`/`warningText`/`successText` on their own colours at 4.5, and `restricted`/`customMarker` against the surface at the 4.5 they actually need. **`contested` is the exception and is recorded rather than blessed:** it has no `*Text` role, but it IS read text today — `.gn-sync-status-bar__failed` sets `color: var(--gn-contested)` on `background: var(--gn-surface)` (`ui.css:2602`, consumed at `sync-status-bar.tsx:85`, 13.6px normal weight, so AA wants 4.5 and not the 3 its `CONTRAST_PAIRS` row declares) — and in `hig`/`minimal` light it measures **4.3746, below 4.5**. PRE-EXISTING and untouched by this change; `neo` light is 6.02, so T5 incidentally fixed it in the one style it touched. The case pins the failing value so a green 3:1 cannot absorb it. Its siblings go with it, measured and equally unblessed: `warning` on surface 4.2485 and `danger` on surface 4.4013 in `hig`/`minimal` light, pairs that **no `CONTRAST_PAIRS` row names at all**. Owner: whoever next touches the sync status bar or the `contested`/`warning`/`danger` roles. (`packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`, `Features.md`) Amended 2026-09-29 by 20.001–20.004 (styling refresh Plan A): the roster is now 44 — eleven rows added for the track/well grounds, the primary's edge and the accessible edge on raised and well grounds; the size check still pins the exact count.
 
 ---
 
@@ -2133,7 +2133,7 @@ SHA-256 with the value taken before the mutation** — never by a shell `diff`, 
 "identical" in this repo. The two survivors are listed with their reasons, and neither is a mutation that
 failed to run: one of them refused to run at first and the refusal is recorded below.
 
-- **M1 — the door check reads the stored column instead of the derived set.** `checkProjectPrefixUnique`'s
+- **M1 — the door check reads the stored column instead of the derived set.** `checkProjectPrefixUnique` (since renamed `checkPrefixReservation`)'s
   input replaced with `new Set(rows.map(r => r.prefix).filter(p => p !== null))`.
   **REDDENS 13.1015. 13.1014 passes.** The runner's own counts: `1 failed | 4 passed (5)` — the one
   failure is 13.1015, so the control case is genuinely green. This is the mutation that separates the
@@ -2200,7 +2200,7 @@ naming: each was a case that PASSED while the property it was named for was fals
 - **13.1030 — the ENTRY half was unreachable.** The spec says the prefix is *entered at creation*, and
   neither founding form had a box: `FoundingGateway` posted `{ name }` only and `foundingSeeds` built
   `project.created` with no prefix. Both forms now carry an optional `Prefix` input.
-- **13.1031** ✅ The **new-project form** authors the prefix: typing `so` produces
+- **13.1031** ✅ The **new-project form** authors the prefix: typing `so` produces **AMENDED 2026-10-02 (prefixes/groups Task 8): the prefix box lives in the Create-project dialog (22.152); the behaviour is unchanged.**
   `project.created` with `prefix: 'SO'` — upper-cased at the keyboard, because `prefixSchema`
   REFUSES lower case rather than normalising it. A second submission with the box left untouched sends
   NO `prefix` key at all.
@@ -2275,12 +2275,12 @@ ONLY when an epic is the reason the view is empty**, keeping its own sentence ot
 not decoration: an all-epic view and a genuinely empty one are the **same state** at all three literal sites,
 so one sentence for both would be false of one of them. **Every case below therefore carries a CONTROL arm.**
 
-- **13.1043** ✅ CLOSED — an all-epic Board says *"No tickets in this view — epics appear in the List."*
+- **13.1043** ✅ CLOSED — an all-epic Board says *"No tickets in this view. Epics appear in the List."*
   (`EMPTY_BOARD_EPICS_COPY`); **a genuinely empty project keeps `EMPTY_BOARD_COPY`, unchanged.** The
   distinction arrives as a PROP, because the component cannot derive it: the epic is dropped before `total`
   increments and `isNarrowed` is deliberately false here, so both cases reach the banner identically.
   `apps/web/test/epics-not-rows.test.tsx`.
-- **13.1044** ✅ CLOSED — the all-epic Backlog says *"Nothing in the backlog — epics appear in the List."*; an
+- **13.1044** ✅ CLOSED — the all-epic Backlog says *"Nothing in the backlog. Epics appear in the List."*; an
   empty backlog keeps the original. Chosen by the **page**, not by `TicketList`, which sees only the
   surviving rows; `backlogNarrowing` is the one place both sets exist.
 - **13.1045** ✅ CLOSED — the calendar's and the timeline's cause-lists **gain the cause** rather than being
@@ -2289,8 +2289,7 @@ so one sentence for both would be false of one of them. **Every case below there
   narrowings and their clause is **conditional** — which is what lets a fourth cause ride along without
   claiming this month has one. Witnessed by `claim-labels.test.ts` 11.1 (the exact sentence) plus the model
   suites. The same treatment reaches the two shipped help documents (see below).
-- **13.1046** ✅ CLOSED — a board COLUMN whose only ticket is an epic says *"No tickets in this column —
-  epics appear in the List."* (`EMPTY_COLUMN_EPICS_COPY`); a genuinely empty column keeps
+- **13.1046** ✅ CLOSED — a board COLUMN whose only ticket is an epic says *"No tickets in this column. Epics appear in the List."* (`EMPTY_COLUMN_EPICS_COPY`); a genuinely empty column keeps
   `EMPTY_COLUMN_COPY`. ⚠ **Stricter than the board's gate on purpose**: the column takes the new sentence
   only when NOTHING ELSE was removed from it, because a column can also be emptied by the card filter, which
   this view cannot disclose — and *"an epic is why this is empty"* would be a half-truth there.
@@ -2339,7 +2338,7 @@ rather than five.
 
 **The fix.** The two failures have different causes and different remedies, so they are different fields:
 `error` is now `list.error` alone, and `prefsError` carries the preferences half. It renders BESIDE the
-column chooser — *"Your column choice was not saved — {the server's own words}"* — because that is where
+column chooser — *"Your column choice was not saved: {the server's own words}"* — because that is where
 the person who needs the sentence is standing.
 
 - **13.1116** ✅ The preferences error is its own field: with `getPreferences` rejecting and
@@ -2493,7 +2492,7 @@ instead of stating what it wants. `pointer-events: none` was rejected too — it
 misreporting its own box to devtools and to anyone reading the CSS, and the owner asked for the
 container to change size.
 
-- **13.1297** ✅ The strip declares `align-self: flex-start`, and **the lift survived it**. The control
+- **13.1297** 🚫 *Retired 2026-10-02 (prefixes and groups Task 7): the actions strip no longer exists — WS-03 (22.147) moved Edit, Archive/Restore and Delete… into the card's overflow menu and `.gn-project-card__actions` was deleted; the claim below is kept as the record of what the strip once had to do.* The strip declared `align-self: flex-start`, and **the lift survived it**. The control
   arm is asserted in the SAME case, not a sibling `it`: it requires the rule to still declare
   `position: relative` and `z-index: 1`, because the shrink is only a fix while the strip also stays
   above the door — a "fix" that bought the width by dropping the lift would put the overlay back over
@@ -4047,7 +4046,7 @@ block, under Node v22.23.2.
 **Unit 4/5 COMPLETION — the collision cleared by owner instruction (2026-09-23), not by `task/notes-7-inline-references` landing.** The controller flagged `notes-page.tsx` and the `.gn-notes` rules in `globals.css` as colliding with that unmerged lane; it still has no open PR as of this block. The owner instructed the session to proceed rather than continue holding, on the basis that a later merge conflict against a release branch is a normal, resolvable outcome in this workflow (the controller's own procedure already names the merge step) — recorded here for whoever reviews the merge into `release/notes` next, since the usual "collision cleared, Plan 7 landed, merged clean" story does not apply.
 
 - **13.1485** ✅ The notes page is WIDE (owner: "the width is too narrow ... basically the entire page minus the left pane") — `.gn-shell--wide` (`max-width: none`) lifts `.gn-shell`'s shared `80rem` cap, declared AFTER `.gn-shell` in source (equal specificity; source order is the only tiebreaker — mutation-witnessed: moving it above `.gn-shell` reddens, restored from the committed tree) and applied only to the notes page's own `<main>`; `.gn-notes`'s own `73.75rem` cap is dropped directly (already page-scoped). The CSS-source half and the rendered `<main class="gn-shell gn-shell--wide">` half are both asserted, since the source rule proves nothing on its own. — (`apps/web/test/notes-css.test.tsx`)
-- **13.1486** ✅ The editor area carries a real MINIMUM height (owner: "the height should also be enough to feel like its a note") — `.gn-notes__editor { min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem); }`, reusing `--app-nav-offset` (`:root`) with its own `0px` fallback rather than a second magic number for the nav bar's height; `12rem` approximates the page's own chrome above the editor (title, byline, breadcrumb, paddings) — a floor, not a pixel-exact fit. — (`apps/web/test/notes-css.test.tsx`)
+- **13.1486** ✅ The editor area carries a real MINIMUM height (owner: "the height should also be enough to feel like its a note") — the floor reuses `--app-nav-offset` (`:root`) with its own `0px` fallback rather than a second magic number for the nav bar's height and is a floor, not a pixel-exact fit. **AMENDED 2026-10-02 (UX fixes T9, 23.162, audit NP-04):** it no longer sits on the `.gn-notes__editor` wrapper (an invisible band under a 134px field) but on the visible field — `.gn-notes__editor .ticket-editor .ticket-editor__content { min-height: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem)); }`. — (`apps/web/test/notes-css.test.tsx`)
 - **13.1487** 🟡 CONFIRMED by the controller's browser check (no citing automated test possible — jsdom has no layout engine, this is a real-browser-only measurement), 2026-09-24, on `release/notes` `b0e0b914` via `chrome-devtools`, real Chrome (Kiro session, note "Shared maintenance notes"): at a 1600px viewport, `.gn-notes__document.getBoundingClientRect()` measured `width: 1248, left: 332, right: 1580` — matching the EXPECTED arithmetic below exactly, no rounding drift. Original arithmetic, now measured rather than merely computed: `.gn-shell` padding is `0 1.25rem` (unchanged by `--wide`), so content width is `1600 - 40 = 1560px`; the tree column stays a fixed `18rem` (288px) with a `1.5rem` (24px) gap; the document column measures `1560 - 288 - 24 = 1248px`, against the OLD three-column arithmetic's `620px` (`.gn-notes`'s old `73.75rem`/1180px cap minus `18rem`/288px tree minus `14rem`/224px TOC minus two `1.5rem`/48px gaps). No third column reappeared.
 - **13.1488** ✅ Clicking the padded empty area below short text focuses the editor at its end (owner: "feel like its a note" — the OTHER half of 13.1486) — `TicketEditorSlot`'s EXISTING `editorRef` prop threaded from `NoteDocument` through `NoteEditorPane` (no new prop surface on `packages/editor`, so the twin-contract tests see nothing new); the wrapper's `onClick` fires `editorInstanceRef.current?.commands.focus('end')` only when `event.target === event.currentTarget`, so a click inside the editor's own content (ProseMirror's own click-to-position-caret) never reaches it. Mutation-witnessed: dropping the focus call reddens, restored from the committed tree. — (`apps/web/test/note-document.test.tsx`)
 - **13.1489** ✅ Confluence-style inner padding on the document column (owner: "take inspiration from confluence") — `.gn-notes__document { padding: 0 clamp(1rem, 3vw, 3rem); }`, generous and viewport-proportional. — (`apps/web/test/notes-css.test.tsx`)

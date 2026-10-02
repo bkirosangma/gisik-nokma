@@ -222,7 +222,9 @@ describe('20.054 three groups 16 apart, lines 8 apart, the footer inside the pad
     const footer = ruleExactly(CSS, '.gn-board-card__footer');
     expect(valueOf(footer, 'margin')).toBe('0.5rem -0.5rem -0.5rem');
     expect(valueOf(footer, 'display')).toBe('flex');
-    expect(valueOf(footer, 'flex-wrap')).toBe('wrap');
+    // Amended 2026-10-02 (UX fixes T7, 23.122, audit BRD-02): the footer is ONE row now (D14), so it no longer wraps —
+    // the provenance line truncates instead. 23.122 pins the new value and its truncation.
+    expect(valueOf(footer, 'flex-wrap')).toBe('nowrap');
     // CONTROL — the epic and title are one group: the chip adds no margin.
     expect(valueOf(ruleExactly(CSS, '.gn-board-card__epic'), 'margin')).toBe('0');
   });

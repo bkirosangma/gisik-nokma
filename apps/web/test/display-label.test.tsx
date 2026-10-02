@@ -142,14 +142,14 @@ describe('E4-33 the shell names a person who has no display name', () => {
   it('13.1054 the /workspaces heading ends in a name, not an em dash', () => {
     // POSITIVE CONTROL: the named person's heading, unchanged by the fix.
     mountWorkspaces();
-    expect(screen.getByRole('heading', { level: 1, name: 'Workspaces — Kiro' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Workspaces: Kiro' })).toBeInTheDocument();
     cleanup();
 
     mockUser = { id: mockUser.id, name: '', email: 'accountant@e2e.gisik-nokma.local' };
     mountWorkspaces();
-    // THE WITNESS — the measured defect was `textContent === "Workspaces — "`.
+    // THE WITNESS — the measured defect was a heading that ended in its separator (`"Workspaces — "`, now `"Workspaces: "`).
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Workspaces — accountant@e2e.gisik-nokma.local' }),
+      screen.getByRole('heading', { level: 1, name: 'Workspaces: accountant@e2e.gisik-nokma.local' }),
     ).toBeInTheDocument();
     expect(document.querySelector('h1.gn-page-title')?.textContent).not.toMatch(/—\s*$/);
   });

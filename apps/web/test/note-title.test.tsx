@@ -11,13 +11,14 @@ import { NoteTitle, sanitizePastedTitleText } from '../src/notes/note-title.js';
  *
  * The sweep this task's brief asks for — every `contentEditable` outside the
  * rich editor, across `apps/web`, `packages/app-core` and `packages/ui` —
- * found exactly ONE: this file's own `<h1>`. The ticket title
+ * found exactly ONE: the note title's own `<h1>` (an `<h2>` since UX fixes
+ * Task 5, case 23.071: the Notes page owns the h1). The ticket title
  * (`gn-ticket-sheet__title-input`) is a real `<input>`, which cannot render
  * rich HTML at all regardless of what is pasted into it — inputs are immune
  * to this class of defect by construction, not by a handler that has to
  * remember to run. Nothing else needed the same treatment.
  *
- * A `<h1 contentEditable>` never actually inserted the RENDERED giant
+ * A heading `contentEditable` never actually inserted the RENDERED giant
  * heading permanently: `commit()` reads `textContent`, which is always
  * plain, so the SAVED title was correct the whole time — the defect was the
  * window between paste and the next blur/Enter, while the pasted HTML was
@@ -38,6 +39,19 @@ function transferWith(plain: string, html: string) {
     getData: (type: string) => (type === 'text/plain' ? plain : html),
   };
 }
+
+describe('23.071 the note title is a heading inside the Notes page, not a second h1 (audit NP-12)', () => {
+  it('23.071 it renders a level-2 heading and no level-1; it is still the editable title field', () => {
+    const { heading } = renderTitle('Compressor log');
+    expect(heading.tagName).toBe('H2');
+    expect(screen.getByRole('heading', { level: 2, name: 'Compressor log' })).toBe(heading);
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    // CONTROL: demoting it did not take the editing away or the page-title look: the same element
+    // still carries the title class and is content-editable.
+    expect(heading).toHaveClass('gn-notes__title', 'gn-page-title');
+    expect(heading.getAttribute('contenteditable')).toBe('true');
+  });
+});
 
 describe('18.331 pasting HTML inserts plain text only, with no element children', () => {
   it('pasting <h1>Big</h1><p>two</p> yields the text "Big two" and no element children', () => {

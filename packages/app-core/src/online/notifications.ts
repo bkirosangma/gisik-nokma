@@ -65,7 +65,7 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
   async function read(path: string): Promise<unknown> {
     const body = await http.get(path);
     if (body === null) {
-      throw new Error(`${path} answered 404 — this route is session-gated and should answer 401`);
+      throw new Error(`${path} answered 404. This route is session-gated and should answer 401`);
     }
     return body;
   }
@@ -99,7 +99,7 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
     const cursor = envelope.nextCursor;
     if (!Array.isArray(rows) || (cursor !== null && typeof cursor !== 'string')) {
       throw new Error(
-        `${path} answered 200 with a body this client cannot read — expected { notifications: [...], nextCursor: string | null }`,
+        `${path} answered 200 with a body this client cannot read. Expected { notifications: [...], nextCursor: string | null }`,
       );
     }
     return { notifications: rows, nextCursor: cursor };
@@ -110,7 +110,7 @@ export function createHttpNotificationsGateway(http: HttpClient): NotificationsG
     const unread = (body as { unread?: unknown }).unread;
     if (typeof unread !== 'number' || !Number.isFinite(unread)) {
       throw new Error(
-        `${path} answered 200 with a body this client cannot read — expected { unread: <number> }`,
+        `${path} answered 200 with a body this client cannot read. Expected { unread: <number> }`,
       );
     }
     return unread;

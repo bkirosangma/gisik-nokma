@@ -71,7 +71,7 @@ function rosterWhereIAm(role: WorkspaceMember['role']): WorkspaceMember[] {
 }
 
 const READ_ONLY_COPY =
-  'You can look, not touch — only a workspace owner or admin can change workflows and ticket types.';
+  'You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.';
 
 describe('the template gallery is a route-level authoring entry point, and a member is not offered it', () => {
   /**
@@ -197,7 +197,7 @@ describe('a role read that FAILS is a refusal on screen, never a quietly read-on
     // arm is also a status, so `findByRole('status')` resolves on the spinner
     // and the case would assert against the wrong element.
     const refusal = await screen.findByText(/could not be loaded/);
-    expect(refusal.closest('p')).toHaveTextContent('Your role in this workspace could not be loaded — reload to try again.');
+    expect(refusal.closest('p')).toHaveTextContent('Your role in this workspace could not be loaded. Reload to try again.');
     expect(refusal.closest('p')).toHaveTextContent('HTTP 500 for /v1/workspaces/x/members');
     // The pair: the screen that would otherwise stand in its place is absent.
     expect(screen.queryByRole('heading', { name: 'Workflows', level: 2 })).not.toBeInTheDocument();

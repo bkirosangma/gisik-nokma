@@ -99,8 +99,8 @@ describe('AttachNotePicker', () => {
     renderPicker({ getNotes: async () => NOTES, attachedIds: ['note_1'] });
     await waitFor(() => expect(screen.getByRole('listbox')).toBeInTheDocument());
     expect(screen.queryByRole('option', { name: /Compressor log/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('option', { name: `Fridge notes · ${PROJECT}` })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: `Unrelated title · ${PROJECT}` })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: `Fridge notes (${PROJECT})` })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: `Unrelated title (${PROJECT})` })).toBeInTheDocument();
     cleanup();
 
     // The cap: nine unattached notes, all matching the empty filter.
@@ -122,7 +122,7 @@ describe('AttachNotePicker', () => {
     const input = screen.getByRole('textbox', { name: 'Find a note' });
     await user.type(input, 'fri');
     await waitFor(() => expect(searchNotes).toHaveBeenCalledWith(WS, 'fri', { mode: 'lexical' }));
-    expect(await screen.findByRole('option', { name: `Fridge broken · ${PROJECT}` })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: `Fridge broken (${PROJECT})` })).toBeInTheDocument();
     cleanup();
 
     // Control: a ReplicaGapError leaves the local list intact and shows the status line.
@@ -139,7 +139,7 @@ describe('AttachNotePicker', () => {
     await user.type(input2, 'fri');
     await waitFor(() => expect(gapSearch).toHaveBeenCalled());
     expect(await screen.findByText('Search needs a connection')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: `Fridge parts list · ${PROJECT}` })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: `Fridge parts list (${PROJECT})` })).toBeInTheDocument();
   });
 
   it('18.249 choosing an existing note writes one note.attached { ticketId } and closes the picker', async () => {
@@ -147,8 +147,8 @@ describe('AttachNotePicker', () => {
     const { source, onAttached } = renderPicker({
       getNotes: async () => [note({ noteId: 'note_1', title: 'Compressor log' })],
     });
-    await screen.findByRole('option', { name: `Compressor log · ${PROJECT}` });
-    await user.click(screen.getByRole('option', { name: `Compressor log · ${PROJECT}` }));
+    await screen.findByRole('option', { name: `Compressor log (${PROJECT})` });
+    await user.click(screen.getByRole('option', { name: `Compressor log (${PROJECT})` }));
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const event = source.ingested[0]![0]!;
     expect(event.type).toBe('note.attached');
@@ -254,7 +254,7 @@ describe('AttachNotePicker', () => {
    */
   it('9.325 an existing-note row splits into a title span and a muted meta span, with the accessible name unchanged', async () => {
     renderPicker({ getNotes: async () => [note({ noteId: 'note_1', title: 'Compressor log' })] });
-    const option = await screen.findByRole('option', { name: `Compressor log · ${PROJECT}` });
+    const option = await screen.findByRole('option', { name: `Compressor log (${PROJECT})` });
     expect(option.querySelector('.gn-attach-note-picker__option-title')).toHaveTextContent('Compressor log');
     expect(option.querySelector('.gn-attach-note-picker__option-meta')).toHaveTextContent(PROJECT);
   });

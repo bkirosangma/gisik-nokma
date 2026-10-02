@@ -9,6 +9,7 @@ export function IconPicker(props: { value: string; onChange(name: string): void;
           type="button"
           className={`icon-picker__choice${props.value === name ? ' icon-picker__choice--selected' : ''}`}
           aria-label={`Icon: ${name}`}
+          title={`Icon: ${name}`}
           aria-pressed={props.value === name}
           disabled={props.disabled === true}
           onClick={() => props.onChange(name)}

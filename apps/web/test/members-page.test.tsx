@@ -495,7 +495,7 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
 
     expect(await screen.findByText(url)).toBeInTheDocument();
     expect(screen.getByText(COPY_IT_NOW)).toBeInTheDocument();
-    expect(COPY_IT_NOW).toBe('Copy it now — it is not stored and cannot be shown again');
+    expect(COPY_IT_NOW).toBe('Copy it now: it is not stored and cannot be shown again');
 
     // The pending row for the SAME invitation is on screen, and the token is
     // not in it. Scoped to the list, so the minted link above cannot satisfy it.
@@ -556,7 +556,7 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
   it('3.136 names a pending row with no credential behind it as dead, not as never-lapsing', async () => {
     mount({ listPending: async () => [{ ...PENDING, expiresAt: null }] });
     expect(
-      await screen.findByText('No link behind this one — withdraw it and invite again.'),
+      await screen.findByText('No link behind this one. Withdraw it and invite again.'),
     ).toBeInTheDocument();
   });
 });
@@ -589,7 +589,7 @@ describe('16.46 the pending list carries its heading, and its count is the list 
     mount({ listPending: async () => [PENDING, SECOND] });
     const heading = await screen.findByRole('heading', {
       level: 2,
-      name: 'Pending invitations · 2',
+      name: 'Pending invitations (2)',
     });
     // ONE text node, asserted STRUCTURALLY — and this is not decoration, it is
     // the only instrument that can see the composition. MEASURED: rebuilding the
@@ -612,7 +612,7 @@ describe('16.46 the pending list carries its heading, and its count is the list 
   it('and one row reads one — the number is a count rather than a constant', async () => {
     mount({ listPending: async () => [PENDING] });
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 1' }),
+      await screen.findByRole('heading', { level: 2, name: 'Pending invitations (1)' }),
     ).toBeInTheDocument();
   });
 
@@ -627,10 +627,10 @@ describe('16.46 the pending list carries its heading, and its count is the list 
    * is. Both halves are asserted, so "the heading is gone" and "the heading is
    * there over the empty sentence" cannot be confused for one another.
    */
-  it('renders `· 0` with no invitations, over the sentence that says so', async () => {
+  it('renders `(0)` with no invitations, over the sentence that says so', async () => {
     mount({ listPending: async () => [] });
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Pending invitations · 0' }),
+      await screen.findByRole('heading', { level: 2, name: 'Pending invitations (0)' }),
     ).toBeInTheDocument();
     expect(screen.getByText('No invitations are outstanding.')).toBeInTheDocument();
   });
@@ -972,7 +972,7 @@ describe('13.763 the summary line is counted from the roster this viewer was ser
     const first = mount({ listPending: async () => [] });
     expect(
       await screen.findByText(
-        'You can see 2 people · 1 owner, 0 admins. Membership and roles are per workspace.',
+        'You can see 2 people: 1 owner, 0 admins. Membership and roles are per workspace.',
       ),
     ).toBeInTheDocument();
     first.unmount();
@@ -989,7 +989,7 @@ describe('13.763 the summary line is counted from the roster this viewer was ser
     // admin, so it lands in the total and in neither count.
     expect(
       await screen.findByText(
-        'You can see 3 people · 1 owner, 1 admin. Membership and roles are per workspace.',
+        'You can see 3 people: 1 owner, 1 admin. Membership and roles are per workspace.',
       ),
     ).toBeInTheDocument();
   });
@@ -1019,7 +1019,7 @@ describe('13.764 the summary names the workspace when it can, and omits the clau
     });
     expect(
       await screen.findByText(
-        'You can see 2 people in Convenience Corner · 1 owner, 0 admins. Membership and roles are per workspace.',
+        'You can see 2 people in Convenience Corner: 1 owner, 0 admins. Membership and roles are per workspace.',
       ),
     ).toBeInTheDocument();
   });
@@ -1031,7 +1031,7 @@ describe('13.764 the summary names the workspace when it can, and omits the clau
     mount({ listPending: async () => [] });
     const summary = await screen.findByText(/You can see 2 people/);
     expect(summary.textContent).toBe(
-      'You can see 2 people · 1 owner, 0 admins. Membership and roles are per workspace.',
+      'You can see 2 people: 1 owner, 0 admins. Membership and roles are per workspace.',
     );
     expect(summary.textContent).not.toContain(WS);
     expect(summary.textContent).not.toContain('undefined');
@@ -1553,7 +1553,7 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     expect(SEND_INVITATION).toBe('Send invitation');
     expect(CREATE_INVITE_LINK).toBe('Create invite link');
     expect(inviteEmailedLine('a@b.test')).toBe('Invitation emailed to a@b.test.');
-    expect(INVITE_EMAIL_FAILED).toBe('The email could not be sent — copy the link below and send it yourself.');
+    expect(INVITE_EMAIL_FAILED).toBe('The email could not be sent. Copy the link below and send it yourself.');
     expect(hasAccountLine('Anselma')).toBe('Anselma already has an account.');
     expect(alreadyMemberLine('Anselma')).toBe('Anselma is already in this workspace.');
   });
@@ -1772,14 +1772,19 @@ describe('6.287 the row action is offered to an admin, on another member’s row
     { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
   ];
 
-  it('6.287 an admin sees it on a member’s row (named by role and text, described by the person), beside the role picker; NEVER on their own row nor on the last owner’s; CONTROL: with a SECOND owner that owner’s row has it', async () => {
+  it('6.287 / 23.023 an admin sees a "More actions for <name>" overflow on a member’s row, beside the role picker, and "Remove from workspace…" is INSIDE it (no longer a button on the row); NEVER on their own row nor on the last owner’s; CONTROL: with a SECOND owner that owner’s row has it', async () => {
+    const user = userEvent.setup();
     mountRemove(ROWS);
     const anselma = await rowOf('Anselma Marak');
-    const button = within(anselma).getByRole('button', { name: REMOVE });
-    expect(button).toHaveAccessibleDescription('Anselma Marak');
+    const more = within(anselma).getByRole('button', { name: 'More actions for Anselma Marak' });
+    expect(within(anselma).queryByRole('button', { name: REMOVE })).toBeNull(); // 23.023: not a row button any more
+    expect(more).toHaveAttribute('aria-haspopup', 'menu');
+    await user.click(more);
+    expect(await within(anselma).findByRole('menu', { name: 'Actions for Anselma Marak' })).toBeInTheDocument();
+    expect(within(anselma).getByRole('menuitem', { name: REMOVE })).toBeInTheDocument();
     expect(within(anselma).getByRole('button', { name: /Role for Anselma Marak/ })).toBeInTheDocument(); // control
-    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull(); // their own row
-    expect(within(await rowOf('Olga Sangma')).queryByRole('button', { name: REMOVE })).toBeNull(); // the last owner
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: /More actions for/ })).toBeNull(); // their own row
+    expect(within(await rowOf('Olga Sangma')).queryByRole('button', { name: /More actions for/ })).toBeNull(); // the last owner
 
     // CONTROL, same case: with a SECOND owner the other owner's row offers it.
     cleanup();
@@ -1787,8 +1792,8 @@ describe('6.287 the row action is offered to an admin, on another member’s row
       { id: ME, name: 'Kiro', role: 'owner' },
       { id: '01J9USER000000000000000009', name: 'Olga Sangma', role: 'owner' },
     ]);
-    expect(within(await rowOf('Olga Sangma')).getByRole('button', { name: REMOVE })).toBeInTheDocument();
-    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull();
+    expect(within(await rowOf('Olga Sangma')).getByRole('button', { name: 'More actions for Olga Sangma' })).toBeInTheDocument();
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: /More actions for/ })).toBeNull();
   });
 
   it('6.287 a non-admin (the pending read refused 403) is offered no removal anywhere; CONTROL: the roster still renders', async () => {
@@ -1796,6 +1801,7 @@ describe('6.287 the row action is offered to an admin, on another member’s row
     expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
     await screen.findByText(ADMIN_ONLY);
     expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+    expect(screen.queryByRole('button', { name: /More actions for/ })).toBeNull();
   });
 });
 
@@ -1807,9 +1813,15 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
   ];
   const REMOVED: RemoveMemberOutcome = { kind: 'removed', invitesWithdrawn: 0, invitesNotWithdrawn: [] };
 
-  async function openDialog(user: ReturnType<typeof userEvent.setup>, name = 'Anselma Marak') {
-    const trigger = within(await rowOf(name)).getByRole('button', { name: REMOVE });
+  /** 23.023: the confirm is reached through the row's overflow, whose trigger is what focus returns to. */
+  async function chooseRemove(user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement) {
     await user.click(trigger);
+    await user.click(await screen.findByRole('menuitem', { name: REMOVE }));
+  }
+
+  async function openDialog(user: ReturnType<typeof userEvent.setup>, name = 'Anselma Marak') {
+    const trigger = within(await rowOf(name)).getByRole('button', { name: `More actions for ${name}` });
+    await chooseRemove(user, trigger);
     return { trigger, dialog: await screen.findByRole('dialog', { name: `Remove ${name} from Convenience Corner?` }) };
   }
 
@@ -1827,7 +1839,7 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
     await waitFor(() => expect(trigger).toHaveFocus());
     expect(screen.getByText('Anselma Marak')).toBeInTheDocument();
 
-    await user.click(trigger);
+    await chooseRemove(user, trigger);
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(screen.queryByText('Anselma Marak')).toBeNull());
     expect(remove).toHaveBeenCalledTimes(1);
@@ -1896,7 +1908,7 @@ describe('6.288 confirming removes the person; the gate’s refusal is shown in 
   it('6.288 the title says "this workspace" when the workspace’s name is not served; the copy is otherwise verbatim', async () => {
     const user = userEvent.setup();
     mountRemove(ROWS, { remove: async () => REMOVED }, { workspaceName: null });
-    await user.click(within(await rowOf('Bora Sangma')).getByRole('button', { name: REMOVE }));
+    await chooseRemove(user, within(await rowOf('Bora Sangma')).getByRole('button', { name: 'More actions for Bora Sangma' }));
     expect(await screen.findByRole('dialog', { name: 'Remove Bora Sangma from this workspace?' })).toBeInTheDocument();
   });
 });
@@ -1983,14 +1995,10 @@ describe('20.65x the Pending invitations row (owner 2026-09-30, P1)', () => {
     const meta = kids[1]!;
     expect(Array.from(meta.children).map((k) => k.className)).toEqual([
       'gn-invite-pending__role',
-      'gn-invite-pending__sep',
       'gn-invite-pending__expiry',
     ]);
-    const sep = meta.children[1]!;
-    expect(sep.getAttribute('aria-hidden')).toBe('true');
-    expect(sep.textContent).toBe('·');
     expect(meta.children[0]!.textContent).toBe('member');
-    expect(meta.children[2]!.textContent).toMatch(/^Lapses /);
+    expect(meta.children[1]!.textContent).toMatch(/^Lapses /);
     expect(kids[2]!.textContent).toBe('Withdraw');
     expect(kids[2]!.className).toContain('gn-invite-pending__withdraw');
 
@@ -2009,7 +2017,7 @@ describe('20.65x the Pending invitations row (owner 2026-09-30, P1)', () => {
     // CONTROL (same `it`): the expiry sentence for a row with no link is still the whole sentence.
     cleanup();
     mount({ listPending: async () => [{ ...PENDING, expiresAt: null }] });
-    expect(await screen.findByText('No link behind this one — withdraw it and invite again.')).toBeInTheDocument();
+    expect(await screen.findByText('No link behind this one. Withdraw it and invite again.')).toBeInTheDocument();
   });
 
   it('20.653 at 40rem and below the address takes a full line and Withdraw wraps under it, left-aligned', async () => {

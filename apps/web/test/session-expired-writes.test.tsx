@@ -112,13 +112,13 @@ describe('E5-25 a write that ends in a 401 takes the person to sign in', () => {
     // (one re-export, not two strings), and the register follows it, so a
     // session sentence is never painted in the transport class.
     expect(EXPIRED_SESSION_COPY).toBe(SESSION_EXPIRED_COPY);
-    const transport = (message: string): string => `We could not reach the server for this save — ${message}`;
+    const transport = (message: string): string => `We could not reach the server for this save: ${message}`;
     expect(writeFailureCopy(new SessionExpiredError('/v1/events'), transport)).toBe(SESSION_EXPIRED_COPY);
     expect(writeFailureCopy(new Error('socket closed'), transport)).toBe(
-      'We could not reach the server for this save — socket closed',
+      'We could not reach the server for this save: socket closed',
     );
     expect(writeFailureRefusalClass(SESSION_EXPIRED_COPY)).toContain('gn-refusal--session');
-    expect(writeFailureRefusalClass('We could not reach the server for this save — x')).toContain(
+    expect(writeFailureRefusalClass('We could not reach the server for this save: x')).toContain(
       'gn-refusal--transport',
     );
   });

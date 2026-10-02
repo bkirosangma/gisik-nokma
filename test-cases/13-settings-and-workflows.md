@@ -210,7 +210,7 @@ the port part only, on `exec2/settings-wf-t7-t8` from `origin/main` = `99884bc9`
 shas are the commit and the blob of the same file and both are cited across the docs, which is worth
 knowing before concluding one of them is stale.
 
-- ✅ **13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible.** Two
+- ✅ **13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and the stripe is visible.** Two AMENDED 2026-10-02 (UX fixes Task 5, case 23.072): the list heading reads `var(--gn-title-section)` (1.25rem, the same 20px) so it matches every other section head.
   halves, split the way every styling case in this repo splits: `packages/app-core/test/ticket-types/ticket-types.test.tsx`
   proves the COMPONENT renders the ported strings and the DOM the parity depends on, and
   `packages/ui/test/tokens.test.ts` measures the `ui.css` rule.
@@ -1160,23 +1160,23 @@ control that silently does nothing is indistinguishable from one that worked.
   **The door's VERB branches (E4-34, 2026-09-21):** it read a bare `Edit ${type.name}` for everyone, so a
   person the read-only banner directly above the list addresses — *"You can look, not touch"* — heard
   `Edit Invoice` five times over. The verb is now `canAuthor ? 'Edit' : 'Open'`, which is the branch the
-  same file already makes for the banner and for the reorder gate. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  same file already makes for the banner and for the reorder gate. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the pair is gone — a CUSTOM row carries one `Reorder <name>` control (a sibling of the door), a built-in none.
 - ✅ **13.929 — the ends are disabled, asserted on the RENDERED control, and the same test names a control
   that is NOT disabled.** The first row's ↑ and the last row's ↓ are `toBeDisabled()`; the movable control
   (`Invoice`, between a built-in and a custom type) is `toBeEnabled()`. The second half is not decoration —
   a screen that disabled every control would satisfy the first half perfectly, which is this repo's
-  "check that cannot fail" shape. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  "check that cannot fail" shape. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the ends are the `Move up` / `Move down` items in the Reorder menu; a built-in row has no control to disable.
 - ✅ **13.930 — a swap submits two `ticket-type.defined` events through the EXISTING door, exchanging the
   two ranks.** Asserted on the submitted payloads' `rank` values — a computed value, not the presence of a
   call — plus the two `id`s and `fields` carried through untouched, because this is a re-rank and not a
-  redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the swap is driven from the Reorder menu's `Move down`; the two events are unchanged.
 - ✅ **13.931 — the arrow that would move a built-in is disabled, read from BOTH sides, and it SAYS WHY to
   a reader who cannot hover it.** `Invoice`'s ↑ (pointing at the built-in above it) and the last built-in's
   ↓ (pointing at the custom type below it, but itself a built-in) are both disabled. **Amended
   2026-09-21 (T-P32):** the reason was in `title` on the disabled control, which a disabled button is out
   of the focus order for — so it reached a mouse user who hovered and nobody else. It is now also attached
   via `aria-describedby`, and the case asserts the attribute resolves to a node carrying the sentence.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** a built-in carries no control at all; the blocked menu item for a custom row beside a built-in is disabled and says why in text.
 - ✅ **13.932 — a server refusal is displayed with its reason rather than silently doing nothing.** Seeded
   as two refused `IngestResult`s; the server's own sentence reaches the reader through a `role="alert"`,
   and the list does not re-order for a swap whose ranks did not change.
@@ -1202,7 +1202,7 @@ control that silently does nothing is indistinguishable from one that worked.
   **The case's own first draft was a check that could not fail** — it waited on `Move Invoice up`, which
   is disabled in *every* state because a built-in sits above it, so `waitFor` returned instantly and
   asserted nothing. It now waits on `Move Invoice down`, which is enabled before the click and disabled
-  only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  only while a swap is in flight. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`) **AMENDED 2026-10-02 (23.171):** the in-flight guard is read from the Reorder menu's items (reopened mid-swap they are disabled with "A reorder is already in flight.").
 
 ### Task 8 — the ticket-type list's `"N tickets"` count (2026-09-19)
 
@@ -1345,7 +1345,7 @@ mutation they kill.
 An independent review mutated this change set and found three survivors. Each is now killed by a case, so
 they are recorded with the mutation they close rather than as extra coverage:
 
-- ✅ **13.943 — a workflow that answers nothing says *"No published versions to show."* rather than
+- ✅ **13.943 — a workflow that answers nothing says *"No published versions yet."* rather than
   loading forever.** `packages/app-core/test/workflow-builder/history.test.tsx`. **Mutation killed:**
   replacing the missing-workflow branch with a bare `return` left **all four** history cases green, because
   nothing asserted the state a stale `workflowId` in the URL reaches — the shell would claim an answer was
@@ -1460,8 +1460,7 @@ present **and** the loading sentence is absent. Either alone passes over a scree
 and a reader cannot tell those two states apart — which is the whole defect, so a case that could not
 tell them apart would not be a case.
 
-- **13.1110** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types —
-  reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
+- **13.1110** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types. Reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
   read replaced by a rejection, so the assertion is over the arm and not over a hand-built screen. —
   (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 - **13.1111** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its
@@ -1614,7 +1613,7 @@ deferral recorded under `13.1141`, `13.1148` and `13.1151`. **Owner: whoever wid
 ## The builder's advisories title stops overriding its panel's ink with `warning` (lane ds1, 2026-09-21, batch B10) — case `13.1146` (second arm)
 
 **The finding, round 2 `E4-32`, MINOR** (the verifier would have raised it to IMPORTANT; no upward
-re-grading by policy). `h3.advisories-panel__title` (*"Worth a look — none of these block publishing"*)
+re-grading by policy). `h3.advisories-panel__title` (*"Worth a look (none of these block publishing)"*)
 painted `color: var(--gn-warning)` on the panel's `--gn-surface-sunken` ground at `font-size: 0.85rem` —
 **13.6px**, far below the large-text exemption — measuring **3.71:1** in `hig` and `minimal` light
 (rgb(178,80,0) on rgb(228,216,204). `neo` light passed and all three darks passed, which is how a

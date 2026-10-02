@@ -27,9 +27,9 @@ const MANUAL_NOTES_SUBSECTIONS = [
   'Who can see your note',
   'Writing a note',
   'Finding a note',
-  "A job's own notes",
+  "A ticket's own notes",
   'Mentioning somebody in a note',
-  'Linking to a job or another note',
+  'Linking to a ticket or another note',
   'Deleting a note, and getting it back',
   'What notes cannot do yet',
 ];

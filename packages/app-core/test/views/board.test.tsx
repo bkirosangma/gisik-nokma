@@ -179,28 +179,28 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
   /* 13.302 — the provenance control unfolds to text carrying BOTH an actor and
    * a time, in one asserted string. The sibling below pins the nameless-claim
    * arm, so the actor is never dropped for want of a display name. */
-  it('unfolds to "marked <state> by <who> on <when>"', async () => {
+  it('unfolds to "Moved to <state> by <who> on <when>" (UX T7, 23.123: the card line, was "who · when" / "marked …")', async () => {
     const user = userEvent.setup();
     render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
-    await user.click(screen.getByRole('button', { name: 'who · when' }));
-    expect(screen.getByText('marked Doing by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Moved to Doing by/ }));
+    expect(screen.getByText('Moved to Doing by Anselma Marak on 19 Aug 2026')).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: a nameless claim still names the actor by id — never anonymous', async () => {
     const user = userEvent.setup();
     const board = errandBoard([boardCardSeed({ stateProvenance: claim({ actorName: null }) })]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    await user.click(screen.getByRole('button', { name: 'who · when' }));
+    await user.click(screen.getByRole('button', { name: /^Moved to Doing by/ }));
     // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
-    expect(screen.getByText('marked Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
+    expect(screen.getByText('Moved to Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done · 2 restricted" with only 6 visible', () => {
+  it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done, 2 restricted" with only 6 visible', () => {
     const board = errandBoard([
       boardCardSeed({ rollup: { totalChildren: 8, terminalChildren: 5, restrictedCount: 2 } }),
     ]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    expect(screen.getByText('5 of 8 done · 2 restricted')).toBeInTheDocument();
+    expect(screen.getByText('5 of 8 done, 2 restricted')).toBeInTheDocument();
   });
 
   /* 13.301 — the reopen-cause chip. Present-arm only: every card in this render
@@ -213,7 +213,7 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
       boardCardSeed({ cause: { kind: 'reopened-for-child', childTicketId: 't_child' } }),
     ]);
     render(<Board board={board} onOpenTicket={() => {}} />);
-    expect(screen.getByText('reopened — live work added')).toBeInTheDocument();
+    expect(screen.getByText('reopened, live work added')).toBeInTheDocument();
   });
 
   it('badges a claim in transit as visually distinct, and only then', () => {
@@ -269,7 +269,7 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
     process.env.TZ = zone;
     try {
       const view = render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
-      const fold = screen.getByRole('button', { name: 'who · when' });
+      const fold = screen.getByRole('button', { name: /^Moved to Doing by/ });
       act(() => {
         fold.click();
       });
@@ -290,11 +290,11 @@ describe('Board card — one clock, and it is not the viewer’s laptop', () => 
   }
 
   it('PLANTED DEFECT: the unfold reads the same IST day from a zone fourteen hours ahead', () => {
-    expect(unfoldUnder('Pacific/Kiritimati')).toBe('marked Doing by Anselma Marak on 19 Aug 2026');
+    expect(unfoldUnder('Pacific/Kiritimati')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2026');
   });
 
   it('PLANTED DEFECT: and from a zone eleven hours behind — two zones, one answer', () => {
-    expect(unfoldUnder('Pacific/Niue')).toBe('marked Doing by Anselma Marak on 19 Aug 2026');
+    expect(unfoldUnder('Pacific/Niue')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2026');
     expect(unfoldUnder('Pacific/Kiritimati')).toEqual(unfoldUnder('Pacific/Niue'));
   });
 
@@ -814,7 +814,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     // case hands one down. The unwired arm has its own case below (3.113).
     render(<Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
-    expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create one.');
+    expect(EMPTY_BOARD_COPY).toBe('No tickets here yet. Create one.');
     // No scaffolding: not one column region is drawn for a board with no groups.
     expect(screen.queryAllByRole('region')).toEqual([]);
   });
@@ -829,7 +829,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     render(
       <Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
     );
-    const button = screen.getByRole('button', { name: 'Create a ticket' });
+    const button = screen.getByRole('button', { name: 'Create ticket' });
     await userEvent.setup().click(button);
     expect(clicks).toEqual([1]);
   });
@@ -844,7 +844,7 @@ describe('3.112 an empty board says words, not nothing', () => {
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
     // A no-op button here would look like a way out of an empty project and
     // would not be one.
-    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).toBeNull();
   });
 
   /**
@@ -916,19 +916,19 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
     expect(within(todo).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
   });
 
-  it('13.465 offers "Add a ticket" only when the shell handed a create handler down, both arms', async () => {
+  it('13.465 offers "Create ticket" only when the shell handed a create handler down, both arms', async () => {
     const user = userEvent.setup();
     const clicks: number[] = [];
     const { rerender } = render(
       <Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => clicks.push(1)} />,
     );
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(clicks).toEqual([1]);
 
     rerender(<Board board={errandBoard()} onOpenTicket={() => {}} />);
     const todoAgain = screen.getByRole('region', { name: 'To do' });
-    expect(within(todoAgain).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    expect(within(todoAgain).queryByRole('button', { name: /^Create ticket in / })).toBeNull();
     // The words stay even with no handler — a no-op button here would look
     // like a way out of an empty column and would not be one, the same
     // "control that lies" discipline `emptyBanner`'s own docblock already
@@ -984,8 +984,8 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
  * `isCreatableState` derivation would produce — so these cases exercise the
  * gate directly rather than inventing a parallel fixture.
  */
-describe('Board — "Add a ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
-  it('13.1431 a creatable empty column shows "Add a ticket", and the click passes the column\'s own selection', async () => {
+describe('Board — "Create ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
+  it('13.1431 a creatable empty column shows "Create ticket", and the click passes the column\'s own selection', async () => {
     const user = userEvent.setup();
     const selections: Array<{ workflowId: string; stateId: string } | undefined> = [];
     render(
@@ -996,7 +996,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
       />,
     );
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(selections).toEqual([{ workflowId: 'wf-errand', stateId: 'todo' }]);
   });
 
@@ -1004,15 +1004,15 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     render(<Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     const done = screen.getByRole('region', { name: 'Done' });
     expect(within(done).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
-    expect(within(done).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    expect(within(done).queryByRole('button', { name: /^Create ticket in / })).toBeNull();
     // The control, same render: 'To do' is empty too, `creatable: true`, and
     // still shows the button — so the absence above is `creatable`'s doing,
     // not a blanket regression of the empty-column action.
     const todo = screen.getByRole('region', { name: 'To do' });
-    expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    expect(within(todo).getByRole('button', { name: /^Create ticket in / })).toBeInTheDocument();
   });
 
-  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
+  it('13.1433 the empty-board "Create ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
     const user = userEvent.setup();
     const calls: Array<Array<{ workflowId: string; stateId: string } | undefined>> = [];
     // `errandBoard()` (this file's own fixture, above): one group, `totalCards
@@ -1028,7 +1028,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
         onCreateTicket={(...args) => calls.push(args)}
       />,
     );
-    await user.click(screen.getByRole('button', { name: 'Create a ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     // NOT `[undefined]` — the handler is called with ZERO arguments, so a
     // regression that hands the click event through as `selection` (`onClick=
     // {onCreateTicket}`) shows as `calls[0]` holding React's synthetic click
@@ -1045,7 +1045,7 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     // vacuously true of a handler that never receives an argument at all.
     calls.length = 0;
     const todo = screen.getByRole('region', { name: 'To do' });
-    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    await user.click(within(todo).getByRole('button', { name: /^Create ticket in / }));
     expect(calls).toEqual([[{ workflowId: 'wf-errand', stateId: 'todo' }]]);
   });
 });
@@ -1224,7 +1224,7 @@ describe('13.1177 the board card draws the due label, and the late tone (ruling 
  * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty state's instruction and
  * its control are ONE decision.
  *
- * `EMPTY_BOARD_COPY` says *"No tickets here yet — create one."* and the button
+ * `EMPTY_BOARD_COPY` says *"No tickets here yet. Create one."* and the button
  * beneath it renders only when `onCreateTicket` is passed. **Every mount in the
  * product passed nothing** — measured at the ruling: `grep -rn 'onCreateTicket='
  * apps/web/app apps/web/src` answered 0 across 63 files while the string appears
@@ -1245,7 +1245,7 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
     render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
     expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create ticket' })).toBeNull();
     // The glyph is the one part of an empty column that reads as a control.
     expect(document.querySelector('.gn-board__column-empty-icon')).toBeNull();
   });
@@ -1273,11 +1273,36 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
       />,
     );
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
-    // Both affordances: the banner's, and the empty COLUMN's own "Add a ticket".
-    expect(screen.getByRole('button', { name: 'Create a ticket' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    // Both affordances: the banner's, and the empty COLUMN's own "Create ticket".
+    expect(screen.getByRole('button', { name: 'Create ticket' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Create ticket in / })).toBeInTheDocument();
     // And the glyph accompanies the control rather than replacing one.
     expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
+  });
+
+  it('22.245 the empty board\'s Create ticket carries the same plus icon as the header Create buttons and stays quiet, not primary', () => {
+    render(
+      <Board
+        board={{
+          projectId: 'p',
+          groups: [
+            {
+              workflowId: 'wf',
+              workflowName: 'W',
+              columns: [{ stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] }],
+            },
+          ],
+        } as never}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => {}}
+      />,
+    );
+    const banner = screen.getByRole('button', { name: 'Create ticket' });
+    expect(banner).toHaveClass('gn-board__empty-create'); // control: this IS the empty-state action
+    expect(banner.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1); // the header's `+` (PlusIcon)
+    // One primary per view (22.150): the header's Create ticket is it, so nothing on the board is.
+    expect(banner).not.toHaveClass('gn-button--primary');
+    expect(document.querySelectorAll('.gn-button--primary')).toHaveLength(0);
   });
 });
 
@@ -1392,8 +1417,8 @@ describe('20.602 the keys row binds the separator to the due label', () => {
     expect(unit.contains(sep)).toBe(true);
     expect(unit.contains(within(line).getByText(formatDate(DUE)))).toBe(true);
     expect(sep.getAttribute('aria-hidden')).toBe('true');
-    // The unwrapped row still reads `key priority · due`.
-    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
+    // The unwrapped row still reads `key priority · due` — amended by 23.093 (UX fixes T6): the due half now opens with the word "Due" ("Overdue" once late).
+    expect(line.textContent).toBe(`GN-1101P2, Due ${formatDate(DUE)}`);
     // CONTROL — every `·` in the row is inside a unit, and a card with no due date draws neither.
     expect([...line.querySelectorAll('.gn-board-card__meta-sep')].every((el) => el.closest('.gn-board-card__due-unit') !== null)).toBe(true);
   });
@@ -1408,7 +1433,7 @@ describe('20.602 the keys row binds the separator to the due label', () => {
 /**
  * 13.1281 — the prototype's meta line (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
  * dueLabel].join(" · ")`), with the KEY first (owner, 2026-09-22). The due half keeps
- * the product's one date formatter and its late tone (13.1177) — the prototype's
+ * the product's one date formatter and its late tone (13.1177), now behind the word "Due" / "Overdue" (23.093: colour is never the only signal) — the prototype's
  * `Due 19 Oct` spelling is not transcribed, because a second date spelling on one
  * card is the drift ruling E5-2 closed. A `null` key (a workspace whose ledger holds
  * no prefix, or the offline replica) draws the due label alone: no dash, no
@@ -1430,17 +1455,57 @@ describe('13.1281 the board card meta line leads with the ticket key', () => {
     expect(key.className).toContain('gn-board-card__key');
     const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
     // `boardCardSeed`'s own default priority is P2 (the birth default).
-    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`GN-1101P2, Due ${formatDate(DUE)}`);
     expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
   });
   it('13.1281 CONTROL — a null key draws the priority badge and the due label, with no key and no placeholder', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(`P2 · ${formatDate(DUE)}`);
+    expect(line.textContent).toBe(`P2, Due ${formatDate(DUE)}`);
     expect(line.querySelector('.gn-board-card__key')).toBeNull();
   });
   it('13.1281 CONTROL — a key with no due date draws the key and the priority badge, with no due separator', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
     expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102P2');
+  });
+});
+
+/**
+ * 23.093 (UX fixes Task 6, audit NP-06, BRD-04): colour is never the only signal. The due date says "Overdue" or
+ * "Due" in words beside the date; the blocked column's chip is the amber `waiting` tone, which is not the danger red
+ * the `blocked` role paints.
+ */
+describe('23.093 the board never leans on colour alone', () => {
+  const TODAY = '2026-09-21';
+  const dueUnit = (date: string, today: string | undefined) => {
+    const { container, unmount } = render(
+      <Board board={errandBoard([boardCardSeed({ dueDate: { date, claim: claim() } })])} onOpenTicket={() => {}} today={today} />,
+    );
+    const unit = container.querySelector<HTMLElement>('.gn-board-card__due-unit')!;
+    return { unit, unmount };
+  };
+
+  it('23.093 a past due date reads "Overdue" in text, and an upcoming one reads "Due"', () => {
+    const late = dueUnit('2026-09-14', TODAY);
+    expect(within(late.unit).getByText('Overdue').className).toContain('gn-board-card__due-label--late');
+    expect(late.unit.textContent).toContain(formatDate('2026-09-14'));
+    late.unmount();
+    // CONTROL — a future date says "Due" and does not carry the late label tone.
+    const soon = dueUnit('2026-09-30', TODAY);
+    expect(within(soon.unit).getByText('Due').className).not.toContain('--late');
+    expect(within(soon.unit).queryByText('Overdue')).toBeNull();
+    soon.unmount();
+    // CONTROL — with no `today` nothing is late, so the word is "Due" for a past date too.
+    const unknown = dueUnit('2026-09-14', undefined);
+    expect(within(unknown.unit).getByText('Due')).toBeTruthy();
+  });
+
+  it('23.093 the Waiting column\'s chip is the waiting tone, not blocked; an ordinary column keeps its category tone', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} />);
+    const waiting = screen.getByRole('region', { name: 'Waiting on counterparty' }).querySelector('.gn-chip')!;
+    expect(waiting.className).toContain('gn-chip--waiting');
+    expect(waiting.className).not.toContain('gn-chip--blocked');
+    // CONTROL — the same query finds the other columns' chips on their own tones.
+    expect(screen.getByRole('region', { name: 'Doing' }).querySelector('.gn-chip')!.className).toContain('gn-chip--active');
   });
 });

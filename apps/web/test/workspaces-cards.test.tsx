@@ -248,7 +248,7 @@ describe('13.379 the card renders every element from data the route served', () 
 
     // Task 7: the two live projects, joined into ONE line. `getByText` on the
     // whole sentence is the assertion a multi-interpolation version fails.
-    expect(within(card).getByText('Shop operations · Deliveries')).toBeInTheDocument();
+    expect(within(card).getByText('Shop operations, Deliveries')).toBeInTheDocument();
     // The archived project is named nowhere — its only trace is the chip.
     expect(within(card).queryByText(/Last winter/)).toBeNull();
     expect(within(card).queryByTestId('project-card-p1')).toBeNull();
@@ -261,7 +261,7 @@ describe('13.379 the card renders every element from data the route served', () 
 
     // ONE text node, plural. `getByText` on the whole sentence is the assertion
     // that a three-interpolation version would fail.
-    expect(within(card).getByText('2 projects · name restricted')).toBeInTheDocument();
+    expect(within(card).getByText('2 projects, name restricted')).toBeInTheDocument();
   });
 
   // Case 13.407 (test-cases/13-deployment-dogfooding.md) — minted by the
@@ -281,7 +281,7 @@ describe('13.379 the card renders every element from data the route served', () 
     ]);
     const card = await screen.findByTestId('workspace-card-ws1');
     expect(
-      within(card).getByText('Delivery · Site readiness · Winter stock · +1 more'),
+      within(card).getByText('Delivery, Site readiness, Winter stock, +1 more'),
     ).toBeInTheDocument();
     // The meta line still counts ALL four, so the truncation never becomes
     // the card's answer to "how many projects are in here".
@@ -367,7 +367,7 @@ describe('13.379 the card renders every element from data the route served', () 
   it('says "1 project" in the singular, which a plural-only implementation cannot', async () => {
     mountWith([workspace({ id: 'ws1', nameRestrictedProjectCount: 1, memberCount: 2 })]);
     const card = await screen.findByTestId('workspace-card-ws1');
-    expect(within(card).getByText('1 project · name restricted')).toBeInTheDocument();
+    expect(within(card).getByText('1 project, name restricted')).toBeInTheDocument();
   });
 });
 
@@ -420,10 +420,10 @@ describe('13.380 a guest card shows one "Restricted" chip and no number outside 
     // the numeric "+1 more" a non-withheld viewer would get.
     expect(
       within(card).getByText(
-        'Shared with a guest · Second guest errand · Third guest errand · and more',
+        'Shared with a guest, Second guest errand, Third guest errand, and more',
       ),
     ).toBeInTheDocument();
-    expect(within(card).getByText('1 project · name restricted')).toBeInTheDocument();
+    expect(within(card).getByText('1 project, name restricted')).toBeInTheDocument();
 
     // ROUTED 1 (Task 7 review, load-bearing): none of the shape-specific
     // regexes above matches "+1 more" — the exact suffix `projectLine` would
@@ -434,7 +434,7 @@ describe('13.380 a guest card shows one "Restricted" chip and no number outside 
     // allowed to show — the restricted count above, never withheld (see
     // `restrictedLine`'s own docblock) — which is stripped out by its exact
     // text rather than excluded by yet another pattern.
-    const restrictedSentence = '1 project · name restricted';
+    const restrictedSentence = '1 project, name restricted';
     const fullText = card.textContent ?? '';
     const withoutRestrictedSentence = fullText.replace(restrictedSentence, '');
     // Proves the strip actually fired, rather than silently no-op-ing if the
@@ -613,7 +613,7 @@ describe('Task 4 — the workspaces summary line', () => {
   it('prints no summary — and the empty-state sentence instead — when the read succeeds with zero workspaces', async () => {
     mountWith([]);
     expect(
-      await screen.findByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
+      await screen.findByText('No workspaces yet. Ask an admin for an invite link, or create your own.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/workspaces? you belong to/i)).toBeNull();
   });

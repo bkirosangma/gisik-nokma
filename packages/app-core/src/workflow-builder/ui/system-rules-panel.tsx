@@ -15,7 +15,7 @@
 export function SystemRulesPanel() {
   return (
     <aside className="system-rules-panel">
-      <h3 className="system-rules-panel__title">System rules — in every workflow</h3>
+      <h3 className="system-rules-panel__title">System rules in every workflow</h3>
       <ul className="system-rules-panel__list">
         <li className="system-rules-panel__rule">
           Provenance on everything: every move records who made it and when. "Done" always unfolds to
@@ -27,7 +27,7 @@ export function SystemRulesPanel() {
         </li>
       </ul>
       <p className="system-rules-panel__footer">
-        These two sit above all workflows and cannot be authored away (product design, §4).
+        These two sit above all workflows and cannot be authored away.
       </p>
     </aside>
   );

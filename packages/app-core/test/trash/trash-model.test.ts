@@ -57,7 +57,7 @@ function deletedItem(over: Partial<DeletedItem> = {}): DeletedItem {
 describe('19.209 the spec’s fixed strings are the exported constants', () => {
   it('19.209 the note, the switch, the title, the empty and offline states, the date line', () => {
     expect(DELETE_NOTE).toBe(
-      'Deleted items sit in Deleted items on your Account page, where you can restore them. Deleting permanently marks the item to be purged for good after 15 days — you can unmark it there any time before then.',
+      'Deleted items sit in Deleted items on your Account page, where you can restore them. Deleting permanently marks the item to be purged for good after 15 days. You can unmark it there any time before then.',
     );
     expect(DELETE_PERMANENTLY_LABEL).toBe('Delete permanently');
     expect(deleteDialogTitle('project', 'Shop operations')).toBe('Delete project “Shop operations”?');
@@ -66,7 +66,7 @@ describe('19.209 the spec’s fixed strings are the exported constants', () => {
     expect(permanentlyDeletedOn('8 Oct')).toBe('Permanently deleted on 8 Oct');
     // CONTROL — the day count is the constant, and the 2026-09-20 soft sentence is untouched.
     expect(DELETE_NOTE).toContain(`after ${String(PURGE_DELAY_DAYS)} days`);
-    expect(ticketDeletedToast('CCSO-3', false)).toBe('CCSO-3 deleted · you can also undo this on the page');
+    expect(ticketDeletedToast('CCSO-3', false)).toBe('CCSO-3 deleted. You can also undo this on the page');
   });
 });
 

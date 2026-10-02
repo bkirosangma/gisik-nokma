@@ -84,14 +84,14 @@ export function TicketNotesSection({
 
   const failed = notes.error !== null;
   const rows = notes.data ?? [];
-  const heading = failed || notes.data === null ? 'Notes' : `Notes · ${rows.length}`;
+  const heading = failed || notes.data === null ? 'Notes' : `Notes (${rows.length})`;
 
   return (
     <section className="gn-ticket-sheet__notes" data-testid="ticket-notes">
       <h3 className="gn-ticket-sheet__caption">{heading}</h3>
       {failed ? (
         <p className="gn-ticket-sheet__notes-error" role="alert" data-testid="ticket-notes-unavailable">
-          {`This ticket's notes could not be read — ${notes.error}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+          {`This ticket's notes could not be read: ${notes.error}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
         </p>
       ) : (
         <ul className="gn-ticket-sheet__note-badges">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { newUlid, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
-import { Button } from '@gisik-nokma/ui';
+import { Button, PlusIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import {
@@ -60,9 +60,9 @@ export type CreateTicketFlowProps = {
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
    *
-   * The board's empty state has a "Create a ticket" button that renders only
+   * The board's empty state has a "Create ticket" button that renders only
    * when `onCreateTicket` is passed down, and the shell had nothing to pass: this
-   * flow owns its dialog's open state and renders its own "New ticket" trigger,
+   * flow owns its dialog's open state and renders its own "Create ticket" trigger,
    * so no caller could open it from anywhere else. A shell that wants the empty
    * board to open this dialog passes `open`/`onOpenChange` and drives it.
    *
@@ -104,7 +104,7 @@ type ReopenPrompt = {
 type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigin };
 
 /**
- * "New ticket", wired through the guarded flow: an instant pre-check preview
+ * "Create ticket", wired through the guarded flow: an instant pre-check preview
  * when the parent is cached, the server's refusal otherwise, and — on
  * `hierarchy.parent-terminal` either way — the reopen offer at the moment it
  * happens (owner decision). Nothing is retried silently; every refusal is
@@ -123,7 +123,7 @@ type Failure = { headline: string | null; refusal: Refusal; origin: RefusalOrigi
  *    paraphrase of the authority.
  *  - A local refusal is not dressed as the server's word. On the instant path
  *    NOTHING is submitted, and the reopen offer carries `refusalOrigin:
- *    'instant'`, which `ReopenDialog` renders as "instant check — " under the
+ *    'instant'`, which `ReopenDialog` renders as "instant check: " under the
  *    preview class. Only an answer that came back through `DataSource.ingest`
  *    is ever labelled "Refused by the server".
  *
@@ -251,7 +251,7 @@ export function CreateTicketFlow({
       setFailure({
         headline:
           'The reopen offer needs the parent’s current state and its workflow, and this build could not read them' +
-          (gap === null ? '.' : ` — ${gap}`),
+          (gap === null ? '.' : `: ${gap}`),
         refusal,
         origin: refusalOrigin,
       });
@@ -464,7 +464,7 @@ export function CreateTicketFlow({
     if (outcome.kind === 'child-refused-after-reopen') {
       setReopenPrompt(null);
       setFailure({
-        headline: `${reopenPrompt.parentTitle} was reopened — that is now recorded history.`,
+        headline: `${reopenPrompt.parentTitle} was reopened. That is now recorded history.`,
         refusal: outcome.refusal,
         origin: 'server',
       });
@@ -496,7 +496,8 @@ export function CreateTicketFlow({
   return (
     <>
       <Button variant="primary" onClick={() => setDialogOpen(true)}>
-        New ticket
+        <PlusIcon />
+        Create ticket
       </Button>
       <NewTicketDialog
         /**
@@ -568,7 +569,7 @@ export function CreateTicketFlow({
           }
         >
           {failure.headline !== null ? `${failure.headline} ` : ''}
-          {failure.origin === 'server' ? 'Refused by the server — ' : 'instant check — '}
+          {failure.origin === 'server' ? 'Refused by the server: ' : 'instant check: '}
           {failure.refusal.rule}: {failure.refusal.reason}
         </p>
       ) : null}

@@ -131,7 +131,7 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  */
 export default function ProjectPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
+    <Suspense fallback={<main className="gn-shell gn-shell--wide" />}>
       <ProjectBoard />
     </Suspense>
   );
@@ -202,8 +202,8 @@ export const BUILTIN_LADDER_NOTICE =
  * whether or not anything was behind it. `TicketList` may draw a backlog that is
  * empty for a reason, and this is that reason named.
  */
-export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
-export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog. Tickets you add land here.';
+export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog. Epics appear in the List.';
 export const BACKLOG_EMPTY_ACTIVE_ONLY_COPY =
   'The backlog is hidden while “Only tickets in progress” is on.';
 
@@ -624,7 +624,7 @@ function ProjectBoard() {
    * BOARD'S empty state can open it.
    *
    * `Board`'s empty banner renders *"No tickets here yet — create one."* and a
-   * "Create a ticket" button that only appears when `onCreateTicket` is passed —
+   * "Create ticket" button that only appears when `onCreateTicket` is passed —
    * and nothing in this app passed it, so the sentence instructed an action the
    * page made impossible from where it was read. The control existed all along,
    * three centimetres to the left in this header; what was missing was a way to
@@ -1080,7 +1080,7 @@ function ProjectBoard() {
           );
         }
         setDeleteNotice({
-          message: `The ticket could not be restored — ${outcome.reason}`,
+          message: `The ticket could not be restored: ${outcome.reason}`,
           undoFor: null,
           permanent: false,
         });
@@ -1175,7 +1175,7 @@ function ProjectBoard() {
    *
    * ✅ **THE RESIDUAL IS CLOSED (owner ruling, 2026-09-20).** It used to be that a
    * backlog holding only epics reached this memo's empty answer and `TicketList`
-   * rendered *"Nothing in the backlog — new tickets land here."* over a backlog
+   * rendered *"Nothing in the backlog. Tickets you add land here."* over a backlog
    * that holds one — a claim about the backlog SET that denied a member of it.
    * `epicsOnly` below is the fact this memo is the only place to compute: it is
    * `true` exactly when there WERE rows here and every one was an epic, and the
@@ -1271,7 +1271,7 @@ function ProjectBoard() {
           onRanked: list.reload,
         });
         if (outcome.status === 'refused') {
-          setRankNotice({ channel: 'server', text: `Refused by the server — ${outcome.rule}: ${outcome.reason}` });
+          setRankNotice({ channel: 'server', text: `Refused by the server: ${outcome.rule}: ${outcome.reason}` });
         } else if (outcome.status === 'unreachable' || outcome.status === 'partial') {
           // `partial` rides the transport channel on purpose: part of the
           // batch DID commit, so it is not a verdict, and the refusal class is
@@ -1423,7 +1423,7 @@ function ProjectBoard() {
         if (location === null) {
           setParentOpenNotice({
             channel: 'server',
-            text: 'That ticket cannot be opened from here — the server will not place it for you.',
+            text: 'That ticket cannot be opened from here. The server will not place it for you.',
           });
           return;
         }
@@ -2159,7 +2159,7 @@ function ProjectBoard() {
     if (ticketTypes.error !== null) {
       return (
         <ShellRefusal
-          what="This workspace’s ticket types, so New ticket is not offered"
+          what="This workspace’s ticket types, so Create ticket is not offered"
           message={ticketTypes.error}
         />
       );
@@ -2176,7 +2176,7 @@ function ProjectBoard() {
     // ⚠ `rowsHaveAnswered`, NOT `rows === null` — owner report 2026-09-23, "the
     // project header still has a flicker during transition", and the flicker was
     // this line. `rows` is nulled on every KEY change, and the list's key carries
-    // the filter, so toggling *Only tickets in progress* retracted the New ticket
+    // the filter, so toggling *Only tickets in progress* retracted the Create ticket
     // BUTTON and put this gate in its place until the refetch landed. The gate is
     // a differently-sized element (229×23 against the button's 116×44), so the
     // header's flex row resized and snapped back — measured at ~40 ms across
@@ -2191,7 +2191,7 @@ function ProjectBoard() {
     if (session.kind === 'loading' || (!list.rowsHaveAnswered && list.error === null)) {
       return (
         <p role="status" className="gn-new-ticket__gate">
-          Preparing the New ticket form…
+          Preparing the Create ticket form…
         </p>
       );
     }
@@ -2284,7 +2284,7 @@ function ProjectBoard() {
   const canCreate = session.kind === 'signed-in' && ticketTypes.error === null;
 
   return (
-    <main id="gn-main" className="gn-shell">
+    <main id="gn-main" className="gn-shell gn-shell--wide">
       {/* The route's title. `projectName` is `null` until the read answers, and
           a null name is not a title — the generic `Board` stands in until it
           arrives, and the effect re-runs with the name when it does. exec1 P12. */}
@@ -2367,7 +2367,7 @@ function ProjectBoard() {
               {/*
                 `.gn-project__header` — Task 2 of the prototype port. Controls
                 ONLY: Task 4 (search), Task 8 (workflow `<select>`) and Task 5
-                (Filters) add their own controls here; New ticket is the one
+                (Filters) add their own controls here; Create ticket is the one
                 control already built, so it moves in now rather than waiting for a
                 later task to relocate it. The breadcrumb and title left this
                 container in fix round 2 and are now BESIDE it, in
@@ -2380,7 +2380,7 @@ function ProjectBoard() {
                 `<p role="status">`) sitting inside a `role="tablist"` alongside four
                 `role="tab"` children — an ARIA violation `.gn-segmented`'s 2px-gap
                 flex track would only have made more visible. Every assertion this
-                page's tests make against `New ticket` queries `screen`/`within(dialog)`
+                page's tests make against `Create ticket` queries `screen`/`within(dialog)`
                 directly rather than scoping from the tablist container, so the move
                 changes no test's reach (`page-refusals.test.tsx`,
                 `project-create-gate.test.tsx`).
@@ -2549,7 +2549,7 @@ function ProjectBoard() {
               time it appeared it moved a control — which is what the owner's two
               screenshots of the live project page show, and what the docblock that
               stood here got wrong. With the switch OFF the controls row (search,
-              workflow picker, switch, Filters, New ticket) sits beside the title;
+              workflow picker, switch, Filters, Create ticket) sits beside the title;
               switching it ON dropped that ENTIRE row under the title, and only then
               wrapped the note inside it.
 
@@ -2635,7 +2635,7 @@ function ProjectBoard() {
               className="gn-project__scope-note gn-project__scope-row"
               data-testid="list-filter-note"
             >
-              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
+              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress. Not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
             </p>
 
             {/*
@@ -2709,6 +2709,7 @@ function ProjectBoard() {
               // first-match reason `apps/web/test/project-page-head.test.tsx`
               // records.
               className="gn-project__rail"
+              fade
               options={PROJECT_VIEW_OPTIONS}
               value={view}
               onChange={setView}
@@ -2944,7 +2945,7 @@ function ProjectBoard() {
                         type="button"
                         className="gn-project__filter-chip-remove"
                         onClick={chip.onRemove}
-                        aria-label={`Remove filter — ${chip.label}`}
+                        aria-label={`Remove filter: ${chip.label}`}
                       >
                         ×
                       </button>
@@ -3173,7 +3174,7 @@ function ProjectBoard() {
 
                     AMENDED (starting-status design, 2026-09-23): `selection`
                     is now a column's own `{workflowId, stateId}` when the
-                    click came from an empty COLUMN's "Add a ticket", or
+                    click came from an empty COLUMN's "Create ticket", or
                     `undefined` from the empty-BOARD button — `Board` calls
                     with none there, unchanged. `setCreateSelection` stores it
                     for `CreateTicketFlow`'s `initialSelection` to read; a
@@ -4218,7 +4219,7 @@ function FiltersSheet({
           {personSection(
             'Collaborators',
             'collaboratorIds',
-            'No view narrows by this yet — you can set it and the filter keeps it, but nothing is filtered by it.',
+            'No view narrows by this yet. You can set it and the filter keeps it, but nothing is filtered by it.',
           )}
 
           <fieldset className="gn-filters__section">

@@ -232,6 +232,7 @@
   background: var(--gn-fill-quaternary);
 }
 .ticket-editor__tool {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -249,6 +250,18 @@
   cursor: pointer;
   -webkit-touch-callout: none;
   transition: background 150ms ease, box-shadow 150ms ease;
+}
+/* HIT AREA (UX fixes T6, 23.090, audit ENT-13): the desktop button draws 32px tall; a transparent `::before` extends the hit
+   box to 44px, centred and painting nothing (the technique `.gn-breadcrumb a::before` uses, 20.616). The phone arm below
+   already floors the button itself at 2.75rem, so it needs no help there. */
+.ticket-editor__tool::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 2.75rem);
+  height: max(100%, 2.75rem);
+  transform: translate(-50%, -50%);
 }
 /* The active mark. `ImageWrapMenu`'s own `--active` rule is the precedent, and
    the reason for a second cue rather than colour is the same: this file has no
@@ -281,7 +294,7 @@
 }
 .ticket-editor__tool:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: var(--gn-disabled-opacity);
 }
 .ticket-editor__tool:disabled:hover {
   background: var(--gn-fill-tertiary);
@@ -973,7 +986,7 @@
   cursor: pointer;
 }
 .editor-slot__submit:disabled {
-  opacity: 0.55;
+  opacity: var(--gn-disabled-opacity);
   cursor: not-allowed;
 }
 .editor-slot__submit:focus-visible {
@@ -1252,4 +1265,4 @@
   font-size: 0.8125rem;
   cursor: pointer;
 }
-.table-toolbar__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.table-toolbar__btn:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }

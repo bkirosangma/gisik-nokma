@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
  *   | `.gn-attention__title`   | "Dense in-list controls get 24, standalone controls get 44" |
  *   | `.gn-help__nav-link`     | "WCAG 2.5.8's 24px floor for an in-list control still clears" |
  *   | `.gn-help__group-toggle` | "above WCAG 2.5.8's 24px floor for an in-list control, below the 44px this file gives STANDALONE controls" |
- *   | `.gn-help__pager-link`   | "sits in running text rather than on its own, so the 24px in-list floor is the applicable one" |
+ *   | `.gn-help__pager-link`   | "sits in running text rather than on its own, so the 24px in-list floor is the applicable one" (AMENDED 2026-10-02, 23.230: the pager and this rule were removed; three of the four remain) |
  *
  * So this is a change to make the CHECKER agree with a rule the product had
  * already written down — not a new threshold. `ui.css` states the whole rule in
@@ -61,8 +61,8 @@ import { fileURLToPath } from 'node:url';
  *     this design exists to prevent: a blanket 24 wearing a structural costume.
  *   * **"a direct child of an `<li>`"** — TOO NARROW, and it misses two of the
  *     four above. `.gn-help__group-toggle` sits in a `<div class="gn-help__group">`,
- *     and `.gn-help__pager-link` is not in a list at all: it is an inline link
- *     inside `<p class="gn-help__pager">`, which its own rule explains.
+ *     and `.gn-help__pager-link` (removed since, 23.230) was not in a list at all: it was an inline link
+ *     inside `<p class="gn-help__pager">`, which its own rule explained.
  *   * **"one of ≥2 sibling controls of the same class"** — TOO LOOSE again.
  *     A board card's two move arrows are exactly that shape, and so is any
  *     toolbar of identical buttons.
@@ -184,22 +184,12 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
       'be read as a dead entry.',
   },
   {
-    control: '.gn-help__pager-link',
-    container: '.gn-help__pager',
-    witness: '.gn-help__pager-label',
-    declaredAt: '.gn-help__pager-link',
-    why:
-      'The "Next section" link at the foot of each section. It looks standalone but is not: it ' +
-      'sits inline after a `Next` label in running text, and its rule says so — "the 24px in-list ' +
-      'floor is the applicable one."',
-  },
-  {
     control: '.gn-board-card__provenance',
     container: '.gn-board__cards',
     witness: '.gn-board__card-slot',
     declaredAt: '.gn-board-card__provenance',
     why:
-      'The `who · when` disclosure on every board card, 66x21 with no min size before E4-3 gave it ' +
+      'The "Moved to … by … on …" provenance disclosure on every board card (the `who · when` button of the time), 66x21 with no min size before E4-3 gave it ' +
       'the floor. A bare text control on the card’s meta line beside the progress count, so its rule ' +
       'reaches the same call `.gn-attention__title` does — 44 would turn each meta row into a slab. ' +
       'It is NOT the card’s open control (`.gn-board__card-slot` is), so it has no larger equivalent. ' +
@@ -282,7 +272,7 @@ export type TapTargets = {
  * output. The rule is narrow on purpose: `display: inline` AND a parent
  * carrying text of its own beyond the link. An `inline-block` control, or a
  * link that is its parent's entire content, is NOT exempt — which is why
- * `.gn-attention__title` (`inline-flex`) and `.gn-help__pager-link`
+ * `.gn-attention__title` (`inline-flex`) and `.gn-help__pager-link` (removed since, 23.230)
  * (`inline-flex`) are NOT reached by it and had to be classified explicitly.
  */
 /**

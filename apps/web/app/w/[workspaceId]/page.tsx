@@ -3,15 +3,20 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { newUlid, type IngestResult } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
+import { newUlid, type GroupRow, type IngestResult } from '@gisik-nokma/domain';
+import { Avatar, Button, Card, Chip, Dialog, PencilIcon, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
 import {
+  ARCHIVE_LABEL,
   DELETE_TRIGGER_LABEL,
   DeleteDialog,
-  deleteItemName,
+  RESTORE_LABEL,
   deletedNotice,
   makeSubmittedFactory,
+  moreActionsFor,
+  readProjectGrouping,
+  rememberProjectGrouping,
   type EnvelopeSeed,
+  type ProjectGrouping,
 } from '@gisik-nokma/app-core';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../src/app-nav.js';
@@ -20,14 +25,23 @@ import { useAppServices, useCurrentUser } from '../../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../../src/expired-session.js';
 import { mayAdminister, restrictedLine, viewerOf } from '../../../src/workspace-viewer.js';
 import { DocumentTitle } from '../../../src/document-title.js';
-import { ProjectEditForm, type ProjectEditValues } from '../../../src/project-edit-form.js';
+import { ProjectEditForm, type EditRefusal, type ProjectEditValues } from '../../../src/project-edit-form.js';
+import { fieldRefusalHandler, ProjectGroupField } from '../../../src/project-group-field.js';
+import { groupSeeds, type GroupChoice } from '../../../src/group-picker-seeds.js';
+import { useWorkspaceGroups } from '../../../src/use-workspace-groups.js';
+import { WorkspacePrefixEdit } from '../../../src/workspace-prefix-edit.js';
 import { bumpProjectsVersion } from '../../../src/projects-version.js';
 import { updateSeeds } from '../../../src/project-update-seeds.js';
+import { GroupedProjects } from '../../../src/grouped-projects.js';
+import { OverflowMenu } from '../../../src/overflow-menu.js';
 
 // Exported from here beside `archiveSeeds` (the two project acts this page
 // submits); the builder lives in `src/` because the project page's header
 // submits the same claim.
 export { updateSeeds };
+
+/** The project card menu's Edit item (the inline Edit button it replaced was named `Edit <project>`). */
+const EDIT_LABEL = 'Edit';
 
 /**
  * Archiving and restoring are ONE control and one symmetric event pair, chosen
@@ -99,6 +113,13 @@ export function foundingSeeds(
    * derived from the name.
    */
   prefix?: string,
+  /**
+   * The group the project is filed under (P-T13, 22.240). `project.created` carries NO `groupId` (its payload is name,
+   * description, prefix), so a chosen group rides as a `project.updated {groupId}` AFTER the founder's grant: a refused
+   * update then leaves a founded project its founder can still open, where the other order would leave one they cannot.
+   * ABSENT (no group chosen) adds nothing: the founding stays the two events it always was.
+   */
+  groupId?: string,
 ): EnvelopeSeed[] {
   return [
     {
@@ -124,6 +145,16 @@ export function foundingSeeds(
       type: 'project.member_added',
       payload: { userId: founderUserId, projectAdmin: true },
     },
+    ...(groupId === undefined
+      ? []
+      : [
+          {
+            workspaceId,
+            entity: { kind: 'project' as const, id: projectId },
+            type: 'project.updated' as const,
+            payload: { groupId },
+          },
+        ]),
   ];
 }
 
@@ -181,7 +212,7 @@ export function foundingSeeds(
  * is the exact question rulings P32 and P38 already answered. Widening later is
  * reversible and discloses one more name; serving a name and retracting it is
  * not. **Owner: whoever next revisits P32/P38 for the admin role.** The
- * *"N projects · name restricted"* line below discloses PART of this, and the
+ * *"N projects, name restricted"* line below discloses PART of this, and the
  * difference matters: that count is the owner's option 2 — the projects the
  * caller already holds a ticket id in — so a project an admin can neither name
  * nor see any ticket in is in NEITHER the list nor the count.
@@ -214,17 +245,48 @@ export default function WorkspaceHomePage() {
   const [failure, setFailure] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * Whether the Create project dialog is open. LIFTED to the page because the page's own
+   * refusal line sits behind a modal scrim: while the dialog is open the refusal is drawn
+   * INSIDE it (so the person who just pressed Create reads it, with their typing intact)
+   * and this page's copy is withheld, so one refusal is never announced twice.
+   */
+  const [createOpen, setCreateOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   /** The project the delete dialog is open on (trash Plan 4, spec §6.2). */
   const [deleting, setDeleting] = useState<ProjectRef | null>(null);
   /** "Deleted project “X”…" after a committed delete — where it went and how back. */
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Grouped or plain (prefixes and groups Task 7, case 22.122) — the person's own choice, kept on this
+   * device per user and per workspace. Read in an EFFECT, not in the initialiser: the first render must
+   * match the server's (plain), and the session may not have answered yet.
+   */
+  const [grouping, setGrouping] = useState<ProjectGrouping>('plain');
+  /** The groups, read only once Grouped is chosen: `null` while loading, `'failed'` when the read refused. */
+  const [groups, setGroups] = useState<GroupRow[] | 'failed' | null>(null);
+  /** Bumped by every reload so a Grouped view re-reads the groups with the projects it sits beside. */
+  const [loads, setLoads] = useState(0);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    setGrouping(userId === null ? 'plain' : readProjectGrouping(userId, workspaceId));
+  }, [userId, workspaceId]);
+
+  const chooseGrouping = useCallback(
+    (choice: ProjectGrouping): void => {
+      setGrouping(choice);
+      if (userId !== null) rememberProjectGrouping(userId, workspaceId, choice);
+    },
+    [userId, workspaceId],
+  );
 
   const reload = useCallback(() => {
     dataSource.query.getMyWorkspaces().then(
       (rows) => {
         setWorkspaces(rows);
         setFailure(null);
+        setLoads((count) => count + 1);
       },
       (cause: unknown) => {
         setFailure(cause instanceof Error ? cause.message : String(cause));
@@ -251,7 +313,12 @@ export default function WorkspaceHomePage() {
    * they had just made — visible to them only as a project that vanished.
    */
   const submit = useCallback(
-    (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void): void => {
+    (
+      build: (actorId: string) => EnvelopeSeed[],
+      whenDone: () => void,
+      /** A form that shows a refusal under its own field claims it (returns true) so the page does not say it twice. */
+      onRefused?: (rule: string, reason: string) => boolean,
+    ): void => {
       setRefusal(null);
       // Refused HERE and not sent, for the same reason the members page refuses
       // a signed-out revoke: `actorId: ''` is turned away by the door's
@@ -301,13 +368,16 @@ export default function WorkspaceHomePage() {
             reload();
             return;
           }
-          // The authority's own words, exactly as the mint, the founding form
-          // and the invitation banner carry them.
-          setRefusal(
-            bad.status === 'refused'
-              ? `${bad.rule}: ${bad.reason}`
-              : `${bad.code}: ${bad.message}`,
-          );
+          // The authority's own words, exactly as the mint, the Create workspace dialog
+          // and the invitation banner carry them — unless the form that asked
+          // shows them under its own field (22.181).
+          if (!(bad.status === 'refused' && onRefused?.(bad.rule, bad.reason) === true)) {
+            setRefusal(
+              bad.status === 'refused'
+                ? `${bad.rule}: ${bad.reason}`
+                : `${bad.code}: ${bad.message}`,
+            );
+          }
           // Re-read on a refusal too: a partly-committed batch changed the
           // world, and a stale list beside a refusal shows two contradictory
           // things at once.
@@ -324,6 +394,26 @@ export default function WorkspaceHomePage() {
 
   const workspace =
     workspaces === null ? null : (workspaces.find((entry) => entry.id === workspaceId) ?? null);
+
+  // The groups door answers members, admins and owners; a guest gets a 404 there, so a guest is never
+  // offered the choice and never asked (the same gate the heading row's control reads).
+  const mayGroup = workspace !== null && workspace.role !== 'guest';
+  const wantGroups = grouping === 'grouped' && mayGroup;
+  useEffect(() => {
+    if (!wantGroups) return;
+    let current = true;
+    dataSource.query.getGroups(workspaceId).then(
+      (rows) => {
+        if (current) setGroups(rows);
+      },
+      () => {
+        if (current) setGroups('failed');
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [dataSource, workspaceId, wantGroups, loads]);
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -357,7 +447,17 @@ export default function WorkspaceHomePage() {
           busy={busy}
           showArchived={showArchived}
           onToggleArchived={() => setShowArchived((open) => !open)}
+          grouping={mayGroup ? grouping : null}
+          groups={groups}
+          onGrouping={chooseGrouping}
           onSubmit={submit}
+          refusal={refusal}
+          createOpen={createOpen}
+          onCreateOpenChange={(open) => {
+            // A new opening starts clean: an earlier archive's refusal is not this form's.
+            if (open) setRefusal(null);
+            setCreateOpen(open);
+          }}
           onDelete={(project) => {
             setNotice(null);
             setDeleting(project);
@@ -388,7 +488,7 @@ export default function WorkspaceHomePage() {
           }}
         />
       ) : null}
-      {refusal !== null ? (
+      {refusal !== null && !createOpen ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {refusal}
         </p>
@@ -450,14 +550,22 @@ function ProjectCard({
   onArchive,
   onEdit,
   onDelete,
+  workspacePrefix,
 }: {
   workspaceId: string;
+  workspacePrefix: string;
   project: ProjectRef;
   countsWithheld: boolean;
   isAdmin: boolean;
   busy: boolean;
   onArchive: (project: ProjectRef) => void;
-  onEdit: (project: ProjectRef, values: ProjectEditValues, whenDone: () => void) => void;
+  onEdit: (
+    project: ProjectRef,
+    values: ProjectEditValues,
+    groups: GroupRow[],
+    whenDone: () => void,
+    onRefused: (rule: string, reason: string) => boolean,
+  ) => void;
   onDelete: (project: ProjectRef) => void;
 }) {
   // MCP CRUD plan Task 2 (owner ruling M1): an owner/admin can rename and
@@ -467,7 +575,10 @@ function ProjectCard({
   // is the same as `project.archived`'s, and this control only tells a person
   // that before they type.
   const [editing, setEditing] = useState(false);
-  const editTrigger = useRef<HTMLButtonElement>(null);
+  const editTrigger = useRef<HTMLButtonElement | null>(null);
+  /** The door's reason for a prefix or group refusal, shown by the form under that field (22.181, 22.187). */
+  const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
+  const { groups, reread } = useWorkspaceGroups(workspaceId, isAdmin && editing);
   return (
     <li data-testid={`project-row-${project.id}`}>
       <Card
@@ -477,12 +588,29 @@ function ProjectCard({
       >
         <Link
           href={`/w/${workspaceId}/p/${project.id}`}
-          aria-label={project.archived ? `${project.name}, archived` : project.name}
+          aria-label={project.archived ? `Open ${project.name}, archived` : `Open ${project.name}`}
           className="gn-project-card__door"
         >
           <span className="gn-project-card__head">
             <span className="gn-project-card__name">{project.name}</span>
             {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
+            {/* The visible cue that the whole card opens the project (WS-03, case 22.147). Decorative:
+                the link's own name says "Open …", and the card — not this glyph — is the target. */}
+            <svg
+              className="gn-project-card__chevron"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M9 5l7 7-7 7" />
+            </svg>
           </span>
           {/* The prototype draws `p.desc` here — a 15px/20px muted line between
               the name row and the chips, inside the card's own click target
@@ -518,51 +646,51 @@ function ProjectCard({
             )}
           </span>
         </Link>
+        {isAdmin ? (
+          // The overflow menu replaces the three inline buttons (WS-03, case 22.147): the card now holds
+          // ONE link and ONE button, and Edit, Archive/Restore and Delete… are a menu away. It stays
+          // mounted while the edit form is open so the form's focus return has a trigger to land on.
+          <OverflowMenu
+            className="gn-project-card__menu"
+            triggerRef={editTrigger}
+            triggerLabel={moreActionsFor(project.name)}
+            menuLabel={`Actions for ${project.name}`}
+            disabled={busy}
+            items={[
+              {
+                label: EDIT_LABEL,
+                onSelect: () => {
+                  setFieldRefusal(null);
+                  setEditing(true);
+                },
+              },
+              { label: project.archived ? RESTORE_LABEL : ARCHIVE_LABEL, onSelect: () => onArchive(project) },
+              { label: DELETE_TRIGGER_LABEL, onSelect: () => onDelete(project) },
+            ]}
+          />
+        ) : null}
         {isAdmin && editing ? (
           <ProjectEditForm
             idPrefix={`gn-project-${project.id}`}
-            initial={{ name: project.name, description: project.description ?? null }}
+            initial={{
+              name: project.name,
+              description: project.description ?? null,
+              prefix: project.prefix,
+              groupId: project.groupId ?? null,
+            }}
+            workspacePrefix={workspacePrefix}
+            groups={groups}
+            refusal={fieldRefusal}
             busy={busy}
-            onSave={(values) => onEdit(project, values, () => setEditing(false))}
+            onSave={(values) => {
+              setFieldRefusal(null);
+              // A `group.name-taken` re-reads the groups so the picker adopts the group someone else made
+              // first (22.187); the form stays open and nothing is resubmitted.
+              onEdit(project, values, groups ?? [], () => setEditing(false), fieldRefusalHandler(setFieldRefusal, reread));
+            }}
             onCancel={() => setEditing(false)}
             returnFocusRef={editTrigger}
           />
-        ) : isAdmin ? (
-          <div className="gn-project-card__actions">
-            <Button
-              ref={editTrigger}
-              type="button"
-              disabled={busy}
-              aria-label={`Edit ${project.name}`}
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              disabled={busy}
-              // The accessible name carries the PROJECT, so a grid of projects
-              // does not present a column of identically-named buttons — the
-              // rule the archived disclosure and the invitation actions already
-              // keep.
-              aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
-              onClick={() => onArchive(project)}
-            >
-              {project.archived ? 'Restore' : 'Archive'}
-            </Button>
-            {/* Spec §6.2: Delete… BESIDE Archive, for the same people (D4) —
-                the ellipsis because it asks before it acts. The accessible name
-                carries the project, the rule the Archive button's own comment
-                states, and contains the visible word (WCAG 2.5.3). */}
-            <Button
-              type="button"
-              disabled={busy}
-              aria-label={deleteItemName(project.name)}
-              onClick={() => onDelete(project)}
-            >
-              {DELETE_TRIGGER_LABEL}
-            </Button>
-          </div>
         ) : null}
       </Card>
     </li>
@@ -624,7 +752,7 @@ function ProjectCard({
  * **NOTES, added Round 19b**, verbatim from the prototype's own `wsLinks` —
  * transcribed, not invented, except the one place the prototype's copy
  * assumes a number this route may not have: the Members note reads *"{N}
- * people · roles and pending invitations."* only when `memberCount` is
+ * people: roles and pending invitations."* only when `memberCount` is
  * served; a guest (withheld, `null`) gets the same sentence with no number
  * prefix, the same "omit rather than leave a dangling clause" rule the
  * header's meta line keeps.
@@ -666,16 +794,16 @@ function WorkspaceLinks({
   const membersNote =
     countsWithheld || memberCount === null
       ? 'roles and pending invitations.'
-      : `${memberCount} ${memberCount === 1 ? 'person' : 'people'} · roles and pending invitations.`;
+      : `${memberCount} ${memberCount === 1 ? 'person' : 'people'}: roles and pending invitations.`;
   return (
     <nav className="gn-workspace-home__links" aria-label="Workspace sections">
       <Link
         href={`/w/${workspaceId}/my-work`}
         className="gn-workspace-home__link"
-        aria-label="My Work"
+        aria-label="My work"
         aria-describedby="gn-link-note-my-work"
       >
-        <span className="gn-workspace-home__link-label">My Work</span>
+        <span className="gn-workspace-home__link-label">My work</span>
         <span className="gn-workspace-home__link-note" id="gn-link-note-my-work">
           Everything assigned to you across this workspace.
         </span>
@@ -779,14 +907,31 @@ function WorkspaceHome({
   busy,
   showArchived,
   onToggleArchived,
+  grouping,
+  groups,
+  onGrouping,
   onSubmit,
+  refusal,
+  createOpen,
+  onCreateOpenChange,
   onDelete,
 }: {
   workspace: WorkspaceRef;
   busy: boolean;
   showArchived: boolean;
   onToggleArchived: () => void;
-  onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  /** The Grouped/Plain choice, or `null` when this caller is not offered one (a guest). */
+  grouping: ProjectGrouping | null;
+  groups: GroupRow[] | 'failed' | null;
+  onGrouping: (choice: ProjectGrouping) => void;
+  onSubmit: (
+    build: (actorId: string) => EnvelopeSeed[],
+    whenDone: () => void,
+    onRefused?: (rule: string, reason: string) => boolean,
+  ) => void;
+  refusal: string | null;
+  createOpen: boolean;
+  onCreateOpenChange: (open: boolean) => void;
   onDelete: (project: ProjectRef) => void;
 }) {
   const viewer = viewerOf(workspace.role);
@@ -818,18 +963,51 @@ function WorkspaceHome({
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
-  const edit = (project: ProjectRef, values: ProjectEditValues, whenDone: () => void): void =>
+  const edit = (
+    project: ProjectRef,
+    values: ProjectEditValues,
+    groupRows: GroupRow[],
+    whenDone: () => void,
+    onRefused: (rule: string, reason: string) => boolean,
+  ): void =>
     onSubmit(
       () =>
         updateSeeds(
           workspace.id,
           project.id,
-          { name: project.name, description: project.description ?? null },
+          {
+            name: project.name,
+            description: project.description ?? null,
+            prefix: project.prefix,
+            groupId: project.groupId ?? null,
+          },
           values,
+          groupRows,
+          newUlid,
         ),
       whenDone,
+      onRefused,
     );
-  // "N members · M active projects · you're an owner" — every number SERVED,
+  const renderCard = (project: ProjectRef) => (
+    <ProjectCard
+      key={project.id}
+      workspaceId={workspace.id}
+      workspacePrefix={workspace.prefix}
+      project={project}
+      countsWithheld={viewer.countsWithheld}
+      isAdmin={isAdmin}
+      busy={busy}
+      onArchive={archive}
+      onEdit={edit}
+      onDelete={onDelete}
+    />
+  );
+  // Grouped is drawn only once the groups have ARRIVED. While they load the plain list stays up, and a
+  // refused read says so beside it — a person who asked for Grouped is told it is not what they are
+  // looking at (case 22.142), never shown a plain list under a Grouped tab as though it were the tree.
+  const groupedView = grouping === 'grouped' && Array.isArray(groups);
+  const groupsFailed = grouping === 'grouped' && groups === 'failed';
+  // "N members, M active projects, you're an owner" — every number SERVED,
   // never derived a second way. The member-count gate is `viewer.
   // countsWithheld`, NOT `workspace.memberCount === null` — a review caught
   // the first draft reading the second, the exact anti-pattern case 13.381
@@ -844,8 +1022,8 @@ function WorkspaceHome({
   const memberClause =
     viewer.countsWithheld || workspace.memberCount === null
       ? ''
-      : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'} · `;
-  const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'} · you're ${viewer.clause}`;
+      : `${workspace.memberCount} ${workspace.memberCount === 1 ? 'member' : 'members'}, `;
+  const meta = `${memberClause}${live.length} ${live.length === 1 ? 'active project' : 'active projects'}, you're ${viewer.clause}`;
 
   /**
    * The rename ruling, 2026-09-19.
@@ -970,11 +1148,34 @@ function WorkspaceHome({
               </Button>
             </form>
           ) : (
-            <h1 className="gn-page-title" aria-labelledby={isAdmin ? RENAME_NAME_ID : undefined}>
+            /* THE VISIBLE RENAME CUE (UX fixes Task 10, case 23.177, audit WS-13). The name above stays the
+               rename's control (13.969); a name that does the job but looks like plain text is not
+               discoverable, so an admin also gets a pencil button BESIDE the heading — a sibling, never inside
+               the `h1`, or the page's level-1 heading would announce itself as an action (13.995). Both open
+               the same in-place field, and both are named `Rename <workspace>`. Non-admins get neither. */
+            <div className="gn-workspace-home__title-row">
+              <h1 className="gn-page-title" aria-labelledby={isAdmin ? RENAME_NAME_ID : undefined}>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    className="gn-workspace-home__rename-trigger"
+                    aria-label={`Rename ${workspace.name}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setNameDraft(workspace.name);
+                      setRenaming(true);
+                    }}
+                  >
+                    <span id={RENAME_NAME_ID}>{workspace.name}</span>
+                  </button>
+                ) : (
+                  workspace.name
+                )}
+              </h1>
               {isAdmin ? (
                 <button
                   type="button"
-                  className="gn-workspace-home__rename-trigger"
+                  className="gn-workspace-home__rename-icon"
                   aria-label={`Rename ${workspace.name}`}
                   disabled={busy}
                   onClick={() => {
@@ -982,13 +1183,16 @@ function WorkspaceHome({
                     setRenaming(true);
                   }}
                 >
-                  <span id={RENAME_NAME_ID}>{workspace.name}</span>
+                  <PencilIcon />
                 </button>
-              ) : (
-                workspace.name
-              )}
-            </h1>
+              ) : null}
+            </div>
           )}
+          {/* The workspace's half of every ticket key (prefixes and groups Task 10, 22.185): the same
+              admin gate as the rename beside it. */}
+          {isAdmin ? (
+            <WorkspacePrefixEdit workspaceId={workspace.id} prefix={workspace.prefix} busy={busy} onSubmit={onSubmit} />
+          ) : null}
           {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
               a dedicated class, not a structural selector — see that class's
               rule in globals.css for why. */}
@@ -1022,8 +1226,25 @@ function WorkspaceHome({
             longer a second control in this header at all**, because the name
             does the job. What the sentence above used to say — *"the header is
             now the monogram and the titles, nothing else"* — stays amended
-            rather than deleted: it remains true of the two buttons it removed. */}
+            rather than deleted: it remains true of the two buttons it removed.
+
+            **AMENDED 2026-10-02 (UX fixes Task 10, case 23.177, audit WS-13).**
+            "No second control in this header" is no longer true for an ADMIN: the
+            name is still the rename's control, but a name that does the job and
+            looks like plain text is not discoverable, so a pencil icon button
+            (`Rename <workspace>`) now sits beside the heading, outside the `h1`.
+            It is still a workspace ACT with no other route, not a navigation
+            affordance, so it does not bring back Members/Settings. */}
       </div>
+
+      {/* THE SECTION ROW IS ON TOP (prefixes and groups Task 7, case 22.120): Round 20 had moved it below the
+          projects and the founding form, where the reference puts it; the owner has now ruled it back above
+          the Projects heading. The grid, the notes and every href are untouched by the move. */}
+      <WorkspaceLinks
+        workspaceId={workspace.id}
+        memberCount={workspace.memberCount}
+        countsWithheld={viewer.countsWithheld}
+      />
 
       {/* Round 20: the heading and its toggle sit in a BARE row above the grid,
           not inside a card. The reference has no container around the projects
@@ -1033,29 +1254,63 @@ function WorkspaceHome({
         <h2 className="gn-workspace-home__heading">Projects</h2>
         {/* Marked AND hidden, both — the `/workspaces` card's precedent. Per
             Task 18/19's own ruling the control renders only when there is
-            something behind it: the prototype's "0 archived · show" is not
+            something behind it: the prototype's "Show 0 archived" is not
             adopted — a control that reveals nothing lies about the shape of the
             data.
 
-            The VISIBLE text is the reference's ("1 archived · show" / "Hide
-            archived"); the ACCESSIBLE NAME is deliberately not, and stays the
+            The VISIBLE text ("Show 1 archived" / "Hide archived") began as the
+            reference's "1 archived · show" and lost the dot in the 23.191 copy pass; the ACCESSIBLE NAME is deliberately not, and stays the
             sentence Round 19b gave it. The reference's collapsed label leads
             with a number and its expanded one names no workspace, so a screen
             reader on a page that will grow more disclosures would hear "1
             archived show" with nothing saying what is archived or where. The
             `aria-label` carries the workspace for the same reason the archive
             buttons carry the project. */}
-        {archived.length > 0 ? (
-          <Button
-            type="button"
-            aria-expanded={showArchived}
-            aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
-            onClick={onToggleArchived}
-          >
-            {showArchived ? 'Hide archived' : `${archived.length} archived · show`}
-          </Button>
-        ) : null}
+        {/* The heading row's controls (case 22.121), in order: the archived toggle, the Grouped/Plain
+            choice, and the Projects section's Create project button (prefixes and groups Task 8, 22.152).
+            The button is for an owner or admin only, the same people who may create a project. */}
+        <div className="gn-workspace-home__projects-actions">
+          {archived.length > 0 ? (
+            <Button
+              type="button"
+              aria-expanded={showArchived}
+              aria-label={`${showArchived ? 'Hide' : 'Show'} archived projects in ${workspace.name}`}
+              onClick={onToggleArchived}
+            >
+              {showArchived ? 'Hide archived' : `Show ${archived.length} archived`}
+            </Button>
+          ) : null}
+          {grouping === null ? null : (
+            <SegmentedControl<ProjectGrouping>
+              aria-label="Show projects"
+              options={[
+                { value: 'grouped', label: 'Grouped' },
+                { value: 'plain', label: 'Plain' },
+              ]}
+              value={grouping}
+              onChange={onGrouping}
+            />
+          )}
+          {/* The Projects section's one primary (prefixes/groups Task 8, case 22.152): a
+              verb + object with its icon, in the heading row it acts under. An owner or
+              admin only — everyone else reads the refusal line below instead. */}
+          {isAdmin ? (
+            <CreateProjectButton
+              workspaceId={workspace.id}
+              busy={busy}
+              onSubmit={onSubmit}
+              refusal={refusal}
+              open={createOpen}
+              onOpenChange={onCreateOpenChange}
+            />
+          ) : null}
+        </div>
       </div>
+      {groupsFailed ? (
+        <p role="status" className="gn-workspace-home__empty">
+          The groups could not be loaded, so the projects are shown as a plain list.
+        </p>
+      ) : null}
       {shown.length === 0 ? (
         // True of THIS CALLER'S list, and said as such. A member outside every
         // project has an empty live list in a workspace full of them, and
@@ -1065,15 +1320,15 @@ function WorkspaceHome({
         // 2026-09-21).** The sentence presupposes projects the reader cannot
         // open — *"no projects YOU can open"* — which is exactly right for the
         // excluded member and exactly wrong for the person who founded this
-        // workspace seconds ago and is looking at the New-project form below,
-        // having created nothing yet. Two different facts reach this one arm and
+        // workspace seconds ago and is looking at the Create project button in
+        // the heading above, having created nothing yet. Two different facts reach this one arm and
         // `shown.length === 0` cannot tell them apart on its own; `isAdmin`
         // together with the SERVED count can. The founder's sentence names the
-        // form below rather than an absence, because the form is the way out and
+        // action rather than an absence, because the button is the way out and
         // it is already on screen.
         isAdmin && workspace.projects.length === 0 ? (
           <p className="gn-workspace-home__empty">
-            No projects yet — create the first one below.
+            No projects yet. Create the first one.
           </p>
         ) : (
           <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
@@ -1083,21 +1338,11 @@ function WorkspaceHome({
         // but the archived cards sort to its END (Round 21, owner ruling), dimmed
         // and badged rather than moved to a section of their own. See `shown`'s
         // own comment above for the order and what it costs.
-        <ul className="gn-workspace-home__projects">
-          {shown.map((project) => (
-            <ProjectCard
-              key={project.id}
-              workspaceId={workspace.id}
-              project={project}
-              countsWithheld={viewer.countsWithheld}
-              isAdmin={isAdmin}
-              busy={busy}
-              onArchive={archive}
-              onEdit={edit}
-              onDelete={onDelete}
-            />
-          ))}
-        </ul>
+        groupedView ? (
+          <GroupedProjects groups={groups} projects={shown} renderCard={renderCard} />
+        ) : (
+          <ul className="gn-workspace-home__projects">{shown.map(renderCard)}</ul>
+        )
       )}
 
       {/* `gn-workspace-home__restricted` (Task 7 review, ROUTED 2): this call
@@ -1112,83 +1357,104 @@ function WorkspaceHome({
         <p className="gn-workspace-card__restricted gn-workspace-home__restricted">{restricted}</p>
       ) : null}
 
-      {/* Non-admins get the reference's refusal NOTE where the form would be,
-          rather than nothing — the same rule the member sentence above keeps:
-          a caller is told what they cannot do here, not left to wonder why the
-          form is absent. ONE sentence for every non-admin role (member and
-          guest alike); the prototype's guest-specific wording asserts a
-          visibility rule ("you can only see tickets that name you") this round
-          does not verify anywhere else, so it is not transcribed. */}
-      {/*
-        ⚠ THE SENTENCE NAMED ONE ROLE OF TWO, AND THAT WAS FALSE — not merely
-        narrower than the gate. `isAdmin` above is `mayAdminister(role)`, which
-        is `role === 'owner' || role === 'admin'` (`workspace-viewer.ts:90-92`),
-        so an OWNER takes the form arm and can create a project in every
-        workspace — while the sentence a member or guest reads says that only an
-        admin can. `apps/server/src/permissions/check-permission.ts`'s own
-        `ADMIN_ONLY_TYPES` agrees the two roles are one door, so the client and
-        the server were never in dispute; only the copy was wrong.
-
-        IT SURVIVED THREE REVIEW PASSES because "unreachable for owners" and
-        "false for its readers" are compatible facts and each looked like the
-        answer: the sentence renders only in the `!isAdmin` arm, so no owner
-        ever reads it — and its audience is exactly the people for whom "ask an
-        admin" is the right move, so nothing a user did ever surfaced it. The
-        claim is about WHO MAY CREATE, though, not about who reads it, and the
-        restriction as stated is wrong in every workspace.
-
-        IT WAS TRANSCRIBED VERBATIM FROM THE PROTOTYPE —
-        `design-system/interactive/desktop.dc.html:2694` and the mobile
-        drawing's `addProjectRefusal` both say "an admin" — which is why it read
-        as authoritative. A drawing is not a requirement: the roles exist in the
-        shipped product and the drawing's wording did not keep up. Corrected
-        here rather than in the drawing, which is the design authority and not
-        this product's copy.
-
-        The documents that QUOTE this sentence (`README.md`, `docs/manual.md`,
-        `docs/faq.md`) each marked it "the app's own wording, which names only
-        the admin"; they are corrected in the same change set, because a
-        quotation of a string that no longer exists is a citation that still
-        resolves and still misleads. */}
-      {isAdmin ? (
-        <NewProjectForm workspaceId={workspace.id} busy={busy} onSubmit={onSubmit} />
-      ) : (
+      {/* Non-admins get a refusal NOTE where the Create project button would be, rather than
+          nothing: a caller is told what they cannot do here, not left to wonder why the
+          control is absent. ONE sentence for every non-admin role (member and guest alike).
+          It names BOTH roles that may create ("an owner or admin"): the sentence once named
+          only the admin while an owner could create a project too, and `isAdmin` is
+          `mayAdminister(role)` (`workspace-viewer.ts`), the same door
+          `ADMIN_ONLY_TYPES` holds on the server. */}
+      {isAdmin ? null : (
         <p className="gn-workspace-home__founding-refusal">
-          Only an owner or an admin can create a project in this workspace.
+          Only an owner or admin can create a project.
         </p>
       )}
 
-      {/* BELOW the projects and the founding form (Round 20), where the
-          reference puts them — they were above both until now. The grid, the
-          notes and every href are untouched by the move; 13.387 asserts the
-          exact set of five inside this nav, and it is scoped by the nav's own
-          accessible name rather than by position, so it holds either way. */}
-      <WorkspaceLinks
-        workspaceId={workspace.id}
-        memberCount={workspace.memberCount}
-        countsWithheld={viewer.countsWithheld}
-      />
     </>
   );
 }
 
 /**
- * No `<h2>` heading here, unlike `/workspaces`' "New workspace" form
- * (`FoundingForm`, which keeps both a heading AND a "Name" label) —
- * transcribed asymmetry, not a dropped one. The prototype's own two blocks
- * differ the same way: the workspace-list block carries a separate `<h2>New
- * workspace</h2>` above a field labelled "Name"; this row's field label IS
- * "New project", with nothing above it. Flagged by review as unexplained;
- * this comment is the explanation.
+ * "Create project" — the Projects heading row's primary button and the dialog it
+ * opens (prefixes/groups Task 8, case 22.152). It replaced the always-visible
+ * "New project" row (`.gn-project-founding`, a raised card with an inline
+ * field+button row): founding a project is an act the person chooses to begin, and
+ * the form now has room for the group picker Task 9 puts in it.
+ *
+ * The form is mounted ONLY while the dialog is open, so each opening starts from
+ * empty fields — the reset the old form did by hand on success. A refusal from the
+ * door is drawn INSIDE the dialog (`refusal`, from the page), where the person who
+ * just pressed Create is looking and their typing is still there to correct.
  */
+function CreateProjectButton({
+  workspaceId,
+  busy,
+  onSubmit,
+  refusal,
+  open,
+  onOpenChange,
+}: {
+  workspaceId: string;
+  busy: boolean;
+  onSubmit: (
+    build: (actorId: string) => EnvelopeSeed[],
+    whenDone: () => void,
+    onRefused?: (rule: string, reason: string) => boolean,
+  ) => void;
+  refusal: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  // Read while the dialog is open, exactly as a card's Edit form does: `null` until they arrive, so the
+  // field is not offered against a list nobody checked.
+  const { groups, reread } = useWorkspaceGroups(workspaceId, open);
+  return (
+    <>
+      <Button variant="primary" onClick={() => onOpenChange(true)}>
+        <PlusIcon />
+        Create project
+      </Button>
+      {open ? (
+        <Dialog open title="Create project" onClose={() => onOpenChange(false)}>
+          <NewProjectForm
+            workspaceId={workspaceId}
+            busy={busy}
+            onSubmit={onSubmit}
+            refusal={refusal}
+            groups={groups}
+            reread={reread}
+            onCancel={() => onOpenChange(false)}
+            onDone={() => onOpenChange(false)}
+          />
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
 function NewProjectForm({
   workspaceId,
   busy,
   onSubmit,
+  refusal,
+  groups,
+  reread,
+  onCancel,
+  onDone,
 }: {
   workspaceId: string;
   busy: boolean;
-  onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  onSubmit: (
+    build: (actorId: string) => EnvelopeSeed[],
+    whenDone: () => void,
+    onRefused?: (rule: string, reason: string) => boolean,
+  ) => void;
+  refusal: string | null;
+  /** The workspace's groups for the picker; `null` while they load or when the read refused (no field then). */
+  groups: GroupRow[] | null;
+  reread: () => void;
+  onCancel: () => void;
+  onDone: () => void;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -1203,6 +1469,9 @@ function NewProjectForm({
    * docblock says these forms do.
    */
   const [prefix, setPrefix] = useState('');
+  const [group, setGroup] = useState<GroupChoice>({ groupId: null, pendingNames: [] });
+  /** A refusal ABOUT the group (22.241), kept here and drawn under the picker; any other rule is the page's line. */
+  const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
 
   const send = (event: FormEvent): void => {
     event.preventDefault();
@@ -1213,47 +1482,81 @@ function NewProjectForm({
     //
     // The name goes AS TYPED. `displayName` refuses a blank one at the domain
     // schema, and trimming here would silently repair a claim the admin made
-    // while making that refusal unreachable — the founding form on
+    // while making that refusal unreachable — the Create workspace dialog on
     // `/workspaces` states the same choice about the same door.
     //
-    // The ULID is minted per SUBMISSION, inside the builder: a retry after a
-    // refusal is a new project, not a second attempt at an id the ledger may
-    // already hold.
+    // TWO CALLS, groups first (P-T13 fix 1, 22.246 / 22.247). The door is NOT atomic (`ingest-service.ts`
+    // `ingestAll` commits each event on its own and goes on after a refusal), so a `group.created` refused
+    // `group.name-taken` inside the founding batch would leave `project.created` and `member_added` committed
+    // with no group, and the retry would mint a SECOND project. So the new groups' `group.created` events go in
+    // their own call, before any project event exists: a refusal there founds nothing and the picker adopts the
+    // existing group (22.241). Only when they all commit is the founding batch sent, filed under the deepest id.
+    // With no new group wanted the first builder answers no seeds, and the page's `submit` treats an empty batch
+    // as done at once, so a project with no new group is still ONE call.
+    //
+    // The ULIDs are minted per SUBMISSION, inside the builders. The project's own id is minted in the founding
+    // builder only, which runs once the groups are settled, so no refusal of a group can have committed a project
+    // under an id the retry forgets. A refusal of the founding batch itself is still a new attempt with a new id.
+    const onGroupRefused = fieldRefusalHandler(setFieldRefusal, reread, ['group']);
+    setFieldRefusal(null);
+    let filedUnder: string | null = group.groupId;
     onSubmit(
-      (actorId) =>
-        foundingSeeds(
-          workspaceId,
-          newUlid(),
-          name,
-          actorId,
-          // `''` is the input UNTOUCHED, and an optional field left untouched
-          // makes no claim — so it is passed as `undefined`, which
-          // `foundingSeeds` turns into an ABSENT key rather than an empty
-          // string. Anything else goes AS TYPED, exactly as the name does and
-          // for the same reason: a whitespace-only description reaches the
-          // domain schema and is refused there with its own sentence, rather
-          // than being silently repaired here into "no description" — which
-          // would make that refusal unreachable from the one form that can
-          // produce a description at all.
-          description === '' ? undefined : description,
-          // Same `''` rule one line up, for the same reason: an untouched
-          // optional box makes no claim, so it becomes an ABSENT key rather
-          // than an empty string — and a prefix left off is not "no key", it
-          // is a key whose half is derived from the name.
-          prefix === '' ? undefined : prefix,
-        ),
       () => {
-        setName('');
-        setDescription('');
-        setPrefix('');
+        if (group.pendingNames.length === 0) return [];
+        const chosen = groupSeeds(workspaceId, groups ?? [], group, newUlid);
+        filedUnder = chosen.groupId;
+        return chosen.seeds;
       },
+      () => {
+        // The new groups are committed (or none were wanted): hold them as EXISTING picks, so a founding refusal
+        // followed by a retry sends no second `group.created` (22.247), and re-read so the picker can draw them.
+        if (group.pendingNames.length > 0) {
+          setGroup({ groupId: filedUnder, pendingNames: [] });
+          reread();
+        }
+        onSubmit(
+          (actorId) =>
+            foundingSeeds(
+              workspaceId,
+              newUlid(),
+              name,
+              actorId,
+              // `''` is the input UNTOUCHED, and an optional field left untouched
+              // makes no claim — so it is passed as `undefined`, which
+              // `foundingSeeds` turns into an ABSENT key rather than an empty
+              // string. Anything else goes AS TYPED, exactly as the name does and
+              // for the same reason: a whitespace-only description reaches the
+              // domain schema and is refused there with its own sentence, rather
+              // than being silently repaired here into "no description" — which
+              // would make that refusal unreachable from the one form that can
+              // produce a description at all.
+              description === '' ? undefined : description,
+              // Same `''` rule one line up, for the same reason: an untouched
+              // optional box makes no claim, so it becomes an ABSENT key rather
+              // than an empty string — and a prefix left off is not "no key", it
+              // is a key whose half is derived from the name.
+              prefix === '' ? undefined : prefix,
+              // No group chosen: no `groupId`, so `foundingSeeds` adds no `project.updated` (22.240's control).
+              filedUnder ?? undefined,
+            ),
+          // The dialog closes on a COMMITTED answer only; the form unmounts with it, so
+          // there is nothing to clear by hand.
+          onDone,
+          // The founding batch's last event files the group, so a refusal of THAT is about the field (22.241); a
+          // `project.prefix-taken` is not (`owns` is `group` only) and stays the dialog's own alert line (22.156).
+          onGroupRefused,
+        );
+      },
+      // A refusal about the group stays in the dialog under the picker; `group.name-taken` re-reads the groups
+      // so the picker adopts the existing one (22.241, as 22.187 on the Edit form). Nothing is resubmitted.
+      onGroupRefused,
     );
   };
 
   return (
-    <form className="gn-project-founding" onSubmit={send}>
-      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-name">
-        <span className="gn-field__label">New project</span>
+    <form className="gn-project-create" onSubmit={send}>
+      <label className="gn-field" htmlFor="gn-new-project-name">
+        <span className="gn-field__label">Name</span>
         <input
           id="gn-new-project-name"
           className="gn-field__input"
@@ -1263,12 +1566,12 @@ function NewProjectForm({
         />
       </label>
       {/* The owner's ruling of 2026-09-19 — *"New-project form gains an optional
-          description input"* — and it is the ONLY place a description is
+          description input"* (the form is the Create project dialog since Task 8) — and it is the ONLY place a description is
           authored: the prototype's `addProject` takes a name and hard-codes
           `desc`, so without this control the column would be written only by
           events the product never sends.
 
-          `New project` stays the row's primary label and this one says
+          `Name` is the dialog's first label and this one says
           "(optional)": the name is required and the schema refuses a blank one,
           so a reader who did not know which box they could skip would find out
           by being refused.
@@ -1276,10 +1579,7 @@ function NewProjectForm({
           No `maxLength` here, matching the name input beside it: the domain
           schema owns the 500-character bound, and an attribute that silently
           stopped the typing would make that refusal unreachable from the form. */}
-      <label
-        className="gn-field gn-project-founding__field"
-        htmlFor="gn-new-project-description"
-      >
+      <label className="gn-field" htmlFor="gn-new-project-description">
         <span className="gn-field__label">Description (optional)</span>
         <input
           id="gn-new-project-description"
@@ -1299,7 +1599,7 @@ function NewProjectForm({
           No `maxLength`, matching the two inputs above: the domain schema owns
           the bound, and an attribute that silently stopped the typing would
           make that refusal unreachable from the form that can produce it. */}
-      <label className="gn-field gn-project-founding__field" htmlFor="gn-new-project-prefix">
+      <label className="gn-field" htmlFor="gn-new-project-prefix">
         <span className="gn-field__label">Prefix (optional)</span>
         <input
           id="gn-new-project-prefix"
@@ -1309,9 +1609,31 @@ function NewProjectForm({
           onChange={(event) => setPrefix(event.target.value.toUpperCase())}
         />
       </label>
-      <Button variant="primary" type="submit" disabled={busy}>
-        Create project
-      </Button>
+      {/* The four-level group picker (R6), the SAME field the Edit form renders (22.240). Offered once the
+          groups have been read, as there: a project is never filed under a group nobody checked. */}
+      {groups !== null ? (
+        <ProjectGroupField
+          groups={groups}
+          value={group}
+          onChange={setGroup}
+          disabled={busy}
+          idPrefix="gn-new-project"
+          refusal={fieldRefusal}
+        />
+      ) : null}
+      {refusal !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {refusal}
+        </p>
+      ) : null}
+      <div className="gn-project-create__actions">
+        <Button type="button" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" type="submit" disabled={busy}>
+          Create project
+        </Button>
+      </div>
     </form>
   );
 }

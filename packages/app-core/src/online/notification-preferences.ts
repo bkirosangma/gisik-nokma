@@ -41,7 +41,7 @@ export function createHttpNotificationPreferencesGateway(
     async load(): Promise<NotificationPreferences> {
       const raw = await http.get(PATH);
       if (raw === null) {
-        throw new Error(`${PATH} answered 404 — this route is session-gated and should answer 401`);
+        throw new Error(`${PATH} answered 404. This route is session-gated and should answer 401`);
       }
       return notificationPreferencesSchema.parse(raw);
     },

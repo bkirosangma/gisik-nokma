@@ -9,6 +9,8 @@ import {
   TOKEN_ROLES,
   colorOf,
   cssVariableName,
+  disabledOpacity,
+  disabledOpacityVariableName,
   fontStackOf,
   fontVariableName,
   motionVariableName,
@@ -19,6 +21,8 @@ import {
   shadowVariableName,
   themeStylesheet,
   themes,
+  titleScale,
+  titleVariableName,
   type FontRole,
   type StyleName,
   type ThemeName,
@@ -132,6 +136,23 @@ describe('CSS variable emission', () => {
    * and the colour is simply gone. Measured: adding `--gn-nonexistent` to
    * ui.css reddens this and no other test in the repo.
    */
+  it('23.070 the type scale is emitted once per step in the bare :root block, as the six --gn-title-* variables', () => {
+    const sheet = themeStylesheet();
+    const bare = /^:root \{([^}]*)\}/m.exec(sheet)?.[1] ?? '';
+    expect(bare.length).toBeGreaterThan(0);
+    for (const step of Object.keys(titleScale) as Array<keyof typeof titleScale>) {
+      expect(bare).toContain(`${titleVariableName(step)}: ${titleScale[step].size};`);
+      expect(bare).toContain(`${titleVariableName(step, true)}: ${titleScale[step].phone};`);
+      expect(sheet.split(`${titleVariableName(step)}:`).length - 1).toBe(1);
+    }
+    // CONTROL (same it): the names are the six the stylesheet rules read.
+    expect(Object.keys(titleScale).map((step) => titleVariableName(step as keyof typeof titleScale))).toEqual([
+      '--gn-title-page',
+      '--gn-title-section',
+      '--gn-title-group',
+    ]);
+  });
+
   it('every var(--gn-…) in ui.css names a declared role', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const referenced = [...new Set([...css.matchAll(/var\((--gn-[a-z0-9-]*)\)/g)].map((hit) => hit[1]))];
@@ -143,10 +164,20 @@ describe('CSS variable emission', () => {
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
       ...FONT_ROLE_NAMES.map(fontVariableName),
       ...([1, 2, 3] as const).map(spaceVariableName),
+      // The prose measure (case 23.043) is declared once in the bare :root block, beside the spacing tokens.
+      '--gn-measure',
+      // The type scale (case 23.070) is declared once in the bare :root block too: three steps, each with a phone step.
+      ...(Object.keys(titleScale) as Array<keyof typeof titleScale>).flatMap((step) => [titleVariableName(step), titleVariableName(step, true)]),
       ...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),
       // The phone bar / top-bar heights (case 21.003) are declared once in the bare :root block, not as colour roles.
       '--gn-phone-bar-height',
       '--gn-phone-top-height',
+      // The one disabled opacity (UX fixes T6, 23.094) is a bare :root declaration like the phone heights.
+      disabledOpacityVariableName,
+      // `.gn-scroll-fade` (23.092) declares its own three variables on itself and reads them in the same rule family.
+      '--gn-scroll-fade-size',
+      '--gn-fade-from',
+      '--gn-fade-to',
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
@@ -156,6 +187,22 @@ describe('CSS variable emission', () => {
     // merely declared in TypeScript.
     expect(referenced).toContain('--gn-custom-marker');
     expect(themeStylesheet()).toContain(`--gn-custom-marker: ${colorOf('light', 'customMarker')};`);
+  });
+
+  /**
+   * 23.094 — the token's VALUE. Every other 23.094 check reads only `var(--gn-disabled-opacity)`, so `0.55` would pass them
+   * all; this is the one place the number is pinned, and where it is emitted.
+   */
+  it('23.094 --gn-disabled-opacity is 0.5, emitted exactly once, in the bare :root block', () => {
+    expect(disabledOpacity).toBe('0.5');
+    const stylesheet = themeStylesheet();
+    const declaration = `${disabledOpacityVariableName}: 0.5;`;
+    expect(stylesheet.split(declaration)).toHaveLength(2); // exactly once
+    const at = stylesheet.indexOf(declaration);
+    const block = stylesheet.slice(stylesheet.lastIndexOf('}', at) + 1, stylesheet.indexOf('}', at) + 1).trim();
+    expect(block.startsWith(':root {')).toBe(true); // the bare :root, not a themed or media-wrapped one
+    // CONTROL — the bare :root is the block that also carries the phone heights, not a different :root.
+    expect(block).toContain('--gn-phone-bar-height');
   });
 
   /**
@@ -458,12 +505,18 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
  * with `neoNavyRaised`/`neoNavySunken` reverted to `neoNavy`, holding dark
  * to ANY separation floor while light already gets `neoPaper` — one hex,
  * zero separation, depth from shadow alone — was the inconsistency. `neo`'s
- * whole visual language is shadow-only depth in both themes now.
+ * visual language is shadow-first depth in both themes.
  *
  * Mutation: reintroduce `neo` into `DARK_SEPARATION_FLOORS` with any floor
  * above `1.0` → reddens, naming the exact regression this exemption guards
- * against (`neoNavyRaised`/`neoNavySunken` drifting away from `neoNavy`
- * again without updating this test to match).
+ * against (`neoNavySunken` drifting away from `neoNavy` again without updating
+ * this test to match).
+ *
+ * **Amended UX T1 (owner U8, 2026-10-02; 23.006): `neoNavyRaised` is the one
+ * dark neo surface that DID step**, `#1b2340` → `#232c50` (1.14 off the page),
+ * so the neo/dark case below no longer says raised is the SAME hex. It still
+ * pins that depth is mostly shadow (sunken stays the surface hex) and the step
+ * is pinned as a literal so a drift reddens here.
  */
 describe('13.341 dark-theme fill separation per style (rule (c))', () => {
   const DARK_SEPARATION_FLOORS: Record<'hig' | 'minimal', { surfaceRaised: number; surfaceSunken: number; raisedSunken: number }> = {
@@ -483,11 +536,12 @@ describe('13.341 dark-theme fill separation per style (rule (c))', () => {
     });
   }
 
-  it('neo/dark: surface, surfaceRaised and surfaceSunken are the SAME hex — depth comes from shadow, not fill, matching neo/light', () => {
+  it('neo/dark: surface and surfaceSunken are the SAME hex; surfaceRaised steps to #232c50 (U8, 23.006) — depth is shadow first, fill second', () => {
     const surface = colorOf('dark', 'surface', 'neo');
     const raised = colorOf('dark', 'surfaceRaised', 'neo');
     const sunken = colorOf('dark', 'surfaceSunken', 'neo');
-    expect(raised).toBe(surface);
+    expect(raised).toBe('#232c50');
+    expect(raised).not.toBe(surface);
     expect(sunken).toBe(surface);
   });
 });
@@ -1090,7 +1144,7 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
     // Dark clears bare surface/raised (see `textAccentDark`'s own docblock)
     // AND, since 2026-09-10, the neo sunken surface too — `neoNavySunken`
     // was reverted to `neoNavy` itself (the prototype's exact dark+neo hex;
-    // see `tokens.ts`'s `neoNavyRaised` docblock), and a darker background
+    // see `tokens.ts`'s `neoNavySunken`, still `neoNavy`), and a darker background
     // only helps a light foreground like `accent` read MORE clearly. This
     // is a changed FACT, not a claim this test still needs to hold the old
     // way — `accent` still carries no GUARANTEE on a sunken background in
@@ -1451,8 +1505,11 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
       }
     }
     expect(checked).toBe(CONTRAST_PAIRS.length * 6);
-    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows. A floor removed is a guarantee removed, and it would show here first.
-    expect(CONTRAST_PAIRS.length).toBe(44);
+    // The roster only GROWS: 33 until the styling refresh (Plan A Task 1, 2026-09-29) added 11 rows, then 44 until UX fixes T1 (owner U5/U8, 2026-10-02) added 8 (the field ring on four grounds, and textAccent and the accent fill on the stepped track/well; 23.001/23.007; two candidate rows, textAccent and textSubtle on surfaceRaised, were already present). then 52 until prefixes and groups T7 (ruling R5, 2026-10-02) added 4 (level1–level4 on surfaceRaised, 22.143). A floor removed is a guarantee removed, and it would show here first.
+    // No two rows share a pair: a duplicate is a row that guards nothing new but inflates the count below (UX fixes T1
+    // fix 1). Asserted BEFORE the count so a re-added copy fails here, by name, and not only as a number that moved.
+    expect(new Set(CONTRAST_PAIRS.map((pair) => `${pair.fg}|${pair.bg}`)).size, 'duplicate fg|bg rows').toBe(CONTRAST_PAIRS.length);
+    expect(CONTRAST_PAIRS.length).toBe(56);
     // And no minimum sits below the floor these rows exist to state, so
     // "re-cleared" cannot have been reached by relaxing a bar to meet a result.
     expect(CONTRAST_PAIRS.every((pair) => pair.minimum >= 3)).toBe(true);
@@ -1562,7 +1619,7 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
 
   /**
    * 10.160 (W1c, 2026-10-01) — `danger` as TEXT on **`surfaceWell`**, the ground of the quiet danger buttons
-   * (`.gn-button.builder-quiet-danger`: "Remove rule", "Delete transition", "Delete state") inside the builder's
+   * (`.gn-button--danger-quiet`, which "Remove rule", "Delete transition" and "Delete state" wear) inside the builder's
    * recessed row body. Same two controls as 16.84 bind the reading to THIS token table.
    */
   it('10.160 danger-as-ink on surfaceWell clears AA in all six combinations, on the ground the builder\'s danger buttons really have', () => {
@@ -1606,7 +1663,8 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * **The chip's fill is a depth problem, and the measurement is what says so.**
  * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3184`),
  * which is `--gn-surface-sunken` on this product's role layer — and under `neo`
- * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex, so a chip on a
+ * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex (in LIGHT; neo dark's raised
+ * stepped to `#232c50` with UX T1, 2026-10-02, see the dark half below), so a chip on a
  * `.gn-card` composites to exactly the card's own colour and its fill draws no
  * boundary at all. **That is asserted here as a fact about the palette**
  * (1.0000, both themes, exactly as case 13.732 asserts it for the avatar), which
@@ -1684,13 +1742,21 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
     // than one, and asserted as equality so a future palette that separates the
     // surface roles reddens here — which would be the signal to re-derive the
     // rule rather than to keep a shadow that had stopped being needed.
-    for (const theme of THEME_NAMES) {
-      const card = colorOf(theme, 'surfaceRaised', 'neo');
-      expect(
-        over(colorOf(theme, chipFill, 'neo'), card),
-        `neo/${theme}: the chip fill no longer collapses onto the card, so this case's premise has moved`,
-      ).toBe(card);
-    }
+    //
+    // Amended UX T1 (owner U8, 2026-10-02; 23.006): neo/dark's raised surface stepped to `#232c50`, so in DARK the chip
+    // (`surfaceSunken`, still `neoNavy`) no longer composites to exactly the card. It is a 1.14 step, though, well under
+    // the 3:1 a boundary owes, so the shadow is still the chip's boundary and the premise holds in the weaker form
+    // asserted for dark below: still no boundary by fill alone.
+    const lightCard = colorOf('light', 'surfaceRaised', 'neo');
+    expect(
+      over(colorOf('light', chipFill, 'neo'), lightCard),
+      `neo/light: the chip fill no longer collapses onto the card, so this case's premise has moved`,
+    ).toBe(lightCard);
+    const darkCard = colorOf('dark', 'surfaceRaised', 'neo');
+    expect(
+      contrastRatio(over(colorOf('dark', chipFill, 'neo'), darkCard), darkCard),
+      `neo/dark: the chip fill now separates from the card by 3:1 or more, so the shadow is no longer what supplies the boundary`,
+    ).toBeLessThan(3);
 
     // THE CONTROL, and it is the whole reason the paragraph above is a claim
     // about `neo` rather than about the palette: under hig/minimal the two roles
@@ -1746,8 +1812,8 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * `.gn-card`'s `--gn-surface-raised`. The first draft of this case measured
  * against `surfaceSunken`, the fill the stripe replaces, and two of its four
  * pinned readings therefore described a layer that is not on screen. Under `neo`
- * the two roles are the same hex (`neoPaper`), which is why the error hid there
- * and only showed under `hig`. 13.920 composites its chip over `surfaceRaised`
+ * LIGHT the two roles are the same hex (`neoPaper`), which is why the error hid there
+ * and only showed under `hig` (neo dark's raised stepped to `#232c50` with UX T1). 13.920 composites its chip over `surfaceRaised`
  * for the same reason.
  *
  * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the row is now a raised
@@ -1880,7 +1946,8 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     expect(measured['minimal/light']).toBeCloseTo(1.1026, 3);
     expect(measured['minimal/dark']).toBeCloseTo(1.2727, 3);
     expect(measured['neo/light']).toBeCloseTo(1.0757, 3);
-    expect(measured['neo/dark']).toBeCloseTo(1.1727, 3);
+    // neo/dark moved 1.1727 -> 1.1684 with UX T1 (owner U8, 2026-10-02): the card the stripe sits on is now `#232c50`.
+    expect(measured['neo/dark']).toBeCloseTo(1.1684, 3);
   });
 
   it('the h2 carries the prototype metrics, so the third string is ported and not just relabelled', () => {
@@ -1891,8 +1958,10 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     // otherwise be unpinned.
     const body = declarationsFor(UI_CSS_TEXT, '.ticket-type-list__title');
     if (body === null) throw new Error('.ticket-type-list__title rule not found in ui.css');
-    // `20px/25px/600` at `desktop.dc.html:820`, carried as rem at the 16px root.
-    expect(body).toMatch(/font-size:\s*1\.25rem/);
+    // `20px/25px/600` at `desktop.dc.html:820`, carried as rem at the 16px root — and, since UX fixes Task 5 (case 23.072,
+    // AMENDED 2026-10-02), read through the section-title token, whose value IS that 20px.
+    expect(body).toMatch(/font-size:\s*var\(--gn-title-section\)/);
+    expect(titleScale.section.size).toBe('1.25rem');
     expect(body).toMatch(/line-height:\s*1\.5625rem/);
     expect(body).toMatch(/font-weight:\s*600/);
     // The metrics are the delta; the text is not. Stated so a reader does not

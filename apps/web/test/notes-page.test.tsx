@@ -219,7 +219,7 @@ describe('18.11 The Notes page — the shell', () => {
     // in the populated case, because "there is nowhere to file a note" and
     // "there is nowhere to file a note YET" are the two facts a person in this
     // state needs told apart.
-    expect(screen.getByRole('button', { name: 'New note' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create note' })).toBeInTheDocument();
     // ...and NOT while loading, where the read has not answered at all.
     empty.unmount();
 
@@ -239,7 +239,7 @@ describe('18.11 The Notes page — the shell', () => {
     expect(await screen.findByText('Loading…')).toBeInTheDocument();
     expect(screen.queryByText('No notes yet')).toBeNull();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create note' })).toBeNull();
   });
 
   /**
@@ -447,6 +447,6 @@ describe('18.11 The Notes page — the shell', () => {
 
     // The topic itself, so a layout that named some OTHER route would fail here
     // rather than at the suffix.
-    expect(documentTitleFor('Notes')).toBe('Notes · Gisik Nokma');
+    expect(documentTitleFor('Notes')).toBe('Notes | Gisik Nokma');
   });
 });

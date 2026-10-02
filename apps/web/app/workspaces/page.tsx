@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { IST_TIME_ZONE } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
+import { formatDay } from '@gisik-nokma/app-core';
+import { Avatar, Button, Card, Chip, Dialog, PlusIcon } from '@gisik-nokma/ui';
 import { FoundingError, InvitationActionError, type PendingInvitation } from '@gisik-nokma/app-core/online';
 import {
   ARCHIVED_CHIP_LABEL,
@@ -24,6 +24,7 @@ import {
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
+import { istToday } from '../../src/ist-today.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
@@ -116,7 +117,7 @@ export default function WorkspacesPage() {
               for them, and answers `''` for someone with neither — and a
               heading must not end in an em dash for that person either. */}
           <h1 className="gn-page-title">
-            Workspaces{user !== null && displayLabelOf(user) !== '' ? ` — ${displayLabelOf(user)}` : ''}
+            Workspaces{user !== null && displayLabelOf(user) !== '' ? `: ${displayLabelOf(user)}` : ''}
           </h1>
           {/* `workspaces !== null` FIRST, and it stays load-bearing: a REFUSED
               read is also `null` here, and short-circuiting on this term before
@@ -135,6 +136,13 @@ export default function WorkspacesPage() {
               {`${workspaces.length} ${workspaces.length === 1 ? 'workspace' : 'workspaces'} you belong to`}
             </p>
           ) : null}
+          {/* The page's one primary (prefixes/groups Task 8, case 22.151): founding a
+              workspace is an act the person chooses to begin, not a form that sits
+              open under the list. It lives in the header row, beside the title it
+              acts under, and the FORM it opens is a dialog. Outside the list's
+              branches, like the form it replaced, so a refused read still leaves
+              the way to found one (3.124). */}
+          <CreateWorkspaceButton />
         </div>
         {/* Error before data, everywhere in this shell. ⚠ CORRECTED 2026-09-20: this
             read "`getMyWorkspaces` is one of the refusing reads (four of them since
@@ -154,7 +162,7 @@ export default function WorkspacesPage() {
           // The second sentence this always needed (Plan 6 Task 15b, item 1). A
           // person with a session and no workspace used to be told only to wait
           // for somebody else, which was the last hole in the founding path.
-          <p>No workspaces yet. Ask an admin for an invite link — or create your own.</p>
+          <p>No workspaces yet. Ask an admin for an invite link, or create your own.</p>
         ) : (
           <>
             {live.length > 0 ? (
@@ -240,33 +248,17 @@ export default function WorkspacesPage() {
         ) : null}
 
         {/*
-          OUTSIDE the list's three branches, and deliberately so. ⚠ CORRECTED
-          2026-09-20: this read "`getMyWorkspaces` is one of the refusing reads —
-          four of them since ruling P25 clause 1, and this is still one — so `error`
-          is its NORMAL resting state against the shipped server — and a founding
-          form nested inside the `workspaces.length === 0` arm would be a form
-          nobody could ever reach." It no longer refuses (rulings P32/P38; the
-          register has been empty since 2026-09-19), **so the empty arm IS reachable
-          and the placement's stated reason has expired. The placement is NOT moved
-          here** — relocating a form is a product decision, not a comment
-          correction's: *owner, whoever next touches this page.*
-          A person who cannot be told which workspaces they are in can still found
-          one, and that is exactly the person who most needs to.
-        */}
-        {/*
-          OUTSIDE the list's five branches too, and beside the founding form for
-          the SAME reason it is. ⚠ CORRECTED 2026-09-20: this read "…for the SAME
-          reason it is: `getMyWorkspaces` refusing is this page's normal resting
-          state" — the refusal is gone (rulings P32/P38; register empty since
-          2026-09-19), so the reason it names has expired; the PLACEMENT is kept
-          and the owner is named above, at the founding form's block. A person with a pending invitation and no workspace
+          OUTSIDE the list's five branches, like the header's Create workspace button
+          (which used to be a form that sat here — the owner moved it into a dialog,
+          prefixes/groups spec 2026-10-01, R7). The old reason, "`getMyWorkspaces`
+          refusing is this page's normal resting state", expired with rulings P32/P38.
+          A person with a pending invitation and no workspace
           yet is precisely the one the banner exists for — nesting it in the
           `length === 0` arm would hide it from everyone whose list failed to
           load, and nesting it inside the list would hide it from the person who
           has no list.
         */}
         <InvitationBanner />
-        <FoundingForm />
       </div>
     </main>
   );
@@ -526,22 +518,14 @@ function WorkspaceCard({
 /**
  * The date this invitation lapses, in the PRODUCT's timezone.
  *
- * `IST_TIME_ZONE` imported rather than the literal re-spelled — `packages/domain/
- * src/ist-day.ts` is the one declaration site and `reporting-scope-guard.test.ts`
- * scans for the literal. The zone is explicit and not the viewer's locale
- * default for the reason `/mcp/tokens` states at the same call: a ledger whose
- * owner decided on one timezone should not tell one person an invitation lapses
- * today and another that it lapsed yesterday.
+ * `formatDay` is the one day renderer (23.193) and reads the IST day, not the
+ * viewer's locale default, for the reason `/mcp/tokens` states at the same call: a
+ * ledger whose owner decided on one timezone should not tell one person an
+ * invitation lapses today and another that it lapsed yesterday.
  */
 function onDay(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return 'an unknown date';
-  return at.toLocaleDateString('en-IN', {
-    timeZone: IST_TIME_ZONE,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (Number.isNaN(new Date(iso).getTime())) return 'an unknown date';
+  return formatDay(iso, istToday());
 }
 
 /**
@@ -715,7 +699,7 @@ function InvitationBanner() {
                     `getByText` that looks for it — the failure that caught this
                     the first time it was written. */}
                 <p className="gn-invitations__when">
-                  {`Invited ${onDay(invitation.invitedAt)} · lapses ${onDay(invitation.expiresAt)}`}
+                  {`Invited ${onDay(invitation.invitedAt)}. Lapses ${onDay(invitation.expiresAt)}.`}
                 </p>
                 <div className="gn-invitations__actions">
                   {/* The accessible names carry the workspace, so two waiting
@@ -773,13 +757,31 @@ function InvitationBanner() {
  * that is possible; before it did, the most this could have shown was
  * `HTTP 422 for /v1/workspaces`.
  *
- * `.gn-workspace-founding` (Round 19b, owner feedback item 3), not the
- * `.gn-founding` this form shared with the home's new-project form until now:
- * the owner's reference draws the two differently — this one a bare column
- * beside the list, the home's a raised card with an inline field+button row —
- * and "shouldn't be that big" was said of exactly this one.
+ * **A DIALOG behind a primary button (prefixes/groups Task 8, cases 22.151).** This
+ * used to be `.gn-workspace-founding`, a bare column that sat under the list
+ * (Round 19b, owner feedback item 3: "shouldn't be that big"); it is now opened from
+ * the header's one primary, "Create workspace", and the form's own submit keeps that
+ * label. The form is mounted ONLY while the dialog is open, so each opening starts
+ * from empty fields and no stale refusal.
  */
-function FoundingForm() {
+function CreateWorkspaceButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="primary" onClick={() => setOpen(true)}>
+        <PlusIcon />
+        Create workspace
+      </Button>
+      {open ? (
+        <Dialog open title="Create workspace" onClose={() => setOpen(false)}>
+          <FoundingForm onCancel={() => setOpen(false)} />
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
+
+function FoundingForm({ onCancel }: { onCancel: () => void }) {
   const router = useRouter();
   const { founding } = useAppServices();
   const [name, setName] = useState('');
@@ -803,7 +805,7 @@ function FoundingForm() {
         after founding every one of My Work's four sections is empty — the
         founder met "Nothing assigned to you. / No claims in transit. / No
         contested claims. / Nothing has been shared with you." and nothing that
-        said what to do next. The home carries the owner's **New project** form
+        said what to do next. The home carries the owner's **Create project** button
         (`w/[workspaceId]/page.tsx`) and the project grid, which is where the
         manual already sends an owner for it (`docs/manual.md:174` — "an owner or
         admin gets a New project form inside the workspace, and that is the only
@@ -825,7 +827,6 @@ function FoundingForm() {
 
   return (
     <form className="gn-workspace-founding" onSubmit={submit}>
-      <h2 className="gn-workspace-founding__heading">New workspace</h2>
       <label className="gn-field" htmlFor="gn-founding-name">
         <span className="gn-field__label">Name</span>
         <input
@@ -851,14 +852,14 @@ function FoundingForm() {
           onChange={(event) => setPrefix(event.target.value.toUpperCase())}
         />
       </label>
-      <Button
-        className="gn-workspace-founding__submit"
-        variant="primary"
-        type="submit"
-        disabled={sending}
-      >
-        Create workspace
-      </Button>
+      <div className="gn-workspace-founding__actions">
+        <Button type="button" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button variant="primary" type="submit" disabled={sending}>
+          Create workspace
+        </Button>
+      </div>
       {refusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {refusal}

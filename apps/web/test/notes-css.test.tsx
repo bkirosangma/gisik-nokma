@@ -199,7 +199,7 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
   });
 
   /** The CSS rule from the case above only matters if the page's `<main>` actually carries the modifier. */
-  it('13.1485b the rendered <main> carries BOTH gn-shell and gn-shell--wide', async () => {
+  it('13.1485b the rendered <main> carries gn-shell, gn-shell--wide and gn-notes-page', async () => {
     const services = stubServices({ getMyWorkspaces: async () => [], getMembers: async () => [] });
     render(
       <Providers services={services}>
@@ -207,7 +207,7 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
       </Providers>,
     );
     const notesDiv = await screen.findByTestId('notes-page');
-    expect(notesDiv.closest('main')).toHaveClass('gn-shell', 'gn-shell--wide');
+    expect(notesDiv.closest('main')).toHaveClass('gn-shell', 'gn-shell--wide', 'gn-notes-page');
   });
 
   /**
@@ -215,11 +215,17 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
    * should also be enough to feel like its a note"), reusing
    * `--app-nav-offset` (globals.css `:root`) with its own `0px` fallback
    * rather than a second magic number for the same fact.
+   *
+   * AMENDED 2026-10-02 (UX fixes T9, 23.162, audit NP-04): the floor moved OFF the
+   * `.gn-notes__editor` wrapper (where it was an invisible band under a 134px
+   * field) onto the visible field, `.gn-notes__editor .ticket-editor .ticket-editor__content`.
+   * 23.162 is the case that pins the wrapper's absence; this keeps the field's derivation.
    */
-  it('13.1486 .gn-notes__editor carries a min-height built from --app-nav-offset', () => {
-    const rule = declarationsFor(CSS, '.gn-notes__editor');
+  it('13.1486 the visible editor field carries a min-height built from --app-nav-offset (AMENDED: no longer the wrapper)', () => {
+    const rule = declarationsFor(CSS, '.gn-notes__editor .ticket-editor .ticket-editor__content');
     expect(rule).not.toBeNull();
-    expect(rule ?? '').toMatch(/min-height:\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    expect(rule ?? '').toMatch(/min-height:\s*max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    expect(declarationsFor(CSS, '.gn-notes__editor') ?? '').not.toMatch(/min-height/);
   });
 
   /**
@@ -479,6 +485,10 @@ describe('18.226 every class the Notes page renders is a class globals.css style
    * each state change, then unions two small supplementary renders for the
    * states that genuinely cannot coexist with the rest.
    */
+  // 20 s, not vitest's default 5 s (flake 18.226, BRIEF-flake-18226-timeout-2026-10-02): this one `it` drives a whole populated page
+  // through every state and asserts a class SET, never a duration. Under machine load (load average 60-72) it took 2203 ms at 5211eee4
+  // and 4139 ms at the release tip against 846 ms when quiet, and timed out in 3 of 5 full web runs and once in a gate (G0, 07:32).
+  // The global `testTimeout` is unchanged and no other test is touched.
   it('the two sets are EQUAL — a rename on either side reddens here', async () => {
     const user = userEvent.setup();
     const seen = new Set<string>();
@@ -548,13 +558,13 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByTestId('note-document');
-    snap(container); // header, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
+    snap(container); // header, bar, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
     // group/group-title, deleted/restore button, session-absent, editor,
     // title, byline, author, edited, scope/scope-wrap, badges, reading-time,
     // byline-actions, toc(wrapper), search/search-input/filters.
 
     // New note → dialog, then a refused Create → dialog-failure.
-    await user.click(screen.getByRole('button', { name: 'New note' }));
+    await user.click(screen.getByRole('button', { name: 'Create note' }));
     await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Draft');
     refuseType = 'note.created';
     await user.click(screen.getByRole('button', { name: 'Create' }));
@@ -663,7 +673,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByText('No notes yet');
-    await user.click(screen.getByRole('button', { name: 'New note' }));
+    await user.click(screen.getByRole('button', { name: 'Create note' }));
     await screen.findByText(/not in a workspace yet/);
     snap(emptyRender.container); // empty, dialog, dialog-empty, hint (NO_NOTE_COPY)
     emptyRender.unmount();
@@ -698,7 +708,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
 
     // NEITHER LIST IS TYPED HERE — see the inbox scanner's own docblock for why.
     expect(rendered).toEqual(styled);
-  });
+  }, 20_000);
 
   it('the one data-attribute globals.css keys a .gn-notes rule on is really rendered', async () => {
     const services = stubServices({
@@ -792,7 +802,8 @@ describe('18.482 the page fills the viewport below the bar, so the PAGE does not
     expect(rows).toMatch(/min-height:\s*0;/);
     // A bare auto row is sized by its content and would push the columns past the viewport instead of scrolling.
     expect(rows).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\);/);
-    expect(ruleIn(body, '.gn-shell--wide')).toMatch(/padding-bottom:\s*0;/);
+    // Scoped to the notes page since UX fixes Task 3 (case 23.040): the project page and the workflow editor wear `.gn-shell--wide` too.
+    expect(ruleIn(body, '.gn-notes-page.gn-shell--wide')).toMatch(/padding-bottom:\s*0;/);
     // CONTROL (same `it`): the token this leans on is the one the bar's other readers use, and it is defined.
     expect(stripComments(CSS)).toMatch(/:root\s*\{\s*--app-nav-offset:\s*4\.35rem;\s*\}/);
     expect(body).not.toMatch(/4\.35rem/);
@@ -842,7 +853,7 @@ describe('18.484 a jump inside the column lands 1rem under ITS top, not under a 
 describe('18.486 the wide block is declared AFTER every rule it overrides', () => {
   /**
    * A media query adds no specificity, so `@media (width > 60rem) { .x { … } }` beats an earlier
-   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide`. The heading
+   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide` (whose notes-only padding, `.gn-notes-page.gn-shell--wide`, is the one wide-block rule with no base rule). The heading
    * `scroll-margin-top` base rule sits in the KB-parity section near the end of the file; a wide block
    * filed earlier (where the first cut of it was) is silently ignored and every jump lands ~86px low,
    * while the TEXT of the override is still present, so 18.484 alone cannot see it.
@@ -852,7 +863,7 @@ describe('18.486 the wide block is declared AFTER every rule it overrides', () =
     const stripped = stripComments(CSS);
     const start = stripped.indexOf('@media (width > 60rem)');
     expect(start).toBeGreaterThan(-1);
-    const selectors = ['.gn-shell--wide', '.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
+    const selectors = ['.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
     for (const selector of selectors) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const base = [...stripped.matchAll(new RegExp(`^${escaped}\\s*\\{`, 'gm'))].map((m) => m.index ?? -1);

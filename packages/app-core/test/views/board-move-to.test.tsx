@@ -70,7 +70,7 @@ async function listed(user: ReturnType<typeof userEvent.setup>, trigger: HTMLEle
   await user.click(within(dialog).getByRole('button', { name: /Move to/ }));
   return within(await screen.findByRole('listbox'))
     .getAllByRole('option')
-    .map((option) => (option.textContent ?? '').split(' — ')[0] ?? '');
+    .map((option) => (option.textContent ?? '').split(' (')[0] ?? '');
 }
 
 describe('21.060 above 40rem each card footer carries a "Move to…" after the ‹ › arrows', () => {
@@ -78,7 +78,7 @@ describe('21.060 above 40rem each card footer carries a "Move to…" after the �
     await mount(boardOf({ doing: ['tk_b'] }));
     expect(footerButtons('tk_b')).toEqual([
       'Move to To do',
-      'Move to next state — Waiting on counterparty or Done',
+      'Move to next state: Waiting on counterparty or Done',
       'Move to another state',
     ]);
     // CONTROL — the arrows keep their behaviour: › still asks which of its two, with only those two on offer.
@@ -99,8 +99,8 @@ describe('21.061 Move to… opens the same dialog over every board destination',
     const user = userEvent.setup();
     const { source } = await mount(boardOf({ done: ['tk_d'] }));
     expect(footerButtons('tk_d')).toEqual([
-      'Move to previous state — Doing or To do',
-      'Move to next state — unavailable',
+      'Move to previous state: Doing or To do',
+      'Move to next state: unavailable',
       'Move to another state',
       'Close Ticket tk_d',
     ]);
@@ -136,7 +136,9 @@ describe('21.062 one accessible name at every width; the visible word differs by
 
   it('21.062 the same name on a phone', async () => {
     stubViewport(true);
-    await mount(boardOf({ doing: ['tk_b'] }));
+    await mount(boardOf({ todo: ['tk_a'], doing: ['tk_b'] }));
+    // UX T7 (23.120): only the picked column is in the page on a phone, so pick Doing first.
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Doing/ }));
     expect(moveTo('tk_b')).toHaveAccessibleName('Move to another state');
   });
 });

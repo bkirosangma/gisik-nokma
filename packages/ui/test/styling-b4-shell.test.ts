@@ -14,7 +14,7 @@ const ROWS: RosterRow[] = [
   { sheet: 'globals', selectors: '.gn-nav', declarations: { 'box-shadow': 'var(--gn-shadow-lift)' } },
   {
     sheet: 'globals',
-    selectors: ['.gn-nav a', '.gn-nav__more-toggle'],
+    selectors: ['.gn-nav a'], // amended 2026-10-02: the retired `Menu` toggle (`.gn-nav__more-toggle`) left this selector list (UX fixes Task 4, case 23.042)
     declarations: {
       'border-radius': '0.75rem',
       transition: 'background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out',
@@ -49,7 +49,7 @@ const KEPT = [NEO_CURRENT.join(', ')];
 describe('20.231 the shell follows the rules', () => {
   it('20.231 every row; the non-current links keep text-muted', () => {
     // CONTROL — the resting links stay `text-muted` (only the current item changes ink).
-    const resting = ruleExactly(cssOf('globals'), ['.gn-nav a', '.gn-nav__more-toggle'], null);
+    const resting = ruleExactly(cssOf('globals'), ['.gn-nav a'], null);
     expect(valueOf(resting, 'color')).toBe('var(--gn-text-muted)');
     for (const row of ROWS) expectRow(row);
   });
@@ -92,6 +92,8 @@ const winnerFor = (css: string, element: keyof typeof CURRENT_TAIL, neo: boolean
   winningValue(
     css,
     (selector) =>
+      // A pseudo-element rule (the lit link's indicator bar, UX fixes 23.044) styles the ::after, not the element.
+      !selector.includes('::') &&
       selector.includes(`.gn-nav ${CURRENT_TAIL[element]}`) && (selector.startsWith('[data-style="neo"]') ? neo : true),
     property,
   );

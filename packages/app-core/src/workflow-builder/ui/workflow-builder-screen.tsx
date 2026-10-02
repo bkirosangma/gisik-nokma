@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
-import { Button } from '@gisik-nokma/ui';
+import { Button, useScrollEdges } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
 import { AuthoringReadRefused, type WorkflowAuthoringGateway, type WorkspaceMember } from '../gateway.js';
@@ -98,6 +98,8 @@ export function WorkflowBuilderScreen(props: {
   // opened from the "Panels" button. Above 40rem the button, the scrim and the Done button are `display: none` and
   // this state paints nothing, so the side-by-side layout is untouched.
   const [panelsOpen, setPanelsOpen] = useState(false);
+  // The left panel scrolls down on the desktop split: `.gn-scroll-fade--y` shows a state list that runs past the fold.
+  const leftEdgesRef = useScrollEdges<HTMLElement>('y');
   const panelsButtonRef = useRef<HTMLButtonElement>(null);
   const panelsDoneRef = useRef<HTMLButtonElement>(null);
   const closePanels = () => {
@@ -174,7 +176,7 @@ export function WorkflowBuilderScreen(props: {
   if (loadFailed) {
     return (
       <p className="workflow-builder-screen__load-error">
-        Could not load workspace people and types — reload to try again.
+        Could not load workspace people and types. Reload to try again.
       </p>
     );
   }
@@ -237,7 +239,8 @@ export function WorkflowBuilderScreen(props: {
           {panelsOpen ? <div className="workflow-builder-screen__scrim" aria-hidden="true" onClick={closePanels} /> : null}
           <aside
             id="workflow-builder-panels"
-            className="workflow-builder-screen__left"
+            className="workflow-builder-screen__left gn-scroll-fade gn-scroll-fade--y"
+            ref={leftEdgesRef}
             data-open={panelsOpen ? 'true' : 'false'}
             onKeyDown={(keyEvent) => {
               if (keyEvent.key === 'Escape' && panelsOpen) closePanels();

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PREFIX_MAX_LENGTH,
   derivePrefix,
+  parseTicketKey,
   prefixSchema,
   resolveProjectPrefixes,
   ticketKey,
@@ -171,5 +172,41 @@ describe('ticketKey', () => {
     // The owner ruled a bare key "is enough" at every display site, so this
     // function takes no context argument to forget to pass.
     expect(ticketKey('CC', 'SO', 1)).toBe('CCSO-1');
+  });
+});
+
+describe('22.024 resolveProjectPrefixes skips reserved prefixes', () => {
+  it('22.024 — a derived prefix flees a reserved one to the next candidate; control: without `reserved` it keeps the base', () => {
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }])).toEqual(['SO']); // control
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }], new Set(['SO']))).toEqual(['SO2']);
+    // An ENTERED prefix is not moved by `reserved`: the door checked it, pass 1 is unchanged.
+    expect(resolveProjectPrefixes([{ name: 'Shop ops', prefix: 'SO' }], new Set(['SO']))).toEqual(['SO']);
+    // Reserved values are taken in order: SO and SO2 both reserved -> SO3.
+    expect(resolveProjectPrefixes([{ name: 'Shop ops' }], new Set(['SO', 'SO2']))).toEqual(['SO3']);
+  });
+});
+
+describe('22.060 parseTicketKey turns key-shaped text into its letters and number', () => {
+  it('22.060 — " ccso-12 " is {CCSO, 12}; control: "CCSO12", "C-1", "hello" and friends are null', () => {
+    expect(parseTicketKey(' ccso-12 ')).toEqual({ letters: 'CCSO', number: 12 });
+    expect(parseTicketKey('CCSO-12')).toEqual({ letters: 'CCSO', number: 12 }); // already canonical
+    expect(parseTicketKey('ab-1')).toEqual({ letters: 'AB', number: 1 }); // two letters is the shortest
+    expect(parseTicketKey('ABCDEF-1234567')).toEqual({ letters: 'ABCDEF', number: 1234567 }); // the longest
+
+    // CONTROL, same `it`: text that is NOT key-shaped is null, so a search for it stays lexical.
+    for (const text of ['CCSO12', 'C-1', 'hello', 'CCSO-', '-12', 'CCSO-1a', 'CCSO-12345678', 'ABCDEFG-1', 'CC SO-12', 'CC1O-12', 'CCSO-12 extra', '']) {
+      expect(parseTicketKey(text), JSON.stringify(text)).toBeNull();
+    }
+  });
+});
+
+describe('22.067 parseTicketKey reads the digit a derived collision prefix carries', () => {
+  it('22.067 — " ccso2-12 " is {CCSO2, 12}; control: a digit in the middle, two digits, a leading digit and a digit 1 stay null', () => {
+    expect(parseTicketKey(' ccso2-12 ')).toEqual({ letters: 'CCSO2', number: 12 });
+    expect(parseTicketKey('CCSO9-1')).toEqual({ letters: 'CCSO9', number: 1 }); // 9 is the last collision digit
+    // CONTROL, same `it`: only ONE trailing digit 2-9 after letters is a key; everything else stays lexical.
+    for (const text of ['CC1O-12', 'CCSO22-1', 'CCSO1-1', 'CCSO0-1', '2CCSO-1', 'CCSO2A-1', 'C2-1', 'ABCDEF2-1234567x']) {
+      expect(parseTicketKey(text), JSON.stringify(text)).toBeNull();
+    }
   });
 });

@@ -153,7 +153,7 @@ describe('PublishControls gating', () => {
     expect(advisories.map((advisory) => advisory.code)).toEqual(['rdu-bypassable', 'rule-bypassable']);
 
     const gateway = setup(store, {}, { withPanel: true });
-    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(screen.getByText('Worth a look (none of these block publishing)')).toBeInTheDocument();
     for (const advisory of advisories) {
       expect(screen.getAllByText(advisory.message).length).toBeGreaterThan(0);
     }
@@ -167,7 +167,7 @@ describe('PublishControls gating', () => {
     expect(gateway.submitted).toHaveLength(1);
     // and the advisories are still on screen after a successful publish — they
     // were never a thing to be cleared, only a thing to be told
-    expect(screen.getByText('Worth a look — none of these block publishing')).toBeInTheDocument();
+    expect(screen.getByText('Worth a look (none of these block publishing)')).toBeInTheDocument();
     for (const advisory of advisories) {
       expect(screen.getAllByText(advisory.message).length).toBeGreaterThan(0);
     }
@@ -285,7 +285,7 @@ describe('PublishControls — the state-mapping dialog', () => {
         // from `getStateOccupancy`), so the sentence denied the thing directly
         // beneath it. The rule is unchanged; the sentence now says what the
         // counts are for.
-        'Version 3 removes states that version 2 has. The counts below are for your information only — the rule needs a destination for every removed state, occupied or not.',
+        'Version 3 removes states that version 2 has. The counts below are for your information only. The rule needs a destination for every removed state, occupied or not.',
       ),
     ).toBeInTheDocument();
 
@@ -295,7 +295,7 @@ describe('PublishControls — the state-mapping dialog', () => {
 
     const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
     expect(confirm).toBeDisabled();
-    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(row).getByRole('button', { name: /Send tickets from Review to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
@@ -334,7 +334,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Every dropped state needs a destination' });
-    await user.click(within(dialog).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(dialog).getByRole('button', { name: /Send tickets from Review to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     await user.click(within(dialog).getByRole('button', { name: 'Publish with this mapping' }));
 
@@ -371,7 +371,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     expect(confirm).toBeDisabled();
     expect(gateway.submitted).toHaveLength(0);
 
-    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(row).getByRole('button', { name: /Send tickets from Review to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.click(confirm);
     expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
@@ -422,7 +422,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     // Only the FIRST row picked — kills a guard that reads dropped[0] alone.
     expect(confirmButton()).toBeDisabled();
     await user.click(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send tickets from Triage to/ }),
     );
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(confirmButton()).toBeDisabled();
@@ -432,7 +432,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     setup(draftDroppingTriageAndReview(workflowId), seed);
     await openDialog();
     await user.click(
-      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send tickets from Review to/ }),
     );
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirmButton()).toBeDisabled();
@@ -440,7 +440,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     // Both picked: enabled, and the payload carries BOTH entries — a mapping
     // that collapsed to one would still satisfy every assertion above.
     await user.click(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send tickets from Triage to/ }),
     );
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     expect(confirmButton()).toBeEnabled();
@@ -449,11 +449,11 @@ describe('PublishControls — the state-mapping dialog', () => {
     const gateway = setup(draftDroppingTriageAndReview(workflowId), seed);
     await openDialog();
     await user.click(
-      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send them to — Triage/ }),
+      within(screen.getByTestId('mapping-row-triage')).getByRole('button', { name: /Send tickets from Triage to/ }),
     );
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
     await user.click(
-      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send tickets from Review to/ }),
     );
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     await user.click(confirmButton());
@@ -498,7 +498,7 @@ describe('PublishControls — the state-mapping dialog', () => {
     const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
     expect(confirm).toBeDisabled();
 
-    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(row).getByRole('button', { name: /Send tickets from Review to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     expect(confirm).toBeEnabled();
     await user.click(confirm);
@@ -676,7 +676,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
 
     expect(await screen.findByText('This publish did not reach the server.')).toBeInTheDocument();
     // The fetch failure's own message, carried rather than replaced.
-    expect(screen.getByText('We could not reach the server for this publish — Failed to fetch')).toBeInTheDocument();
+    expect(screen.getByText('We could not reach the server for this publish: Failed to fetch')).toBeInTheDocument();
     // NOT the refusal's sentence, and not its tone. A dropped connection is not
     // an adjudication — the same distinction the board and the sheet draw.
     expect(screen.queryByText('The server refused this publish.')).toBeNull();
@@ -707,7 +707,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
 
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     const row = await screen.findByTestId('mapping-row-review');
-    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(row).getByRole('button', { name: /Send tickets from Review to/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
     await user.click(screen.getByRole('button', { name: 'Publish with this mapping' }));
 
@@ -719,7 +719,7 @@ describe('PublishControls — the transport arm and the mapping a refusal keeps 
     // PRE-FILLED: the row still resolves to the state that was chosen, and the
     // confirm button is therefore already enabled without touching anything.
     expect(
-      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send tickets from Review to/ }),
     ).toHaveTextContent('To do');
     const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
     expect(confirm).toBeEnabled();

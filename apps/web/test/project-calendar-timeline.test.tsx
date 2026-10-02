@@ -435,13 +435,48 @@ describe('the project page mounts four views over one list read', () => {
       </Providers>,
     );
     await openTab('Calendar');
-    // The model's own label shape: "needed by 30 Aug — Kiro's claim". The name
-    // proves `getMembers` reached `userName`; an unresolved roster would print
-    // `user_kiro`, which is narrower but visibly different.
-    expect(
-      await screen.findByRole('button', { name: "needed by 30 Aug — Kiro's claim" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /user_kiro/ })).not.toBeInTheDocument();
+    // Since 23.140 the marker is NAMED by its ticket (`<key> <title>`) and the claim — "needed by 30 Aug —
+    // Kiro's claim" — is its DESCRIPTION (and its `title`). The property this case keeps is ATTRIBUTION: the
+    // roster name reached `userName`, so an unresolved roster would print `user_kiro` in the description.
+    const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Kiro's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Kiro's claim");
+    // The negative half reads the DESCRIPTION and the `title`, never the name: the name is the ticket now, so
+    // `queryByRole('button', { name: /user_kiro/ })` could never match and would pass vacuously.
+    expect(marker.getAttribute('title')).not.toContain('user_kiro');
+    expect(marker.getAttribute('aria-describedby')).not.toBeNull();
+    expect(document.getElementById(marker.getAttribute('aria-describedby') ?? '')?.textContent).not.toContain('user_kiro');
+  });
+
+  it('23.140 the calendar chip carries the ticket KEY the page served (CCSO-4 DLT), and an unkeyed row is named by its title alone', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-23T06:00:00.000Z'));
+    const { unmount } = render(
+      <Providers
+        services={servedList([
+          row({ key: 'CCSO-4', fields: { title: claim('DLT'), dueDate: claim({ date: '2026-08-30' }) } }),
+        ])}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+    expect(await screen.findByRole('button', { name: 'CCSO-4 DLT' })).toBeInTheDocument();
+    unmount();
+
+    // CONTROL, same `it`: with no key the chip is the title alone — so `CCSO-4 DLT` above is the key's doing.
+    render(
+      <Providers
+        services={servedList([
+          row({ key: null, fields: { title: claim('DLT'), dueDate: claim({ date: '2026-08-30' }) } }),
+        ])}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+    expect(await screen.findByRole('button', { name: 'DLT' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /CCSO/ })).not.toBeInTheDocument();
   });
 
   it('11.243 a claim made by a person the roster omits (a guest, for a member) is attributed by the names-only read, not the raw id', async () => {
@@ -464,10 +499,13 @@ describe('the project page mounts four views over one list read', () => {
       </Providers>,
     );
     await openTab('Calendar');
-    expect(
-      await screen.findByRole('button', { name: "needed by 30 Aug — Gita Guest's claim" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /user_gita/ })).not.toBeInTheDocument();
+    // 23.140: the chip is named by its ticket; the attribution is read from its DESCRIPTION and `title`.
+    const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Gita Guest's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Gita Guest's claim");
+    // Negative half: the raw actor id appears in neither (the name could never match it).
+    expect(marker.getAttribute('title')).not.toContain('user_gita');
+    expect(document.getElementById(marker.getAttribute('aria-describedby') ?? '')?.textContent).not.toContain('user_gita');
   });
 
   /**
@@ -666,9 +704,10 @@ describe('the project page mounts four views over one list read', () => {
       </Providers>,
     );
     await openTab('Calendar');
-    expect(
-      await screen.findByRole('button', { name: "Filed on: 26 Aug — Kiro's claim" }),
-    ).toBeInTheDocument();
+    // 23.140: the chip names the ticket; the custom field's own name rides in the description and `title`.
+    const marker = await screen.findByRole('button', { name: 'CCSO-7 Inspected' });
+    expect(marker).toHaveAccessibleDescription("Filed on: 26 Aug, Kiro's claim");
+    expect(marker).toHaveAttribute('title', "Filed on: 26 Aug, Kiro's claim");
   });
 
   it('11.167 leaves the Board and List arms exactly as they were — refusals, not spinners', async () => {
@@ -722,9 +761,13 @@ describe('the roster is a convenience, never a gate', () => {
     // as `Unknown person` (Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.)
     // A refusal panel here would have put the calendar behind a read it does not
     // need in order to be correct.
-    expect(
-      await screen.findByRole('button', { name: "needed by 30 Aug — Unknown person's claim" }),
-    ).toBeInTheDocument();
+    // 23.140: the chip is the ticket; the attribution (the floor, `Unknown person`) is its description and `title`.
+    const marker = await screen.findByRole('button', { name: 'CCSO-7 DLT' });
+    expect(marker).toHaveAccessibleDescription("needed by 30 Aug, Unknown person's claim");
+    expect(marker).toHaveAttribute('title', "needed by 30 Aug, Unknown person's claim");
+    // The raw actor id is in neither (the old `queryByRole(name: /user_kiro/)` could not match a ticket name).
+    expect(marker.getAttribute('title')).not.toContain('user_kiro');
+    expect(document.getElementById(marker.getAttribute('aria-describedby') ?? '')?.textContent).not.toContain('user_kiro');
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 

@@ -51,7 +51,7 @@ import { useNoteAutosave } from './use-note-autosave.js';
  * or "not yours" must not guess which of the two it was.
  */
 const NOT_PLACEABLE =
-  'That ticket cannot be opened from here — the server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
+  'That ticket cannot be opened from here. The server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
 
 /**
  * What the locator said about the currently open ticket — keyed by the
@@ -242,7 +242,7 @@ function NoteDocumentBody({
         setPlacement({
           ticketId: openTicketId,
           projectId: null,
-          notice: `That ticket could not be opened — ${cause instanceof Error ? cause.message : String(cause)}`,
+          notice: `That ticket could not be opened: ${cause instanceof Error ? cause.message : String(cause)}`,
         });
       },
     );
@@ -389,9 +389,9 @@ function NoteDocumentBody({
 
   /**
    * Imperative access to the live Tiptap instance (owner, 2026-09-23: the
-   * page should "feel like its a note" — `.gn-notes__editor`'s own
-   * `min-height` pads the area below short text, and this is what a click
-   * there does). Threaded through `TicketEditorSlot`'s existing `editorRef`
+   * page should "feel like its a note" — the editor field's own
+   * `min-height` (`globals.css`, 23.162) makes the area tall, and this is what a click
+   * on the wrapper's own padding does). Threaded through `TicketEditorSlot`'s existing `editorRef`
    * prop rather than a new one, so the twin-contract tests
    * (`ticket-editor-slot.test.tsx`) see no new surface.
    */

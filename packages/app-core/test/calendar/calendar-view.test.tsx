@@ -59,6 +59,26 @@ function ticket(
   };
 }
 
+/**
+ * A marker chip is NAMED by its ticket now (23.140: `<key> <title>`, or the title alone) and its claim — "needed by
+ * 30 Aug — Kiro's claim" — is its tooltip, so the cases that look a marker up BY ITS CLAIM do it through the
+ * tooltip. Markers only: a bar's tooltip is its provenance and would otherwise match a claim phrase it contains.
+ */
+function markersBy(claim: string | RegExp): HTMLElement[] {
+  return screen
+    .getAllByRole('button')
+    .filter((chip) => chip.querySelector('.gn-calendar__glyph') !== null)
+    .filter((chip) => {
+      const tooltip = chip.getAttribute('title') ?? '';
+      return typeof claim === 'string' ? tooltip.includes(claim) : claim.test(tooltip);
+    });
+}
+function markerBy(claim: string | RegExp): HTMLElement {
+  const found = markersBy(claim);
+  if (found.length !== 1) throw new Error(`expected one marker for ${String(claim)}, found ${found.length}`);
+  return found[0] as HTMLElement;
+}
+
 /** A Sunday in the Aug-2026 grid's fourth row (2026-08-17 … 2026-08-23). */
 const TODAY = '2026-08-23';
 
@@ -95,7 +115,7 @@ describe('11.61 a marker is a claim, attributed, and it opens its ticket', () =>
       fields: { title: claimField('DLT'), dueDate: claimField({ date: '2026-08-30' }) },
     });
     const onOpenTicket = renderCalendar([input]);
-    const marker = screen.getByRole('button', { name: "needed by 30 Aug — Kiro's claim" });
+    const marker = markerBy("needed by 30 Aug, Kiro's claim");
     fireEvent.click(marker);
     expect(onOpenTicket).toHaveBeenCalledWith(input.state.id);
   });
@@ -109,9 +129,9 @@ describe('11.61 a marker is a claim, attributed, and it opens its ticket', () =>
         },
       }),
     ]);
-    expect(screen.getByRole('button', { name: /needed by 30 Aug/ })).toHaveAttribute(
+    expect(markerBy(/needed by 30 Aug/)).toHaveAttribute(
       'title',
-      'needed by 30 Aug — Anselma\'s claim · "after the bank account opens"',
+      'needed by 30 Aug, Anselma\'s claim. "after the bank account opens"',
     );
   });
 });
@@ -130,7 +150,7 @@ describe('11.62 a bar is drawn only from a claimed pair, and it spans the days i
     const bar = screen.getByRole('button', { name: 'Span' });
     expect(bar).toHaveAttribute(
       'title',
-      "starts 24 Aug — Kiro's claim · needed by 30 Aug — Kiro's claim",
+      "starts 24 Aug, Kiro's claim; needed by 30 Aug, Kiro's claim",
     );
     // The week 2026-08-24 … 2026-08-30 is exactly the fifth grid row, so the
     // bar covers all seven columns: grid lines 1 through 8.
@@ -265,11 +285,11 @@ describe('11.65 per-week overflow folds, and folding is reversible', () => {
     );
     renderCalendar(inputs);
     expect(MAX_VISIBLE_PER_WEEK).toBe(4);
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(4);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: '+1 more' }));
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(5);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'show fewer' }));
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(4);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(4);
   });
 
   /**
@@ -296,10 +316,10 @@ describe('11.65 per-week overflow folds, and folding is reversible', () => {
     ];
     renderCalendar(inputs);
     expect(screen.getAllByRole('button', { name: /^Bar \d$/ })).toHaveLength(4);
-    expect(screen.queryAllByRole('button', { name: /needed by 26 Aug/ })).toHaveLength(0);
+    expect(markersBy(/needed by 26 Aug/)).toHaveLength(0);
     // Folded, not dropped: the control is present and it reveals what it hid.
     fireEvent.click(screen.getByRole('button', { name: '+1 more' }));
-    expect(screen.getAllByRole('button', { name: /needed by 26 Aug/ })).toHaveLength(1);
+    expect(markersBy(/needed by 26 Aug/)).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: /^Bar \d$/ })).toHaveLength(4);
   });
 
@@ -318,8 +338,8 @@ describe('11.66 a claim still in transit says so', () => {
       ticket({ fields: { title: claimField('Pending'), dueDate: claimField({ date: '2026-08-28' }) } }, ['dueDate']),
       ticket({ fields: { title: claimField('Settled'), dueDate: claimField({ date: '2026-08-27' }) } }),
     ]);
-    expect(screen.getByRole('button', { name: /needed by 28 Aug/ })).toHaveAttribute('data-pending', 'true');
-    expect(screen.getByRole('button', { name: /needed by 27 Aug/ })).not.toHaveAttribute('data-pending');
+    expect(markerBy(/needed by 28 Aug/)).toHaveAttribute('data-pending', 'true');
+    expect(markerBy(/needed by 27 Aug/)).not.toHaveAttribute('data-pending');
   });
 
   it('a bar whose either claim is in transit is marked in transit', () => {
@@ -366,10 +386,10 @@ describe('11.67 month navigation moves, and Today returns to the day that was ha
     );
     renderCalendar(inputs);
     fireEvent.click(screen.getByRole('button', { name: '+1 more' }));
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(5);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
     fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(4);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(4);
   });
 });
 
@@ -381,7 +401,7 @@ describe('11.68 a custom date claim renders under its own field name', () => {
       [{ id: 'filed-on', name: 'Filed on' }],
     );
     const onOpenTicket = renderCalendar([input]);
-    const marker = screen.getByRole('button', { name: "Filed on: 30 Aug — Kiro's claim" });
+    const marker = markerBy("Filed on: 30 Aug, Kiro's claim");
     expect(marker).toHaveAttribute('data-field-id', 'filed-on');
     fireEvent.click(marker);
     expect(onOpenTicket).toHaveBeenCalledWith(input.state.id);
@@ -391,7 +411,7 @@ describe('11.68 a custom date claim renders under its own field name', () => {
     renderCalendar([
       ticket({ fields: { title: claimField('Plain'), dueDate: claimField({ date: '2026-08-28' }) } }),
     ]);
-    expect(screen.getByRole('button', { name: /needed by 28 Aug/ })).not.toHaveAttribute('data-field-id');
+    expect(markerBy(/needed by 28 Aug/)).not.toHaveAttribute('data-field-id');
   });
 });
 
@@ -405,15 +425,15 @@ describe('11.69 the legend is the readability affordance, and hiding is visibly 
     const legend = screen.getByRole('group', { name: 'Claimed date fields' });
     const toggle = within(legend).getByRole('checkbox', { name: 'Filed on (2)' });
     expect(toggle).toBeChecked();
-    expect(screen.getAllByRole('button', { name: /Filed on:/ })).toHaveLength(2);
+    expect(markersBy(/Filed on:/)).toHaveLength(2);
 
     fireEvent.click(toggle);
-    expect(screen.queryAllByRole('button', { name: /Filed on:/ })).toHaveLength(0);
+    expect(markersBy(/Filed on:/)).toHaveLength(0);
     // The switch survives its own use, and it still says how much it hides.
     expect(within(legend).getByRole('checkbox', { name: 'Filed on (2)' })).not.toBeChecked();
 
     fireEvent.click(toggle);
-    expect(screen.getAllByRole('button', { name: /Filed on:/ })).toHaveLength(2);
+    expect(markersBy(/Filed on:/)).toHaveLength(2);
   });
 
   it('hiding one field leaves the others on screen', () => {
@@ -435,8 +455,8 @@ describe('11.69 the legend is the readability affordance, and hiding is visibly 
       ),
     ]);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Filed on (1)' }));
-    expect(screen.queryAllByRole('button', { name: /Filed on:/ })).toHaveLength(0);
-    expect(screen.getAllByRole('button', { name: /Inspected on:/ })).toHaveLength(1);
+    expect(markersBy(/Filed on:/)).toHaveLength(0);
+    expect(markersBy(/Inspected on:/)).toHaveLength(1);
   });
 
   it('a month with no custom date claims renders no legend — empty chrome is noise', () => {
@@ -522,7 +542,7 @@ describe('11.70 a day that is not a day is never placed on a day that is', () =>
       [ticket({ fields: { title: claimField('Impossible'), dueDate: claimField({ date: '2026-02-30' }) } })],
       { today: '2026-02-15' },
     );
-    const marker = screen.getByRole('button', { name: /2026-02-30/ });
+    const marker = markerBy(/2026-02-30/);
     expect(marker).toHaveAttribute('data-unplaceable', 'true');
     expect(marker.closest('li')).toHaveStyle({ gridColumn: '1 / 8' });
     // Exactly one, because the mark means THIS claim's day and not "an item".
@@ -543,7 +563,7 @@ describe('11.70 a day that is not a day is never placed on a day that is', () =>
     renderCalendar([
       ticket({ fields: { title: claimField('Placeable'), dueDate: claimField({ date: '2026-08-28' }) } }),
     ]);
-    const marker = screen.getByRole('button', { name: /needed by 28 Aug/ });
+    const marker = markerBy(/needed by 28 Aug/);
     expect(marker.closest('li')).toHaveStyle({ gridColumn: '5 / 6' });
     expect(document.querySelectorAll('[data-unplaceable]')).toHaveLength(0);
   });
@@ -599,11 +619,11 @@ describe('11.71 the grid says which days belong to the month it is headed by', (
       ticket({ fields: { title: claimField('September'), dueDate: claimField({ date: '2026-09-01' }) } }),
     ]);
     // 2026-07-31 is the Friday of the leading row (27 Jul – 2 Aug).
-    const july = screen.getByRole('button', { name: "needed by 31 Jul — Kiro's claim" });
+    const july = markerBy("needed by 31 Jul, Kiro's claim");
     expect(july.closest('li')).toHaveStyle({ gridColumn: '5 / 6' });
     expect(july.closest('[data-week]')).toHaveAttribute('data-week', '2026-07-27');
     // 2026-09-01 is the Tuesday of the trailing row (31 Aug – 6 Sep).
-    const september = screen.getByRole('button', { name: "needed by 1 Sep — Kiro's claim" });
+    const september = markerBy("needed by 1 Sep, Kiro's claim");
     expect(september.closest('li')).toHaveStyle({ gridColumn: '2 / 3' });
     expect(september.closest('[data-week]')).toHaveAttribute('data-week', '2026-08-31');
     // Neither is the honesty note's business: the month is not empty.
@@ -644,8 +664,8 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
       fields: { title: claimField('Out of lane'), dueDate: claimField({ date: '2026-08-27' }) },
     });
     renderCalendar([epic, inLane, outOfLane], { laneEpicId: 'epic1' });
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(1);
-    expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(1);
+    expect(markersBy(/needed by 27 Aug/)).toHaveLength(0);
   });
 
   /**
@@ -688,8 +708,8 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
     });
     // Present AND absent, as the lane case above: the first half proves the grid
     // drew the lane, and only the second proves it was narrowed to it.
-    expect(screen.getAllByRole('button', { name: /needed by 28 Aug/ })).toHaveLength(1);
-    expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
+    expect(markersBy(/needed by 28 Aug/)).toHaveLength(1);
+    expect(markersBy(/needed by 27 Aug/)).toHaveLength(0);
   });
 });
 
@@ -701,7 +721,7 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
  * title alone — the date span lives only in the `title` attribute, which is
  * not reliably read by assistive tech (it requires hover, which touch/mobile
  * AT has no equivalent for). A marker's own accessible name already carries
- * its date (`item.label`, e.g. "needed by 30 Aug — Kiro's claim" —
+ * its date (`item.label`, e.g. "needed by 30 Aug, Kiro's claim" —
  * `itemClassName`'s sibling docblock: "the accessible name is the claim and
  * nothing else"), so this fix does not touch markers.
  */
@@ -745,21 +765,24 @@ describe("11.222 a bar's date span is a linked DESCRIPTION, not folded into its 
     expect(describedById).not.toBeNull();
     const description = document.getElementById(describedById!);
     expect(description).not.toBeNull();
-    expect(description).toHaveTextContent("starts 24 Aug — Kiro's claim · needed by 30 Aug — Kiro's claim");
+    expect(description).toHaveTextContent("starts 24 Aug, Kiro's claim; needed by 30 Aug, Kiro's claim");
     // Not a second, competing statement of the same text: the attribute the
     // hover-only title carried is unchanged, and the description is the SAME
     // string linked a second, AT-reachable way — not a duplicate invention.
     expect(bar).toHaveAttribute('title', description!.textContent);
   });
 
-  it('links no description onto a marker, whose own label already names the date', () => {
+  it("links a marker's claim as its description too (23.140: the name is the ticket, so the date moves out of it)", () => {
     renderCalendar([
       ticket({
         fields: { title: claimField('DLT'), dueDate: claimField({ date: '2026-08-30' }) },
       }),
     ]);
-    const marker = screen.getByRole('button', { name: "needed by 30 Aug — Kiro's claim" });
-    expect(marker).not.toHaveAttribute('aria-describedby');
+    const marker = markerBy("needed by 30 Aug, Kiro's claim");
+    expect(marker).toHaveAccessibleName('DLT');
+    const describedById = marker.getAttribute('aria-describedby');
+    expect(describedById).not.toBeNull();
+    expect(document.getElementById(describedById!)).toHaveTextContent("needed by 30 Aug, Kiro's claim");
   });
 });
 
@@ -802,5 +825,45 @@ describe('11.224 the month grid carries the APG calendar-grid roles, not positio
     // sits inside the same `[role="row"]` section) — scoped to `.gn-calendar__days`.
     const days = document.querySelector('[data-week="2026-08-17"] .gn-calendar__days');
     expect(within(days as HTMLElement).getAllByRole('gridcell')).toHaveLength(7);
+  });
+});
+
+describe('23.140 a calendar marker names its ticket (audit PV-05)', () => {
+  const DUE = { date: '2026-08-28' };
+  const keyed = (): TicketDatesInput => ({
+    ...ticket({ fields: { title: claimField('Which GST scheme is the firm on'), dueDate: claimField(DUE) } }),
+    key: 'CCSO-4',
+  });
+
+  it('23.140 the chip reads "<key> <title>"; the claim ("needed by …, Kiro\'s claim") moves to the tooltip and the description', () => {
+    renderCalendar([keyed()]);
+    // Named by the ticket, not by the claim — the audit's "something is due" answered "which ticket".
+    const chip = screen.getByRole('button', { name: 'CCSO-4 Which GST scheme is the firm on' });
+    expect(chip).toHaveTextContent('CCSO-4 Which GST scheme is the firm on');
+    expect(chip.textContent).not.toContain('needed by');
+    // The claim is still said — as the hover tooltip AND as a description a touch reader hears.
+    expect(chip.getAttribute('title')).toContain("needed by 28 Aug, Kiro's claim");
+    const describedBy = chip.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy ?? '')?.textContent).toContain("needed by 28 Aug, Kiro's claim");
+
+    // CONTROL — an unkeyed (offline) ticket shows the title only: no "null", no leading space, no invented key.
+    document.body.innerHTML = '';
+    renderCalendar([
+      { ...ticket({ fields: { title: claimField('Unkeyed ticket'), dueDate: claimField(DUE) } }), key: null },
+    ]);
+    const bare = screen.getByRole('button', { name: 'Unkeyed ticket' });
+    expect(bare.textContent).toBe('◆Unkeyed ticket');
+    // …and a bar (start AND due) is still named by its title alone, so only the marker changed.
+    document.body.innerHTML = '';
+    renderCalendar([
+      {
+        ...ticket({
+          fields: { title: claimField('A bar'), startDate: claimField({ date: '2026-08-24' }), dueDate: claimField(DUE) },
+        }),
+        key: 'CCSO-9',
+      },
+    ]);
+    expect(screen.getByRole('button', { name: 'A bar' })).toBeInTheDocument();
   });
 });

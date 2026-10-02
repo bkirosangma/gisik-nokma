@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Sheet } from '@gisik-nokma/ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { isWithin } from './path-within.js';
 import {
   BAR_DESTINATIONS,
   DEFAULT_BAR,
@@ -131,11 +132,11 @@ export function BottomBar({
     const d = DESTINATIONS[id];
     if (d.scope === 'global') {
       const path = id === 'notes' ? '/notes' : '/inbox';
-      return { href: path, current: id === 'notes' ? pathname === path || pathname.startsWith(`${path}/`) : pathname === path };
+      return { href: path, current: id === 'notes' ? isWithin(pathname, path) : pathname === path };
     }
     if (d.scope === 'workspace') {
       const href = `/w/${workspaceId}/${id}`;
-      return { href, current: pathname === href };
+      return { href, current: isWithin(pathname, href) };
     }
     const tab = d.tab as ProjectTab;
     if (targetProject === undefined) return { href: `/w/${workspaceId}`, current: false };
@@ -236,7 +237,7 @@ function MoreBody({
   // Exactly what the bar does not carry — and, like the bar, nothing that cannot resolve.
   const rest = BAR_DESTINATIONS.filter((id) => !slots.includes(id) && resolvable(id));
   return (
-    <nav className="gn-bar-sheet" aria-label="More destinations">
+    <nav className="gn-bar-sheet gn-bar-sheet--more" aria-label="More destinations">
       <ul className="gn-bar-sheet__list">
         {rest.map((id) => {
           const { href, current, onClick } = resolve(id);
@@ -295,7 +296,7 @@ function EditBody({
     <div className="gn-bar-sheet">
       <section>
         <h3 className="gn-bar-sheet__heading">In the bar</h3>
-        {slots.length === 0 ? <p className="gn-bar-sheet__note">Nothing here — the bar shows only More.</p> : null}
+        {slots.length === 0 ? <p className="gn-bar-sheet__note">Nothing here. The bar shows only More.</p> : null}
         <ul className="gn-bar-sheet__list">
           {slots.map((id, index) => {
             const label = DESTINATIONS[id].label;
@@ -311,7 +312,7 @@ function EditBody({
         </ul>
       </section>
       <section>
-        <h3 className="gn-bar-sheet__heading">Available{full ? ' — the bar is full' : ''}</h3>
+        <h3 className="gn-bar-sheet__heading">Available{full ? ' (the bar is full)' : ''}</h3>
         <ul className="gn-bar-sheet__list">
           {available.map((id) => (
             <li key={id} className="gn-bar-sheet__edit-row">

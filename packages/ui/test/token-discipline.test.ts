@@ -201,12 +201,26 @@ describe('the gate can see every tree the scanner polices', () => {
     // also declares `turbo.json`, which the very next assertion is about) is a
     // different kind of dependency and comparing the two together would force this
     // list to enumerate files it has no opinion on.
+    // LITERAL trees only: the wildcard entries (`apps/*/test/**`, the package.json
+    // globs — the other readers of the `apps/` and `packages/` listing) are a
+    // different list, asserted by the next case, and are not client source roots.
     const declaredTrees = inputs
-      .filter((input) => input.startsWith('$TURBO_ROOT$/') && input.endsWith('/**'))
+      .filter((input) => input.startsWith('$TURBO_ROOT$/') && input.endsWith('/**') && !/[*?]/.test(input.slice(0, -'/**'.length)))
       .map((input) => input.slice('$TURBO_ROOT$/'.length, -'/**'.length));
     // Compared as sorted lists rather than sets, so a failure PRINTS both sides and
     // names the tree that is missing instead of only that the counts differ.
     expect(declaredTrees.slice().sort()).toEqual(CLIENT_SOURCE_ROOTS.slice().sort());
+  });
+
+  it('13.1711 and the wildcard readers of the apps/ and packages/ listing are inputs too (cache audit, 2026-10-02)', () => {
+    const config = parseJsonc(readFileSync(join(REPO_ROOT, 'turbo.json'), 'utf8')) as {
+      tasks: Record<string, { inputs?: string[] } | undefined>;
+    };
+    // The suite lists every workspace's test/ directory and package.json; a cached gate
+    // must miss when one of those changes in a package this task does not depend on.
+    for (const wanted of ['apps/*/test/**', 'packages/*/test/**', 'apps/*/package.json', 'packages/*/package.json']) {
+      expect(config.tasks['@gisik-nokma/ui#test']?.inputs, wanted).toContain(`$TURBO_ROOT$/${wanted}`);
+    }
   });
 
   it('and turbo.json is itself an input, because these very cases read it', () => {

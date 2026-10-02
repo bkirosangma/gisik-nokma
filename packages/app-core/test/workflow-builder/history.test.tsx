@@ -84,6 +84,25 @@ describe('WorkflowHistoryScreen', () => {
    * screen that rendered only version numbers, or the latest definition twice,
    * satisfies every count in the case above and fails here.
    */
+  /**
+   * 23.071 — the screen's heading is the page's ONE level-1 heading (UX fixes Task 5, audit WF-07):
+   * the history route renders no other, so an `h2` left the page with none.
+   */
+  it('23.071 "Version history" is a level-1 heading and the only one; no level-2 heading carries that name', async () => {
+    render(
+      <WorkflowHistoryScreen
+        workspaceId={newUlid()}
+        workflowId={WORKFLOW_ID}
+        gateway={createFakeGateway({ workflows: [v1, v2] })}
+      />,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Version history' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    // CONTROL: the screen did render its versions (the heading is not the only thing there).
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Version history' })).toBeNull();
+  });
+
   it('13.940 renders a superseded version with its own content, not a version number', async () => {
     render(
       <WorkflowHistoryScreen
@@ -106,7 +125,8 @@ describe('WorkflowHistoryScreen', () => {
     // own content is present, so "v2 has no Review" is a fact about v2 rather
     // than about an empty card.
     expect(within(versionCard(2)).getByText('To do')).toBeInTheDocument();
-    expect(within(versionCard(2)).getByText('Done')).toBeInTheDocument();
+    // Two nodes now: the state's name and its category word (23.093 — a category is never colour alone).
+    expect(within(versionCard(2)).getAllByText('Done')).toHaveLength(2);
 
     // And the CONTENT is not only the state names: v1 ran two transitions
     // through Review, v2 runs one, and v1's mapping column is absent because a
@@ -140,7 +160,7 @@ describe('WorkflowHistoryScreen', () => {
         gateway={createFakeGateway({ workflows: [v2] })}
       />,
     );
-    expect(await screen.findByText('No published versions to show.')).toBeInTheDocument();
+    expect(await screen.findByText('No published versions yet.')).toBeInTheDocument();
     // The control: the loading line is GONE, so this is the answered state
     // rather than the sentence rendering beside a spinner that never stops.
     expect(screen.queryByText('Loading history…')).toBeNull();
@@ -173,5 +193,46 @@ describe('WorkflowListScreen — the second action', () => {
     // Both candidates with no door stay absent, asserted rather than assumed.
     expect(screen.queryByRole('button', { name: /Duplicate/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Discard draft/ })).toBeNull();
+  });
+});
+
+/**
+ * 23.093 (UX fixes Task 6, audit WF-12): a workflow state chip drew its category as a 4px coloured bar and nothing
+ * else, so the category lived in colour alone. Each chip now carries the category word (Open / Active / Done).
+ */
+describe('23.093 every workflow chip carries its category in text', () => {
+  const WORDS: Record<string, string> = { open: 'Open', active: 'Active', terminal: 'Done' };
+
+  it('23.093 the list screen and the history screen both write the category beside the state name', async () => {
+    const { unmount } = render(
+      <WorkflowListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={createFakeGateway({ workflows: [v1] })}
+        onOpen={() => {}}
+        onHistory={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    await screen.findByText('Field ops');
+    const listChips = [...document.querySelectorAll<HTMLElement>('.workflow-list__state')];
+    expect(listChips).toHaveLength(v1.states.length);
+    listChips.forEach((chip, index) => {
+      const state = v1.states[index]!;
+      expect(chip.querySelector('.workflow-list__state-category')!.textContent).toBe(WORDS[state.category]);
+      expect(chip.textContent).toContain(state.name);
+    });
+    unmount();
+
+    render(
+      <WorkflowHistoryScreen workspaceId={newUlid()} workflowId={WORKFLOW_ID} gateway={createFakeGateway({ workflows: [v1, v2] })} />,
+    );
+    await screen.findByText('Version history');
+    const historyChips = [...versionCard(1).querySelectorAll<HTMLElement>('.workflow-list__state')];
+    expect(historyChips.map((chip) => chip.querySelector('.workflow-list__state-category')?.textContent)).toEqual(
+      v1.states.map((state) => WORDS[state.category]),
+    );
+    // CONTROL — the bar is still there and still decorative; the word is the addition, not a replacement.
+    for (const bar of versionCard(1).querySelectorAll('.workflow-list__state-bar')) expect(bar).toHaveAttribute('aria-hidden', 'true');
   });
 });

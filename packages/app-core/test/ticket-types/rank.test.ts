@@ -46,22 +46,22 @@ describe('rankImplications', () => {
 describe('rankImplicationsCopy', () => {
   it('names the possible parents and the root option', () => {
     expect(rankImplicationsCopy(rankImplications('invoice', 3, BUILTINS))).toBe(
-      'Can sit under: Epic, Story · or at the project root.',
+      'Can sit under: Epic, Story, or at the project root.',
     );
   });
 
   it('a rank with no possible parents is the top of the hierarchy', () => {
     expect(rankImplicationsCopy(rankImplications('epic', 1, BUILTINS))).toBe(
-      'Top of the hierarchy — sits at the project root.',
+      'Top of the hierarchy. It sits at the project root.',
     );
   });
 
   it('the deepest rank names its parent requirement, and says the same thing to a custom type there', () => {
     expect(rankImplicationsCopy(rankImplications('sub-task', 4, BUILTINS))).toBe(
-      'Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
+      'Must sit under a parent. This is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
     );
     expect(rankImplicationsCopy(rankImplications('invoice', 4, BUILTINS))).toBe(
-      'Must sit under a parent — this is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
+      'Must sit under a parent. This is the smallest kind of work, so tickets of this type always belong to something bigger. Can sit under: Epic, Story, Task.',
     );
   });
 });

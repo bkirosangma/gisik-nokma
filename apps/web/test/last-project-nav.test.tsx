@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -433,5 +433,28 @@ describe('E5-34 the item names the project you are actually on', () => {
     expect(trigger).toHaveAttribute('href', '/w/ws_1/p/p_gamma');
     // No chip and no ", archived" — the badge is the state, not decoration.
     expect(trigger).not.toHaveTextContent('Archived');
+  });
+});
+
+describe('23.044 the project item says what it is (audit SYS-20, NP-26, WS-08)', () => {
+  it('23.044 the item reads "Last project: <name>" visibly, outside the link, and the link keeps its accessible name', async () => {
+    rememberProject('p_gamma');
+    const { container } = renderNav(servicesFor([WS_1]));
+
+    const link = await screen.findByRole('link', { name: itemName('Gamma') });
+    const wrapper = container.querySelector('.gn-nav__project');
+    expect(wrapper?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Last project: Gamma');
+    const label = wrapper?.querySelector('.gn-nav__project-label');
+    expect(label?.textContent).toBe('Last project: ');
+    // The label is a sibling BEFORE the link, so the link's own name (and the 13.865 selectors) are unchanged.
+    expect(link.contains(label ?? null)).toBe(false);
+    expect(label?.nextElementSibling).toBe(link);
+
+    // CONTROL (same `it`): with no reachable project nothing renders, label included.
+    cleanup();
+    window.localStorage.clear();
+    const empty = renderNav(servicesFor([workspace({ id: 'ws_1', projects: [] })]));
+    await new Promise((settle) => setTimeout(settle, 50));
+    expect(empty.container.querySelector('.gn-nav__project-label')).toBeNull();
   });
 });

@@ -348,8 +348,9 @@ test('the workspace list RENDERS what it is served, and the founding door is sti
   await expect(page.getByTestId(`workspace-card-${WS}`)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible();
   await expect(page.getByText('No workspaces yet.')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'New workspace' })).toBeVisible();
+  // The founding door is the header's Create workspace button; the form is behind it (22.151).
   await expect(page.getByRole('button', { name: 'Create workspace' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('the board renders a card, its restricted-count line, and its attributed provenance', async ({
@@ -360,9 +361,9 @@ test('the board renders a card, its restricted-count line, and its attributed pr
   // states. The route segments are this app's own (`app/w/[workspaceId]/p/[projectId]`).
   await page.goto(`/w/${WS}/p/${PRJ}`);
   await expect(page.getByRole('region', { name: 'Doing' })).toBeVisible();
-  await expect(page.getByText('5 of 8 done · 2 restricted')).toBeVisible();
-  await page.getByRole('button', { name: 'who · when' }).click();
-  await expect(page.getByText('marked Doing by Anselma Marak on 19 Aug 2026')).toBeVisible();
+  await expect(page.getByText('5 of 8 done, 2 restricted')).toBeVisible();
+  await page.getByRole('button', { name: /^Moved to Doing by/ }).click();
+  await expect(page.getByText('Moved to Doing by Anselma Marak on 19 Aug 2026')).toBeVisible();
 });
 
 test('an invite link names the workspace and offers the join', async ({ page }) => {

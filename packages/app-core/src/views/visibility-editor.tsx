@@ -30,10 +30,10 @@ import type { ClaimProvenance, ResolvedVisibilityMode, RosterMember, TicketVisib
  * inventing). Silently adding the author would file a claim they did not make,
  * against the one invariant this product is built on.
  */
-export const OWNER_ALWAYS_SEES_COPY = 'Visible to: these people — and the workspace owner, always.';
+export const OWNER_ALWAYS_SEES_COPY = 'Visible to: these people, and the workspace owner, always.';
 
 export const LOCKOUT_WARNING_COPY =
-  'You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.';
+  'You are about to lose access to this ticket. A project admin, or the workspace owner, who always sees it, can restore it.';
 
 /**
  * What the read-only arm says when this viewer may not edit — i.e. the answer to
@@ -76,7 +76,7 @@ export const READ_ONLY_COPY =
  */
 export function writeUnreachedCopy(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
-  return `We could not reach the server for this change — ${message}. Who can see this ticket is unchanged.`;
+  return `We could not reach the server for this change: ${message}. Who can see this ticket is unchanged.`;
 }
 
 /**
@@ -530,7 +530,7 @@ export function VisibilityEditor({
             // the reader cannot tell a name withheld by policy from a list that
             // was simply never drawn.
             <span className="gn-visibility__roster-unserved">
-              The list itself is not being served — this read carries the ticket’s audience mode
+              The list itself is not being served. This read carries the ticket’s audience mode
               and not the names it holds.
             </span>
           ) : null}
@@ -562,7 +562,7 @@ export function VisibilityEditor({
 
       {current === null ? (
         <p className="gn-visibility__unserved" role="status">
-          The audience this ticket has now is not being served yet — no read on this branch carries
+          The audience this ticket has now is not being served yet. No read on this branch carries
           it. Anything shown here would be a guess.
         </p>
       ) : null}

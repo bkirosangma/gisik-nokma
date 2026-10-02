@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   InboxView,
@@ -13,7 +14,8 @@ import { HttpError } from '@gisik-nokma/app-core/online';
 import type { Notification } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
-import { useAppServices } from '../../src/providers.js';
+import { useAppServices, useSessionStatus } from '../../src/providers.js';
+import { useLastWorkspace } from '../../src/use-last-workspace.js';
 import { useActorLabels } from '../../src/use-actor-labels.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { ticketSheetPath } from '../../src/ticket-location.js';
@@ -71,9 +73,9 @@ const FILTER_OF: Record<InboxTab, InboxFilter> = {
 const EMPTY_COPY: Record<InboxTab, string> = {
   all: EMPTY_INBOX_COPY,
   unread:
-    'Nothing unread. You have read everything sent to you — nothing was deleted, this filter just has no matches.',
+    'Nothing unread. You have read everything sent to you. Nothing was deleted, this filter just has no matches.',
   mentions:
-    'No mentions. Nobody has named you in a comment — nothing was deleted, this filter just has no matches.',
+    'No mentions. Nobody has named you in a comment. Nothing was deleted, this filter just has no matches.',
 };
 
 /**
@@ -98,10 +100,10 @@ const EMPTY_COPY: Record<InboxTab, string> = {
  * by independent review.
  */
 export const BULK_REFUSED_COPY =
-  'Those notifications were not marked read — one go can carry at most a page of your inbox, and this list is longer. Mark a page at a time, or narrow the tab first.';
+  'Those notifications were not marked read. One go can carry at most a page of your inbox, and this list is longer. Mark a page at a time, or narrow the tab first.';
 /** The other arm: nobody adjudicated, so it must not read as a refusal. */
 export const BULK_UNREACHED_COPY =
-  'Those notifications were not marked read — the server could not be reached. What is on screen has been reloaded.';
+  'Those notifications were not marked read. The server could not be reached. What is on screen has been reloaded.';
 
 /**
  * THE SINGLE ROW'S OWN PAIR, and the same split the bulk pair keeps (E5-10,
@@ -114,10 +116,10 @@ export const BULK_UNREACHED_COPY =
  * the state this pair exists to end.
  */
 export const ROW_REFUSED_COPY =
-  'That notification was not marked read — the server refused it. What is on screen has been reloaded.';
+  'That notification was not marked read. The server refused it. What is on screen has been reloaded.';
 /** The row's transport arm: nobody adjudicated, so it must not read as a refusal. */
 export const ROW_UNREACHED_COPY =
-  'That notification was not marked read — the server could not be reached. What is on screen has been reloaded.';
+  'That notification was not marked read. The server could not be reached. What is on screen has been reloaded.';
 
 /**
  * The UNDO's own sentence (E5-10, 2026-09-21).
@@ -128,10 +130,10 @@ export const ROW_UNREACHED_COPY =
  * sentence the page has already withdrawn. It says which way the truth now lies.
  */
 export const UNDO_FAILED_COPY =
-  'That could not be undone — the notifications are still marked read. What is on screen has been reloaded.';
+  'That could not be undone. The notifications are still marked read. What is on screen has been reloaded.';
 
 export const CANNOT_OPEN_COPY =
-  'That ticket cannot be opened from here — it may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
+  'That ticket cannot be opened from here. It may have been removed, or it is no longer visible to you. The message itself is yours and stays.';
 
 /**
  * What the page says when the NEXT page fails — beside the control, not instead
@@ -191,6 +193,26 @@ export const PAGING_FAILURE_PREFIX = 'More of your inbox could not be loaded, so
  * sheet use, ordered by `actorLabelFrom`, so this is not a third authority. A
  * person no read names still renders as their id: attributed, never anonymous.
  */
+/**
+ * The next step out of an empty inbox (23.195, SYS-18): a real link, not a sentence about one. This page has no
+ * `[workspaceId]` segment, so My work is reached through the workspace the shell remembers; a person with none yet
+ * is sent to the workspace list, which is where one is chosen or created.
+ */
+function EmptyInboxNext(): React.JSX.Element {
+  const session = useSessionStatus();
+  const userId = session.kind === 'signed-in' ? session.user.id : null;
+  const remembered = useLastWorkspace(undefined, userId);
+  return remembered.status === 'remembered' ? (
+    <p className="gn-inbox__next">
+      <Link href={`/w/${remembered.workspaceId}/my-work`}>Open My work</Link>
+    </p>
+  ) : (
+    <p className="gn-inbox__next">
+      <Link href="/workspaces">Choose a workspace</Link>
+    </p>
+  );
+}
+
 export default function InboxPage() {
   const router = useRouter();
   const { notifications: gateway, ticketLocation } = useAppServices();
@@ -519,11 +541,14 @@ export default function InboxPage() {
             ) : page === null ? (
               <p role="status">Loading…</p>
             ) : page.notifications.length === 0 ? (
-              <p role="status" className="gn-inbox__empty">
-                {/* Filter-SPECIFIC, because the unfiltered sentence is a claim
-                    about the whole inbox and is false under a filter. */}
-                {EMPTY_COPY[tab]}
-              </p>
+              <>
+                <p role="status" className="gn-inbox__empty">
+                  {/* Filter-SPECIFIC, because the unfiltered sentence is a claim
+                      about the whole inbox and is false under a filter. */}
+                  {EMPTY_COPY[tab]}
+                </p>
+                <EmptyInboxNext />
+              </>
             ) : (
               <>
                 <InboxView

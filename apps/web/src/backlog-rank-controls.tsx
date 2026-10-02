@@ -166,7 +166,7 @@ export async function submitRank(
         status: 'partial',
         applied: failedAt,
         total: events.length,
-        message: `Only ${failedAt} of the ${events.length} parts of this move reached the server — the list has been reloaded to match what the server holds.`,
+        message: `Only ${failedAt} of the ${events.length} parts of this move reached the server. The list has been reloaded to match what the server holds.`,
       };
     }
     const failure = results[0];
@@ -195,7 +195,7 @@ export async function submitRank(
       status: 'unreachable',
       message: writeFailureCopy(
         cause,
-        (message) => `We could not reach the server for this move — ${message}`,
+        (message) => `We could not reach the server for this move: ${message}`,
       ),
     };
   } finally {
@@ -218,6 +218,15 @@ export type BacklogRankControlsProps = {
   onRanked: () => void;
   onOptimistic: (ticketId: string, rank: string | null) => void;
 };
+
+/**
+ * What the buttons change, said where a sighted pointer and a description-reading screen reader both find it (UX
+ * fixes T8, 23.144, audit PV-14). The rank is ONE project-wide order, but a grouped Backlog draws it in sections,
+ * so a move that crosses a group edge looks like it did nothing — the tooltip says whose order it is. The
+ * accessible NAME is unchanged (`Move <title> up`): a long name read a second time per row helps nobody.
+ */
+const RANK_UP_TITLE = 'Move up in backlog order: the order of the whole backlog, not only this group';
+const RANK_DOWN_TITLE = 'Move down in backlog order: the order of the whole backlog, not only this group';
 
 /**
  * A Backlog row's Move up / Move down pair, and that row's own notice.
@@ -302,6 +311,7 @@ export function BacklogRankControls({
         type="button"
         className="gn-row-action"
         aria-label={`Move ${row.title} up`}
+        title={RANK_UP_TITLE}
         disabled={up === undefined || submitting}
         onClick={() => void rank(up)}
       >
@@ -311,6 +321,7 @@ export function BacklogRankControls({
         type="button"
         className="gn-row-action"
         aria-label={`Move ${row.title} down`}
+        title={RANK_DOWN_TITLE}
         disabled={down === undefined || submitting}
         onClick={() => void rank(down)}
       >
@@ -318,7 +329,7 @@ export function BacklogRankControls({
       </button>
       {serverRefusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
-          {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+          {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
         </p>
       ) : null}
       {transportError !== null ? (

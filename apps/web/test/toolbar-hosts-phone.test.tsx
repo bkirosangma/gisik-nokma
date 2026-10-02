@@ -97,6 +97,9 @@ async function mountSheet(phone: boolean): Promise<Mounted & { unmount: () => vo
     <TicketSheet dataSource={services.dataSource} workspaceId={WS} ticketId={TICKET} currentUserId={USER} onClose={() => undefined} editorSlot={TicketEditorSlot} />,
   );
   const host = await screen.findByTestId('field-description');
+  // AMENDED 2026-10-02 (23.125): a phone sheet opens on its fields and keeps the description behind a disclosure, so
+  // the editor mounts only once it is pressed. The assertions below are unchanged; only the way in is.
+  if (phone) fireEvent.click(await within(host).findByRole('button', { name: /^(Add a|Edit) description$/ }));
   await waitFor(() => expect(host.querySelector('.ticket-editor .ProseMirror')).not.toBeNull());
   return { host, toolbar: host.querySelector('.ticket-editor__toolbar') as HTMLElement, unmount: view.unmount };
 }
@@ -165,16 +168,18 @@ async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
   desktop.unmount();
 }
 
+// 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.233 the ticket sheet gets the phone bar, and every tool stays reachable', () => {
   it('21.233 at ≤40rem the sheet description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountSheet);
-  });
+  }, 20_000);
 });
 
+// 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.234 the new-ticket dialog gets the phone bar, and every tool stays reachable', () => {
   it('21.234 at ≤40rem the dialog description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountDialog);
-  });
+  }, 20_000);
 });
 
 // ── 21.235: the editor's OWN phone arm ────────────────────────────────────────────────────────────────────────────
@@ -236,7 +241,7 @@ const ui = readUiCss();
  * Each host's editor CONTENT width at a phone viewport, read from the rules that make it. Sheet and dialog both
  * fill the viewport at ≤40rem and carry the same 1.5rem side padding on their body, so the slot is the viewport
  * less 2 × 1.5rem; the toolbar fills the slot (`.editor-slot` has no border or side padding).
- *   - sheet:  `.gn-sheet { width: 100%; max-width: none }` in the phone arm (`ui.css:962`) and
+ *   - sheet:  `.gn-sheet { width: 100%; max-width: none }` in the ≤64rem arm (`ui.css`, 23.053) and
  *             `.gn-sheet__body { padding: 0 1.5rem 1.5rem }` (`ui.css:949`) — the description is a `section` in the body.
  *   - dialog: `.gn-dialog { width: 100% }` in the phone arm (`ui.css:979`) and `.gn-dialog__body` (`ui.css:948`, the same rule).
  */
@@ -261,7 +266,8 @@ function sideSpace(body: string): number {
 }
 function hostWidths(): { sheetSide: number; dialogSide: number } {
   const side = (selector: string): number => px((valueOf(bodyRule(selector), 'padding') ?? '').split(/\s+/)[1] ?? null, 0);
-  expect(valueOf(ruleExactly(ui, '.gn-sheet', PHONE), 'width')).toBe('100%');
+  // The sheet's full-width rule is the 64rem tablet arm's since UX fixes Task 4 (case 23.053), which covers every phone width too.
+  expect(valueOf(ruleExactly(ui, '.gn-sheet', '@media (max-width: 64rem)'), 'width')).toBe('100%');
   expect(valueOf(ruleExactly(ui, '.gn-dialog', PHONE), 'width')).toBe('100%');
   // The model's 24px is only true while NOTHING between the viewport and the toolbar adds side space: no phone arm
   // re-pads either body, and no rule on the wrappers (scrims, the panel, the description section, the dialog's field,
@@ -311,12 +317,17 @@ async function twoRowsInHost(mount: Mounter, side: number): Promise<void> {
   expect(SELECT_WIDTH).toBe(97.5);
 }
 
+// 20 s per `it`, as notes-css (flake 18.226, #898): each `it` mounts the real sheet (or dialog) twice and packs four widths,
+// and asserts geometry, never a duration. The 2026-10-02 LOCAL release gate timed 21.236 out at the 5 s default (load average
+// ~74); alone under that load it took 5250 ms, its siblings 21.233 3560 ms, 21.234 1518 ms, 21.237 1401 ms. Reviewer B's LOCAL
+// run at load 164: 21.233 5233 ms (timed out at 5 s), 21.234 2934 ms, 21.236 10486 ms, 21.237 8855 ms. 21.235 is a stylesheet
+// read (705 ms) and keeps the default. The global `testTimeout` is unchanged.
 describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, in the sheet and in the dialog at 360–466', () => {
   it('21.236 the ticket sheet (viewport − 2 × the sheet body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountSheet, hostWidths().sheetSide);
-  });
+  }, 20_000);
   it('21.237 the new-ticket dialog (viewport − 2 × the dialog body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountDialog, hostWidths().dialogSide);
-  });
+  }, 20_000);
 });
 

@@ -157,7 +157,12 @@
   .gn-button--danger:active:not(:disabled) { transform: none; }
 }
 .gn-button:disabled {
-  opacity: 0.55;
+  opacity: var(--gn-disabled-opacity);
+  cursor: not-allowed;
+}
+/* A QUIET button (`aria-disabled`, still focusable): the same look as a disabled one, from the same token (UX fixes T6, 23.094). */
+.gn-button[aria-disabled='true'] {
+  opacity: var(--gn-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -236,6 +241,34 @@
 .gn-chip--pending .gn-chip__dot { background: var(--gn-pending); }
 .gn-chip--restricted .gn-chip__dot { background: var(--gn-restricted); }
 .gn-chip--contested .gn-chip__dot { background: var(--gn-contested); }
+/* "Waiting" (UX fixes T6, 23.093, audit NP-06): a column that waits on someone else is not a column that is stuck. It took
+   the BLOCKED red, which read as an error; the amber `--gn-pending` role (contrast-paired at 3:1 on the surface) says "in
+   someone else's court" and the chip's own text names it, so the colour is never the only signal. */
+.gn-chip--waiting .gn-chip__dot { background: var(--gn-pending); }
+
+/* SCROLL FADES (UX fixes T6, 23.092, audit SYS-14, BRD-07, ENT-13, SET-25, WF-10, PV-04): a scroller whose content runs
+   past an edge says so. `useScrollEdges` (the hook) writes `data-at-start` / `data-at-end` as "true" or "false"; with
+   both "true" (nothing hidden, or a scroller that does not scroll) there is NO mask at all, so a fitting scroller is
+   untouched. An edge with content past it fades over `--gn-scroll-fade-size` to transparent. `.gn-scroll-fade` runs left to
+   right, `--y` top to bottom. The mask clips the scroller's own box-shadow, so a scroller that wears a shadow keeps it on a
+   WRAPPER, not on the masked element. A mask reads only alpha; `black` is the opaque stop, not a colour. */
+.gn-scroll-fade {
+  --gn-scroll-fade-size: 1.5rem;
+  --gn-fade-from: black;
+  --gn-fade-to: black;
+}
+.gn-scroll-fade[data-at-start='false'] { --gn-fade-from: transparent; }
+.gn-scroll-fade[data-at-end='false'] { --gn-fade-to: transparent; }
+.gn-scroll-fade[data-at-start='false'],
+.gn-scroll-fade[data-at-end='false'] {
+  -webkit-mask-image: linear-gradient(to right, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to right, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+}
+.gn-scroll-fade--y[data-at-start='false'],
+.gn-scroll-fade--y[data-at-end='false'] {
+  -webkit-mask-image: linear-gradient(to bottom, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+  mask-image: linear-gradient(to bottom, var(--gn-fade-from), black var(--gn-scroll-fade-size), black calc(100% - var(--gn-scroll-fade-size)), var(--gn-fade-to));
+}
 
 /* Rule 04 (styling refresh Plan A Task 4): every static panel rests on the lit-edge, falling `lift` shadow. neo's lift IS its raised pair; minimal draws none. A Card is never itself interactive (card.tsx), so hover lift is keyed on the interactive element's own class, never here (pattern P-LIFT). */
 .gn-card {
@@ -459,7 +492,8 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 1.5rem;
+  /* + the bottom bar's height while one shows: `--gn-bar-lift` is declared by `globals.css` at ≤64rem (UX fixes Task 4 fix 2, case 23.056). */
+  bottom: calc(1.5rem + var(--gn-bar-lift, 0px));
   z-index: 60;
   display: flex;
   justify-content: center;
@@ -947,18 +981,34 @@ a.gn-ticket-sheet__crumb--link {
 .gn-sheet__close:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-dialog__body,
 .gn-sheet__body { padding: 0 1.5rem 1.5rem; overflow-y: auto; }
+/* UX fixes T7 (BRD-09, case 23.124): a dialog's actions in a footer OUTSIDE the scrolling body. The panel is a flex
+   column capped at 90vh and only `__body` scrolls, so the footer stays in view at any height; `sticky` states the
+   same intent for a caller whose panel is not capped. A hint line (why Create is disabled) sits beside the actions. */
+.gn-dialog__footer {
+  position: sticky;
+  bottom: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.75rem 1.5rem 1.5rem;
+  background: var(--gn-surface-raised);
+  border-top: 1px solid var(--gn-border);
+}
+.gn-dialog__footer-hint { flex: 1 1 12rem; margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
 
 /* The ticket sheet's header "Move" shortcut (case 21.071): a phone-only second door to the State row's
    Move…, so it is not painted at all above 40rem. It follows `.gn-button` (same specificity), so this
    `display: none` wins over `.gn-button`'s `inline-flex`. */
 .gn-sheet__move { display: none; }
 
-/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
-   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
-   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
-   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). */
-@media (max-width: 40rem) {
-  /* The ticket sheet fills the screen: the `.gn-sheet--full` form, forced (21.070). */
+/* The ticket sheet through the tablet band (UX fixes Task 4, owner ruling U3, case 23.053; it was inside the phone arm below,
+   case 21.070). At ≤64rem the sheet is the whole screen: the `.gn-sheet--full` form, forced, with its header sticky, so a
+   700px tablet no longer gets a floating panel with a scrim sliver either side. AFTER the base rules it overrides (equal
+   specificity: source order decides). The dialogs' bottom-sheet rules and the Move shortcut stay in the 40rem arm. */
+@media (max-width: 64rem) {
   .gn-sheet {
     width: 100%;
     max-width: none;
@@ -966,13 +1016,25 @@ a.gn-ticket-sheet__crumb--link {
     box-shadow: none;
     background: var(--gn-surface);
   }
-  /* The header stays put while the body scrolls under it, and carries the Move shortcut (21.071). */
+  /* The header stays put while the body scrolls under it. */
   .gn-sheet__header {
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--gn-surface);
   }
+  /* `Full screen` goes with it: the pill expands the sheet to the viewport, which the sheet already fills here, so the
+     control would have no effect to offer. (Below 40rem the ticket sheet's own arm hides it too, case 13.1057.) */
+  .gn-sheet__full { display: none; }
+}
+
+/* The web app on phones — sheet and dialogs (Plan Task 6, cases 21.070–21.073; FD10, FD11). Every rule is
+   inside the one 40rem arm and AFTER the base rules it overrides (equal specificity: source order decides).
+   NO `animation` is restated here — a phone arm that did would, being later in the file, defeat the
+   `prefers-reduced-motion` arm that turns `.gn-dialog`'s rise off (21.073). The sheet's own full-width rules moved
+   to the 64rem arm above (23.053); what stays is phone-only: the Move shortcut and the dialogs as bottom sheets. */
+@media (max-width: 40rem) {
+  /* The ticket sheet's header carries the Move shortcut (21.071). */
   .gn-sheet__move { display: inline-flex; }
   /* Dialogs become bottom sheets (21.072): pinned to the bottom edge, full width, rounded on top only. */
   .gn-dialog__scrim { align-items: flex-end; }
@@ -1114,6 +1176,10 @@ a.gn-ticket-sheet__crumb--link {
   flex-direction: column;
   gap: 0.5rem;
 }
+/* UX fixes T7 (BRD-01, case 23.120): `display: flex` above outranks the UA sheet's own `hidden`, so a hidden column
+   would stay painted. On a phone `BoardGroupSection` hides every column the picker did not choose (and makes it
+   `inert`); this rule is what makes the attribute mean "takes no room", so the rail is as tall as the shown column. */
+.gn-board__column[hidden] { display: none; }
 /* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
    2026-09-16) — no rule was ever added for it. `board.tsx:409` renders the
    column name as `Chip`'s own child text, tone set from `column.blocked`/
@@ -1341,13 +1407,14 @@ a.gn-ticket-sheet__crumb--link {
    the product's own. They overlap on `border`, `background`, `padding` and
    `color`; source order decides, and this one is later.
    Styling refresh Plan B (Task B9): P-QUIET — the constant above is
-   superseded. The header's New ticket is the board's one loud element, so the
+   superseded. The header's Create ticket is the board's one loud element, so the
    empty state's own create action is a quiet outlined 44px pill, washed on
    hover; a second primary would break rule 01. */
 .gn-board__empty-create {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.625rem;
   min-height: 2.75rem;
   padding: 0 1.125rem;
   border: 1px solid var(--gn-border);
@@ -1432,6 +1499,7 @@ a.gn-ticket-sheet__crumb--link {
    the house chip fill (plan D19) — and no margin, because the epic and the
    title are ONE group (8px apart via the card's gap). */
 .gn-board-card__epic {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: flex;
   width: fit-content;
   align-items: center;
@@ -1462,6 +1530,7 @@ a.gn-ticket-sheet__crumb--link {
    accent — the accent is saved for the action (rule 03), and the underline is
    what tells it apart from the plain `key`/`due` text beside it. */
 .gn-board-card__parent-key {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   min-height: 1.5rem;
@@ -1659,6 +1728,7 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board__column--drop-refused { opacity: 0.55; cursor: not-allowed; }
 .gn-board__column--drop-refused .gn-board__card-slot { cursor: not-allowed; }
 .gn-board-card__title {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   font: inherit;
   font-size: 0.9375rem;
   line-height: 1.5rem;
@@ -1712,6 +1782,10 @@ a.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-subtle); font-size: 0.75rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* The word before the date (UX fixes T6, 23.093, audit BRD-04): "Due" or, once the date has passed, "Overdue", so a late
+   card is not late by red alone. The date keeps its own colour; the pair sits in `.gn-board-card__due-unit`. */
+.gn-board-card__due-label { color: var(--gn-text-subtle); font-size: 0.75rem; font-weight: 600; margin-inline-end: -0.25rem; }
+.gn-board-card__due-label--late { color: var(--gn-danger); }
 /* THE KEYS ROW (owner request, 2026-09-23; formerly "the prototype's meta
    line under the chips", `desktop.dc.html:2496-2504`, key first, owner
    2026-09-22): `[parent key badge] key [priority badge]`, then the due
@@ -1772,21 +1846,19 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__priority--p1 { color: var(--gn-danger); }
 .gn-board-card__priority--p2 { color: var(--gn-text-muted); }
 .gn-board-card__priority--p3 { color: var(--gn-text-subtle); }
-/* The card's FOOTER: "who · when" left, the arrows (and Close) right, one row.
-   `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the card's 8px gap
-   makes the 16 between groups; the negative sides and bottom let the 44px
-   targets reach 8px into the card's 16px padding, so the card does not grow
-   (the mockup, `Main.dc.html:109`). Wraps when "who · when" unfolds into a
-   long sentence, so the arrows drop to their own line rather than shrink. */
+/* The card's FOOTER: the provenance line left, the arrows (and Close) right, ONE row (D14; UX fixes T7, case 23.122,
+   audit BRD-02). It never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance` below),
+   and a pressed line wraps inside its own button. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
+   card's 8px gap makes the 16 between groups; the negative sides and bottom let the 44px targets reach 8px into
+   the card's 16px padding, so the card does not grow (the mockup, `Main.dc.html:109`). */
 .gn-board-card__footer {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin: 0.5rem -0.5rem -0.5rem;
 }
 .gn-board-card__provenance {
-  display: inline-flex;
-  align-items: center;
+  display: block;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 2.75rem;
@@ -1797,6 +1869,11 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   font: inherit;
   font-size: 0.75rem;
+  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). */
+  line-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--gn-text-subtle);
   cursor: pointer;
   text-align: left;
@@ -1829,6 +1906,13 @@ a.gn-ticket-sheet__crumb--link {
      24px dense-in-list floor this comment argued for is superseded by the
      owner-approved card (`Main.dc.html:110`), and `DENSE_IN_LIST` keeps its
      entry (a 44px target passes a 24px floor). */
+}
+/* Pressed: the whole sentence, wrapped in place. The footer stays a row; the button grows taller (UX fixes T7, 23.122). */
+.gn-board-card__provenance[aria-expanded="true"] {
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.25rem;
+  padding-block: 0.75rem;
 }
 /* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
    button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
@@ -1878,11 +1962,9 @@ a.gn-ticket-sheet__crumb--link {
   cursor: pointer;
   transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
 }
-/* Spec row "Move button, unavailable": `opacity:0.4; cursor:not-allowed` —
-   this component's OWN metric, not `.gn-button`'s generic `:disabled` rule
-   (0.55 — `:79-82` above): the spec gives this control its own number, kept
-   rather than folded into the shared default. */
-.gn-board-card__move:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Spec row "Move button, unavailable": the prototype gave this control its own 0.4. UX fixes T6 (23.094, audit SYS-09) folds it
+   into the ONE disabled token, `--gn-disabled-opacity`, so a disabled control reads the same everywhere. */
+.gn-board-card__move:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* The Move button (mobile plan Tasks 4–5): a ghost pill with a word, after the two arrows, wearing the arrows'
    own metrics and P-GHOST states (they share the class). Above 40rem the word is "Move to…"; the phone arm
    below swaps it for "Move". The 44px floor (rule 01) is restated here rather than inherited so that a later
@@ -1935,7 +2017,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 1px;
 }
 .gn-row-action:disabled,
-.gn-list__bulk-close:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* Styling refresh Plan B (Task B6): P-GHOST — a control inside a table row is a text control with no edge; hover or focus washes it. */
 .gn-row-action {
   display: inline-flex;
@@ -2021,7 +2103,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 0;
 }
 .gn-board-card__close:disabled,
-.gn-board__column-action:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-board__column-action:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 
 /* The board on a phone (mobile plan Task 4, FD8/FD13). The same 40rem the rest of the phone layer breaks at —
    `PHONE_BOARD_QUERY` (`packages/app-core/src/views/use-phone-board.ts`) is that width in JS, and case 21.040 reads
@@ -2046,6 +2128,7 @@ a.gn-ticket-sheet__crumb--link {
     font-size: 0.9375rem;
   }
   .gn-board-phone-picker { max-width: 100%; margin-bottom: 0.5rem; overflow-x: auto; }
+  .gn-board-phone-picker__activation { display: contents; }
   .gn-board-card__move-label--phone { display: inline; }
   .gn-board-card__move-label--wide { display: none; }
 }
@@ -2368,9 +2451,9 @@ a.gn-ticket-sheet__crumb--link {
 .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
   color: var(--gn-text-inverted);
 }
-/* "Group header row": `padding 11px 16px; trayBg + trayShadow` — the same
-   pair `.gn-timeline__weeks` uses for identical prototype vocabulary
-   (`--gn-surface-sunken`/`--gn-shadow-sunken`). DECLARED DIVERGENCE, not a
+/* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair `.gn-timeline__weeks` uses
+   (`--gn-surface-sunken`/`--gn-shadow-sunken`); UX fixes T6 (23.095) flattened it to a quaternary tint, so the heading
+   no longer reads as a text field. DECLARED DIVERGENCE, not a
    match: the prototype draws this as a `<tr>` spanning the table's columns;
    this product's architecture already renders one grouping's rows as a
    SEPARATE `<table>` per section with an `<h3>` above it (Group-by wiring
@@ -2385,12 +2468,12 @@ a.gn-ticket-sheet__crumb--link {
   flex-wrap: wrap;
   margin: 0 0 0.4rem;
   padding: 0.6875rem 1rem;
-  /* Styling refresh Plan B (Task B6): a recessed track band with the card radius. */
-  background: var(--gn-surface-track);
-  box-shadow: var(--gn-shadow-track);
+  /* A flat tint with the card radius (UX fixes T6, 23.095, audit PV-17): this was a recessed track band, which read as a text
+     field; a heading is not a trough, so it takes the quaternary fill and no inset shadow. */
+  background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-card);
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
+  font-size: var(--gn-title-section);
+  line-height: 1.5625rem;
   font-weight: 600;
   color: var(--gn-text);
 }
@@ -2418,6 +2501,7 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-list__collapse,
 .gn-list__open {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   font: inherit;
   border: none;
   background: none;
@@ -2669,10 +2753,14 @@ a.gn-ticket-sheet__crumb--link {
    serves both. At <=40rem the table stops being a table: it, its body and each row become blocks/flex lines,
    the column-header row is clipped (visually hidden, not removed), the title cell takes the first line and the
    key · state · assignee · due cells wrap beneath it as small meta. The bulk-select checkbox is lifted to its
-   own 44px square at the row's start (the row reserves room with `:has`). The bulk-close bar's slot takes a
-   full row and the Confirm close button fills it, the cancel ✕ beside it. Inside the one 40rem arm and AFTER
-   every base rule it overrides. */
-@media (max-width: 40rem) {
+   own 44px square at the row's start (the row reserves room with `:has`). (The bulk-close bar's slot took a
+   full row here until UX fixes Task 5, case 23.073: it now sits in the toolbar row at its own width.) Inside the one arm and AFTER
+   every base rule it overrides.
+
+   THE ARM IS 64rem, NOT 40rem (UX fixes Task 4, owner ruling U3, case 23.052; it was 40rem when written, case 21.111): the
+   table's 51.25rem floor overflows the narrower tablets, so the stacked rows serve the whole tablet band, and a
+   1025px+ desktop keeps the table. */
+@media (max-width: 64rem) {
   .gn-list__table { display: block; min-width: 0; }
   .gn-list__table tbody { display: block; }
   .gn-list__table thead {
@@ -2706,9 +2794,6 @@ a.gn-ticket-sheet__crumb--link {
   }
   .gn-list__table-cell--title { order: -1; flex: 1 0 100%; min-width: 0; padding: 0; }
   .gn-list__table-cell--data { padding: 0; font-size: 0.8125rem; line-height: 1.125rem; white-space: normal; }
-  .gn-list__controls-end { flex: 1 1 100%; margin-left: 0; display: flex; }
-  .gn-list__bulk { flex: 1 1 100%; display: flex; }
-  .gn-list__bulk-close { flex: 1 1 auto; }
 }
 /* The attention strip is the prototype's tinted card, adopted WHOLE (owner
    ruling, 2026-09-18): `--tintWarning` fill, `--cardR` radius, `18px 20px`
@@ -2760,6 +2845,8 @@ a.gn-ticket-sheet__crumb--link {
    same WCAG 2.5.8 floor `.gn-attention__title`'s note below holds, now met by
    the row that contains the button as well as by the button. */
 .gn-attention__items { list-style: none; margin: 0.625rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+/* NP-05 (UX fixes T9, 23.163): the "Show all N" disclosure under the capped list; a `Button`, so the 44px floor and the pill are the button's own. */
+.gn-attention__more { margin-top: 0.5rem; }
 .gn-attention__item { position: relative; display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; min-height: 1.5rem; padding: 0.4375rem 0; cursor: pointer; }
 /* 24px — WCAG 2.5.8's floor, not 2.5.5's 44. Measured on the signed-in shell at
    390px before this: `249x23`, `266x23`, `305x23`, `270x23` for the attention
@@ -2813,11 +2900,12 @@ a.gn-ticket-sheet__crumb--link {
 .gn-attention__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
 
 .gn-my-work { display: flex; flex-direction: column; gap: 1.2rem; }
-.gn-my-work__heading { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--gn-text-muted); }
+.gn-my-work__heading { margin: 0 0 0.5rem; font-size: var(--gn-title-section); line-height: 1.5625rem; color: var(--gn-text-muted); }
 .gn-my-work__empty { color: var(--gn-text-muted); margin: 0; }
 .gn-my-work__item,
 .gn-my-work__contested { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .gn-my-work__title {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   min-height: 1.5rem;
@@ -2943,7 +3031,7 @@ a.gn-ticket-sheet__crumb--link {
   transition: background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-ticket-sheet__delete:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
-.gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
+.gn-ticket-sheet__delete:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 /* ⚠ `align-self`, `text-align` and `justify-content` are here because this block
    MOVED into the grid's `field-state` `<dd>` on 2026-09-22 (spec decision 1). That
    cell is right-aligned — `align-items: flex-end; text-align: right` on
@@ -3265,7 +3353,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transition: background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-ticket-sheet__attach-file:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
-.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: 0.6; }
+.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: var(--gn-disabled-opacity); }
 .gn-ticket-sheet__attach-file:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
@@ -3363,7 +3451,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem;
   margin: 0;
   color: var(--gn-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 /*
@@ -3471,7 +3558,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
   text-align: right;
 }
-.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: 0.7; }
+.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: var(--gn-disabled-opacity); }
 .gn-visibility__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* Read-only viewer chips (spec decision 7, `desktop.dc.html:1214-1222`): no ×
@@ -3490,7 +3577,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   font-size: 0.75rem;
   line-height: 1rem;
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 .gn-visibility__viewer-chips {
@@ -3553,7 +3639,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   font-size: 0.75rem;
   line-height: 1rem;
-  text-transform: uppercase;
   letter-spacing: 0.6px;
 }
 .gn-visibility__mode,
@@ -3658,8 +3743,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-reopen__summary { font-weight: 600; margin: 0 0 0.4rem; }
 .gn-reopen__picker { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.7rem 0; }
 .gn-reopen__gap { color: var(--gn-text-muted); margin: 0.7rem 0; }
-.gn-reopen__actions,
-.gn-new-ticket__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
+.gn-reopen__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .gn-new-ticket__field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
 .gn-create-flow__trouble { color: var(--gn-danger); margin: 0.6rem 0 0; }
 
@@ -3685,6 +3769,21 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    layout depends on, and the grid track resolves against it. The pair is the
    fix; either half alone restores the bug. */
 .gn-workflow-canvas { display: grid; width: 100%; height: 100%; min-height: 480px; }
+/* UX fixes T10 (WF-02, 23.175): the "Fit to screen" control — a 44px target, a quiet raised chip in the canvas corner. */
+.gn-workflow-canvas__fit {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-lift);
+  color: var(--gn-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-workflow-canvas__fit:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* E4-16: React Flow's own vendor stylesheet paints its required attribution
    link at 10px with a fixed grey (`node_modules/@xyflow/react/dist/style.css`
@@ -3721,8 +3820,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    composition the renamed `CONTRAST_PAIRS` rows guarantee. */
 .gn-state-node__initial-badge { color: var(--gn-text-accent); font-size: 0.75rem; font-weight: 600; }
 .gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
-.gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
-.gn-state-node__creatable { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
+/* UX fixes T10 (WF-03, 23.176): each option row is a 44px target and the WHOLE row is the <label>, so a tap anywhere across
+   it toggles the checkbox; the reason a row is locked is visible text beneath it. */
+.gn-state-node__blocked,
+.gn-state-node__creatable { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; margin-top: 0.1rem; font-size: 0.8rem; cursor: pointer; }
+.gn-state-node__reason { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
 
 .gn-any-state-node {
   background: var(--gn-surface-raised);
@@ -3906,8 +4008,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem; /* 44px: the picker's tiles were 32px (UX fixes T6, 23.090, audit TT-06) */
+  height: 2.75rem;
   padding: 0;
   /* A real 1.5px transparent border, not the browser's default button chrome
      `border-color` alone would otherwise recolour: with no `border-style`/
@@ -4060,7 +4162,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    into, had no visible focus indicator at all (WCAG 2.2 §2.4.7 *Focus Visible*,
    Level AA). The ring goes on the WRAPPER, keyed on `:focus-within`, because the
    wrapper div carries no `tabIndex` of its own — the inner input is what takes
-   focus — and `outline-offset: 1px` is `.gn-field__input`'s own value, so the
+   focus — and `outline-offset: 3px` is `.gn-field__input`'s own value (U9, 2026-10-02; it was 1px), so the
    searchable and non-searchable branches of this control look identical while
    focused. The rule's own selector text is deliberately NOT written out in this
    comment: `rule()` in `components.test.tsx` does a raw brace-matching scan with
@@ -4069,7 +4171,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `.gn-select__trigger--multiple` below already warns about, for the same helper. */
 .gn-select__trigger--searchable:focus-within {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  outline-offset: 3px;
 }
 
 /* N chips plus the open button (non-searchable) or the filter input (searchable) overflow
@@ -4201,7 +4303,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    blob `6d7b67c0a52c`), carried as rem at the 16px root this product sets. Was
    `1rem` with no line-height of its own, so it inherited the UA's normal
    leading and sat visibly lighter and smaller than the drawing. */
-.ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+.ticket-type-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 /* The web app on phones — New ticket type is the list's one primary on its own full row (Plan Task 11, case 21.173).
    Inside the one 40rem arm, AFTER `.ticket-type-list__header`. */
@@ -4238,7 +4340,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   width: 100%;
   padding: 0.6rem 0.75rem;
   border: none;
-  border-radius: var(--gn-radius-card);
+  /* The INNER radius (UX fixes T6, 23.095, audit TT-04): the row sits in a card padded 0.5rem, so its corners are the card's
+     radius less that padding, which keeps the two curves concentric instead of a row rounder than the card holding it. */
+  border-radius: calc(var(--gn-radius-card) - 0.5rem);
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-lift);
   font: inherit;
@@ -4255,15 +4359,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    where nothing forces the distinction — the same argument `.gn-list__table-row`
    records for its own choice (`:1080-1087`).
 
-   `--fill4` → `--gn-fill-quaternary` is the mapping `.gn-members__row` already
-   uses for this identical construct (`apps/web/app/globals.css:1524`), which is
-   also where the parity is worked through.
+   `--fill4` → `--gn-fill-quaternary` is the mapping the Members roster used for this identical construct until UX fixes T6
+   (23.095) replaced that zebra with a hairline; the parity is worked through in this block, and the type rows keep the zebra.
 
    THE PRODUCT'S OTHER TWO ZEBRAS DIFFER, AND THAT IS RECORDED RATHER THAN
    HARMONISED. `.gn-list__table-row` (`:1088`) and `.gn-timeline__row` (`:2703`)
    both stripe the ODD child, so those two families read INVERTED against the
    prototype. **The measurement and its named owner already exist**
-   (`globals.css:1518-1523`: *"owner: whoever next touches those two families"*),
+   (the Members note that recorded it was removed with that zebra by UX fixes T6; the owner, "whoever next touches those two families", is unchanged),
    so this rule adds the third member of the matching set and re-records
    nothing — harmonising those two is not this screen's change. */
 .ticket-type-list__rows li:nth-child(even) .ticket-type-list__row {
@@ -4289,8 +4392,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    colours seem to be too bright... the feel of the neumorphic elements is
    greatly diminished"). Same pair `.ticket-type-list__badge` and `.gn-field__
    input` already wire in for exactly this reason. */
+/* UX fixes T6 (23.095, audit TT-04) REVERSED the sunken row above: a pressed-in row inside a card read as a field, and a stack of
+   them as a stack of text boxes. Under neo the row is now FLAT on the card, a hairline between neighbours and square corners, so
+   the depth belongs to the card alone (nothing sunken inside a raised card). The zebra and hover tints still apply. */
 [data-style="neo"] .ticket-type-list__row {
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+  border-bottom: 1px solid var(--gn-border);
 }
 .ticket-type-list__icon { display: inline-flex; color: var(--gn-text-muted); flex: none; }
 .ticket-type-list__info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; min-width: 0; }
@@ -4388,10 +4497,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    radius, beside a shared `Button` that is 44px, border-less and
    control-radiused, against a prototype that draws 44. */
 .ticket-type-editor__save { align-self: flex-start; }
-/* The web app on phones — the ticket type editor's Save takes its own full row (Plan Task 11, case 21.173). */
-@media (max-width: 40rem) {
-  .ticket-type-editor__save { flex: 1 1 100%; }
-}
+/* The web app on phones — the ticket type editor's Save keeps its own width beside Cancel (UX fixes Task 5, case 23.074;
+   it took a full row under case 21.173). */
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
@@ -4680,21 +4787,28 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
 }
-.workflow-builder-screen__name:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+.workflow-builder-screen__name:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 3px; }
 .workflow-builder-screen__name:disabled {
   background: var(--gn-surface-sunken);
   color: var(--gn-text-muted);
   cursor: not-allowed;
 }
 [data-style="neo"] .workflow-builder-screen__name {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
+}
+/* U7: flat when disabled, AFTER the neo rule above (case 23.004). The ring and the inset go; the 1px stays transparent. */
+[data-style="neo"] .workflow-builder-screen__name:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-text-subtle);
 }
 
 /* Two columns since 2026-09-30 (W1): the right rail is gone — its inspectors
@@ -4790,7 +4904,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
     min-height: 28rem;
   }
   .workflow-builder-screen__title-row { flex-direction: column; align-items: stretch; }
-  .workflow-builder-screen__name { min-height: 2.75rem; font-size: 1.5rem; line-height: 2rem; }
+  .workflow-builder-screen__name { min-height: 2.75rem; font-size: var(--gn-title-page-phone); line-height: 2rem; }
   .workflow-builder-screen__actions { width: 100%; }
   .workflow-builder-screen__add-state,
   .workflow-builder-screen__panels { flex: 1 1 0; min-height: 2.75rem; }
@@ -4914,34 +5028,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: none;
   padding: 0.5rem;
 }
-/* W1c (2026-10-01, case 10.159): the destructive buttons inside the well — "Remove rule" and "Delete transition"
-   (`transition-inspector.tsx`), "Delete state" (`state-inspector.tsx`) — are QUIET danger buttons: danger ink on a
-   transparent ground, a 1px danger ring on hover, in every style. The filled variant's own geometry (48px, the lift, the 4% hover
-   scale) is the confirm button of a dialog; in neo it read as a large red pill dominating the recessed well. Same
-   shape as `.gn-ticket-sheet__delete`. The variant class stays on the element (still the destructive affordance by
-   class, colour AND label); the class is `builder-quiet-danger`, deliberately NOT in a `builder-row*` family: an
-   element that also carries `gn-button` is exempt from 13.767's rendered == styled set, and a styled-but-exempt class
-   would break that equality. This rule sits one class above `.gn-button--danger` and its `:hover:not(:disabled)`.
-   Danger as ink on `surfaceWell` clears 4.5 in all six style x theme combinations (`tokens.test.ts`, case 10.160).
-   The hover is a RING and not `.gn-button--ghost`'s `fill-quaternary` wash, and that is a measurement: danger ink on the
-   wash over the well is 4.18 (hig/minimal light) and 4.47 (hig/minimal dark), below 4.5, while a ring leaves the ground
-   and so the ink at its rest ratio (4.60 worst). */
+/* W1c (2026-10-01, case 10.159; repainted by UX fixes T2, case 23.022): the destructive buttons inside the well —
+   "Remove rule" and "Delete transition" (`transition-inspector.tsx`), "Delete state" (`state-inspector.tsx`) — are QUIET
+   danger buttons, in every style. The filled variant's own geometry (48px, the lift, the 4% hover scale) is the confirm
+   button of a dialog; in neo it read as a large red pill dominating the recessed well. The three buttons now wear
+   `variant="danger-quiet"`, so the PAINT (a 1px danger edge, danger ink, a transparent ground, a ring on hover) comes
+   from `.gn-button--danger-quiet` (case 23.022), the one destructive treatment for every list; this class carries only
+   the builder's METRICS (44px, 1rem of padding, the inherited font size). It declares no `background`, `color`,
+   `box-shadow` or `border`, and has no `:hover` / `:active` arm: a paint declaration here would fork the treatment again
+   (case 10.159). It stays on the element for that reason and for 13.767: it is deliberately NOT in a `builder-row*`
+   family, because an element that also carries `gn-button` is exempt from 13.767's rendered == styled set, and a
+   styled-but-exempt class would break that equality. This rule is (0,2,0), so it beats the variant's single-class
+   `min-height` / `padding` / `font-size`. Danger as ink on `surfaceWell` clears 4.5 in all six style x theme
+   combinations (`tokens.test.ts`, case 10.160).
+   History, still true of the variant's hover: it is a RING and not `.gn-button--ghost`'s `fill-quaternary` wash, and that
+   is a measurement: danger ink on the wash over the well is 4.18 (hig/minimal light) and 4.47 (hig/minimal dark), below
+   4.5, while a ring leaves the ground and so the ink at its rest ratio (4.60 worst). */
 .gn-button.builder-quiet-danger {
   min-height: 2.75rem;
   padding: 0 1rem;
-  background: transparent;
-  color: var(--gn-danger);
-  box-shadow: none;
   font-size: inherit;
-}
-.gn-button.builder-quiet-danger:hover:not(:disabled) {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--gn-danger);
-  transform: none;
-}
-.gn-button.builder-quiet-danger:active:not(:disabled) {
-  box-shadow: none;
-  transform: none;
 }
 
 /* E4-28: a visually-hidden description node, referenced by `aria-describedby`
@@ -5011,6 +5117,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   align-items: center;
   justify-content: center;
   min-height: 2.75rem; /* 44px */
+  min-width: 2.75rem; /* 44px: a bare arrow glyph is narrower than its 12px padding makes it (UX fixes T6, 23.090) */
   padding: 0 0.75rem; /* 12px */
   border: 1px solid var(--gn-border);
   border-radius: 999px;
@@ -5173,7 +5280,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1rem; /* 16px */
   font-weight: 600;
   color: var(--gn-text-muted);
-  text-transform: uppercase;
   letter-spacing: 0.03125rem; /* 0.5px */
 }
 
@@ -5214,8 +5320,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the previous whole-cell outline (`outline: 2px solid var(--gn-accent)` on
    `.gn-calendar__day--today`, removed below it used to sit) — the two are the
    same signal and stacking both would say "today" twice. `onColor` →
-   `--gn-accent-text`, the SAME pair `.gn-timeline__bar` and
-   `.gn-filters__chip[aria-pressed='true']` already use for "accent ground +
+   `--gn-accent-text`, the SAME pair `.gn-timeline__bar` (and, before UX fixes T2, the pressed
+   filter chip) use for "accent ground +
    onColor" (`CONTRAST_PAIRS` measures `accentText` on `accent`, never
    `textInverted` there — see `.gn-timeline__bar`'s own docblock above).
    `aria-current`/`data-today`/`data-day` stay on the OUTER cell div
@@ -5257,7 +5363,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 2px;
   background: var(--gn-surface);
 }
-/* "Event pill": `radius 6px; padding 2px 7px; 12px/16px; accent ground;
+/* UX fixes T2 (U1, SYS-04, case 23.021) SUPERSEDES the accent ground below: the pill is `fillPrimary` (the quiet
+   primary tint) with a 3px accent EDGE and the main text colour, because an accent block per event shouts as loudly as
+   the one primary button on the screen. The text clears 4.5:1 on the fill composited over `surface` (the ground
+   `.gn-calendar__items` pins) in all six style x theme combinations. The history below describes the pill's original
+   accent ground and is kept for the reasons it records.
+   "Event pill": `radius 6px; padding 2px 7px; 12px/16px; accent ground;
    onColor`. ONE exception, task-10-brief's own: the custom-field marker
    (`--custom`, below) keeps today's plain-text treatment and does NOT become
    a tinted pill — `customMarker` measures 4.807 on neo's paper, but every
@@ -5280,15 +5391,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-size: 0.75rem; /* 12px */
   line-height: 1rem; /* 16px */
   cursor: pointer;
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-fill-primary);
+  border-left: 3px solid var(--gn-accent);
+  color: var(--gn-text);
 }
-/* The glyph now sits ON the accent-filled pill (it did not before this
-   task), so it takes `accentText` to read against that ground — bare
-   `accent` here would be accent-on-accent, unreadable. The custom-item
+/* The glyph sits ON the pill, so it takes the pill's own text colour (`--gn-text`, T2: the pill is no longer
+   accent-filled, and `textAccent` on `fillPrimary` is 4.19 in neo dark, under 4.5). The custom-item
    override two rules down is untouched: that item is NOT a pill, so its
    glyph keeps the custom-marker colour it always had. */
-.gn-calendar__glyph { color: var(--gn-accent-text); margin-right: 0.2rem; }
+.gn-calendar__glyph { color: var(--gn-text); margin-right: 0.2rem; }
 /* UNCHANGED per this task's one exception: `color: var(--gn-custom-marker)`
    only, no background — see the "Event pill" comment above. */
 .gn-calendar__item--custom { color: var(--gn-custom-marker); background: transparent; }
@@ -5335,6 +5446,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-calendar__items { grid-template-columns: repeat(7, minmax(3rem, 1fr)); }
   .gn-calendar__weekday-head,
   .gn-calendar__week { min-width: 22rem; }
+  /* One line per chip (UX fixes T8, 23.141, audit PV-06): in a 3rem day column a wrapped chip broke one word per
+     line, spilled out of its pill and stretched a week row to ~300px. The chip now names its ticket (23.140) and
+     the claim lives in the tooltip, so truncating the text loses nothing the row needs. */
+  .gn-calendar__item { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 /* Plan 9 Task 11 — the timeline's week columns.
@@ -5515,7 +5630,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-timeline__bar {
   border: none;
   border-radius: 0.375rem;
-  margin: 0.3125rem 0.1875rem;
+  /* UX fixes T8 (23.142, audit PV-10): the bar sits in the WEEK columns it touches and these margins trim it to its
+     real days. A percentage margin resolves against the grid AREA (the weeks the bar spans), so `lead` days of
+     `7 * weeks` is exactly that share of it. The view sets the three custom properties; the 0.1875rem is the
+     breathing room the bar always had. `grid-row: 1` keeps the today line (also row 1) from pushing it down. */
+  grid-row: 1;
+  margin: 0.3125rem 0;
+  margin-left: calc(var(--timeline-bar-lead, 0) / (7 * var(--timeline-bar-weeks, 1)) * 100% + 0.1875rem);
+  margin-right: calc(var(--timeline-bar-tail, 0) / (7 * var(--timeline-bar-weeks, 1)) * 100% + 0.1875rem);
   padding: 0.1875rem 0.5625rem;
   text-align: left;
   font: inherit;
@@ -5538,6 +5660,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-timeline__bar[data-clipped-start] { border-left: 2px dashed var(--gn-border-strong); border-radius: 0 0.375rem 0.375rem 0; }
 .gn-timeline__bar[data-clipped-end] { border-right: 2px dashed var(--gn-border-strong); border-radius: 0.375rem 0 0 0.375rem; }
 .gn-timeline__bar[data-clipped-start][data-clipped-end] { border-radius: 0; }
+/* The today line (UX fixes T8, 23.142, audit PV-10): a hairline in the middle of today's day, in every row. A
+   zero-width item in the one-week column today falls in; its percentage margin is a share of that week. It paints
+   in the accent (a token) and takes no click. */
+.gn-timeline__today {
+  grid-row: 1;
+  align-self: stretch;
+  width: 0;
+  margin-left: calc((var(--timeline-today-lead, 0) + 0.5) / 7 * 100%);
+  border-left: 2px solid var(--gn-accent);
+  pointer-events: none;
+  z-index: 1;
+}
 
 .gn-timeline__claims { list-style: none; margin: 0; padding: 0; }
 .gn-timeline__claim { font-size: 0.75rem; color: var(--gn-custom-marker); }
@@ -5574,7 +5708,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font: inherit;
   padding: 0;
   cursor: pointer;
+  /* A `<button>` centres its text; a title that wraps then loses the list's left edge (UX fixes T8, 23.145, audit PV-12). */
+  text-align: left;
 }
+/* The undated list's heading and per-ticket action (UX fixes T8, 23.143, audit PV-11). */
+.gn-timeline__side-heading { margin: 0 0 0.25rem; font-size: 0.875rem; font-weight: 600; color: var(--gn-text); }
+.gn-timeline__add-dates { margin-left: 0.5rem; }
 .gn-timeline__side-note { color: var(--gn-text-muted); margin-left: 0.5rem; font-size: 0.8rem; }
 /* The two reasons the plain heading is FALSE of: the claims are both there and
    still cannot draw a period. Marked the way `.gn-calendar__item--unplaceable`
@@ -5944,9 +6083,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    stylesheet both of those apps already load, rather than in either app. Two
    copies of this block would be two help screens that drift apart. */
 
-/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the 72ch reading
+/* `.gn-help` CHANGED MEANING on 2026-09-15. It used to BE the reading
    column; it is now the two-column shell, and `.gn-help__column` inside it
-   carries the 72ch. Recorded because the old name did not change: a reader of
+   carries the measure (72ch then; `var(--gn-measure)`, 70ch, since UX fixes Task 3). Recorded because the old name did not change: a reader of
    a diff elsewhere in the tree would otherwise assume it still centres text.
 
    The reference's own shape (`Gisik Nokma Desktop`, the Help screen): an
@@ -6031,18 +6170,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    no section-to-section gap to copy. */
 .gn-help__column {
   width: 100%;
-  max-width: 72ch;
+  max-width: var(--gn-measure);
   padding-top: 1.75rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
-/* The title and the search box are ONE group in the reference (`gap:14px`),
-   set closer than the 20px rhythm around them. A wrapper rather than a
-   margin on the `h1`, because the column is a flex container now and a
-   bottom margin there would ADD to the gap instead of replacing it. */
-.gn-help__intro { display: flex; flex-direction: column; gap: 0.875rem; }
-
+/* The title and the search box were ONE group in the reference (`gap:14px`); since 23.239 the search lives in the
+   sidebar's pinned header, so the title stands alone at the top of the column. */
 /* The page title, added 2026-09-15 — `/help` previously rendered no `h1` at
    all. The prototype's own values: 34px/41px, 700, −0.4px tracking, and 14px
    to the search label below it (the reference groups the two with `gap:14px`).
@@ -6060,19 +6195,37 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* The 14px that used to live here is now `.gn-help__intro`'s `gap` — same
      distance, but it survives the column becoming a flex container. */
   margin: 0;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
 }
 
-/* The reference's own `label`: a flex column with `gap:8px`, not a block with
-   a margin under the caption. The outer margin is gone with it — the column's
-   `gap` is the rhythm now. */
-.gn-help__search { display: flex; flex-direction: column; gap: 0.5rem; }
-/* 17px/22px/600, from the reference. It had the weight but not the size: it
-   was inheriting 16px, which is the same gap the body text below had. */
-.gn-help__search-label { font-size: 1.0625rem; line-height: 1.375rem; font-weight: 600; }
+/* THE FIELD LIVES IN THE PINNED SIDEBAR HEADER (23.239), first, above the Manual/FAQ switch; on a phone the
+   same node is the first thing in the floating panel. It was the reference's own `label` — a flex column with a
+   visible 17px caption — and is now a plain positioned box: the caption became a visually-hidden label (the
+   accessible name is kept) because the header's budget is one 44px field, and the short placeholder says the
+   same thing. `position: relative` is for the `/` hint below. */
+.gn-help__search { position: relative; }
+/* The `/` hint (23.240): drawn only while the field is empty and only where a keyboard is the likely input — the
+   phone arm below hides it. `pointer-events: none` so a click on it focuses the field under it. */
+.gn-help__search-hint {
+  position: absolute;
+  top: 50%;
+  right: 0.625rem;
+  transform: translateY(-50%);
+  min-width: 1.25rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--gn-border);
+  border-radius: 0.3rem;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  text-align: center;
+  pointer-events: none;
+}
 /* ── THE FIELD IS A WELL, NOT A CARD, and this is a correction rather than a
    preference. It read `--gn-surface-raised` (`#fbf7f3`), which is LIGHTER
    than the page it sits on (`#efe7df`) — so an input the eye should read as
@@ -6122,7 +6275,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__search-input {
   width: 100%;
   min-height: 2.75rem;            /* 44px — the minimum touch target */
-  padding: 0 0.875rem;
+  padding: 0 2.5rem 0 0.875rem;   /* the right inset keeps typed text off the `/` hint */
   font-size: 1.0625rem;
   color: var(--gn-text);
   border: 1px solid var(--gn-border);
@@ -6130,7 +6283,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-radius: var(--gn-radius-control);
 }
 [data-style="neo"] .gn-help__search-input {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }
@@ -6138,7 +6291,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__toggle:focus-visible,
 .gn-help__group-toggle:focus-visible,
 .gn-help__nav-link:focus-visible,
-.gn-help__pager-link:focus-visible,
 .gn-help__result-title:focus-visible,
 .gn-help__link:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -6326,7 +6478,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      behaviour there exactly. */
   top: calc(var(--app-nav-offset, 0px) + 1.5rem);
   max-height: calc(100vh - var(--app-nav-offset, 0px) - 3rem);
-  overflow-y: auto;
+  /* NO `overflow` here (23.231): the aside holds the PINNED header (search, Manual/FAQ switch) and the topics
+     list, and only the list scrolls — `.gn-help__nav` below. An `overflow-y: auto` on the aside scrolled the
+     switch away with the list, which is the defect the owner reported. */
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -6339,7 +6493,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      happens to read. */
   box-shadow: inset -1px 0 0 var(--gn-border);
 }
+.gn-help__sidebar:focus { outline: none; }
+/* The pinned header: search, then the Manual/FAQ switch. `flex: none` — it never shrinks or scrolls. */
+.gn-help__sidebar-head { flex: none; display: flex; flex-direction: column; gap: 0.75rem; }
+/* The topics list — and, on a phone, the search results that replace it — is the ONE scroller of the sidebar
+   (23.231). `min-height: 0` is what lets a flex child shrink below its content so it scrolls instead of pushing
+   the aside past its `max-height`. */
+.gn-help__nav,
+.gn-help__panel-results { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .gn-help__nav { display: flex; flex-direction: column; gap: 0.75rem; }
+/* The `hidden` attribute is the topics list stepping aside for the panel's search results; `display: flex`
+   above would otherwise beat the user-agent's `[hidden]` rule. */
+.gn-help__nav[hidden] { display: none; }
 
 /* The `TOPICS` label. Uppercased in CSS, not in the markup, so the accessible
    name a screen reader announces is the sentence-case word — and so the string
@@ -6354,7 +6519,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    group counts, the caret, the section eyebrow, the pager's `Next`. The guide
    knows only two, so THREE of those five sites come back to `textMuted` and
    the remaining two (`.gn-help__section-eyebrow`, `.gn-help__pager-label`) do
-   not: they sit in the document column, which the guide never covers. The
+   not: they sit in the document column, which the guide never covers. (AMENDED 2026-10-02, 23.230: the pager
+   and its label are gone, so one site survives — `.gn-help__section-eyebrow`.) The
    sidebar's labels therefore read at the same weight as its links again —
    the exact thing the third step was introduced to separate. The role is NOT
    orphaned and needs no token change; see `tokens.ts`'s `textSubtleLight` for
@@ -6371,7 +6537,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.125rem;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--gn-text-muted);
 }
 
@@ -6513,8 +6678,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    this page, which is the distinction ARIA draws between the two values, and
    `page` here would tell a screen reader the reader had navigated away. */
 .gn-help__nav-link[aria-current='location'] {
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-surface-track);
+  color: var(--gn-text);
   font-weight: 600;
 }
 /* The reference gives the active row no hover change at all. Stated rather than
@@ -6522,7 +6687,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    ties in some orders, and the active row would flash to a quaternary fill — the
    exact "hover makes it disappear" collision this file already fixed once on the
    old help tabs. */
-.gn-help__nav-link[aria-current='location']:hover { background: var(--gn-accent); }
+.gn-help__nav-link[aria-current='location']:hover { background: var(--gn-surface-track); }
 
 /* Stacked below ~768px. Stated as a rule rather than left to `flex-wrap`: with
    only the wrap, a 274px sidebar on a 390px phone keeps its width and leaves a
@@ -6531,23 +6696,88 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    right edge to the bottom one because it is now a divider between rows, and
    the sticky behaviour is dropped: a full-width sticky block would cover the
    document it is meant to navigate. */
+/* ── THE FLOATING LAUNCHER BUTTON (shared with the Notes TOC launcher) ──────────────────────────────────────────
+   A 2.75rem (44px, the WCAG 2.5.5 floor) round control — neutral chrome, not the brand hue — on the raised
+   surface and `lift-near`. MOVED here from `apps/web/app/globals.css` so Help (shared with `apps/desktop`, which
+   loads only this sheet) and the Notes page draw ONE button instead of two copies that drift. Its corner and its
+   lift are each screen's own: `.gn-notes__toc` places it bottom-left, `.gn-help__launcher` bottom-right. */
+.gn-toc-launcher__button {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  box-shadow: var(--gn-shadow-lift-near);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.gn-toc-launcher__button:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── THE PHONE: THE SIDEBAR BECOMES A FLOATING PANEL (23.232–23.237) ─────────────────────────────────────────────
+   Owner, 2026-10-02: "Mobile Content Section for Help Page … Move it from being fixed at the top to being a
+   floating menu on the bottom right." Replaces the in-flow "Contents" disclosure (23.174). Above 47.9375rem the
+   launcher is not drawn and the aside is the sticky sidebar; at or below it the SAME aside is a fixed panel
+   anchored bottom-right, shown while `data-panel-open='true'`, and the button below opens it.
+
+   Both are lifted over the bottom bar by `var(--gn-bar-lift, 0px)` — declared by `apps/web/app/globals.css` while
+   a bar shows (case 23.056) and 0 where there is none (signed out, `apps/desktop`) — and held inside the safe
+   area by `max(1rem, env(safe-area-inset-*))`, as the Notes launcher is. */
+.gn-help__launcher { display: none; }
 @media (max-width: 47.9375rem) {
-  .gn-help__sidebar {
-    flex-basis: 100%;
-    position: static;
-    max-height: none;
-    /* Explicit, not left to the `auto` above: with no `max-height` it would
-       never scroll anyway, but an `auto` box is still a scroll container, and
-       the guide states `visible` here for that reason. */
-    overflow-y: visible;
-    padding: 1.75rem 0 1.25rem;
-    box-shadow: inset 0 -1px 0 var(--gn-border);
+  .gn-help__launcher {
+    display: flex;
+    position: fixed;
+    z-index: 30;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(max(1rem, env(safe-area-inset-bottom, 0px)) + var(--gn-bar-lift, 0px));
   }
-  /* The 2rem of side padding goes with the sidebar: stacked, this pane spans
-     the viewport, and the shell's own inset (0.75rem on a phone,
-     `globals.css:65`) is the one that should hold the text off the edge. On
-     desktop, where there is no shell, edge-to-edge at 390px is the reference's
-     own behaviour for a window that narrow. */
+  /* The panel sits 3.5rem above the button's own bottom: the 2.75rem button and a 0.75rem gap. Its height is
+     what is left between the app bar and that line, so it scrolls INSIDE itself and never covers the bar (the
+     `100dvh` line is the one browsers that know the unit use; `100vh` is the fallback). */
+  .gn-help__sidebar {
+    position: fixed;
+    top: auto;
+    left: auto;
+    z-index: 30;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(max(1rem, env(safe-area-inset-bottom, 0px)) + var(--gn-bar-lift, 0px) + 3.5rem);
+    flex: none;
+    width: min(22rem, calc(100vw - 2rem));
+    max-height: calc(100vh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+    max-height: calc(100dvh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+    gap: 0.75rem;
+    padding: 1rem 0.75rem 0.5rem 1rem;
+    background: var(--gn-surface-raised);
+    border-radius: var(--gn-radius-card);
+    box-shadow: var(--gn-shadow-lift-near);
+    transform-origin: bottom right;
+    transition: opacity 160ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0s;
+  }
+  /* Closed: out of sight AND out of the tab order and the accessibility tree (`visibility`), which is why the
+     visibility change waits for the exit transition and the entrance does not. */
+  .gn-help__sidebar[data-panel-open='false'] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(0.75rem);
+    transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 120ms;
+  }
+  /* 23.237: reduced motion opens and closes without the slide (or the fade). */
+  @media (prefers-reduced-motion: reduce) {
+    .gn-help__sidebar,
+    .gn-help__sidebar[data-panel-open='false'] { transition: none; }
+  }
+  .gn-help__search-hint { display: none; }
+  /* The topic list's own right inset is the panel's: 0.75rem of padding holds the scrollbar off the edge. */
+  .gn-help__nav,
+  .gn-help__panel-results { padding-right: 0.25rem; }
   .gn-help__main { flex-basis: 100%; padding: 0 0 2rem; }
   .gn-help__column { padding-top: 1.25rem; }
 }
@@ -6569,6 +6799,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__entry {
   scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
 }
+/* The desktop search results' wrapper (UX fixes T13 fix 1, 23.239): the first line lands just below the app bar
+   when a search from deep in the document brings them into view. */
+.gn-help__results-anchor { scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem); }
 .gn-help__section { margin-bottom: 2.5rem; }
 /* The section eyebrow — `MANUAL · GETTING STARTED`. 13px/18px/600 with 0.4px
    tracking (0.4 ÷ 13 = 0.0308em) and 6px to the `h2`, all from the reference.
@@ -6580,7 +6813,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.125rem;
   font-weight: 600;
   letter-spacing: 0.0308em;
-  text-transform: uppercase;
   color: var(--gn-text-subtle);      /* `--label3`, as `.gn-help__eyebrow` */
 }
 /* 22px/28px/600, from the reference. It was 1.3rem (20.8px) with an inherited
@@ -6611,12 +6843,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__h3 { margin: 0 0 0.4rem; font-size: 1.0625rem; line-height: 1.375rem; }
 /* `text-wrap: pretty` is the reference's own, on every paragraph. It costs
    nothing where unsupported and stops the short last line — this column is
-   72ch of prose, which is exactly where a one-word orphan shows. */
+   70ch of prose, which is exactly where a one-word orphan shows. */
 .gn-help__p { margin: 0 0 0.875rem; font-size: 1.0625rem; line-height: 1.375rem; text-wrap: pretty; }
 .gn-help__list { margin: 0 0 0.9rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.0625rem; line-height: 1.375rem; }
-/* A TRAY CARD, not a ruled aside — the reference draws a quote as the same
-   `--trayBg`/`--trayShadow` box it uses for the search results, with no rule
-   down its side at all. The `3px solid var(--gn-accent)` border is gone with
+/* A flat tinted card, not a ruled aside — the reference drew a quote as its tray box (UX fixes T6 flattened it, see the fill
+   below), with no rule down its side at all. The `3px solid var(--gn-accent)` border is gone with
    the change: an accent bar is emphasis, and a pulled quote in a manual is an
    aside, which is the opposite. 14px/16px padding and 16px of air above and
    below are the reference's own. */
@@ -6624,8 +6855,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   margin: 1rem 0;
   padding: 0.875rem 1rem;
   border-radius: var(--gn-radius-card);
-  background: var(--gn-surface-well);
-  box-shadow: var(--gn-shadow-track);
+  /* A tinted FLAT fill, no inset shadow (UX fixes T6, 23.095, audit NP-21): a pulled quote is an aside, not a pressed-in control. */
+  background: var(--gn-fill-quaternary);
   font-size: 1.0625rem;
   line-height: 1.375rem;
   text-wrap: pretty;
@@ -6642,36 +6873,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `.gn-help__toc-link` above. */
 .gn-help__link { color: var(--gn-text-accent); }
 
-/* The `Next` pager at the foot of each section. The reference puts a hairline
-   above it and pays for the space with `padding-top` on the children (4px on
-   the row, 16px on each child); one 1.25rem on the row is the same 20px with
-   one declaration instead of three. `box-shadow: inset` and not `border-top`
-   because a border would change the box's own height, and because the
-   hairline's colour is the same `fill4` role the sidebar's divider uses. */
-.gn-help__pager {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin: 0;
-  padding-top: 1.25rem;
-  box-shadow: inset 0 1px 0 var(--gn-fill-quaternary);
-}
-/* `--label3` here too — "Next" is the furniture beside the link, not the
-   thing being read. The link itself keeps `textAccent`. */
-.gn-help__pager-label { font-size: 0.9375rem; line-height: 1.25rem; color: var(--gn-text-subtle); }
-/* `min-height: 1.5rem` for WCAG 2.5.8's 24px floor, as with the sidebar links —
-   one standalone-looking link per section, but it sits in running text rather
-   than on its own, so the 24px in-list floor is the applicable one. */
-.gn-help__pager-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.5rem;
-  color: var(--gn-text-accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-.gn-help__pager-link:hover { text-decoration: underline; }
+/* The per-section `Next` pager that stood here was REMOVED (23.230, owner 2026-10-02: "Either remove this, or put
+   only one section at a time" — one continuous page). `.gn-help__section`'s own `margin-bottom` above is what
+   marks the end of a topic now. */
 
 /* Wide content scrolls INSIDE its own box; the page never scrolls sideways. */
 .gn-help__table-scroll { overflow-x: auto; margin: 0 0 1rem; }
@@ -6836,6 +7040,22 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      selected tab would lift instead of press (B-D3, 10.80). */
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-selected);
+  /* U6 (owner, 2026-10-02; case 23.003): the pressed segment also reads in WEIGHT and a BAR, not by its inset alone
+     (the inset measured as invisible: audit SYS-06, SET-08, NP-17). The label is semibold and a 2px bar in the main
+     TEXT colour, not the accent (U1), sits under it. */
+  position: relative;
+  font-weight: 600;
+}
+[data-style="neo"] .gn-segmented__item--on::after {
+  content: "";
+  position: absolute;
+  bottom: 0.375rem;
+  left: 50%;
+  width: 1rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gn-text);
+  transform: translateX(-50%);
 }
 .gn-segmented__item:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -6919,7 +7139,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  /* U9 (owner, 2026-10-02; case 23.005): 3px, not 1px, so the ring clears the sunken shadow and the neo rim. */
+  outline-offset: 3px;
 }
 /* Had no rule at all before this: a disabled `.gn-field__input` (a built-in
    ticket type's locked rank, a read-only field row) fell back to nothing but
@@ -6932,19 +7153,41 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   color: var(--gn-text-muted);
   cursor: not-allowed;
 }
-/* ── OWNER RULING 2026-09-09 (Task 14 AMENDMENT rule (a)): under `neo` the
-   empty input takes the PURE NEO look — sunken, no border — even though the
-   shadow edge measures below 3:1 (1.24 light / 1.16 dark, both themes, Task
-   13's measurement). The cost was flagged (13.284/13.291's own reasoning: an
-   empty field then carries no ≥3:1 boundary to identify it) and the owner
-   reaffirmed "pure neo look." Case 13.339 pins this and quotes the waived
-   number; `hig`/`minimal` are UNTOUCHED by this rule and keep 13.291's
-   bordered look. Radius is inherited from the base rule above — only the
-   boundary treatment changes here. */
+/* ── OWNER RULING 2026-10-02 (U5, UX fixes T1; case 23.002): under `neo` a text field is sunken AND ringed.
+
+   History, kept because it is the reason this rule is shaped as it is. On 2026-09-09 (Task 14 AMENDMENT rule (a))
+   the owner ruled the empty neo input "pure neo look": sunken, `border: none`, even though its shadow edge measured
+   1.24 light / 1.16 dark, below the 3:1 a non-text boundary owes (case 13.339 pinned it and quoted the waiver).
+   The 2026-10-01 audit then found people could not locate empty fields in neo (SYS-05, WS-04, NP-25, TT-14), and
+   the owner reversed the waiver for TEXT FIELDS: **"borders on buttons only" became "borders on buttons and text
+   fields".** It stays in full for cards, wells, notices and rows, which keep their shadow-only edge.
+
+   The ring is a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
+   raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
+   `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
+   to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
+   also removes the 1px that a neo field lost to its missing border compared with a hig one. */
 [data-style="neo"] .gn-field__input {
-  border: none;
+  border: 1px solid var(--gn-field-rim);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
+}
+/* U7 (owner, 2026-10-02; cases 23.004, 23.009): a DISABLED neo field is flat: no ring, no inset, muted text on
+   whatever ground it sits on. "No depth" reads as "not interactive". The border keeps its 1px (`transparent`, not
+   `none`) so a disabled field does not change size next to an enabled one. The text is `--gn-text-subtle`, which
+   clears 4.5:1 on both neo wells (4.77 light, 6.82 dark), so it stays readable inside a sunken well.
+
+   SOURCE ORDER: this sits AFTER the neo field rule above and is asserted to (23.004). The base
+   `.gn-field__input:disabled` is declared BEFORE that rule and is `(0,2,0)`, the same as the neo rule, so it
+   loses the cascade by order; this arm is `(0,3,0)` and wins either way, and the order is kept as the mutation
+   that proves the rule is read. A `Select` trigger is a `.gn-field__input` too, so its disabled form is covered
+   by the second selector. */
+[data-style="neo"] .gn-field__input:disabled,
+[data-style="neo"] .gn-select__trigger:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-text-subtle);
 }
 
 /* ── The raised trigger coat (`Select`'s `appearance="raised"`; case 13.1344).
@@ -7008,6 +7251,30 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
 
+/* ── The quiet danger button (UX fixes T2, U1/SYS-12, case 23.022): the ONE destructive treatment until the confirm
+   dialog. A row's "Delete" / "Remove" is OUTLINED, not filled: a danger-coloured 1px edge and label on a transparent
+   ground, no lift. The filled `.gn-button--danger` is the confirm dialog's loud element and nothing else. Danger as ink
+   clears 4.5:1 on a raised card and on a well in all six style x theme combinations (so the edge clears 3); on bare
+   `surface` it is 4.40 in hig/minimal light, which no site uses. Hover THICKENS the edge to 2px (an inset ring) rather
+   than washing the ground: the ink on `fill-quaternary` over a well is under 4.5 (the measurement the builder's
+   `.gn-button.builder-quiet-danger` comment above records), a ring leaves the ink at its rest ratio. The builder's
+   three destructive buttons wear this variant too and keep `builder-quiet-danger` only as their metrics hook. */
+.gn-button--danger-quiet {
+  border: 1px solid var(--gn-danger);
+  background: transparent;
+  color: var(--gn-danger);
+  box-shadow: none;
+}
+.gn-button--danger-quiet:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--gn-danger);
+  transform: none;
+}
+.gn-button--danger-quiet:active:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
 /* ── Page header: icon tile, title, tagline. Opt-in per screen. ─────────── */
 .gn-page-header {
   display: flex;
@@ -7045,7 +7312,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-page-header__title {
   margin: 0;
-  font-size: 2.1rem;
+  font-size: var(--gn-title-page);
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -7108,7 +7375,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Styling refresh Plan B (Task B5): 16px between the header's groups (rule 02). */
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
-.gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+.gn-project__title { font-size: var(--gn-title-page); line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
 /* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
    OWN page. It sits under the title as its own line rather than inside the
    heading, so a screen reader hears the project's name as the heading and the
@@ -7257,6 +7524,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font: inherit;
   font-size: 1.0625rem;
 }
+/* U5 (case 23.002): the project search is a text field, so under `neo` it wears the ring too. It had no neo arm and no
+   border at all (`border: none` above, the sunken shadow alone), which measured 1.18 in light. */
+[data-style="neo"] .gn-project__search {
+  border: 1px solid var(--gn-field-rim);
+}
 .gn-project__filter-chip {
   display: inline-flex;
   align-items: center;
@@ -7275,6 +7547,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    button in this file makes the same choice (`.gn-board-card__title`,
    `.gn-board__empty-create`, 37 more) — a convention, not a one-off. */
 .gn-project__filter-chip-remove {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   border: none;
   background: none;
   padding: 0;
@@ -7322,7 +7595,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    already decided"): raising a `ctlBg` control to neo's raised/inset shadow
    is an OPEN DECISION the repo owner left to a future round, not something
    one page's task should settle piecemeal on one control. Applying it here
-   and not on `.gn-button`'s own Filters/New ticket, three centimetres to
+   and not on `.gn-button`'s own Filters/Create ticket, three centimetres to
    this control's right, would make this the one place in the product that
    quietly took a side on a question everything else has left alone. The
    metric's own colour is left unset (`color: var(--gn-text)`, matching
@@ -7347,18 +7620,30 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline-offset: 1px;
 }
 
-/* The web app on phones — the project header (Plan Task 8, case 21.110). At <=40rem the controls row takes the
-   whole width of the head: the search fills the first row with Filters beside it (`order` lifts them above
-   the workflow picker and the active-only switch, which keep their DOM order after them), and New ticket —
-   the header's one primary button, a direct child — takes a full row of its own. Inside the one 40rem arm and
-   AFTER `.gn-project__header` and `.gn-project__search`, so source order decides. `.gn-project__filters` is a
-   hook the page puts on the Filters button; nothing paints it above 40rem. The view tabs' scroller lives
-   with `.gn-project__rail` in `globals.css`. */
-@media (max-width: 40rem) {
-  .gn-project__header { flex: 1 1 100%; }
-  .gn-project__search { order: -2; flex: 1 1 0; min-width: 0; }
-  .gn-project__filters { order: -1; flex: none; }
-  .gn-project__header > .gn-button--primary { flex: 1 1 100%; }
+/* The project header through the tablet band and on phones (UX fixes Task 4, owner ruling U3, case 23.054; it was a phone-only
+   arm at <=40rem, Plan Task 8, case 21.110, which stretched Create ticket across a row of its own).
+
+   At <=64rem the toolbar is TWO rows: row one is the identity (crumb over title) at the left and Create ticket — the
+   header's one primary, a direct child — at the right; row two is the search with Filters beside it, then the workflow
+   picker and the active-only switch. Create ticket is never full width: it is an icon button with a word, and a full-width
+   one was the loudest thing on the page (the prototype's one loud element is the page's action, not a banner).
+
+   HOW. `.gn-project__header` is `display: contents`, so its children are flex items of `.gn-project__head` beside the
+   identity and `order` can lay them out across both: identity 0 (the default), the primary 1, then a LINE BREAK — the
+   head's `::after`, a 100%-wide zero-height item ordered 2 — then the controls 3 and 4. A wrapping flex row cannot be
+   told "break here" any other way without a second wrapper in `page.tsx`. The `::after` costs one extra row-gap, so
+   `row-gap` is half what a gap between the rows should be. `.gn-project__filters` is a hook the page puts on the Filters
+   button; nothing paints it above 64rem. The view tabs' scroller lives with `.gn-project__rail` in `globals.css`.
+   AFTER `.gn-project__header`, `.gn-project__search` and `.gn-project__identity`: source order decides. */
+@media (max-width: 64rem) {
+  .gn-project__head { row-gap: 0.5rem; }
+  .gn-project__head::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+  .gn-project__header { display: contents; }
+  .gn-project__identity { flex: 1 1 0; min-width: 0; }
+  .gn-project__header > * { order: 4; }
+  .gn-project__search { order: 3; flex: 1 1 0; }
+  .gn-project__filters { order: 3; flex: none; }
+  .gn-project__header > .gn-button--primary { order: 1; margin-left: auto; }
 }
 
 /* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
@@ -7406,7 +7691,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-filters__heading { font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; margin: 0; }
 .gn-filters__section-label {
   font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600;
-  color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.0375rem;
+  color: var(--gn-text-muted); letter-spacing: 0.0375rem;
 }
 .gn-filters__footer {
   padding: 1rem 1.5rem; background: var(--gn-fill-quaternary);
@@ -7486,7 +7771,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 
-/* Category chip — `radius 999px; padding 8px 12px; 13px`, selected `accent`
+/* Category chip — `radius 999px; padding 8px 12px; 13px`. UX fixes T2 (U1, case 23.020): the selected state is the
+   quiet `surfaceTrack` + a 600 label in `--gn-text` (`text` on `surfaceTrack` is a declared pair), no longer the
+   accent fill; the pressed choice carries the check glyph (`ChoiceGlyph`). The paragraph below records the original
+   accent pairing and is kept as history. Originally: selected `accent`
    ground + `onColor`. The gated pair is `{ fg: 'accentText', bg: 'accent' }`
    (`tokens.ts` `CONTRAST_PAIRS`, measured at 4.5:1 in both themes) —
    `.gn-button--primary`/`.gn-avatar--tint-0` already pair `--gn-accent`
@@ -7508,8 +7796,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-filters__chip[aria-pressed='true'] {
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-surface-track);
+  color: var(--gn-text);
+  font-weight: 600;
 }
 .gn-filters__chip:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -7541,8 +7830,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-filters__choice-glyph { flex: none; }
 .gn-filters__choice[data-mode='include'] {
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
+  background: var(--gn-surface-track);
+  color: var(--gn-text);
+  font-weight: 600;
 }
 /* Exclude is a choice, not an error: the OFF ground, explicitly, and no
    danger tone anywhere in this rule (13.551 reads exactly this body). The
@@ -7568,7 +7858,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: var(--gn-shadow-sunken);
 }
 .gn-filters__choice--row[data-mode='include'] {
-  background: var(--gn-accent);
+  background: var(--gn-surface-track);
   box-shadow: none;
 }
 /* Exclude keeps the ROW's own ground (spec §4's table: off and exclude share a
@@ -7603,7 +7893,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__load-error { margin: 0; color: var(--gn-text); }
 .workflow-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .workflow-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-list__title { margin: 0; font-size: 1rem; }
+.workflow-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
 /* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
@@ -7628,6 +7918,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 0.375rem;
   font-size: 0.75rem;
   line-height: 1rem;
   padding: 0.1875rem 0.5625rem 0.1875rem 0.8125rem;
@@ -7635,6 +7926,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-surface-sunken);
 }
 [data-style="neo"] .workflow-list__state { box-shadow: var(--gn-shadow-sunken-compact); }
+/* The category as a WORD beside the state name (UX fixes T6, 23.093, audit WF-12): the bar's colour was the only thing saying
+   Open / Active / Done. The bar stays, `aria-hidden`; the word carries it. */
+.workflow-list__state-category { color: var(--gn-text-muted); }
 .workflow-list__state-bar {
   position: absolute;
   left: 0;
@@ -7689,7 +7983,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.75rem;
 }
 .workflow-history__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-history__title { margin: 0; font-size: 1rem; }
+.workflow-history__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-history__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-history__versions {
   display: flex;
@@ -7884,6 +8178,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    cluster's, not this control's, and it is reported with a named owner. */
 .gn-infotip { position: relative; display: inline-flex; align-items: center; }
 .gn-infotip__trigger {
+  position: relative; /* anchors the hit-slop `::before` at the end of this file (UX fixes T6, 23.090) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8151,9 +8446,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    that for every control in the product is an owner visual decision, not one a
    screen's task should take on the review's behalf.
 
-   `:disabled { opacity: 0.4 }` is the prototype's OWN number for this control
-   (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`), not `.gn-button`'s generic
-   0.55 (`:126`) — the same distinction `.gn-board-card__move:disabled` records.
+   `:disabled` was the prototype's OWN 0.4 for this control (`:3161-3162`, `";opacity:0.4;cursor:not-allowed"`); UX fixes T6
+   (23.094) folds it into the one `--gn-disabled-opacity` token, as `.gn-board-card__move:disabled` was.
 
    **⚠ THE BODY BELOW IS A COPY OF `.gn-board-card__move`'s AND NOTHING GUARDS THE
    DRIFT — found by review 2026-09-20 and RECORDED rather than fixed.** The two are
@@ -8180,7 +8474,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
    So the `<li>` becomes the flex row the comment describes, and `__reorder` a
    flex pair so the two arrows read as one unit at `.gn-board-card__moves`'s own
-   `0.5rem` gap. **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
+   `0.5rem` gap. (AMENDED 2026-10-02, 23.171: there is ONE Reorder button now, so the pair is a single item and the gap
+   separates nothing visible; the wrapper keeps the declaration.) **THE ROW DOOR KEEPS `width: 100%`, which as a flex item means
    its base is the full line and it shrinks against the pair** — asserted by
    measurement below rather than by reading the spec, and deliberately NOT
    rewritten, because `.ticket-type-list__row`'s body is pinned by 10.80
@@ -8218,11 +8513,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: transparent;
   color: var(--gn-text-subtle);
   font: inherit;
+  padding-inline: 0.75rem; /* UX fixes T10: the trigger is the word "Reorder", not an arrow */
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
 }
-/* Styling refresh Plan B (Task B16): P-GHOST icon — the reorder arrows are text controls with no edge; hover or focus washes them. */
+/* Styling refresh Plan B (Task B16): P-GHOST — the reorder trigger (the "Reorder" word since 23.171; the arrows before) is a text control with no edge; hover or focus washes it. */
 .ticket-type-list__move:hover:not(:disabled),
 .ticket-type-list__move:focus-visible {
   background: var(--gn-fill-tertiary);
@@ -8232,7 +8528,32 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 0;
 }
-.ticket-type-list__move:disabled { opacity: 0.4; cursor: not-allowed; }
+.ticket-type-list__move:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
+
+/* UX fixes T10 (SET-03, 23.171): the row's Reorder menu. (The trigger is a word, not an arrow, so `.ticket-type-list__move`
+   above carries inline padding beside its 44px floor.) Each menu item is a 44px target. */
+.ticket-type-list__menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+}
+.ticket-type-list__menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ticket-type-list__menu-item:hover:not(:disabled),
+.ticket-type-list__menu-item:focus-visible { background: var(--gn-fill-tertiary); }
+.ticket-type-list__menu-item:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.ticket-type-list__menu-item:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
 
 /* --- The comment thread and its box (executor 2's comment-thread dispatch) ---
    Prototype: `design-system/interactive/desktop.dc.html:1268-1330` — the block
@@ -8534,3 +8855,50 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-note-badge--project { background: var(--gn-tint-warning); }
 .gn-note-badge--inherit { background: var(--gn-fill-secondary); }
 .gn-note-badge--explicit { background: var(--gn-fill-quaternary); }
+
+/* ── The type scale on a phone (UX fixes Task 5, cases 23.070 / 23.072; audit SYS-02, WF-05, WF-06, SET-17, NP-15) ────
+   Every page title reads `--gn-title-page` (34px) and, here, `--gn-title-page-phone` (22px); every section head reads
+   `--gn-title-section` (20px) and `--gn-title-section-phone` (18px). The tokens are emitted once by `themeStylesheet()`
+   (`tokens.ts`), so no rule spells a size. The workflow editor's name field takes its phone size in its own arm above
+   (`.workflow-builder-screen__name`); the project title stays ONE line and ellipsises, as a header row should. */
+@media (max-width: 40rem) {
+  .gn-help__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-page-header__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-project__title {
+    font-size: var(--gn-title-page-phone);
+    line-height: 1.75rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gn-list__section-title,
+  .gn-my-work__heading,
+  .workflow-list__title,
+  .workflow-history__title,
+  .ticket-type-list__title { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
+}
+
+/* HIT AREAS (UX fixes T6, 23.090, audit SYS-10, PV-09, PV-18, ENT-13, SET-13): the controls below draw a box under 44px on
+   purpose (an inline link-button in a dense card, a 24px caret, a 24px ×, the (i) trigger). Their DRAWN box stays; a
+   transparent `::before` extends the HIT box to 2.75rem, centred, the technique `.gn-breadcrumb a::before` already uses
+   (20.616). Each control's BASE rule carries `position: relative` (so the pseudo anchors to it); this block holds only the
+   pseudo. `max(100%, 2.75rem)` keeps a wide link as wide as it is. The pseudo paints nothing: no fill, no border, no
+   shadow, so a hit-slop never changes how a control looks. Neighbouring slops overlap by a few pixels; the later sibling
+   wins the overlap, which is acceptable on a card whose own row is the larger target. */
+.gn-board-card__epic::before,
+.gn-board-card__title::before,
+.gn-board-card__parent-key::before,
+.gn-my-work__title::before,
+.gn-list__open::before,
+.gn-list__collapse::before,
+.gn-project__filter-chip-remove::before,
+.gn-infotip__trigger::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 2.75rem);
+  height: max(100%, 2.75rem);
+  transform: translate(-50%, -50%);
+}

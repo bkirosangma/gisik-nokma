@@ -203,11 +203,11 @@ describe('AppNav — the mounts, not the components', () => {
    *
    * `AppNav` carries three destinations and the review's mutation proved the
    * suite noticed none of them going missing. Asserting all three by their
-   * rendered names and hrefs — and asserting `My Work` is withheld when there is
+   * rendered names and hrefs — and asserting `My work` is withheld when there is
    * no workspace in scope, which is the one conditional in this file — makes the
    * whole nav a measured surface rather than only the line this round added.
    */
-  it('11.171 carries Workspaces always and My Work only inside a workspace', async () => {
+  it('11.171 carries Workspaces always and My work only inside a workspace', async () => {
     currentPath = '/workspaces';
     const { rerender } = render(
       <Providers services={NO_NAV_SERVICES}>
@@ -216,7 +216,7 @@ describe('AppNav — the mounts, not the components', () => {
     );
     expect(screen.getByRole('link', { name: 'Workspaces' })).toHaveAttribute('href', '/workspaces');
     // Absent, not empty: no workspace is in scope, so there is nowhere for it to go.
-    expect(screen.queryByRole('link', { name: 'My Work' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'My work' })).not.toBeInTheDocument();
 
     currentPath = '/w/ws_1/my-work';
     rerender(
@@ -224,7 +224,7 @@ describe('AppNav — the mounts, not the components', () => {
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-    expect(await screen.findByRole('link', { name: 'My Work' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
       '/w/ws_1/my-work',
     );
@@ -246,7 +246,7 @@ describe('AppNav — the mounts, not the components', () => {
    * this file's own case-id line in `test-cases/11-calendar-notifications.md`.
    */
   describe('11.185 the link set is closed at each of the three nav shapes', () => {
-    it('WITHOUT a workspace: only the four ALWAYS items, no My Work/Board/Settings', () => {
+    it('WITHOUT a workspace: only the four ALWAYS items, no My work/Board/Settings', () => {
       currentPath = '/workspaces';
       render(
         <Providers services={NO_NAV_SERVICES}>
@@ -265,7 +265,7 @@ describe('AppNav — the mounts, not the components', () => {
       expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
     });
 
-    it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
+    it('WITH a workspace, no project: the served name, My work and Members join, Board does not', async () => {
       currentPath = '/w/ws_1/my-work';
       render(
         <Providers services={workspacesOf([workspace({ id: 'ws_1', name: 'Convenience Corner' })])}>
@@ -454,7 +454,7 @@ describe('13.391 the nav is contextual', () => {
     // HAS a remembered workspace, on every global page they open.
     expect(
       await screen.findByText(
-        'No workspace selected — pick one to reach its board, members and settings.',
+        'No workspace selected. Pick one to reach its board, members and settings.',
       ),
     ).toBeInTheDocument();
 
@@ -488,7 +488,7 @@ describe('13.391 the nav is contextual', () => {
     expect(screen.queryByRole('link', { name: '' })).not.toBeInTheDocument();
     // The other workspace-scoped items are NOT held hostage to the name read —
     // they need only the id, which is already in hand.
-    expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My work' })).toBeInTheDocument();
   });
 
   /**
@@ -572,7 +572,7 @@ describe('13.391 the nav is contextual', () => {
       'href',
       '/w/ws_1',
     );
-    expect(screen.getByRole('link', { name: 'My Work' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'My work' })).toHaveAttribute(
       'href',
       '/w/ws_1/my-work',
     );
@@ -585,7 +585,7 @@ describe('13.391 the nav is contextual', () => {
       '/settings?workspaceId=ws_1',
     );
     // Not current: you are on `/inbox`, not in the workspace.
-    expect(screen.getByRole('link', { name: 'My Work' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'My work' })).not.toHaveAttribute('aria-current');
     // And the note must not claim otherwise.
     expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
   });
@@ -614,7 +614,7 @@ describe('13.391 the nav is contextual', () => {
     // merely slow.
     expect(await screen.findByText(/No workspace selected/)).toBeInTheDocument();
     expect(screen.queryByText('Convenience Corner')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
   });
 
   /**
@@ -639,9 +639,9 @@ describe('13.391 the nav is contextual', () => {
     );
 
     // The inbox link is the settled-render witness: it proves the bar painted,
-    // so "no My Work" below is a decision and not a snapshot taken too early.
+    // so "no My work" below is a decision and not a snapshot taken too early.
     expect(await screen.findByRole('link', { name: 'Inbox' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
@@ -678,7 +678,7 @@ describe('13.391 the nav is contextual', () => {
 
     // No `await`. These must be present in the first committed render.
     expect(screen.getByRole('link', { name: 'Convenience Corner' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'My Work' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My work' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Members' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
     // And the note never flashes in their place.
@@ -723,7 +723,7 @@ describe('13.391 the nav is contextual', () => {
       </Providers>,
     );
     expect(screen.queryByRole('link', { name: 'Convenience Corner' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'My Work' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'My work' })).toBeNull();
   });
 
   /**
@@ -1234,7 +1234,7 @@ describe('13.393 exactly one nav item is current, and sign-out keeps its full na
       </Providers>,
     );
     await screen.findByRole('link', { name: 'Convenience Corner' });
-    const myWork = screen.getByRole('link', { name: 'My Work' });
+    const myWork = screen.getByRole('link', { name: 'My work' });
     expect(myWork).toHaveAttribute('aria-current', 'page');
     const others = screen.getAllByRole('link').filter((a) => a !== myWork);
     for (const other of others) {
@@ -1339,7 +1339,7 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
    * Signed out on `/help` — the route `app-nav.tsx` itself calls *"the route
    * most likely to be wanted by someone who cannot get in"* — the bar painted
    * `Workspaces`, `Help`, `Account`, an unlabelled inbox icon and the scope
-   * note *"No workspace selected — pick one to reach its board, members and
+   * note *"No workspace selected. Pick one to reach its board, members and
    * settings."*, and **no Sign in**. Pressing Workspaces signed out landed on
    * `/sign-in` by a 401 bounce with no `next=`, so the destination was thrown
    * away; Account repainted the page E5-13's second reproduction describes; the
@@ -1418,67 +1418,38 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
 });
 
 /**
- * Case `13.1138` — E4-11 — THE PHONE DISCLOSURE'S WIRING, witnessed at the component because
- * the CSS arm cannot be: jsdom evaluates no media query, so a stylesheet test
- * can prove the breakpoint hides the wrapper but not that the button which
- * unhides it is wired to it.
- *
- * What matters here is the ONE property the shape was chosen for: **the links
- * are never conditionally rendered.** A closed bar is a visual state, not a
- * missing link, so the scoped routes stay in the document — and therefore in
- * the accessibility tree and one Tab away — at every width. A `{moreOpen && …}`
- * implementation would have passed every assertion below about the open state
- * and silently deleted three routes from the phone's accessibility tree; the
- * "BOTH states" case is what refuses that.
+ * Case `13.1138` — E4-11 — AMENDED 2026-10-02 (UX fixes Task 4, owner ruling U3, case 23.042): THE DISCLOSURE'S TOGGLE IS
+ * GONE. This block witnessed the `Menu` button's wiring (`aria-expanded`, `aria-controls`, `data-open`), and the button was
+ * retired: from 64rem down the bottom bar is the navigation, so there is nothing for a toggle to open. What the block
+ * existed to protect stays, and is what remains asserted: **the links are never conditionally rendered.** A painted-away
+ * link is a visual state, not a missing one, so the scoped routes stay in the document at every width — `.gn-nav__more` is
+ * `display: none` at ≤64rem by the stylesheet, not omitted by the component. (jsdom evaluates no media query, so the
+ * wrapper's hiding is `nav-phone-disclosure.test.ts`'s; the bar's own rendering is `tablet-band.test.tsx`'s, 23.050.)
  */
-describe('E4-11 — the workspace links sit behind one disclosure', () => {
+describe('E4-11 — the workspace links are in the document with no Menu toggle in front of them', () => {
   beforeEach(() => {
     currentPath = '/w/ws_1/my-work';
     mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
   });
 
-  const renderOnAPhoneRoute = () =>
+  it('13.1138 the scoped links are in the document, and there is no Menu button, no aria-controls target and no data-open state', () => {
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav workspaceId="ws_1" />
       </Providers>,
     );
-
-  it('starts closed, and says so in the accessibility tree rather than only in CSS', () => {
-    renderOnAPhoneRoute();
-    const toggle = screen.getByRole('button', { name: 'Menu' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveAttribute('aria-controls', 'gn-nav-more');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
+    for (const name of ['My work', 'Members', 'Settings']) {
+      expect(screen.getByRole('link', { name }), `${name} left the document`).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
+    expect(document.getElementById('gn-nav-more')).toBeNull();
+    // CONTROL — the wrapper the links sit in is still there, and carries no open/closed state.
+    const wrapper = document.querySelector('.gn-nav__more');
+    expect(wrapper).not.toBeNull();
+    expect(wrapper).not.toHaveAttribute('data-open');
   });
 
-  it('13.1138 opens, and the scoped links are in the document in BOTH states', async () => {
-    renderOnAPhoneRoute();
-    const scoped = ['My Work', 'Members', 'Settings'];
-    for (const name of scoped) {
-      expect(screen.getByRole('link', { name }), `${name} left the CLOSED document`).toBeInTheDocument();
-    }
-
-    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'true');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'true');
-    for (const name of scoped) {
-      expect(screen.getByRole('link', { name }), `${name} left the OPEN document`).toBeInTheDocument();
-    }
-
-    // And back — the control is a toggle, not a one-way reveal.
-    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
-  });
-
-  it('renders NO toggle when there is nothing behind it to disclose', () => {
-    // Signed out on a global route with no remembered workspace: every child of
-    // `.gn-nav__more` is gated on `!noWorkspace`, so the toggle would open an
-    // empty panel. This is the negative control for the gate above — it fails
-    // if the toggle is rendered unconditionally, and it fails if the gate is
-    // tightened to `workspaceName !== null` instead (the name is unresolved
-    // here, but the three id-only links are not).
+  it('signed out there is no Menu button either, and the bar still mounts', () => {
     currentPath = '/help';
     mockSessionUser = null;
     render(
@@ -1487,9 +1458,8 @@ describe('E4-11 — the workspace links sit behind one disclosure', () => {
       </Providers>,
     );
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
-    // The bar is still the bar: the always-items render, so this is the gate
-    // answering "no" rather than the component failing to mount. Signed out,
-    // the always-item is the bar's own `Sign in` (E5-31, B11), not `Workspaces`.
+    // The bar is still the bar: the always-items render, so this is the absence being real
+    // rather than the component failing to mount. Signed out, the always-item is the bar's own `Sign in` (E5-31, B11).
     expect(document.querySelector('nav.gn-nav a.gn-nav__signin')).toHaveTextContent('Sign in');
   });
 });
@@ -1574,5 +1544,54 @@ describe('the nav brand group', () => {
         expect(el.hasAttribute(attr), `${el.tagName} carries ${attr}`).toBe(false);
       }
     }
+  });
+});
+
+/**
+ * 23.044 — "where am I" is a segment-bounded PREFIX match for Settings, My work and Members (audit SYS-20, NP-26, WS-08);
+ * this block pins Settings, `bottom-bar.test.tsx` pins My work and Members against the bar's own light.
+ * The workspace link stays exact (`/w/<id>` is not "inside" `/w/<id>/members`, case 13.393).
+ */
+describe('23.044 Settings lights on every route under it', () => {
+  function renderAt(path: string) {
+    currentPath = path;
+    return render(
+      <Providers services={workspacesOf([workspace({ id: 'ws_1' })])}>
+        <AppNav workspaceId="ws_1" />
+      </Providers>,
+    );
+  }
+
+  it('23.044 /w/<id>/settings/workflows/<id> and /settings/* light Settings and nothing else', async () => {
+    renderAt('/w/ws_1/settings/workflows/wf_1');
+    const settings = await screen.findByRole('link', { name: 'Settings' });
+    expect(settings).toHaveAttribute('aria-current', 'page');
+    for (const other of screen.getAllByRole('link').filter((a) => a !== settings)) {
+      expect(other, other.textContent ?? '').not.toHaveAttribute('aria-current', 'page');
+    }
+    cleanup();
+    renderAt('/settings/anything');
+    expect(await screen.findByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+
+    // CONTROL (same `it`): `/settings` still lights Settings; a sibling route, a lookalike segment and a
+    // different workspace's settings do not; the workspace link stays exact on `/w/ws_1/members`.
+    for (const [path, lit] of [
+      ['/settings', true],
+      ['/w/ws_1/my-work', false],
+      ['/settingsx', false],
+      ['/w/ws_1/settingsx', false],
+      ['/w/ws_other/settings/workflows/wf_1', false],
+    ] as const) {
+      cleanup();
+      renderAt(path);
+      const link = await screen.findByRole('link', { name: 'Settings' });
+      if (lit) expect(link, path).toHaveAttribute('aria-current', 'page');
+      else expect(link, path).not.toHaveAttribute('aria-current');
+    }
+    cleanup();
+    renderAt('/w/ws_1/members');
+    await screen.findByRole('link', { name: 'Settings' });
+    expect(screen.getByRole('link', { name: 'Convenience Corner' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Members' })).toHaveAttribute('aria-current', 'page');
   });
 });

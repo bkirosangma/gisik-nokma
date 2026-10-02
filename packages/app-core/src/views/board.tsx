@@ -17,12 +17,12 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, PlusIcon, SnowflakeIcon, useScrollEdges } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
-import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
+import { actorLabel, formatCardProvenance, formatDate } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
   BoardCard as BoardCardData,
@@ -31,7 +31,7 @@ import type {
   BoardView as BoardViewData,
 } from '../view-types.js';
 import { allBoardTargets, arrowTargets } from './board-arrows.js';
-import { BoardPhonePicker, useActiveRailColumn } from './board-phone-picker.js';
+import { BoardPhonePicker, useActiveColumn, useFollowOpenMove } from './board-phone-picker.js';
 import { usePhoneBoard } from './use-phone-board.js';
 import { setCardDragImage } from './board-drag-image.js';
 import { moveOutcome } from './board-moves.js';
@@ -88,7 +88,7 @@ export type BoardProps = {
    * `selection` is OPTIONAL on every call (starting-status design, 2026-09-23):
    * the whole-board button (`emptyBanner`) and the empty-board banner call it
    * with none, exactly as before this parameter existed. A creatable
-   * empty-COLUMN's own "Add a ticket" calls it WITH one — `{workflowId,
+   * empty-COLUMN's own "Create ticket" calls it WITH one — `{workflowId,
    * stateId}`, that column's own identity — so the shell can pre-fill the
    * New-ticket dialog's type and status. Widening an existing required-arity
    * callback rather than adding a second prop: every call site already reads
@@ -277,7 +277,7 @@ export type BoardMoveCapability = {
  * assert the same string this renders rather than a re-typed copy of it — two
  * spellings of one sentence is how a copy change passes a test it broke.
  */
-export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
+export const EMPTY_BOARD_COPY = 'No tickets here yet. Create one.';
 
 /**
  * The words an empty board says when NOBODY WIRED THE CREATE AFFORDANCE (E5… V1,
@@ -321,7 +321,7 @@ export const EMPTY_BOARD_UNWIRED_COPY = 'No tickets here yet.';
  * mount written before this prop existed reading exactly as it did. Reachability is
  * witnessed both ways: `13.1043` (all-epic) and `13.303`/`13.466` (genuinely empty).
  */
-export const EMPTY_BOARD_EPICS_COPY = 'No tickets in this view — epics appear in the List.';
+export const EMPTY_BOARD_EPICS_COPY = 'No tickets in this view. Epics appear in the List.';
 
 /**
  * The words a single COLUMN says when it holds no cards of its own — a
@@ -377,7 +377,7 @@ export const EMPTY_COLUMN_COPY = 'No tickets in this column.';
  * a filter AND by the epic rule takes the OLD text: "epics are why this is empty" would
  * be a half-truth, and `EMPTY_COLUMN_COPY` is the one written to survive not knowing.
  */
-export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column — epics appear in the List.';
+export const EMPTY_COLUMN_EPICS_COPY = 'No tickets in this column. Epics appear in the List.';
 
 /**
  * The `dataTransfer` format a dragged card's ticket id travels under
@@ -631,7 +631,7 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
    * collapsed only where there is another workflow to distinguish it from: the
    * owner's answer on 2026-09-23 was *"single workflow → UNCOLLAPSED, including
    * when it is empty"*, because a lone empty workflow collapsed would be a board
-   * showing a heading and nothing else, hiding the per-column `Add a ticket`
+   * showing a heading and nothing else, hiding the per-column `Create ticket`
    * buttons that are the only thing to act on there. A LONE group is therefore
    * never collapsed by default — and note that this is about the DEFAULT only:
    * a person may collapse a lone workflow by hand, and case `13.1413` holds both
@@ -887,7 +887,10 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
             className="gn-board__empty-create"
             onClick={() => onCreateTicket()}
           >
-            Create a ticket
+            {/* The same `+` the header's Create buttons carry (P-T13, 22.245), so every Create action reads alike.
+                Still NOT primary: the header's Create ticket is the view's one (22.150). */}
+            <PlusIcon />
+            Create ticket
           </button>
         ) : null}
       </>
@@ -1138,16 +1141,29 @@ function BoardGroupSection({
     railLeft: number;
   } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
+  // The rail scrolls sideways: `.gn-scroll-fade` reads these two attributes so a column running off an edge shows it.
+  const railEdgesRef = useScrollEdges<HTMLDivElement>('x', railRef);
   // Mobile plan FD8: on a phone the rail shows one column at a time (CSS scroll-snap) with a picker above it, and
   // the column collapse is not applied — a collapsed column renders a strip INSTEAD of its cards, so only the
   // DOM can expand it. The person's stored choices are left alone: the same memory collapses the column again
   // the moment the screen is wide enough.
   const phone = usePhoneBoard();
-  const { activeStateId, pick: pickColumn } = useActiveRailColumn(
+  const { activeStateId, pick: pickColumn } = useActiveColumn(
     railRef,
     group.columns.map((column) => column.stateId),
-    phone && expanded,
   );
+  // U-T7 fix 1 (23.126): the column that holds a card with an open Move dialog or a notice is the one shown, so
+  // neither is ever in a `hidden`, `inert` column. `Dialog` does not portal and the card is drawn in its landing column.
+  const sessions = useContext(MoveStateContext)?.sessions;
+  const heldIn = !phone || sessions === undefined
+    ? null
+    : (group.columns.find((column) =>
+        column.cards.some((card) => {
+          const held = sessions[card.ticketId];
+          return held !== undefined && (held.dialog !== null || held.refusal !== null || held.serverRefusal !== null || held.transportError !== null);
+        }),
+      )?.stateId ?? null);
+  useFollowOpenMove(heldIn, activeStateId, pickColumn);
   useHydrationLayoutEffect(() => {
     const pending = pendingFocusRef.current;
     if (pending === null) return;
@@ -1294,21 +1310,20 @@ function BoardGroupSection({
         Collapsed hides the RAIL, which is the whole point of the control: the
         request was to reclaim the row, so a state that hid the cards and left
         four empty columns standing would not answer it. Hiding the rail takes
-        the columns, their per-column empty copy and their `Add a ticket` with
+        the columns, their per-column empty copy and their `Create ticket` with
         it (`13.1409`).
       */}
       {phone && expanded && activeStateId !== null ? (
         <BoardPhonePicker
           columns={group.columns.map((column) => ({ stateId: column.stateId, name: column.name, count: column.cards.length }))}
-          railRef={railRef}
           activeStateId={activeStateId}
           onPick={pickColumn}
         />
       ) : null}
       <div
-        className="gn-board__rail"
+        className="gn-board__rail gn-scroll-fade"
         id={railId}
-        ref={railRef}
+        ref={railEdgesRef}
         hidden={!expanded}
         // A card's `dragend` bubbles here from its slot: that covers Esc and a
         // drop outside every column, neither of which fires `drop`.
@@ -1359,6 +1374,12 @@ function BoardGroupSection({
             aria-label={column.name}
             data-testid={`board-column-${column.stateId}`}
             data-state-id={column.stateId}
+            // UX fixes T7 (BRD-01): on a phone only the column the picker chose is in the page. `inert` takes the
+            // others out of the tab order and the accessibility tree; `hidden` (with `.gn-board__column[hidden]`
+            // in `ui.css`) takes them out of the layout, so the rail is as tall as the shown column. `tabIndex`
+            // lets the picker land focus on an EMPTY column, which has no card to receive it.
+            {...(phone && column.stateId !== activeStateId ? { inert: true, hidden: true } : {})}
+            tabIndex={phone ? -1 : undefined}
             className={
               (column.blocked ? 'gn-board__column gn-board__column--blocked' : 'gn-board__column') +
               (collapsed ? ' gn-board__column--collapsed' : '') +
@@ -1447,7 +1468,7 @@ function BoardGroupSection({
             ) : (
               <>
             <header className="gn-board__column-header">
-              <Chip tone={column.blocked ? 'blocked' : column.category}>{column.name}</Chip>
+              <Chip tone={column.blocked ? 'waiting' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
               {/*
                * `Close all (N)` — spec §8.3's Board bullet: "A TERMINAL
@@ -1521,12 +1542,14 @@ function BoardGroupSection({
              * that scoping it was "outside this task" is what this task closes):
              * `{workflowId: group.workflowId, stateId: column.stateId}`, this
              * column's own identity, so the shell can pre-fill the New-ticket
-             * dialog's type and status. Labelled "Add a ticket" rather than
-             * repeating `emptyBanner`'s "Create a ticket" for two reasons: it
-             * matches the prototype's own per-column copy, and a board can
-             * render both an `emptyBanner` button and one of these per empty
-             * column at once (R6) — an identical accessible name on every one
-             * of them would be indistinguishable by role and name alike.
+             * dialog's type and status. Its VISIBLE text is "Create ticket" like every
+             * other entry point (BRD-19, 22.155: one action, one name), and its
+             * ACCESSIBLE name adds the column — "Create ticket in <column>" — because
+             * a board can render both an `emptyBanner` button and one of these per
+             * empty column at once (R6), and an identical accessible name on every
+             * one of them would be indistinguishable by role and name alike. The
+             * visible text is contained in the name, so a voice-control user who
+             * says what they see still reaches it.
              *
              * GATED ON `column.creatable`, not merely on `onCreateTicket` being
              * passed (starting-status design): a state a workflow forbids
@@ -1564,11 +1587,12 @@ function BoardGroupSection({
                 </p>
                 {onCreateTicket !== undefined && column.creatable ? (
                   <Button
+                    aria-label={`Create ticket in ${column.name}`}
                     onClick={() =>
                       onCreateTicket({ workflowId: group.workflowId, stateId: column.stateId })
                     }
                   >
-                    Add a ticket
+                    Create ticket
                   </Button>
                 ) : null}
               </div>
@@ -2013,11 +2037,11 @@ function BoardCardSlot({
 }
 
 /**
- * A card never renders a state as a standing fact. The state is folded behind
- * "who · when" and unfolds to the whole claim — WHO marked it and WHEN —
- * through `formatStateProvenance`, which is the module that knows a nameless
- * claim still names its actor by id and that every instant this product shows
- * goes through the domain's one `formatIstInstant`. Inlining either half here
+ * A card never renders a state as a standing fact. It says what happened — "Moved to
+ * Doing by Anselma Marak on 19 Aug" (UX fixes T7, audit BRD-03; it was a "who · when" placeholder) — through
+ * `formatCardProvenance`, which is the module that knows a nameless claim still names its actor
+ * and that every instant this product shows goes through the domain's one `formatIstInstant`.
+ * Pressing the line unfolds it to the same sentence with the year. Inlining either half here
  * would give the board a second clock and a second idea of anonymity.
  *
  * `pending` is a CLIENT-SIDE view flag on `BoardCard` — true only between
@@ -2149,7 +2173,7 @@ function BoardCardView({
         {card.pending ? <Chip tone="pending">claim in transit</Chip> : null}
         {card.cause !== null ? (
           <Chip tone="active" title="This parent was reopened because it acquired live work">
-            reopened — live work added
+            reopened, live work added
           </Chip>
         ) : null}
         {card.rollup !== null ? (
@@ -2192,12 +2216,16 @@ function BoardCardView({
           {card.priority.value}
         </span>
         {card.dueDate !== null ? (
-          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `·` and the
+          /* ONE UNBREAKABLE UNIT (visual-fixes V1, 2026-09-30): the `,` and the
              due label wrap TOGETHER, so a separator is never left alone at the
              end of one line with its date at the start of the next. The
-             markup's text is unchanged and the `·` stays `aria-hidden`. */
+             markup's text is unchanged and the `,` stays `aria-hidden`. */
           <span className="gn-board-card__due-unit">
-            <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
+            <span className="gn-board-card__meta-sep" aria-hidden="true">{', '}</span>
+            {/* Colour is never the only signal (UX fixes T6, 23.093): a past date SAYS "Overdue" as well as turning red. */}
+            <span className={late ? 'gn-board-card__due-label gn-board-card__due-label--late' : 'gn-board-card__due-label'}>
+              {late ? 'Overdue' : 'Due'}
+            </span>{' '}
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
               title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
@@ -2207,7 +2235,7 @@ function BoardCardView({
           </span>
         ) : null}
       </p>
-      {/* The card's FOOTER (styling refresh Plan A Task 6): "who · when" and
+      {/* The card's FOOTER (styling refresh Plan A Task 6): the provenance line and
           the move arrows share one row that reaches into the card's padding,
           so 44px targets do not grow the card. Layout only — both children
           are exactly what they were. */}
@@ -2218,7 +2246,7 @@ function BoardCardView({
           aria-expanded={unfolded}
           onClick={() => setUnfolded((value) => !value)}
         >
-          {unfolded ? formatStateProvenance(stateName, card.stateProvenance) : 'who · when'}
+          {formatCardProvenance(stateName, card.stateProvenance, today, unfolded)}
         </button>
         {arrows}
       </div>
@@ -2268,7 +2296,7 @@ export function refusalCopy(workflow: WorkflowDef, available: string[]): string 
   const onBoard = available.filter((stateId) => stateId !== BACKLOG_STATE_ID);
   if (onBoard.length === 0) return "This ticket can't move from here.";
   const names = onBoard.map((stateId) => stateNameOf(workflow, stateId));
-  return `Can't move there — try ${names.join(' or ')}.`;
+  return `Can't move there. Try ${names.join(' or ')}.`;
 }
 
 /**
@@ -2535,7 +2563,7 @@ function MoveArrows({
         // quite true. REDUNDANT on this component specifically (`13.590a`'s
         // own docblock measures it): `attemptMove`, this function's one call
         // site, already clears `serverRefusal` unconditionally before every
-        // new attempt, so a stale "Refused by the server — …" notice
+        // new attempt, so a stale "Refused by the server: …" notice
         // surviving into a later silent answer is not reachable through the
         // arrows today either way. Kept for agreement with `closeCard` (which
         // has no such wrapper and DOES rely on this line) and as a second
@@ -2567,7 +2595,7 @@ function MoveArrows({
       // a 401 is neither, and `writeFailureCopy` is the one place that is
       // decided.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move: ${message}`),
       );
       moveState.dropPending(card.ticketId);
     } finally {
@@ -2640,7 +2668,7 @@ function MoveArrows({
         // Ruling 27/34: silence, not a refusal — `transportError`, and
         // `serverRefusal` cleared alongside it (Ruling 34's own pairing,
         // case `13.588c`): a REFUSED click followed by a SILENT one must not
-        // leave the earlier "Refused by the server — …" notice standing
+        // leave the earlier "Refused by the server: …" notice standing
         // beside the new one, describing an answer that no longer holds.
         setServerRefusal(null);
         setTransportError('The server did not answer this close.');
@@ -2663,7 +2691,7 @@ function MoveArrows({
       // `transportError` channel `submitDirect` uses, own sentence, never
       // `serverRefusal`. E5-25: the 401 arm joins it, one author.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this close: ${message}`),
       );
     } finally {
       setSubmitting(false);
@@ -2744,12 +2772,12 @@ function MoveArrows({
     });
   };
 
-  /** "Move to Doing" for one target; "Move to next state — Doing or Done" for a choice; the "unavailable" sentence for none. */
+  /** "Move to Doing" for one target; "Move to next state: Doing or Done" for a choice; the "unavailable" sentence for none. */
   const arrowLabel = (direction: 'previous' | 'next', targets: string[]): string => {
-    if (targets.length === 0) return `Move to ${direction} state — unavailable`;
+    if (targets.length === 0) return `Move to ${direction} state: unavailable`;
     if (targets.length === 1) return `Move to ${stateNameOf(workflow, targets[0]!)}`;
     const names = targets.map((stateId) => stateNameOf(workflow, stateId));
-    return `Move to ${direction} state — ${names.join(' or ')}`;
+    return `Move to ${direction} state: ${names.join(' or ')}`;
   };
 
   /**
@@ -2892,7 +2920,7 @@ function MoveArrows({
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
       // E5-25: a 401 goes to the session sentence through the same author.
       setTransportError(
-        writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        writeFailureCopy(cause, (message) => `We could not reach the server for this move: ${message}`),
       );
       settleFailedDialogWrite();
     }
@@ -2973,7 +3001,7 @@ function MoveArrows({
         {refusal !== null ? <MoveRefusalNotice workflow={workflow} available={refusal.available} /> : null}
         {serverRefusal !== null && dialog === null ? (
           <p role="alert" className="gn-refusal gn-refusal--server">
-            {`Refused by the server — ${serverRefusal.rule}: ${serverRefusal.reason}`}
+            {`Refused by the server: ${serverRefusal.rule}: ${serverRefusal.reason}`}
           </p>
         ) : null}
         {/*

@@ -24,8 +24,9 @@ import { envelopeFor, submitBatch, submitOne } from './submit.js';
  * `archive_*`/`delete_*` refuse unless `confirm_name` is the project's exact
  * CURRENT name, read from the directory at call time and never remembered: a
  * check against a name read earlier would let a delete through on an old name
- * (plan Review Focus 1). The prefix is IMMUTABLE after creation (FD3), so
- * `update_project` has no `prefix` argument.
+ * (plan Review Focus 1). `update_project` has no `prefix` argument: the prefix
+ * is changed by an owner or admin through the app (the event carries one since
+ * the prefixes and groups plan Task 1; the MCP gains no such tool there).
  */
 const NOT_FOUND = 'project not found or not visible to you';
 const projectId = z.string().min(1);

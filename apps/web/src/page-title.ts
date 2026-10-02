@@ -14,7 +14,7 @@
  *
  * ## Why the suffix lives here and not in `layout.tsx`'s `metadata`
  *
- * Next's own idiom is `title: { template: '%s · Gisik Nokma' }` in the root
+ * Next's own idiom is `title: { template: '%s | Gisik Nokma' }` in the root
  * layout, with each route exporting `metadata.title = 'Privacy'`. **That
  * mechanism reaches SERVER components only**, and 19 of this app's 23 routes are
  * `'use client'`, where a `metadata` export is ignored without a word — the
@@ -35,20 +35,20 @@
 export const APP_NAME = 'Gisik Nokma';
 
 /**
- * `'Privacy'` → `'Privacy · Gisik Nokma'`.
+ * `'Privacy'` → `'Privacy | Gisik Nokma'`.
  *
  * Idempotent on the product name itself: a route whose topic IS the product
- * (`/workspaces`, say) must not read `Gisik Nokma · Gisik Nokma`. Returning the
+ * (`/workspaces`, say) must not read `Gisik Nokma | Gisik Nokma`. Returning the
  * name unchanged is the honest answer there — the topic and the product are the
  * same thing — rather than a doubled suffix nobody meant.
  *
  * A blank or whitespace-only topic is treated as NO topic and answers the
- * product name, because `' · Gisik Nokma'` is a title that begins with a
+ * product name, because `' | Gisik Nokma'` is a title that begins with a
  * separator. Nothing in the product passes one; the guard is here so that the
  * failure is a sensible title rather than a leading glyph.
  */
 export function documentTitleFor(topic: string): string {
   const trimmed = topic.trim();
   if (trimmed === '' || trimmed === APP_NAME) return APP_NAME;
-  return `${trimmed} · ${APP_NAME}`;
+  return `${trimmed} | ${APP_NAME}`;
 }

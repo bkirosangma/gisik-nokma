@@ -4,7 +4,6 @@ import {
   HELP_GROUPS,
   helpGroupTitle,
   helpNav,
-  helpNextSection,
   type HelpGroup,
 } from '../../src/help/groups.js';
 import type { HelpDocument } from '../../src/help/types.js';
@@ -43,8 +42,8 @@ describe("15.19 help groups partition their document's sections, in its own orde
    * - a group listing its sections in a different order from the document
    *
    * The last one matters as much as the first three because BOTH the sidebar
-   * and the `Next` pager read an order — the sidebar from `HELP_GROUPS`, the
-   * pager from `document.sections` — so a difference would make the sidebar
+   * and the page read an order — the sidebar from `HELP_GROUPS`, the page
+   * from `document.sections` (the `Next` pager that also did is gone, 23.230) — so a difference would make the sidebar
    * present a reading order the document does not have, with nothing broken
    * enough to notice.
    */
@@ -142,32 +141,15 @@ describe('15.20 every help section is reachable from the sidebar, grouped or not
   });
 });
 
-describe('15.21 the eyebrow and the pager read the document, not a hand-kept list', () => {
+describe('15.21 the eyebrow reads the document, not a hand-kept list', () => {
   it('15.21 helpGroupTitle names the owning group, and null where none is declared', () => {
     const manual = document('manual');
     const faq = document('faq');
     expect(helpGroupTitle(manual, '1-signing-in')).toBe('Getting started');
-    expect(helpGroupTitle(manual, '11-setting-up-your-own-stages-owners-and-admins')).toBe(
+    expect(helpGroupTitle(manual, '11-setting-up-your-own-states-owners-and-admins')).toBe(
       'Permissions and setup',
     );
     expect(helpGroupTitle(manual, 'not-a-section')).toBeNull();
     expect(helpGroupTitle(faq, 'privacy')).toBeNull();
-  });
-
-  /**
-   * The pager reads `document.sections`, so it keeps working for an ungrouped
-   * document and for a drifted section. The `null` at the last section is what
-   * stops a "Next" pointing nowhere from being drawn at all.
-   */
-  it('15.21 helpNextSection follows document order and stops at the last section', () => {
-    const manual = document('manual');
-    const faq = document('faq');
-    expect(helpNextSection(manual, '1-signing-in')?.id).toBe('2-finding-your-way-around');
-    const lastManual = manual.sections[manual.sections.length - 1];
-    expect(helpNextSection(manual, lastManual?.id ?? '')).toBeNull();
-    expect(helpNextSection(faq, 'signing-in')?.id).toBe('workspaces-and-projects');
-    const lastFaq = faq.sections[faq.sections.length - 1];
-    expect(helpNextSection(faq, lastFaq?.id ?? '')).toBeNull();
-    expect(helpNextSection(manual, 'not-a-section')).toBeNull();
   });
 });

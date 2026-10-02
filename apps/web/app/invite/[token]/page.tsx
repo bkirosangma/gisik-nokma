@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
 // Imported rather than the literal re-spelled — `packages/domain/` owns the zone,
 // the same reason `/workspaces` imports it for its own `lapses …` line.
-import { IST_TIME_ZONE } from '@gisik-nokma/domain';
+import { formatDay } from '@gisik-nokma/app-core';
 import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core/online';
+import { istToday } from '../../../src/ist-today.js';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
 
 /**
@@ -54,14 +55,8 @@ import { useAppServices, useSessionStatus } from '../../../src/providers.js';
  * instant rather than `Invalid Date`, which is not a day anybody set.
  */
 function onDay(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return 'on an unknown date';
-  return at.toLocaleDateString('en-IN', {
-    timeZone: IST_TIME_ZONE,
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  if (Number.isNaN(new Date(iso).getTime())) return 'on an unknown date';
+  return formatDay(iso, istToday());
 }
 
 export default function InvitePage() {
@@ -116,7 +111,13 @@ export default function InvitePage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <h1 className="gn-page-title">Gisik Nokma</h1>
+      {/* A dead link's ONE h1 is its own headline (UX fixes T10, ENT-04), so the product name steps down to a
+          paragraph in that arm rather than leaving two h1s on the page. */}
+      {invite === null ? (
+        <p className="gn-page-title">Gisik Nokma</p>
+      ) : (
+        <h1 className="gn-page-title">Gisik Nokma</h1>
+      )}
       <Card className="gn-invite">
         {invite === 'loading' ? (
           <p>Checking the invitation…</p>
@@ -131,7 +132,7 @@ export default function InvitePage() {
               been used up by trying.
             */}
             <p className="gn-invite__unreachable" data-testid="invite-unreachable" role="status">
-              This invitation could not be checked — the server did not answer. Nothing has been
+              This invitation could not be checked. The server did not answer. Nothing has been
               used up, so the link may still be good.
             </p>
             <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>
@@ -140,10 +141,16 @@ export default function InvitePage() {
           </>
         ) : invite === null ? (
           <>
+            <h1 className="gn-invite__dead-title">This invitation can&rsquo;t be used</h1>
             <p className="gn-invite__dead">
               This invitation link does not open anything. It may have been used, withdrawn, or
-              lapsed — ask whoever invited you for a new one.
+              lapsed. Ask whoever invited you for a new one.
             </p>
+            {/* THE ONE PRIMARY (ENT-04): a dead end needs a way on, and the way on for a person with no live
+                link is the sign-in page. The workspaces link below is the quiet second door. */}
+            <Link className="gn-button gn-button--primary" href="/sign-in">
+              Go to sign in
+            </Link>
             {/*
               AND IT OFFERS SOMEWHERE TO GO (E5-18, 2026-09-21). The arm was one
               `<p>` in a Card with no link at all: a person who followed a dead
@@ -153,10 +160,12 @@ export default function InvitePage() {
               address it was sent to — so it is the honest destination rather than
               a generic home link.
             */}
-            <p>
-              <Link href="/workspaces">See your workspaces</Link>
-              {' '}— any invitation waiting for you is there.
-            </p>
+            {session.kind === 'signed-in' ? (
+              <p>
+                <Link href="/workspaces">See your workspaces</Link>
+                {' '}— any invitation waiting for you is there.
+              </p>
+            ) : null}
           </>
         ) : (
           <>
@@ -184,8 +193,8 @@ export default function InvitePage() {
               <p>
                 <Link href={`/sign-in?next=${encodeURIComponent(`/invite/${token}`)}`}>
                   Sign in to accept
-                </Link>{' '}
-                — any of the four sign-in methods works; you land back here.
+                </Link>
+                {'. '}Any of the four sign-in methods works; you land back here.
               </p>
             ) : (
               <Button variant="primary" onClick={accept}>

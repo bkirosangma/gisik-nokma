@@ -1,14 +1,24 @@
-import { SegmentedControl } from '@gisik-nokma/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { SegmentedControl, useScrollEdges } from '@gisik-nokma/ui';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { HELP_CONTENT } from './content.generated.js';
 import {
   HELP_DOCUMENT_LABELS,
   helpGroupTitle,
   helpNav,
-  helpNextSection,
   type HelpNavGroup,
 } from './groups.js';
-import { searchHelp, type HelpMatch } from './search.js';
+import { searchHelp, type HelpMatch, type HelpSearchResult } from './search.js';
 import type { HelpBlock, HelpDocument, HelpSpan } from './types.js';
 
 /**
@@ -143,7 +153,6 @@ function DocumentView({ document }: { document: HelpDocument }) {
       <Blocks blocks={document.intro} />
       {document.sections.map((section) => {
         const group = helpGroupTitle(document, section.id);
-        const next = helpNextSection(document, section.id);
         return (
           <section
             key={section.id}
@@ -165,7 +174,7 @@ function DocumentView({ document }: { document: HelpDocument }) {
               shows the label alone rather than an empty separator.
             */}
             <p className="gn-help__section-eyebrow">
-              {group === null ? label : `${label} · ${group}`}
+              {group === null ? label : `${label}, ${group}`}
             </p>
             <h2 className="gn-help__h2">{section.title}</h2>
             <Blocks blocks={section.intro} />
@@ -175,25 +184,6 @@ function DocumentView({ document }: { document: HelpDocument }) {
                 <Blocks blocks={entry.blocks} />
               </div>
             ))}
-            {/*
-              The `Next` pager. A real anchor to the next section's own id, not
-              a state change — so it works with middle-click, with the back
-              button, and while JavaScript is still loading, and it leaves a
-              fragment in the URL that the sidebar's active marker then reads.
-
-              Drawn per section rather than once at the page foot because the
-              document is all on the page: the pager's value here is "you have
-              reached the end of THIS topic", which is a per-section fact. The
-              last section gets none at all rather than one pointing nowhere.
-            */}
-            {next === null ? null : (
-              <p className="gn-help__pager">
-                <span className="gn-help__pager-label">Next</span>
-                <a className="gn-help__pager-link" href={`#${document.id}-${next.id}`}>
-                  {next.title}
-                </a>
-              </p>
-            )}
           </section>
         );
       })}
@@ -226,7 +216,7 @@ function Results({ matches, query }: { matches: HelpMatch[]; query: string }) {
               {match.entry.title}
             </a>
             <span className="gn-help__result-where">
-              {match.documentTitle} · {match.sectionTitle}
+              {match.documentTitle}, {match.sectionTitle}
             </span>
             {match.excerpt.length > 0 ? (
               <span className="gn-help__result-excerpt">{match.excerpt}</span>
@@ -235,6 +225,41 @@ function Results({ matches, query }: { matches: HelpMatch[]; query: string }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * What a search puts on the page: the matches, or the one sentence that says nothing matched, or nothing at all
+ * for an empty query.
+ *
+ * ONE component for two homes (23.235): on desktop it renders in the main reading column, where a long excerpt
+ * has room; on a phone it renders inside the floating panel, so a reader halfway down the manual can search and
+ * pick an entry without scrolling to the top. `HelpBrowser` renders it in exactly one of the two, never both —
+ * a second copy would be a second `role="status"` region announcing the same count twice.
+ *
+ * `compact` drops the sentence that points at "the list below": inside the panel there is no list below it.
+ */
+function SearchOutput({
+  result,
+  query,
+  compact,
+}: {
+  result: HelpSearchResult;
+  query: string;
+  compact: boolean;
+}) {
+  // The three states are drawn separately and named, rather than collapsing two of them into an empty list.
+  // "You have not searched yet" and "nothing matched that" are different situations, and this product says
+  // which kind of nothing it is looking at everywhere else.
+  if (result.kind === 'matches') return <Results matches={result.matches} query={query} />;
+  if (result.reason.kind !== 'no-match') return null;
+  return (
+    <p className="gn-help__none" role="status">
+      Nothing in the manual or FAQ matches <strong>“{result.reason.query}”</strong>. All{' '}
+      {result.reason.searched} entries were searched, so this is a real absence rather than a search that did
+      not run. The product may simply not do that thing yet.
+      {compact ? '' : ' The list below is everything there is.'}
+    </p>
   );
 }
 
@@ -424,7 +449,101 @@ function GroupItems({
 }
 
 /**
- * The topic sidebar: the document tabs, a `Topics` label, and the groups.
+ * The phone breakpoint, spelled exactly as the stylesheet's `@media` arm spells it (`packages/ui/src/ui.css`,
+ * the `.gn-help__sidebar` phone arm). Case 23.232 reads both and fails if they drift: a floating button drawn at
+ * one width while the CSS turns the sidebar into a panel at another would leave a reader with a button that opens
+ * nothing, or a panel with no button.
+ */
+export const HELP_PHONE_QUERY = '(max-width: 47.9375rem)';
+
+function subscribePhone(onChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+  const list = window.matchMedia(HELP_PHONE_QUERY);
+  list.addEventListener('change', onChange);
+  return () => list.removeEventListener('change', onChange);
+}
+
+function phoneSnapshot(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    ? window.matchMedia(HELP_PHONE_QUERY).matches
+    : false;
+}
+
+/**
+ * Is Help on a phone? Decides where the search RESULTS render (the panel, or the main column) and whether `/`
+ * opens the panel; every purely visual phone rule stays in the stylesheet. `false` on the server and wherever
+ * `matchMedia` is missing (jsdom), which is the desktop layout every existing suite already drives.
+ */
+function useHelpPhone(): boolean {
+  return useSyncExternalStore(subscribePhone, phoneSnapshot, () => false);
+}
+
+/** Is the keystroke going into something the reader is typing in? `/` must not steal it. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest('input, textarea, select') !== null) return true;
+  return target.closest('[contenteditable]:not([contenteditable="false"])') !== null;
+}
+
+/**
+ * THE search field — one component, rendered once, in the sidebar's pinned header (23.239). On desktop it is the
+ * first thing in that header, above the Manual/FAQ switch; on a phone the same node is the first thing in the
+ * floating panel. It is never two fields kept in sync: there is one `query`, one input and one `ref`.
+ *
+ * The visible label is gone and the accessible name is kept (a visually-hidden `label`): in a pinned header 44px
+ * is the budget, and the placeholder says the same thing in the ~226px content width. The `/` hint is drawn only
+ * while the field is empty, so it never sits under the browser's own clear button.
+ */
+function HelpSearch({
+  value,
+  onChange,
+  onKeyDown,
+  onFocus,
+  inputRef,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+  onFocus: (relatedTarget: EventTarget | null) => void;
+  inputRef: RefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <div className="gn-help__search">
+      <label className="gn-visually-hidden" htmlFor="gn-help-search">
+        Search the manual and FAQ
+      </label>
+      <input
+        id="gn-help-search"
+        ref={inputRef}
+        className="gn-help__search-input"
+        type="search"
+        value={value}
+        placeholder="Search help"
+        aria-keyshortcuts="/"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={onKeyDown}
+        onFocus={(event) => onFocus(event.relatedTarget)}
+      />
+      {value === '' ? (
+        <kbd className="gn-help__search-hint" aria-hidden="true">
+          /
+        </kbd>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The topic sidebar: a pinned header (search, then the document tabs) and the topics, and it is also the phone's
+ * floating panel.
+ *
+ * ## One element, two layouts (23.231–23.236)
+ *
+ * Above the phone breakpoint this is the sticky sidebar: the header is `flex: none` and the topics list is the
+ * ONLY part that scrolls, so the Manual/FAQ switch never leaves the viewport. At `≤47.9375rem` the same `<aside>`
+ * becomes a fixed bottom-right panel that the floating launcher (a sibling, drawn by `HelpBrowser`) opens. The
+ * same DOM nodes serve both, so the order — search, switch, groups — and the single search field come for free.
+ * This replaces the in-flow "Contents" disclosure of 23.174.
  *
  * ## It navigates the whole document; it does not replace it
  *
@@ -443,8 +562,9 @@ function GroupItems({
  *
  * Keeping the full document buys the prototype's information architecture — the
  * groups, the counts, the active row — at none of that cost. The section
- * eyebrow and the `Next` pager work over a scrolling document unchanged; only
- * the render mode is declined.
+ * eyebrow works over a scrolling document unchanged; only the render mode is
+ * declined. (The per-section `Next` pager that once sat here was removed by the
+ * owner's ruling, 23.230: one continuous page.)
  *
  * ## Groups default to OPEN
  *
@@ -462,65 +582,103 @@ function TopicSidebar({
   documentId,
   onDocument,
   activeSection,
+  search,
+  panelOpen,
+  panelResults,
+  onPick,
+  asideRef,
 }: {
   document: HelpDocument;
   documentId: HelpDocument['id'];
   onDocument: (id: HelpDocument['id']) => void;
   activeSection: string | null;
+  search: ReactNode;
+  panelOpen: boolean;
+  /** The search output, when it belongs in the panel (a phone) and a query is showing; otherwise `null`. */
+  panelResults: ReactNode;
+  /** A link inside the panel was chosen. */
+  onPick: (event: { target: EventTarget | null }) => void;
+  asideRef: RefObject<HTMLElement | null>;
 }) {
   const [collapsed, setCollapsed] = useState<Readonly<Record<string, true>>>({});
   const nav = useMemo(() => helpNav(document), [document]);
+  const edgesRef = useScrollEdges<HTMLElement>('y');
 
   return (
-    <aside className="gn-help__sidebar">
-      {/*
-        The document switch, MOVED here from above the search box and REBUILT
-        on the shared `SegmentedControl` (2026-09-15).
+    <aside
+      id="gn-help-panel"
+      className="gn-help__sidebar"
+      ref={asideRef}
+      tabIndex={-1}
+      data-panel-open={panelOpen ? 'true' : 'false'}
+    >
+      {/* The PINNED header: it never scrolls, on desktop (23.231) or in the phone panel (23.233). */}
+      <div className="gn-help__sidebar-head">
+        {search}
+        {/*
+          The document switch, MOVED here from above the search box and REBUILT
+          on the shared `SegmentedControl` (2026-09-15).
 
-        It was two bordered buttons carrying the documents' full titles, stacked
-        into a column because "Gisik Nokma — instruction manual" is 31
-        characters and will not sit beside its sibling in 274px. The owner
-        lifted the copy ruling that forced that — "forget the ruling on the
-        information losing. make the manual/faq switch like in the attached
-        file" — so the labels are the reference's own `Manual`/`FAQ` (its
-        source: `helpTabs: [{ k: "manual", l: "Manual" }, { k: "faq", l: "FAQ"
-        }]`), and with two short words the reference's side-by-side pair fits.
+          It was two bordered buttons carrying the documents' full titles, stacked
+          into a column because "Gisik Nokma — instruction manual" is 31
+          characters and will not sit beside its sibling in 274px. The owner
+          lifted the copy ruling that forced that — "forget the ruling on the
+          information losing. make the manual/faq switch like in the attached
+          file" — so the labels are the reference's own `Manual`/`FAQ` (its
+          source: `helpTabs: [{ k: "manual", l: "Manual" }, { k: "faq", l: "FAQ"
+          }]`), and with two short words the reference's side-by-side pair fits.
 
-        `SegmentedControl` rather than a local rule, because the reference's
-        treatment IS this component's: a 2px tray, `flex: 1` segments, and the
-        selected one lifted onto `surfaceRaised` + `shadowRaised`. Measured
-        against the prototype's inline styles, the only deliberate divergence
-        is the segment height — 44px here against its 36px — and that number is
-        load-bearing: `ui.css` records that 40px reddened the tap-target
-        ratchet on `/sign-in` the moment anything first rendered the component.
+          `SegmentedControl` rather than a local rule, because the reference's
+          treatment IS this component's: a 2px tray, `flex: 1` segments, and the
+          selected one lifted onto `surfaceRaised` + `shadowRaised`. Measured
+          against the prototype's inline styles, the only deliberate divergence
+          is the segment height — 44px here against its 36px — and that number is
+          load-bearing: `ui.css` records that 40px reddened the tap-target
+          ratchet on `/sign-in` the moment anything first rendered the component.
 
-        It also retires a whole local identity. `/account`'s Style and Theme
-        controls are already `SegmentedControl`; a fifth hand-rolled segmented
-        row on this screen was the thing to avoid.
+          It also retires a whole local identity. `/account`'s Style and Theme
+          controls are already `SegmentedControl`; a fifth hand-rolled segmented
+          row on this screen was the thing to avoid.
 
-        `aria-label` carries the same string the `<nav>` wrapper used to, so no
-        accessible name is lost. The wrapper itself is gone deliberately: a
-        `tablist` is a control, not a navigation landmark, and wrapping one in
-        `<nav>` announced a region that was never navigation.
-      */}
-      <SegmentedControl
-        options={HELP_CONTENT.map((doc) => ({
-          value: doc.id,
-          label: HELP_DOCUMENT_LABELS[doc.id],
-        }))}
-        value={documentId}
-        onChange={onDocument}
-        aria-label="Help documents"
-      />
-
+          `aria-label` carries the same string the `<nav>` wrapper used to, so no
+          accessible name is lost. The wrapper itself is gone deliberately: a
+          `tablist` is a control, not a navigation landmark, and wrapping one in
+          `<nav>` announced a region that was never navigation.
+        */}
+        <SegmentedControl
+          options={HELP_CONTENT.map((doc) => ({
+            value: doc.id,
+            label: HELP_DOCUMENT_LABELS[doc.id],
+          }))}
+          value={documentId}
+          onChange={onDocument}
+          aria-label="Help documents"
+        />
+      </div>
+      {panelResults === null ? null : (
+        <div className="gn-help__panel-results" onClick={onPick}>
+          {panelResults}
+        </div>
+      )}
       {/*
         `aria-labelledby` on the landmark rather than an `aria-label` that
         repeats the word: the visible "Topics" is real text, so pointing at it
         names the navigation region without a second copy of the string that
         could drift from it. A heading would also name it, but it would put a
         third `h2` level into a page whose `h2`s are the document's sections.
+
+        The topics list is the ONE scroller of the sidebar (and of the phone panel), so the scroll fade lives
+        here and not on the `aside`: a fade mask on the container that also holds the header would fade the
+        pinned switch. It is `hidden` while the panel shows search results instead of the topics.
       */}
-      <nav className="gn-help__nav" aria-labelledby="gn-help-topics">
+      <nav
+        id="gn-help-nav"
+        className="gn-help__nav gn-scroll-fade gn-scroll-fade--y"
+        ref={edgesRef}
+        aria-labelledby="gn-help-topics"
+        hidden={panelResults !== null}
+        onClick={onPick}
+      >
         <p className="gn-help__eyebrow" id="gn-help-topics">
           Topics
         </p>
@@ -593,13 +751,68 @@ function TopicSidebar({
   );
 }
 
+/**
+ * The floating "Contents and search" button (23.232). Drawn only at phone width (the stylesheet hides it above
+ * the breakpoint), bottom-right, lifted over the bottom bar by `--gn-bar-lift`. While the panel is open it shows
+ * a ✕ where the list glyph was: the same button closes the panel (23.234).
+ *
+ * The accessible name stays "Contents and search" in both states and `aria-expanded` carries the state — a
+ * name that flipped to "Close …" would make a screen reader announce a different control mid-interaction.
+ */
+function Launcher({
+  open,
+  onToggle,
+  buttonRef,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  buttonRef: RefObject<HTMLButtonElement | null>;
+}) {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      className="gn-toc-launcher__button gn-help__launcher"
+      aria-label="Contents and search"
+      aria-expanded={open}
+      aria-controls="gn-help-panel"
+      onClick={onToggle}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h10M4 18h13" />}
+      </svg>
+    </button>
+  );
+}
+
 export function HelpBrowser() {
   const [query, setQuery] = useState('');
   const [documentId, setDocumentId] = useState<HelpDocument['id']>('manual');
+  const [panelOpen, setPanelOpen] = useState(false);
   const result = useMemo(() => searchHelp(HELP_CONTENT, query), [query]);
   const active = HELP_CONTENT.find((d) => d.id === documentId) ?? HELP_CONTENT[0];
   const fragment = useUrlFragment();
   const visibleSection = useVisibleSection(active);
+  const phone = useHelpPhone();
+  const asideRef = useRef<HTMLElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  /** Where focus was before the search field took it — what Escape gives focus back to. */
+  const cameFrom = useRef<Element | null>(null);
+  const jumpFrom = useRef<Element | null>(null);
+  /** The `/` shortcut opened the panel and wants the search field, not the panel itself, focused. */
+  const wantSearch = useRef(false);
+  const savedScroll = useRef<number | null>(null);
   /*
     SCROLL POSITION FIRST, the URL second, and both are needed.
 
@@ -617,6 +830,173 @@ export function HelpBrowser() {
   const activeSection =
     visibleSection ?? (active === undefined ? null : sectionOfFragment(active, fragment));
 
+  const searching = result.kind === 'matches' || result.reason.kind === 'no-match';
+  const output = (
+    <SearchOutput result={result} query={query.trim()} compact={phone} />
+  );
+
+  const closePanel = useCallback(() => {
+    setPanelOpen(false);
+    launcherRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  // A link chosen inside the panel closes it, so the article it jumped to is what the reader sees. Only on a
+  // phone with the panel open: on desktop the same links are the plain sidebar and must not move focus.
+  const onPick = useCallback(
+    (event: { target: EventTarget | null }) => {
+      if (!panelOpen) return;
+      if (event.target instanceof Element && event.target.closest('a') !== null) closePanel();
+    },
+    [panelOpen, closePanel],
+  );
+
+  // Escape and an outside tap close the panel and give focus back to its button (23.234).
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) closePanel();
+    };
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target === null) return;
+      if (asideRef.current?.contains(target) || launcherRef.current?.contains(target)) return;
+      // The browser's own mousedown focus change runs AFTER this handler, so focusing the button now would be
+      // undone. Close now; give focus back one task later, and only if the tap left it nowhere (a tap on another
+      // control keeps the focus it just took).
+      setPanelOpen(false);
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active === null || active === document.body) launcherRef.current?.focus({ preventScroll: true });
+      }, 0);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [panelOpen, closePanel]);
+
+  // Opening: focus moves into the panel (the search field if `/` asked for it) and the current section is
+  // scrolled into view inside the topics list (23.233). The list is scrolled by its own `scrollTop` and not with
+  // `scrollIntoView`, which would also scroll every ancestor, the page included.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const aside = asideRef.current;
+    if (aside === null) return;
+    if (wantSearch.current) {
+      wantSearch.current = false;
+      searchRef.current?.focus();
+    } else {
+      aside.focus({ preventScroll: true });
+    }
+    const nav = aside.querySelector<HTMLElement>('.gn-help__nav');
+    const current = nav?.querySelector<HTMLElement>('[aria-current="location"]');
+    if (nav !== null && nav !== undefined && current !== null && current !== undefined && !nav.hidden) {
+      const within = nav.getBoundingClientRect();
+      const at = current.getBoundingClientRect();
+      nav.scrollTop += at.top - within.top - (within.height - at.height) / 2;
+    }
+  }, [panelOpen]);
+
+  // `/` focuses the search from anywhere (23.240) — except while the reader is typing somewhere, or holding a
+  // modifier (Ctrl+/ and Cmd+/ belong to the browser and the OS).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      jumpFrom.current = window.document.activeElement;
+      if (!phone) {
+        searchRef.current?.focus();
+      } else if (panelOpen) {
+        searchRef.current?.focus();
+      } else {
+        wantSearch.current = true;
+        setPanelOpen(true);
+      }
+    };
+    window.document.addEventListener('keydown', onKey);
+    return () => window.document.removeEventListener('keydown', onKey);
+  }, [phone, panelOpen]);
+
+  const onSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') return;
+    if (phone) {
+      // A typed query is cleared first; an empty field lets Escape reach the panel, which closes it.
+      if (query !== '') {
+        event.preventDefault();
+        event.stopPropagation();
+        setQuery('');
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    setQuery('');
+    const back = cameFrom.current;
+    cameFrom.current = null;
+    if (back instanceof HTMLElement && back.isConnected && back !== window.document.body) {
+      back.focus();
+    } else {
+      searchRef.current?.blur();
+    }
+  };
+
+  const onSearchFocus = (relatedTarget: EventTarget | null) => {
+    const from = jumpFrom.current ?? (relatedTarget instanceof Element ? relatedTarget : null);
+    jumpFrom.current = null;
+    cameFrom.current = from;
+  };
+
+  // The reader's place in the document survives a search (23.239): the results are drawn above the document in
+  // the column, so the position is saved as the query goes from empty to non-empty and put back when it clears.
+  const changeQuery = (next: string) => {
+    if (query.trim() === '' && next.trim() !== '' && savedScroll.current === null) {
+      savedScroll.current = window.scrollY;
+    }
+    setQuery(next);
+  };
+  const wasSearching = useRef(false);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    if (wasSearching.current && !searching) {
+      const was = savedScroll.current;
+      savedScroll.current = null;
+      if (was !== null && Math.abs(window.scrollY - was) > 1) window.scrollTo(0, was);
+    }
+    // The first results of a search made from deep in the document are drawn above the reader: bring them into view,
+    // just once (not on later keystrokes) and only when they are not already in view. Focus stays in the field.
+    if (!wasSearching.current && searching && !phone) {
+      const at = resultsRef.current;
+      if (at !== null) {
+        const margin = Number.parseFloat(getComputedStyle(at).scrollMarginTop) || 0;
+        const top = at.getBoundingClientRect().top;
+        if (top < margin - 1 || top > window.innerHeight - 1) at.scrollIntoView({ block: 'start' });
+      }
+    }
+    wasSearching.current = searching;
+  }, [searching, phone]);
+  // Following a result (or any link) makes the old position stale: clearing afterwards must not yank the reader
+  // back from the entry they chose.
+  useEffect(() => {
+    const forget = () => {
+      savedScroll.current = null;
+    };
+    window.addEventListener('hashchange', forget);
+    return () => window.removeEventListener('hashchange', forget);
+  }, []);
+
+  const search = (
+    <HelpSearch
+      value={query}
+      onChange={changeQuery}
+      onKeyDown={onSearchKeyDown}
+      onFocus={onSearchFocus}
+      inputRef={searchRef}
+    />
+  );
+
   return (
     <div className="gn-help">
       {active === undefined ? null : (
@@ -625,6 +1005,11 @@ export function HelpBrowser() {
           documentId={documentId}
           onDocument={setDocumentId}
           activeSection={activeSection}
+          search={search}
+          panelOpen={panelOpen}
+          panelResults={phone && searching ? output : null}
+          onPick={onPick}
+          asideRef={asideRef}
         />
       )}
       <div className="gn-help__main">
@@ -646,48 +1031,12 @@ export function HelpBrowser() {
             different; adopt the additions" (owner, 2026-09-08) — since there is no
             shipped wording here to replace.
           */}
-          {/*
-            The title and the search box are wrapped as one group because the
-            reference sets them closer to each other (14px) than to anything
-            around them (20px), and `.gn-help__column` is a flex container as
-            of the same change — so the distance has to be a `gap` on a
-            wrapper rather than a margin on the `h1`, which would add to the
-            column's gap instead of replacing it.
-
-            A presentational element with no semantics, deliberately: it sits
-            between the column and an `h1`/`label` that both keep their own
-            roles, so nothing an assistive technology reads changes.
-          */}
-          <div className="gn-help__intro">
-            <h1 className="gn-help__title">Help</h1>
-            <label className="gn-help__search" htmlFor="gn-help-search">
-              <span className="gn-help__search-label">Search the manual and FAQ</span>
-              <input
-                id="gn-help-search"
-                className="gn-help__search-input"
-                type="search"
-                value={query}
-                placeholder="due date, passkey, offline…"
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-          </div>
-
-          {/*
-            The three states are drawn separately and named, rather than collapsing
-            two of them into an empty list. "You have not searched yet" and "nothing
-            matched that" are different situations, and this product says which kind
-            of nothing it is looking at everywhere else.
-          */}
-          {result.kind === 'matches' ? <Results matches={result.matches} query={query.trim()} /> : null}
-          {result.kind === 'none' && result.reason.kind === 'no-match' ? (
-            <p className="gn-help__none" role="status">
-              Nothing in the manual or FAQ matches <strong>“{result.reason.query}”</strong>. All{' '}
-              {result.reason.searched} entries were searched, so this is a real absence rather than a
-              search that did not run — the product may simply not do that thing yet. The list below is
-              everything there is.
-            </p>
-          ) : null}
+          <h1 className="gn-help__title">Help</h1>
+          {phone || !searching ? null : (
+            <div ref={resultsRef} className="gn-help__results-anchor">
+              {output}
+            </div>
+          )}
 
           {/*
             The flat `.gn-help__toc` — a wrapped row of every section link — stood
@@ -704,6 +1053,11 @@ export function HelpBrowser() {
           {active === undefined ? null : <DocumentView document={active} />}
         </div>
       </div>
+      <Launcher
+        open={panelOpen}
+        onToggle={() => (panelOpen ? closePanel() : setPanelOpen(true))}
+        buttonRef={launcherRef}
+      />
     </div>
   );
 }

@@ -537,7 +537,7 @@ describe('AccountPage — Your workspaces', () => {
       </Providers>,
     );
     expect(await screen.findByText('Convenience Corner')).toBeInTheDocument();
-    expect(screen.getByText('1 project · 1 archived')).toBeInTheDocument();
+    expect(screen.getByText('1 project, 1 archived')).toBeInTheDocument();
     // The whole-array reading must be gone, not merely joined by the right one.
     expect(screen.queryByText('2 projects')).toBeNull();
   });
@@ -584,8 +584,8 @@ describe('AccountPage — Sessions', () => {
     ]);
     const user = userEvent.setup();
     mount();
-    expect(await screen.findByText('Chrome on Mac · 7F3K')).toBeInTheDocument();
-    expect(screen.getByText('Unknown device · Q2ZA')).toBeInTheDocument();
+    expect(await screen.findByText('Chrome on Mac (7F3K)')).toBeInTheDocument();
+    expect(screen.getByText('Unknown device (Q2ZA)')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/v1/me/devices', { credentials: 'include' });
     const readsBefore = deviceReads();
     await user.click(screen.getByRole('button', { name: /^Sign out this device/ }));
@@ -677,7 +677,7 @@ describe('AccountPage — Passkeys', () => {
     await user.click(screen.getByRole('button', { name: 'Add a passkey' }));
     expect(addPasskey).toHaveBeenCalledWith({ name: 'Work laptop' });
     expect(await screen.findByText('Work laptop')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'iCloud Keychain · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'iCloud Keychain (1)' })).toBeInTheDocument();
     expect(passkeyReads()).toBe(2);
   });
 
@@ -823,7 +823,7 @@ describe('19.257 /account mounts Deleted items for a signed-in person', () => {
     mountWithDeleted(read);
     expect(await screen.findByRole('heading', { name: 'Deleted items' })).toBeInTheDocument();
     expect(await screen.findByText('Signage')).toBeInTheDocument();
-    expect(screen.getByText('Deleted by you · 29 Sep')).toBeInTheDocument();
+    expect(screen.getByText('Deleted by you, 29 Sep')).toBeInTheDocument();
     cleanup();
 
     sessionAnswer.current = null;

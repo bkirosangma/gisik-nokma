@@ -1,6 +1,6 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { BUILTIN_TICKET_TYPE_SEEDS, type PublishedWorkflowDef, type TicketTypeDef } from '@gisik-nokma/domain';
-import { Button, Card } from '@gisik-nokma/ui';
+import { Button, Card, Popover } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -63,7 +63,9 @@ const VISUALLY_HIDDEN = {
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
  *   and no event carries one. The prototype's other badge value (`"Built-in"`) IS
  *   drawn, beside the rank in the meta line.
- * - **the ↑/↓ reorder controls — BUILT 2026-09-19, when the owner lifted the hold.**
+ * - **the ↑/↓ reorder controls — BUILT 2026-09-19, when the owner lifted the hold.** (AMENDED 2026-10-02, 23.171: they
+ *   are now a "Reorder" menu — Move up / Move down / Move to top — on CUSTOM rows only; the text below keeps the history
+ *   and says "arrow" where it means the menu item.)
  *   `docs/lanes/owner-holds.md` §1 had put *"`isTypes` | reorder and per-type
  *   counts"* on the owner's hold list, and that register's own rule is that a hold
  *   lifts only when the owner names it — **the owner named it on 2026-09-19**. The
@@ -85,7 +87,8 @@ const VISUALLY_HIDDEN = {
  *   neighbour, and the server's own `ORDER BY rank, type_id` resolves a tie by an
  *   id — by nothing a person can see. Both types are re-ranked in one `submit`.
  *
- *   **The arrow that would move a built-in is DISABLED, not refused after the
+ *   **(AMENDED 2026-10-02, 23.171: a built-in now carries NO control at all, and a custom type's move that would
+ *   cross one is the DISABLED menu item.) The arrow that would move a built-in is DISABLED, not refused after the
  *   fact.** For the same per-event reason: the four built-ins are rank-locked
  *   server-side (`packages/rule-engine/src/checks/ticket-type.ts:60-62` refunds
  *   `type.builtin-rank`), so a swap across one would HALF commit — the neighbour's
@@ -138,11 +141,11 @@ const VISUALLY_HIDDEN = {
  * construct — `(i % 2 ? ";background:var(--fill4)" : "")` over a **0-based** `i`
  * (`desktop.dc.html:3159`), so the tint falls on the **1-indexed EVEN** rows —
  * and this screen's rule takes that parity exactly, `:nth-child(even)` over the
- * rows list, the same shape and the same token `.gn-members__row` already ships
- * (`apps/web/app/globals.css:1524`). **Two other families in this repo ported
+ * rows list, the same shape and the same token the Members roster shipped until UX fixes T6 (23.095) swapped its zebra for
+ * a hairline. **Two other families in this repo ported
  * this same construct to ODD and therefore read inverted against the prototype
  * (`.gn-list__table-row`, `ui.css:1088`; `.gn-timeline__row`, `:2703`) — that
- * inversion is already recorded, with a named owner, at `globals.css:1518-1523`,
+ * inversion is already recorded, with a named owner, in `ui.css`'s `.ticket-type-list__row` zebra block,
  * and harmonising them is not this screen's to do.**
  *
  * The three strings: the action is the prototype's `"New type"` (`:823`), the h2
@@ -186,7 +189,7 @@ export function TicketTypeListScreen(props: {
    */
   const [ticketCounts, setTicketCounts] = useState<Record<string, number> | 'unavailable' | null>(null);
   // A refusal the CLIENT did not predict. The client predicts the one refusal it
-  // knows about (`type.builtin-rank`, below, by disabling the arrow that would
+  // knows about (`type.builtin-rank`, below, by disabling the menu item that would
   // provoke it), but the server is the authority and may refuse for a reason
   // this screen does not model. Swallowing it would render a control that does
   // nothing, which a reader cannot tell from a click that worked.
@@ -194,8 +197,8 @@ export function TicketTypeListScreen(props: {
   // One swap at a time. Without this, a second click landing inside the first
   // `submit`'s round-trip computes from the PRE-swap array and overwrites it —
   // probed by review: two clicks in one tick folded to two types sharing a rank,
-  // the exact tie the two-event swap exists to prevent. Every arrow is disabled
-  // while a swap is in flight.
+  // the exact tie the two-event swap exists to prevent. Every Reorder menu item is
+  // disabled while a swap is in flight.
   const [reorderPending, setReorderPending] = useState(false);
   /** Per-mount prefix for the reorder reasons' ids — see the buttons' note. */
   const reorderReasonId = useId();
@@ -239,7 +242,7 @@ export function TicketTypeListScreen(props: {
   // records: a failed read and a read still in flight are different states, and a
   // reader who sees the loading sentence cannot tell them apart.
   if (loadFailed) {
-    return <p className="ticket-type-list__load-error">Could not load ticket types — reload to try again.</p>;
+    return <p className="ticket-type-list__load-error">Could not load ticket types. Reload to try again.</p>;
   }
   if (types === null || workflows === null) return <p className="ticket-type-list__loading">Loading ticket types…</p>;
   // The narrowed array, named once. `types` is still `TicketTypeDef[] | null` to
@@ -253,7 +256,7 @@ export function TicketTypeListScreen(props: {
   const count = types.length;
 
   /**
-   * Why the arrow at `index` pointing `delta` cannot move anything — or `null`
+   * Why the Reorder menu item at `index` pointing `delta` cannot move anything — or `null`
    * when it can. Two blockers are structural:
    *
    *  - the END of the list has nothing to swap with;
@@ -263,7 +266,7 @@ export function TicketTypeListScreen(props: {
    *    therefore HALF commit: the other type's re-rank lands, the built-in's is
    *    refused, and the two then share a rank, which the server's own
    *    `ORDER BY rank, type_id` resolves by an id — that is, by nothing a person
-   *    can see. So the arrow is disabled rather than the refusal discovered.
+   *    can see. So the menu item is disabled rather than the refusal discovered.
    */
   function moveBlocker(index: number, delta: -1 | 1): string | null {
     const target = index + delta;
@@ -285,26 +288,24 @@ export function TicketTypeListScreen(props: {
    * new gateway op — the same door the editor's own `"Hierarchy rank"` field
    * uses (`ticket-type-editor-screen.tsx:283-309`).
    */
-  async function moveType(index: number, delta: -1 | 1): Promise<void> {
-    const target = index + delta;
-    const moving = orderedTypes[index]!;
-    const other = orderedTypes[target]!;
+  async function moveType(index: number, target: number): Promise<void> {
+    // The span the move touches: every type from the nearer end to the farther. The moved type takes
+    // the slot at `target`; each type between slides one place toward where it was, and the SLOTS'
+    // ranks stay where they are — so the ranks held by the span are only re-dealt, never invented.
+    const lo = Math.min(index, target);
+    const hi = Math.max(index, target);
+    const span = orderedTypes.slice(lo, hi + 1);
+    const ranks = span.map((type) => type.rank);
+    const reordered = span.filter((type) => type.id !== orderedTypes[index]!.id);
+    reordered.splice(target - lo, 0, orderedTypes[index]!);
+    const next = reordered.map((type, offset) => ({ ...type, rank: ranks[offset]! }));
     setReorderPending(true);
     try {
-      const results = await gateway.submit([
-        buildTicketTypeDefinedEvent({
-          workspaceId,
-          actorId: props.session.userId,
-          origin: 'web',
-          def: { ...moving, rank: other.rank },
-        }),
-        buildTicketTypeDefinedEvent({
-          workspaceId,
-          actorId: props.session.userId,
-          origin: 'web',
-          def: { ...other, rank: moving.rank },
-        }),
-      ]);
+      const results = await gateway.submit(
+        next.map((def) =>
+          buildTicketTypeDefinedEvent({ workspaceId, actorId: props.session.userId, origin: 'web', def }),
+        ),
+      );
       const refusal = results.find((result) => result.status === 'refused');
       if (refusal !== undefined && refusal.status === 'refused') {
         setReorderRefusal({ rule: refusal.rule, reason: refusal.reason });
@@ -325,22 +326,24 @@ export function TicketTypeListScreen(props: {
       // as it is NOW, never against the render-scope `orderedTypes` snapshot this
       // click was born in. Applying a snapshot is what let a second click inside
       // the round-trip overwrite the first swap's result.
+      const committed = new Map(next.map((type) => [type.id, type.rank]));
       setTypes((previous) =>
         previous === null
           ? null
           : previous
-              .map((type) =>
-                type.id === moving.id
-                  ? { ...type, rank: other.rank }
-                  : type.id === other.id
-                    ? { ...type, rank: moving.rank }
-                    : type,
-              )
+              .map((type) => (committed.has(type.id) ? { ...type, rank: committed.get(type.id)! } : type))
               .sort((a, b) => a.rank - b.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
       );
     } finally {
       setReorderPending(false);
     }
+  }
+
+  /** Where "Move to top" goes: the first slot of the unbroken run of custom types ending at `index`. */
+  function topOfCustomRun(index: number): number {
+    let top = index;
+    while (top > 0 && !builtinIds.has(orderedTypes[top - 1]!.id)) top -= 1;
+    return top;
   }
   /**
    * The `"N tickets"` meta segment, LAST in the line — which is where the
@@ -397,65 +400,6 @@ export function TicketTypeListScreen(props: {
         <ul className="ticket-type-list__rows">
           {types.map((type, index) => (
             <li key={type.id}>
-              {canAuthor ? (
-                // SIBLINGS of the row, never children: the whole row is one
-                // `<button>` (`:387-416`, the row-as-door ruling), and a button
-                // inside a button is an invalid tree jsdom renders without
-                // complaint — so the controls sit beside the door.
-                <span className="ticket-type-list__reorder">
-                  <button
-                    type="button"
-                    className="ticket-type-list__move"
-                    aria-label={`Move ${type.name} up`}
-                    /*
-                      WHY A BLOCKED MOVE IS DISABLED, made reachable. These two
-                      controls explain themselves through `title` on a DISABLED
-                      button — out of the focus order, so the sentence reached
-                      only a mouse user who hovered. `aria-describedby` attaches
-                      the same words to the control wherever it is reached; the
-                      `title` stays for the hovering reader. The id carries the
-                      TYPE's id because this component renders one control pair
-                      per row and a shared id would point every row at the
-                      first row's sentence.
-                    */
-                    aria-describedby={
-                      moveBlocker(index, -1) === null ? undefined : `${reorderReasonId}-up-${type.id}`
-                    }
-                    title={moveBlocker(index, -1) ?? `Move ${type.name} up`}
-                    disabled={moveBlocker(index, -1) !== null}
-                    onClick={() => {
-                      void moveType(index, -1);
-                    }}
-                  >
-                    <span aria-hidden="true">↑</span>
-                    {moveBlocker(index, -1) !== null && (
-                      <span id={`${reorderReasonId}-up-${type.id}`} style={VISUALLY_HIDDEN}>
-                        {moveBlocker(index, -1)}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="ticket-type-list__move"
-                    aria-label={`Move ${type.name} down`}
-                    aria-describedby={
-                      moveBlocker(index, 1) === null ? undefined : `${reorderReasonId}-down-${type.id}`
-                    }
-                    title={moveBlocker(index, 1) ?? `Move ${type.name} down`}
-                    disabled={moveBlocker(index, 1) !== null}
-                    onClick={() => {
-                      void moveType(index, 1);
-                    }}
-                  >
-                    <span aria-hidden="true">↓</span>
-                    {moveBlocker(index, 1) !== null && (
-                      <span id={`${reorderReasonId}-down-${type.id}`} style={VISUALLY_HIDDEN}>
-                        {moveBlocker(index, 1)}
-                      </span>
-                    )}
-                  </button>
-                </span>
-              ) : null}
               <button
                 type="button"
                 className="ticket-type-list__row"
@@ -486,11 +430,30 @@ export function TicketTypeListScreen(props: {
                 </span>
                 {builtinIds.has(type.id) ? <span className="ticket-type-list__badge">Built-in</span> : null}
               </button>
+              {canAuthor && !builtinIds.has(type.id) ? (
+                // A SIBLING of the row door, never a child: the whole row is one `<button>` (the row-as-door
+                // ruling), and a button inside a button is an invalid tree jsdom renders without complaint.
+                // UX fixes T10 (SET-03): one "Reorder" door on a CUSTOM row, after the door so every row's
+                // door starts at the same left edge; a built-in is rank-locked and carries no control at all.
+                <span className="ticket-type-list__reorder">
+                  <ReorderMenu
+                    name={type.name}
+                    typeId={type.id}
+                    reasonId={reorderReasonId}
+                    upBlocker={moveBlocker(index, -1)}
+                    downBlocker={moveBlocker(index, 1)}
+                    onUp={() => void moveType(index, index - 1)}
+                    onDown={() => void moveType(index, index + 1)}
+                    onTop={() => void moveType(index, topOfCustomRun(index))}
+                  />
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
         {/*
-          E5-14 — WHY THE ARROWS DO NOTHING. All ten ↑/↓ controls render disabled,
+          E5-14 — WHY THE ARROWS DO NOTHING. (Since 23.171 the built-ins carry no control, so no dead control is
+          drawn for them; the note below is still true of the rank rule.) All ten ↑/↓ controls render disabled,
           and the reason lived only in each button's `title` attribute
           (`moveBlocker`, "Built-in types keep their rank.") — a hover tooltip,
           with no touch or keyboard equivalent. A reader on a phone met ten dead
@@ -510,5 +473,68 @@ export function TicketTypeListScreen(props: {
         </p>
       </Card>
     </section>
+  );
+}
+
+/**
+ * The "Reorder" menu on a custom row (UX fixes T10, SET-03, case 23.171): Move up / Move down / Move to top
+ * in the shared `Popover`. A blocked item stays disabled and says why in words — a visually-hidden reason the
+ * button points at, plus the `title` for a hovering reader (the pair the arrows carried).
+ */
+function ReorderMenu(props: {
+  name: string;
+  typeId: string;
+  reasonId: string;
+  upBlocker: string | null;
+  downBlocker: string | null;
+  onUp: () => void;
+  onDown: () => void;
+  onTop: () => void;
+}): ReactNode {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const item = (key: 'up' | 'down' | 'top', label: string, blocker: string | null, run: () => void): ReactNode => (
+    <>
+      <button
+        type="button"
+        className="ticket-type-list__menu-item"
+        disabled={blocker !== null}
+        aria-describedby={blocker === null ? undefined : `${props.reasonId}-${key}-${props.typeId}`}
+        title={blocker ?? label}
+        onClick={() => {
+          setOpen(false);
+          run();
+        }}
+      >
+        {label}
+      </button>
+      {blocker !== null && (
+        <span id={`${props.reasonId}-${key}-${props.typeId}`} style={VISUALLY_HIDDEN}>
+          {blocker}
+        </span>
+      )}
+    </>
+  );
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="ticket-type-list__move"
+        aria-label={`Reorder ${props.name}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        Reorder
+      </button>
+      <Popover triggerRef={triggerRef} open={open} onClose={() => setOpen(false)} aria-label={`Reorder ${props.name}`}>
+        <div className="ticket-type-list__menu">
+          {item('up', 'Move up', props.upBlocker, props.onUp)}
+          {item('down', 'Move down', props.downBlocker, props.onDown)}
+          {item('top', 'Move to top', props.upBlocker, props.onTop)}
+        </div>
+      </Popover>
+    </>
   );
 }

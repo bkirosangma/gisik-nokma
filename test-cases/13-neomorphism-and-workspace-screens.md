@@ -56,6 +56,10 @@ card-scale) and is recorded here only for completeness, not as a call.
   knowingly, not hidden.** A positive control guards `rule()`'s substring matching: the neo selector and
   the base selector must read back DIFFERENT bodies. *Mutation-witnessed: giving the neo override a
   border reddens this case alone (227/228 pass). Restored, checksum-verified.* — (`packages/ui/test/components.test.tsx`)
+  **AMENDED 2026-10-02 (UX fixes T1, U5–U8, owner: "borders on buttons AND text fields"; cases 23.002, 23.004):
+  the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
+  (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
+  their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
 - **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
   (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
   makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
@@ -264,7 +268,8 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   route "is among the five routes this sweep visits"). The sweep still cannot compute a `box-shadow`'s
   contrast ratio (`sweepBorders` composites `border-{side}-*` only, by design), so this does not become a
   fifth measured route in the ordinary sense: a live DOM check on each route confirms the field genuinely
-  has `border: none` and a non-`none` `box-shadow` (grounding the waiver's premise against THIS tree
+  has `border: none` and a non-`none` `box-shadow` — **AMENDED 2026-10-02 (UX fixes T1, U5): the neo field now
+  has a 1px solid ring, so the e2e DOM check expects `solid` and the waiver is superseded** (grounding the waiver's premise against THIS tree
   rather than trusting Task 13's report unverified), and Task 13's own measured numbers (1.24 light / 1.16
   dark) are then recorded as a SANCTIONED entry in the persisted roster — appended after `below` is
   computed, so it can never trip the zero-below-3 assertion, since that assertion is about what this
@@ -690,9 +695,9 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   below, asserted absent at zero rather than printing `0 archived`. The restricted line is one text node
   (`2 projects · name restricted`), which a three-interpolation version fails. **Negative controls, because
   zero is where this card lies most easily:** a card with nothing restricted renders no line at all
-  (*"0 projects · name restricted"* would appear on every owner's card, where the count is zero by
+  (*"0 projects, name restricted"* would appear on every owner's card, where the count is zero by
   construction), a card with nothing archived renders no chip mentioning it, and both singulars — `1
-  member`, `1 project · name restricted` — are asserted on cards that have one, so the plurals above are a
+  member`, `1 project, name restricted` — are asserted on cards that have one, so the plurals above are a
   choice rather than the only string the code can produce. Mutations, each red at its own site: drop the
   `− blocked` subtraction from the active chip; stop splitting archived out of the live list; loosen
   `count <= 0` to `count < 0` so the line prints at zero. **And the TINT, which the rest of this case does
@@ -706,13 +711,13 @@ the rule withholds") is AMENDED in the same change set, quoting the sentence it 
   asserted; that would pin the hash rather than the property. Positive control: both avatars carry a tint
   class at all, so the inequality cannot pass on two undefineds.
   — (`apps/web/test/workspaces-cards.test.tsx`)
-- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project · name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
+- **13.380** ✅ A guest card shows ONE `Restricted` chip and no number outside the owner-ruled restricted sentence (whole-branch review, Minor 2: retitled from "no number anywhere", which the card's own *"1 project, name restricted"* falsified — the test strips that exact sentence before its digit scan). The point of the case is
   the absence, not the presence: a card printing the chip AND a zero passes *"'Restricted' is present"*
   and fails this. `0` is a claim — *"no work you can see"* — and it is exactly the claim the server
   declined to make by omitting the key (`13.366` on the route side). The numbers are queried away
   individually, by shape, so a failure says which one leaked. What the guest IS still told is asserted in
   the same run: the project's NAME (rulings P32/P38 withhold names, not this), and
-  *"1 project · name restricted"* — the string the whole owner ruling exists to make renderable.
+  *"1 project, name restricted"* — the string the whole owner ruling exists to make renderable.
   Mutation: print `${memberCount ?? 0} members` beside the chip → RED.
   — (`apps/web/test/workspaces-cards.test.tsx`)
 - **13.381** ✅ The role sentence and every gated affordance read ONE value. The fixture is deliberately
@@ -992,7 +997,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   the screen; the pairing's own measured margin (4.539, `packages/ui/src/tokens.ts`'s `textAccentLight`
   docblock) already covers it in every style and theme. —
   (`app-nav.test.tsx`)
-- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column,
+- **13.394** ✅ Two founding-form class families, not one — `.gn-workspace-founding` (a bare column, **AMENDED 2026-10-02 (prefixes/groups Task 8): `.gn-project-founding` is deleted; the workspace-home half now reads "the New-project form is the Create-project dialog's `.gn-project-create` form" and the `/workspaces` half "`.gn-workspace-founding` is the dialog's form column, mounted only while open". Both ride the new buttons (22.151, 22.152).**
   max-width 420px, no card) for `/workspaces`' "New workspace" block, and `.gn-project-founding` (a
   raised card, an inline field+button row) for the home's "New project" row. Both asserted by className
   on the real `<form>` element, positively (carries its own class) and negatively (does not carry the
@@ -1003,7 +1008,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   computing `tintIndexOf` on the id AND on the name directly (rather than comparing two renders, which
   this page's fixed route param cannot produce) and requiring the rendered class to match the id-keyed
   index and NOT the name-keyed one, with a positive control that the fixture's id and name do not
-  coincidentally hash to the same tint. The meta line — *"N members · M active projects · you're an
+  coincidentally hash to the same tint. The meta line — *"N members, M active projects, you're an
   X"* — reads only SERVED numbers (`memberCount`; `live.length`, this caller's own non-archived list)
   and a role CLAUSE from the SAME `viewerOf` call the `/workspaces` card's sentence reads, so the two
   cannot disagree about the same person. **The member-count gate is `viewer.countsWithheld`, NOT
@@ -1036,7 +1041,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   the rule: a control that reveals nothing lies about the shape of the data. —
   (`workspace-home.test.tsx`)
 - **13.398** ✅ The five door cards carry NOTES now, verbatim from the prototype's own `wsLinks` — except
-  the Members note, whose *"{N} people · roles and pending invitations."* only prints a number when
+  the Members note, whose *"{N} people: roles and pending invitations."* only prints a number when
   `memberCount` is served; a guest (withheld) gets the sentence with the prefix OMITTED, never a `0`, the
   same rule the header's meta line and the `/workspaces` card both keep. Targets are UNCHANGED from Task
   19 (13.387's own literals) — only the notes are new, transcribed rather than invented. —
@@ -2236,7 +2241,7 @@ arms that discriminate:
 
 1. **the visible text IS the name** — a control labelled `Rename` passes all four and fails this;
 2. **it is focusable** — `.focus()` and `document.activeElement`, which an `h1` with an `onClick` fails;
-3. **exactly ONE rename control exists**, and no bare `Rename` survives — the old shape had two.
+3. **exactly ONE rename control exists**, and no bare `Rename` survives — the old shape had two. **AMENDED 2026-10-02 (23.177):** exactly one lives INSIDE the heading (the arm counts within the `h1`); an admin now also has a pencil icon button beside it, outside the `h1`, with the same accessible name.
 
 plus **Escape cancels**, which nothing above covered (13.963 covers commit, 13.964 the blank guard).
 
@@ -2356,7 +2361,7 @@ the route's half; `13.983` witnesses the mapper's.
 - **13.983** ✅ The mapper **refuses** a project row that omits the key, naming its path *and* the guard's own sentence.
 - **13.984** ✅ The project card draws the description **inside its own door**.
 - **13.985** ✅ A project nobody described draws **no element at all** — not an empty one.
-- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused).
+- **13.986** ✅ The New-project form sends the description as typed, and **omits the key** when the box is left untouched (so an optional field left alone is never refused). **AMENDED 2026-10-02 (prefixes/groups Task 8): the form is the Create-project dialog (22.152); the description is still sent as typed and omitted when untouched.**
 - **13.987** ✅ End to end through the REAL door: a description authored over the wire reaches the exact served body — the full `project.created` → projection → read → route path in one assertion.
 
 **Mutation witnesses, run and recorded rather than predicted.** `13.978` — changing the projection's
@@ -2417,7 +2422,7 @@ stays free for the batch's remaining tasks.
 **The defect, in the finding's own words.** The events door answers refusals inside a `200` body, so the only
 `401` a write can meet is the session guard's — produced before the handler. The client transport throws
 `HttpError` with `message = "HTTP 401 for /v1/events"`, and **every write catch in the product painted that
-as transport**: *"We could not reach the server for this change — HTTP 401 for /v1/events"*
+as transport**: *"We could not reach the server for this change: HTTP 401 for /v1/events"*
 (`ticket-sheet.tsx:1074`), and the same sentence at `board.tsx:1430`, `:1532`, `:1736`,
 `bulk-close-dialog.tsx:233`, `backlog-rank-controls.tsx:186`, `backlog-start-button.tsx:113`,
 `workspace-settings-form.tsx:298` and the project page's delete-Undo — **nine sites, and not one of them
@@ -2453,7 +2458,7 @@ above for where the allocation is recorded). `13.1159` is minted here.
 
 **The defect.** Signed out on `/help` — the route `app-nav.tsx`'s own docblock calls *"the route most
 likely to be wanted by someone who cannot get in"* — the bar painted `Workspaces`, `Help`, `Account`, an
-unlabelled inbox icon and the scope note *"No workspace selected — pick one to reach its board, members
+unlabelled inbox icon and the scope note *"No workspace selected. Pick one to reach its board, members
 and settings."* — **and no Sign in.** Pressing Workspaces signed out landed on `/sign-in` by a 401 bounce
 with no `next=`, so the destination was thrown away; pressing Account repainted the page E5-13's second
 reproduction describes; the inbox icon pointed at a session-gated route; and the note instructed a person
@@ -2514,7 +2519,7 @@ capability to remove a sentence.
 **Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
 above). `13.1162` is minted here.
 
-**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet — create one."*,
+**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet. Create one."*,
 and the "Create a ticket" button beneath it — and the per-column "Add a ticket" — render only when
 `onCreateTicket` is passed (`board.tsx:493-497`, `:762-764`). **No web caller passed it**: measured at the
 ruling, `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered **0 across 63 files** while the
@@ -2597,7 +2602,7 @@ a member only the projects they may see (`visible-projects.ts`), so "outside eve
 workspace" and "a workspace with none" both reach this arm as `projects: []`; the count cannot separate
 them and the ROLE can.
 
-- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and
+- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and **AMENDED 2026-10-02 (prefixes/groups Task 8): the sentence is now "No projects yet. Create the first one." — "below" is gone because the button is in the heading row (22.153).**
   not the member's sentence, and the form the sentence names really is on screen); a member with the
   SAME empty list keeps the member's sentence. —
   (`apps/web/test/workspace-home.test.tsx`)
@@ -2665,11 +2670,11 @@ token docblocks so the move is legible.
 - ✅ **13.1602 — `description: null` clears the description and leaves the name; an absent `description` leaves it as it was;** control: `description: 'x'` sets it. Mutation: treat absent as null. `proj-projects.test.ts`; the payload arm (`{ description: null }` alone parses) is in `project-updated.test.ts`.
 - ✅ **13.1603 — a workspace MEMBER is refused `project.updated` with the admin-only reason; an admin and the owner commit;** control: the same member's `ticket.created` in that project is not refused. Mutation: remove `project.updated` from `ADMIN_ONLY_TYPES`. `apps/server/test/permissions/project-updated-permission.test.ts`.
 - ✅ **13.1604 — `project.updated` naming a project nobody founded is refused `project-unknown`;** control: a founded project commits. Mutation: drop it from `projectsNamedBy`. `project-updated-permission.test.ts`.
-- ✅ **13.1605 — the prefix never changes: a `project.updated` payload carrying `prefix` is refused as an unknown key (at the door it answers `invalid`), and the row's prefix is unchanged after a rename;** control: the rename without a prefix commits and moves the name only. Mutation: allow `prefix` in the schema. `project-updated.test.ts` (schema), `project-updated-permission.test.ts` (door), `proj-projects.test.ts` (row).
+- ✅ **13.1605 — a rename never moves the prefix: a `project.updated` carrying only a new name commits and the row's prefix is unchanged;** control: the payload schema stays strict (a stranger key is still refused). **Amended 2026-10-02 (prefixes and groups plan Task 1):** `project.updated` now carries an explicit `prefix` (22.002), so the earlier clause "a payload carrying `prefix` is refused as an unknown key" no longer holds; only a RENAME is inert. `project-updated.test.ts` (schema), `project-updated-permission.test.ts` (door), `proj-projects.test.ts` (row).
 - ✅ **13.1606 — a rebuild of `proj_projects` from the ledger equals the live table after created → updated → updated;** control: `verifyProjections` reports no drift. Mutation: skip the `project.updated` handler (the rebuilt row stays at its founding values). `proj-projects.test.ts`.
-- ✅ **13.1607 — `updateSeeds` sends only what changed: a new name alone → `{ name }`; an emptied description → `{ description: null }`; nothing changed → no event;** control: both changed → both keys, against the project entity. Mutation: always send both keys (each key's mutation reddens it). `apps/web/test/workspace-home-project-edit.test.tsx`.
+- ✅ **13.1607 — `updateSeeds` (widened by prefixes and groups Task 10 to take the prefix, the group, the groups list and an id source) sends only what changed: a new name alone → `{ name }`; an emptied description → `{ description: null }`; nothing changed → no event;** control: both changed → both keys, against the project entity. Mutation: always send both keys (each key's mutation reddens it). `apps/web/test/workspace-home-project-edit.test.tsx`.
 - ✅ **13.1608 — the workspace home's project card shows "Edit" to an owner/admin (`mayAdminister`) and not to a member, beside Archive;** control: Archive keeps its existing gate. Mutation: show the admin strip to everyone. `workspace-home-project-edit.test.tsx`.
-- ✅ **13.1609 — Edit opens an inline form (Name, Description) prefilled with the current values; Save submits `updateSeeds`, Cancel and Escape submit nothing (with a change pending) and restore the card;** control: a refused save keeps the form open with the typed value and the server's reason, and a Save with nothing changed sends nothing and closes. Mutation: submit on Cancel / on Escape / close the form on a refusal. `workspace-home-project-edit.test.tsx`; the header's Escape is in `project-header-edit.test.tsx`.
+- ✅ **13.1609 — Edit opens an inline form (Name, Description; Prefix and Group since prefixes and groups Task 10, 22.180–22.187) prefilled with the current values; Save submits `updateSeeds`, Cancel and Escape submit nothing (with a change pending) and restore the card;** control: a refused save keeps the form open with the typed value and the server's reason, and a Save with nothing changed sends nothing and closes. Mutation: submit on Cancel / on Escape / close the form on a refusal. `workspace-home-project-edit.test.tsx`; the header's Escape is in `project-header-edit.test.tsx`.
 - ✅ **13.1610 — a blank name is not sent (the form says "A project needs a name." and marks the field invalid) — `displayName` would refuse it anyway;** control: a one-character name is sent. Mutation: drop the client blank check (BOTH guards: the disabled Save and the `send` check — either alone is redundant with the other, since Enter cannot submit past a disabled Save). `workspace-home-project-edit.test.tsx`.
 - ✅ **13.1611 — the project page header offers the same Edit to an owner/admin and shows the new name after save;** control: a member sees the title without Edit. Mutation: header Edit for members. `apps/web/test/project-header-edit.test.tsx`.
 - 🧪 **13.1612 — browser: rename a project from the card and from the header in hig/minimal/neo; the board header, the workspace nav and the card all show the new name after save; 44 px targets; Escape closes;** Evidence: per-style values. (Controller's browser pass.)

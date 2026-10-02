@@ -9,7 +9,7 @@ export type {
 export * from './workflow-builder/index.js';
 export * from './view-types.js';
 export { makeSubmittedFactory, type EnvelopeSeed, type MakeSubmitted } from './submit.js';
-export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from './provenance.js';
+export { actorLabel, formatDate, formatDateTime, formatDay, formatStateProvenance } from './provenance.js';
 export { actorLabelFrom, memberLabel, UNKNOWN_PERSON } from './member-label.js';
 export { mentionCandidatesOf, type MentionPerson } from './mention-candidates.js';
 export { createClientStateCache, type ClientStateCache } from './cache.js';
@@ -206,6 +206,7 @@ export {
   TIMELINE_EMPTY_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
   barProvenance,
   claimTooltip,
@@ -315,6 +316,14 @@ export {
   resetBottomBar,
   type BarDestination,
 } from './preferences/bottom-bar.js';
+export {
+  DEFAULT_PROJECT_GROUPING,
+  PROJECT_GROUPING_KEY_PREFIX,
+  projectGroupingKey,
+  readProjectGrouping,
+  rememberProjectGrouping,
+  type ProjectGrouping,
+} from './preferences/project-grouping.js';
 export {
   MAX_SAVED_FILTERS,
   SavedFilterRefused,

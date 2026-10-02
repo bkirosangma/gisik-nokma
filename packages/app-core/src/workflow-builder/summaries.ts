@@ -34,7 +34,7 @@ export function summarizeRule(rule: Rule, ctx: SummaryContext): string {
       if (rule.userIds !== undefined && rule.userIds.length > 0) {
         parts.push(rule.userIds.map((userId) => ctx.memberName(userId)).join(', '));
       }
-      if (parts.length === 0) return 'Restricted to nobody — nobody may make this move.';
+      if (parts.length === 0) return 'Restricted to nobody. Nobody may make this move.';
       return `Only ${parts.join(', or ')} may make this move.`;
     }
     case 'require-comment':
@@ -44,7 +44,7 @@ export function summarizeRule(rule: Rule, ctx: SummaryContext): string {
     case 'require-field':
       return `Needs "${ctx.fieldName(rule.field)}" set first.`;
     case 'require-different-user':
-      return `Needs a second person — someone other than whoever moved this to "${ctx.stateName(rule.thanActorOf.to)}".`;
+      return `Needs a second person: someone other than whoever moved this to "${ctx.stateName(rule.thanActorOf.to)}".`;
   }
 }
 

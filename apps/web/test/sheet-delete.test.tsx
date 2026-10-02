@@ -280,7 +280,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     // moment: the page strip is rendered with this toast, not after it.
     await waitFor(() =>
       expect(
-        screen.getByText(`${TITLE} deleted · you can also undo this on the page`),
+        screen.getByText(`${TITLE} deleted. You can also undo this on the page`),
       ).toBeInTheDocument(),
     );
     // …and it is UNDOABLE, which is the other half of "history-retaining". This
@@ -304,13 +304,13 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
 
     await waitFor(() => expect(ingested).toHaveLength(1));
     await waitFor(() =>
-      expect(screen.getByText('GH-1183 deleted · you can also undo this on the page')).toBeInTheDocument(),
+      expect(screen.getByText('GH-1183 deleted. You can also undo this on the page')).toBeInTheDocument(),
     );
     // The control, in the same run: with a key present the sentence does NOT
     // carry the title, so a host still interpolating `${title}` reddens here.
     // Asserted on the whole sentence rather than on the bare title, because the
     // sheet draws the title as its own heading.
-    expect(screen.queryByText(`${TITLE} deleted · you can also undo this on the page`)).toBeNull();
+    expect(screen.queryByText(`${TITLE} deleted. You can also undo this on the page`)).toBeNull();
   });
 
   it('16.84 the Undo posts ticket.restored FOR THE ID IT WAS OFFERED', async () => {
@@ -333,7 +333,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     // already taken would invite a second restore of a live ticket, which the
     // engine refuses (`not-deleted`) and which reads as a fault to the reader.
     await waitFor(() =>
-      expect(screen.queryByText(`${TITLE} deleted · you can also undo this on the page`)).toBeNull(),
+      expect(screen.queryByText(`${TITLE} deleted. You can also undo this on the page`)).toBeNull(),
     );
   });
 
@@ -346,7 +346,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
 
     await waitFor(() =>
-      expect(screen.queryByText(`${TITLE} deleted · you can also undo this on the page`)).toBeNull(),
+      expect(screen.queryByText(`${TITLE} deleted. You can also undo this on the page`)).toBeNull(),
     );
     // Exactly ONE event ever posted: dismissing is not an undo, and the absence
     // is the assertion. Without it, a Dismiss wired to the same handler as the
@@ -433,7 +433,7 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
 
     // The TOAST is gone — asserted positively first, so the rest of this case
     // cannot pass by the timer simply not being wired.
-    await waitFor(() => expect(screen.queryByText(/you can also undo this on the page/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/You can also undo this on the page/)).toBeNull());
     // …and the ROUTE is not. This is the finding's whole subject.
     expect(strip()).not.toBeNull();
 
@@ -525,7 +525,7 @@ describe('19.233–19.234 the Undo after a PERMANENT delete unmarks first', () =
     await userEvent.click(screen.getByTestId('deleted-undo-button'));
     await waitFor(() => expect(ingested).toHaveLength(2));
     expect(types(ingested[1])).toEqual(['purge.unmarked', 'ticket.restored']);
-    await screen.findByText(`The ticket could not be restored — ${reason}`);
+    await screen.findByText(`The ticket could not be restored: ${reason}`);
     // CONTROL — the mark is gone, so the strip now says so and sends the restore alone.
     expect(await screen.findByText(ticketDurableUndoLine(TITLE, false))).toBeInTheDocument();
 

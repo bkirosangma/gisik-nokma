@@ -344,13 +344,27 @@ export type ReplicaDataSourceDeps = {
  * ------------------------------------------------------------------ */
 
 const NO_WORKSPACE_TABLE: ReplicaAbsence = {
-  field: 'WorkspaceRef.name / .memberCount / .projects — each project carrying a name, archived, and two counts',
+  field: 'WorkspaceRef.name / .memberCount / .projects (each project carrying a name, archived, and two counts)',
   because:
-    'the local schema (packages/sync-client/src/storage/schema.ts) has no workspaces table and no projects table — bootstrap ships definitions, tickets and `me`, and `Me` carries bare project IDS with no names. A nav rendering an id where a name goes is a nav naming something nobody authored. Task 16 widened the shape rather than this absence: `memberCount` needs a roster this device does not hold, and `archived` plus the two per-project counts need the projects table named above. The counts could NOT be honestly computed from the local ticket set even so — they are VISIBILITY-SCOPED server-side, and a replica holds only what was already visible, so counting locally would answer a different question in the same field',
-  owner: 'Plan 10 — the bootstrap payload and the local schema, not a /v1 route',
+    'the local schema (packages/sync-client/src/storage/schema.ts) has no workspaces table and no projects table. Bootstrap ships definitions, tickets and `me`, and `Me` carries bare project IDS with no names. A nav rendering an id where a name goes is a nav naming something nobody authored. Task 16 widened the shape rather than this absence: `memberCount` needs a roster this device does not hold, and `archived` plus the two per-project counts need the projects table named above. The counts could NOT be honestly computed from the local ticket set even so. They are VISIBILITY-SCOPED server-side, and a replica holds only what was already visible, so counting locally would answer a different question in the same field',
+  owner: 'Plan 10: the bootstrap payload and the local schema, not a /v1 route',
 };
 
 const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
+
+/**
+ * Prefixes and groups Task 7. The group tree has no local fold: `group.*` events are withheld from replica
+ * visibility on purpose (`visible-events-for.ts`), so this device never receives them and a `[]` here would
+ * say "this workspace has no groups" for a workspace that has forty.
+ */
+const GROUPS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'GroupRow[] (the workspace group tree)',
+    because:
+      'the local replica holds no group rows. Group events are withheld from replica streams until a later task adds a fold, so any answer would be a tree nobody authored, and an empty one would claim the workspace has no groups',
+    owner: 'Prefixes and groups plan: the replica fold for group events, not a /v1 route',
+  },
+];
 
 /**
  * Trash series Plan 3 (D9) NARROWED this entry rather than deleting it: the
@@ -360,10 +374,10 @@ const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
  */
 export const DELETED_ITEMS_NOT_CACHED: readonly ReplicaAbsence[] = [
   {
-    field: 'DeletedItem[] — until one online read is cached on this device',
+    field: 'DeletedItem[] (until one online read is cached on this device)',
     because:
       'the local schema holds no lifecycle state (no deleted_at or purge_marked_at on any local table), so the list is never computed here; it is the last GET /v1/me/deleted-items body, kept in deleted_items_cache, and this device has not read it online yet',
-    owner: 'Trash series Plan 3 — the cache fills on the first online read of Deleted items on this device',
+    owner: 'Trash series Plan 3: the cache fills on the first online read of Deleted items on this device',
   },
 ];
 
@@ -372,7 +386,7 @@ const MEMBERS_ABSENCES: readonly ReplicaAbsence[] = [
     field: 'Actor.name',
     because:
       'no roster is replicated. `membership.*` events are not in the bootstrap payload and there is no members table, so every actor this device knows is an id off an envelope. `mapAssignee` may substitute the id for a name on ONE actor it was handed; enumerating a workspace roster out of the ids that happen to appear in the local ledger would invent the membership list itself',
-    owner: 'Plan 10 — a replicated roster (bootstrap payload + local schema)',
+    owner: 'Plan 10: a replicated roster (bootstrap payload + local schema)',
   },
 ];
 
@@ -381,13 +395,13 @@ const SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
     field: 'SearchHit.matchedIn',
     because:
       'Replica.searchLocal scans ticket titles and comment bodies and returns one flat {ticketId,title} list; which of the two matched is discarded inside that function, exactly as routes/search.ts destroys it in its query. Reporting `title` for every hit would name the wrong column for every comment match',
-    owner: 'Plan 10 — Replica.searchLocal (packages/sync-client), not /v1/search',
+    owner: 'Plan 10: Replica.searchLocal (packages/sync-client), not /v1/search',
   },
   {
     field: 'SearchHit.snippet',
     because:
       'there is no local highlighter; the offline scan is a LIKE over lowercased text and keeps no match offsets. A snippet cut at an arbitrary offset reads as the server\'s ts_headline and is not one',
-    owner: 'Plan 10 — Replica.searchLocal',
+    owner: 'Plan 10: Replica.searchLocal',
   },
 ];
 
@@ -413,21 +427,21 @@ const NOTE_SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
     field: 'NoteSearchHit (every field)',
     because:
       'the device has neither index. The lexical one needs a note body flattened to text and FOLDED (spec §7.2) plus a workspace vocabulary for the correction pass, none of which the local schema or `Replica.searchLocal` builds; the meaning one needs the 130 MB model\'s output, which cannot exist offline at all. Serving the lexical half alone would make the screen work while typing and fail after the pause',
-    owner: 'Plan 10 — a folded local note index and a chosen offline answer for `mode=meaning`',
+    owner: 'Plan 10: a folded local note index and a chosen offline answer for `mode=meaning`',
   },
 ];
 
 const MY_WORK_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'WorkItem.projectName',
-    because: 'no projects table locally — a WorkItem carries the project NAME and this device holds only ids',
-    owner: 'Plan 10 — the local schema',
+    because: 'no projects table locally: a WorkItem carries the project NAME and this device holds only ids',
+    owner: 'Plan 10: the local schema',
   },
   {
     field: 'ContestedClaim.title',
     because:
-      'the contests table stores contestedEventId, ticketId, claimant, rule, reason and the original envelope — no title. It is joinable to `tickets` only when the contested ticket is still in local scope, and a contest survives a purge of its ticket, so the join is not total',
-    owner: 'Plan 10 — the contests table / a Replica accessor',
+      'the contests table stores contestedEventId, ticketId, claimant, rule, reason and the original envelope, with no title. It is joinable to `tickets` only when the contested ticket is still in local scope, and a contest survives a purge of its ticket, so the join is not total',
+    owner: 'Plan 10: the contests table / a Replica accessor',
   },
 ];
 
@@ -435,8 +449,8 @@ const ATTENTION_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'AttentionItem (every kind)',
     because:
-      'the attention strip is a COMPUTED read (spec §7, "computed, never authored") whose four buckets are defined by the server sweep — `stale` needs a last-touched horizon nothing local records, `due-soon` needs the server\'s IST day boundary rather than the device\'s clock, and `blocked`/`contested` are the only two this store could answer. Serving two of four under one method name would be an attention strip that silently never warns about the other two',
-    owner: 'Plan 10 — a local attention rule set, deliberately not invented here',
+      'the attention strip is a COMPUTED read (spec §7, "computed, never authored") whose four buckets are defined by the server sweep: `stale` needs a last-touched horizon nothing local records, `due-soon` needs the server\'s IST day boundary rather than the device\'s clock, and `blocked`/`contested` are the only two this store could answer. Serving two of four under one method name would be an attention strip that silently never warns about the other two',
+    owner: 'Plan 10: a local attention rule set, deliberately not invented here',
   },
 ];
 
@@ -460,8 +474,8 @@ const WORKSPACE_SETTINGS_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'WorkspaceSettings (all three knobs and the provenance)',
     because:
-      'the local replica has no workspace-settings fold — `workspace.settings_set` is a workspace-entity event and every local projection here is ticket-shaped, so there is no row to read. Serving the defaults instead would be indistinguishable from a workspace that really claimed them, and `autoCloseAfterDays: null` is a CLAIM ("off") as well as the default, so a replica answering null would show "off" for a workspace that turned auto-close ON',
-    owner: 'Plan 10 — a local workspace-settings fold, deliberately not invented here',
+      'the local replica has no workspace-settings fold: `workspace.settings_set` is a workspace-entity event and every local projection here is ticket-shaped, so there is no row to read. Serving the defaults instead would be indistinguishable from a workspace that really claimed them, and `autoCloseAfterDays: null` is a CLAIM ("off") as well as the default, so a replica answering null would show "off" for a workspace that turned auto-close ON',
+    owner: 'Plan 10: a local workspace-settings fold, deliberately not invented here',
   },
 ];
 
@@ -532,8 +546,8 @@ const COMMENTS_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'TicketComment (the whole thread, including the body)',
     because:
-      'a comment’s FILES are resolved against the server’s `attachments` table, which does not exist locally, and the renderer draws an image node as nothing — so a thread derived from the local ledger would draw a comment that embeds a file as a comment with no file, indistinguishably from one that embeds none. The bodies alone are derivable; the attribution is not, and serving the derivable half would state the underivable half as absent',
-    owner: 'Plan 10 — an attachments table in the local schema (bootstrap payload + sync), the same fix `getTicketAttachments` names',
+      'a comment’s FILES are resolved against the server’s `attachments` table, which does not exist locally, and the renderer draws an image node as nothing, so a thread derived from the local ledger would draw a comment that embeds a file as a comment with no file, indistinguishably from one that embeds none. The bodies alone are derivable; the attribution is not, and serving the derivable half would state the underivable half as absent',
+    owner: 'Plan 10: an attachments table in the local schema (bootstrap payload + sync), the same fix `getTicketAttachments` names',
   },
 ];
 
@@ -541,8 +555,8 @@ const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'AttachmentListEntry (the whole list, both arms)',
     because:
-      'no attachments table exists locally — the rows live in a server table the upload door writes and the bootstrap payload does not ship. The `attachment.added` event is a DIFFERENT fact with a different writer: the row exists the moment bytes land, while the event is the client\'s claim about them, `routes/attachments.ts` says it expects that claim afterwards and `Features.md` §9 records the web client does not post it today. Deriving the list from the local ledger would omit an upload whose event never arrived and include an event whose upload failed, in the same field, indistinguishably',
-    owner: 'Plan 10 — an attachments table in the local schema (bootstrap payload + sync), not a /v1 route',
+      'no attachments table exists locally: the rows live in a server table the upload door writes and the bootstrap payload does not ship. The `attachment.added` event is a DIFFERENT fact with a different writer: the row exists the moment bytes land, while the event is the client\'s claim about them, `routes/attachments.ts` says it expects that claim afterwards and `Features.md` §9 records the web client does not post it today. Deriving the list from the local ledger would omit an upload whose event never arrived and include an event whose upload failed, in the same field, indistinguishably',
+    owner: 'Plan 10: an attachments table in the local schema (bootstrap payload + sync), not a /v1 route',
   },
 ];
 
@@ -550,8 +564,8 @@ const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'UserPreferences (the whole document)',
     because:
-      'amendment 14: preferences are SERVER-OWNED per-user rows and not ledger events, so they are not in the event stream this replica mirrors and there is no preferences table locally. `getPreferences` answering DEFAULT_VIEW_PREFS would be ruling P24\'s exact failure — a default wearing a user\'s authority — and `putPreferences` accepting a write it can never send would lose the choice silently',
-    owner: 'Plan 10 — replicating amendment 14 rows (a decision no task owns yet)',
+      'amendment 14: preferences are SERVER-OWNED per-user rows and not ledger events, so they are not in the event stream this replica mirrors and there is no preferences table locally. `getPreferences` answering DEFAULT_VIEW_PREFS would be ruling P24\'s exact failure (a default wearing a user\'s authority) and `putPreferences` accepting a write it can never send would lose the choice silently',
+    owner: 'Plan 10: replicating amendment 14 rows (a decision no task owns yet)',
   },
 ];
 
@@ -613,7 +627,7 @@ export const OFFLINE_BORN_ABSENCE: ReplicaAbsence = {
   // enumerable datum naming the task P34 had just established could not
   // discharge it. The field is the half a tool reads.
   owner:
-    'Lane A, closure 2b (ruling P34) — an offline list that unions getTickets with listTicketSummaries and renders the second kind as claims',
+    'Lane A, closure 2b (ruling P34): an offline list that unions getTickets with listTicketSummaries and renders the second kind as claims',
 };
 
 /**
@@ -646,6 +660,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
+  getGroups: GROUPS_ABSENCES,
   getDeletedItems: DELETED_ITEMS_NOT_CACHED,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
@@ -840,7 +855,7 @@ function priorityOf(state: TicketState): PriorityView {
   const claim = state.fields['priority'];
   if (claim === undefined || !PRIORITIES.includes(claim.value as Priority)) {
     throw new Error(
-      `replica: no priority claim on ticket ${state.id} — every ticket.created writes one since 2026-09-22, so this replica replayed under an older reducer; re-bootstrap`,
+      `replica: no priority claim on ticket ${state.id}. Every ticket.created writes one since 2026-09-22, so this replica replayed under an older reducer; re-bootstrap`,
     );
   }
   return {
@@ -1100,7 +1115,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         {
           field: 'ListRow.stateProvenance',
           because: `no ticket.created or ticket.transitioned event is stored for ${state.id}, and no snapshot provenance was delivered for it either, so no actor or clock can be named for the state it is in`,
-          owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
+          owner: 'Plan 10: the local events table, or a snapshot written before ruling P36 added the provenance column',
         },
       ]);
     }
@@ -1196,6 +1211,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
+    getGroups: () => Promise.reject(new ReplicaGapError('getGroups', GROUPS_ABSENCES)),
     getDeletedItems: async () => {
       let body: unknown;
       try {
@@ -1426,7 +1442,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
             {
               field: 'BoardCard.stateProvenance',
               because: `no ticket.created or ticket.transitioned event is stored for ${state.id}, and no snapshot provenance was delivered for it either`,
-              owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
+              owner: 'Plan 10: the local events table, or a snapshot written before ruling P36 added the provenance column',
             },
           ]);
         }
@@ -1556,7 +1572,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           {
             field: 'TicketRead.stateProvenance',
             because: `no ticket.created or ticket.transitioned event is stored for ${ticketId}, and no snapshot provenance was delivered for it either`,
-            owner: 'Plan 10 — the local events table, or a snapshot written before ruling P36 added the provenance column',
+            owner: 'Plan 10: the local events table, or a snapshot written before ruling P36 added the provenance column',
           },
         ]);
       }

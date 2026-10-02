@@ -115,8 +115,9 @@ written to make it work.*
   *The ordering half is not theoretical: the first draft of the map filed `§10 — Who can see what` with
   "Workspaces and people", four chapters from its place in the document, and this case reddened on
   exactly that. A set-partition check would have passed it. It matters because the sidebar reads the
-  group order and the `Next` pager reads the document's, so a non-contiguous group makes a reader
-  following the sidebar and a reader following `Next` visit the same sections in different sequences.*
+  group order and the page reads the document's, so a non-contiguous group makes a reader
+  following the sidebar and a reader scrolling the page visit the same sections in different sequences.
+  (AMENDED 2026-10-02, 23.230: the `Next` pager, which read the document's order too, is gone.)*
   *A positive control runs THROUGH THE SAME COMPARISON, not a hand-rolled substitute — this repo's
   recorded failure shape is a control that does not traverse the measurement's own path — mutating the
   real group list three ways (drop, duplicate, reverse) and asserting each is rejected.*
@@ -135,10 +136,10 @@ written to make it work.*
   *Mutation-witnessed: making `helpNav` filter strays away instead of appending them reddens two of the
   three at `EXIT=1`. Sources restored and verified by SHA-256, never `git checkout`.* —
   (`packages/app-core/test/help/groups.test.ts`)
-- **15.21** ✅ The eyebrow and pager helpers read the document rather than a second hand-kept list:
-  `helpGroupTitle` names the owning group and returns `null` where none is declared, and
-  `helpNextSection` follows `document.sections` and stops at the last one — so the pager keeps working
-  for an ungrouped document and for a drifted section, and is never drawn pointing nowhere. —
+- **15.21** ✅ The eyebrow helper reads the document rather than a second hand-kept list:
+  `helpGroupTitle` names the owning group and returns `null` where none is declared. **AMENDED 2026-10-02
+  (23.230):** the second half of this case — `helpNextSection` following `document.sections` for the `Next`
+  pager — went with the pager (removed, owner's ruling), with its test. —
   (`packages/app-core/test/help/groups.test.ts`)
 - **15.22** ✅ **The sidebar renders one collapsible group per declared group, each naming its own
   count, and groups start OPEN.** Both halves of the collapse are asserted: a test of the click alone
@@ -163,7 +164,7 @@ written to make it work.*
   and the two that reach the FAQ by clicking a tab named `FAQ`. Source restored and verified by
   SHA-256.*
   *Every query is scoped through `getByRole('navigation', { name: 'Topics' })`, and that is not
-  tidiness: each section's `Next` pager carries the NEXT SECTION'S OWN TITLE, so an unscoped
+  tidiness: each section's `Next` pager (REMOVED 2026-10-02, 23.230; the scoping stayed) carried the NEXT SECTION'S OWN TITLE, so an unscoped
   `getByRole('link', { name: '§1 — Signing in' })` matches two elements, and a test that resolved the
   ambiguity by taking the first match would pass with the sidebar deleted.*
   *Mutation-witnessed: defaulting groups to closed reddens three of the four at `EXIT=1`.* —
@@ -196,7 +197,7 @@ written to make it work.*
   gives every element a zero rect, so `top <= 0` is true of every section there and a test would pin an
   artifact of the environment rather than the rule. Both were verified by scrolling a real browser —
   see the measured sequence below.* — (`packages/app-core/test/help/help-browser.test.tsx`)
-- **15.24** ✅ One `Next` pager per section EXCEPT THE LAST, pointing at the next section's anchor and
+- 🚫 **15.24** — removed with the `Next` pager by 23.230 (owner, 2026-10-02: "Either remove this"); the case and its test are deleted, the id stays unused. It read: One `Next` pager per section EXCEPT THE LAST, pointing at the next section's anchor and
   named with its title. Asserted as a COUNT against the real document rather than by finding one pager
   and calling it proved, because the off-by-one is the whole defect class: a pager on the last section
   would point nowhere, and a missing one mid-document would strand a reader.

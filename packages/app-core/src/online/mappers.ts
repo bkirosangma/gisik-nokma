@@ -1,3 +1,4 @@
+import type { GroupRow } from '@gisik-nokma/domain';
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
@@ -163,7 +164,7 @@ export class ServingGapError extends MappingError {
   constructor(method: string, absences: readonly Absence[]) {
     super(
       method,
-      `facts the shipped route does not serve — ${absences
+      `facts the shipped route does not serve: ${absences
         .map((absence) => `${absence.field} (${absence.because}; owner: ${absence.owner})`)
         .join('; ')}`,
     );
@@ -261,8 +262,8 @@ export const LIST_TOO_LARGE_ABSENCE: Absence = {
   // and no wire key exists for "the project is too big for the view type".
   wireKey: null,
   wireRoute: null,
-  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set — serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
-  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type — the bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
+  because: `the project holds more than ${LIST_ROW_CAP} tickets and TicketListView is the COMPLETE row set, so serving the pages already fetched would present a truncated list as the whole project, which is the defect this loop exists to prevent`,
+  owner: `raise LIST_ROW_CAP once a real project-size distribution is known, or give the list surface a paged view type. The bound is a disclosed assumption (${LIST_ROW_CAP} rows = ${LIST_PAGE_CAP} pages x ${LIST_PAGE_SIZE}, a page size this client SENDS rather than inherits), never a measurement`,
 };
 
 /** A request the shipped route's query language cannot express. */
@@ -402,7 +403,7 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
   if (uncategorized > 0) {
     throw new MappingError(
       `${path}.uncategorizedChildren`,
-      `0 — the server counted ${uncategorized} children whose state category it could not read, and RollupToViewer has no field to say so, so rendering the other counts would present an admittedly incomplete total as a complete one`,
+      `0, because the server counted ${uncategorized} children whose state category it could not read, and RollupToViewer has no field to say so, so rendering the other counts would present an admittedly incomplete total as a complete one`,
     );
   }
   return {
@@ -1074,7 +1075,7 @@ const FILTER_BLOCKED_ABSENCE: Absence = {
   wireRoute: null,
   because:
     "the server's filterSpecSchema carries a `blocked` term and the client's FilterSpec has no key for it, so a saved filter using it cannot be shown, edited or written back without silently dropping the criterion",
-  owner: 'Plan 6 — the client FilterSpec type (view-types.ts), not a route',
+  owner: 'Plan 6: the client FilterSpec type (view-types.ts), not a route',
 };
 
 /**
@@ -1132,8 +1133,8 @@ export function toClientFilterSpec(raw: unknown, path: string): FilterSpec {
             field: 'FilterSpec.fields',
             wireKey: null,
             wireRoute: null,
-            because: `the client's fields is Record<fieldId, value> — equality only — and this clause asks for op '${op}'`,
-            owner: 'Plan 6 — the client FilterSpec type (view-types.ts), not a route',
+            because: `the client's fields is Record<fieldId, value> (equality only) and this clause asks for op '${op}'`,
+            owner: 'Plan 6: the client FilterSpec type (view-types.ts), not a route',
           },
         ]);
       }
@@ -1420,7 +1421,7 @@ function describedText(
   if (!Object.prototype.hasOwnProperty.call(record, key)) {
     throw new MappingError(
       path,
-      'a project description key — every project row must state its description, ' +
+      'a project description key: every project row must state its description, ' +
         'spelling "not described" as null rather than omitting the key',
     );
   }
@@ -1577,12 +1578,24 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
           // into one value, so a null here is not a project without a prefix
           // but a route that did not resolve one. `asString` refuses it.
           prefix: asString(row['prefix'], `${projectPath}.prefix`),
+          // Required key, nullable value (prefixes and groups Task 6): `null` is "ungrouped", a
+          // MISSING key is a construction site that forgot the field and is refused.
+          groupId: nullableGroupId(row, `${projectPath}.groupId`),
           ticketCount: withheldOrNumber(row, 'ticketCount', `${projectPath}.ticketCount`),
           blockedCount: withheldOrNumber(row, 'blockedCount', `${projectPath}.blockedCount`),
         };
       }),
     };
   });
+}
+
+/** `string | null`, and the KEY must be present: absent is a route that did not answer, not "ungrouped". */
+function nullableGroupId(row: Record<string, unknown>, path: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(row, 'groupId')) {
+    throw new MappingError(path, 'a project group key (a string, or null when ungrouped; never omitted)');
+  }
+  const value = row['groupId'];
+  return value === null ? null : asString(value, path);
 }
 
 /**
@@ -2885,6 +2898,33 @@ export function mapNoteVersionBody(raw: unknown): unknown {
 }
 
 export { mapDeletedItems };
+
+/**
+ * `GET /v1/workspaces/:id/groups` → `GroupRow[]` (prefixes and groups Task 7). Every key is REQUIRED, and
+ * `parentId` is required-but-nullable (`asStringOrNull`): `null` is a top-level group, a missing key is a
+ * route that did not answer. A level outside 1–4 is refused rather than clamped, because the home nests
+ * its headings by it and a clamped level would put a group under the wrong heading without any error.
+ */
+export function mapGroupRows(raw: unknown): GroupRow[] {
+  const body = asRecord(raw, 'groups');
+  return asArray(body['groups'], 'groups.groups').map((entry, index) => {
+    const path = `groups.groups[${index}]`;
+    const row = asRecord(entry, path);
+    const level = asNumber(row['level'], `${path}.level`);
+    if (level !== 1 && level !== 2 && level !== 3 && level !== 4) {
+      throw new MappingError(`${path}.level`, 'a group level, 1 to 4');
+    }
+    return {
+      id: asString(row['id'], `${path}.id`),
+      parentId: asStringOrNull(row, 'parentId', `${path}.parentId`),
+      level,
+      name: asString(row['name'], `${path}.name`),
+      rank: asString(row['rank'], `${path}.rank`),
+      projectCount: asNumber(row['projectCount'], `${path}.projectCount`),
+      childCount: asNumber(row['childCount'], `${path}.childCount`),
+    };
+  });
+}
 
 /** `POST /v1/purged-lookup`'s body (trash Plan 3). A row that is not a lifecycle ref is a `MappingError`, never skipped. */
 export function mapPurgedLookup(raw: unknown): PurgedRef[] {

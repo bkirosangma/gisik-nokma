@@ -151,7 +151,7 @@ export function PasskeysSection({
       ) : (
         groupByProvider(passkeys).map(({ provider, rows }) => (
           <div key={provider} className="gn-account__device-group">
-            <h3 className="gn-account__group-title">{`${provider} · ${rows.length}`}</h3>
+            <h3 className="gn-account__group-title">{`${provider} (${rows.length})`}</h3>
             <ul className="gn-account__passkey-list">
               {rows.map((passkey) => {
                 const label = passkey.name ?? 'Unnamed passkey';
@@ -169,7 +169,7 @@ export function PasskeysSection({
                       <span className="gn-account__passkey-stale">Not used recently</span>
                     ) : null}
                     <Button
-                      variant="danger"
+                      variant="danger-quiet"
                       // An unnamed passkey carries its added date so two of them are still told apart by name.
                       aria-label={
                         passkey.name === null ? `Delete passkey ${label} added ${added}` : `Delete passkey ${label}`

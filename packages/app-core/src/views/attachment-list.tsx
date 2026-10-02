@@ -115,10 +115,10 @@ export function AttachmentList({ entries }: AttachmentListProps) {
                   renderer, never an ISO slice, which would report the UTC day and
                   disagree with every other date on this sheet for five and a half
                   hours every night. */}
-              {`last seen as “${entry.name}” (${entry.mimeType}) · captured ${formatDate(entry.capturedAt)}`}
+              {`last seen as “${entry.name}” (${entry.mimeType}), captured ${formatDate(entry.capturedAt)}`}
             </span>
             <span className="gn-attachment__status">
-              Contents unknown — the board holds a link to this file, not the file.
+              Contents unknown. The board holds a link to this file, not the file.
             </span>
           </li>
         ),

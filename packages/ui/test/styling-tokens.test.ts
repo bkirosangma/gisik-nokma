@@ -58,7 +58,8 @@ describe('20.001 surfaceTrack — the recessed track ground', () => {
       expect(colorOf('dark', 'surfaceTrack', style)).toBe('#10152a');
     }
     for (const theme of THEMES) {
-      expect(colorOf(theme, 'surfaceTrack', 'neo')).toBe(colorOf(theme, 'surface', 'neo'));
+      // Amended UX T1 (owner U8, 2026-10-02; 23.007): neo's track steps to the well fill, no longer the one-hex surface.
+      expect(colorOf(theme, 'surfaceTrack', 'neo')).toBe(theme === 'light' ? '#e6dcd2' : '#141a33');
     }
     for (const fg of ['text', 'textMuted', 'textSubtle'] as const) {
       expect(declared(fg, 'surfaceTrack', 4.5), `${fg} on surfaceTrack is not a declared pair`).toBe(true);
@@ -86,7 +87,8 @@ describe('20.002 surfaceWell — the well inside a raised panel', () => {
       expect(colorOf('dark', 'surfaceWell', style)).toBe('#1a213b');
     }
     for (const theme of THEMES) {
-      expect(colorOf(theme, 'surfaceWell', 'neo')).toBe(colorOf(theme, 'surface', 'neo'));
+      // Amended UX T1 (owner U8, 2026-10-02; 23.007): neo's well steps, no longer the one-hex surface.
+      expect(colorOf(theme, 'surfaceWell', 'neo')).toBe(theme === 'light' ? '#e6dcd2' : '#141a33');
     }
     for (const fg of ['text', 'textMuted', 'textSubtle'] as const) {
       expect(declared(fg, 'surfaceWell', 4.5), `${fg} on surfaceWell is not a declared pair`).toBe(true);
@@ -211,9 +213,11 @@ describe('20.013 neo speaks its own depth language', () => {
       expect(shadowValueOf('neo', theme, 'lift-drag')).toMatch(/^14px 14px 32px /);
       expect(shadowValueOf('neo', theme, 'lift-press')).toMatch(/^4px 4px 10px /);
       expect(shadowValueOf('neo', theme, 'action')).toMatch(/^4px 4px 10px /);
-      // CONTROL — no hig primitive leaks into neo.
+      // CONTROL — no hig primitive leaks into neo. Amended UX T1 (owner U8, 2026-10-02): neo's dark raised highlight is now
+      // `#f2e9e11f`, the same hex as hig's `lift-near` highlight, so the hex alone no longer tells them apart; hig's is the
+      // INSET `0px 1px 0px` layer, and neo draws none.
       for (const role of NEW_ROLES) {
-        expect(shadowValueOf('neo', theme, role), `neo/${theme}/${role}`).not.toMatch(/#273a63|#33629f|#f2e9e11f/);
+        expect(shadowValueOf('neo', theme, role), `neo/${theme}/${role}`).not.toMatch(/#273a63|#33629f|inset 0px 1px 0px #f2e9e1/);
       }
     }
   });

@@ -44,7 +44,7 @@ describe('summarizeRule', () => {
 
   it('an empty restrict-to says so honestly', () => {
     expect(summarizeRule({ kind: 'restrict-to' }, ctx)).toBe(
-      'Restricted to nobody — nobody may make this move.',
+      'Restricted to nobody. Nobody may make this move.',
     );
   });
 
@@ -60,14 +60,14 @@ describe('summarizeRule', () => {
   it('require-different-user names the watched state', () => {
     expect(
       summarizeRule({ kind: 'require-different-user', thanActorOf: { to: 'submitted' } }, ctx),
-    ).toBe('Needs a second person — someone other than whoever moved this to "Submitted".');
+    ).toBe('Needs a second person: someone other than whoever moved this to "Submitted".');
   });
 
   it('unknown ids fall back to the raw id rather than crashing', () => {
     expect(summarizeRule({ kind: 'require-field', field: 'ghost' }, ctx)).toBe('Needs "ghost" set first.');
     expect(
       summarizeRule({ kind: 'require-different-user', thanActorOf: { to: 'gone' } }, ctx),
-    ).toBe('Needs a second person — someone other than whoever moved this to "gone".');
+    ).toBe('Needs a second person: someone other than whoever moved this to "gone".');
   });
 });
 

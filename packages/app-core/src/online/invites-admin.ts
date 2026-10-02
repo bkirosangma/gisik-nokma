@@ -181,7 +181,7 @@ export function createHttpInviteAdminGateway(http: HttpClient): InviteAdminGatew
           // An address is what an admin recognises the invitation BY, so a
           // missing one is shown as the gap it is rather than as an empty cell
           // that reads like an invitation to nobody.
-          address: asString(row['address']) ?? `(no address recorded — row ${index + 1})`,
+          address: asString(row['address']) ?? `(no address recorded, row ${index + 1})`,
           channel: asString(row['channel']) ?? '(no channel recorded)',
           role: asString(row['role']) ?? '(no role recorded)',
           projectIds: Array.isArray(row['projectIds'])

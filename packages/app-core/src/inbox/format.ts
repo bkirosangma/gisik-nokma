@@ -99,7 +99,7 @@ export function notificationHeadline(notification: Notification, userName: UserN
     case 'stale-ticket': {
       const payload = notification.payload as StaleTicketNotificationPayload;
       const state = payload.stateName ?? payload.stateId;
-      return `In ${state} since ${sinceDay(payload.enteredAt)} — moved there by ${userName(payload.enteredBy)}`;
+      return `In ${state} since ${sinceDay(payload.enteredAt)}, moved there by ${userName(payload.enteredBy)}`;
     }
     default: {
       // A sixth kind is a COMPILE error rather than a headline-less row. The
