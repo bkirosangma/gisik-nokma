@@ -563,5 +563,5 @@ mcp-everything	9	in-flight	-	-	landed in release/mcp-everything as #933; reaches
 mcp-everything	10	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	11	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	12	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
-mcp-everything	13	in-flight	-	-	on task/mcp-e-13-search-deleted, in review; not yet landed in release/mcp-everything
+mcp-everything	13	in-flight	-	-	landed in release/mcp-everything as #935; reaches main with that release
 mcp-everything	14	todo	-	-	not started; owner step, runs after the merge to main (Q6)
