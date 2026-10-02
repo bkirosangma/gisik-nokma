@@ -51,7 +51,7 @@
 - ✅ **22.067 — `parseTicketKey(" ccso2-12 ")` is `{ letters: "CCSO2", number: 12 }` (one trailing digit 2–9, the collision suffix of a DERIVED project prefix, `collisionCandidates` → `SO2`…`SO9`);** control, same `it`: `"CC1O-12"` (digit in the middle), `"CCSO22-1"` (two digits), `"CCSO1-1"`, `"CCSO0-1"`, a leading digit, a digit then a letter and `"C2-1"` all stay `null`. Mutation: letters-only regex → red (also 22.068). (`packages/domain/test/prefix.test.ts`; `packages/domain/src/prefix.ts`)
 - ✅ **22.068 — two projects that derive the same prefix (`ZO` and `ZO2`): `<ws>ZO2-1` finds the SECOND project's ticket, and its card reads that same key;** control, same `it`: `<ws>ZO-1` finds the first project's ticket, and `<ws>ZO3-1` (a digit nothing took) finds nothing. Mutation: letters-only regex → red (also 22.067). (`apps/server/test/routes/search-by-key.test.ts`)
 
-## 22.5 The group tree — events, projection, door, read route
+## 22.6 The group tree — events, projection, door, read route
 
 *Task 6. Ids `22.108`–`22.119` are unused.*
 
@@ -74,7 +74,7 @@
 - ✅ **22.106 — reorder and delete of a group that does not exist are refused `group.unknown`:** a re-delivered delete and a reorder of a fabricated id; control: the live group's reorder commits. Mutations: drop the `readGroup` null check in the `group.reordered` arm, or in the `group.deleted` arm → red. (`groups.test.ts`; `checkGroupRules`)
 - ✅ **22.107 — a TRASHED project still blocks its group's delete (`group.in-use`);** control: after `project.undeleted` and an ungroup the delete commits. Mutation: add `AND deleted_at IS NULL` to the in-use query → red. (`groups.test.ts`)
 
-## 22.4 The workspace home — nav row, heading row, grouped view
+## 22.7 The workspace home — nav row, heading row, grouped view
 
 - ✅ **22.120 — the workspace's section links come BEFORE the Projects heading (amends 13.673's "after the project list");** control: the links are still one `nav` named "Workspace sections" with the same four doors. Mutation: render the links under the project list → red. (`apps/web/test/workspace-home.test.tsx`, the 13.673 test; `apps/web/app/w/[workspaceId]/page.tsx`)
 - ✅ **22.121 — the Projects heading row holds, in order, the `h2`, the archived toggle, the "Show projects" Grouped/Plain control and the Create project button (an owner or admin only, 22.152; it mounted into a `data-slot="create-project"` placeholder until prefixes and groups Task 8 landed);** control: a member has the control but no create slot, a guest has neither. (`apps/web/test/workspace-home-grouped.test.tsx`)
