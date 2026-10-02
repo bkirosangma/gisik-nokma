@@ -22,12 +22,16 @@ describe('collision (spec §3.1)', () => {
     expect(rectsOverlap(a, { ...ob, x: 0, y: -69 }, NODE_GAP)).toBe(false);
   });
 
-  it('25.507 dragging into an obstacle from the left stops at its left edge minus the gap (slides, does not jump past)', () => {
+  it('25.507 dragging into an obstacle from the left or the right stops at the near edge plus/minus the gap (slides, does not jump past)', () => {
     expect(clampToAvoidOverlap({ x: 150, y: 0 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 92, y: 0 });
+    // the mirror: a drag into `ob` from the right stops at its right edge plus the gap
+    expect(clampToAvoidOverlap({ x: 250, y: 0 }, size, [ob], { x: 400, y: 0 })).toEqual({ x: 308, y: 0 });
   });
 
-  it('25.508 the nearest valid candidate wins: approaching from above stops above it', () => {
+  it('25.508 the nearest valid candidate wins: approaching from above or below stops at the near edge', () => {
     expect(clampToAvoidOverlap({ x: 200, y: -20 }, size, [ob], { x: 200, y: -200 })).toEqual({ x: 200, y: -68 });
+    // approaching from below stops below it
+    expect(clampToAvoidOverlap({ x: 200, y: 40 }, size, [ob], { x: 200, y: 200 })).toEqual({ x: 200, y: 68 });
   });
 
   it('25.509 a corner between two obstacles picks the closest free spot', () => {
