@@ -338,6 +338,7 @@ function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
       </p>
       <GroupsTree
         workspaceId={workspaceId}
+        userId={wiring.session.userId}
         canEdit={wiring.session.role === 'owner' || wiring.session.role === 'admin'}
         groups={groups.data}
         onSubmit={onSubmit}
