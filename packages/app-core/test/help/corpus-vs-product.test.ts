@@ -102,7 +102,7 @@ describe('15.35 the help corpus against the product', () => {
   it('23.196 — a quotation WRAPPED over a line is checked; a wrapped correct one stays green; the bound is one newline', () => {
     const baseline = { absent: [] };
     const stale = compareAbsent({
-      documents: [{ id: 'd', source: 'docs/d.md', text: 'It says *"No such\nthing here"* now.' }],
+      documents: [{ source: 'docs/d.md', text: 'It says *"No such\nthing here"* now.' }],
       product: 'Sign out',
       baseline,
     });
@@ -110,7 +110,7 @@ describe('15.35 the help corpus against the product', () => {
     // CONTROL: the same wrap over a string the product HAS (indented continuation, as in a list item) is silent,
     // so the red above is the wrap being read and not a rule that fires on every wrapped span.
     const right = compareAbsent({
-      documents: [{ id: 'd', source: 'docs/d.md', text: 'It says *"Sign\n   out"* now.' }],
+      documents: [{ source: 'docs/d.md', text: 'It says *"Sign\n   out"* now.' }],
       product: 'Sign out',
       baseline,
     });
@@ -129,7 +129,7 @@ describe('15.35 the help corpus against the product', () => {
    */
   it('23.197 — a stale quote that exists only inside a COMMENT is reported; the same text in a string literal is found', () => {
     const STALE = ['5 of 8 done', '2 restricted'].join(' \u00b7 ');
-    const documents = [{ id: 'd', source: 'docs/d.md', text: `It reads "${STALE}" now.` }];
+    const documents = [{ source: 'docs/d.md', text: `It reads "${STALE}" now.` }];
     const baseline = { absent: [] };
     const commented = `/** "${STALE}" */\nconst a = 1; // "${STALE}"\n`;
     const stale = compareAbsent({ documents, product: stripComments(commented), baseline });
