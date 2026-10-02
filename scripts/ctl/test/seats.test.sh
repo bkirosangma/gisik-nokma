@@ -150,7 +150,8 @@ out=$(run "$d" --flag)
 check "13.1815 --flag prints only the flagged seat, with its reason, then a summary of N flagged of M" '[ "$(printf "%s\n" "$out" | grep -c "^gisik:")" = 1 ] && printf "%s\n" "$out" | grep "^gisik:" | grep -q "^gisik:2 .*FLAG idle-no-task" && printf "%s\n" "$out" | tail -1 | grep -q "^OK seats 1 flagged of 3"'
 d=$(fixture); mkpane "$d/3.pane" "✢ Misting… (3s · ↓ 2k tokens)" "" 12 sonnet-5-5 ""; meta "$d" 3 exec3 0
 check "13.1815 --flag with nothing to flag prints no seat lines and exits 0" 'out=$(run "$d" --flag); [ $? -eq 0 ] && [ "$(printf "%s\n" "$out" | grep -c "^gisik:")" = 0 ] && printf "%s\n" "$out" | tail -1 | grep -q "^OK seats 0 flagged of 1"'
-check "13.1815 --flag --json prints the flagged seat objects only" 'out=$(run "$d" --flag --json 2>/dev/null); [ -z "$out" ]'
+mkpane "$d/6.pane" "⏺ x" "" 12 opus-5-5 ""; meta "$d" 6 dispatcher 0
+check "13.1815 --flag --json prints the flagged seat objects only (window 6 of 2)" 'out=$(run "$d" --flag --json 2>/dev/null); [ "$(printf "%s\n" "$out" | grep -c "^{")" = 1 ] && [ "$(jv "$out" 6 "d[\"flags\"][0]")" = idle-no-watch ]'
 
 # ============ 6. the whole verb, against a fake tmux ============
 # A bare repo + a worktree-like checkout: the branch tracks the RELEASE branch (the way a task branch is cut), pushed to origin/<branch>.
@@ -184,12 +185,12 @@ check "13.1816 verb: dirty counts the changed files (2 untracked)" '[ "$(jv "$ou
 check "13.1816 verb: a window whose directory is not a git worktree has no branch facts (null), and the line still prints" '[ "$(jv "$out" 2 "d[\"branch\"]")" = None ] && vrun | grep -q "^gisik:2 reviewerA reviewer "'
 check "13.1816 verb: unpushed with no origin/<branch> counts commits on no origin ref at all (b and c = 2)" '( cd "$co" && git switch -q -c task/z && git commit -q --allow-empty -m c ); o=$(vrun --json 2>&1); r=$(jv "$o" 1 "d[\"unpushed\"]"); ( cd "$co" && git switch -q task/y ); [ "$r" = 2 ]'
 check "13.1817 read-only: the verb called tmux with list-windows, capture-pane and display-message only — no send-keys, paste-buffer, load-buffer, kill-window" '! grep -E "^(send-keys|paste-buffer|load-buffer|kill-window|new-window|select-window|copy-mode)" "$fd/calls" && grep -q "^capture-pane" "$fd/calls"'
-check "13.1817 read-only: the verb did not change the checkout (same dirty files, same HEAD)" '[ "$(git -C "$co" status --porcelain | wc -l | tr -d " ")" = 2 ] && [ "$(git -C "$co" rev-parse --short HEAD)" = "$head7" ]'
+check "13.1817 read-only: the verb ran and did not change the checkout (same dirty files, same HEAD)" '[ "$(jv "$out" 1 "d[\"dirty\"]")" = 2 ] && [ "$(git -C "$co" status --porcelain | wc -l | tr -d " ")" = 2 ] && [ "$(git -C "$co" rev-parse --short HEAD)" = "$head7" ]'
 check "13.1818 --dry-run touches no tmux at all and exits OK" ': > "$fd/calls"; o=$(vrun --dry-run 2>&1); [ $? -eq 0 ] && printf "%s" "$o" | tail -1 | grep -q "^OK seats dry-run" && [ ! -s "$fd/calls" ]'
 # 13 windows, all in the same worktree, timed (the budget is 2 s; the real run is quoted in DONE).
 : > "$fd/windows"; for i in $(seq 1 13); do cp "$FX/busy-sonnet.pane" "$fd/panes/$i.pane"; printf '%s exec%s 0 %s\n' "$i" "$i" "$co" >> "$fd/windows"; done
-s=$(python3 -c 'import time;print(time.time())'); vrun >/dev/null 2>&1; e=$(python3 -c 'import time;print(time.time())')
-check "13.1819 speed: 13 windows in under 2 s through the fake tmux" 'python3 -c "import sys; sys.exit(0 if $e - $s < 2.0 else 1)"'
+s=$(python3 -c 'import time;print(time.time())'); n13=$(vrun --json 2>/dev/null | grep -c "^{"); e=$(python3 -c 'import time;print(time.time())')
+check "13.1819 speed: 13 windows in under 2 s through the fake tmux" '[ "$n13" = 13 ] && python3 -c "import sys; sys.exit(0 if $e - $s < 2.0 else 1)"'
 # parity with lib.sh: the box this verb reads is the box ctl_box_text reads, on every box variant used above.
 check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed ghost, an unclosed ghost, and real+ghost" 'ok=1
   for variant in "plain words" "\\033[2mghost\\033[0m" "\\033[2munclosed ghost" "real \\033[2mghost\\033[0m" ""; do
