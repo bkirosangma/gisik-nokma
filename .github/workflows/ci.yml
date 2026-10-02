@@ -611,6 +611,12 @@ jobs:
 
       # Seeding and user creation happen inside the suite's own globalSetup,
       # which also REFUSES the run unless what is listening is really the stack.
+      # The spec files import `@gisik-nokma/domain` (smoke.spec.ts: `newUlid`), which resolves to
+      # its `dist/`; this job installs but does not build, so without this the run dies with
+      # `Cannot find module '…/domain/dist/index.js'` (run 36971568470). 13.1728.
+      - name: build the workspace packages the E2E specs import
+        run: pnpm turbo run build --filter=@gisik-nokma/domain
+
       - name: run the deployed-stack E2E
         run: pnpm run test:e2e:stack
 

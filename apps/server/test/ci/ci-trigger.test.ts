@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -106,5 +106,48 @@ describe('13.1727 the dev stack probes its own server over IPv4, not through `lo
     const broken = compose.replace('http://127.0.0.1:3000/healthz', 'http://localhost:3000/healthz');
     expect(broken).not.toBe(compose);
     expect(probeOf(broken)).toMatch(/localhost/);
+  });
+});
+
+describe('13.1728 the e2e job builds every workspace package its specs import', () => {
+  // The job installs but never builds, and a workspace package resolves to its `dist/`: smoke.spec.ts
+  // imports `@gisik-nokma/domain`, so the run died with "Cannot find module …/domain/dist/index.js"
+  // once the stack finally came up (run 36971568470).
+  const SPEC_DIR = join(REPO_ROOT, 'apps/web/e2e-stack');
+  const importedPackages = (): string[] => {
+    const names = new Set<string>();
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith('.ts')) {
+          for (const m of readFileSync(full, 'utf8').matchAll(/from '@gisik-nokma\/([a-z-]+)'/g)) names.add(m[1]!);
+        }
+      }
+    };
+    walk(SPEC_DIR);
+    return [...names].sort();
+  };
+  const stepsBefore = (text: string): string[] => {
+    const doc = parse(text) as { jobs: { e2e: { steps: { name?: string; run?: string }[] } } };
+    const steps = doc.jobs.e2e.steps;
+    const at = steps.findIndex((st) => st.name === 'run the deployed-stack E2E');
+    expect(at, 'the E2E step has been renamed or removed').toBeGreaterThan(0);
+    return steps.slice(0, at).map((st) => st.run ?? '');
+  };
+  const unbuilt = (text: string): string[] => {
+    const runs = stepsBefore(text).join('\n');
+    return importedPackages().filter((pkg) => !new RegExp(`turbo run build[^\\n]*--filter=@gisik-nokma/${pkg}\\b`).test(runs));
+  };
+
+  it('every @gisik-nokma/* the specs import is built before the E2E step', () => {
+    expect(importedPackages().length, 'found no workspace import — the reader has drifted').toBeGreaterThan(0);
+    expect(unbuilt(ciYml)).toEqual([]);
+  });
+
+  it('CONTROL: with the build step removed the reader reports the package unbuilt', () => {
+    const without = ciYml.replace('turbo run build --filter=@gisik-nokma/domain', 'echo skipped');
+    expect(without).not.toBe(ciYml);
+    expect(unbuilt(without)).toContain('domain');
   });
 });
