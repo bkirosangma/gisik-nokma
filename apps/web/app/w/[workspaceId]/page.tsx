@@ -3,15 +3,20 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { newUlid, type IngestResult } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, Dialog, PlusIcon } from '@gisik-nokma/ui';
+import { newUlid, type GroupRow, type IngestResult } from '@gisik-nokma/domain';
+import { Avatar, Button, Card, Chip, Dialog, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
 import {
+  ARCHIVE_LABEL,
   DELETE_TRIGGER_LABEL,
   DeleteDialog,
-  deleteItemName,
+  RESTORE_LABEL,
   deletedNotice,
   makeSubmittedFactory,
+  moreActionsFor,
+  readProjectGrouping,
+  rememberProjectGrouping,
   type EnvelopeSeed,
+  type ProjectGrouping,
 } from '@gisik-nokma/app-core';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../src/app-nav.js';
@@ -23,11 +28,16 @@ import { DocumentTitle } from '../../../src/document-title.js';
 import { ProjectEditForm, type ProjectEditValues } from '../../../src/project-edit-form.js';
 import { bumpProjectsVersion } from '../../../src/projects-version.js';
 import { updateSeeds } from '../../../src/project-update-seeds.js';
+import { GroupedProjects } from '../../../src/grouped-projects.js';
+import { OverflowMenu } from '../../../src/overflow-menu.js';
 
 // Exported from here beside `archiveSeeds` (the two project acts this page
 // submits); the builder lives in `src/` because the project page's header
 // submits the same claim.
 export { updateSeeds };
+
+/** The project card menu's Edit item (the inline Edit button it replaced was named `Edit <project>`). */
+const EDIT_LABEL = 'Edit';
 
 /**
  * Archiving and restoring are ONE control and one symmetric event pair, chosen
@@ -226,12 +236,36 @@ export default function WorkspaceHomePage() {
   const [deleting, setDeleting] = useState<ProjectRef | null>(null);
   /** "Deleted project “X”…" after a committed delete — where it went and how back. */
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Grouped or plain (prefixes and groups Task 7, case 22.122) — the person's own choice, kept on this
+   * device per user and per workspace. Read in an EFFECT, not in the initialiser: the first render must
+   * match the server's (plain), and the session may not have answered yet.
+   */
+  const [grouping, setGrouping] = useState<ProjectGrouping>('plain');
+  /** The groups, read only once Grouped is chosen: `null` while loading, `'failed'` when the read refused. */
+  const [groups, setGroups] = useState<GroupRow[] | 'failed' | null>(null);
+  /** Bumped by every reload so a Grouped view re-reads the groups with the projects it sits beside. */
+  const [loads, setLoads] = useState(0);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    setGrouping(userId === null ? 'plain' : readProjectGrouping(userId, workspaceId));
+  }, [userId, workspaceId]);
+
+  const chooseGrouping = useCallback(
+    (choice: ProjectGrouping): void => {
+      setGrouping(choice);
+      if (userId !== null) rememberProjectGrouping(userId, workspaceId, choice);
+    },
+    [userId, workspaceId],
+  );
 
   const reload = useCallback(() => {
     dataSource.query.getMyWorkspaces().then(
       (rows) => {
         setWorkspaces(rows);
         setFailure(null);
+        setLoads((count) => count + 1);
       },
       (cause: unknown) => {
         setFailure(cause instanceof Error ? cause.message : String(cause));
@@ -332,6 +366,26 @@ export default function WorkspaceHomePage() {
   const workspace =
     workspaces === null ? null : (workspaces.find((entry) => entry.id === workspaceId) ?? null);
 
+  // The groups door answers members, admins and owners; a guest gets a 404 there, so a guest is never
+  // offered the choice and never asked (the same gate the heading row's control reads).
+  const mayGroup = workspace !== null && workspace.role !== 'guest';
+  const wantGroups = grouping === 'grouped' && mayGroup;
+  useEffect(() => {
+    if (!wantGroups) return;
+    let current = true;
+    dataSource.query.getGroups(workspaceId).then(
+      (rows) => {
+        if (current) setGroups(rows);
+      },
+      () => {
+        if (current) setGroups('failed');
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [dataSource, workspaceId, wantGroups, loads]);
+
   return (
     <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
@@ -364,6 +418,9 @@ export default function WorkspaceHomePage() {
           busy={busy}
           showArchived={showArchived}
           onToggleArchived={() => setShowArchived((open) => !open)}
+          grouping={mayGroup ? grouping : null}
+          groups={groups}
+          onGrouping={chooseGrouping}
           onSubmit={submit}
           refusal={refusal}
           createOpen={createOpen}
@@ -481,7 +538,7 @@ function ProjectCard({
   // is the same as `project.archived`'s, and this control only tells a person
   // that before they type.
   const [editing, setEditing] = useState(false);
-  const editTrigger = useRef<HTMLButtonElement>(null);
+  const editTrigger = useRef<HTMLButtonElement | null>(null);
   return (
     <li data-testid={`project-row-${project.id}`}>
       <Card
@@ -491,12 +548,29 @@ function ProjectCard({
       >
         <Link
           href={`/w/${workspaceId}/p/${project.id}`}
-          aria-label={project.archived ? `${project.name}, archived` : project.name}
+          aria-label={project.archived ? `Open ${project.name}, archived` : `Open ${project.name}`}
           className="gn-project-card__door"
         >
           <span className="gn-project-card__head">
             <span className="gn-project-card__name">{project.name}</span>
             {project.archived ? <Chip tone="neutral">Archived</Chip> : null}
+            {/* The visible cue that the whole card opens the project (WS-03, case 22.147). Decorative:
+                the link's own name says "Open …", and the card — not this glyph — is the target. */}
+            <svg
+              className="gn-project-card__chevron"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M9 5l7 7-7 7" />
+            </svg>
           </span>
           {/* The prototype draws `p.desc` here — a 15px/20px muted line between
               the name row and the chips, inside the card's own click target
@@ -532,6 +606,23 @@ function ProjectCard({
             )}
           </span>
         </Link>
+        {isAdmin ? (
+          // The overflow menu replaces the three inline buttons (WS-03, case 22.147): the card now holds
+          // ONE link and ONE button, and Edit, Archive/Restore and Delete… are a menu away. It stays
+          // mounted while the edit form is open so the form's focus return has a trigger to land on.
+          <OverflowMenu
+            className="gn-project-card__menu"
+            triggerRef={editTrigger}
+            triggerLabel={moreActionsFor(project.name)}
+            menuLabel={`Actions for ${project.name}`}
+            disabled={busy}
+            items={[
+              { label: EDIT_LABEL, onSelect: () => setEditing(true) },
+              { label: project.archived ? RESTORE_LABEL : ARCHIVE_LABEL, onSelect: () => onArchive(project) },
+              { label: DELETE_TRIGGER_LABEL, onSelect: () => onDelete(project) },
+            ]}
+          />
+        ) : null}
         {isAdmin && editing ? (
           <ProjectEditForm
             idPrefix={`gn-project-${project.id}`}
@@ -541,42 +632,6 @@ function ProjectCard({
             onCancel={() => setEditing(false)}
             returnFocusRef={editTrigger}
           />
-        ) : isAdmin ? (
-          <div className="gn-project-card__actions">
-            <Button
-              ref={editTrigger}
-              type="button"
-              disabled={busy}
-              aria-label={`Edit ${project.name}`}
-              onClick={() => setEditing(true)}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              disabled={busy}
-              // The accessible name carries the PROJECT, so a grid of projects
-              // does not present a column of identically-named buttons — the
-              // rule the archived disclosure and the invitation actions already
-              // keep.
-              aria-label={`${project.archived ? 'Restore' : 'Archive'} ${project.name}`}
-              onClick={() => onArchive(project)}
-            >
-              {project.archived ? 'Restore' : 'Archive'}
-            </Button>
-            {/* Spec §6.2: Delete… BESIDE Archive, for the same people (D4) —
-                the ellipsis because it asks before it acts. The accessible name
-                carries the project, the rule the Archive button's own comment
-                states, and contains the visible word (WCAG 2.5.3). */}
-            <Button
-              type="button"
-              disabled={busy}
-              aria-label={deleteItemName(project.name)}
-              onClick={() => onDelete(project)}
-            >
-              {DELETE_TRIGGER_LABEL}
-            </Button>
-          </div>
         ) : null}
       </Card>
     </li>
@@ -793,6 +848,9 @@ function WorkspaceHome({
   busy,
   showArchived,
   onToggleArchived,
+  grouping,
+  groups,
+  onGrouping,
   onSubmit,
   refusal,
   createOpen,
@@ -803,6 +861,10 @@ function WorkspaceHome({
   busy: boolean;
   showArchived: boolean;
   onToggleArchived: () => void;
+  /** The Grouped/Plain choice, or `null` when this caller is not offered one (a guest). */
+  grouping: ProjectGrouping | null;
+  groups: GroupRow[] | 'failed' | null;
+  onGrouping: (choice: ProjectGrouping) => void;
   onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
   refusal: string | null;
   createOpen: boolean;
@@ -849,6 +911,24 @@ function WorkspaceHome({
         ),
       whenDone,
     );
+  const renderCard = (project: ProjectRef) => (
+    <ProjectCard
+      key={project.id}
+      workspaceId={workspace.id}
+      project={project}
+      countsWithheld={viewer.countsWithheld}
+      isAdmin={isAdmin}
+      busy={busy}
+      onArchive={archive}
+      onEdit={edit}
+      onDelete={onDelete}
+    />
+  );
+  // Grouped is drawn only once the groups have ARRIVED. While they load the plain list stays up, and a
+  // refused read says so beside it — a person who asked for Grouped is told it is not what they are
+  // looking at (case 22.142), never shown a plain list under a Grouped tab as though it were the tree.
+  const groupedView = grouping === 'grouped' && Array.isArray(groups);
+  const groupsFailed = grouping === 'grouped' && groups === 'failed';
   // "N members · M active projects · you're an owner" — every number SERVED,
   // never derived a second way. The member-count gate is `viewer.
   // countsWithheld`, NOT `workspace.memberCount === null` — a review caught
@@ -1045,6 +1125,15 @@ function WorkspaceHome({
             rather than deleted: it remains true of the two buttons it removed. */}
       </div>
 
+      {/* THE SECTION ROW IS ON TOP (prefixes and groups Task 7, case 22.120): Round 20 had moved it below the
+          projects and the founding form, where the reference puts it; the owner has now ruled it back above
+          the Projects heading. The grid, the notes and every href are untouched by the move. */}
+      <WorkspaceLinks
+        workspaceId={workspace.id}
+        memberCount={workspace.memberCount}
+        countsWithheld={viewer.countsWithheld}
+      />
+
       {/* Round 20: the heading and its toggle sit in a BARE row above the grid,
           not inside a card. The reference has no container around the projects
           section at all — each project is its own card, so an outer one would
@@ -1065,6 +1154,9 @@ function WorkspaceHome({
             archived show" with nothing saying what is archived or where. The
             `aria-label` carries the workspace for the same reason the archive
             buttons carry the project. */}
+        {/* The heading row's controls (case 22.121), in order: the archived toggle, the Grouped/Plain
+            choice, and the Projects section's Create project button (prefixes and groups Task 8, 22.152).
+            The button is for an owner or admin only, the same people who may create a project. */}
         <div className="gn-workspace-home__projects-actions">
           {archived.length > 0 ? (
             <Button
@@ -1076,6 +1168,17 @@ function WorkspaceHome({
               {showArchived ? 'Hide archived' : `${archived.length} archived · show`}
             </Button>
           ) : null}
+          {grouping === null ? null : (
+            <SegmentedControl<ProjectGrouping>
+              aria-label="Show projects"
+              options={[
+                { value: 'grouped', label: 'Grouped' },
+                { value: 'plain', label: 'Plain' },
+              ]}
+              value={grouping}
+              onChange={onGrouping}
+            />
+          )}
           {/* The Projects section's one primary (prefixes/groups Task 8, case 22.152): a
               verb + object with its icon, in the heading row it acts under. An owner or
               admin only — everyone else reads the refusal line below instead. */}
@@ -1091,6 +1194,11 @@ function WorkspaceHome({
           ) : null}
         </div>
       </div>
+      {groupsFailed ? (
+        <p role="status" className="gn-workspace-home__empty">
+          The groups could not be loaded, so the projects are shown as a plain list.
+        </p>
+      ) : null}
       {shown.length === 0 ? (
         // True of THIS CALLER'S list, and said as such. A member outside every
         // project has an empty live list in a workspace full of them, and
@@ -1118,21 +1226,11 @@ function WorkspaceHome({
         // but the archived cards sort to its END (Round 21, owner ruling), dimmed
         // and badged rather than moved to a section of their own. See `shown`'s
         // own comment above for the order and what it costs.
-        <ul className="gn-workspace-home__projects">
-          {shown.map((project) => (
-            <ProjectCard
-              key={project.id}
-              workspaceId={workspace.id}
-              project={project}
-              countsWithheld={viewer.countsWithheld}
-              isAdmin={isAdmin}
-              busy={busy}
-              onArchive={archive}
-              onEdit={edit}
-              onDelete={onDelete}
-            />
-          ))}
-        </ul>
+        groupedView ? (
+          <GroupedProjects groups={groups} projects={shown} renderCard={renderCard} />
+        ) : (
+          <ul className="gn-workspace-home__projects">{shown.map(renderCard)}</ul>
+        )
       )}
 
       {/* `gn-workspace-home__restricted` (Task 7 review, ROUTED 2): this call
@@ -1160,16 +1258,6 @@ function WorkspaceHome({
         </p>
       )}
 
-      {/* BELOW the projects (Round 20), where the
-          reference puts them — they were above both until now. The grid, the
-          notes and every href are untouched by the move; 13.387 asserts the
-          exact set of five inside this nav, and it is scoped by the nav's own
-          accessible name rather than by position, so it holds either way. */}
-      <WorkspaceLinks
-        workspaceId={workspace.id}
-        memberCount={workspace.memberCount}
-        countsWithheld={viewer.countsWithheld}
-      />
     </>
   );
 }

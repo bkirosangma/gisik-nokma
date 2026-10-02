@@ -12,6 +12,7 @@ import {
   mapWorkspaceSettings,
   mapBoardView,
   mapDeletedItems,
+  mapGroupRows,
   mapHistory,
   mapIngestResults,
   LIST_PAGE_CAP,
@@ -166,6 +167,15 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => mapWorkspaceRefs(await http.get('/v1/me/workspaces')),
 
+    getGroups: async (workspaceId) => {
+      const path = `/v1/workspaces/${workspaceId}/groups`;
+      const raw = await http.get(path);
+      // `Promise<GroupRow[]>` has no absence value, and `[]` would CLAIM the workspace has no groups when
+      // the truth is that this caller may not be told (a guest, a stranger — the route answers 404 to both).
+      // So the transport's `null` is re-raised as the STATUS it was, as `getBoard` does, never as an empty tree.
+      if (raw === null) throw new HttpError(404, path);
+      return mapGroupRows(raw);
+    },
     getDeletedItems: async () => mapDeletedItems(await http.get('/v1/me/deleted-items')),
 
     purgedAmong: async (ids) => {

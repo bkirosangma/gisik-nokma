@@ -490,6 +490,10 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
+      // Added by prefixes and groups Task 7 (case 22.124), directly under `getMyWorkspaces` — the position
+      // `REPLICA_GAPS` gained the key at. No replica table folds `group.*` events yet, so the tree refuses
+      // rather than answering `[]`, which would claim a workspace with forty groups has none.
+      ['getGroups', () => ds.query.getGroups(WS)],
       // Added by the trash series (Plan 1 Task 8), directly under
       // `getMyWorkspaces` — the same position `REPLICA_GAPS` gained the key at,
       // for the same order-sensitive reason every other entry here is placed
@@ -557,9 +561,9 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         // property this line holds is that the owner is a NAMED plan the client
         // must change — widening the set to the plans that will actually do the
         // work keeps the property; hard-coding any one of them would have made
-        // the sentence false for the others.
+        // the sentence false for the others. Prefixes and groups Task 7 added the FOURTH, for `getGroups`.
         expect(absence.owner, `${name}: ${absence.field}`).toMatch(
-          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3) — /,
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan) — /,
         );
       }
       names.push(name);

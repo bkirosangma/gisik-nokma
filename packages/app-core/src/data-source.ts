@@ -1,5 +1,6 @@
 import type {
   DeletedItem,
+  GroupRow,
   IngestResult,
   LedgerEvent,
   PurgedRef,
@@ -244,6 +245,13 @@ export type NoteSearchResult = { notes: NoteSearchHit[]; corrected?: string[] };
 
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
+  /**
+   * One workspace's group tree, flat, ordered by level then rank (prefixes and groups Task 7; the home's
+   * grouped view nests it by `parentId`). Online: `GET /v1/workspaces/:id/groups`, which answers a guest
+   * and a stranger alike with 404 — so the REJECTION is an ordinary answer here, and the home reads it as
+   * "no tree to show", never as an empty tree. Replica: refuses with `ReplicaGapError` (no local fold).
+   */
+  getGroups(workspaceId: string): Promise<GroupRow[]>;
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
