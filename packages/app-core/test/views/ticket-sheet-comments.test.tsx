@@ -922,6 +922,20 @@ describe('26.115 comment edit and delete leave through the one write door', () =
     expect(ofType(src, 'comment.added')).toHaveLength(0); // control: an edit never posts a second comment
   });
 
+  it('26.113 Cancel closes the in-place editor and ingests nothing', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const row = screen.getByTestId(`comment-${MINE.commentId}`);
+    expect(within(row).getByRole('button', { name: 'Save' })).toBeTruthy(); // control: the editor really opened
+    await user.click(within(row).getByRole('button', { name: 'Cancel' }));
+    expect(within(row).queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(within(row).getByText('The bucket is the defect.')).toBeTruthy();
+    expect(src.ingested.flat().filter((e) => e.type !== 'ticket.created')).toEqual([]);
+  });
+
   it('26.115 Delete then confirm ingests exactly one comment.deleted', async () => {
     const src = mount();
     const user = userEvent.setup();
