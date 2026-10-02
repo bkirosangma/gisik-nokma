@@ -975,7 +975,7 @@ ATTRIBUTES, and this element had none before and has one now, so the count RISES
 
 ## The phone `Menu` toggle is not painted above 40rem (E4-11, `rel/browser-findings`, 2026-09-22) — case `13.1218`
 
-- **13.1218** ✅ The `Menu` toggle LOSES the cascade above 40rem and WINS it below, read as the WINNING
+- **13.1218** ✅ *(AMENDED 2026-10-02 (UX fixes Task 4, owner U3): the toggle is gone; the case now reads the WINNING `.gn-nav__more` display — `contents` above 64rem and `none` at ≤64rem — with the same planted-selector mutation witness.)* The `Menu` toggle LOSES the cascade above 40rem and WINS it below, read as the WINNING
   `display` rather than as a declaration. A matcher over tag/class compounds and descendant combinators
   resolves the cascade over the unconditional rules (`none`) and over those PLUS the 40rem block's contents
   (`inline-flex`); the competitor `.gn-nav button { display: inline-flex }` is asserted present in the same

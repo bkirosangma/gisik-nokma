@@ -55,11 +55,11 @@ function codeOf(relative: string): string {
 const MOUNTS_THE_BAR = /app-nav|bottom-bar|\bAppNav\b|\bBottomBar\b/;
 
 describe('21.190 sign-in on a phone', () => {
-  it('21.190 the card fills the width with 1rem gutters; the method, passkey and provider buttons are full width and ≥48px', () => {
+  it('21.190 the card fills the width with the shared 24px gutter (UX fixes 23.041); the method, passkey and provider buttons are full width and ≥48px', () => {
     // The centring column's own cap (26rem) and the card's give way; the gutter is a longhand on the
     // `--centred` modifier, never the `padding` shorthand on `.gn-shell`.
     expect(valueOf(ruleExactly(css, '.gn-shell--centred > *', PHONE), 'max-width')).toBe('none');
-    expect(valueOf(ruleExactly(css, '.gn-shell--centred', PHONE), 'padding-inline')).toBe('1rem');
+    expect(valueOf(ruleExactly(css, '.gn-shell--centred', PHONE), 'padding-inline')).toBe('var(--gn-space-3)');
     expect(valueOf(ruleExactly(css, '.gn-sign-in', PHONE), 'max-width')).toBe('none');
 
     const buttons = ruleExactly(css, ['.gn-sign-in__method .gn-button', '.gn-sign-in__alternatives > .gn-button'], PHONE);

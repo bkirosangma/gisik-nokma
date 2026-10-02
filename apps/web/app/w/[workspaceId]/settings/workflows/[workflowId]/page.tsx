@@ -54,7 +54,7 @@ export default function EditWorkflowPage() {
   }, [gateway, workspaceId, workflowId]);
 
   return (
-    <main id="gn-main" className="gn-shell">
+    <main id="gn-main" className="gn-shell gn-shell--wide">
       <AppNav workspaceId={workspaceId} />
       {/* The breadcrumb back to the workflow list. Two things make this the
           route's job rather than `WorkflowBuilderScreen`'s: routing is the one
@@ -80,6 +80,8 @@ export default function EditWorkflowPage() {
       <nav className="gn-builder-crumb" aria-label="Breadcrumb">
         <Link href={`/w/${workspaceId}/settings/workflows`}>Settings › Workflows</Link>
       </nav>
+      {/* The page's one h1 (UX fixes Task 5, case 23.071): the visible title is the name FIELD, which is not a heading. */}
+      <h1 className="gn-visually-hidden">Edit workflow</h1>
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
       ) : draft.kind === 'loading' ? (

@@ -199,7 +199,7 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
   });
 
   /** The CSS rule from the case above only matters if the page's `<main>` actually carries the modifier. */
-  it('13.1485b the rendered <main> carries BOTH gn-shell and gn-shell--wide', async () => {
+  it('13.1485b the rendered <main> carries gn-shell, gn-shell--wide and gn-notes-page', async () => {
     const services = stubServices({ getMyWorkspaces: async () => [], getMembers: async () => [] });
     render(
       <Providers services={services}>
@@ -207,7 +207,7 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
       </Providers>,
     );
     const notesDiv = await screen.findByTestId('notes-page');
-    expect(notesDiv.closest('main')).toHaveClass('gn-shell', 'gn-shell--wide');
+    expect(notesDiv.closest('main')).toHaveClass('gn-shell', 'gn-shell--wide', 'gn-notes-page');
   });
 
   /**
@@ -802,7 +802,8 @@ describe('18.482 the page fills the viewport below the bar, so the PAGE does not
     expect(rows).toMatch(/min-height:\s*0;/);
     // A bare auto row is sized by its content and would push the columns past the viewport instead of scrolling.
     expect(rows).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\);/);
-    expect(ruleIn(body, '.gn-shell--wide')).toMatch(/padding-bottom:\s*0;/);
+    // Scoped to the notes page since UX fixes Task 3 (case 23.040): the project page and the workflow editor wear `.gn-shell--wide` too.
+    expect(ruleIn(body, '.gn-notes-page.gn-shell--wide')).toMatch(/padding-bottom:\s*0;/);
     // CONTROL (same `it`): the token this leans on is the one the bar's other readers use, and it is defined.
     expect(stripComments(CSS)).toMatch(/:root\s*\{\s*--app-nav-offset:\s*4\.35rem;\s*\}/);
     expect(body).not.toMatch(/4\.35rem/);
@@ -852,7 +853,7 @@ describe('18.484 a jump inside the column lands 1rem under ITS top, not under a 
 describe('18.486 the wide block is declared AFTER every rule it overrides', () => {
   /**
    * A media query adds no specificity, so `@media (width > 60rem) { .x { … } }` beats an earlier
-   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide`. The heading
+   * `.x { … }` and LOSES to a later one — the same tie 13.1485 pins for `.gn-shell--wide` (whose notes-only padding, `.gn-notes-page.gn-shell--wide`, is the one wide-block rule with no base rule). The heading
    * `scroll-margin-top` base rule sits in the KB-parity section near the end of the file; a wide block
    * filed earlier (where the first cut of it was) is silently ignored and every jump lands ~86px low,
    * while the TEXT of the override is still present, so 18.484 alone cannot see it.
@@ -862,7 +863,7 @@ describe('18.486 the wide block is declared AFTER every rule it overrides', () =
     const stripped = stripComments(CSS);
     const start = stripped.indexOf('@media (width > 60rem)');
     expect(start).toBeGreaterThan(-1);
-    const selectors = ['.gn-shell--wide', '.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
+    const selectors = ['.gn-notes', '.gn-notes__body', '.gn-notes__tree', '.gn-notes__document', '.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)'];
     for (const selector of selectors) {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const base = [...stripped.matchAll(new RegExp(`^${escaped}\\s*\\{`, 'gm'))].map((m) => m.index ?? -1);

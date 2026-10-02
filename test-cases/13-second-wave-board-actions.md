@@ -284,7 +284,7 @@ left column. **The closing quote sits at `:718`, outside the `690-712` range thi
 corrected here, and the range widened rather than the quote moved, because a range that does not contain
 its own quotation is the thing a reader stops trusting.
 
-- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled
+- ✅ **13.767 — the builder screen's four BEM families and the rules that style them are one fact spelled AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the name field's font-size is `var(--gn-title-page)`.
   in two packages, and nothing else ties the spellings.** The instrument is `saved-filters`' —
   harvest the classes the stylesheet names and the classes the component renders, and compare the SETS —
   applied across the `ui`/`app-core` boundary, where a rename on one side is invisible to both packages'
@@ -325,7 +325,7 @@ its own quotation is the thing a reader stops trusting.
   placement refusal and not a deletion.
   (`packages/app-core/test/workflow-builder/builder-css-binding.test.tsx:392`)
 
-- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1`
+- ✅ **13.770 — the workflow name is the title, and stays a control.** The prototype draws an `h1` AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the four title metrics are the page-title rule's own as before; the font-size is spelled `var(--gn-title-page)` in both rules.
   (`desktop.dc.html@6d7b67c0a52c:1016`); the product's name is editable, so the design fit is the
   prototype's TYPOGRAPHY on an `<input>` rather than an `h1` beside it — the name is already on screen
   inside the field the person edits, so a heading would print the same words twice in one header. **The
