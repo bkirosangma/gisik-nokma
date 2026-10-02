@@ -51,5 +51,5 @@ export const displayName = z
   .min(1)
   .refine(
     (value) => value.length === 0 || value.trim() !== '',
-    'must not be blank — a name of only spaces names nothing',
+    'must not be blank: a name of only spaces names nothing',
   );

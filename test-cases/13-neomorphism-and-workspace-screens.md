@@ -57,7 +57,7 @@ card-scale) and is recorded here only for completeness, not as a call.
   the base selector must read back DIFFERENT bodies. *Mutation-witnessed: giving the neo override a
   border reddens this case alone (227/228 pass). Restored, checksum-verified.* — (`packages/ui/test/components.test.tsx`)
   **AMENDED 2026-10-02 (UX fixes T1, U5–U8, owner: "borders on buttons AND text fields"; cases 23.002, 23.004):
-  the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
+  the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)` *(Superseded by N10, and the role retired by HK-4, 2026-10-02: no ring, no `--gn-field-rim`.)*
   (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
   their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
   **AMENDED 2026-10-02 by N10 (neo refresh, case 24.040): the ring is retired.** The neo rule is `border: 1px solid transparent`

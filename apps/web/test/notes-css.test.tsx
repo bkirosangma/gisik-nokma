@@ -708,7 +708,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
 
     // NEITHER LIST IS TYPED HERE — see the inbox scanner's own docblock for why.
     expect(rendered).toEqual(styled);
-  }, 20_000);
+  });
 
   it('the one data-attribute globals.css keys a .gn-notes rule on is really rendered', async () => {
     const services = stubServices({

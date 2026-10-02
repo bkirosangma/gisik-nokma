@@ -552,14 +552,14 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
         status: 'invalid' as const,
         eventId: event.id,
         code: 'invalid-payload' as const,
-        message: 'title: must not be blank — a title of only spaces names nothing',
+        message: 'title: must not be blank: a title of only spaces names nothing',
       })),
     );
     const onCreated = renderFlow(source);
     await createTicketUnderParent(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Refused by the server: invalid-payload: title: must not be blank — a title of only spaces names nothing',
+      'Refused by the server: invalid-payload: title: must not be blank: a title of only spaces names nothing',
     );
     expect(onCreated).not.toHaveBeenCalled();
   });
