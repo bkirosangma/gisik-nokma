@@ -116,3 +116,16 @@ describe('F-5 a state node stays inside its column (N3)', () => {
     expect(13 * 16).toBeLessThan(260 - 40);
   });
 });
+
+describe('F-5 a node checkbox is drawn at a usable size at the phone opening zoom', () => {
+  it('23.277 the node checkboxes are 17px, so at zoom 0.8 they are ≥13px on screen (the browser default 13px drew 10px)', () => {
+    const rule = ruleExactly(readUiCss(), ".gn-state-node input[type='checkbox']");
+    const px = Number(/^([0-9.]+)rem$/.exec(valueOf(rule, 'width') ?? '')?.[1]) * 16;
+    expect(valueOf(rule, 'height')).toBe(valueOf(rule, 'width'));
+    expect(px * PHONE_OPEN_ZOOM).toBeGreaterThanOrEqual(13);
+    // CONTROL — the browser's own 13px box would NOT clear 13px on screen at 0.8, so the rule is what does the work;
+    // and 17px is still inside the 44px row (23.176), which it must not grow.
+    expect(13 * PHONE_OPEN_ZOOM).toBeLessThan(13);
+    expect(px).toBeLessThan(44);
+  });
+});

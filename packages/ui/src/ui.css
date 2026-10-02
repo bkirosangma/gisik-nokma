@@ -3909,6 +3909,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-state-node__blocked,
 .gn-state-node__creatable { display: flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; margin-top: 0.1rem; font-size: 0.8rem; cursor: pointer; }
 .gn-state-node__reason { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+/* F-5 (WF-03, 23.277): the phone canvas opens at zoom 0.8, where the browser's 13px box is drawn at 10px; 17px lands at 13.6px. */
+.gn-state-node input[type='checkbox'] { width: 1.0625rem; height: 1.0625rem; }
 
 .gn-any-state-node {
   background: var(--gn-surface-raised);
