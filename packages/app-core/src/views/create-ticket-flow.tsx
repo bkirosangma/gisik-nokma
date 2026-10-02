@@ -17,6 +17,7 @@ import type { AssignOutsider, LookupPerson } from '../people/types.js';
 import type { TicketRead } from '../view-types.js';
 import type { EditorSlotComponent } from './editor-slot.js';
 import { NewTicketDialog, type NewTicketDraft, type TypeOption } from './new-ticket-dialog.js';
+import type { PendingCreate } from './board-move-state.js';
 import { ReopenDialog, type RefusalOrigin } from './reopen-dialog.js';
 
 export type CreateTicketFlowProps = {
@@ -57,6 +58,21 @@ export type CreateTicketFlowProps = {
    */
   initialSelection?: { workflowId: string; stateId: string };
   onCreated: (ticketId: string) => void;
+  /**
+   * Smoothness T7 (spec S5, audit SM-03) — the create is shown BEFORE the server answers. When given, the flow
+   * calls this with the ticket it is about to file the moment both instant pre-checks have passed, closes the
+   * dialog at once, and the shell draws a ghost card from it (`applyPendingCreates`). Only a ticket born IN FOCUS
+   * has a column to be drawn in; a backlog birth, or a type whose workflow cannot be resolved here, keeps the
+   * old shape (the dialog stays until the answer). ABSENT is normal: nothing changes.
+   */
+  onPending?: (create: PendingCreate) => void;
+  /**
+   * Called for every answer that is not a commit — a refusal, an invalid claim, a needs-reopen offer, a thrown
+   * transport failure — with the id the ghost was drawn for, so the shell removes it. The dialog reopens with the
+   * draft the person typed (and the SAME ticket id, so a retry after an unclear failure is refused
+   * `ticket.already-exists` rather than filing a second ticket).
+   */
+  onRefused?: (ticketId: string) => void;
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
    *
@@ -183,6 +199,8 @@ export function CreateTicketFlow({
   workflowStates,
   initialSelection,
   onCreated,
+  onPending,
+  onRefused,
   open,
   onOpenChange,
 }: CreateTicketFlowProps) {
@@ -196,6 +214,8 @@ export function CreateTicketFlow({
     setSelfOpen(next);
     onOpenChange?.(next);
   };
+  /** The draft to hand back to the dialog on its NEXT open — one shot: a Cancel, or the Create button, clears it (E2-37). */
+  const [restoreDraft, setRestoreDraft] = useState<NewTicketDraft | undefined>(undefined);
   const [reopenPrompt, setReopenPrompt] = useState<ReopenPrompt | null>(null);
   const [parentRefusal, setParentRefusal] = useState<Refusal | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -383,12 +403,41 @@ export function CreateTicketFlow({
       draft.assigneeIsOutsider === true && assignOutsider !== undefined && draft.assigneeId !== null
         ? { ...dataSource, ingest: outsiderIngest(assignOutsider, draft.assigneeId) }
         : dataSource;
-    const outcome = await submitChildEvent(via, childEvent);
+    // THE GHOST (T7): from here the claim is on the wire, so the dialog closes and the board shows the card.
+    const ghostWorkflowId = typeOptions.find((option) => option.id === draft.typeId)?.workflowId;
+    const ghostStateId =
+      draft.start === 'backlog' || ghostWorkflowId === undefined
+        ? undefined
+        : (draft.stateId ?? workflowStates(ghostWorkflowId)?.initialStateId);
+    const ghost =
+      onPending !== undefined && ghostWorkflowId !== undefined && ghostStateId !== undefined
+        ? { ticketId: draft.ticketId, workflowId: ghostWorkflowId, stateId: ghostStateId, title: draft.title, typeId: draft.typeId, priority: draft.priority }
+        : undefined;
+    if (ghost !== undefined) {
+      setRestoreDraft(undefined);
+      setDialogOpen(false);
+      onPending?.(ghost);
+    }
+    // Every answer that is not a commit takes the ghost back and hands the draft back to the dialog.
+    const takeBack = (): void => {
+      if (ghost === undefined) return;
+      onRefused?.(ghost.ticketId);
+      setRestoreDraft(draft);
+      setDialogOpen(true);
+    };
+    let outcome: Awaited<ReturnType<typeof submitChildEvent>>;
+    try {
+      outcome = await submitChildEvent(via, childEvent);
+    } catch (error) {
+      takeBack();
+      throw error;
+    }
     if (outcome.kind === 'committed') {
       setDialogOpen(false);
       onCreated(childEvent.entity.id);
       return;
     }
+    takeBack();
     if (outcome.kind === 'needs-reopen' && draft.parentId !== null) {
       await openReopenPrompt(childEvent, draft.parentId, outcome.refusal, 'server');
       return;
@@ -495,7 +544,13 @@ export function CreateTicketFlow({
 
   return (
     <>
-      <Button variant="primary" onClick={() => setDialogOpen(true)}>
+      <Button
+        variant="primary"
+        onClick={() => {
+          setRestoreDraft(undefined);
+          setDialogOpen(true);
+        }}
+      >
         <PlusIcon />
         Create ticket
       </Button>
@@ -536,10 +591,14 @@ export function CreateTicketFlow({
         workflowStates={workflowStates}
         initialSelection={initialSelection}
         stateRefusal={stateRefusal}
+        restoreDraft={restoreDraft}
         onCreate={(draft) => {
           void create(draft).catch(report);
         }}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => {
+          setRestoreDraft(undefined);
+          setDialogOpen(false);
+        }}
       />
       {reopenPrompt !== null ? (
         <ReopenDialog
