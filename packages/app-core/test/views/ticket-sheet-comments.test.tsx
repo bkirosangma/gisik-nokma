@@ -159,7 +159,7 @@ function fakeEditorSlot(seen: {
             })
           }
         >
-          Post
+          {props.submitLabel ?? 'Post'}
         </button>
         {/* The uploader seam, driven directly. ⚠ THE `.catch` IS THE CONTRACT
             BEING MODELLED, not defensive noise: the real
@@ -888,5 +888,70 @@ describe('19.195 the description editor waits for its chips', () => {
     renderSheet(source(), { editorSlot: StubSlot });
     await screen.findByTestId('stub-description-editor');
     expect(captured.find((props) => props['mode'] === 'description')?.['isPurged']).toBeDefined();
+  });
+});
+
+describe('26.115 comment edit and delete leave through the one write door', () => {
+  const MINE = { ...COMMENT, authorId: 'user_kiro', editedAt: null, deletedAt: null };
+  const NAMES = [
+    { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+    { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+  ];
+  const mount = (extra: Record<string, unknown> = {}, comment: TicketComment = MINE) =>
+    renderSheet(source({ getTicketComments: async () => [comment], getMembers: async () => NAMES }), {
+      editorSlot: fakeEditorSlot({ modes: [] }),
+      ...extra,
+    });
+  const ofType = (src: { ingested: Array<Array<{ type: string }>> }, type: string) =>
+    src.ingested.flat().filter((e) => e.type === type);
+
+  it('26.115 Edit then Save ingests exactly one comment.edited against the ticket, origin web, the viewer as actor', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    await user.click(within(screen.getByTestId(`comment-${MINE.commentId}`)).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(ofType(src, 'comment.edited')).toHaveLength(1));
+    expect(ofType(src, 'comment.edited')[0]).toMatchObject({
+      entity: { kind: 'ticket', id: TICKET },
+      payload: { commentId: MINE.commentId, body: { type: 'doc', content: [] } },
+      origin: 'web',
+      actorId: 'user_kiro',
+    });
+    expect(ofType(src, 'comment.added')).toHaveLength(0); // control: an edit never posts a second comment
+  });
+
+  it('26.115 Delete then confirm ingests exactly one comment.deleted', async () => {
+    const src = mount();
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Kiro's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(ofType(src, 'comment.deleted')).toHaveLength(0); // control: the question comes first
+    await user.click(screen.getByRole('button', { name: 'Delete comment' }));
+    await waitFor(() => expect(ofType(src, 'comment.deleted')).toHaveLength(1));
+    expect(ofType(src, 'comment.deleted')[0]).toMatchObject({
+      entity: { kind: 'ticket', id: TICKET },
+      payload: { commentId: MINE.commentId },
+      origin: 'web',
+      actorId: 'user_kiro',
+    });
+  });
+
+  it('26.112 canModerateComments offers a moderator Delete on someone else’s comment, never Edit; without it, nothing', async () => {
+    const theirs = { ...COMMENT, editedAt: null, deletedAt: null };
+    mount({ canModerateComments: true }, theirs);
+    const user = userEvent.setup();
+    const section = await screen.findByTestId('sheet-comments');
+    await user.click(await within(section).findByRole('button', { name: "More actions for Anselma Marak's comment" }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Delete']);
+  });
+
+  it('26.112 CONTROL — a viewer who is neither the writer nor a moderator gets no "…"', async () => {
+    mount({}, { ...COMMENT, editedAt: null, deletedAt: null });
+    const section = await screen.findByTestId('sheet-comments');
+    await within(section).findByText('The bucket is the defect.');
+    expect(within(section).queryByRole('button', { name: /More actions/ })).toBeNull();
   });
 });
