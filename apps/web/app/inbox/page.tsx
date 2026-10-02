@@ -18,6 +18,7 @@ import { useAppServices, useSessionStatus } from '../../src/providers.js';
 import { useLastWorkspace } from '../../src/use-last-workspace.js';
 import { useActorLabels } from '../../src/use-actor-labels.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
+import { InboxRowsSkeleton } from '../../src/skeletons/screen-skeletons.js';
 import { ticketSheetPath } from '../../src/ticket-location.js';
 
 /**
@@ -539,7 +540,7 @@ export default function InboxPage() {
             {error !== null ? (
               <ShellRefusal what="Your inbox" message={error} />
             ) : page === null ? (
-              <p role="status">Loading…</p>
+              <InboxRowsSkeleton />
             ) : page.notifications.length === 0 ? (
               <>
                 <p role="status" className="gn-inbox__empty">

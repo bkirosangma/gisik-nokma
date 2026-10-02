@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { newUlid, type GroupRow, type IngestResult } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip, Dialog, PencilIcon, PlusIcon, SegmentedControl } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, Dialog, PencilIcon, PlusIcon, SegmentedControl, Skeleton } from '@gisik-nokma/ui';
 import {
   ARCHIVE_LABEL,
   DELETE_TRIGGER_LABEL,
@@ -27,6 +27,7 @@ import { mayAdminister, restrictedLine, viewerOf } from '../../../src/workspace-
 import { DocumentTitle } from '../../../src/document-title.js';
 import { ProjectEditForm, type EditRefusal, type ProjectEditValues } from '../../../src/project-edit-form.js';
 import { fieldRefusalHandler, ProjectGroupField } from '../../../src/project-group-field.js';
+import { GroupFieldSkeleton, ProjectGridSkeleton } from '../../../src/skeletons/screen-skeletons.js';
 import { groupSeeds, type GroupChoice } from '../../../src/group-picker-seeds.js';
 import { useWorkspaceGroups } from '../../../src/use-workspace-groups.js';
 import { WorkspacePrefixEdit } from '../../../src/workspace-prefix-edit.js';
@@ -427,8 +428,11 @@ export default function WorkspaceHomePage() {
         </>
       ) : workspaces === null ? (
         <>
-          <h1 className="gn-page-title">Workspace</h1>
-          <p>Loading…</p>
+          <h1 className="gn-page-title">
+            <span className="gn-visually-hidden">Workspace</span>
+            <Skeleton width="18rem" height="var(--gn-title-page-size)" />
+          </h1>
+          <ProjectGridSkeleton />
         </>
       ) : workspace === null ? (
         <>
@@ -1409,7 +1413,7 @@ function CreateProjectButton({
 }) {
   // Read while the dialog is open, exactly as a card's Edit form does: `null` until they arrive, so the
   // field is not offered against a list nobody checked.
-  const { groups, reread } = useWorkspaceGroups(workspaceId, open);
+  const { groups, loading: groupsLoading, reread } = useWorkspaceGroups(workspaceId, open);
   return (
     <>
       <Button variant="primary" onClick={() => onOpenChange(true)}>
@@ -1424,6 +1428,7 @@ function CreateProjectButton({
             onSubmit={onSubmit}
             refusal={refusal}
             groups={groups}
+            groupsLoading={groupsLoading}
             reread={reread}
             onCancel={() => onOpenChange(false)}
             onDone={() => onOpenChange(false)}
@@ -1440,6 +1445,7 @@ function NewProjectForm({
   onSubmit,
   refusal,
   groups,
+  groupsLoading,
   reread,
   onCancel,
   onDone,
@@ -1454,6 +1460,8 @@ function NewProjectForm({
   refusal: string | null;
   /** The workspace's groups for the picker; `null` while they load or when the read refused (no field then). */
   groups: GroupRow[] | null;
+  /** True while the groups read is in flight: the field's own skeleton, so the form does not grow when they arrive. */
+  groupsLoading: boolean;
   reread: () => void;
   onCancel: () => void;
   onDone: () => void;
@@ -1622,6 +1630,8 @@ function NewProjectForm({
           idPrefix="gn-new-project"
           refusal={fieldRefusal}
         />
+      ) : groupsLoading ? (
+        <GroupFieldSkeleton />
       ) : null}
       {refusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">

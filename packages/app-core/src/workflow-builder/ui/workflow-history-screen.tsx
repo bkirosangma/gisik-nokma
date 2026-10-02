@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PublishedWorkflowDef, StateCategory } from '@gisik-nokma/domain';
-import { Card } from '@gisik-nokma/ui';
+import { Card, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { CATEGORY_LABEL } from '../category-label.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 
@@ -118,7 +118,15 @@ export function WorkflowHistoryScreen(props: {
   if (loadFailed) {
     return <p className="workflow-history__load-error">Could not load this workflow's history. Reload to try again.</p>;
   }
-  if (versions === null) return <p className="workflow-history__loading">Loading history…</p>;
+  if (versions === null) {
+    return (
+      <section className="workflow-history">
+        <SkeletonRegion label="Loading history">
+          <Skeleton shape="block" height="4rem" rows={3} />
+        </SkeletonRegion>
+      </section>
+    );
+  }
   if (versions.length === 0) {
     return (
       <div className="workflow-history__empty-state">

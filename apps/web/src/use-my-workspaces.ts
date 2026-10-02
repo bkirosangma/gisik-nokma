@@ -76,15 +76,16 @@ function start(userId: string, dataSource: DataSource, version: number, previous
 
 /**
  * One shared `getMyWorkspaces` read per signed-in person (audit SM-05; spec §3.2), where each reader used to send
- * its own. Four readers use the rows through this: the nav's workspace name and dropdown (`useWorkspaceLookup`), Last
- * project and the phone switcher's project list (`useWorkspaceProjects`), the project / My Work name
- * (`useProjectName`), and the project page's `ProjectTitle` (its role and description; smoothness T6) with the page's own
- * header-name wait. Module-scoped, so a remount (every page remounts `AppNav`) paints from memory.
+ * its own. Five readers use the rows through this: the nav's workspace name and dropdown (`useWorkspaceLookup`), Last
+ * project and the phone switcher's project list (`useWorkspaceProjects`), the project / My Work name (`useProjectName`),
+ * the project page's `ProjectTitle` (its role and description; smoothness T6) with the page's own header-name wait, and
+ * the phone switcher's sheet, on open (smoothness T8, case 25.120). Module-scoped, so a remount (every page remounts
+ * `AppNav`) paints from memory.
  *
  * Not every reader is on it, and that is not an oversight. `useCanModerateComments` keeps its own direct read on
  * purpose: it derives a PERMISSION from the role, and the same-tick in-flight dedupe (`withInflightDedupe`) already
- * folds it into this call. The phone switcher's own list and `/notes` still call `getMyWorkspaces` directly until smoothness
- * T8 and T9 move them here; so a page can send more than one.
+ * folds it into this call. `/notes` still calls `getMyWorkspaces` directly until smoothness T9 moves it here; so a
+ * page can send more than one.
  *
  * Keyed by the signed-in user's id AND the data source (FD5): another person on the same device never
  * sees these rows, and a signed-out render drops them. Re-read when a write bumps `projects-version.ts` (a

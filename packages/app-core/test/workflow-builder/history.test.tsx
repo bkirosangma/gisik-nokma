@@ -163,7 +163,7 @@ describe('WorkflowHistoryScreen', () => {
     expect(await screen.findByText('No published versions yet.')).toBeInTheDocument();
     // The control: the loading line is GONE, so this is the answered state
     // rather than the sentence rendering beside a spinner that never stops.
-    expect(screen.queryByText('Loading history…')).toBeNull();
+    expect(screen.queryByText('Loading history')).toBeNull(); // the skeleton region's name (smoothness T8)
   });
 });
 

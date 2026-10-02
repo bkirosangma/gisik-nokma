@@ -110,7 +110,7 @@ describe('23.172 the magic-link primary is full width at every width', () => {
     expect(valueOf(base, 'justify-content')).toBe('center');
     // The primary lives in that form, and is the page's one primary on the screen.
     const page = codeOf('app/sign-in/page.tsx');
-    expect(page).toMatch(/<form\s+className="gn-sign-in__method-form"[\s\S]*?<Button variant="primary" type="submit">\s*Send magic link/);
+    expect(page).toMatch(/<form\s+className="gn-sign-in__method-form"[\s\S]*?<Button variant="primary" type="submit"[^>]*>\s*Send magic link/);
     // "At least as wide as the passkey button": that button is a stretched child of a flex column (no
     // `align-items` narrowing it, no width of its own outside the phone arm), so it spans the card; the
     // primary's 100% is the same span.
@@ -170,7 +170,7 @@ describe('21.191 invite accept, /mcp/connect and /mcp/authorize on a phone', () 
 
   it('21.191 Join / Allow stay the ONE primary on their screens (the variant is the page\'s, this arm only widens it)', () => {
     const invite = codeOf('app/invite/[token]/page.tsx');
-    expect(invite).toMatch(/<Button variant="primary" onClick=\{accept\}>/);
+    expect(invite).toMatch(/<Button variant="primary" onClick=\{accept\}[^>]*>/);
     const connect = codeOf('app/mcp/connect/page.tsx');
     expect(connect).toMatch(/<Button variant="primary" onClick=\{\(\) => decide\(true\)\}/);
     // CONTROL — the deny control on the connect screen is the ghost, so there is exactly one primary per screen.
