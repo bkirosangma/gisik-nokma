@@ -138,7 +138,8 @@ describe('23.043 prose has a measure (audit SYS-16, ENT-17, NP-11, NP-23, SET-23
 
 describe('23.044 the lit state is one thing in the bar and the top nav (audit SYS-20, NP-26, WS-08)', () => {
   it('23.044 both draw an indicator from --gn-nav-indicator on [aria-current="page"], and the last-project item is divided from the destinations', () => {
-    const phone = '@media (max-width: 40rem)';
+    // The bar's rules are the 64rem arm's since UX fixes Task 4 (case 23.051); they were the 40rem phone arm's when this case was written.
+    const phone = '@media (max-width: 64rem)';
     // The token is declared once, in :root.
     const declared = rulesNaming(css, ':root').filter((rule) => valueOf(rule.body, '--gn-nav-indicator') !== null);
     expect(declared).toHaveLength(1);
@@ -156,10 +157,16 @@ describe('23.044 the lit state is one thing in the bar and the top nav (audit SY
 
     // Popover rows (menuitems) are excluded from the bar, and the project name may shrink below its text.
     expect(top).not.toBe('');
-    expect(valueOf(ruleExactly(css, '.gn-nav__more > .gn-nav__project > a', '@media (min-width: 70.0625rem)'), 'min-width')).toBe('0');
-    // The label gives its room back up to 80rem — the rule is nested in the min-width: 70.0625rem arm, so it is the 1121–1280px band (the row has no width to spare).
-    const hidden = ruleExactly(css, '.gn-nav__project-label', '@media (max-width: 80rem)');
-    expect(valueOf(hidden, 'display')).toBe('none');
+    expect(valueOf(ruleExactly(css, '.gn-nav__more > .gn-nav__project > a', '@media (min-width: 64.0625rem)'), 'min-width')).toBe('0');
+    // The label is not hidden at any width (UX fixes Task 4, amended 2026-10-02): the 1121–1280px `display: none` Task 3 added as an
+    // interim — the row had no width to spare — is gone, the row being refitted from 1025px with a tighter gap (case 23.042).
+    expect(rulesNaming(css, '.gn-nav__project-label').filter((rule) => valueOf(rule.body, 'display') === 'none')).toEqual([]);
+    // What fits it (measured in Chrome 2026-10-02: 1121px, seed names, label 76 of 76px; 25-character names: the label gives way
+    // first and the link stays readable): link padding and gap tightened, the label shrinks before the link, the group has a floor.
+    const arm = '@media (min-width: 64.0625rem)';
+    expect(valueOf(ruleExactly(css, '.gn-nav .gn-nav__links a', arm), 'padding-inline')).toBe('0.5rem');
+    expect(valueOf(ruleExactly(css, '.gn-nav__project-label', arm), 'flex')).toBe('0 8 auto');
+    expect(valueOf(ruleExactly(css, '.gn-nav__more > .gn-nav__project', arm), 'min-width')).toBe('6.25rem');
 
     // CONTROL (same `it`): the indicator is NOT a colour on the text alone — it is a separate bar in both.
     expect(valueOf(ruleExactly(css, '.gn-bottom-bar__indicator', phone), 'height')).toBe('0.1875rem');

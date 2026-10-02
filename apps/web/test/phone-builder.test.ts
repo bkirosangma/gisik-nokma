@@ -141,7 +141,8 @@ describe('21.170 the workflow editor: the canvas fills the screen and pans; the 
     // The sheet sits above the scrim, which sits above the bottom bar (z-index 30).
     expect(Number(valueOf(open, 'z-index'))).toBeGreaterThan(Number(valueOf(scrim, 'z-index')));
     expect(Number(valueOf(scrim, 'z-index'))).toBeGreaterThan(30);
-    expect(valueOf(ruleExactly(globals, '.gn-bottom-bar', PHONE), 'z-index')).toBe('30');
+    // The bar's rules are the 64rem tablet arm's since UX fixes Task 4 (case 23.051).
+    expect(valueOf(ruleExactly(globals, '.gn-bottom-bar', '@media (max-width: 64rem)'), 'z-index')).toBe('30');
     after(ui, ['.workflow-builder-screen__left']);
     after(ui, [".workflow-builder-screen__left[data-open='true']"], [['.workflow-builder-screen__left']]);
 

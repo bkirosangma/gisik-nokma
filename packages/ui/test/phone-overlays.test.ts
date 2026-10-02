@@ -11,6 +11,8 @@ import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules
  * passes every value check.
  */
 const PHONE = '@media (max-width: 40rem)';
+/** The sheet's own full-width rules moved here (UX fixes Task 4, owner ruling U3, case 23.053); the dialogs and the Move shortcut stayed on PHONE. */
+const BAND = '@media (max-width: 64rem)';
 const REDUCED = '@media (prefers-reduced-motion: reduce)';
 const css = readUiCss();
 
@@ -26,20 +28,21 @@ function position(selectors: string[], atRule: string | null): number {
   return index;
 }
 
-describe('21.070 the ticket sheet is full screen at ≤40rem', () => {
-  it('21.070 .gn-sheet is 100% wide, square and flat at the phone size and the Full-screen toggle is hidden; above 40rem it keeps min(40rem, 94vw) and its toggle', () => {
-    const phone = ruleExactly(css, '.gn-sheet', PHONE);
+describe('21.070 the ticket sheet is full screen at ≤64rem (was ≤40rem; amended 2026-10-02, UX fixes Task 4, case 23.053)', () => {
+  it('21.070 .gn-sheet is 100% wide, square and flat through the tablet band and the Full-screen toggle is hidden; above 64rem it keeps min(40rem, 94vw) and its toggle', () => {
+    const phone = ruleExactly(css, '.gn-sheet', BAND);
     expect(valueOf(phone, 'width')).toBe('100%');
     expect(valueOf(phone, 'max-width')).toBe('none');
     expect(valueOf(phone, 'border-radius')).toBe('0');
     expect(valueOf(phone, 'box-shadow')).toBe('none');
+    expect(valueOf(ruleExactly(css, '.gn-sheet__full', BAND), 'display')).toBe('none');
     expect(valueOf(ruleExactly(css, '.gn-sheet__full', PHONE), 'display')).toBe('none');
     // It is the `.gn-sheet--full` FORM, so the same ground as the explicit full state.
     expect(valueOf(phone, 'background')).toBe(valueOf(ruleExactly(css, '.gn-sheet--full'), 'background'));
     // Source order: the arm must come after the base rule it overrides.
-    expect(position(['.gn-sheet'], PHONE)).toBeGreaterThan(position(['.gn-sheet'], null));
+    expect(position(['.gn-sheet'], BAND)).toBeGreaterThan(position(['.gn-sheet'], null));
 
-    // CONTROL — above 40rem the panel is unchanged: docked, left-rounded, 40rem wide.
+    // CONTROL — above 64rem the panel is unchanged: docked, left-rounded, 40rem wide.
     const base = ruleExactly(css, '.gn-sheet');
     expect(valueOf(base, 'width')).toBe('min(40rem, 94vw)');
     expect(valueOf(base, 'border-radius')).toBe('var(--gn-radius-track) 0 0 var(--gn-radius-track)');
@@ -49,12 +52,12 @@ describe('21.070 the ticket sheet is full screen at ≤40rem', () => {
 });
 
 describe('21.071 the sheet header sticks and carries the phone-only Move shortcut (CSS half)', () => {
-  it('21.071 .gn-sheet__header is sticky at the top at ≤40rem and the Move shortcut is shown only there; the base header is not sticky', () => {
-    const phone = ruleExactly(css, '.gn-sheet__header', PHONE);
+  it('21.071 .gn-sheet__header is sticky at the top at ≤64rem (amended 2026-10-02, case 23.053) and the Move shortcut is shown only at ≤40rem; the base header is not sticky', () => {
+    const phone = ruleExactly(css, '.gn-sheet__header', BAND);
     expect(valueOf(phone, 'position')).toBe('sticky');
     expect(valueOf(phone, 'top')).toBe('0');
     expect(valueOf(phone, 'background')).toBe('var(--gn-surface)');
-    expect(position(['.gn-sheet__header'], PHONE)).toBeGreaterThan(position(['.gn-dialog__header', '.gn-sheet__header'], null));
+    expect(position(['.gn-sheet__header'], BAND)).toBeGreaterThan(position(['.gn-dialog__header', '.gn-sheet__header'], null));
 
     expect(valueOf(ruleExactly(css, '.gn-sheet__move', PHONE), 'display')).toBe('inline-flex');
     // CONTROL — above 40rem the shortcut is not painted and the base header is a plain flex row.

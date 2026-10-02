@@ -13,6 +13,7 @@ import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import { PHONE_QUERY } from '../src/use-is-phone.js';
+import { TABLET_BAR_QUERY } from '../src/use-tablet-bar.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -47,7 +48,7 @@ function swallowNavigation(): () => void {
 }
 let unswallow: () => void = () => undefined;
 
-/** jsdom has no `matchMedia`; `AppNav` renders the bar only when the viewport query matches. */
+/** jsdom has no `matchMedia`; `AppNav` renders the bar only when the viewport query matches (it answers every query alike). */
 function stubPhoneViewport(matches: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
@@ -422,13 +423,20 @@ describe('21.037 / 21.038 AppNav renders the bar ONLY at phone width, and instea
 });
 
 describe('21.033 the script and the stylesheet name the same phone width', () => {
-  it('21.033 PHONE_QUERY is the stylesheet\'s own 40rem arm, and the bottom bar\'s rules sit under it', () => {
+  // AMENDED 2026-10-02 (UX fixes Task 4, owner ruling U3, case 23.051): the bar's rules moved from the 40rem arm to the 64rem tablet
+  // arm and `AppNav` now gates the bar on `TABLET_BAR_QUERY`, so `PHONE_QUERY` no longer governs the bar. What it still pins, and
+  // what this case now asserts, is that the PHONE top bar's rules (the switcher in place of the link row) sit under it.
+  it('21.033 PHONE_QUERY is the stylesheet\'s own 40rem arm, and the phone top bar\'s rules sit under it (the bar\'s moved to 64rem: 23.051)', () => {
     const css = readFileSync(resolve(__dirname, '../app/globals.css'), 'utf8');
     expect(css).toContain(`@media ${PHONE_QUERY} {`);
-    // CONTROL — the bar's own box rule is drawn under THAT arm (the nearest at-rule above it), not merely under some 40rem arm.
-    const rule = css.indexOf('  .gn-bottom-bar {');
+    // CONTROL — the switcher's own box rule is drawn under THAT arm (the nearest at-rule above it), not merely under some 40rem arm.
+    const rule = css.indexOf('  .gn-phone-switcher {');
     expect(rule).toBeGreaterThan(0);
     expect(css.slice(css.lastIndexOf('@media', rule)).startsWith(`@media ${PHONE_QUERY} {`)).toBe(true);
+    // CONTROL — and the bar's own box rule is NOT under it any more: its nearest at-rule is the 64rem arm (`TABLET_BAR_QUERY`).
+    const bar = css.indexOf('  .gn-bottom-bar {');
+    expect(bar).toBeGreaterThan(0);
+    expect(css.slice(css.lastIndexOf('@media', bar)).startsWith(`@media ${TABLET_BAR_QUERY} {`)).toBe(true);
   });
 });
 

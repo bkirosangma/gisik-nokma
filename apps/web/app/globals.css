@@ -1839,8 +1839,13 @@ input, textarea, select { font-family: inherit; }
    names itself (the name line; `aria-label="Role for …"`; the chip's text). The zebra (13.887) lives
    on the row's background, which a block row still paints, so no rule here names `.gn-members__row`:
    the rows are reached as `tr`, because that guard counts rules that name the class. AFTER the base
-   rules above (`.gn-members__table`, `__cell`, `__role`, `__role-cell`). */
-@media (max-width: 40rem) {
+   rules above (`.gn-members__table`, `__cell`, `__role`, `__role-cell`).
+
+   AT ≤64rem, NOT ≤40rem (UX fixes Task 4, owner ruling U3, case 23.052; it was 40rem when written, case 21.092): the table's
+   51.25rem (820px) floor overflows the card on the narrower tablets (the card is the viewport less the shell's gutters), so
+   the roster scrolled sideways inside the band; the owner's ruling is one stacked form through the whole band rather than a
+   table that switches form part-way. */
+@media (max-width: 64rem) {
   .gn-members__table { display: block; min-width: 0; }
   .gn-members__table thead { display: none; }
   .gn-members__table tbody { display: block; }
@@ -2147,7 +2152,7 @@ input, textarea, select { font-family: inherit; }
    invented new number now that this rule reaches both bars. */
 .gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 800; }
 
-/* PHONE: THE WORKSPACE LINKS COLLAPSE INTO ONE DISCLOSURE (E4-11).
+/* THE WORKSPACE LINKS' WRAPPER (E4-11; the disclosure itself was retired by UX fixes Task 4, case 23.042).
 
    At 390 px this bar measured **390×310** — the links wrapped to five 44-px
    rows, 37 % of an 844-px viewport, and the board's first card sat 1105 px
@@ -2158,53 +2163,48 @@ input, textarea, select { font-family: inherit; }
    What that item never said — and what the `--app-nav-offset` docblock above
    says explicitly it is NOT — is that the bar may take five rows.
 
-   So below 40rem the workspace-scoped links move behind `.gn-nav__more-toggle`
-   and the row holds `Workspaces`, the toggle and `.gn-nav__corner`'s inbox and
-   account on ONE line at the published 4.35rem.
+   That was first answered with a `Menu` toggle that disclosed the links (40rem,
+   then 70rem). It is answered now by the bottom bar, which carries the
+   destinations at ≤64rem, so the wrapper is `display: none` there (the arm
+   further down) and the toggle is gone.
 
    WHY A `<div>` AND NOT `<details>`. The wide-width arm has to be
    `display: contents`, so the links lay out as DIRECT children of
    `.gn-nav__links` exactly as they did before this rule existed — the desktop
    bar is unchanged, not merely close. A closed `<details>` hides its own
-   content through internal slotting that no stylesheet can undo, so the open
-   state is a `data-open` attribute instead: the links are always in the
-   document, always one Tab away, and always in the accessibility tree. */
+   content through internal slotting that no stylesheet can undo, and the links
+   must stay in the document at every width. */
 .gn-nav__more { display: contents; }
 
-/* ⚠ TWO CLASSES, AND THE SECOND ONE IS THE WHOLE FIX (E4-11, 2026-09-22).
+/* THE `Menu` TOGGLE IS GONE (UX fixes Task 4, case 23.042). It shipped for E4-11 as `.gn-nav .gn-nav__more-toggle`, two classes
+   deep because a single-class `display: none` lost to `.gn-nav a, .gn-nav button { display: inline-flex }` and the
+   owner's screenshot showed the button painted on the desktop bar; the test that should have caught it asserted the
+   declaration and not the winning one. Neither the rule nor the element exists now: at ≤64rem the bottom bar is the
+   navigation and `.gn-nav__more` is `display: none` (below); above it the row is painted directly. The lesson stands for
+   any future hidden-by-default control here: a scan of declarations is not a scan of the WINNING declaration. */
 
-   This shipped as `.gn-nav__more-toggle { display: none; }` — (0,1,0) — and it
-   LOST to `.gn-nav a, .gn-nav button { display: inline-flex; … }` further down
-   this file, which is (0,1,1). So above 40rem the phone's `Menu` toggle was
-   PAINTED on the desktop bar, unstyled, while the arm that exists to show it had
-   not even applied. The owner's screenshot is that button.
+/* ABOVE 64rem the links are ONE line, always. The row used to `wrap`, which is what put "Settings" alone on a second row
+   whenever the workspace or project name was longer than the seed data's ("Convenience Corner" + "gggg"). The two names
+   are the only data-driven widths in the bar, so THEY give way: each truncates with an ellipsis (`.gn-nav__label` is the
+   text span — `text-overflow` does not apply to the `inline-flex` link itself) while every fixed link keeps its full
+   label at the house size. `min-width: 0` is what lets a flex item go below its content width at all.
 
-   **Source order only decides between EQUAL specificity**, which is why moving
-   this rule below the generic one would not have fixed it; `.gn-nav
-   .gn-nav__more-toggle` is (0,2,0) and beats (0,1,1) wherever the two sit. The
-   phone arm below carries the SAME two classes, so it still wins inside the
-   media query — equal specificity, later in the file.
-
-   No `!important`: this file has none for a layout property, and an override
-   flag is the wrong lever for a problem that is a specificity.
-
-   ⚠ THE TEST THAT SHOULD HAVE CAUGHT THIS WAS GREEN THROUGHOUT. Case 13.1137's
-   `'the toggle is painted nowhere above 40rem'` asserted that this rule's
-   DECLARATION reads `display: none` — which it did, and the browser painted the
-   button anyway. A scan of declarations is not a scan of the WINNING
-   declaration; `nav-phone-disclosure.test.ts` now resolves the cascade. */
-.gn-nav .gn-nav__more-toggle { display: none; }
-
-/* ABOVE the disclosure breakpoint the links are ONE line, always. The row used
-   to `wrap`, which is what put "Settings" alone on a second row whenever the
-   workspace or project name was longer than the seed data's ("Convenience
-   Corner" + "gggg"). The two names are the only data-driven widths in the bar,
-   so THEY give way: each truncates with an ellipsis (`.gn-nav__label` is the
-   text span — `text-overflow` does not apply to the `inline-flex` link itself)
-   while every fixed link keeps its full label at the house size. `min-width:
-   0` is what lets a flex item go below its content width at all. */
-@media (min-width: 70.0625rem) {
-  .gn-nav__links { flex-wrap: nowrap; }
+   THE ARM STARTS AT 64.0625rem, ONE HUNDREDTH OF A PIXEL ABOVE THE BOTTOM BAR'S 64rem (UX fixes Task 4, case 23.042): at
+   exactly 1024px the bar is the navigation and these links are not painted; at 1025px the reverse. There is no width
+   at which both show or neither does, and no `Menu` button between them (it was the disclosure for the 641–1120 band
+   the bar now covers). */
+@media (min-width: 64.0625rem) {
+  /* TIGHTER THAN THE 1rem THE ROW HAD (Task 4): the arm now starts at 1025px, 95px narrower than the 1120px the disclosure
+     held the row to, and the links carry their own side padding (0.5rem here, see below), so the gap between two
+     labels is 1rem + this. Three quarters of a rem off each gap (1rem to 0.25rem, with the padding below) is what buys the
+     "Last project:" label back at 1121px with the seed names; the labels' tap areas do not shrink. */
+  .gn-nav__links { flex-wrap: nowrap; gap: 0.25rem; }
+  /* AND A TIGHTER SIDE PADDING (0.5rem, from 0.875rem), measured in Chrome with the label back (case 23.044): at 1121px
+     with the seed names ("Convenience Corner" / "gggg") the "Last project:" label needed ~65px more than the row had
+     (0.625rem still left it 21px short), and 6 links x 2 sides x 6px buys back 72. The tap area stays the 2.75rem-high
+     row; only its width gives. The selector is one class heavier than `.gn-nav a` (below) because that rule comes later
+     in the file. */
+  .gn-nav .gn-nav__links a { padding-inline: 0.5rem; }
   .gn-nav__links > a,
   .gn-nav__more > a { white-space: nowrap; flex: none; }
   .gn-nav__more > a.gn-nav__workspace,
@@ -2213,22 +2213,16 @@ input, textarea, select { font-family: inherit; }
     max-width: 16rem;
   }
   .gn-nav__more > .gn-nav__project > a { max-width: 100%; min-width: 0; }
-  /* THE "Last project:" LABEL COSTS WIDTH (UX fixes Task 3, case 23.044): ~90px of label plus the divider and gap, and
-     the shell's gutter grew 8px at this width. The 220px budget and 4.5rem floors described below were measured before
-     either, and at 1121–1280px they no longer both fit. So from the disclosure breakpoint up to 80rem the label is
-     hidden and the divider alone separates the item; at 80rem and above (room to spare) it shows. Task 4 refits this
-     row for 1024–1120px and owns the final answer. */
-  @media (max-width: 80rem) {
-    .gn-nav__project-label { display: none; }
-  }
-  /* The floor a name may be squeezed to: 4.5rem is the 0.875rem padding twice
-     plus ~2.75rem of label (five characters and an ellipsis). It is a floor,
-     not a size: at 1121px, the narrowest width this arm serves, the row has
-     220px for the two names (measured) so each keeps ~110px, and the floor
-     only matters if a fixed link ever grows. It is small enough not to pad a
-     short name much (a four-letter project name is 66px; the floor is 72). */
-  .gn-nav__more > a.gn-nav__workspace,
-  .gn-nav__more > .gn-nav__project { min-width: 4.5rem; }
+  /* The floor a name may be squeezed to: 4.5rem is the 0.875rem padding twice plus ~2.75rem of label (five characters and
+     an ellipsis). It is a floor, not a size, and it is small enough not to pad a short name much (a four-letter project
+     name is 66px; the floor is 72). */
+  .gn-nav__more > a.gn-nav__workspace { min-width: 4.5rem; }
+  /* The project group also holds the "Last project:" label (visible again here, Task 4 carry-over, case 23.044), so its
+     floor is the hairline, padding and the link's own floor (6.25rem), with no room kept for the label. The label gives
+     way FIRST (shrink factor 8, ellipsis) so a long name keeps its link readable instead of collapsing under the label
+     (measured in Chrome at 1025, 1121 and 1280px with seed and 25-character names: one row, no overflow). */
+  .gn-nav__more > .gn-nav__project { min-width: 6.25rem; }
+  .gn-nav__project-label { flex: 0 8 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .gn-nav__label {
     min-width: 0;
     overflow: hidden;
@@ -2237,38 +2231,23 @@ input, textarea, select { font-family: inherit; }
   }
 }
 
-/* THE DISCLOSURE BREAKS AT 70rem, NOT 40rem (owner browser pass 2026-09-29:
-   "Settings" wrapped to a second row at 1280 with a real workspace name).
-   MEASURED before the change, on the dev stack with the shipped 16px labels:
-   the desktop row is brand + Workspaces + workspace name + last project +
-   My Work + Members + Settings + Notes + inbox + avatar. The five fixed links
-   are 463px with their gaps and the corner + brand are 366px, so the row needs
-   ~830px before either data-driven name — and 1024px (which is 64rem) left the
-   links 602px, so the bar was two rows at 1024 and FOUR at 768 (250px tall)
-   even with the short seed names. 70rem is where the fixed links, the corner,
-   the brand and a floor of 4.5rem for each of the two names (they truncate
-   above, `.gn-nav__label`) still fit one line: 1120px. The text stays at the
-   house 16px everywhere; nothing was shrunk to make it fit. */
-@media (max-width: 70rem) {
-  .gn-nav .gn-nav__more-toggle { display: inline-flex; align-items: center; }
+/* THE BOTTOM BAR TAKES OVER AT 64rem (UX fixes Task 4, owner ruling U3 — the 641–1120px band had the desktop nav squeezed
+   behind a `Menu` toggle and a phone-sized hit target). The destination links are the bar's job from here down, so the
+   row is not painted; the elements stay in the document (the bar's slots and its More sheet are their replacement). This
+   used to break at 70rem, MEASURED then at 830px of fixed content before either name (owner browser pass 2026-09-29:
+   "Settings" wrapped at 1280 with a real workspace name); the arm above now carries that row from 1025px with the gap
+   tightened rather than the text shrunk — the text stays at the house 16px everywhere. */
+@media (max-width: 64rem) {
   .gn-nav__more { display: none; }
-  .gn-nav__more[data-open="true"] {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem;
-    flex-basis: 100%;
-    min-width: 0;
-  }
 }
 /* THE PHONE SWITCHER'S WRAPPER (mobile-web plan Task 2, case 21.012). A `<div>`, not the
    button, carries the show/hide, because `.gn-nav button { display: inline-flex }` (0,1,1) outranks
    any single-class `display: none` a button could wear — the cascade failure
-   `.gn-nav .gn-nav__more-toggle { display: none }` above is spelled out for. Hidden by default; the
+   the retired `.gn-nav .gn-nav__more-toggle` rule was spelled out for. Hidden by default; the
    40rem arm below paints it. Not a `.gn-nav*` selector, so no top-level `.gn-nav*` rule changed. */
 .gn-phone-switcher { display: none; }
-/* THE PHONE BOTTOM BAR (mobile-web plan Task 3, cases 21.028–21.031): hidden by default; the 40rem arm
-   below paints it. `AppNav` also renders it only at phone width (`use-is-phone.ts`), so this is the
+/* THE BOTTOM BAR (mobile-web plan Task 3, cases 21.028–21.031; tablet band since UX fixes Task 4): hidden by default; the
+   64rem arm below paints it. `AppNav` also renders it only at ≤64rem (`use-tablet-bar.ts`), so this is the
    belt for the first frame before that effect has run. */
 .gn-bottom-bar { display: none; }
 /* THE SHELL'S SESSION NOTICE (SYS-01, cases 21.239–21.241): shown by `SessionNotice` only while the
@@ -2302,8 +2281,8 @@ input, textarea, select { font-family: inherit; }
 }
 @media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
-     promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
-     line") is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)
+     promise (the row holds the brand, Workspaces and .gn-nav__corner's ... on ONE
+     line) is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)
      spends real space that budget never had. Hiding it here, rather than the
      tile, is what the ruling asks for — the tile alone is what the phone bar
      already carried before this round. */
@@ -2361,7 +2340,14 @@ input, textarea, select { font-family: inherit; }
     text-overflow: ellipsis;
   }
   .gn-account .gn-page-title { font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; }
+}
 
+/* ── THE BOTTOM BAR, 64rem AND BELOW (mobile-web plan Task 3, cases 21.028–21.031; widened from the 40rem phone arm to the tablet
+   band by UX fixes Task 4, owner ruling U3, cases 23.050–23.051). `AppNav` renders it at the same width, by script
+   (`use-tablet-bar.ts`: `TABLET_BAR_QUERY`), so the two cannot name different widths without 23.051 failing. The phone TOP bar's
+   rules above stay in the 40rem arm: a tablet keeps its link row's brand, Workspaces and avatar and gains the bar; only a
+   phone swaps the row for the switcher. Every rule here is AFTER the hidden-by-default base `.gn-bottom-bar` it overrides. */
+@media (max-width: 64rem) {
   /* ── The bottom bar (Task 3). Fixed to the bottom, one bar-height tall PLUS the home-indicator
      inset (`viewport-fit: cover` makes `env(safe-area-inset-bottom)` real on iOS, FD9), the
      inset taken as padding so the items stay centred in the 3.5rem above it. `--gn-phone-bar-height`
@@ -2668,12 +2654,10 @@ input, textarea, select { font-family: inherit; }
 /* Resting/hover treatment (owner spec, transcribed from
    `design-system/interactive/desktop.dc.html`'s `--label`/`--label2`/`--radius`
    vars — the same source `blue600`/`textAccent` already trace to). Scoped to
-   `<a>` and to `.gn-nav__more-toggle`: the three `<button>` children
-   (`StyleToggle`, `ThemeToggle`, sign-out) keep their own `.gn-button` colour
-   and radius, and only share the tap-target sizing above. **The toggle is the
-   fourth button and the exception** — it carries no `.gn-button`, so nothing
-   else gave it a ground, a radius or a hover at all, and it is a peer of the
-   links it reveals rather than an action beside them (E4-11, 2026-09-22).
+   `<a>`: the `<button>` children (`StyleToggle`, `ThemeToggle`, sign-out) keep
+   their own `.gn-button` colour and radius, and only share the tap-target
+   sizing above. (It also covered the `Menu` toggle, a button with no
+   `.gn-button`, until UX fixes Task 4 retired it, case 23.042.)
 
    `--label2` (the spec's resting-label colour, `rgba(32,43,73,0.78)`) has no
    primitive of its own in this palette — every hex here is a role in
@@ -2696,8 +2680,7 @@ input, textarea, select { font-family: inherit; }
    this to be pinned smaller instead of varying by style, matching the spec's
    own `--radius` var (constant across the prototype's styles too). Not a
    colour, so outside the token-discipline scanner's remit. */
-.gn-nav a,
-.gn-nav__more-toggle {
+.gn-nav a {
   /* Styling refresh Plan B (Task B4): 12px radius (rule 05) and the feedback-time transition (rule 12). */
   border-radius: 0.75rem;
   padding-inline: 0.875rem;
@@ -2706,18 +2689,12 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
   text-decoration: none;
   transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
-  /* A `<button>` brings chrome an `<a>` never had — a `ButtonFace` ground, an
-     outset border and a default cursor. `.gn-nav__more-toggle` is the one nav
-     button with no `.gn-button`, so nothing else clears them, and at 390 px it
-     painted as a grey OS control sitting in the link row (E4-11, 2026-09-22). */
   background: transparent;
   border: none;
   cursor: pointer;
 }
 .gn-nav a:hover,
-.gn-nav a:focus-visible,
-.gn-nav__more-toggle:hover,
-.gn-nav__more-toggle:focus-visible {
+.gn-nav a:focus-visible {
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
 }

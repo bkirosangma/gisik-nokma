@@ -1720,7 +1720,7 @@ mechanism the height depends on.
 
 ### The cases
 
-- ✅ **13.1137 — the phone breakpoint hides the wrapper, and the wide arm does not.** This is a SOURCE
+- ✅ **13.1137 — the breakpoint hides the wrapper, and the wide arm does not.** *AMENDED 2026-10-02 (UX fixes Task 4, owner U3): the breakpoint is now 64rem (the wide arm starts at 64.0625rem), the wrapper is `display: none` at ≤64rem because the bottom bar replaces it, and the Menu toggle is gone (23.042). The scan below was written for the 40rem phone arm.* This is a SOURCE
   scan, not a rendered one, and deliberately: the gate has no browser (`apps/web/e2e-*` is Playwright,
   not in `pnpm test`), and the property at issue is which declarations a rule carries, on which the
   stylesheet *is* the authority. `apps/web/test/nav-phone-disclosure.test.ts`. **Two controls, and
@@ -1736,7 +1736,7 @@ mechanism the height depends on.
   `@media (max-width: 40rem)` blocks, so "the 40rem block" is not a thing that exists — the block is
   selected by containing `.gn-nav__more`, which is why asking for the first one answers about
   `.gn-workspace-list`.
-- ✅ **13.1138 — the toggle is wired to the panel, and the links are in the document in BOTH states.**
+- ✅ **13.1138 — the links are in the document, and there is no toggle.** *AMENDED 2026-10-02 (UX fixes Task 4, owner U3): the Menu toggle and its `aria-controls`/`data-open` wiring are removed (the bar is the navigation at ≤64rem), so this case now asserts `My Work` / `Members` / `Settings` are in the document, no Menu button renders and the wrapper carries no `data-open`; the signed-out control stands. The description below is the toggle it was written for.*
   `apps/web/test/app-nav.test.tsx`. jsdom evaluates no media query, so the stylesheet test above can
   prove the breakpoint hides the wrapper but not that the button which unhides it is wired to it; this
   case covers the half the scan cannot reach. The toggle starts `aria-expanded="false"` with
@@ -1751,12 +1751,12 @@ mechanism the height depends on.
 
 *Ids `13.1536`–`13.1539` are unused. Amends the phone-disclosure cases `13.1137`–`13.1138`: the breakpoint moved from 40rem to 70rem.*
 
-- ✅ **13.1530 — above 70rem the links row does not wrap.** Mutation: `flex-wrap: wrap` back in the wide arm → red (with 13.1534). (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1530 — above 64rem (was 70rem; AMENDED 2026-10-02 (UX fixes Task 4, owner U3), arm 64.0625rem) the links row does not wrap.** Mutation: `flex-wrap: wrap` back in the wide arm → red (with 13.1534). (`apps/web/test/nav-one-line.test.ts`)
 - ✅ **13.1531 — the two data-driven names (workspace, last project) truncate with an ellipsis; every fixed link keeps its full label.** (`apps/web/test/nav-one-line.test.ts`)
-- ✅ **13.1532 — the disclosure and the wide arm meet at 70rem with no gap and no overlap.** (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1532 — the hidden wrapper and the wide arm meet at 64rem / 64.0625rem with no gap and no overlap** (was the disclosure and the wide arm at 70rem; AMENDED 2026-10-02 (UX fixes Task 4, owner U3))**.** (`apps/web/test/nav-one-line.test.ts`)
 - ✅ **13.1533 — nothing in either arm shrinks the house text size to make the bar fit.** (`apps/web/test/nav-one-line.test.ts`)
 - ✅ **13.1534 — MUTATION WITNESS: a wrapping wide arm is a reading the cases catch.** (`apps/web/test/nav-one-line.test.ts`)
-- 🧪 **13.1535 — browser: the bar is one row at 1280 and at 1121 (links fit 699/699 px), and one row with a `Menu` toggle at 1024 and 768.** Measured 2026-09-29 by real computed sizes on a lane `next dev` (before: `Settings` alone on a second row at 1280; 4 rows at 1024 and 768). The reported scrollbar could not be reproduced. (`apps/web/app/globals.css`) *Measured 2026-09-29, controller browser pass on the dev stack built from `release/trash` b75ad0ce (LOCAL): one 70px row at 1280, 1121, 1024 and 768 with no horizontal scroll; the Menu toggle at 1024 and 768; names truncate with an ellipsis at 1121.* MANUAL by nature (no automated test cites 13.1535), so it stays 🧪: the run above is its evidence.
+- 🧪 **13.1535 — browser** *(AMENDED 2026-10-02 (UX fixes Task 4, owner U3): the Menu toggle at 1024 and 768 below is superseded by the bottom bar; the 1121 label measurement is redone in 23.044)*: the bar is one row at 1280 and at 1121 (links fit 699/699 px), and one row with a `Menu` toggle at 1024 and 768.** Measured 2026-09-29 by real computed sizes on a lane `next dev` (before: `Settings` alone on a second row at 1280; 4 rows at 1024 and 768). The reported scrollbar could not be reproduced. (`apps/web/app/globals.css`) *Measured 2026-09-29, controller browser pass on the dev stack built from `release/trash` b75ad0ce (LOCAL): one 70px row at 1280, 1121, 1024 and 768 with no horizontal scroll; the Menu toggle at 1024 and 768; names truncate with an ellipsis at 1121.* MANUAL by nature (no automated test cites 13.1535), so it stays 🧪: the run above is its evidence.
 
 ## The Members "Send invitation" button shows progress (fix-now batch S3, 2026-09-29) — block `13.1560`–`13.1579`
 
