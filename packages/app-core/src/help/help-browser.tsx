@@ -469,11 +469,19 @@ function TopicSidebar({
   activeSection: string | null;
 }) {
   const [collapsed, setCollapsed] = useState<Readonly<Record<string, true>>>({});
+  // UX fixes T10 (WF/HLP, 23.174): at phone width the topic tree sits behind a "Contents" disclosure so the
+  // article starts within the first screen. State only matters there — at desktop width the button is not
+  // drawn and the tree is always shown.
+  const [contentsOpen, setContentsOpen] = useState(false);
   const nav = useMemo(() => helpNav(document), [document]);
   const edgesRef = useScrollEdges<HTMLElement>('y');
 
   return (
-    <aside className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y" ref={edgesRef}>
+    <aside
+      className="gn-help__sidebar gn-scroll-fade gn-scroll-fade--y"
+      ref={edgesRef}
+      data-contents-open={contentsOpen ? 'true' : 'false'}
+    >
       {/*
         The document switch, MOVED here from above the search box and REBUILT
         on the shared `SegmentedControl` (2026-09-15).
@@ -521,7 +529,24 @@ function TopicSidebar({
         could drift from it. A heading would also name it, but it would put a
         third `h2` level into a page whose `h2`s are the document's sections.
       */}
-      <nav className="gn-help__nav" aria-labelledby="gn-help-topics">
+      <button
+        type="button"
+        className="gn-help__contents-toggle"
+        aria-expanded={contentsOpen}
+        aria-controls="gn-help-nav"
+        onClick={() => setContentsOpen((was) => !was)}
+      >
+        Contents
+      </button>
+      <nav
+        id="gn-help-nav"
+        className="gn-help__nav"
+        aria-labelledby="gn-help-topics"
+        // Picking a topic closes the disclosure, so the article it jumped to is what the reader sees.
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest('a') !== null) setContentsOpen(false);
+        }}
+      >
         <p className="gn-help__eyebrow" id="gn-help-topics">
           Topics
         </p>

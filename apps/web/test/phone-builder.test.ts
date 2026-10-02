@@ -260,7 +260,7 @@ describe('21.173 ticket types: form fields full width; the reorder targets stay 
     expect(valueOf(ruleExactly(ui, '.ticket-type-editor__layout'), 'grid-template-columns')).toBe('minmax(0, 1fr) minmax(0, 18rem)');
   });
 
-  it('21.173 the ↑/↓ reorder buttons are ≥44px square at every width: the base is 2.75rem both ways and no phone rule narrows it', () => {
+  it('21.173 the Reorder button is ≥44px tall and at least 44px wide at every width: the base is 2.75rem both ways and no phone rule narrows it', () => {
     const move = ruleExactly(ui, '.ticket-type-list__move');
     expect(valueOf(move, 'min-height')).toBe('2.75rem');
     expect(valueOf(move, 'min-width')).toBe('2.75rem');
@@ -269,7 +269,8 @@ describe('21.173 ticket types: form fields full width; the reorder targets stay 
       (rule) => rule.atRule !== null && rule.selectors.includes('.ticket-type-list__move') && /min-(height|width)/.test(rule.body),
     );
     expect(narrowing).toEqual([]);
-    // CONTROL — the reorder pair keeps its gap, so the two targets are not touching (≥8px between).
+    // The wrapper's declared gap, kept as the 21.173 layout pin: it held the ↑/↓ pair before 23.171 and now holds the one
+    // Reorder trigger, so it separates nothing visible — it is the wrapper's layout, not a claim about two targets.
     expect(valueOf(ruleExactly(ui, '.ticket-type-list__reorder'), 'gap')).toBe('0.5rem');
   });
 });

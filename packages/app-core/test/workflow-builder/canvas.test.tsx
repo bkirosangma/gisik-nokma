@@ -15,6 +15,7 @@ import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { WorkflowCanvas } from '../../src/workflow-builder/ui/workflow-canvas.js';
+import { ruleExactly, valueOf, readUiCss } from '../../../ui/test/helpers/css-rules.js';
 
 const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
 
@@ -446,7 +447,9 @@ describe('10.133 the canvas never shrinks a control below its own declared size'
     '../../src/workflow-builder/ui/workflow-canvas.tsx',
   );
 
-  it('passes fitViewOptions={{ minZoom: 1 }} to ReactFlow, floor-checked against the JSX it configures', () => {
+  // AMENDED 2026-10-02 (23.175): the floor is no longer 1:1 (it cropped wide graphs); the fit still has a declared
+  // floor, passed as `fitViewOptions`, and 23.175 below pins its value and the Fit to screen control.
+  it('passes a floored fitViewOptions to ReactFlow, checked against the JSX it configures', () => {
     const src = readFileSync(SRC_PATH, 'utf8');
     // Anchored to the SAME `<ReactFlow` element the prop must land on, not a
     // bare substring search: a `minZoom: 1` sitting in a comment or an
@@ -456,7 +459,74 @@ describe('10.133 the canvas never shrinks a control below its own declared size'
     // preceded by a bare newline+whitespace, so it does not match first).
     const opening = /<ReactFlow\b[\s\S]*?\n\s*>/.exec(src)?.[0];
     expect(opening, 'no <ReactFlow ...> opening tag found').toBeDefined();
-    expect(opening).toMatch(/fitViewOptions=\{\{\s*minZoom:\s*1\s*\}\}/);
+    expect(opening).toMatch(/fitViewOptions=\{FIT_OPTIONS\}/);
+    expect(src).toMatch(/const FIT_OPTIONS = \{\s*minZoom:\s*FIT_MIN_ZOOM/);
     expect(opening).toMatch(/\bfitView\b/);
+  });
+});
+
+/**
+ * 23.175 (UX fixes T10, WF-02) — AMENDS 10.133: the canvas opens on the WHOLE graph. The 1:1 floor above cropped
+ * a graph wider than the canvas, so `minZoom` is LOWERED (on the instance as well, which caps `fitView` at its own
+ * default 0.5) and a "Fit to screen" control (44px, named) refits on demand. Same instrument as 10.133 and for the
+ * same reason (jsdom has no layout, so a real fit never runs): a source-level read of the JSX it configures.
+ */
+describe('23.175 the canvas opens fitted to the whole graph, and has a Fit to screen control', () => {
+  const SRC_PATH = join(dirname(fileURLToPath(import.meta.url)), '../../src/workflow-builder/ui/workflow-canvas.tsx');
+
+  it('23.175 fitView honours the whole graph (minZoom below 1, on the options AND the instance), Fit to screen is a named button, and a zoom is never re-fitted on an edit', () => {
+    const src = readFileSync(SRC_PATH, 'utf8');
+    const opening = /<ReactFlow\b[\s\S]*?\n\s*>/.exec(src)?.[0];
+    expect(opening, 'no <ReactFlow ...> opening tag found').toBeDefined();
+    expect(opening).toMatch(/\bfitView\b/);
+    expect(opening).toMatch(/\bminZoom=\{FIT_MIN_ZOOM\}/);
+    expect(opening).toMatch(/fitViewOptions=\{FIT_OPTIONS\}/);
+    const floor = Number(/const FIT_MIN_ZOOM = ([0-9.]+);/.exec(src)?.[1]);
+    expect(floor).toBeGreaterThan(0);
+    expect(floor).toBeLessThan(0.5); // below React Flow's own default floor, or the fit could never zoom out further
+    // The control, rendered: a button named "Fit to screen".
+    renderCanvas(createDraftStore(draftFromTemplate(errand)));
+    const fit = screen.getByRole('button', { name: 'Fit to screen' });
+    expect(fit).toHaveClass('gn-workflow-canvas__fit');
+    // …and a 44px target: the stylesheet declares both floors on that one rule (the jsdom render measures nothing).
+    const fitRule = ruleExactly(readUiCss(), '.gn-workflow-canvas__fit');
+    expect(valueOf(fitRule, 'min-height')).toBe('2.75rem');
+    expect(valueOf(fitRule, 'min-width')).toBe('2.75rem');
+    // CONTROL — the user's zoom is KEPT after an edit: the one `fitView(` CALL is the button's own handler. No
+    // effect refits on a draft change, so nothing re-fits on every change.
+    expect(src.match(/\bfitView\(/g)).toHaveLength(1);
+    expect(src).toMatch(/onClick=\{\(\) => void fitView\(/);
+    expect(src).not.toMatch(/useEffect/);
+  });
+});
+
+/**
+ * 23.176 (UX fixes T10, WF-03) — a state node's option rows are 44px targets with the whole row a <label>, and the
+ * reason a row is locked is VISIBLE text, not a hover-only `title`.
+ */
+describe('23.176 state-node option rows', () => {
+  it('23.176 the option rows are ≥44px labels; a locked row shows its reason as text; an unlocked row shows none', async () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../ui/src/ui.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = /\.gn-state-node__blocked,\s*\.gn-state-node__creatable\s*\{([^}]*)\}/.exec(css)?.[1];
+    expect(rule, 'no shared rule for the two option rows').toBeDefined();
+    expect(rule).toMatch(/min-height:\s*2\.75rem/);
+    expect(rule).toMatch(/display:\s*flex/);
+
+    renderCanvas(createDraftStore(draftFromTemplate(errand)));
+    const done = screen.getByTestId('state-node-done');
+    // The row IS the label: the checkbox sits inside it, so a click on the label text toggles it.
+    const checkbox = within(done).getByRole('checkbox', { name: 'Tickets can start here' });
+    expect(checkbox.closest('label.gn-state-node__creatable')).not.toBeNull();
+    expect(within(done).getByRole('checkbox', { name: 'Blocked' }).closest('label.gn-state-node__blocked')).not.toBeNull();
+    // The disabled reason is text on the page, wired to the checkbox it explains.
+    const reason = screen.getByTestId('gn-state-reason-done');
+    expect(reason).toHaveTextContent("A done state can't be a starting status");
+    expect(checkbox.getAttribute('aria-describedby')).toBe(reason.id);
+    expect(screen.getByTestId('gn-state-reason-later')).toHaveTextContent('The start state always allows new tickets');
+
+    // CONTROL — an enabled row (an open, non-start state) draws NO reason, so the text above is the lock's, not a constant.
+    const next = screen.getByTestId('state-node-next');
+    expect(within(next).queryByTestId('gn-state-reason-next')).toBeNull();
+    expect(within(next).getByRole('checkbox', { name: 'Tickets can start here' })).not.toHaveAttribute('aria-describedby');
   });
 });

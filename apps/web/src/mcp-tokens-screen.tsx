@@ -372,17 +372,22 @@ export function McpTokensScreen({
                           NOTHING here rather than an empty line: `null` is the
                           server's spelling for "not named", and a blank line would
                           read as a name of zero length. */}
-                      {token.name === null ? null : (
+                      {token.name === null ? (
+                        // UX fixes T10 (SET-02): an unnamed token says what it IS, in the row's
+                        // first line, instead of leading with a date. It is NOT the name element —
+                        // `null` still draws no name, so this line cannot read as a name.
+                        <span className="gn-mcp-tokens__generic">Assistant connected with a token</span>
+                      ) : (
                         <span className="gn-mcp-tokens__name">{token.name}</span>
                       )}
-                      Approved {approvedOn(token.createdAt)}
-                      {/* The honest answer for a token nothing has used yet, rather
-                          than a date picked to fill the column. `last_used` is NULL
-                          until the first resolution. */}
+                      {/* The honest answer for a token nothing has used yet, rather than a date
+                          picked to fill the column. `last_used` is NULL until the first resolution. */}
                       <span className="gn-mcp-tokens__used">
-                        {token.lastUsedAt === null
-                          ? 'Never used'
-                          : `Last used ${approvedOn(token.lastUsedAt)}`}
+                        {`Created ${approvedOn(token.createdAt)} · ${
+                          token.lastUsedAt === null
+                            ? 'never used'
+                            : `last used ${approvedOn(token.lastUsedAt)}`
+                        }`}
                       </span>
                     </span>
                     {namingId === token.id ? (
@@ -436,7 +441,7 @@ export function McpTokensScreen({
                           // human handle an UNNAMED connection has; two approved on
                           // the same day are the one pair this cannot separate, and
                           // that is stated rather than hidden.
-                          aria-label={`${token.name === null ? 'Name' : 'Rename'} the connection approved ${approvedOn(token.createdAt)}`}
+                          aria-label={`${token.name === null ? 'Add a name to' : 'Rename'} the connection created ${approvedOn(token.createdAt)}`}
                           disabled={busy !== null}
                           onClick={() => {
                             setRefusal(null);
@@ -444,14 +449,14 @@ export function McpTokensScreen({
                             setDraft(token.name ?? '');
                           }}
                         >
-                          {token.name === null ? 'Name' : 'Rename'}
+                          {token.name === null ? 'Add a name' : 'Rename'}
                         </Button>
                         <Button
                           data-testid={`mcp-tokens-revoke-${token.id}`}
                           onClick={() => revoke(token.id)}
                           disabled={busy !== null}
                         >
-                          {busy === token.id ? 'Revoking…' : 'Revoke'}
+                          {busy === token.id ? 'Revoking…' : 'Revoke this token'}
                         </Button>
                       </>
                     )}
@@ -477,7 +482,7 @@ export function McpTokensScreen({
                     <li className="gn-mcp-tokens__row" key={connection.id}>
                       <span className="gn-mcp-tokens__when">
                         <span className="gn-mcp-tokens__name">
-                          {connection.clientName} · {connection.redirectHost}
+                          {connection.clientName} ({connection.redirectHost})
                         </span>
                         Connected {approvedOn(connection.createdAt)}
                         <span className="gn-mcp-tokens__used">
@@ -492,7 +497,7 @@ export function McpTokensScreen({
                         onClick={() => disconnect(connection.id)}
                         disabled={disconnecting !== null}
                       >
-                        {disconnecting === connection.id ? 'Disconnecting…' : 'Disconnect'}
+                        {disconnecting === connection.id ? 'Disconnecting…' : `Disconnect ${connection.clientName}`}
                       </Button>
                     </li>
                   ))}

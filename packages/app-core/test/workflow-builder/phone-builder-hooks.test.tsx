@@ -233,20 +233,21 @@ describe('21.172 template doors and the workflow list carry the classes the sing
 });
 
 describe('21.173 ticket types carry the classes the full-width / reorder rules key on', () => {
-  it('21.173 the list: New ticket type is `ticket-type-list__new` in the header; each row has two `ticket-type-list__move` buttons inside `ticket-type-list__reorder`', async () => {
+  it('21.173 the list: New ticket type is `ticket-type-list__new` in the header; each custom row has one `ticket-type-list__move` (Reorder) button inside `ticket-type-list__reorder`', async () => {
     const { container } = render(
       <TicketTypeListScreen
         workspaceId={newUlid()}
         session={session}
-        gateway={createFakeGateway({ ticketTypes: [taskType], workflows: [published] })}
+        // `task` is a built-in (rank-locked, no Reorder control — 23.171), so a custom type sits beside it.
+        gateway={createFakeGateway({ ticketTypes: [taskType, { ...taskType, id: 'errand', name: 'Errand', rank: 9 }], workflows: [published] })}
         onOpen={() => {}}
         onNew={() => {}}
       />,
     );
-    await screen.findByText('Task');
+    await screen.findByText('Errand');
     expect(container.querySelector('header.ticket-type-list__header > .ticket-type-list__new')).toHaveClass('gn-button--primary');
     const reorder = container.querySelector('.ticket-type-list__rows li > .ticket-type-list__reorder')!;
-    expect(reorder.querySelectorAll('button.ticket-type-list__move')).toHaveLength(2);
+    expect(reorder.querySelectorAll('button.ticket-type-list__move')).toHaveLength(1); // amended 2026-10-02 (23.171): was two arrows
   });
 
   it('21.173 the editor: the header’s actions row holds Save (`ticket-type-editor__save`); each field row carries `fields-editor__name`, `fields-editor__type`; Add field is `fields-editor__add`', async () => {

@@ -41,6 +41,10 @@ const ALLOWED_DOUBLES: Record<string, { count: number; why: string }> = {
     count: 4,
     why: 'three exclusive ternary branches (error, loading, not in the directory) each paint their own "Workspace" h1 and the ready state paints the renamable one: one renders at a time',
   },
+  'apps/web/app/invite/[token]/page.tsx': {
+    count: 2,
+    why: 'the product name is the h1 while the invite is alive, and a dead link (UX fixes T10, ENT-04) paints its own headline as the h1 while the name steps down to a paragraph: the two arms are exclusive, so one renders at a time',
+  },
   'apps/web/app/w/[workspaceId]/settings/ticket-types/[typeId]/page.tsx': {
     count: 2,
     why: 'the delegate file holds the Edit AND the New pane, each defaulting `heading` to h1; the route mounts one of them',

@@ -532,7 +532,7 @@ test wrote, not that it shows the credential the CLI is holding.*
 - **14.97** ✅ The row names the approval date in the product's timezone and the page **never prints
   the id**; the empty state names the connect page. —
   (`apps/web/test/mcp-tokens-page.test.tsx`)
-  *Mutation: print `token.id` in the row → fails.*
+  *Mutation: print `token.id` in the row → fails.* **AMENDED 2026-10-02 (23.170):** the row reads `Created <date> · last used …` and the button `Revoke this token`; "Approved" and the bare `Revoke` are gone.
 - **14.98** ✅ Revoking sends `DELETE /v1/me/mcp-tokens/<that row's id>` and **reloads the list from the
   server** rather than splicing it locally. — (`apps/web/test/mcp-tokens-page.test.tsx`)
 - **14.99** ✅ A 404 on revoke is reported as "already gone" — the only thing true of both meanings the
@@ -544,7 +544,7 @@ test wrote, not that it shows the credential the CLI is holding.*
   before revoking. — (`apps/server/test/mcp/mcp-tokens.test.ts`)
 - **14.103** ✅ The screen says **"Never used"** for one and names the day for the other, asserted in
   ONE case with both rows present — either half alone passes for a component that renders one string
-  unconditionally. — (`apps/web/test/mcp-tokens-page.test.tsx`)
+  unconditionally. — (`apps/web/test/mcp-tokens-page.test.tsx`) **AMENDED 2026-10-02 (23.170):** the wording is `never used` / `last used <day>` inside the `Created … ·` line.
 
 > ### The CSRF control could not see a DELETE
 >
@@ -723,7 +723,7 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.271 — Disconnect (`DELETE /v1/me/mcp-connections/:id`) deletes the connection: its access token stops authenticating and its refresh token is `invalid_grant`;** control: another person's id answers 404 and their connection, access token and refresh token all survive. Mutation: revoke by id without the owner (`revokeConnection(…, null)`; a review survivor).
 - ✅ **14.272 — the DELETE refuses a cookie request with a foreign Origin (403 `forbidden_origin`);** control: `Origin: WEB_ORIGIN` passes the hook. Mutation: remove the route from `HTTP_ORIGIN_PROTECTED_ROUTES`.
 - ✅ **14.273 — `GET /v1/mcp/public-url` answers `{ url: "<MCP_PUBLIC_URL>/mcp" }` when the door is on and `{ url: null }` when off;** control: unauthenticated callers get the same answer. Mutation: return the web origin.
-- ✅ **14.274 — the Connected assistants screen shows each hosted connection as "{app name} · {host}", "Connected {date}", "Last used {date}" or "Never used" and a **Disconnect** button; local tokens keep **Revoke**;** control: a person with neither sees the existing empty state. Mutation: label the hosted button Revoke. **Also:** with ZERO local tokens and a live hosted connection the screen must NOT say "No assistants are connected" (control in the same `it`: both lists empty does say it). Mutation: drop `&& connections.length === 0` from the empty-state condition.
+- ✅ **14.274 — the Connected assistants screen shows each hosted connection as "{app name} · {host}", "Connected {date}", "Last used {date}" or "Never used" and a **Disconnect** button; local tokens keep **Revoke**;** control: a person with neither sees the existing empty state. Mutation: label the hosted button Revoke. **Also:** with ZERO local tokens and a live hosted connection the screen must NOT say "No assistants are connected" (control in the same `it`: both lists empty does say it). Mutation: drop `&& connections.length === 0` from the empty-state condition. **AMENDED 2026-10-02 (23.170):** a hosted row reads "{app} ({host})" and its button `Disconnect {app}`.
 - ✅ **14.275 — Disconnect removes the row only after the DELETE resolves and shows the server's reason on failure;** control: while in flight the row stays and its button reads "Disconnecting…". Mutation: remove the row before the DELETE resolves.
 - ✅ **14.276 — the "Connect an assistant" panel shows the URL from `/v1/mcp/public-url` with a **Copy** button (writes it to the clipboard, then reads "Copied") and a "How to connect" link to the Help article;** control: with `url: null` the panel is absent. Mutation: hard-code the URL.
 - ✅ **14.277 — the screen reads `/v1/me/mcp-connections` and `/v1/me/mcp-tokens` independently: a failure of one shows its own failure sentence and still renders the other;** control: both succeed → both lists. Mutation: make one failure fail both. **Also, both arrival orders:** a connections failure that lands AFTER the tokens read, and one that lands BEFORE it, each leave the token list rendered with no tokens-failed sentence. Mutation: the connections error arm also does `setTokens(null); setLoadFailed(true)`.

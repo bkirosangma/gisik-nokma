@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpError, InviteAcceptanceError, createHttpInviteGateway } from '@gisik-nokma/app-core/online';
@@ -368,11 +368,41 @@ describe('17.067 the invite page shows the deadline and a next step (E5-18)', ()
    * and no next step. `/workspaces` is where their own waiting invitations live.
    */
   it('17.069 the dead-link arm offers a next step instead of stopping at the sentence', async () => {
+    // Amended 2026-10-02 (23.173): "See your workspaces" is the SIGNED-IN person's quiet link; a signed-out one is
+    // offered "Go to sign in" (the page's primary) instead.
+    session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
     mount({ getInvite: async () => null });
     await screen.findByText(/does not open anything/);
     expect(screen.getByRole('link', { name: 'See your workspaces' })).toHaveAttribute(
       'href',
       '/workspaces',
     );
+  });
+});
+
+/**
+ * UX fixes T10 (ENT-04) — a dead invitation is a dead END, and the page now names that and offers the way on.
+ */
+describe('23.173 the dead-invitation page', () => {
+  it('23.173 an h1 "This invitation can\'t be used", the why, a primary "Go to sign in", and a quiet "See your workspaces" only when signed in', async () => {
+    session = { isPending: false };
+    mount({ getInvite: async () => null });
+    expect(await screen.findByRole('heading', { level: 1, name: 'This invitation can\u2019t be used' })).toBeInTheDocument();
+    // ONE h1 — the product name steps down in this arm.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByText(/used, withdrawn, or lapsed/)).toBeInTheDocument();
+    const primary = screen.getByRole('link', { name: 'Go to sign in' });
+    expect(primary).toHaveAttribute('href', '/sign-in');
+    expect(primary).toHaveClass('gn-button--primary');
+    // Signed out: no "See your workspaces" (it would 401-bounce).
+    expect(screen.queryByRole('link', { name: 'See your workspaces' })).toBeNull();
+
+    // CONTROL — signed in, the quiet link appears, and the primary is still the one primary.
+    cleanup();
+    session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
+    mount({ getInvite: async () => null });
+    expect(await screen.findByRole('link', { name: 'See your workspaces' })).toHaveAttribute('href', '/workspaces');
+    expect(screen.getByRole('link', { name: 'Go to sign in' })).toHaveClass('gn-button--primary');
+    expect(screen.getByRole('link', { name: 'See your workspaces' })).not.toHaveClass('gn-button--primary');
   });
 });

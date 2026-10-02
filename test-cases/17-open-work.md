@@ -304,7 +304,7 @@ dead link, possibly while signed out, got a sentence and no next step.
 
 - **17.069** ✅ The dead-link arm links to `/workspaces` — where their own waiting invitations live,
   including the one this link was for if they signed in under the address it was sent to — rather than a
-  generic home link. — (`apps/web/test/invite-page.test.tsx`)
+  generic home link. — (`apps/web/test/invite-page.test.tsx`) **AMENDED 2026-10-02 (23.173):** the link is the SIGNED-IN person's quiet one; a signed-out arrival gets the primary `Go to sign in` instead.
 
 **(c) ⚠ DECLINE IS NOT BUILT, AND THE DOOR THE FINDING NAMES DOES NOT FIT THIS PAGE.** The decline that
 exists is `MyInvitationsGateway.decline(inviteId)` (`packages/app-core/src/online/my-invitations.ts:50`),

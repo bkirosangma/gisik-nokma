@@ -102,6 +102,28 @@ describe('21.190 sign-in on a phone', () => {
   });
 });
 
+describe('23.172 the magic-link primary is full width at every width', () => {
+  it('23.172 the Send magic link button fills its form in the BASE rule, as wide as the passkey button; the phone arm still holds', () => {
+    // The base rule, drawn OUTSIDE any media arm — not only the 40rem arm.
+    const base = ruleExactly(css, '.gn-sign-in__method-form .gn-button');
+    expect(valueOf(base, 'width')).toBe('100%');
+    expect(valueOf(base, 'justify-content')).toBe('center');
+    // The primary lives in that form, and is the page's one primary on the screen.
+    const page = codeOf('app/sign-in/page.tsx');
+    expect(page).toMatch(/<form\s+className="gn-sign-in__method-form"[\s\S]*?<Button variant="primary" type="submit">\s*Send magic link/);
+    // "At least as wide as the passkey button": that button is a stretched child of a flex column (no
+    // `align-items` narrowing it, no width of its own outside the phone arm), so it spans the card; the
+    // primary's 100% is the same span.
+    const alternatives = ruleExactly(css, '.gn-sign-in__alternatives');
+    expect(valueOf(alternatives, 'flex-direction')).toBe('column');
+    expect(valueOf(alternatives, 'align-items')).toBeNull();
+    // CONTROL — the rule is not a blanket: no `.gn-button` rule outside the arm narrows the form's button, and
+    // the phone arm for the method and passkey buttons is untouched.
+    expect(valueOf(ruleExactly(css, ['.gn-sign-in__method .gn-button', '.gn-sign-in__alternatives > .gn-button'], PHONE), 'width')).toBe('100%');
+    expect(rulesNaming(css, '.gn-sign-in__method-form .gn-button').filter((r) => r.atRule !== null)).toEqual([]);
+  });
+});
+
 describe('21.191 invite accept, /mcp/connect and /mcp/authorize on a phone', () => {
   it('21.191 the connect stage and the authorize card fill the width; the centring (C1) is kept; the decision buttons are full width', () => {
     expect(valueOf(ruleExactly(css, '.gn-mcp-connect__stage', PHONE), 'max-width')).toBe('none');

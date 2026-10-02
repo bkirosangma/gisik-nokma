@@ -189,7 +189,7 @@ describe('read-only workflow views for non-admins', () => {
       // 21.170: the phone Panels / Done buttons only open and close the sheet that holds those rows — navigation too.
       // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
       // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
-      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels/);
+      expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
     }
     expect(gateway.submitted).toEqual([]);
   });
@@ -392,7 +392,8 @@ describe('no authoring action is reachable by any path the builder screen offers
         // 21.170: the phone Panels / Done buttons only open and close the sheet that holds those rows — navigation too.
         // W1 (2026-09-30): a States/Transitions row head is a disclosure that only SELECTS — the same kind of
         // thing as a jump; the authoring buttons live inside the row's body and would still fail this match.
-        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels/);
+        // 23.175: the canvas's "Fit to screen" only moves the viewport — a view control, not an authoring action.
+        expect(button.className).toMatch(/(issues|advisories)-panel__jump|builder-row__head|workflow-builder-screen__panels|workflow-canvas__fit/);
       }
     }
 
