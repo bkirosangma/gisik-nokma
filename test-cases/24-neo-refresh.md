@@ -67,5 +67,5 @@
 - ✅ **24.111 — neo-light and neo-dark: the help segmented track and the current nav item are recesses; the ghost button (read on `/sign-in`: `/help` signed out draws none) is raised (N3, N9).**
 - ✅ **24.112 — neo-light and neo-dark: board cards sit 14px apart and 14px under the column title (N7).**
 - ✅ **24.113 — the primary focus ring sits 3px outside the accent edge (Review Focus 3).**
-- ✅ **24.114 — hig and minimal regression: the sign-in card, field, primary and ghost render the pre-refresh shadows (spec §6–7).**
+- ✅ **24.114 — hig and minimal regression: the sign-in card, field, primary and ghost render the pre-refresh shadows (spec §6–7). The field keeps a visible border colour and no neo `LINE` layer (hig: its two track insets; minimal: none), and the primary at rest is hig's three `btnShadow` layers (minimal: none) with no neo press blue — each read paired, in the same test, with the neo read it contrasts with (24.110).**
 - ✅ **24.115 — neo-light and neo-dark: the switch cascade — off paints the well recess and a raised-compact knob, on paints the accent with `knob-on` and no track shadow (FIX 1 item 4).**

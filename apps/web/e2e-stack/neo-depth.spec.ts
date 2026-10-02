@@ -25,7 +25,7 @@ const THEMES = ['light', 'dark'] as const;
 type Theme = (typeof THEMES)[number];
 
 /** Where the screenshots go: outside the repo, so a re-run never dirties the tree. */
-const SHOTS = resolve(process.cwd(), '../../../gisik-nokma-lanes/neo-refresh-verify/2026-10-02');
+const SHOTS = resolve(process.cwd(), '../../../gisik-nokma-lanes/neo-refresh-verify', process.env['NEO_VERIFY_DATE'] ?? new Date().toISOString().slice(0, 10));
 mkdirSync(SHOTS, { recursive: true });
 
 // The producing tokens are `neoShadows(NEO_LIGHT | NEO_DARK)` in `packages/ui/src/tokens.ts`; a literal that differs from the computed
@@ -238,10 +238,24 @@ test('24.113 the primary focus ring sits 3px outside the accent edge', async ({ 
 for (const style of ['hig', 'minimal'] as const) {
   test(`24.114 ${style} regression: the sign-in card, field, primary and ghost render the pre-refresh shadows`, async ({ page }) => {
     await page.goto('/sign-in', { waitUntil: 'networkidle' });
+    const field = page.locator('.gn-field__input').first();
+    const primary = page.locator('.gn-button--primary').first();
+    const fieldRead = () => field.evaluate((el) => ({ borderColor: getComputedStyle(el).borderColor, boxShadow: getComputedStyle(el).boxShadow }));
+
+    // CONTROL FIRST (the 24.110 reads, same page): in neo the field's border is transparent and its shadow carries the LINE layer, and
+    // the primary is one fall. The reads below can only pass for hig/minimal because those values are ABSENT there, not because the
+    // selector matched nothing.
+    await applyStyle(page, 'neo', 'light');
+    const neoField = await fieldRead();
+    expect(neoField.borderColor, 'control: neo field border is transparent').toBe('rgba(0, 0, 0, 0)');
+    expect(layers(neoField.boxShadow).map((l) => l.colour), 'control: neo field shadow carries the LINE layer').toContain(LINE.light);
+    await expect.poll(async () => layers(await boxShadow(primary)).length, { message: 'control: neo primary settles to one fall' }).toBe(1);
+
     await applyStyle(page, style, 'light');
     const read = async (sel: string) => layers(await boxShadow(page.locator(sel).first()));
-    const fieldBorder = await page.locator('.gn-field__input').first().evaluate((el) => getComputedStyle(el).borderStyle);
-    expect(fieldBorder).toBe('solid'); // the rim stays outside neo
+    expect((await fieldRead()).borderColor, `${style}: the field keeps its own visible border colour, not the neo transparent one`).not.toBe('rgba(0, 0, 0, 0)');
+    const fieldFlat = await field.evaluate((el) => getComputedStyle(el).borderStyle);
+    expect(fieldFlat).toBe('solid'); // the rim stays outside neo
 
     // The page LOADS in neo and `applyStyle` flips it, so the buttons' and cards' `box-shadow` transitions are still running from the
     // neo value for a moment (first run: the ghost read `1.33585px` offsets, a frame of the neo pair on its way to `none`). Poll until
@@ -260,14 +274,36 @@ for (const style of ['hig', 'minimal'] as const) {
     };
     const card = await settled('.gn-card');
     const ghost = await settled('.gn-button--ghost');
+    const primaryRest = await settled('.gn-button--primary');
+    const fieldAfter = await fieldRead();
     expect(ghost, `${style}: the ghost draws no depth`).toEqual([]);
+    expect(layers(fieldAfter.boxShadow).map((l) => l.colour), `${style}: the field's shadow carries no neo LINE layer`).not.toContain(LINE.light);
+    expect(
+      primaryRest.map((l) => l.colour),
+      `${style}: the primary carries no neo press blue (${ACCENT_PRESS.light}) at rest`,
+    ).not.toContain(ACCENT_PRESS.light);
     if (style === 'hig') {
       // hig `lift`: a lit inset edge plus two falls, the first being shadowFallLight1 (#273a631f).
       expect(card.length, `hig: the three lift layers; got ${JSON.stringify(card)}`).toBe(3);
       expect(card.some((l) => l.inset && l.y === 1 && l.blur === 0), 'hig: the lit edge').toBe(true);
       expect(card.some((l) => !l.inset && l.x === 0 && l.y === 1 && l.blur === 2 && channels(l.colour) === '39, 58, 99'), 'hig: the 0 1 2 fall in #273a63').toBe(true);
+      // hig `action-filled` = `action` (`btnShadow`): a lit inset edge, a 0 1 2 fall in #273a63, a 0 8 16 -6 glow in the accent #33629f.
+      // Neo's primary is ONE fall (24.110), so three layers with these colours cannot be the neo rule leaking.
+      expect(primaryRest.length, `hig: the primary's three btnShadow layers; got ${JSON.stringify(primaryRest)}`).toBe(3);
+      expect(primaryRest.map((l) => [l.inset, l.x, l.y, l.blur, l.spread, channels(l.colour)])).toEqual([
+        [true, 0, 1, 0, 0, '255, 255, 255'],
+        [false, 0, 1, 2, 0, '39, 58, 99'],
+        [false, 0, 8, 16, -6, '51, 98, 159'],
+      ]);
+      // hig `track`: the field's two insets, a dark top shade and a lit bottom lip — not the neo recess band.
+      const fieldLayers = layers(fieldAfter.boxShadow);
+      expect(fieldLayers.length, `hig: the field's two track insets; got ${fieldAfter.boxShadow}`).toBe(2);
+      expect(fieldLayers.every((l) => l.inset), 'hig: both field layers are insets').toBe(true);
+      expect(hasRecessBand(fieldLayers), 'hig: not the neo 3px 3px 5px recess band').toBe(false);
     } else {
       expect(card, 'minimal: the card is flat').toEqual([]);
+      expect(primaryRest, 'minimal: the primary draws no depth').toEqual([]);
+      expect(layers(fieldAfter.boxShadow), 'minimal: the field draws no depth').toEqual([]);
     }
     await shot(page, `sign-in-${style}`);
   });
