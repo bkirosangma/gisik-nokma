@@ -2493,7 +2493,7 @@ instead of stating what it wants. `pointer-events: none` was rejected too — it
 misreporting its own box to devtools and to anyone reading the CSS, and the owner asked for the
 container to change size.
 
-- **13.1297** ✅ The strip declares `align-self: flex-start`, and **the lift survived it**. The control
+- **13.1297** 🚫 *Retired 2026-10-02 (prefixes and groups Task 7): the actions strip no longer exists — WS-03 (22.147) moved Edit, Archive/Restore and Delete… into the card's overflow menu and `.gn-project-card__actions` was deleted; the claim below is kept as the record of what the strip once had to do.* The strip declared `align-self: flex-start`, and **the lift survived it**. The control
   arm is asserted in the SAME case, not a sibling `it`: it requires the rule to still declare
   `position: relative` and `z-index: 1`, because the shrink is only a fix while the strip also stays
   above the door — a "fix" that bought the width by dropping the lift would put the overlay back over

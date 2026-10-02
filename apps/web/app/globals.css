@@ -1153,11 +1153,6 @@ input, textarea, select { font-family: inherit; }
    instead of matching the pre-Task-6 2.4px — zeroed rather than restored. */
 .gn-workspace-home__header-titles .gn-workspace-list__role--pinned { margin-top: 0; }
 .gn-workspace-home__links { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.75rem; margin: 1.4rem 0 0; }
-/* Phone (case 21.091): the section cards are one column BY RULE. `auto-fit` already lands on one
-   below ~34rem, but "one column" is the phone's promise, not an accident of a 15rem minimum. */
-@media (max-width: 40rem) {
-  .gn-workspace-home__links { grid-template-columns: minmax(0, 1fr); }
-}
 .gn-workspace-home__link {
   background: var(--gn-surface-raised);
   /* Styling refresh Plan B (Task B13): P-RAISED — the lit-edge `lift` shadow, with the P-LIFT transition (hover and press below). */
@@ -1197,6 +1192,16 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-home__link:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-workspace-home__link-label { font-size: 1.05rem; font-weight: 600; }
 .gn-workspace-home__link-note { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* Phone (case 22.148, replacing 21.091's one-column stack): the four section cards are a horizontally
+   scrollable row of compact chips, so the page's own content — the projects — starts above the fold on a
+   390px screen instead of under four stacked cards. The notes are hidden by `display: none`, which does
+   NOT take them out of the accessible description: `aria-describedby` still reads a hidden referent.
+   The padding gives the chips' lift shadow room that the scroller's clipping would otherwise take. */
+@media (max-width: 40rem) {
+  .gn-workspace-home__links { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 0.5rem; padding: 0.25rem 0.25rem 0.5rem; }
+  .gn-workspace-home__link { flex: 0 0 auto; justify-content: center; min-height: 2.75rem; padding: 0.5rem 1rem; }
+  .gn-workspace-home__link-note { display: none; }
+}
 /* Round 19b: the archived toggle moved INTO this row, at its end — the
    reference's layout — so the heading and the disclosure control share one
    line instead of the toggle trailing the list below. */
@@ -1211,6 +1216,15 @@ input, textarea, select { font-family: inherit; }
    heading row's trailing side; `wrap` lets them drop under the heading on a phone. */
 .gn-workspace-home__projects-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .gn-workspace-home__heading { margin: 0; font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; }
+/* The row's controls (case 22.121): the archived toggle, the Grouped/Plain choice and the Create project button, one
+   group at the row's end. The slot is empty until the Create button mounts into it, and an empty one takes
+   no room (and adds no gap). */
+.gn-workspace-home__projects-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+.gn-workspace-home__projects-actions > [data-slot]:empty { display: none; }
+/* Phone (case 22.148): the title takes its own line, and the controls share one row under it. */
+@media (max-width: 40rem) {
+  .gn-workspace-home__projects-heading { flex-direction: column; align-items: stretch; }
+}
 /* Round 21 (owner: "3 columns like for workspaces"): a FIXED three-track grid
    with `.gn-workspace-list`'s own two breakpoints, replacing Round 20's
    `repeat(auto-fit, minmax(17.5rem, 1fr))`.
@@ -1336,42 +1350,30 @@ input, textarea, select { font-family: inherit; }
   overflow-wrap: anywhere;
 }
 .gn-project-card__chips { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.25rem; }
-/* `position: relative` + `z-index` lift this strip above the door's stretched
-   `::after` — without it the transparent overlay would cover Archive/Restore
-   and eat the click. `margin-top: auto` pins it to the card's bottom now that
-   every card in a row is the tallest one's height (Round 22): equal-height
-   cards with buttons floating at different heights is the complaint the height
-   change would otherwise have traded for, so the two belong together.
-
-   SHRINK-TO-FIT, and the lift above is exactly why it has to be. This strip is
-   a flex item of the COLUMN `.gn-project-card`, whose default
-   `align-items: stretch` widens every child to the card's inner width — and a
-   stretched strip has its WHOLE box raised above the door, so every pixel of
-   it that is not the button is a dead zone: the pointer there hits the strip,
-   not the door's overlay, and the card neither lights nor navigates. Owner,
-   2026-09-22, from one screenshot of this page: the container measured
-   362.66 x 44 against a ~186-wide Archive button, *"it has this wide empty
-   space there, which gets in the way of clicking the card. Make the container
-   size be the same as the button size."* `align-self` names the mechanism —
-   the parent's `stretch` — rather than fighting it with a width, so the strip
-   is now exactly its content (the one button, or several plus the `gap`) at
-   the card's left edge, still pinned to the bottom, and `flex-wrap` still
-   wraps if that content ever exceeds the card width. 13.1297 holds both
-   halves: the shrink, and that this lift survived it. */
-.gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; position: relative; z-index: 1; margin-top: auto; align-self: flex-start; }
-/* Archive/Restore lights up UNDER THE POINTER, and the card body does not
-   (Round 21, owner: "on hover over the archive button, light up the button and
-   the card body stays normal").
-
-   The button's own cue is now the ghost `Button`'s hover fill (Plan A Task 3),
-   so this strip carries no hover rule of its own: Round 21's brightness filter
-   on `.gn-project-card__actions .gn-button` is DELETED (Styling refresh Plan B,
-   Task B13), one hover vocabulary instead of a second one for this button.
-
-   The second half needed no change and is worth stating so nobody "fixes" it:
-   the card's own hover is `.gn-card:has(> .gn-project-card__door:hover)`, whose
-   `>` combinator matches only the DOOR as a direct child, so hovering this
-   button is inert on the card. */
+/* The card's acts live in an overflow menu now (WS-03, case 22.147), the SAME menu the workspace
+   card carries: absolutely placed in the corner at `z-index: 2`, which lifts it above the door's stretched
+   `::after` exactly as the retired actions strip was lifted, so the menu stays clickable while everything
+   else on the card navigates. The head leaves room for it, so a long name never runs under the trigger. */
+.gn-project-card:has(> .gn-project-card__menu) .gn-project-card__head { padding-right: 2.5rem; }
+/* The chevron says "this card opens the project" without a second control: decorative, muted until the
+   card is hovered or focused, and nudged right by the same lift the card's shadow already moves. */
+.gn-project-card__chevron { flex: none; color: var(--gn-text-muted); }
+.gn-project-card__door:hover .gn-project-card__chevron,
+.gn-project-card__door:focus-visible .gn-project-card__chevron { color: var(--gn-text); }
+/* Grouped view (prefixes and groups Task 7, cases 22.140/22.141): each group is a section headed by its
+   name and a level strip, and a child group nests inside its parent. The strip's colour is the LEVEL's
+   (ruling R5, `--gn-level-N`), never the group's own; the strip is also named, so colour is never the only
+   signal. The ungrouped section has no strip: it is not a level. */
+.gn-grouped-projects { display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-group-section { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+.gn-group-section .gn-group-section { margin-left: 1rem; }
+.gn-group-section__head { display: flex; align-items: center; gap: 0.625rem; }
+.gn-group-section__name { margin: 0; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
+.gn-group-section__strip { flex: none; align-self: stretch; width: 0.375rem; min-height: 1.5rem; border-radius: 999px; }
+.gn-group-section__strip[data-level="1"] { background: var(--gn-level-1); }
+.gn-group-section__strip[data-level="2"] { background: var(--gn-level-2); }
+.gn-group-section__strip[data-level="3"] { background: var(--gn-level-3); }
+.gn-group-section__strip[data-level="4"] { background: var(--gn-level-4); }
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
