@@ -743,7 +743,7 @@ function NoteDocumentBody({
         ref={editorRoot}
         data-testid="note-editor"
         onClick={(event) => {
-          if (event.target !== event.currentTarget || !editing) return;
+          if (event.target !== event.currentTarget) return;
           editorInstanceRef.current?.commands.focus('end');
         }}
       >
