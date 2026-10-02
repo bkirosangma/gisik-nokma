@@ -774,6 +774,10 @@ export const TOKEN_ROLES = [
    * the dedicated ring colour (`neoFieldRimOnWellLight` / `neoFieldRimDark`, ≥ 3:1 on `surface`, `surfaceRaised`,
    * `surfaceSunken` and `surfaceWell`). Under `hig` and `minimal` it is the field's EXISTING edge (`border`), so
    * the role is defined in every style and a field rule can read it without a style test. Never text.
+   *
+   * **AMENDED 2026-10-02 (neo refresh N10, case 24.040): the neo field ring is retired.** No `ui.css` or `globals.css` rule reads
+   * `--gn-field-rim` now (only comments name it); the neo field's boundary is the `field` shadow's line layer. The role stays
+   * mapped in every style (hig/minimal = `border`) and the `CONTRAST_PAIRS` rows keep its colours honest.
    */
   'fieldRim',
   'text',
