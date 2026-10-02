@@ -107,7 +107,11 @@ describe('20.075 the fields sit in a well', () => {
     const inner = 'calc(var(--gn-radius-card) - 0.5rem)';
     expect(valueOf(ruleExactly(CSS, '.gn-ticket-sheet__field--tinted dt'), 'border-radius')).toBe(`${inner} 0 0 ${inner}`);
     expect(valueOf(ruleExactly(CSS, '.gn-ticket-sheet__field--tinted dd'), 'border-radius')).toBe(`0 ${inner} ${inner} 0`);
-    expect(styleForks(['.gn-ticket-sheet__fields', '.gn-ticket-sheet__field--tinted'])).toEqual([]);
+    // AMENDED 2026-10-02 (neo refresh T1, planner ruling FIX 1 item 5 / 24.010): the ONE neo-only fork is the tinted label's
+    // colour arm (textSubtle is 4.469 on its ground in neo-light); any other fork on these selectors is still refused.
+    expect(styleForks(['.gn-ticket-sheet__fields', '.gn-ticket-sheet__field--tinted'])).toEqual([
+      '[data-style="neo"] .gn-ticket-sheet__field--tinted dt',
+    ]);
     // CONTROL — the stripe itself (16.116) is still painted.
     expect(valueOf(ruleExactly(CSS, '.gn-ticket-sheet__field--tinted dt'), 'background')).toBe('var(--gn-fill-quaternary)');
     expect(valueOf(ruleExactly(CSS, '.gn-ticket-sheet__field--tinted dd'), 'background')).toBe('var(--gn-fill-quaternary)');
