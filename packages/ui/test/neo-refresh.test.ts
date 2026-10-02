@@ -235,8 +235,10 @@ describe('24.009 the consumer door: every selector the plan switches renders in 
 
 describe('24.010 the tinted ticket-sheet label stays legible in neo (FIX 1 item 5, planner ruling 2026-10-02)', () => {
   it('24.010 textMuted clears 4.5 on the tinted label ground and the neo arm reads it; textSubtle does not (the control)', () => {
-    const ground = over(colorOf('light', 'fillQuaternary', 'neo'), colorOf('light', 'surfaceTrack', 'neo'));
+    const ground = over(colorOf('light', 'fillQuaternary', 'neo'), colorOf('light', 'surfaceWell', 'neo'));
     expect(contrastRatio(colorOf('light', 'textMuted', 'neo'), ground)).toBeGreaterThanOrEqual(4.5);
+    // the dark row: the arm applies in both themes, so textMuted must clear on the dark well too
+    expect(contrastRatio(colorOf('dark', 'textMuted', 'neo'), over(colorOf('dark', 'fillQuaternary', 'neo'), colorOf('dark', 'surfaceWell', 'neo')))).toBeGreaterThanOrEqual(4.5);
     expect(valueOf(ruleExactly(readUiCss(), '[data-style="neo"] .gn-ticket-sheet__field--tinted dt'), 'color')).toBe('var(--gn-text-muted)');
     // CONTROL: the base rule's `textSubtle` is 4.469 on that composite — the defect the arm fixes.
     expect(contrastRatio(colorOf('light', 'textSubtle', 'neo'), ground)).toBeLessThan(4.5);

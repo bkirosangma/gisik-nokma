@@ -1682,8 +1682,9 @@ describe('Step 2c-1 (2026-09-18) — the refreshed export token layer', () => {
  * **The chip's fill is a depth problem, and the measurement is what says so.**
  * The prototype fills a state chip with `--trayBg` (`desktop.dc.html:3184`),
  * which is `--gn-surface-sunken` on this product's role layer — and under `neo`
- * `surface`, `surfaceRaised` and `surfaceSunken` are the SAME hex (in LIGHT; neo dark's raised
- * stepped to `#232c50` with UX T1, 2026-10-02, see the dark half below), so a chip on a
+ * `surface`, `surfaceRaised` and `surfaceSunken` were the SAME hex (in LIGHT; neo dark's raised
+ * stepped to `#232c50` with UX T1, 2026-10-02, see the dark half below). **AMENDED 2026-10-02 (neo refresh 24.007): neo-light `surfaceSunken`
+ * is now the well (`neoWellLight`), no longer the same hex as `surface`/`surfaceRaised`, and neo-dark `surfaceRaised` is `#1b2340` again.**, so a chip on a
  * `.gn-card` composites to exactly the card's own colour and its fill draws no
  * boundary at all. **That is asserted here as a fact about the palette**
  * (1.0000, both themes, exactly as case 13.732 asserts it for the avatar), which
@@ -1763,7 +1764,7 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
     // rule rather than to keep a shadow that had stopped being needed.
     //
     // Amended UX T1 (owner U8, 2026-10-02; 23.006): neo/dark's raised surface stepped to `#232c50`, so in DARK the chip
-    // (`surfaceSunken`, still `neoNavy`) no longer composites to exactly the card. It is a 1.14 step, though, well under
+    // (`surfaceSunken`, which was `neoNavy` then and is `neoWellDark` since neo refresh 24.007, 2026-10-02) no longer composites to exactly the card. It is a 1.14 step, though, well under
     // the 3:1 a boundary owes, so the shadow is still the chip's boundary and the premise holds in the weaker form
     // asserted for dark below: still no boundary by fill alone.
     const lightCard = colorOf('light', 'surfaceRaised', 'neo');
@@ -1832,8 +1833,8 @@ describe('13.920 — a workflow state chip keeps a boundary under neo, and its c
  * `.gn-card`'s `--gn-surface-raised`. The first draft of this case measured
  * against `surfaceSunken`, the fill the stripe replaces, and two of its four
  * pinned readings therefore described a layer that is not on screen. Under `neo`
- * LIGHT the two roles are the same hex (`neoPaper`), which is why the error hid there
- * and only showed under `hig` (neo dark's raised stepped to `#232c50` with UX T1). 13.920 composites its chip over `surfaceRaised`
+ * LIGHT the two roles were the same hex (`neoPaper`) — until neo refresh 24.007 (2026-10-02) made `surfaceSunken` the well — which is why the error hid there
+ * and only showed under `hig` (neo dark's raised stepped to `#232c50` with UX T1, and returned to `#1b2340` with neo refresh N4). 13.920 composites its chip over `surfaceRaised`
  * for the same reason.
  *
  * Amended 2026-09-29 by 20.351 (styling refresh Plan B): the row is now a raised

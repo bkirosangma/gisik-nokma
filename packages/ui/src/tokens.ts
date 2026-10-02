@@ -228,10 +228,11 @@ export const primitives = {
    * window was never empty for the colours the product ships; it was empty for a colour it had already dropped.
    *
    * **Measured on `#232c50` (the `CONTRAST_PAIRS` rows and 23.006):** `accent` 5.62, `textAccent` ≥ 4.5,
-   * `textSubtle` 5.40 (`neoTextSubtleDark`), `text` and `textMuted` higher. `neoNavySunken` stays `neoNavy`: fields keep their ground and
-   * are recessed by their shadow alone.
+   * `textSubtle` 5.40 (`neoTextSubtleDark`), `text` and `textMuted` higher. `neoNavySunken` stayed `neoNavy` then: fields kept their ground and
+   * were recessed by their shadow alone. **AMENDED 2026-10-02 (neo refresh N2; 24.007): neo-dark `surfaceSunken` is now the well (`neoWellDark`).**
    */
   neoNavyRaised: '#232c50',
+  /** RETIRED 2026-10-02 (neo refresh N2; 24.007) — mapped by no role (neo-dark `surfaceSunken` is `neoWellDark`); kept for the record. */
   neoNavySunken: '#1b2340',
   /**
    * `neo` DARK `textSubtle` (UX fixes T1, found by 18.306 on the first run): `textSubtleDark` `#a0a0a5` reads 5.21 on
@@ -241,12 +242,6 @@ export const primitives = {
    * and `minimal` dark keep `#a0a0a5` (their floor is 3 and they did not move). Mapped for `neo`/dark only.
    */
   neoTextSubtleDark: '#a3a3a8',
-  /**
-   * `neo` LIGHT `textSubtle` (neo refresh T1, 2026-10-02; found by 18.306 on the first run after N2): the field ground is now the
-   * well (`neoWellLight` `#e6dcd2`) and a placeholder is composited through `fillQuaternary` on it (`#e0d5ca`), where the shared
-   * `textSubtleLight` `#5e5e62` read 4.47 — under the neo floor of 4.5. `#5b5b5f` reads 4.68 there and 5.67 on paper. Same
-   * precedent as `neoTextSubtleDark`. `hig`/`minimal` keep `textSubtleLight`.
-   */
   /**
    * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
    *
@@ -1411,7 +1406,7 @@ const NO_REFRESH_SHADOWS: Record<RefreshShadowRole, readonly ShadowLayer[]> = {
   drop: [], 'drop-side': [],
 };
 
-/** The scrim drops `.gn-dialog`-class panels and the sheet already painted as a literal `var(--gn-shadow)` (hig and minimal), now named roles. Neo reads its own pair instead. */
+/** The two scrim drops hig and minimal already painted as literals — `.workflow-rebind-dialog` (`0 8px 24px var(--gn-shadow)`) and `.gn-filters__panel` (`-0.75rem 0 2.5rem var(--gn-shadow)`) — now named roles. Neo reads its own pair instead. */
 const DROP: Record<ThemeName, readonly ShadowLayer[]> = {
   light: [{ x: 0, y: 8, blur: 24, colour: 'scrimLight' }],
   dark: [{ x: 0, y: 8, blur: 24, colour: 'scrimDark' }],

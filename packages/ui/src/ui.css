@@ -3208,7 +3208,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__field dt { color: var(--gn-text-subtle); font-size: 0.8125rem; padding: 0.75rem 0 0.75rem 0.75rem; display: flex; align-items: flex-start; }
 .gn-ticket-sheet__field dd { margin: 0; padding: 0.75rem 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end; text-align: right; min-width: 0; }
 .gn-ticket-sheet__field--tinted dt { background: var(--gn-fill-quaternary); border-radius: calc(var(--gn-radius-card) - 0.5rem) 0 0 calc(var(--gn-radius-card) - 0.5rem); }
-/* Neo refresh FIX 1 item 5 (2026-10-02, 24.010): the tinted label sits on fill-quaternary over the track well; textSubtle is 4.469 there in neo-light, so the neo arm reads textMuted. */
+/* Neo refresh FIX 1 item 5 (2026-10-02, 24.010): the tinted label sits on fill-quaternary over the well (`.gn-ticket-sheet__fields`); textSubtle is 4.469 there in neo-light, so the neo arm reads textMuted. */
 [data-style="neo"] .gn-ticket-sheet__field--tinted dt { color: var(--gn-text-muted); }
 .gn-ticket-sheet__field--tinted dd { background: var(--gn-fill-quaternary); border-radius: 0 calc(var(--gn-radius-card) - 0.5rem) calc(var(--gn-radius-card) - 0.5rem) 0; }
 /* The shared eyebrow the sheet's section headings wear (spec 2026-09-22 decision
