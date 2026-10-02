@@ -16,7 +16,7 @@ export {
   type HelpGroup,
   type HelpNavGroup,
 } from './groups.js';
-export { HelpBrowser } from './help-browser.js';
+export { HELP_PHONE_QUERY, HelpBrowser } from './help-browser.js';
 export {
   blockSpans,
   entryText,
