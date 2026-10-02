@@ -892,6 +892,18 @@ export const TOKEN_ROLES = [
    * that wants them apart moves this line, not every call site.
    */
   'customMarker',
+  /**
+   * The four group-level colours (prefixes and groups Task 7, ruling R5: ONE colour per level, the same
+   * for every group at that level). They paint the strip on a group's section heading on the workspace
+   * home, so the depth of a group reads without the words. Each is a decorative-but-meaningful mark, held
+   * to the non-text 3:1 on `surfaceRaised` by the pairs below; the four differ in every style and theme
+   * (`level-colours.test.ts`, case 22.143), because a shared colour would make the strip say nothing.
+   * Level 1 is the outermost group, level 4 the innermost.
+   */
+  'level1',
+  'level2',
+  'level3',
+  'level4',
 ] as const;
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
@@ -943,6 +955,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet600',
     contested: 'magenta600',
     customMarker: 'violet600',
+    level1: 'blue600',
+    level2: 'violet600',
+    level3: 'magenta600',
+    level4: 'amber700',
   },
   dark: {
     surface: 'navyBase',
@@ -984,6 +1000,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet300',
     contested: 'magenta300',
     customMarker: 'violet300',
+    level1: 'blue300',
+    level2: 'violet300',
+    level3: 'magenta300',
+    level4: 'amber300',
   },
 };
 
@@ -1733,6 +1753,11 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'pending', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'restricted', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'contested', bg: 'surfaceRaised', minimum: 3 },
+  /** Group-level strips (prefixes and groups Task 7, case 22.143): non-text marks on the project card's surface. */
+  { fg: 'level1', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'level2', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'level3', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'level4', bg: 'surfaceRaised', minimum: 3 },
   /**
    * Added with the border sweep, and ONLY with it — `docs/hig-adoption-brief.md`
    * §7: *"Whichever wins, a `border`-on-`surface` pair should be ADDED to
@@ -1816,9 +1841,9 @@ export function colorOf(theme: ThemeName, role: TokenRole, style: StyleName = 'h
   return primitives[override ?? themes[theme][role]];
 }
 
-/** `surfaceRaised` → `--gn-surface-raised`. */
+/** `surfaceRaised` → `--gn-surface-raised`; `level1` → `--gn-level-1`. */
 export function cssVariableName(role: TokenRole): string {
-  return `--gn-${role.replace(/[A-Z]/g, (upper) => `-${upper.toLowerCase()}`)}`;
+  return `--gn-${role.replace(/[A-Z]|\d+/g, (part) => `-${part.toLowerCase()}`)}`;
 }
 
 const RADIUS_ROLES: readonly RadiusRole[] = ['card', 'control', 'track'];

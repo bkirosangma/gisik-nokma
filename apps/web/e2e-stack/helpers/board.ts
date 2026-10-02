@@ -106,7 +106,7 @@ function projectLinks(page: Page, workspaceId: string) {
  * 2. **`.first()` re-introduces the positional pick.** A loose match plus `.first()` is exactly
  *    "whichever the database put first", with a name-shaped alibi.
  *
- * The door carries `aria-label={project.name}` (`app/w/[workspaceId]/page.tsx`), so an EXACT
+ * The door carries `aria-label="Open <project name>"` (`app/w/[workspaceId]/page.tsx`, WS-03), so an EXACT
  * accessible-name match is available and is the identity, not a filter over it. `toHaveCount(1)`
  * makes ambiguity a loud red instead of a silent pick.
  *
@@ -115,7 +115,7 @@ function projectLinks(page: Page, workspaceId: string) {
  */
 export async function seededProjectHref(page: Page, workspaceId: string): Promise<string> {
   await page.goto(`/w/${workspaceId}`, { waitUntil: 'networkidle' });
-  const link = page.getByRole('link', { name: SEEDED_PROJECT_NAME, exact: true });
+  const link = page.getByRole('link', { name: `Open ${SEEDED_PROJECT_NAME}`, exact: true });
   try {
     await expect(link).toHaveCount(1, { timeout: 15_000 });
   } catch {
@@ -158,7 +158,7 @@ export async function openSeededBoard(
   await page.locator(`a[href^="/w/${workspaceId}"]`).first().click();
   await page.waitForURL(new RegExp(`/w/${workspaceId}(/|\\?|$)`), { timeout: 15_000 });
 
-  const link = page.getByRole('link', { name: SEEDED_PROJECT_NAME, exact: true });
+  const link = page.getByRole('link', { name: `Open ${SEEDED_PROJECT_NAME}`, exact: true });
   try {
     await expect(link).toHaveCount(1, { timeout: 15_000 });
   } catch {

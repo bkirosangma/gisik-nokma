@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactElement, type RefObject } from 'react';
 
 export type OverflowItem = { label: string; onSelect: () => void };
 
@@ -14,7 +14,9 @@ export type OverflowItem = { label: string; onSelect: () => void };
  * and a pointer-down outside closing it. Each item closes the menu, returns focus, then runs.
  *
  * `className` adds a modifier to the wrapper: the card menu is absolutely placed in its card's
- * corner; the byline's sits in a flex row (`.gn-card-menu--inline`).
+ * corner; the byline's sits in a flex row (`.gn-card-menu--inline`). `triggerRef`, when given, is
+ * pointed at the trigger button, so a caller whose item opens something in place (the project card's
+ * Edit form) can send focus back to it when that closes.
  */
 export function OverflowMenu({
   triggerLabel,
@@ -22,12 +24,14 @@ export function OverflowMenu({
   items,
   disabled = false,
   className,
+  triggerRef: outerTriggerRef,
 }: {
   triggerLabel: string;
   menuLabel: string;
   items: readonly OverflowItem[];
   disabled?: boolean;
   className?: string;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }): ReactElement {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -79,7 +83,10 @@ export function OverflowMenu({
   return (
     <div className={className === undefined ? 'gn-card-menu' : `gn-card-menu ${className}`}>
       <button
-        ref={triggerRef}
+        ref={(node) => {
+          triggerRef.current = node;
+          if (outerTriggerRef !== undefined) (outerTriggerRef as { current: HTMLButtonElement | null }).current = node;
+        }}
         type="button"
         className="gn-card-menu__trigger"
         aria-haspopup="menu"

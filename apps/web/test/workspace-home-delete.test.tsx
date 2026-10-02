@@ -69,6 +69,12 @@ function mount(reads: WorkspaceRef[][]) {
 
 const row = (projectId: string) => screen.getByTestId(`project-row-${projectId}`);
 
+/** The card's acts are an overflow menu (WS-03, 22.147): open it, then press one item. */
+async function pickProjectAct(projectId: string, projectName: string, item: string): Promise<void> {
+  await userEvent.click(within(row(projectId)).getByRole('button', { name: `More actions for ${projectName}` }));
+  await userEvent.click(within(row(projectId)).getByRole('menuitem', { name: item }));
+}
+
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -78,12 +84,15 @@ describe('19.241–19.243 project Delete… on the workspace home', () => {
   it('19.241 an admin sees Delete… beside Archive; CONTROL: a member sees neither', async () => {
     mount([[workspaceAs('admin')]]);
     const card = await screen.findByTestId('project-row-p1');
-    expect(within(card).getByRole('button', { name: 'Archive Shop operations' })).toBeInTheDocument();
-    expect(within(card).getByRole('button', { name: deleteItemName('Shop operations') })).toHaveTextContent(DELETE_TRIGGER_LABEL);
+    // WS-03 (22.147): Archive and Delete… are menu items now, one open menu away.
+    await userEvent.click(within(card).getByRole('button', { name: 'More actions for Shop operations' }));
+    expect(within(card).getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument();
+    expect(within(card).getByRole('menuitem', { name: DELETE_TRIGGER_LABEL })).toBeInTheDocument();
     cleanup();
 
     mount([[workspaceAs('member')]]);
     const memberCard = await screen.findByTestId('project-row-p1');
+    expect(within(memberCard).queryByRole('button', { name: /More actions/ })).toBeNull();
     expect(within(memberCard).queryByRole('button', { name: deleteItemName('Shop operations') })).toBeNull();
     expect(within(memberCard).queryByRole('button', { name: 'Archive Shop operations' })).toBeNull();
   });
@@ -93,13 +102,14 @@ describe('19.241–19.243 project Delete… on the workspace home', () => {
       [workspaceAs('admin')],
       [workspaceAs('admin', { projects: [workspaceAs('admin').projects[1]!] })],
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: deleteItemName('Shop operations') }));
+    await screen.findByTestId('project-row-p1');
+    await pickProjectAct('p1', 'Shop operations', DELETE_TRIGGER_LABEL);
     let dialog = await screen.findByRole('alertdialog', { name: 'Delete project “Shop operations”?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(sent).toHaveLength(0);
     expect(row('p1')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: deleteItemName('Shop operations') }));
+    await pickProjectAct('p1', 'Shop operations', DELETE_TRIGGER_LABEL);
     dialog = await screen.findByRole('alertdialog', { name: 'Delete project “Shop operations”?' });
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Delete permanently' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
@@ -118,7 +128,8 @@ describe('19.241–19.243 project Delete… on the workspace home', () => {
       await screen.findByRole('button', { name: 'Show archived projects in Convenience Corner' }),
     );
     const archived = row('p3');
-    expect(within(archived).getByRole('button', { name: deleteItemName('Old signage') })).toBeInTheDocument();
-    expect(within(archived).getByRole('button', { name: 'Restore Old signage' })).toBeInTheDocument();
+    await userEvent.click(within(archived).getByRole('button', { name: 'More actions for Old signage' }));
+    expect(within(archived).getByRole('menuitem', { name: DELETE_TRIGGER_LABEL })).toBeInTheDocument();
+    expect(within(archived).getByRole('menuitem', { name: 'Restore' })).toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+import type { GroupRow } from '@gisik-nokma/domain';
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
@@ -2897,6 +2898,33 @@ export function mapNoteVersionBody(raw: unknown): unknown {
 }
 
 export { mapDeletedItems };
+
+/**
+ * `GET /v1/workspaces/:id/groups` → `GroupRow[]` (prefixes and groups Task 7). Every key is REQUIRED, and
+ * `parentId` is required-but-nullable (`asStringOrNull`): `null` is a top-level group, a missing key is a
+ * route that did not answer. A level outside 1–4 is refused rather than clamped, because the home nests
+ * its headings by it and a clamped level would put a group under the wrong heading without any error.
+ */
+export function mapGroupRows(raw: unknown): GroupRow[] {
+  const body = asRecord(raw, 'groups');
+  return asArray(body['groups'], 'groups.groups').map((entry, index) => {
+    const path = `groups.groups[${index}]`;
+    const row = asRecord(entry, path);
+    const level = asNumber(row['level'], `${path}.level`);
+    if (level !== 1 && level !== 2 && level !== 3 && level !== 4) {
+      throw new MappingError(`${path}.level`, 'a group level, 1 to 4');
+    }
+    return {
+      id: asString(row['id'], `${path}.id`),
+      parentId: asStringOrNull(row, 'parentId', `${path}.parentId`),
+      level,
+      name: asString(row['name'], `${path}.name`),
+      rank: asString(row['rank'], `${path}.rank`),
+      projectCount: asNumber(row['projectCount'], `${path}.projectCount`),
+      childCount: asNumber(row['childCount'], `${path}.childCount`),
+    };
+  });
+}
 
 /** `POST /v1/purged-lookup`'s body (trash Plan 3). A row that is not a lifecycle ref is a `MappingError`, never skipped. */
 export function mapPurgedLookup(raw: unknown): PurgedRef[] {
