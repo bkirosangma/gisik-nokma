@@ -13,6 +13,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
 import { AppNav } from '../../../../src/app-nav.js';
+import { ListPageShell } from '../../../../src/skeletons/page-shells.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useSessionStatus } from '../../../../src/providers.js';
 import { peopleProps } from '../../../../src/people-props.js';
@@ -87,7 +88,7 @@ import {
  */
 export default function MyWorkPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
+    <Suspense fallback={<ListPageShell title="My work" rows={5} />}>
       <MyWorkBoard />
     </Suspense>
   );

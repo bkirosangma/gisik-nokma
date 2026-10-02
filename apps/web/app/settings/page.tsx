@@ -14,6 +14,7 @@ import { HttpError } from '@gisik-nokma/app-core/online';
 import type { GroupRow } from '@gisik-nokma/domain';
 import { useScrollEdges } from '@gisik-nokma/ui';
 import { AppNav } from '../../src/app-nav.js';
+import { ListPageShell } from '../../src/skeletons/page-shells.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
 import { useAppServices } from '../../src/providers.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
@@ -161,7 +162,7 @@ function typeEditHref(workspaceId: string, typeId: string): string {
 export default function SettingsPage() {
   return (
     <>
-      <Suspense fallback={<main className="gn-shell" />}>
+      <Suspense fallback={<ListPageShell title="Settings" rows={4} />}>
         <SettingsContent />
       </Suspense>
     </>
