@@ -8,12 +8,12 @@ import { describe, expect, it } from 'vitest';
  *
  * The controller's browser pass measured `scrollWidth` 321 at 320 px in neo (light and dark), the right edge of
  * `BUTTON.gn-segmented__item` at 321, and read it as a neo-only rule. It is not: there is none. The Style control is three
- * labels — *Apple HIG*, *Minimal*, *Neomorphic* — and the SELECTED item is weight 600, so with neo selected the longest
+ * labels — *Apple HIG*, *Minimal*, *Neumorphic* — and the SELECTED item is weight 600, so with neo selected the longest
  * label is bold and ~2 px wider. The real cause is wider than that: the card's content is 256 px at 320 (12 px shell padding
  * + 20 px card padding each side), the track keeps 4 px of its own, and the three items' `padding: 0 1rem` (ui.css) plus
  * their min-content labels need ~284 px, so the track already spilled ~36 px out of its card in EVERY style; hig and minimal
  * merely ended on the viewport's edge (320) and neo's bold label tipped it one pixel past. Measured on the real stylesheets
- * in headless Chromium at 320: before, right edge 320.9 / scrollWidth 321 (neo, Neomorphic selected); after, the track
+ * in headless Chromium at 320: before, right edge 320.9 / scrollWidth 321 (neo, the bold label then spelled "Neomorphic"); after, the track
  * ends inside its card (right edge 284 - no spill) in every selection.
  *
  * The fix is at the cause: the Appearance items lose half their side padding below 23rem (where the card starts to be

@@ -39,14 +39,14 @@
 
 ## 24.4 Depth on ghost and icon buttons (T4)
 
-- ❌ **24.060 — ghost buttons keep their border and gain the quiet depth, through the base rule only (N3, 13.340).**
-- ❌ **24.061 — icon buttons (the sheet close, the row actions) take the same quiet depth (N3).**
-- ❌ **24.065 — reduced motion removes the transition, never the shadow (Review Focus 5).**
+- ✅ **24.060 — ghost buttons keep their border and gain the quiet depth, through the base rule only (N3, 13.340).**
+- ✅ **24.061 — icon buttons (the sheet close, the row actions) take the same quiet depth (N3).**
+- ✅ **24.065 — reduced motion removes the transition, never the shadow (Review Focus 5).**
 
 ## 24.5 Switch and checkbox neo arms (T5)
 
-- ❌ **24.070 — the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2).**
-- ❌ **24.071 — the neo column checkbox: a recessed box when off, a flat accent when on (N6).**
+- ✅ **24.070 — the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2).**
+- ✅ **24.071 — the neo column checkbox: a recessed box when off, a flat accent when on (N6).**
 
 ## 24.6 Halo clearance (T6)
 

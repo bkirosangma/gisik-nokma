@@ -981,8 +981,16 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   color: var(--gn-text-muted);
   cursor: pointer;
-  transition: background-color var(--gn-motion-feedback) ease-out;
+  box-shadow: var(--gn-shadow-quiet);
+  transition:
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out),
+    background-color var(--gn-motion-feedback) ease-out;
 }
+/* Neo refresh N3 (24.061): the dialog's close is the same icon button as the sheet's and takes the same quiet depth (none in hig and
+   minimal) — the `box-shadow` and `transition` in the rule above, pressed here. The comment sits OUTSIDE that body on purpose: 13.1148
+   compares the raw body `rule('.gn-sheet__close')` reads with the comment-stripped one. */
+.gn-dialog__close:active:not(:disabled),
+.gn-sheet__close:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 /* Styling refresh (Plan A Task 7): the overlay dismiss control is a GHOST icon (pattern P-GHOST; the mockup's header icons, `Sheet.dc.html:30-35`): transparent at rest, a soft fill and the focus ring when pointed at or focused. */
 .gn-dialog__close:hover,
 .gn-dialog__close:focus-visible,
@@ -1861,8 +1869,11 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__priority--p2 { color: var(--gn-text-muted); }
 .gn-board-card__priority--p3 { color: var(--gn-text-subtle); }
 /* The card's FOOTER: the provenance line left, the arrows (and Close) right, ONE row (D14; UX fixes T7, case 23.122,
-   audit BRD-02). It never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance` below),
-   and a pressed line wraps inside its own button. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
+   audit BRD-02). Up to 1024px it never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance`
+   below), and a pressed line wraps inside its own button. ABOVE 1024px it is TWO rows (neo follow-up F-1, 2026-10-02,
+   cases 23.320–23.322, audit BRD-02/BRD-03): the arrows, "Move to…" and Close need up to 246px of a 256px footer, so
+   beside a truncating line they wrapped into two rows around it; the arm after `.gn-board-card__notice` below gives
+   the line its own full-width row and the controls theirs. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
    card's 8px gap makes the 16 between groups; the negative sides and bottom let the 44px targets reach 8px into
    the card's 16px padding, so the card does not grow (the mockup, `Main.dc.html:109`). */
 .gn-board-card__footer {
@@ -1883,7 +1894,8 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   font: inherit;
   font-size: 0.75rem;
-  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). */
+  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). Above 1024px the line wraps instead
+     of truncating (F-1, 23.320). */
   line-height: 2.75rem;
   white-space: nowrap;
   overflow: hidden;
@@ -2031,7 +2043,7 @@ a.gn-ticket-sheet__crumb--link {
   outline-offset: 1px;
 }
 .gn-row-action:disabled,
-.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
+.gn-list__bulk-close:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; box-shadow: none; }
 /* Styling refresh Plan B (Task B6): P-GHOST — a control inside a table row is a text control with no edge; hover or focus washes it. */
 .gn-row-action {
   display: inline-flex;
@@ -2047,13 +2059,26 @@ a.gn-ticket-sheet__crumb--link {
   font-size: 0.9375rem; /* 15px */
   font-weight: 600;
   cursor: pointer;
+  /* Neo refresh N3 (24.061): the quiet depth (none in hig and minimal), pressed on :active. */
+  box-shadow: var(--gn-shadow-quiet);
+  transition:
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out),
+    background-color var(--gn-motion-feedback) ease-out;
 }
 .gn-row-action:hover:not(:disabled),
 .gn-row-action:focus-visible {
   background: var(--gn-fill-tertiary);
   color: var(--gn-text-muted);
 }
+.gn-row-action:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 .gn-row-action:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+/* Neo refresh 24.065: no transition for a reduced-motion user, the shadow swap itself still happens (instantly). This arm sits AFTER
+   the close group's and `.gn-row-action`'s base rules: all three are (0,1,0), so an arm written beside `.gn-button`'s would lose to them. */
+@media (prefers-reduced-motion: reduce) {
+  .gn-dialog__close,
+  .gn-sheet__close,
+  .gn-row-action { transition: none; }
+}
 /* Styling refresh Plan B (Task B6): P-QUIET — the bulk close is a standalone toolbar control: an outlined pill, a soft wash on hover. */
 .gn-list__bulk-close {
   display: inline-flex;
@@ -2164,6 +2189,35 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__notice { display: contents; }
 /* A move refusal takes its own line under the arrows rather than squeezing beside them in the footer row. */
 .gn-board-card__notice > .gn-refusal { flex-basis: 100%; }
+/* The controls group (neo follow-up F-1, 2026-10-02, cases 23.320–23.322): ‹, ›, "Move to…" and Close are ONE item. Up to
+   1024px it is `display: contents`, so they are the flex items of `.gn-board-card__moves` exactly as before and the
+   phone and tablet footers are untouched. Above 1024px (the shell's desktop band, 23.042) the footer is two rows: the
+   provenance line full-width and READABLE on one line — it may wrap to a second rather than truncate, which is what
+   "Moved to To do by…" at 133px was (BRD-03) — and the controls one right-aligned row that never wraps (`flex: none`,
+   `flex-wrap: nowrap`; the pre-F-1 `flex-wrap: wrap` is what split them across two 44px rows). `.gn-board-card__moves`
+   keeps its own wrap so a refusal, which takes `flex-basis: 100%` above, still lands on a line of its own beneath the
+   controls. The disabled ‹ and › stay rendered (disabled, never absent) at the one disabled token's opacity. The
+   provenance's 44px floor is kept by the 12px padding either side of a 20px line. */
+.gn-board-card__controls { display: contents; }
+@media (min-width: 64.0625rem) {
+  .gn-board-card__footer { flex-wrap: wrap; }
+  .gn-board-card__provenance {
+    flex: 1 1 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.25rem;
+    padding-block: 0.75rem;
+  }
+  .gn-board-card__moves { flex: 1 1 100%; }
+  .gn-board-card__controls {
+    display: flex;
+    flex: none;
+    flex-wrap: nowrap;
+    align-items: center;
+    margin-left: auto;
+  }
+}
 .gn-list { display: flex; flex-direction: column; gap: 1.1rem; }
 /* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
    align-items:center;flex-wrap:wrap`. */
@@ -2408,7 +2462,7 @@ a.gn-ticket-sheet__crumb--link {
   padding: 0 0.75rem;
   border-radius: 999px;
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift);
+  box-shadow: var(--gn-shadow-raised-compact); /* Neo refresh N6 (24.071): a 44px control takes the compact pair; hig maps `raised-compact` to `lift`, so hig/minimal are unchanged. */
   color: var(--gn-text);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -2480,6 +2534,18 @@ a.gn-ticket-sheet__crumb--link {
 }
 .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box::after {
   color: var(--gn-text-inverted);
+}
+/* Neo refresh N6 (24.071): the box is a chip-sized recess when off; checked stays the flat accent (the tick is the cue). */
+[data-style="neo"] .gn-list__column-box {
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact);
+  border: 1px solid var(--gn-border);
+  box-sizing: border-box; /* the 1px stays inside the 18px box; the BASE rule is untouched, so hig/minimal keep 18px content-box */
+}
+[data-style="neo"] .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box {
+  background: var(--gn-accent);
+  box-shadow: none;
+  border-color: transparent;
 }
 /* "Group header row": `padding 11px 16px`; the prototype drew it as `trayBg + trayShadow`, the pair `.gn-timeline__weeks` uses
    (`--gn-surface-sunken`/`--gn-shadow-sunken`); UX fixes T6 (23.095) flattened it to a quaternary tint, so the heading
@@ -7308,8 +7374,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border: 1px solid var(--gn-border);
   color: var(--gn-text-muted);
   font-weight: 600;
+  /* Neo refresh N3 (2026-10-02, 24.060): depth on the quiet button, the border KEPT (D6). `quiet` renders none in hig and
+     minimal, so this base-rule line is how neo gets its pair without a [data-style] block (13.340). */
+  box-shadow: var(--gn-shadow-quiet);
 }
-.gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); }
+.gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); box-shadow: var(--gn-shadow-quiet-near); }
+.gn-button--ghost:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 
 /* ── The quiet danger button (UX fixes T2, U1/SYS-12, case 23.022): the ONE destructive treatment until the confirm
    dialog. A row's "Delete" / "Remove" is OUTLINED, not filled: a danger-coloured 1px edge and label on a transparent
@@ -8225,6 +8295,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-switch:disabled { cursor: not-allowed; }
 .gn-switch:disabled:not(:checked) { background: var(--gn-surface-sunken); }
 .gn-switch:disabled::after { border-color: var(--gn-border); }
+/* Neo refresh N6 (2026-10-02; 24.070): the switch gets a neo arm. The OFF track is a recess on the well colour, the knob is
+   raised on the compact pair and keeps its border-strong ring (the 2.95 debt recorded above is untouched); the ON track
+   stays the flat accent (FD2: a switch's on-state is its value), its knob carries one fall (`knob-on`, T2). Disabled is flat. */
+/* CASCADE (reviewer A, FIX 1): an unscoped `[data-style="neo"] .gn-switch` (0,2,0) would come AFTER `.gn-switch:checked`
+   (0,2,0) and paint the well over the accent. So the OFF arms are scoped `:not(:checked)` AND the ON arms restate the accent
+   and `knob-on` at (0,3,0)/(0,3,1), after them. The arms set no `transition`: at (0,3,0) they would out-cascade the
+   reduced-motion `.gn-switch { transition: none }` below; the base `background` transition still runs. */
+/* Reviewer A, N1: `[data-style="neo"] .gn-switch:not(:checked)` (0,3,0) comes after `.gn-switch:disabled:not(:checked)` (0,3,0),
+   so in neo a disabled OFF switch paints `surface-well`, not `surface-sunken`. The same colour after T1 (24.007: both are
+   `neoWell*`), so nothing differs; no rule change. */
+[data-style="neo"] .gn-switch:not(:checked) {
+  background: var(--gn-surface-well);
+  box-shadow: var(--gn-shadow-recess);
+}
+[data-style="neo"] .gn-switch:not(:checked)::after { box-shadow: var(--gn-shadow-raised-compact); }
+[data-style="neo"] .gn-switch:checked { background: var(--gn-accent); box-shadow: none; }
+[data-style="neo"] .gn-switch:checked::after { box-shadow: var(--gn-shadow-knob-on); }
+[data-style="neo"] .gn-switch:disabled,
+[data-style="neo"] .gn-switch:disabled::after { box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gn-switch,

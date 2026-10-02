@@ -226,6 +226,7 @@ describe('20.054 three groups 16 apart, lines 8 apart, the footer inside the pad
     expect(valueOf(footer, 'display')).toBe('flex');
     // Amended 2026-10-02 (UX fixes T7, 23.122, audit BRD-02): the footer is ONE row now (D14), so it no longer wraps —
     // the provenance line truncates instead. 23.122 pins the new value and its truncation.
+    // Amended 2026-10-02 (neo follow-up F-1, 23.320): that is the base rule, i.e. up to 1024px; above it an @media arm wraps the footer into two rows.
     expect(valueOf(footer, 'flex-wrap')).toBe('nowrap');
     // CONTROL — the epic and title are one group: the chip adds no margin.
     expect(valueOf(ruleExactly(CSS, '.gn-board-card__epic'), 'margin')).toBe('0');

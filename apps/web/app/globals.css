@@ -1086,7 +1086,7 @@ input, textarea, select { font-family: inherit; }
    button that should hug its label. */
 .gn-account__appearance { align-items: stretch; gap: 1rem; }
 
-/* At phone width the Style control's three labels (Apple HIG, Minimal, Neomorphic) need ~284px with the shared item's
+/* At phone width the Style control's three labels (Apple HIG, Minimal, Neumorphic) need ~284px with the shared item's
    `padding: 0 1rem`, and the card's content is 256px at 320 (12px shell + 20px card padding a side, less the track's own 4px),
    so the track spilled ~36px out of the card in EVERY style; it only read as a page scroll (scrollWidth 321) in neo, where
    the selected item is the longest label in weight 600. Half the side padding below 23rem (the card starts being narrower
