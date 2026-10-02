@@ -69,3 +69,10 @@
 - ✅ **24.113 — the primary focus ring sits 3px outside the accent edge (Review Focus 3).**
 - ✅ **24.114 — hig and minimal regression: the sign-in card, field, primary and ghost render the pre-refresh shadows (spec §6–7). The field keeps a visible border colour and no neo `LINE` layer (hig: its two track insets; minimal: none), and the primary at rest is hig's three `btnShadow` layers (minimal: none) with no neo press blue — each read paired, in the same test, with the neo read it contrasts with (24.110).**
 - ✅ **24.115 — neo-light and neo-dark: the switch cascade — off paints the well recess and a raised-compact knob, on paints the accent with `knob-on` and no track shadow (FIX 1 item 4).**
+
+## 24.9 Retiring the dead fieldRim role (HK-4)
+
+- ✅ **24.120 — the `fieldRim` role, `--gn-field-rim` and the `neoFieldRim*` primitives are gone; the neighbouring roles are still emitted (HK-4, 2026-10-02).** Control, same `it`: `surfaceWell`, `--gn-surface-well:` and `--gn-border:` remain. Mutation: re-add `fieldRim` to `TOKEN_ROLES` → red.
+- ✅ **24.121 — no `CONTRAST_PAIRS` row names `fieldRim`; the roster is 52 (56 minus four).** Control: the `border`/`surfaceWell` (3:1) and `textAccent`/`surfaceTrack` (4.5:1) rows stay. Mutation: restore one `fieldRim` row → red.
+- ✅ **24.122 — neither `ui.css` nor `globals.css` contains `field-rim`, not even in a comment.** Control: the sources still carry `var(--gn-border)` and `.gn-field__input`. Mutation: a `--gn-field-rim` mention in `ui.css` → red.
+- ✅ **24.123 — zero drift: `border` under `hig` and `minimal` is `#6c6c70` (light) and `#98989d` (dark), what `fieldRim` mapped to; neo `border` is the same hex.** Control: the two themes differ. Mutation: change the hig `border` mapping → red. (24.002's `hig-minimal-shadows.before.json` lost its four `fieldRim` surface keys: a fixture-only change, the role it recorded no longer exists; 24.009 is untouched.)
