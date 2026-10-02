@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import { contrastRatio, over } from './helpers/contrast.js';
 import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { readGlobalsCss } from './helpers/style-patterns.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
@@ -242,5 +243,97 @@ describe('24.010 the tinted ticket-sheet label stays legible in neo (FIX 1 item 
     expect(valueOf(ruleExactly(readUiCss(), '[data-style="neo"] .gn-ticket-sheet__field--tinted dt'), 'color')).toBe('var(--gn-text-muted)');
     // CONTROL: the base rule's `textSubtle` is 4.469 on that composite — the defect the arm fixes.
     expect(contrastRatio(colorOf('light', 'textSubtle', 'neo'), ground)).toBeLessThan(4.5);
+  });
+});
+
+// ---- T2 press inversion and the filled-fill rule (24.020-24.026; N1, N8) ----
+// The two sheets are read once under T2-only names: the other neo lanes append to this file and declare their own.
+const t2Ui = readUiCss();
+const t2Globals = readGlobalsCss();
+
+describe('24.020 the primary is a filled surface: one dark fall, a longer one on hover, a self-coloured inset on press (N8)', () => {
+  it('24.020 .gn-button--primary reads action-filled / action-filled-near / action-filled-press and keeps its edge, fill and scale', () => {
+    const rest = ruleExactly(t2Ui, '.gn-button--primary');
+    expect(valueOf(rest, 'box-shadow')).toBe('var(--gn-shadow-action-filled)');
+    expect(valueOf(rest, 'border')).toBe('1px solid var(--gn-accent-edge)');
+    expect(valueOf(rest, 'background')).toBe('var(--gn-accent)');
+    const hover = ruleExactly(t2Ui, '.gn-button--primary:hover:not(:disabled)');
+    expect(valueOf(hover, 'box-shadow')).toBe('var(--gn-shadow-action-filled-near)');
+    expect(valueOf(hover, 'transform')).toBe('scale(1.04)');
+    const press = ruleExactly(t2Ui, '.gn-button--primary:active:not(:disabled)');
+    expect(valueOf(press, 'box-shadow')).toBe('var(--gn-shadow-action-filled-press)');
+    expect(valueOf(press, 'transform')).toBe('scale(0.98)');
+    // CONTROL: no rule in the sheet gives the primary the paper pair (`--gn-shadow-action)`) any more.
+    expect(t2Ui).not.toMatch(/\.gn-button--primary[^{]*\{[^}]*--gn-shadow-action\)/);
+  });
+});
+
+describe('24.021 the confirm button takes the danger roles: a self-coloured red inset on press (N8)', () => {
+  it('24.021 .gn-button--danger reads danger / danger-near / danger-press', () => {
+    expect(valueOf(ruleExactly(t2Ui, '.gn-button--danger'), 'box-shadow')).toBe('var(--gn-shadow-danger)');
+    expect(valueOf(ruleExactly(t2Ui, '.gn-button--danger:hover:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-danger-near)');
+    expect(valueOf(ruleExactly(t2Ui, '.gn-button--danger:active:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-danger-press)');
+    // CONTROL: the quiet danger stays flat.
+    expect(valueOf(ruleExactly(t2Ui, '.gn-button--danger-quiet'), 'box-shadow')).toBe('none');
+  });
+});
+
+describe("24.022 a disabled filled button is flat in neo through neo-valued roles; hig keeps today's disabled shadow (spec §7)", () => {
+  it('24.022 the primary and the confirm read action-filled-disabled / danger-disabled when disabled; the base :disabled rule is untouched', () => {
+    expect(valueOf(ruleExactly(t2Ui, ['.gn-button--primary:disabled', ".gn-button--primary[aria-disabled='true']"]), 'box-shadow')).toBe('var(--gn-shadow-action-filled-disabled)');
+    expect(valueOf(ruleExactly(t2Ui, ['.gn-button--danger:disabled', ".gn-button--danger[aria-disabled='true']"]), 'box-shadow')).toBe('var(--gn-shadow-danger-disabled)');
+    expect(valueOf(ruleExactly(t2Ui, '.gn-button--ghost:disabled'), 'box-shadow')).toBe('none'); // hig/minimal quiet is none already
+    const base = ruleExactly(t2Ui, '.gn-button:disabled');
+    expect(valueOf(base, 'box-shadow')).toBeNull();
+    expect(valueOf(base, 'opacity')).toBe('var(--gn-disabled-opacity)');
+    // CONTROL: in hig the disabled primary still renders its action shadow (24.009 pins the role equality).
+    expect(shadowValueOf('hig', 'light', 'action-filled-disabled')).toBe(shadowValueOf('hig', 'light', 'action'));
+  });
+});
+
+describe('24.023 the button focus ring sits 3px out, so the accent edge and the ring read as one ring with a gap', () => {
+  it('24.023 .gn-button:focus-visible is outline 2px, offset 3px (the field already uses 3px, U9)', () => {
+    const f = ruleExactly(t2Ui, '.gn-button:focus-visible');
+    expect(valueOf(f, 'outline')).toBe('2px solid var(--gn-focus-ring)');
+    expect(valueOf(f, 'outline-offset')).toBe('3px');
+    // CONTROL: the field's own offset is unchanged.
+    expect(valueOf(ruleExactly(t2Ui, '.gn-field__input:focus-visible'), 'outline-offset')).toBe('3px');
+  });
+});
+
+describe('24.024 the on-switch knob carries one dark fall and no highlight (N8)', () => {
+  it('24.024 .gn-switch:checked::after reads knob-on; the checked track stays a flat accent', () => {
+    expect(valueOf(ruleExactly(t2Ui, '.gn-switch:checked::after'), 'box-shadow')).toBe('var(--gn-shadow-knob-on)');
+    const on = ruleExactly(t2Ui, '.gn-switch:checked');
+    expect(valueOf(on, 'background')).toBe('var(--gn-accent)');
+    expect(valueOf(on, 'box-shadow')).toBe('none');
+  });
+});
+
+describe('24.025 cards, doors and board cards press into the surface (N1): every :active site reads lift-press, which neo renders inset', () => {
+  it('24.025 the four press sites read var(--gn-shadow-lift-press) and no card rule transforms', () => {
+    const sites: Array<[string, string | readonly string[]]> = [
+      [t2Ui, '.gn-board__card-slot:active > .gn-board-card'],
+      [t2Ui, '.template-gallery__door:active'],
+      [t2Globals, '.gn-workspace-home__link:active'],
+      [t2Globals, ['.gn-card:has(> .gn-workspace-card__door:active)', '.gn-card:has(> .gn-project-card__door:active)']],
+    ];
+    for (const [css, sel] of sites) {
+      const body = ruleExactly(css, sel);
+      expect(valueOf(body, 'box-shadow'), String(sel)).toBe('var(--gn-shadow-lift-press)');
+      expect(valueOf(body, 'transform'), String(sel)).toBeNull();
+    }
+    // the rule the ruling rests on: a shadow change, not motion
+    expect(valueOf(ruleExactly(t2Ui, '.gn-board-card'), 'transition')).toContain('box-shadow');
+    // CONTROL: neo renders the press role inset (the inversion is T1's token value), and lift stays outset.
+    expect(shadowValueOf('neo', 'light', 'lift-press')).toContain('inset');
+    expect(shadowValueOf('neo', 'light', 'lift').startsWith('inset')).toBe(false);
+  });
+});
+
+describe('24.026 the drag clone keeps its lift while the source card presses', () => {
+  it('24.026 .gn-board-drag-image > .gn-board-card reads lift-drag, not lift-press', () => {
+    expect(valueOf(ruleExactly(t2Ui, '.gn-board-drag-image > .gn-board-card'), 'box-shadow')).toBe('var(--gn-shadow-lift-drag)');
+    expect(shadowValueOf('neo', 'light', 'lift-drag').startsWith('inset')).toBe(false);
   });
 });
