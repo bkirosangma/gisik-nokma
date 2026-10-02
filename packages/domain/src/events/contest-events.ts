@@ -154,7 +154,7 @@ export function renderContestedClaimAttribution(
   actorLabel?: string,
 ): string {
   return (
-    `claimed by ${actorLabel ?? 'Unknown person'} at ${formatIstInstant(claim.clientTime)} by their clock — ` +
+    `claimed by ${actorLabel ?? 'Unknown person'} at ${formatIstInstant(claim.clientTime)} by their clock, ` +
     `refused ${formatIstInstant(claim.contestedAt)}`
   );
 }

@@ -222,7 +222,8 @@ describe('ticket event vocabulary', () => {
         'invalid-payload',
       );
       expect(refusalMessage('ticket.created', { ...BASE, start: 'backlog', stateId: 'doing' })).toContain(
-        'a backlog ticket has no starting status',
+        // 23.371 (HK-3): no spaced em dash; the quoted tokens are unchanged.
+        'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
       );
     });
 
@@ -339,14 +340,14 @@ describe('ticket.field_set value is required', () => {
     expect(ticketFieldSetPayload.safeParse({ fieldId: 'title' }).success).toBe(false);
     expect(issues({ fieldId: 'title' })).toContainEqual({
       path: ['value'],
-      message: 'is required — a field claim with no value would record a clearing nobody made',
+      message: 'is required: a field claim with no value would record a clearing nobody made',
     });
   });
 
   it('planted defect: refuses an explicitly undefined value — JSON erases the difference from absence', () => {
     expect(issues({ fieldId: 'title', value: undefined })).toContainEqual({
       path: ['value'],
-      message: 'is required — a field claim with no value would record a clearing nobody made',
+      message: 'is required: a field claim with no value would record a clearing nobody made',
     });
   });
 
@@ -403,7 +404,7 @@ describe('ticket.created title must not be blank', () => {
     expect(ticketCreatedPayload.safeParse(created('   ')).success).toBe(false);
     expect(issues(created('   '))).toContainEqual({
       path: ['title'],
-      message: 'must not be blank — a title of only spaces names nothing',
+      message: 'must not be blank: a title of only spaces names nothing',
     });
   });
 
@@ -433,7 +434,7 @@ describe('ticket.created title must not be blank', () => {
     // `malformedPayloadDetail` mirrors, so the door and the engine say the path
     // the same way.
     expect(refusalMessage('ticket.created', created('   '))).toBe(
-      "payload for 'ticket.created' v1 is invalid at title: must not be blank — a title of only spaces names nothing",
+      "payload for 'ticket.created' v1 is invalid at title: must not be blank: a title of only spaces names nothing",
     );
   });
 });

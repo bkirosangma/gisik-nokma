@@ -47,7 +47,7 @@ export const ticketCreatedPayload = z
     title: z
       .string()
       .min(1)
-      .refine((value) => value.trim() !== '', 'must not be blank — a title of only spaces names nothing'),
+      .refine((value) => value.trim() !== '', 'must not be blank: a title of only spaces names nothing'),
     /**
      * Where the ticket is born (spec §1.3): `'backlog'` — the universal state —
      * or `'focus'` — the workflow's initial state. OPTIONAL, and ABSENT MEANS
@@ -155,7 +155,7 @@ export const ticketCreatedPayload = z
     // starting status. The client's own form disables the status picker
     // while "Starts in the backlog?" is on and never sends both; this refusal
     // is the domain's own door for a payload built some other way.
-    message: 'a backlog ticket has no starting status — a ticket.created cannot carry both start: "backlog" and stateId',
+    message: 'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
     path: ['stateId'],
   });
 
@@ -202,7 +202,7 @@ export const ticketFieldSetPayload = z.object({
   fieldId: z.string().min(1),
   value: z
     .unknown()
-    .refine((value) => value !== undefined, 'is required — a field claim with no value would record a clearing nobody made'),
+    .refine((value) => value !== undefined, 'is required: a field claim with no value would record a clearing nobody made'),
 });
 
 export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
@@ -334,7 +334,7 @@ export const ticketRankedPayload = z
     rank: z
       .string()
       .regex(RANK_KEY_REGEX, 'must be a rank key over 0-9a-z')
-      .refine(isRankKey, "must not end in '0' — nothing sorts below it, so the key would be unorderable"),
+      .refine(isRankKey, "must not end in '0': nothing sorts below it, so the key would be unorderable"),
   })
   .strict();
 

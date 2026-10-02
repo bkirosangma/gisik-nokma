@@ -172,14 +172,14 @@ async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
 describe('21.233 the ticket sheet gets the phone bar, and every tool stays reachable', () => {
   it('21.233 at ≤40rem the sheet description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountSheet);
-  }, 20_000);
+  });
 });
 
 // 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.234 the new-ticket dialog gets the phone bar, and every tool stays reachable', () => {
   it('21.234 at ≤40rem the dialog description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountDialog);
-  }, 20_000);
+  });
 });
 
 // ── 21.235: the editor's OWN phone arm ────────────────────────────────────────────────────────────────────────────
@@ -325,9 +325,9 @@ async function twoRowsInHost(mount: Mounter, side: number): Promise<void> {
 describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, in the sheet and in the dialog at 360–466', () => {
   it('21.236 the ticket sheet (viewport − 2 × the sheet body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountSheet, hostWidths().sheetSide);
-  }, 20_000);
+  });
   it('21.237 the new-ticket dialog (viewport − 2 × the dialog body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountDialog, hostWidths().dialogSide);
-  }, 20_000);
+  });
 });
 

@@ -8,7 +8,7 @@ import type {
 } from '@gisik-nokma/domain';
 import { PRIORITIES, prioritySchema, ticketKey } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
-import { rollupFor } from '../visibility/rollup.js';
+import { rollupsFor } from '../visibility/rollup.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 import { stateProvenanceFor } from './state-provenance.js';
 import { ticketNumbers } from './ticket-numbers.js';
@@ -84,7 +84,7 @@ export const PROJ_TICKET_COLUMNS =
  * Its caller must supply both.** That is stated as an obligation rather than as
  * reassurance, because the whole chain below it defers the same way and nothing
  * in this file closes the loop: `stateProvenanceFor` is a by-id read over the
- * ledger, and `rollupFor` is workspace-blind by design (case 6.84). Hand
+ * ledger, and `rollupsFor` is workspace-blind by design (case 6.84). Hand
  * `assembleTicketCards` a row from another tenancy and it will assemble a full
  * card for it.
  *
@@ -106,7 +106,7 @@ export async function fetchTicketRows(db: Queryable, ticketIds: string[]): Promi
 /**
  * `proj_tickets` rows → `TicketCard`s: the title and due-date claims read out
  * of the `FieldClaim` map, state provenance batched from the ledger, rollups
- * per-viewer through Plan 4's `rollupFor`.
+ * per-viewer through Plan 4's rollup (`rollupsFor`, one call per page).
  *
  * ## Every blank this function could emit is either a real fact or a throw
  *
@@ -135,13 +135,15 @@ export async function fetchTicketRows(db: Queryable, ticketIds: string[]): Promi
  * The throws are deliberately loud rather than skipped rows: a card silently
  * missing from a board is the same lie with a longer fuse.
  *
- * ## One rollup query per row
+ * ## One rollup pass per page
  *
- * `rollupFor` is asked per ticket, which is N round trips for N cards. That is
- * Plan 4's shape and it is left alone here rather than reimplemented as a batch
- * — a second enumeration of "who may see which child" beside `rollupFor` is
- * exactly the duplication `visibleTicketsWhere` was extracted to stop. If the
- * board's card count makes it matter, the batch belongs INSIDE `rollupFor`.
+ * The rollups of every row come from ONE `rollupsFor` call before the loop (smoothness T11, spec
+ * D7, audit SM-06), where this used to ask `rollupFor` per card — N round trips for N cards. The
+ * batch lives INSIDE `visibility/rollup.ts`, as this paragraph once said it should: there is still
+ * one enumeration of "who may see which child", `rollupsFor`'s, and `rollupFor` is that function
+ * asked about one parent. A card whose parent has no children has no entry in the map and carries
+ * `rollup: null`, exactly as before (case 25.190 holds every card's rollup equal to the frozen
+ * per-ticket answer, for every viewer class).
  */
 export async function assembleTicketCards(
   db: Queryable,
@@ -153,6 +155,11 @@ export async function assembleTicketCards(
     rows.map((r) => r.ticket_id),
   );
   const keys = await cardKeysFor(db, rows);
+  const rollups = await rollupsFor(
+    db,
+    viewerId,
+    rows.map((r) => r.ticket_id),
+  );
   const cards: TicketCard[] = [];
 
   for (const row of rows) {
@@ -163,7 +170,7 @@ export async function assembleTicketCards(
       );
     }
 
-    const rollupView = await rollupFor(db, viewerId, row.ticket_id);
+    const rollupView = rollups.get(row.ticket_id) ?? null;
     const rollup: TicketRollup | null =
       rollupView === null
         ? null

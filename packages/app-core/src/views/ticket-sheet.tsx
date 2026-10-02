@@ -1914,7 +1914,7 @@ export function TicketSheet({
    * `checks/fields.ts:118-123` answers `field.title-required` for `null` and
    * `field.type-mismatch` for anything whose `value.trim().length` is 0. That
    * is the same rule the New-ticket form leans on — `ticketCreatedPayload`'s
-   * *"must not be blank — a title of only spaces names nothing"* — so a second
+   * *"must not be blank: a title of only spaces names nothing"* — so a second
    * rule here would be a second, weaker door to one field, which is exactly
    * what this sheet refuses elsewhere. The value travels AS TYPED and the
    * engine's answer is what the reader sees.

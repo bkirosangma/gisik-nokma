@@ -27,6 +27,6 @@
   "expected": {
     "refused": true,
     "rule": "malformed-payload",
-    "reason": "This ticket.created event's payload is malformed: at title: must not be blank — a title of only spaces names nothing"
+    "reason": "This ticket.created event's payload is malformed: at title: must not be blank: a title of only spaces names nothing"
   }
 }
