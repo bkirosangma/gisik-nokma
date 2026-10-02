@@ -821,7 +821,8 @@ describe('the roster is a convenience, never a gate', () => {
     );
     await openTab('Calendar');
 
-    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    // A named skeleton region (smoothness T6, 25.071), not a sentence: the arm is still a WAIT, said in words to a screen reader.
+    expect(await screen.findByText('Loading the calendar')).toBeInTheDocument();
     // The grid is not merely empty — it is not drawn at all.
     expect(document.querySelector('.gn-calendar')).toBeNull();
     // And the claim about claims is not made.
@@ -845,7 +846,7 @@ describe('the roster is a convenience, never a gate', () => {
     );
     await openTab('Timeline');
 
-    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the timeline')).toBeInTheDocument();
     expect(document.querySelector('.gn-timeline')).toBeNull();
     expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { useMemo, useState, type HTMLAttributes, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { Avatar, Chip, Select, Table, useScrollEdges, type TableColumn } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDate } from '../provenance.js';
@@ -1280,15 +1280,19 @@ function ListCell({
 }
 
 export type TicketListState = {
-  /** `null` until the rows load, and it stays null when the read FAILS. */
+  /**
+   * `null` until the rows load, and it stays null when the read FAILS. A filter change keeps the PREVIOUS answer's rows of the
+   * same project here until the new walk lands (smoothness T6, S4), and a refusal withdraws them.
+   */
   rows: ListRow[] | null;
   /**
    * Whether the list has EVER answered, over this hook's whole lifetime.
    *
    * `rows === null` is the right test for "do I have rows to render". It is the
    * wrong test for "does the Create ticket control exist", because a filter change
-   * re-keys the query and nulls `rows` on every toggle — which retracted the
-   * button and flickered the project header. Gate controls on this instead.
+   * re-keys the query and (before smoothness T6 carried the rows) nulled `rows` on
+   * every toggle — which retracted the button and flickered the project header.
+   * Gate controls on this instead.
    */
   rowsHaveAnswered: boolean;
   prefs: ProjectViewPrefs;
@@ -1420,9 +1424,28 @@ export function useTicketList(
   // stringify differently and would rekey — clearing the list and re-walking every
   // page for a question already answered.
   const filterKey = stableFilterKey(filter);
-  const list = useLiveQuery(source, workspaceId, `${projectId}\u0000${filterKey}`, () =>
-    source.query.getTickets(projectId, filter, 'flat'),
+  //
+  // `cacheKey` (smoothness T6, spec S4): the project AND the filter name the read in the session cache, so a revisit paints
+  // the last answer to THIS question and the same project under another filter borrows nothing from the cache.
+  const list = useLiveQuery(
+    source,
+    workspaceId,
+    `${projectId}\u0000${filterKey}`,
+    () => source.query.getTickets(projectId, filter, 'flat'),
+    { cacheKey: `list:${projectId}:${filterKey}` },
   );
+  // The rows of the last answer, kept while a FILTER change is answered (S4): a toggle re-keys the query, `data` is `null`
+  // until the new walk lands, and a skeleton in place of rows the person was just reading is the flicker this removes.
+  // Carried only within one project and never beside an error: another project's rows are never served under this one, and
+  // a refused read withdraws them, so the refusal is the only thing on screen for that question.
+  const carried = useRef<{ projectId: string; rows: ListRow[] } | null>(null);
+  // Stamped with the PROJECT THE ANSWER IS FOR (`list.data.projectId`), not the one now being asked about: on the render that
+  // re-keys the hook `data` still holds the previous key's answer until its effect clears it, and stamping that with the new
+  // project would carry project A's rows under project B.
+  if (list.data !== null) carried.current = { projectId: list.data.projectId, rows: list.data.rows };
+  const rows =
+    list.data?.rows ??
+    (list.error === null && carried.current !== null && carried.current.projectId === projectId ? carried.current.rows : null);
   const preferences = usePreferences(source, workspaceId);
   const stored = preferences.document?.projects[projectId];
 
@@ -1438,10 +1461,9 @@ export function useTicketList(
   const prefs = stored ?? DEFAULT_VIEW_PREFS;
 
   return {
-    rows: list.data?.rows ?? null,
-    // Lifetime, not per-key — a filter change re-keys the query and nulls `rows`,
-    // and a caller gating a CONTROL on `rows === null` would retract it on every
-    // toggle. See `LiveQueryResult.hasAnswered`.
+    rows,
+    // Lifetime, not per-key — a filter change re-keys the query, and a caller gating a CONTROL on
+    // `rows === null` would retract it on every toggle. See `LiveQueryResult.hasAnswered`.
     rowsHaveAnswered: list.hasAnswered,
     prefs,
     prefsOrigin: prefsOriginOf(prefs),

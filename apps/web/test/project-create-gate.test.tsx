@@ -191,6 +191,19 @@ afterEach(() => {
 });
 
 /**
+ * The header's Create ticket control, once it can be PRESSED. Smoothness T6 (25.074): while the session or the list walk is open the
+ * control is the same button, busy and disabled, instead of a sentence — so it is in the document at once and `findByRole` alone
+ * would hand a test the disabled one, whose click goes nowhere. Same single-match semantics as the `findByRole` it replaces.
+ */
+async function findEnabledCreate(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const button = screen.getByRole('button', { name: 'Create ticket' });
+    expect(button).toBeEnabled();
+    return button;
+  });
+}
+
+/**
  * The dialog's Type and Parent pickers are the shared SEARCHABLE `Select` now, so their options
  * can no longer be read off the trigger: the trigger is an `<input role="combobox">` with no
  * `<option>` children of its own, and the rows exist only while the panel is OPEN, portal-rendered
@@ -263,7 +276,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
 
     // The control IS offered now — creation at project root never needed the list.
     const user = userEvent.setup();
-    const open = await screen.findByRole('button', { name: 'Create ticket' });
+    const open = await findEnabledCreate();
     fireEvent.click(open);
 
     // And the half that keeps 3.142's claim true: there is no parent `<select>` at
@@ -330,7 +343,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
     // Still exactly these two, and still in this order, after the shared-Select migration: the
     // synthetic `{ value: '', label: 'None (project root)' }` option replaces the hand-written
     // `<option value="">` one-for-one at the head of the list rather than adding to it.
@@ -371,7 +384,7 @@ describe('3.158 a preferences failure does not claim the parent list cannot be s
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
 
     // The true thing present...
     expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
@@ -397,7 +410,7 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
 
     // Read ONCE and asserted three times: opening the panel is now a real interaction, so three
     // separate reads would be three open/close cycles of the same list to no purpose.
@@ -432,7 +445,7 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
       </Providers>,
     );
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
     expect(await typeOptionLabels(user)).toEqual(['Epic', 'Story', 'Task', 'Sub-task']);
     // The sentence that stops the ladder from passing itself off as the answer.
     expect(screen.getByText(BUILTIN_LADDER_NOTICE)).toBeInTheDocument();
@@ -515,7 +528,7 @@ describe('3.144 the write door is never offered an empty actor', () => {
     };
     render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
     await user.type(screen.getByLabelText('Title'), 'Order the new sign');
     await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
@@ -617,7 +630,7 @@ describe('13.591f the birth-state control does not depend on which parent a REAL
     };
     render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Create ticket' }));
+    await user.click(await findEnabledCreate());
 
     const birthState = (): HTMLElement => screen.getByRole('checkbox', { name: 'Starts in the backlog?' });
 

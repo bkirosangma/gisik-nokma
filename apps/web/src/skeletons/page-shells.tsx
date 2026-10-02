@@ -1,5 +1,5 @@
 'use client';
-import { Card, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
+import { Card, Skeleton, SkeletonRegion, Table, type TableColumn } from '@gisik-nokma/ui';
 import type { ProjectTab } from '../use-last-project.js';
 import { AppNavSkeleton } from './app-nav-skeleton.js';
 
@@ -30,6 +30,59 @@ function BoardCardSkeleton() {
   );
 }
 
+const LIST_COLUMNS: TableColumn<number>[] = [
+  { id: 'key', header: <Skeleton width="3rem" height="0.75rem" />, cell: () => <Skeleton width="4rem" height="0.875rem" /> },
+  { id: 'title', header: <Skeleton width="4rem" height="0.75rem" />, cell: () => <Skeleton width="85%" height="1rem" /> },
+  { id: 'state', header: <Skeleton width="3rem" height="0.75rem" />, cell: () => <Skeleton shape="block" width="4.5rem" height="1.25rem" /> },
+  { id: 'assignee', header: <Skeleton width="4rem" height="0.75rem" />, cell: () => <Skeleton shape="circle" width="1.5rem" height="1.5rem" /> },
+  { id: 'due', header: <Skeleton width="2.5rem" height="0.75rem" />, cell: () => <Skeleton width="4rem" height="0.875rem" /> },
+];
+const LIST_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
+
+/**
+ * The project page's tab body (smoothness T5 and T6; spec S1, amendment S-R1): ONE shape per tab, shared by the route's
+ * Suspense fallback and by the page's five wait arms, so the swap from either to the real view moves nothing. The board is its
+ * own rail, column and card; the list is its own `.gn-list` > `.gn-list__table-wrap` > `table.gn-table` with the real row class
+ * (the `Table` component itself, so the box model is the table's, not an imitation of it). The calendar, timeline and backlog
+ * keep T5's block shapes: their real views are drawn from data the skeleton has no way to size.
+ */
+export function ProjectTabBodySkeleton({ tab }: { tab: ProjectTab }) {
+  if (tab === 'board') {
+    return (
+      <div className="gn-board__rail">
+        {[0, 1, 2].map((column) => (
+          <section key={column} className="gn-board__column">
+            <header className="gn-board__column-header">
+              <Skeleton shape="block" width="6rem" height="1.5rem" />
+            </header>
+            <ul className="gn-board__cards">
+              {[0, 1, 2].map((card) => <BoardCardSkeleton key={card} />)}
+            </ul>
+          </section>
+        ))}
+      </div>
+    );
+  }
+  if (tab === 'list') {
+    return (
+      <div className="gn-list">
+        <div className="gn-list__table-wrap">
+          <Table
+            columns={LIST_COLUMNS}
+            rows={LIST_ROWS}
+            rowKey={(row) => String(row)}
+            className="gn-list__table"
+            rowClassName="gn-list__table-row"
+          />
+        </div>
+      </div>
+    );
+  }
+  if (tab === 'calendar') return <Skeleton shape="block" height="32rem" />;
+  if (tab === 'timeline') return <Skeleton shape="block" height="2.5rem" rows={6} />;
+  return <Skeleton shape="block" height="3rem" rows={8} />;
+}
+
 export function ProjectPageSkeleton({ tab = 'board' }: { tab?: ProjectTab }) {
   return (
     <main id="gn-main" className="gn-shell gn-shell--wide gn-shell--skeleton" aria-busy="true">
@@ -41,26 +94,7 @@ export function ProjectPageSkeleton({ tab = 'board' }: { tab?: ProjectTab }) {
           {TAB_SHAPES.map((index) => <Skeleton key={index} shape="block" width="5rem" height="2.25rem" />)}
         </div>
         <Skeleton shape="block" height="2.75rem" />
-        {tab === 'board' ? (
-          <div className="gn-board__rail">
-            {[0, 1, 2].map((column) => (
-              <section key={column} className="gn-board__column">
-                <header className="gn-board__column-header">
-                  <Skeleton shape="block" width="6rem" height="1.5rem" />
-                </header>
-                <ul className="gn-board__cards">
-                  {[0, 1, 2].map((card) => <BoardCardSkeleton key={card} />)}
-                </ul>
-              </section>
-            ))}
-          </div>
-        ) : tab === 'calendar' ? (
-          <Skeleton shape="block" height="32rem" />
-        ) : tab === 'timeline' ? (
-          <Skeleton shape="block" height="2.5rem" rows={6} />
-        ) : (
-          <Skeleton shape="block" height="3rem" rows={8} />
-        )}
+        <ProjectTabBodySkeleton tab={tab} />
       </SkeletonRegion>
     </main>
   );

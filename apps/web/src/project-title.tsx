@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { Button, PencilIcon } from '@gisik-nokma/ui';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
@@ -8,8 +8,9 @@ import { newUlid } from '@gisik-nokma/domain';
 import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from './project-edit-form.js';
 import { useWorkspaceGroups } from './use-workspace-groups.js';
 import { updateSeeds } from './project-update-seeds.js';
-import { bumpProjectsVersion, useProjectsVersion } from './projects-version.js';
+import { bumpProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 import { mayAdminister } from './workspace-viewer.js';
 
 /**
@@ -43,53 +44,31 @@ export function ProjectTitle({
   const { dataSource } = useAppServices();
   const session = useSessionStatus();
   const userId = session.kind === 'signed-in' ? session.user.id : null;
-  const version = useProjectsVersion();
-  const [row, setRow] = useState<{
-    role: string;
-    description: string | null;
-    prefix: string;
-    groupId: string | null;
-    workspacePrefix: string;
-  } | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   /** A prefix or group refusal, handed to the form to show under its field (22.181, 22.184, 22.187). */
   const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
+  // The caller's role here and the project's description, out of the SAME shared read the nav and the name hooks ride
+  // (`useMyWorkspaces`; smoothness T6, audit SM-05): a remount within its freshness window paints from memory with no new request,
+  // and a write that bumps `projects-version` re-reads for it exactly as it did for its own effect.
+  const mine = useMyWorkspaces();
+  const row = useMemo(() => {
+    const workspace = mine.rows?.find((entry) => entry.id === workspaceId);
+    const project = workspace?.projects.find((entry) => entry.id === projectId);
+    return workspace === undefined || project === undefined
+      ? null
+      : {
+          role: workspace.role,
+          description: project.description ?? null,
+          prefix: project.prefix,
+          groupId: project.groupId ?? null,
+          workspacePrefix: workspace.prefix,
+        };
+  }, [mine.rows, workspaceId, projectId]);
+
   const { groups, reread } = useWorkspaceGroups(workspaceId, row !== null && mayAdminister(row.role) && editing);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (userId === null) {
-      setRow(null);
-      return;
-    }
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        const workspace = rows.find((entry) => entry.id === workspaceId);
-        const project = workspace?.projects.find((entry) => entry.id === projectId);
-        setRow(
-          workspace === undefined || project === undefined
-            ? null
-            : {
-                role: workspace.role,
-                description: project.description ?? null,
-                prefix: project.prefix,
-                groupId: project.groupId ?? null,
-                workspacePrefix: workspace.prefix,
-              },
-        );
-      },
-      () => {
-        if (!cancelled) setRow(null);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, workspaceId, projectId, userId, version]);
 
   const save = useCallback(
     (values: ProjectEditValues): void => {

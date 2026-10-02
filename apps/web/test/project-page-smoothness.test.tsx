@@ -44,6 +44,11 @@ vi.mock('../src/auth-client.js', () => ({
   authClient: { useSession: () => mockSession, signOut: async () => ({ data: {}, error: null }) },
 }));
 
+// The one reader on this page that keeps its OWN `getMyWorkspaces` call on purpose (T4: it derives a permission, and the in-flight
+// dedupe folds it into the shared call only in the same tick). Silenced here so 25.085 counts what T6 moved — ProjectTitle's read —
+// and nothing else; no case in this file is about moderation.
+vi.mock('../src/use-can-moderate-comments.js', () => ({ useCanModerateComments: () => false }));
+
 // Records every startTransition / useTransition-started update so a case can tell a transition from a plain set-state.
 const transitions = { start: 0, hook: 0 };
 vi.mock('react', async (importOriginal) => {
@@ -375,17 +380,24 @@ describe('the header names reserve their place (S1, S-R1; audit SM-02)', () => {
 
   it('25.085 ProjectTitle rides the shared workspaces read: one getMyWorkspaces call for the page, and a remount within 30 s makes no second', async () => {
     const getMyWorkspaces = vi.fn(async () => [ROW()]);
-    const first = mount({ getMyWorkspaces });
+    // ONE service object across both mounts, as the app has one data source for its life: the shared read is keyed by it.
+    const shared = services({ getMyWorkspaces });
+    const page = () => (
+      <Providers services={shared}>
+        <ProjectPage />
+      </Providers>
+    );
+    const first = render(page());
     expect(await screen.findByRole('heading', { name: 'Stockroom' })).toBeInTheDocument();
     expect(getMyWorkspaces).toHaveBeenCalledTimes(1); // nav, name hooks and ProjectTitle share ONE read
     first.unmount();
-    mount({ getMyWorkspaces });
+    render(page());
     // Served from memory on the first frame, with no new request.
     expect(screen.getByRole('heading', { name: 'Stockroom' })).toBeInTheDocument();
     expect(getMyWorkspaces).toHaveBeenCalledTimes(1);
     // Control: the hook itself is what is shared — a bare consumer sees the same rows.
     const bare = renderHook(() => useMyWorkspaces(), {
-      wrapper: ({ children }) => <Providers services={services({ getMyWorkspaces })}>{children}</Providers>,
+      wrapper: ({ children }) => <Providers services={shared}>{children}</Providers>,
     });
     expect(bare.result.current.rows?.[0]?.name).toBe('Corner Shop');
     expect(getMyWorkspaces).toHaveBeenCalledTimes(1);

@@ -3076,5 +3076,11 @@ export function useBoard(
   // exactly what changes when the board is pointed somewhere else. Passing it
   // as the key is what makes a project switch refetch at all — see the two
   // effects in `useLiveQuery`.
-  return useLiveQuery(source, workspaceId, projectId, () => source.query.getBoard(projectId));
+  //
+  // `cacheKey` (smoothness T6, spec S4; audit SM-01): the last answer for THIS project is painted on the first frame of a
+  // revisit while the fresh read is open. The key names the project, and the cache stores it under the workspace as well,
+  // so another project or another workspace never borrows it.
+  return useLiveQuery(source, workspaceId, projectId, () => source.query.getBoard(projectId), {
+    cacheKey: `board:${projectId}`,
+  });
 }
