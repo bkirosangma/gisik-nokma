@@ -177,3 +177,15 @@ Smoothness add-on G-6, owner 2026-10-02: *"in the ticket and notes comment edito
 - ✅ **25.388 — the button is a quiet ghost control with the N3 depth: transparent, rests on `--gn-shadow-quiet`, `--gn-shadow-quiet-near` on hover, `--gn-shadow-quiet-press` on `:active` (declared after the hover), no raised shadow and no `[data-style]` block; the strip's 32px tool size on a desktop, a 44px floor on phones in an arm placed AFTER the base rule (same specificity, source order decides), a focus ring.** Control: the Attach rule beside it IS raised. Mutations: the phone floor, the rest shadow, the `:active` rule removed → red.
 - ✅ **25.389 — every comment editor reaches the slot as `mode="comment"` (two in the ticket sheet, two in the note comments), so one toggle covers the composer and the in-place edit on both surfaces.** Control: the note-body host uses no comment mode.
 - ✅ **25.390 — a change made in another tab (the `storage` event for `gn-comment-toolbar`) reaches a mounted comment editor; an event for another key does not.** Mutation: the `storage` listener removed → red.
+
+## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)
+
+<!-- G-9 T1 -->
+
+<!-- G-9 T2 -->
+
+<!-- G-9 T3 -->
+
+<!-- G-9 T4 -->
+
+<!-- G-9 T5 -->

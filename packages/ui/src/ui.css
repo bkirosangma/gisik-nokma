@@ -3915,6 +3915,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* F-5 (N3): the reason line wrapped nowhere and widened To do over the edge to Doing; 13rem (208px) is under a 260px column. */
   max-width: 13rem;
 }
+/* G-9: T1 dragging */
+
+/* G-9: T3 guides+outline */
+
+/* G-9: T4 tidy+add-transition */
+
+/* G-9: T5 fullscreen */
+
+/* G-9: end */
 .gn-state-node--open { border-left: 6px solid var(--gn-category-open); }
 .gn-state-node--active { border-left: 6px solid var(--gn-category-active); }
 .gn-state-node--terminal { border-left: 6px solid var(--gn-category-terminal); }
