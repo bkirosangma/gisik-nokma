@@ -613,7 +613,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(stale.daysInFlight).toBe(19);
     expect(stale.thresholdDays).toBe(7);
     expect(stale.reason).toBe(
-      'In an active state since 2026-08-01 — past the 7-day staleness threshold.',
+      'In an active state since 1 Aug, past the 7-day staleness threshold.',
     );
 
     // overdue — the claim from the 10th is before today (2026-08-20, IST), so
@@ -848,7 +848,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(evening.enteredStateAt).toBe('2026-08-13T14:00:00.000Z');
     expect(evening.daysInFlight).toBe(7);
     expect(evening.reason).toBe(
-      'In an active state since 2026-08-13 — past the 7-day staleness threshold.',
+      'In an active state since 13 Aug, past the 7-day staleness threshold.',
     );
     expect(idsOf(atSeven, 'stale')).not.toContain(fx.istFresh6Id);
     // …and neither is the one that entered at EXACTLY IST midnight. The window
@@ -862,7 +862,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(staleItem.daysInFlight).toBe(7);
     // The label is the IST day, not the UTC slice of the same instant.
     expect(staleItem.reason).toBe(
-      'In an active state since 2026-08-13 — past the 7-day staleness threshold.',
+      'In an active state since 13 Aug, past the 7-day staleness threshold.',
     );
 
     // The positive control for that absence: move the threshold by ONE day and
@@ -877,7 +877,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(freshItem.daysInFlight).toBe(6);
     expect(freshItem.enteredStateAt).toBe('2026-08-13T18:31:00.000Z');
     expect(freshItem.reason).toBe(
-      'In an active state since 2026-08-14 — past the 6-day staleness threshold.',
+      'In an active state since 14 Aug, past the 6-day staleness threshold.',
     );
 
     // --- Half two: the instant the strip is READ ---

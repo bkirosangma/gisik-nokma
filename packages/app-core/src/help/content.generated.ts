@@ -6825,7 +6825,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"In an active state since 2026-07-10 — past the 7-day staleness threshold.\""
+                    "text": "\"In an active state since 10 Jul, past the 7-day staleness threshold.\""
                   },
                   {
                     "kind": "text",
@@ -6833,7 +6833,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"due 30 Aug (in 4 days)\""
+                    "text": "\"due 5 Oct (in 4 days)\""
                   }
                 ]
               },

@@ -25,12 +25,12 @@ import { WS, claim } from '../helpers/seed.js';
  * constructed is narrower than the one given here and it is the FIRST half of the
  * sentence: no route composes this string.**
  *
- * Note what the due-soon reason names: `2026-08-30`, the raw claimed day, not
- * `30 Aug 2026`. That is the server's spelling and it is rendered as sent.
+ * Note what the due-soon reason names: `30 Aug`, the product's day format, not the
+ * raw `2026-08-30`. That is the server's spelling and it is rendered as sent.
  */
 const BLOCKED_REASON = 'In "Waiting on counterparty" — a blocked state.';
-const STALE_REASON = 'In an active state since 2026-07-10 — past the 7-day staleness threshold.';
-const DUE_SOON_REASON = 'Needed by 2026-08-30 — due within 7 days.';
+const STALE_REASON = 'In an active state since 10 Jul, past the 7-day staleness threshold.';
+const DUE_SOON_REASON = 'due 30 Aug (in 4 days)';
 const CONTESTED_REASON = 'Refused on sync: restrict-to — only the assignee may close this';
 
 /** The three kinds the shipped route emits, plus Plan 10's fourth. */
