@@ -51,6 +51,21 @@ export function liveQueryAgeMs(key: string, now: number = Date.now()): number | 
 }
 
 /**
+ * The workspaces with at least one entry older than `olderThanMs`, read back off the
+ * `liveQueryStoreKey` prefix: what the freshness sweep reloads on focus (smoothness T4,
+ * spec D13; audit SM-15). A key with no workspace prefix is not one this cache wrote
+ * through `useLiveQuery`, and answers nothing here.
+ */
+export function staleWorkspaces(olderThanMs: number, now: number = Date.now()): string[] {
+  const stale = new Set<string>();
+  for (const [key, entry] of entries) {
+    const cut = key.indexOf('\u0000');
+    if (cut > 0 && now - entry.at > olderThanMs) stale.add(key.slice(0, cut));
+  }
+  return [...stale];
+}
+
+/**
  * Sign-out, the 401 redirects and a change of signed-in person call this: a
  * cache is per person, never per device. It also moves the read epoch, so a read
  * that was in flight for the previous person can neither write into the cache
