@@ -83,16 +83,21 @@ describe('25.517 (hook level) Escape: the cancelled gesture stays active, and th
       if (cancel) act(() => result.current.cancelDrag());
       act(() => result.current.onNodesChange([moved('a', 230, true)]));
       act(() => result.current.onNodesChange([moved('a', 260, false)]));
+      const idBeforeEnd = result.current.draggingId(); // the gesture stays active (cancelled or not) until endDrag: T3/T4's nudge guard reads null as "a nudge"
       let done: ReturnType<typeof result.current.endDrag> = null;
       act(() => { done = result.current.endDrag(); });
-      return { done, x: result.current.nodes.find((m) => m.id === 'a')!.position.x };
+      return { done, idBeforeEnd, idAfterEnd: result.current.draggingId(), x: result.current.nodes.find((m) => m.id === 'a')!.position.x };
     };
     const cancelled = run(true);
     expect(cancelled.done).toBeNull();
     expect(cancelled.x).toBe(10);
+    expect(cancelled.idBeforeEnd).toBe('a');
+    expect(cancelled.idAfterEnd).toBeNull();
     const control = run(false);
     expect(control.done).toEqual({ id: 'a', position: { x: 260, y: 0 } });
     expect(control.x).toBe(260);
+    expect(control.idBeforeEnd).toBe('a');
+    expect(control.idAfterEnd).toBeNull();
   });
 
   it('endDrag called in the same tick as the drag-end change (React Flow does both in one pointer-up) returns that change\'s position, not the one from the last render', () => {

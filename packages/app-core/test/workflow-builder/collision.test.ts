@@ -8,7 +8,7 @@ const ob = { x: 200, y: 0, width: 100, height: 60 };
 describe('collision (spec §3.1)', () => {
   it('25.505 a free target is returned unchanged', () => {
     expect(clampToAvoidOverlap({ x: 0, y: 200 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 0, y: 200 });
-    expect(builder.clampToAvoidOverlap).toBe(clampToAvoidOverlap); // the barrel re-exports it (the only door T3's hook will use)
+    expect(builder.clampToAvoidOverlap).toBe(clampToAvoidOverlap); // the barrel re-exports it (app-core's public door, src/index.ts:9)
   });
 
   it('25.506 overlap honours the gap on all four sides: touching within 8 px counts, 9 px apart does not', () => {
