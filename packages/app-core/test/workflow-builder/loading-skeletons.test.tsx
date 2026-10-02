@@ -41,7 +41,7 @@ describe('25.130 the workflow builder screens', () => {
     const gateway = { ...createFakeGateway(), listWorkflows: () => gate.promise };
     const { container } = render(<WorkflowListScreen workspaceId={workspaceId} session={session} gateway={gateway} onOpen={() => undefined} onHistory={() => undefined} onNew={() => undefined} />);
     const rows = region(container, 'Loading workflows');
-    expect(rows.closest('section.workflow-list') ?? rows.querySelector('.workflow-list__cards, .workflow-list__card, .gn-skeleton')).not.toBeNull();
+    expect(rows.closest('section.workflow-list'), 'the rows are not inside the list\'s own section').not.toBeNull();
     expect(screen.queryByText('Loading workflows…')).toBeNull();
     act(() => gate.resolve([]));
     await screen.findByText('No workflows yet.');
@@ -86,7 +86,8 @@ describe('25.131 the comment thread', () => {
   it('25.131 an open read draws rows in the thread\'s own container (no "Comments (0)", no "No comments yet.", no sentence); an answered-empty read still says so (control)', () => {
     const { container, rerender } = render(<CommentsThread comments={null} nameOf={(id: string) => id} />);
     const rows = region(container, 'Loading comments');
-    expect(rows.closest('.gn-comments') ?? rows).toBeTruthy();
+    expect(rows.closest('section.gn-comments'), 'the rows are not inside the thread\'s own section').not.toBeNull();
+    expect(rows.querySelectorAll('ul.gn-comments__list > li.gn-comment'), 'the region does not hold the thread\'s own list and comment rows').toHaveLength(2);
     expect(screen.queryByText('Loading…')).toBeNull();
     expect(screen.queryByText('No comments yet.')).toBeNull();
     rerender(<CommentsThread comments={[]} nameOf={(id: string) => id} />);

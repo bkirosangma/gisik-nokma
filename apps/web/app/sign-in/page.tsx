@@ -221,7 +221,7 @@ function SignInForm() {
    * cleared in `finally`, so a refusal or a network failure frees the button again; while one call is open every other control on
    * the card is disabled too, because two sign-in attempts in flight is never what a person meant.
    */
-  const [sending, setSending] = useState<'none' | 'otp' | 'verify' | 'magic' | 'passkey' | 'social'>('none');
+  const [sending, setSending] = useState<'none' | 'otp' | 'verify' | 'magic' | 'passkey' | 'google' | 'apple'>('none');
   const idle = sending === 'none';
   const run = (
     kind: Exclude<typeof sending, 'none'>,
@@ -517,10 +517,10 @@ function SignInForm() {
                      name: 'Continue with Google' })` resolves — so 13.292's
                      locator still finds this control after the restyle. */
                   aria-label="Continue with Google"
-                  busy={sending === 'social'}
+                  busy={sending === 'google'}
                   disabled={!idle}
                   onClick={() =>
-                    run('social', () => authClient.signIn.social({ provider: 'google', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
+                    run('google', () => authClient.signIn.social({ provider: 'google', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
                   }
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -531,10 +531,10 @@ function SignInForm() {
                 <Button
                   className="gn-sign-in__mark"
                   aria-label="Continue with Apple"
-                  busy={sending === 'social'}
+                  busy={sending === 'apple'}
                   disabled={!idle}
                   onClick={() =>
-                    run('social', () => authClient.signIn.social({ provider: 'apple', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
+                    run('apple', () => authClient.signIn.social({ provider: 'apple', callbackURL: webOriginCallback(next) }), (message) => message, () => undefined)
                   }
                 >
                   <AppleMark />

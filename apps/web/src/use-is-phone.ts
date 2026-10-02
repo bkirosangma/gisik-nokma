@@ -22,9 +22,10 @@ export const PHONE_QUERY = '(max-width: 40rem)';
  * progress" into the Filters sheet on a phone (the header keeps them inline above 40rem).
  *
  * `false` on the server and wherever `matchMedia` does not exist. It is a `useSyncExternalStore` (smoothness T8, case 25.141/25.144,
- * audit SM-08): the server snapshot is `false`, so the markup the server sent is what hydrates, and React then re-renders with the
- * client snapshot BEFORE paint, so the first painted frame already has the real answer (no effect, no flash of the wrong shell);
- * it follows a foldable opening or a window resize through the `change` event.
+ * audit SM-08): the server snapshot is `false`, so on a HARD LOAD the server markup paints and hydrates first (the CSS belt keeps the
+ * corner links hidden in that frame) and the client answer follows the hydration commit. On every CLIENT mount (each route hop
+ * remounts `AppNav`) the first render already has the answer, with no effect and no flash of the wrong shell; it follows a
+ * foldable opening or a window resize through the `change` event.
  */
 export function useIsPhone(): boolean {
   return useSyncExternalStore(subscribePhone, () => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches, () => false);

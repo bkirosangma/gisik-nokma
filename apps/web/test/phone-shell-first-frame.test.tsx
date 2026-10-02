@@ -249,6 +249,31 @@ describe('25.143 two unread badges are one poll', () => {
     });
     expect(unreadCount, 'a stopped store asks nothing').toHaveBeenCalledTimes(2);
   });
+
+  it('25.145 the FIRST render after a sign-out reads 0, not the previous session\'s count (11.169: the guard, not the passive cleanup); control: the probe saw 2 before', async () => {
+    const unreadCount = vi.fn(async () => 2);
+    const services = servicesOf([ws], { unreadCount });
+    const seen: number[] = [];
+    function Probe() {
+      seen.push(inboxLink.useInboxUnread());
+      return null;
+    }
+    const tree = () => (
+      <Providers services={services}>
+        <Probe />
+      </Providers>
+    );
+    const view = render(tree());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(seen[seen.length - 1], 'the count never landed, so the control proves nothing').toBe(2);
+    seen.length = 0;
+    mockSessionUser = null;
+    view.rerender(tree());
+    // RTL's act flushes the passive cleanup that zeroes the store, so only the FIRST recorded render shows the guard.
+    expect(seen[0], 'the first render after the sign-out painted the previous session\'s count').toBe(0);
+  });
 });
 
 describe('25.120 the phone switcher joins the shared workspaces read', () => {

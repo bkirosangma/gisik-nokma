@@ -25,9 +25,10 @@ export const TABLET_BAR_QUERY = '(max-width: 64rem)';
  * first frame, before this effect has run.
  *
  * `false` on the server and wherever `matchMedia` does not exist. It is a `useSyncExternalStore` (smoothness T8, case 25.141/25.144,
- * audit SM-08): the server snapshot is `false`, so the markup the server sent is what hydrates, and React then re-renders with the
- * client snapshot BEFORE paint, so the first painted frame already has the real answer (no effect, no flash of the wrong shell);
- * it follows a foldable opening or a window resize through the `change` event.
+ * audit SM-08): the server snapshot is `false`, so on a HARD LOAD the server markup paints and hydrates first (the CSS belt keeps the
+ * corner links hidden in that frame) and the client answer follows the hydration commit. On every CLIENT mount (each route hop
+ * remounts `AppNav`) the first render already has the answer, with no effect and no flash of the wrong shell; it follows a
+ * foldable opening or a window resize through the `change` event.
  */
 export function useTabletBar(): boolean {
   return useSyncExternalStore(subscribeTabletBar, () => typeof window.matchMedia === 'function' && window.matchMedia(TABLET_BAR_QUERY).matches, () => false);

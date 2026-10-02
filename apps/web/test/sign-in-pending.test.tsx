@@ -147,4 +147,33 @@ describe('25.134 every submit is a busy button while its call is in flight', () 
     expect(mark).toHaveAttribute('aria-busy', 'true');
     act(() => via.resolve({ error: null }));
   });
+
+  it('25.134 with both social marks, a click on Google makes Google busy and Apple disabled-not-busy, and the reverse', async () => {
+    methodsAnswer(Promise.resolve({ google: true, apple: true, phone: false }));
+    const user = userEvent.setup();
+    render(<SignInPage />);
+    const google = () => screen.getByRole('button', { name: 'Continue with Google' });
+    const apple = () => screen.getByRole('button', { name: 'Continue with Apple' });
+    await screen.findByRole('button', { name: 'Continue with Apple' });
+    const first = deferred<{ error: null }>();
+    social.mockReturnValueOnce(first.promise);
+    await user.click(google());
+    expect(google()).toBeDisabled();
+    expect(google()).toHaveAttribute('aria-busy', 'true');
+    expect(apple()).toBeDisabled();
+    expect(apple()).not.toHaveAttribute('aria-busy', 'true');
+    await user.click(apple());
+    expect(social).toHaveBeenCalledTimes(1);
+    act(() => first.resolve({ error: null }));
+    await waitFor(() => expect(apple()).not.toBeDisabled());
+    const second = deferred<{ error: null }>();
+    social.mockReturnValueOnce(second.promise);
+    await user.click(apple());
+    expect(apple()).toHaveAttribute('aria-busy', 'true');
+    expect(apple()).toBeDisabled();
+    expect(google()).toBeDisabled();
+    expect(google()).not.toHaveAttribute('aria-busy', 'true');
+    act(() => second.resolve({ error: null }));
+    await waitFor(() => expect(google()).not.toBeDisabled());
+  });
 });
