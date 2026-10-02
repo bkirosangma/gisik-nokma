@@ -831,6 +831,246 @@ export const HELP_CONTENT: HelpContent = [
         ],
         "entries": [
           {
+            "id": "on-a-phone-or-a-narrow-window",
+            "title": "On a phone or a narrow window",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a phone, and on a tablet or any window up to about 1024 pixels wide, the links leave the top of the screen and become a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "bar along the bottom"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": the places you use most, then "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens a sheet with everything the bar does not carry — including the workspace's last project, set apart with its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Last project:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " label — and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The bar is yours to arrange. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit bottom bar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", the last row of "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", to choose which places the bar carries and in what order; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Reset to default"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " puts it back. The product remembers your choice."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a tall phone the rows in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " sit at the bottom of the sheet, just above "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit bottom bar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", where your thumb is, and the space above them is left empty. On a short screen the sheet scrolls instead, and nothing is cut off."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-help-page",
+            "title": "The Help page",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is in the avatar menu (or a plain link in the bar when you are signed out). It holds this manual and the FAQ, each as one long page that reads straight down. There is no Next button: pick a topic from the contents list to jump to it, or just keep scrolling."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "On a computer"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " the contents list sits on the left and stays in view as you scroll. At the top of it are the search box and the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Manual"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "FAQ"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " switch, so you can search or change document from anywhere on the page; only the list of topics below them scrolls. The topic you are reading is marked. Press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "/"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " anywhere on the page (except while you are typing in a box) and the cursor jumps to the search box; press Escape in it to clear it and go back to where you were."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "On a phone"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " the contents list and search are behind a round button at the bottom right of the screen, named "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Contents and search"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". It opens a panel with the search box first, then the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Manual"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " / "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "FAQ"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " switch, then the topics, each group with its count. The topic you are reading is marked and scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the button was, the Escape key, or a tap outside it closes the panel too, without moving you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Searching"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " looks through both documents. Type in the box ("
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Search help"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") and the matches replace the page until you clear the box, which puts you back at the place you were reading. On a phone the matches appear inside the panel; picking one closes it and takes you to that entry, wherever you were on the page."
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
             "id": "light-or-dark",
             "title": "Light or dark",
             "blocks": [
@@ -1346,23 +1586,23 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               },
               {
-                "kind": "quote",
+                "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "text",
+                    "text": "Only an owner or admin can. On the workspace's home page they see a pencil button, "
+                  },
+                  {
                     "kind": "bold",
-                    "text": "Worth knowing:"
+                    "text": "Rename"
                   },
                   {
                     "kind": "text",
-                    "text": " at the moment "
+                    "text": " plus the workspace's name, beside the heading; pressing the name itself does the same. Either one turns the heading into a box. A member or a guest is shown neither, and a rename that reached the product from somebody else is refused: "
                   },
                   {
                     "kind": "italic",
-                    "text": "anyone"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " inside a workspace can rename it — including the most limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on."
+                    "text": "\"Only a workspace owner or admin can rename a workspace.\""
                   }
                 ]
               }
@@ -2576,6 +2816,39 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "text",
+                    "text": "That message sits under a heading, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "This invitation can't be used"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Go to sign in"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beneath it so the page is never a dead end. If the person is already signed in it also offers "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "See your workspaces"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", where an invitation waiting for them is listed."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "bold",
                     "text": "That is genuinely all anyone can find out."
                   },
@@ -3014,6 +3287,35 @@ export const HELP_CONTENT: HelpContent = [
                       "text": " row's date box, like Due. (§5)"
                     }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "On a phone"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " the panel opens on the things you change most — State, Assignee and Priority — and the description is folded behind "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a description"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " ("
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit description"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " once it has one) so the fields are in the first screen."
+                  }
                 ]
               },
               {
@@ -4886,7 +5188,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " buttons on it. Each row also has a "
+                    "text": " buttons on it. Those buttons move a job in the order of the whole backlog, not only within the group it is listed under, and they stay visible when the backlog is grouped; hover one and it says so. Each row also has a "
                   },
                   {
                     "kind": "bold",
@@ -5034,6 +5336,27 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " — a coloured icon and P1/P2/P3, tinting the whole card: red fire for P1, green leaf for P2, frozen-blue snowflake for P3."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "One column at a time on a phone."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Above the board is a row of buttons, one per column, each with the number of cards in it; the one you press is the column you see, and the others are out of the way (there is no sideways swiping). The ‹ and › arrows on a card still move it. If a move needs a comment, or is refused, the board shows the column the card is in until you close the box, so the box and the message are in front of you, and then goes back to the column you were on. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " stays at the bottom of its window, so you can always reach it."
                   }
                 ]
               },
@@ -5334,6 +5657,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
+                    "text": "A marker reads the job's key and title — so you can tell which job it is without opening it — and the claim behind it (who said the date, and which one) is in its hover text. On a phone a marker is one line, cut with an ellipsis if the title is long."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
                     "text": "Custom date fields your business set up appear here too, on the same terms, labelled with the field's own name."
                   }
                 ]
@@ -5542,7 +5874,48 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a contradiction goes into a side list beside the chart, with a heading saying which of five reasons it is there for."
+                    "text": ". A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by rather than at the end of its week. A thin line marks today in every row."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Anything with only one date, no dates, or a contradiction goes into a list beside the chart headed "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Not on the timeline yet\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with a count. The sentence under the heading says what to do: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"These tickets have no dates yet.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when none of them has a date, or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Add a start and a due date to place a ticket on the timeline.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when some have one. Each entry says what is missing, and its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add dates"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button opens the job so you can set them."
                   }
                 ]
               },
@@ -6282,7 +6655,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", with four kinds of thing, in this order:"
+                    "text": ", with five kinds of thing, in this order:"
                   }
                 ]
               },
@@ -6290,6 +6663,16 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "list",
                 "ordered": true,
                 "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Overdue"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a claimed deadline that has passed."
+                    }
+                  ],
                   [
                     {
                       "kind": "bold",
@@ -6330,6 +6713,35 @@ export const HELP_CONTENT: HelpContent = [
                       "text": " — a claim somebody disputed; its sentence is the rule's own reason for refusing it."
                     }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Each job appears once"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with its strongest reason — a job that is both overdue and blocked is one Overdue row. The strip shows the first five; if there are more, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and a number opens the rest, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show fewer"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " folds it back."
+                  }
                 ]
               },
               {
@@ -7352,6 +7764,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "The canvas opens showing the whole drawing"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", zoomed out as far as it needs to be to fit (never past a quarter size). After you have panned or zoomed, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Fit to screen"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button at the bottom left brings the whole drawing back. The tick boxes on a stage are big enough to tap, and when one is stuck on, the reason is written under it rather than hidden in a hover."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "The left-hand column lists everything, and each row opens in place."
                   },
                   {
@@ -7917,6 +8350,47 @@ export const HELP_CONTENT: HelpContent = [
               {
                 "kind": "text",
                 "text": " badge on the four that came with the workspace."
+              }
+            ]
+          },
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "kind": "text",
+                "text": "Each type you made yourself has a "
+              },
+              {
+                "kind": "bold",
+                "text": "Reorder"
+              },
+              {
+                "kind": "text",
+                "text": " button opening a small menu — "
+              },
+              {
+                "kind": "bold",
+                "text": "Move up"
+              },
+              {
+                "kind": "text",
+                "text": ", "
+              },
+              {
+                "kind": "bold",
+                "text": "Move down"
+              },
+              {
+                "kind": "text",
+                "text": " and "
+              },
+              {
+                "kind": "bold",
+                "text": "Move to top"
+              },
+              {
+                "kind": "text",
+                "text": " (the top of your own types). An item that cannot apply is greyed out and says why in words. The four built-in types have no Reorder button: they keep their rank, and your own types are ordered among themselves."
               }
             ]
           }
@@ -9022,11 +9496,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
+                    "text": "Create note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". A window, titled "
+                  },
+                  {
+                    "kind": "bold",
                     "text": "New note"
                   },
                   {
                     "kind": "text",
-                    "text": ". A window opens with three things:"
+                    "text": ", opens with three things:"
                   }
                 ]
               },
@@ -9561,7 +10043,31 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type."
+                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type. It opens on that list when no note is open. On a narrow screen the list is a drawer: the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens and closes it, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is on screen whether the drawer is open or shut."
                   }
                 ]
               },
@@ -10626,15 +11132,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The same list also shows anything you approved from a computer with the older, installed way of connecting an assistant. Each has its own "
+                    "text": "The same list also shows anything you approved from a computer with the older, installed way of connecting an assistant. Each row says when it was created and when it was last used (or that it was never used), and has its own button: "
                   },
                   {
                     "kind": "bold",
-                    "text": "Revoke"
+                    "text": "Revoke this token"
                   },
                   {
                     "kind": "text",
-                    "text": " or "
+                    "text": " for an installed one, or "
                   },
                   {
                     "kind": "bold",
@@ -10642,7 +11148,31 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button."
+                    "text": " and the assistant's name for one connected through Claude or ChatGPT, whose row shows the app's name with its web address beside it. A token nobody has named reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assistant connected with a token"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a name"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button lets you say which assistant it is (the button reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Rename"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " once it has a name)."
                   }
                 ]
               },
@@ -11533,15 +12063,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, and the new name appears in everybody's list. Worth knowing: right now "
+                    "text": "Yes, and the new name appears in everybody's list. Only an owner or admin can: on the workspace's home page they see a pencil button ("
                   },
                   {
-                    "kind": "italic",
-                    "text": "anyone"
+                    "kind": "bold",
+                    "text": "Rename"
                   },
                   {
                     "kind": "text",
-                    "text": " inside the workspace can rename it, including the most limited guest. Nobody has decided who should be allowed to. It is recorded with a name on it and can be changed back, but it is untidy."
+                    "text": " plus the workspace's name) beside the heading, and pressing the name does the same. A member or a guest is not shown either, and the product refuses their rename with "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Only a workspace owner or admin can rename a workspace.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The change is recorded with a name on it and can be changed back."
                   }
                 ]
               }
@@ -11645,6 +12183,71 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a phone, a tablet or any window up to about 1024 pixels wide the links are in a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "bar along the bottom"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " instead, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at its right-hand end holding the rest, plus "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit bottom bar"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", the last row of "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", lets you choose what the bar carries."
                   }
                 ]
               }
@@ -11913,6 +12516,34 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "italic",
                     "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The page is headed "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "This invitation can't be used"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Go to sign in"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button (and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "See your workspaces"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " if they are already signed in)."
                   }
                 ]
               },
@@ -12514,6 +13145,21 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "why-do-i-only-see-one-column-of-the-board-on-my-phone",
+            "title": "Why do I only see one column of the board on my phone?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "That is how the board works on a phone: one column at a time, chosen from the row of buttons above it (each shows how many cards are in it). There is no sideways swiping. If a move needs a comment or is refused, the board shows the column the card is in until you close the box, then returns to yours."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "what-s-the-line-at-the-bottom-of-a-card",
             "title": "What's the line at the bottom of a card?",
             "blocks": [
@@ -12912,6 +13558,53 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "Yes. An admin can rename all four built-in types, change their icons, and change which stage set they use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will still always need a parent. Custom types you create yourself can be re-ranked either way later."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-put-my-job-types-in-a-different-order",
+            "title": "Can I put my job types in a different order?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Your own types, yes: each one has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Reorder"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move up"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move down"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move to top"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (an item that cannot apply is greyed out and says why). The four built-in types have no such button — they keep their rank."
                   }
                 ]
               }
@@ -14303,7 +14996,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " a start and a needed-by claim. On the Timeline, anything with only one date, no dates, or a contradiction goes into a side list with a heading saying which of five reasons it is there for."
+                    "text": " a start and a needed-by claim. On the Timeline, anything with only one date, no dates, or a contradiction goes into a list headed "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Not on the timeline yet\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with a count, saying what is missing for each job. Its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add dates"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button opens the job so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day."
                   }
                 ]
               }
@@ -14612,6 +15321,37 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "If nothing needs attention, the strip does not appear at all — no box, no \"all caught up\" message, nothing. That is deliberate: an empty box headed \"Needs your attention\" reads like an all-clear you did not earn. A blank space there is the normal way of saying \"nothing needs you right now\"."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-strip-only-shows-five-rows-where-s-the-rest",
+            "title": "The strip only shows five rows. Where's the rest?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Each job appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and the strip shows the first five. If there are more, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show all"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the number is under them; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Show fewer"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " folds it back."
                   }
                 ]
               }
@@ -15003,7 +15743,54 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " picker reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes."
+                    "text": " picker reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " page has its own search too, over the manual and this FAQ only (below)."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-search-the-help",
+            "title": "How do I search the help?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Type in the search box at the top of the Help page's contents list (it says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Search help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "); matches from the manual and the FAQ replace the page until you clear the box, and you go back to where you were. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "/"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " anywhere on the page, except while typing in a box, to jump to it. On a phone the search is behind the round "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Contents and search"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button at the bottom right, inside the panel it opens; picking a match closes the panel and takes you to the entry. The page has no Next button — it reads straight down."
                   }
                 ]
               }

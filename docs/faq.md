@@ -133,9 +133,11 @@ If you have been given a limited role, that is deliberate and correct. It does n
 projects do not exist and it does not pretend you have none — it shows you your share.
 
 **Can I rename a workspace later?**
-Yes, and the new name appears in everybody's list. Worth knowing: right now *anyone* inside the
-workspace can rename it, including the most limited guest. Nobody has decided who should be allowed
-to. It is recorded with a name on it and can be changed back, but it is untidy.
+Yes, and the new name appears in everybody's list. Only an owner or admin can: on the workspace's home
+page they see a pencil button (**Rename** plus the workspace's name) beside the heading, and pressing the
+name does the same. A member or a guest is not shown either, and the product refuses their rename with
+*"Only a workspace owner or admin can rename a workspace."* The change is recorded with a name on it and
+can be changed back.
 
 **I typed a name that was just spaces and it refused.**
 Correct — "A workspace needs a name." Note that it does *not* trim spaces off a real name: type
@@ -147,6 +149,10 @@ The bar is short on purpose, and what it carries depends on where you are. Signe
 **Settings** join them, with the workspace's name and your inbox and avatar at the right-hand end. The
 settings screens for stages and job types are behind **Settings**. See
 [Stages and moves](#stages-and-moves).
+
+On a phone, a tablet or any window up to about 1024 pixels wide the links are in a **bar along the
+bottom** instead, with **More** at its right-hand end holding the rest, plus **Settings**, **Account** and
+**Help**. **Edit bottom bar**, the last row of **More**, lets you choose what the bar carries.
 
 ---
 
@@ -200,7 +206,8 @@ the older link stops working.
 
 **Somebody says the invitation link doesn't work.**
 They will see: *"This invitation link does not open anything. It may have been used, withdrawn, or
-lapsed — ask whoever invited you for a new one."*
+lapsed — ask whoever invited you for a new one."* The page is headed **This invitation can't be used** and
+has a **Go to sign in** button (and **See your workspaces** if they are already signed in).
 
 That is genuinely all anyone can find out. The product deliberately refuses to say which of the four
 it was — never existed, withdrawn, already used, expired — so that nobody can go fishing with random
@@ -338,6 +345,11 @@ nothing.
 If half of it works, it tells you both halves: that the parent really was reopened and that is
 permanent history, and separately why your job was refused. Nothing is quietly undone.
 
+**Why do I only see one column of the board on my phone?**
+That is how the board works on a phone: one column at a time, chosen from the row of buttons above it
+(each shows how many cards are in it). There is no sideways swiping. If a move needs a comment or is
+refused, the board shows the column the card is in until you close the box, then returns to yours.
+
 **What's the line at the bottom of a card?**
 It says what happened last, in words: *"Moved to Doing by Anselma Marak on 19 Aug"*. Press it and it adds
 the year; press it again and it folds back. A move from an earlier year always shows its year. Every value in the product carries who claimed it and when — nothing is presented as a fact
@@ -438,6 +450,11 @@ editor live. Nothing to bookmark.
 Yes. An admin can rename all four built-in types, change their icons, and change which stage set they
 use. What cannot change is where a built-in type sits in the hierarchy — so a renamed sub-task will
 still always need a parent. Custom types you create yourself can be re-ranked either way later.
+
+**Can I put my job types in a different order?**
+Your own types, yes: each one has a **Reorder** button with **Move up**, **Move down** and **Move to top**
+(an item that cannot apply is greyed out and says why). The four built-in types have no such button — they
+keep their rank.
 
 **Do my existing jobs break when I publish a new version of a workflow?**
 No. Publishing again makes a new version and jobs created under the old one stay on it unless they are
@@ -755,8 +772,9 @@ connecting them. That is your cue to go and fix the dates.
 **What's the difference between the Calendar and the Timeline?**
 The Calendar is a month grid; the Timeline is the same idea stretched sideways over weeks, moving four
 weeks at a time. Both draw a bar only when a job has **both** a start and a needed-by claim. On the
-Timeline, anything with only one date, no dates, or a contradiction goes into a side list with a
-heading saying which of five reasons it is there for.
+Timeline, anything with only one date, no dates, or a contradiction goes into a list headed *"Not on
+the timeline yet"* with a count, saying what is missing for each job. Its **Add dates** button opens the
+job so you can set them. A thin line marks today on the Timeline, and a bar ends on the real day.
 
 **Does the Calendar show closed jobs?**
 Not by default, and neither does the Timeline. Both leave closed work out until you ask for it; the List
@@ -829,6 +847,11 @@ thing and says so, rather than marking some of them.
 If nothing needs attention, the strip does not appear at all — no box, no "all caught up" message,
 nothing. That is deliberate: an empty box headed "Needs your attention" reads like an all-clear you did not
 earn. A blank space there is the normal way of saying "nothing needs you right now".
+
+**The strip only shows five rows. Where's the rest?**
+Each job appears once, under its strongest reason (overdue, then blocked, stale, due soon, contested), and
+the strip shows the first five. If there are more, **Show all** and the number is under them; **Show
+fewer** folds it back.
 
 **Seven days is too long / too short for us.**
 Both numbers — "sitting too long" and "how far ahead counts as due soon" — can be changed by the owner
@@ -927,7 +950,15 @@ offline, it says "searching offline copy" underneath, so you know the results mi
 date — and on the **website's project board**, in the box above the tabs, both only narrow something
 already on screen. The `:ticket ` picker reaches the deep search described just above, narrowed to jobs
 and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own.
-Notes have a separate search again, on the Notes page: its own engine, and it only searches notes.
+Notes have a separate search again, on the Notes page: its own engine, and it only searches notes. The
+**Help** page has its own search too, over the manual and this FAQ only (below).
+
+**How do I search the help?**
+Type in the search box at the top of the Help page's contents list (it says **Search help**); matches
+from the manual and the FAQ replace the page until you clear the box, and you go back to where you were.
+Press **/** anywhere on the page, except while typing in a box, to jump to it. On a phone the search is
+behind the round **Contents and search** button at the bottom right, inside the panel it opens; picking a
+match closes the panel and takes you to the entry. The page has no Next button — it reads straight down.
 
 **If I use the deep search through the `:ticket` picker, what would catch me out?**
 Two things, on the ticket-search half at least — the picker inherits the engine's own limits:

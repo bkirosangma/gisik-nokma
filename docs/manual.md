@@ -149,6 +149,41 @@ last project appear only once that name has arrived. With no workspace open the 
 workspace selected — pick one to reach its board, members and settings."* **Signed out there is no
 avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
 
+### On a phone or a narrow window
+
+On a phone, and on a tablet or any window up to about 1024 pixels wide, the links leave the top of the
+screen and become a **bar along the bottom**: the places you use most, then **More**. **More** opens a
+sheet with everything the bar does not carry — including the workspace's last project, set apart with its
+**Last project:** label — and **Settings**, **Account** and **Help**.
+
+The bar is yours to arrange. Press **Edit bottom bar**, the last row of **More**, to choose which places
+the bar carries and in what order; **Reset to default** puts it back. The product remembers your choice.
+
+On a tall phone the rows in **More** sit at the bottom of the sheet, just above **Edit bottom bar**,
+where your thumb is, and the space above them is left empty. On a short screen the sheet scrolls
+instead, and nothing is cut off.
+
+### The Help page
+
+**Help** is in the avatar menu (or a plain link in the bar when you are signed out). It holds this manual
+and the FAQ, each as one long page that reads straight down. There is no Next button: pick a topic from
+the contents list to jump to it, or just keep scrolling.
+
+- **On a computer** the contents list sits on the left and stays in view as you scroll. At the top of it
+  are the search box and the **Manual** / **FAQ** switch, so you can search or change document from
+  anywhere on the page; only the list of topics below them scrolls. The topic you are reading is
+  marked. Press **/** anywhere on the page (except while you are typing in a box) and the cursor jumps
+  to the search box; press Escape in it to clear it and go back to where you were.
+- **On a phone** the contents list and search are behind a round button at the bottom right of the screen,
+  named **Contents and search**. It opens a panel with the search box first, then the **Manual** /
+  **FAQ** switch, then the topics, each group with its count. The topic you are reading is marked and
+  scrolled into view. Picking a topic closes the panel and takes you to its heading; the ✕ where the
+  button was, the Escape key, or a tap outside it closes the panel too, without moving you.
+- **Searching** looks through both documents. Type in the box (**Search help**) and the matches replace
+  the page until you clear the box, which puts you back at the place you were reading. On a phone the
+  matches appear inside the panel; picking one closes it and takes you to that entry, wherever you were
+  on the page.
+
 ### Light or dark
 
 On your **Account** page there is a **Theme** control with the three choices side by side — not a button
@@ -227,9 +262,10 @@ it. **That is deliberate, not broken** — you are being shown your share.
 
 You can rename a workspace and the new name appears in everybody's list.
 
-> **Worth knowing:** at the moment *anyone* inside a workspace can rename it — including the most
-> limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
-> rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
+Only an owner or admin can. On the workspace's home page they see a pencil button, **Rename** plus the
+workspace's name, beside the heading; pressing the name itself does the same. Either one turns the
+heading into a box. A member or a guest is shown neither, and a rename that reached the product from
+somebody else is refused: *"Only a workspace owner or admin can rename a workspace."*
 
 ### Edit a project
 
@@ -417,6 +453,10 @@ If somebody tells you their link does not work, the message they see is: *"This 
 not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
 one."*
 
+That message sits under a heading, **This invitation can't be used**, with a **Go to sign in** button
+beneath it so the page is never a dead end. If the person is already signed in it also offers **See your
+workspaces**, where an invitation waiting for them is listed.
+
 **That is genuinely all anyone can find out.** The product deliberately refuses to say which of those
 four it was, so that nobody can go fishing with random links. Do not waste time diagnosing it —
 withdraw it and send a fresh one.
@@ -495,6 +535,10 @@ On the Details tab you can do **five things**:
 4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every job has one; new jobs start at
    P2. A job cannot be left without one, so there is nothing to clear. (§5)
 5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
+
+**On a phone** the panel opens on the things you change most — State, Assignee and Priority — and the
+description is folded behind **Add a description** (**Edit description** once it has one) so the fields
+are in the first screen.
 
 Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
@@ -867,8 +911,10 @@ project and opens there.
 ### Backlog
 
 The first tab, and where a new job starts its life. It lists the jobs that have not begun, in an order
-you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Each row also has a
-**Start** button that moves that job into its workflow.
+you arrange — drag a row, or use the **Move up** and **Move down** buttons on it. Those buttons move a
+job in the order of the whole backlog, not only within the group it is listed under, and they stay
+visible when the backlog is grouped; hover one and it says so. Each row also has a **Start** button that
+moves that job into its workflow.
 
 It does not leave closed jobs out, unlike the Calendar and the Timeline below. When it is empty it says
 so: *"Nothing in the backlog — new tickets land here."* — or, when the only thing it would have listed
@@ -898,6 +944,13 @@ the job belongs to one — press it to open that epic. A **parent-key badge** be
 when it sits under a job that is not already named by the epic chip — press it to open that parent. And
 every card carries its **priority badge** — a coloured icon and P1/P2/P3, tinting the whole card: red
 fire for P1, green leaf for P2, frozen-blue snowflake for P3.
+
+**One column at a time on a phone.** Above the board is a row of buttons, one per column, each with the
+number of cards in it; the one you press is the column you see, and the others are out of the way (there
+is no sideways swiping). The ‹ and › arrows on a card still move it. If a move needs a comment, or is
+refused, the board shows the column the card is in until you close the box, so the box and the message
+are in front of you, and then goes back to the column you were on. **Create ticket** stays at the
+bottom of its window, so you can always reach it.
 
 Columns are grouped by which set of stages they belong to, so if two job types use different
 arrangements you get two clearly separated groups rather than one confusing mess.
@@ -954,6 +1007,10 @@ A month grid, drawn **only from days somebody actually claimed**. Nothing is est
   rather than quietly fixing it. That is your cue to go and fix the dates.
 - No dates at all → not on the calendar.
 
+A marker reads the job's key and title — so you can tell which job it is without opening it — and the
+claim behind it (who said the date, and which one) is in its hover text. On a phone a marker is one line,
+cut with an ellipsis if the title is long.
+
 Custom date fields your business set up appear here too, on the same terms, labelled with the field's
 own name.
 
@@ -987,9 +1044,14 @@ the legend switches, because those live only in this view.
 ### Timeline
 
 The same idea stretched sideways over weeks, moving four weeks at a time with **Earlier** and
-**Later**. A bar again needs both a start and a needed-by. Anything with only one date, no dates, or a
-contradiction goes into a side list beside the chart, with a heading saying which of five reasons it
-is there for.
+**Later**. A bar again needs both a start and a needed-by, and it ends on the real day of the needed-by
+rather than at the end of its week. A thin line marks today in every row.
+
+Anything with only one date, no dates, or a contradiction goes into a list beside the chart headed
+*"Not on the timeline yet"*, with a count. The sentence under the heading says what to do: *"These
+tickets have no dates yet."* when none of them has a date, or *"Add a start and a due date to place a
+ticket on the timeline."* when some have one. Each entry says what is missing, and its **Add dates**
+button opens the job so you can set them.
 
 **Closed jobs are hidden here too, on the same terms as the Calendar** — the two ways back, and the
 chip it is easy to mistake, are described in that section above.
@@ -1109,12 +1171,17 @@ person. Past that you are told you have too many, and closing one frees a slot s
 
 ### The "Needs your attention" strip
 
-A row at the top of My Work, headed *"Needs your attention"*, with four kinds of thing, in this order:
+A row at the top of My Work, headed *"Needs your attention"*, with five kinds of thing, in this order:
 
-1. **Blocked** — sitting in a stage somebody flagged as blocked.
-2. **Stale** — has been sitting in the same stage too long.
-3. **Due soon** — a claimed deadline coming up.
-4. **Contested** — a claim somebody disputed; its sentence is the rule's own reason for refusing it.
+1. **Overdue** — a claimed deadline that has passed.
+2. **Blocked** — sitting in a stage somebody flagged as blocked.
+3. **Stale** — has been sitting in the same stage too long.
+4. **Due soon** — a claimed deadline coming up.
+5. **Contested** — a claim somebody disputed; its sentence is the rule's own reason for refusing it.
+
+**Each job appears once**, with its strongest reason — a job that is both overdue and blocked is one
+Overdue row. The strip shows the first five; if there are more, **Show all** and a number opens the
+rest, and **Show fewer** folds it back.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
 since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-08-30 — due within 7
@@ -1343,6 +1410,11 @@ It is a drawing canvas. Each stage is a box. **Add state** makes a new one. Each
 **To connect two stages, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a job can go this way".
 
+**The canvas opens showing the whole drawing**, zoomed out as far as it needs to be to fit (never past a
+quarter size). After you have panned or zoomed, the **Fit to screen** button at the bottom left brings
+the whole drawing back. The tick boxes on a stage are big enough to tap, and when one is stuck on, the
+reason is written under it rather than hidden in a hover.
+
 **The left-hand column lists everything, and each row opens in place.** Above the system rules you will
 find a **States** list and a **Transitions** list, each with a count. Press a row and it opens right there
 to show its settings: for a stage, its name, **Set as start** and **Delete state**; for an arrow, its
@@ -1457,6 +1529,11 @@ affect you: **a parent cannot be finished while any of its children is still goi
 
 There is a separate screen for these. It lists your types with their rank, how many custom fields each
 has, and a **Built-in** badge on the four that came with the workspace.
+
+Each type you made yourself has a **Reorder** button opening a small menu — **Move up**, **Move down**
+and **Move to top** (the top of your own types). An item that cannot apply is greyed out and says why in
+words. The four built-in types have no Reorder button: they keep their rank, and your own types are
+ordered among themselves.
 
 ### Making a new type
 
@@ -1723,7 +1800,7 @@ you are at `/notes`, which lists every workspace and project you belong to and t
 
 ### Making a note
 
-Press **New note**. A window opens with three things:
+Press **Create note**. A window, titled **New note**, opens with three things:
 
 - **Title** — what the note is about.
 - **Home** — the workspace, or one of its projects, the note is filed in. A note lives in exactly one
@@ -1817,7 +1894,9 @@ animating if your device is set to reduce motion.
 ### Finding a note
 
 The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title
-filter that narrows every group as you type.
+filter that narrows every group as you type. It opens on that list when no note is open. On a narrow
+screen the list is a drawer: the **Notes** button beside **Create note** opens and closes it, and
+**Create note** is on screen whether the drawer is open or shut.
 
 There is also a search box. Type into it and two things happen: spelling matches — the words you typed,
 allowing for a near miss — appear almost immediately, and matches **by meaning** are added a little
@@ -2002,7 +2081,11 @@ website address it came from, when it was connected and when it was last used. P
 row and that assistant loses access at once — its next request is refused.
 
 The same list also shows anything you approved from a computer with the older, installed way of connecting
-an assistant. Each has its own **Revoke** or **Disconnect** button.
+an assistant. Each row says when it was created and when it was last used (or that it was never used),
+and has its own button: **Revoke this token** for an installed one, or **Disconnect** and the
+assistant's name for one connected through Claude or ChatGPT, whose row shows the app's name with its web
+address beside it. A token nobody has named reads **Assistant connected with a token**; its **Add a
+name** button lets you say which assistant it is (the button reads **Rename** once it has a name).
 
 Removing the connector inside Claude or ChatGPT stops that app asking; **Disconnect** here is the one that
 cuts the access off from our side, so use it if you are not sure.
