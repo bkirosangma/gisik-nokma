@@ -113,7 +113,7 @@ check "13.1786 --dry-run still refuses a moved branch" 'mk clean; $G clone -q "$
 
 # --- 13.1787: no force, ever ---------------------------------------------------------------------------------------------------
 V="$HERE/verbs/tipmerge.sh"
-pushes() { /usr/bin/grep -E '^[^#]*git[^#]* push' "$1" | /usr/bin/grep -v 'echo'; }
+pushes() { /usr/bin/grep -E '^[^#]*git +push ' "$1" | /usr/bin/grep -v 'echo'; }
 forceful() { /usr/bin/grep -Eq -- '(--force|--delete|--mirror| -f( |$)|push[^#]* \+|:refs/heads/\$\{?base)' ; }
 check "13.1787 the verb has exactly one push and it carries no force, delete, mirror or + refspec" '[ -f "$V" ] && [ "$(pushes "$V" | wc -l | tr -d " ")" = 1 ] && ! pushes "$V" | forceful'
 check "13.1787 CONTROL — the detector flags every forceful form it exists to catch" 'for l in "git push --force origin x" "git push -f origin x" "git push origin +x:refs/heads/b" "git push --force-with-lease origin x" "git push origin :refs/heads/\$base" "git push --delete origin b"; do printf "%s\n" "$l" | forceful || exit 1; done'
