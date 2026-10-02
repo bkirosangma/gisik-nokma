@@ -215,11 +215,17 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
    * should also be enough to feel like its a note"), reusing
    * `--app-nav-offset` (globals.css `:root`) with its own `0px` fallback
    * rather than a second magic number for the same fact.
+   *
+   * AMENDED 2026-10-02 (UX fixes T9, 23.162, audit NP-04): the floor moved OFF the
+   * `.gn-notes__editor` wrapper (where it was an invisible band under a 134px
+   * field) onto the visible field, `.gn-notes__editor .ticket-editor .ticket-editor__content`.
+   * 23.162 is the case that pins the wrapper's absence; this keeps the field's derivation.
    */
-  it('13.1486 .gn-notes__editor carries a min-height built from --app-nav-offset', () => {
-    const rule = declarationsFor(CSS, '.gn-notes__editor');
+  it('13.1486 the visible editor field carries a min-height built from --app-nav-offset (AMENDED: no longer the wrapper)', () => {
+    const rule = declarationsFor(CSS, '.gn-notes__editor .ticket-editor .ticket-editor__content');
     expect(rule).not.toBeNull();
-    expect(rule ?? '').toMatch(/min-height:\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    expect(rule ?? '').toMatch(/min-height:\s*max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    expect(declarationsFor(CSS, '.gn-notes__editor') ?? '').not.toMatch(/min-height/);
   });
 
   /**
@@ -552,13 +558,13 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByTestId('note-document');
-    snap(container); // header, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
+    snap(container); // header, bar, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
     // group/group-title, deleted/restore button, session-absent, editor,
     // title, byline, author, edited, scope/scope-wrap, badges, reading-time,
     // byline-actions, toc(wrapper), search/search-input/filters.
 
     // New note → dialog, then a refused Create → dialog-failure.
-    await user.click(screen.getByRole('button', { name: 'New note' }));
+    await user.click(screen.getByRole('button', { name: 'Create note' }));
     await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Draft');
     refuseType = 'note.created';
     await user.click(screen.getByRole('button', { name: 'Create' }));
@@ -667,7 +673,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByText('No notes yet');
-    await user.click(screen.getByRole('button', { name: 'New note' }));
+    await user.click(screen.getByRole('button', { name: 'Create note' }));
     await screen.findByText(/not in a workspace yet/);
     snap(emptyRender.container); // empty, dialog, dialog-empty, hint (NO_NOTE_COPY)
     emptyRender.unmount();
