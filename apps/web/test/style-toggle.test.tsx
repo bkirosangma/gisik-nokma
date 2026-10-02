@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -51,7 +54,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
    * 13.344, restated for the new shape: all three styles are visible at once
    * under one labelled control, and picking one stamps `data-style` on the
    * theme element. The LABELS are pinned too — the reference names them
-   * "Apple HIG", "Minimal" and "Neomorphic", not the old abbreviations
+   * "Apple HIG", "Minimal" and "Neumorphic", not the old abbreviations
    * ("HIG"/"Neu"). Mutation: drop the control's `aria-label` → RED (the
    * `tablist` lookup is by that name).
    */
@@ -62,7 +65,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
     const names = within(tablist())
       .getAllByRole('tab')
       .map((tab) => tab.textContent);
-    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neomorphic']);
+    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neumorphic']);
 
     await user.click(segment('Apple HIG'));
     expect(document.documentElement.dataset['style']).toBe('hig');
@@ -75,7 +78,7 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
    */
   it('defaults to neo when nothing is stored', () => {
     render(<StyleToggle />);
-    expect(segment('Neomorphic')).toHaveAttribute('aria-selected', 'true');
+    expect(segment('Neumorphic')).toHaveAttribute('aria-selected', 'true');
   });
 
   /**
@@ -107,10 +110,66 @@ describe('StyleToggle — neo is the default, not the absence of a choice', () =
   it('describes the selected style, and the description follows the selection', async () => {
     const user = userEvent.setup();
     render(<StyleToggle />);
-    expect(screen.getByText(/^Neomorphic:/)).toBeInTheDocument();
+    expect(screen.getByText(/^Neumorphic:/)).toBeInTheDocument();
 
     await user.click(segment('Minimal'));
     expect(screen.getByText(/^Minimal:/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Neomorphic:/)).toBeNull();
+    expect(screen.queryByText(/^Neumorphic:/)).toBeNull();
+  });
+});
+
+/**
+ * 23.310 / 23.311 — the third Style option is spelled "Neumorphic" (owner, 2026-10-02: *"the style section in account says
+ * Neomorphic. but i think its Neumorphic right?"*). The established term is neumorphism, from "new skeuomorphism". Only the
+ * user-visible spelling moves: the code value `'neo'`, `data-style="neo"`, the CSS class and token names, and the file names
+ * stay as they are.
+ *
+ * Control, in the same `it()`: the other two labels are unchanged and the option still maps to `neo`, so the assertion cannot be
+ * satisfied by renaming everything. Mutation: restore "Neomorphic" in `style-toggle.tsx` → RED on the label, the description
+ * and the scan.
+ */
+const WEB_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(WEB_DIR, '..', '..', '..');
+
+function sourceFiles(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (['node_modules', '.next', 'dist', 'coverage', '.turbo', 'test', 'tests', '__tests__'].includes(name)) continue;
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) sourceFiles(path, out);
+    else if (/\.(tsx?|css|md|mdx|json)$/.test(name)) out.push(path);
+  }
+  return out;
+}
+
+describe('23.310 — the Style control spells its third option "Neumorphic"', () => {
+  it('labels the option "Neumorphic" and keeps the other two and the `neo` value', async () => {
+    const user = userEvent.setup();
+    render(<StyleToggle />);
+
+    const names = within(tablist())
+      .getAllByRole('tab')
+      .map((tab) => tab.textContent);
+    expect(names).toEqual(['Apple HIG', 'Minimal', 'Neumorphic']);
+    expect(screen.queryByRole('tab', { name: 'Neomorphic' })).toBeNull();
+    expect(screen.getByText(/^Neumorphic: soft raised surfaces/)).toBeInTheDocument();
+
+    await user.click(segment('Minimal'));
+    await user.click(segment('Neumorphic'));
+    expect(document.documentElement.dataset['style']).toBe('neo');
+  });
+
+  it('23.311 — no product source, manual, FAQ or generated help spells "Neomorphic"', () => {
+    const roots = [
+      join(REPO, 'apps', 'web', 'src'),
+      join(REPO, 'apps', 'web', 'app'),
+      join(REPO, 'apps', 'server', 'src'),
+      join(REPO, 'packages', 'ui', 'src'),
+      join(REPO, 'packages', 'app-core', 'src'),
+    ];
+    const files = [...roots.flatMap((root) => sourceFiles(root)), join(REPO, 'docs', 'manual.md'), join(REPO, 'docs', 'faq.md')];
+    // Control: the haystack holds its subject — the very file that renders the label is in it.
+    expect(files).toContain(join(REPO, 'apps', 'web', 'src', 'style-toggle.tsx'));
+    const offenders = files.filter((file) => /neomorphic/i.test(readFileSync(file, 'utf8')));
+    expect(offenders.map((file) => file.slice(REPO.length + 1))).toEqual([]);
   });
 });
