@@ -44,6 +44,7 @@ import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
 import { clearLastProjectCache, LAST_PROJECT_KEY } from '../src/use-last-project.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
+import { clearMyWorkspacesCache } from '../src/use-my-workspaces.js';
 
 const css = readGlobalsCss();
 
@@ -64,16 +65,18 @@ beforeEach(() => {
   clearLastProjectCache();
   clearWorkspaceNameCache();
   clearWorkspaceProjectsCache();
+  clearMyWorkspacesCache();
   currentPath = '/w/ws_1';
 });
 afterEach(cleanup);
 
 /**
- * `getMyWorkspaces` reads one bar mount sends. Three, and all three predate U-T14: the workspace name (`useWorkspaceLookup`),
- * Last project's list (`useWorkspaceProjects` in `LastProjectNav`) and the phone switcher's (`useWorkspaceProjects` in
- * `PhoneSwitcher`, mounted but hidden above 40rem). The workspace dropdown adds NONE: its rows ride the name's read.
+ * `getMyWorkspaces` reads one bar mount sends. ONE, since smoothness T4 (case 25.041). It was three: the workspace name
+ * (`useWorkspaceLookup`), Last project's list (`useWorkspaceProjects` in `LastProjectNav`) and the phone switcher's
+ * (`useWorkspaceProjects` in `PhoneSwitcher`, mounted but hidden above 40rem). All three now read the rows through
+ * `useMyWorkspaces`, which makes the request once per person per page. The workspace dropdown still adds NONE.
  */
-const BAR_MOUNT_READS = 3;
+const BAR_MOUNT_READS = 1;
 const sleep = (ms: number) => new Promise<void>((settle) => setTimeout(settle, ms));
 
 function project(over: Partial<ProjectRef> & { id: string }): ProjectRef {
@@ -382,7 +385,7 @@ describe('23.254–23.257 the workspace name opens the same dropdown', () => {
     await userEvent.hover(name);
     const menu = await screen.findByRole('menu', { name: 'Workspaces' });
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(2);
-    // The dropdown's rows came from the name's own read: a second request for them would make this 4.
+    // The dropdown's rows came from the shared read: a second request for them would make this 2.
     expect(calls).toBe(BAR_MOUNT_READS);
 
     // CONTROL (same `it`): a refused read gives no name and no list.

@@ -39,6 +39,43 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('useInboxUnread: the badge does not poll a hidden tab (audit SM-15)', () => {
+  afterEach(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  });
+
+  it('25.046 the badge does not poll while the document is hidden, and polls again when it is shown', async () => {
+    vi.useFakeTimers();
+    const unreadCount = vi.fn(async () => 2);
+    render(
+      <Providers services={stubServices({}, { notifications: { unreadCount } })}>
+        <InboxNavLink />
+      </Providers>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(unreadCount).toHaveBeenCalledTimes(1);
+    // The control, in the same it(): a VISIBLE tab polls on the interval.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REFRESH_MS);
+    });
+    expect(unreadCount).toHaveBeenCalledTimes(2);
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REFRESH_MS * 2);
+    });
+    expect(unreadCount).toHaveBeenCalledTimes(2);
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await Promise.resolve();
+    });
+    expect(unreadCount).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('InboxNavLink — the badge that keeps its last honest value', () => {
   it('11.152 reads the unread total once on mount and renders it with its real accessible name', async () => {
     render(
