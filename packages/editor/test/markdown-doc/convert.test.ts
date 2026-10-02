@@ -34,6 +34,12 @@ describe('26.001–26.009 the converter', () => {
   it('26.001 runs with no DOM', () => {
     expect(typeof (globalThis as { document?: unknown }).document).toBe('undefined');
     expect(inline('**x**')[0]).toMatchObject({ type: 'text', text: 'x', marks: [{ type: 'bold' }] });
+    // The SAME literal agreement.test.ts asserts under jsdom (its 26.001 control): no DOM changes nothing.
+    expect(markdownToDoc('**x**', resolve).doc).toEqual({
+      type: 'doc',
+      attrs: { schemaVersion: 2 },
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'bold' }] }] }],
+    });
   });
 
   it('26.002 every supported node and mark round-trips Markdown → document → Markdown', () => {
@@ -152,6 +158,8 @@ describe('26.001–26.009 the converter', () => {
     expect(inline('[a](javascript:alert(1))')).toEqual([{ type: 'text', text: '[a](javascript:alert(1))' }]);
     expect(inline(`[a](user:${ASHA})`)).toEqual([{ type: 'text', text: `[a](user:${ASHA})` }]);
     expect(inline('[a](https://x.in)')[0]?.marks?.[0]).toMatchObject({ type: 'link', attrs: { href: 'https://x.in' } });
+    // linkify stays off: a bare URL is ONE text node with no link mark (as the editor's `autolink: false` keeps it).
+    expect(inline('see https://x.in')).toEqual([{ type: 'text', text: 'see https://x.in' }]);
   });
 
   it('26.009 scanMarkdownRefs uses the same tokenizer', () => {

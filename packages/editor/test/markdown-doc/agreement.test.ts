@@ -28,3 +28,15 @@ describe('26.011 the browser serializer and the converter agree on the shared no
     }
   });
 });
+
+describe('26.001 control: the converter under jsdom', () => {
+  it('26.001 control: with a DOM present, markdownToDoc returns the identical JSON the node run asserts', () => {
+    expect(typeof document).not.toBe('undefined');
+    // The literal convert.test.ts's 26.001 asserts under the node environment.
+    expect(markdownToDoc('**x**', none).doc).toEqual({
+      type: 'doc',
+      attrs: { schemaVersion: 2 },
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'bold' }] }] }],
+    });
+  });
+});
