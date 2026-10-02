@@ -257,8 +257,8 @@ count and — once it has any projects — a line naming them.
   workspace's name first, because it removes the workspace from every member at once; it then sits
   under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
-If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
-— or create your own."* Both of those are real options.
+If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link, or
+create your own."* Both of those are real options.
 
 If you have been given a limited role, you may see a workspace's name with no projects listed under
 it. **That is deliberate, not broken** — you are being shown your share.
@@ -345,8 +345,8 @@ What changes and what does not:
 - **The workspace's prefix works the same way**, for every project at once. A workspace may take back one
   of its own old prefixes.
 
-Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and
-search by them, but it cannot change a prefix.
+Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix —
+but only after it has shown you what would change and you have confirmed with the old letters.
 
 ### Group your projects
 
@@ -459,7 +459,7 @@ already signed in, there is a **Join [workspace]** button.
   and projects, with a fresh link and a new email. Either way the older link stops working.
 
 If somebody tells you their link does not work, the message they see is: *"This invitation link does
-not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
+not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new
 one."*
 
 That message sits under a heading, **This invitation can't be used**, with a **Go to sign in** button
@@ -552,7 +552,7 @@ are in the first screen.
 Under the ticket's title, above the tabs, there is a short line of chips: the state it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
 *"Closed by … on …"* chip once it is closed. Directly below that line is where the ticket sits: *"At project
-root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent — exists, but you
+root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent: it exists, but you
 can't see it"*.
 
 The Details tab then reads top to bottom: the **description** box first, then the field rows — **State**,
@@ -604,6 +604,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
   signed-in identity the phone shell does not have yet, so the control is withheld there rather than
   shipped in a shape that always fails silently (E5-44).
+- **You can edit or delete your own comments.** Each comment you wrote has a **…** button: **Edit** opens it in
+  place — change it and press **Save**, or **Cancel** to leave it as it was. An edited comment says *edited* beside
+  its time; press that word (or hold it on a phone) to see when. **Delete** asks once — *Delete this comment? It is
+  removed for everyone.* — and leaves *Comment deleted*, with who wrote it and when, where it was. Only the person
+  who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit
+  notify the new people only. The ticket's History tab reads *Comment edited* and *Comment deleted*.
 - **You can attach a file to a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet's
   **Attachments** tab lists the ticket's files and has its own **Attach a file** button, and the comment
@@ -730,7 +736,7 @@ straight away.
   be done first. This is the one rule that sits above every workflow and cannot be turned off — you
   will see it named in the workflow editor as a fixed system rule.
 
-### "5 of 8 done · 2 restricted"
+### "5 of 8 done, 2 restricted"
 
 Five of its eight children are finished, and two of those eight are hidden **from you** — not from
 everybody, from you, because of who can see what.
@@ -740,7 +746,7 @@ true total and tells you part of it is not yours to see. If nothing is hidden, i
 "restricted" part at all. If a ticket has no children at all, no progress number shows — not "0 of 0",
 just nothing.
 
-### "Restricted parent — exists, but you can't see it"
+### "Restricted parent: it exists, but you can't see it"
 
 This means the ticket really does belong to a bigger ticket, and you are not allowed to see what that bigger
 ticket is — not even its title. The product deliberately tells you a parent *exists* rather than making
@@ -756,11 +762,11 @@ Open a ticket and its panel carries a **Subtasks** section, sitting between the 
 fields. It has four parts.
 
 **The heading** reads "Subtasks", and when the ticket has children it carries their progress on the same
-line — **"Subtasks · 3 of 5 done"**, with **"· 2 restricted"** added when some of them are not yours to
-see.
+line, in brackets after it — **Subtasks (3 of 5 done)** — with **, 2 restricted** added inside the brackets
+when some of them are not yours to see.
 
-**The children**, one line each, with **each child's own state** beside it: *"Order the brochures ·
-To do"*. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
+**The children**, one line each, with **each child's own state** beside it: *Order the brochures* with a
+**To do** chip. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
 its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty
 space to interpret.
 
@@ -768,8 +774,8 @@ space to interpret.
 Rebrand for Kalita Tea"**. Press it and that parent's panel opens in place of the one you were reading.
 It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in
 turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one
-you are not allowed to see, the chip reads **"Subtask of a restricted parent"** instead and is not
-pressable — see "Restricted parent — exists, but you can't see it" above.
+you are not allowed to see, the line reads "Restricted parent: it exists, but you can't see it" instead,
+and there is nothing to press.
 
 **The add row** at the bottom of the section takes a **New subtask title** and files the new child under
 the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent
@@ -787,7 +793,7 @@ weighed exactly as the standard ones are. Two tickets at the same rank cannot ne
 **Sub-task**.
 
 **Where nothing at all is smaller, the row is not drawn.** You get a sentence instead — *"This is a
-Sub-task — nothing smaller can sit under it."* — rather than a box and a button that could only end in
+Sub-task. Nothing smaller can sit under it."* — rather than a box and a button that could only end in
 a refusal. And if your list of types cannot be read at all, the section says *that* rather than showing
 you an empty row and letting you conclude there is nothing below.
 
@@ -1079,7 +1085,7 @@ is simply empty. So turning the switch on changes what the line **says** and nev
 **looks like** — nothing above or below it moves.
 
 > **Read that last sentence carefully.** The switch **does not affect the Board** — and a project opens
-> on the Board the first time you look at it. So you can turn it on, read "done are excluded", and be
+> on the Board the first time you look at it. So you can turn it on, read "Not started and done are both excluded", and be
 > looking at a Done column full of done cards. The note exists precisely because of this.
 
 > **And the Backlog is the odd one of the four.** The switch narrows the list, calendar and timeline; on
@@ -1193,8 +1199,7 @@ Overdue row. The strip shows the first five; if there are more, **Show all** and
 rest, and **Show fewer** folds it back.
 
 Each one carries its own sentence, so you never have to guess why it is there: *"In an active state
-since 2026-07-10 — past the 7-day staleness threshold."* or *"Needed by 2026-08-30 — due within 7
-days."*
+since 10 Jul, past the 7-day staleness threshold."* or *"due 5 Oct (in 4 days)"*
 
 **If nothing needs attention, the strip does not appear at all.** No box, no "all caught up" message,
 nothing. That is deliberate — an empty box headed "Needs your attention" reads like an all-clear you did
@@ -1214,7 +1219,7 @@ a sixth kind.
 2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a ticket's comment or description, or in a note or one of its comments. The row names the ticket or the note, and clicking it opens that ticket or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
-5. Something has been sitting in one state too long — *"In Doing since 21 Aug — moved there by
+5. Something has been sitting in one state too long — *"In Doing since 21 Aug, moved there by
    Anselma Marak"*
 
 **To mark one thing read: click the row.** If the marking fails, it reloads to show you the truth
@@ -1377,7 +1382,7 @@ the list. Reaching it through the link never has this problem.
 
 ### Who can use it
 
-Owners and admins only. If a member goes there they get: *"You can look, not touch — only a workspace
+Owners and admins only. If a member goes there they get: *"You can look, but not change anything. Only a workspace
 owner or admin can change workflows and ticket types."* No "New workflow" button, all the boxes
 switched off. They can look, they cannot break anything, and there is no way to accidentally publish.
 
@@ -1500,8 +1505,8 @@ there is no finished state; an arrow points at a state that does not exist; a st
 a finished state with no way in; two identical arrows; or a "who may move it" rule that names nobody.
 
 Each issue is clickable and jumps you to the offending box or arrow. **The Publish button stays off,
-with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues
-— this workflow can be published."*
+with the reason written out, for as long as any of them stands.** When it is clean it says *"No issues.
+This workflow can be published."*
 
 ### Advisories
 
@@ -1943,6 +1948,15 @@ comment that mentions somebody tells them as soon as it is posted. **Only people
 yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
 setting under Account → Notifications, exactly like a mention on a ticket.
 
+### Editing or deleting a comment on a note
+
+A comment on a note works as it does on a ticket. Each comment you wrote has a **…** button: **Edit** opens it in
+place — change it and press **Save**, or **Cancel** to leave it as it was — and an edited comment says *edited*
+beside its time (press the word to see when). **Delete** asks once, *Delete this comment? It is removed for
+everyone.*, and leaves *Comment deleted* with who wrote it and when. Only the person who wrote a comment can edit it;
+they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is
+restored. Mentions you add in an edit notify the new people only.
+
 ### Linking to a ticket or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the tickets you
@@ -2015,12 +2029,28 @@ do it yourself.
 - **Workspaces.** See the workspaces you belong to, start a new one (you become its owner), rename one,
   archive or restore one, and delete one or bring it back.
 - **Projects.** See a workspace's projects, start one, change its name or description, archive or restore
-  it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts
-  one, but it cannot change a prefix afterwards; do that yourself (§3).
+  it, file it in a group, and delete one or bring it back. The assistant can give a new project a short
+  prefix when it starts one, and an owner or admin can have it change that prefix later (§3).
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the tickets
   shared with you — never the full list, and never anyone's email address.
 - **Tickets.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
   me* works — and add, move, comment on and assign them.
+- **Notes.** Read, write and change notes — the whole body, one section under a heading, or a few lines at the end —
+  move them, attach them to tickets, and delete or bring them back.
+- **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
+  anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
+- **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
+- **Every ticket action** — change any field, close and reopen, reorder the backlog, see a ticket's history, delete
+  one or bring it back.
+- **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
+  read), and invitations waiting for you.
+- **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
+  who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing
+  happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the
+  item's current name.
+
+**Formatting comes through.** The assistant writes in Markdown, so headings, lists, bold text, links, mentions and
+ticket links appear in comments and notes exactly as if you had typed them in the app.
 
 **Deleting is never final here.** When your assistant deletes a workspace or a project it goes to **Deleted
 items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased.

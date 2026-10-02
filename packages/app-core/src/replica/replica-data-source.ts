@@ -1300,6 +1300,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         authorId: c.authorId,
         body: c.body,
         recordedAt: c.recordedAt,
+        editedAt: c.editedAt,
+        deletedAt: c.deletedAt,
       }));
     },
     getNoteHistory: async (workspaceId, noteId) => {

@@ -207,7 +207,7 @@ the older link stops working.
 
 **Somebody says the invitation link doesn't work.**
 They will see: *"This invitation link does not open anything. It may have been used, withdrawn, or
-lapsed — ask whoever invited you for a new one."* The page is headed **This invitation can't be used** and
+lapsed. Ask whoever invited you for a new one."* The page is headed **This invitation can't be used** and
 has a **Go to sign in** button (and **See your workspaces** if they are already signed in).
 
 That is genuinely all anyone can find out. The product deliberately refuses to say which of the four
@@ -308,7 +308,7 @@ that is not at the bottom for standalone tickets. The message tells you this usi
 No. Refused, including the clever cases where somebody has changed the ranks around to try to make it
 legal.
 
-**What does "5 of 8 done · 2 restricted" mean?**
+**What does "5 of 8 done, 2 restricted" mean?**
 Five of its eight direct children are finished, and two of the eight are hidden **from you** — not from
 everybody. The product gives you the true total and tells you part of it is not yours to see, rather
 than quietly showing "5 of 6" and making the ticket look nearly finished. If nothing is hidden, it does
@@ -325,7 +325,7 @@ old parent with no children, that parent's progress number disappears rather tha
 Unconfirmed. The total and the restricted count are certain; whether the restricted part is further
 broken down is not.
 
-**"Restricted parent — exists, but you can't see it." What is that?**
+**What does "Restricted parent: it exists, but you can't see it" mean?**
 The ticket does belong to a bigger ticket, and you are not allowed to see what that bigger ticket is — not even
 its title. The product deliberately tells you a parent exists rather than letting the ticket look like it
 has none. If a ticket genuinely has no parent it says **"At project root"** — a different sentence on
@@ -438,7 +438,7 @@ removed later, whoever removed it had to say where those tickets go, and yours f
 said, your ticket refuses to move rather than the product guessing, and it tells you it is stranded.
 
 **Can a regular member edit our workflow?**
-No. They get "You can look, not touch — only a workspace owner or admin can change workflows and
+No. They get "You can look, but not change anything. Only a workspace owner or admin can change workflows and
 ticket types", with no New workflow button and every box switched off. They can look. There is no way
 for a non-admin to accidentally publish something.
 
@@ -705,7 +705,7 @@ names its immediate parent, if that parent is not already the epic chip's own ti
 **Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
 saying so, and the note is important, because **a project opens on the Board the first time you look at
-it.** So you can turn it on, read "done are excluded", and be looking at a Done column full of done cards.
+it.** So you can turn it on, read "Not started and done are both excluded", and be looking at a Done column full of done cards.
 
 **Is that really the only filter?**
 Not any more. It was when this answer was written — one switch, and nothing else on any screen. Now
@@ -745,7 +745,7 @@ If it is in the "Recently assigned" strip at the top, it also appears in its nor
 down. That is on purpose.
 
 **Do lists load everything at once?**
-They come in pages of fifty with a "load more" that picks up exactly where the last one stopped — no
+They come in pages of fifty with a "Load more" that picks up exactly where the last one stopped — no
 repeats, no gaps.
 
 **What happens on a really big project?**
@@ -880,7 +880,7 @@ Yes. Every ticket has a "Who can see this" setting with four options: everyone i
 on the project, only the people you name, or inherited from the parent.
 
 **Does the owner see everything, even the private ones?**
-Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people, and the workspace owner, always."* It shows that line even when you have picked "everyone in the
+Yes, always — and the screen says so on **every** setting, all the time: *"Visible to: these people, and the workspace owner, always."* It shows that line even when you have picked "Everyone in the
 workspace" and even to somebody who cannot change the setting. Showing it only on the private option
 would let people assume the other options exclude the owner.
 

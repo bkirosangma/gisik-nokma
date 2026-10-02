@@ -1553,7 +1553,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No workspaces yet. Ask an admin for an invite link — or create your own.\""
+                    "text": "\"No workspaces yet. Ask an admin for an invite link, or create your own.\""
                   },
                   {
                     "kind": "text",
@@ -2215,7 +2215,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and search by them, but it cannot change a prefix."
+                    "text": "Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix — but only after it has shown you what would change and you have confirmed with the old letters."
                   }
                 ]
               }
@@ -2880,7 +2880,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   }
                 ]
               },
@@ -3431,7 +3431,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Restricted parent — exists, but you can't see it\""
+                    "text": "\"Restricted parent: it exists, but you can't see it\""
                   },
                   {
                     "kind": "text",
@@ -3814,6 +3814,96 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — commenting from the phone needs a signed-in identity the phone shell does not have yet, so the control is withheld there rather than shipped in a shape that always fails silently (E5-44)."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "You can edit or delete your own comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Each comment you wrote has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button: "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " opens it in place — change it and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to leave it as it was. An edited comment says "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " beside its time; press that word (or hold it on a phone) to see when. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks once — "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Delete this comment? It is removed for everyone."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — and leaves "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", with who wrote it and when, where it was. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit notify the new people only. The ticket's History tab reads "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment edited"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Comment deleted"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ],
                   [
@@ -4369,7 +4459,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "5-of-8-done-2-restricted",
-            "title": "\"5 of 8 done · 2 restricted\"",
+            "title": "\"5 of 8 done, 2 restricted\"",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -4400,8 +4490,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "restricted-parent-exists-but-you-can-t-see-it",
-            "title": "\"Restricted parent — exists, but you can't see it\"",
+            "id": "restricted-parent-it-exists-but-you-can-t-see-it",
+            "title": "\"Restricted parent: it exists, but you can't see it\"",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -4469,23 +4559,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " reads \"Subtasks\", and when the ticket has children it carries their progress on the same line — "
+                    "text": " reads \"Subtasks\", and when the ticket has children it carries their progress on the same line, in brackets after it — "
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Subtasks · 3 of 5 done\""
+                    "text": "Subtasks (3 of 5 done)"
                   },
                   {
                     "kind": "text",
-                    "text": ", with "
+                    "text": " — with "
                   },
                   {
                     "kind": "bold",
-                    "text": "\"· 2 restricted\""
+                    "text": ", 2 restricted"
                   },
                   {
                     "kind": "text",
-                    "text": " added when some of them are not yours to see."
+                    "text": " added inside the brackets when some of them are not yours to see."
                   }
                 ]
               },
@@ -4510,11 +4600,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Order the brochures · To do\""
+                    "text": "Order the brochures"
                   },
                   {
                     "kind": "text",
-                    "text": ". A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
+                    "text": " with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "To do"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
                   }
                 ]
               },
@@ -4535,15 +4633,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Press it and that parent's panel opens in place of the one you were reading. It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one you are not allowed to see, the chip reads "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "\"Subtask of a restricted parent\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " instead and is not pressable — see \"Restricted parent — exists, but you can't see it\" above."
+                    "text": ". Press it and that parent's panel opens in place of the one you were reading. It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one you are not allowed to see, the line reads \"Restricted parent: it exists, but you can't see it\" instead, and there is nothing to press."
                   }
                 ]
               },
@@ -4626,7 +4716,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This is a Sub-task — nothing smaller can sit under it.\""
+                    "text": "\"This is a Sub-task. Nothing smaller can sit under it.\""
                   },
                   {
                     "kind": "text",
@@ -6090,7 +6180,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"Not started and done are both excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
                   }
                 ]
               },
@@ -6825,7 +6915,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"In an active state since 2026-07-10 — past the 7-day staleness threshold.\""
+                    "text": "\"In an active state since 10 Jul, past the 7-day staleness threshold.\""
                   },
                   {
                     "kind": "text",
@@ -6833,7 +6923,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Needed by 2026-08-30 — due within 7 days.\""
+                    "text": "\"due 5 Oct (in 4 days)\""
                   }
                 ]
               },
@@ -6929,7 +7019,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "italic",
-                      "text": "\"In Doing since 21 Aug — moved there by Anselma Marak\""
+                      "text": "\"In Doing since 21 Aug, moved there by Anselma Marak\""
                     }
                   ]
                 ]
@@ -7555,7 +7645,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"You can look, not touch — only a workspace owner or admin can change workflows and ticket types.\""
+                    "text": "\"You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.\""
                   },
                   {
                     "kind": "text",
@@ -8268,7 +8358,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No issues — this workflow can be published.\""
+                    "text": "\"No issues. This workflow can be published.\""
                   }
                 ]
               }
@@ -10337,6 +10427,85 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "editing-or-deleting-a-comment-on-a-note",
+            "title": "Editing or deleting a comment on a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A comment on a note works as it does on a ticket. Each comment you wrote has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens it in place — change it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Cancel"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to leave it as it was — and an edited comment says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "edited"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside its time (press the word to see when). "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " asks once, "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Delete this comment? It is removed for everyone."
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and leaves "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Comment deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with who wrote it and when. Only the person who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is restored. Mentions you add in an edit notify the new people only."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "linking-to-a-ticket-or-another-note",
             "title": "Linking to a ticket or another note",
             "blocks": [
@@ -10728,7 +10897,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, but it cannot change a prefix afterwards; do that yourself (§3)."
+                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, file it in a group, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, and an owner or admin can have it change that prefix later (§3)."
                     }
                   ],
                   [
@@ -10758,7 +10927,88 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " works — and add, move, comment on and assign them."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Notes."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Read, write and change notes — the whole body, one section under a heading, or a few lines at the end — move them, attach them to tickets, and delete or bring them back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete anyone's). Mentions like "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "@Asha"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " notify only people who can read the ticket or note."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Files."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Every ticket action"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — change any field, close and reopen, reorder the backlog, see a ticket's history, delete one or bring it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Your work and your inbox."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " What is on your plate, what needs attention, your notifications (and marking them read), and invitations waiting for you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Admin, with a check first."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Inviting and removing people, roles, prefixes, groups, workflows, ticket types, who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the item's current name."
+                    }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Formatting comes through."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The assistant writes in Markdown, so headings, lists, bold text, links, mentions and ticket links appear in comments and notes exactly as if you had typed them in the app."
+                  }
                 ]
               },
               {
@@ -12611,7 +12861,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   },
                   {
                     "kind": "text",
@@ -13104,7 +13354,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-does-5-of-8-done-2-restricted-mean",
-            "title": "What does \"5 of 8 done · 2 restricted\" mean?",
+            "title": "What does \"5 of 8 done, 2 restricted\" mean?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13171,8 +13421,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "restricted-parent-exists-but-you-can-t-see-it-what-is-that",
-            "title": "\"Restricted parent — exists, but you can't see it.\" What is that?",
+            "id": "what-does-restricted-parent-it-exists-but-you-can-t-see-it-m",
+            "title": "What does \"Restricted parent: it exists, but you can't see it\" mean?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13615,7 +13865,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No. They get \"You can look, not touch — only a workspace owner or admin can change workflows and ticket types\", with no New workflow button and every box switched off. They can look. There is no way for a non-admin to accidentally publish something."
+                    "text": "No. They get \"You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types\", with no New workflow button and every box switched off. They can look. There is no way for a non-admin to accidentally publish something."
                   }
                 ]
               }
@@ -14805,7 +15055,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards."
+                    "text": " So you can turn it on, read \"Not started and done are both excluded\", and be looking at a Done column full of done cards."
                   }
                 ]
               }
@@ -14991,7 +15241,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "They come in pages of fifty with a \"load more\" that picks up exactly where the last one stopped — no repeats, no gaps."
+                    "text": "They come in pages of fifty with a \"Load more\" that picks up exactly where the last one stopped — no repeats, no gaps."
                   }
                 ]
               }
@@ -15549,7 +15799,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It shows that line even when you have picked \"everyone in the workspace\" and even to somebody who cannot change the setting. Showing it only on the private option would let people assume the other options exclude the owner."
+                    "text": " It shows that line even when you have picked \"Everyone in the workspace\" and even to somebody who cannot change the setting. Showing it only on the private option would let people assume the other options exclude the owner."
                   }
                 ]
               }

@@ -130,7 +130,7 @@ export const INVITE_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const INVITE_NOT_OPENABLE_BODY = {
   error: 'not_found',
   message:
-    'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.',
+    'This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.',
 } as const;
 
 /**

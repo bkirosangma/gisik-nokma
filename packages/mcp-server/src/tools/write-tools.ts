@@ -1,12 +1,24 @@
 import { z } from 'zod';
-import { newUlid, plainTextToDoc } from '@gisik-nokma/domain';
+import { PRIORITIES, newUlid } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
+import { MARKDOWN_SYNTAX_HELP, markdownBody, parentOf } from './markdown-io.js';
 import { envelopeFor, submitOne } from './submit.js';
 
 /** One ticket-entity envelope (the four write tools here all act on a ticket). */
 const envelope = (session: Session, workspaceId: string, ticketId: string, type: string, payload: unknown) =>
   envelopeFor(session, workspaceId, { kind: 'ticket', id: ticketId }, type, payload);
+
+/** The birth fields `create_ticket` takes beyond the original four (MCP-everything T9). */
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a day in YYYY-MM-DD form');
+const birthShape = {
+  markdown: z.string().optional(),
+  priority: z.enum(PRIORITIES).optional(),
+  assigneeId: z.string().min(1).optional(),
+  stateId: z.string().min(1).optional(),
+  startDate: day.optional(),
+  dueDate: day.optional(),
+};
 
 export function writeTools(session: Session): ToolDefinition[] {
   return [
@@ -16,7 +28,9 @@ export function writeTools(session: Session): ToolDefinition[] {
         'Create a ticket in a project. `typeId` names a ticket type that already exists in the ' +
         'workspace; `parentId` is the epic or parent ticket, or null for a top-level ticket. The ' +
         'workflow, the initial state and every rule are the product\'s, not this tool\'s. `start` ' +
-        'chooses where it is born: `\'backlog\'` (the default) or `\'focus\'`.',
+        'chooses where it is born: `\'backlog\'` (the default) or `\'focus\'`. Optional: `markdown` (the description), ' +
+        '`priority` (P1–P3), `assigneeId` ("me" is you), `stateId` (the status it starts in; the ticket then starts in focus, ' +
+        'so do not combine it with start "backlog"), `startDate` / `dueDate` (YYYY-MM-DD). ' + MARKDOWN_SYNTAX_HELP,
       inputSchema: {
         workspaceId: z.string().min(1),
         projectId: z.string().min(1),
@@ -24,6 +38,7 @@ export function writeTools(session: Session): ToolDefinition[] {
         title: z.string().min(1),
         parentId: z.string().min(1).nullable().optional(),
         start: z.enum(['backlog', 'focus']).optional(),
+        ...birthShape,
       },
       handler: async (args) => {
         const a = z
@@ -34,8 +49,12 @@ export function writeTools(session: Session): ToolDefinition[] {
             title: z.string().min(1),
             parentId: z.string().min(1).nullable().optional(),
             start: z.enum(['backlog', 'focus']).optional(),
+            ...birthShape,
           })
           .parse(args);
+        if (a.stateId !== undefined && a.start === 'backlog') {
+          throw new Error('a backlog ticket has no starting status — pass either start: "backlog" or a stateId, not both');
+        }
         const ticketId = newUlid();
         const event = envelope(session, a.workspaceId, ticketId, 'ticket.created', {
           typeId: a.typeId,
@@ -57,7 +76,14 @@ export function writeTools(session: Session): ToolDefinition[] {
           // `'backlog'` on the wire — never an absent key — so a reader of
           // the ledger cannot mistake "no argument was given" for "this
           // event predates the field".
-          start: a.start ?? 'backlog',
+          // A `stateId` means the ticket is BORN in that state, which a backlog ticket has not got (domain refusal): it starts in focus.
+          start: a.stateId !== undefined ? 'focus' : (a.start ?? 'backlog'),
+          ...(a.markdown === undefined || a.markdown.trim() === '' ? {} : { description: await markdownBody(session, a.workspaceId, a.markdown) }),
+          ...(a.priority === undefined ? {} : { priority: a.priority }),
+          ...(a.assigneeId === undefined ? {} : { assigneeId: a.assigneeId === 'me' ? session.userId() : a.assigneeId }),
+          ...(a.stateId === undefined ? {} : { stateId: a.stateId }),
+          ...(a.startDate === undefined ? {} : { startDate: { date: a.startDate } }),
+          ...(a.dueDate === undefined ? {} : { dueDate: { date: a.dueDate } }),
         });
         const committed = await submitOne(session, event);
         return { ticketId, ...(committed as object) };
@@ -92,22 +118,17 @@ export function writeTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'add_comment',
-      description: 'Add a comment to a ticket, attributed to you.',
-      inputSchema: {
-        workspaceId: z.string().min(1),
-        ticketId: z.string().min(1),
-        text: z.string().min(1),
-      },
+      description: `Add a comment to a ticket (ticketId) or a note (noteId), attributed to you. ${MARKDOWN_SYNTAX_HELP} (\`text\` is the old name of \`markdown\` and is read the same way.)`,
+      inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1).optional(), noteId: z.string().min(1).optional(), markdown: z.string().min(1).optional(), text: z.string().min(1).optional() },
       handler: async (args) => {
         const a = z
-          .object({ workspaceId: z.string().min(1), ticketId: z.string().min(1), text: z.string().min(1) })
+          .object({ workspaceId: z.string().min(1), ticketId: z.string().min(1).optional(), noteId: z.string().min(1).optional(), markdown: z.string().min(1).optional(), text: z.string().min(1).optional() })
           .parse(args);
-        // A document object, not a string — `commentAddedPayload.body` is
-        // `z.record(z.string(), z.unknown())`.
-        return submitOne(
-          session,
-          envelope(session, a.workspaceId, a.ticketId, 'comment.added', { body: plainTextToDoc(a.text) }),
-        );
+        const parent = parentOf(a, 'add_comment');
+        if ((a.markdown === undefined) === (a.text === undefined)) throw new Error('add_comment takes exactly one of markdown or text');
+        // MARKDOWN, not `plainTextToDoc` (the 13:37 defect): the converter stores headings, lists and mentions as the editor would.
+        const body = await markdownBody(session, a.workspaceId, (a.markdown ?? a.text) as string);
+        return submitOne(session, envelopeFor(session, a.workspaceId, parent, 'comment.added', { body }));
       },
     },
     {

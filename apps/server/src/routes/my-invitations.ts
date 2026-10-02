@@ -84,7 +84,7 @@ export type MyInvitationRouteDeps = {
 export const INVITATION_NOT_YOURS_BODY = {
   error: 'not_found',
   message:
-    'This invitation is no longer open. It may have been accepted, declined, or withdrawn, or it may have lapsed — ask whoever invited you for a new one.',
+    'This invitation is no longer open. It may have been accepted, declined, or withdrawn, or it may have lapsed. Ask whoever invited you for a new one.',
 } as const;
 
 type PendingRow = {

@@ -218,7 +218,7 @@ export async function readAttention(
       kind: 'blocked',
       card,
       stateName,
-      reason: `In "${stateName}" — a blocked state.`,
+      reason: `In the blocked state "${stateName}".`,
     });
   }
 
@@ -244,7 +244,7 @@ export async function readAttention(
       // A count of Indian days, subtracted — never a millisecond quotient.
       daysInFlight: istDaysBetween(enteredOnIstDay, today),
       thresholdDays: settings.staleDays,
-      reason: `In an active state since ${enteredOnIstDay} — past the ${settings.staleDays}-day staleness threshold.`,
+      reason: staleReason(enteredOnIstDay, today, settings.staleDays),
     });
   }
 
@@ -287,11 +287,21 @@ export async function readAttention(
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
-/** `2026-08-17` → `17 Aug` — with the year when it differs from the current year, so a date a year back is not read as this one. */
+/** `2026-08-17` → `17 Aug` (a due day's, and the stale reason's entry day) — with the year when it differs from the current year, so a date a year back is not read as this one. */
 function dueDayLabel(day: string, today: string): string {
   const [year = '', month = '', date = ''] = day.split('-');
   const label = `${Number(date)} ${MONTHS[Number(month) - 1] ?? month}`;
   return year === today.slice(0, 4) ? label : `${label} ${year}`;
+}
+
+/**
+ * The stale sentence the strip prints verbatim: `In an active state since 10 Jul,
+ * past the 7-day staleness threshold.` The day is the product's day format (the
+ * same label a due reason uses), and the clause break is a comma, so the line holds
+ * neither an ISO date nor a spaced em dash (UX fixes F-8, case 23.300).
+ */
+export function staleReason(enteredDay: string, today: string, staleDays: number): string {
+  return `In an active state since ${dueDayLabel(enteredDay, today)}, past the ${staleDays}-day staleness threshold.`;
 }
 
 /**

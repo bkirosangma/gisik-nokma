@@ -60,6 +60,9 @@ card-scale) and is recorded here only for completeness, not as a call.
   the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
   (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
   their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
+  **AMENDED 2026-10-02 by N10 (neo refresh, case 24.040): the ring is retired.** The neo rule is `border: 1px solid transparent`
+  (so the box keeps its size) with `box-shadow: var(--gn-shadow-field)`, whose line layer is the boundary. The test now asserts
+  the transparent border, the `field` shadow, the sunken ground, and that `border: none` stays gone; the ring text above is history.
 - **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
   (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
   makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
@@ -115,7 +118,7 @@ card-scale) and is recorded here only for completeness, not as a call.
   `<select>` remains in scope is untouched, since a segmented picker is not a native select — this
   control simply stopped being a `Select` call site.) `StyleToggle` renders one labelled control —
   a `role="tablist"` named `Style` holding 3 `role="tab"` entries, **`Apple HIG`/`Minimal`/
-  `Neomorphic`** (the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
+  `Neumorphic`** (spelling corrected from `Neomorphic`, owner 2026-10-02; the labels changed with the reference, from `HIG`/`Minimal`/`Neu`) — with
   `data-style` landing on `document.documentElement` when a choice is made, and a line beneath the
   control naming the selected style. That description line has its own case: it must TRACK the
   selection, asserted by switching and reading again, because fixed copy would satisfy any
@@ -123,8 +126,8 @@ card-scale) and is recorded here only for completeness, not as a call.
   name); hard-code the description → RED on the second read. —
   (`apps/web/test/style-toggle.test.tsx`)
 - **13.345** ✅ With nothing stored, the applied `data-style` is `neo` — witnessed as
-  `aria-selected="true"` on the `Neomorphic` tab (retitled 2026-09-15 with the return to
-  `SegmentedControl`; previously the `Select` trigger's own visible label text, and before that a
+  `aria-selected="true"` on the `Neumorphic` tab (retitled 2026-09-15 with the return to
+  `SegmentedControl`, and the tab's spelling corrected from `Neomorphic` 2026-10-02 (23.310); previously the `Select` trigger's own visible label text, and before that a
   native `<select>`'s `value`). *Mutation-witnessed here:
   defaulting the component's initial state to `hig` reddens this case (plus 13.344's broader render
   check, which also asserts the default) — 2/4 fail in `style-toggle.test.tsx`. Restored, checksum-verified.* — (`apps/web/test/style-toggle.test.tsx`)
@@ -277,7 +280,9 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   image: both DOM checks passed (`border: none` and a real `box-shadow` on `/sign-in` and `/workspaces`),
   the roster now sweeps 7 routes (19 elements examined, unchanged — no bordered element exists on either
   new route), `belowCount: 0`, and `non-text-contrast-roster.json`'s `sanctionedWaivers` carries exactly
-  the entry above. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
+  the entry above. **AMENDED 2026-10-02 by N10 (24.040): the ring is retired, so the DOM check now expects `border-style: solid`
+  with a TRANSPARENT colour (`rgba(0, 0, 0, 0)`), not a ring, and a `box-shadow` that contains the light-theme line
+  `rgb(137, 115, 98)` (`viewport.spec.ts`).** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
 - **13.357** ✅ `WorkspaceRef` gains `role`; `mapWorkspaceRefs` reads it (`GET /v1/me/workspaces` has
   disclosed `role` since the route first answered, per its own docblock — only the client-side read was
   missing) and each `/workspaces` card renders its own caller role. The additions table's one
@@ -384,6 +389,10 @@ same way).
   DERIVED from the (here, stubbed) `/v1/auth/methods` response — this case changes only what the stub
   answers, not the page's own gating logic — and it is a style witness only, run against a fresh browser
   context where nothing is stored. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+  *Re-pinned 2026-10-02 (neo release CI FIX 2; #931's `viewport` job, which runs only in CI): neo-light
+  `--gn-surface-sunken` reads `#e6dcd2` (N2, `neoWellLight`; was `#f1eae3`), and the pressed segment's rendered
+  `box-shadow` carries `inset`, `3px 3px 5px` and `-1px -1px 1px` (N9, `selected: recess`; was `3px 3px 6px` /
+  `-3px -3px 6px`), with the old pair asserted gone. RED on 5a468e24 (4 of 4 viewports), green after.*
 - **13.363** ✅ The accessible-name floor on `/sign-in` does not fall — no role or label changed in this
   round (the only markup edit is the email placeholder, which carries no accessible name of its own), and
   13.362's phone:true witness runs OUTSIDE the `UNAUTHED_ROUTES` sweep specifically so it cannot move the
@@ -1170,7 +1179,7 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   card is the remaining divergence from §7 and is not done here. **(f) The APPEARANCE card is rebuilt
   to its own owner reference image** (2026-09-15) — the one card with no prototype counterpart, since
   it is this page's own section per spec §4 — as two labelled `SegmentedControl`s in place of a
-  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neomorphic`) with a
+  `Select` trigger and an icon-only cycle button: Style (`Apple HIG`/`Minimal`/`Neumorphic`) with a
   description line that must TRACK the selection, Theme (`System`/`Light`/`Dark`), and a closing
   footnote. Cases 13.344-13.346 and 3.83 are retitled for the new control shapes rather than
   renumbered, and both component suites were rewritten to assert the SAME properties through the new

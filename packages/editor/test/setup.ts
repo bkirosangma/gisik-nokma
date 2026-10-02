@@ -43,14 +43,20 @@ const emptyRect = (): DOMRect =>
     toJSON: () => ({}),
   }) as DOMRect;
 
-if (!Range.prototype.getClientRects) Range.prototype.getClientRects = emptyRectList;
-if (!Element.prototype.getClientRects) Element.prototype.getClientRects = emptyRectList;
-if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = emptyRect;
-if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = function () {};
-if (!('ResizeObserver' in globalThis)) {
-  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  };
+/**
+ * Files that opt into `// @vitest-environment node` (the markdown-doc converter, which must
+ * run with no DOM, case 26.001) have no `Range` or `Element` to shim; the shims are for jsdom.
+ */
+if (typeof document !== 'undefined') {
+  if (!Range.prototype.getClientRects) Range.prototype.getClientRects = emptyRectList;
+  if (!Element.prototype.getClientRects) Element.prototype.getClientRects = emptyRectList;
+  if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = emptyRect;
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = function () {};
+  if (!('ResizeObserver' in globalThis)) {
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+  }
 }

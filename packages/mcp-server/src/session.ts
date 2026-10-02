@@ -1,5 +1,5 @@
 import type { McpConfig } from './config.js';
-import { HttpError, type GisikClient } from './http-client.js';
+import { HttpError, type DownloadedBytes, type FileBytes, type GisikClient } from './http-client.js';
 import { runDeviceLogin, type LoginPrompt } from './device-login.js';
 import { clearCachedToken, readCachedToken, writeCachedToken, type CachedToken } from './token-cache.js';
 
@@ -11,6 +11,10 @@ export type Session = {
   /** A JSON POST to a route other than the event door (founding a workspace is `POST /v1/workspaces`). */
   post(path: string, body: unknown): Promise<unknown>;
   postEvents(events: unknown[]): Promise<unknown>;
+  /** Raw bytes of a download (`GET /v1/attachments/:id`); never parsed as JSON. */
+  getBytes(path: string): Promise<DownloadedBytes>;
+  /** A multipart upload (`POST /v1/attachments`): fields first, then the file. */
+  postMultipart(path: string, fields: Record<string, string>, file: FileBytes): Promise<unknown>;
 };
 
 /**
@@ -65,5 +69,7 @@ export async function createSession(deps: {
     get: (path) => withReauth((token) => deps.client.get(path, token)),
     post: (path, body) => withReauth((token) => deps.client.post(path, body, token)),
     postEvents: (events) => withReauth((token) => deps.client.post('/v1/events', { events }, token)),
+    getBytes: (path) => withReauth((token) => deps.client.getBytes(path, token)),
+    postMultipart: (path, fields, file) => withReauth((token) => deps.client.postMultipart(path, fields, file, token)),
   };
 }

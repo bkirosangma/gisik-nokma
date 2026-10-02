@@ -25,7 +25,8 @@ describe('20.021 the primary Button — size, label, edge, radius', () => {
     expect(valueOf(primary, 'border')).toBe('1px solid var(--gn-accent-edge)');
     expect(valueOf(primary, 'background')).toBe('var(--gn-accent)');
     expect(valueOf(primary, 'color')).toBe('var(--gn-accent-text)');
-    expect(valueOf(primary, 'box-shadow')).toBe('var(--gn-shadow-action)');
+    // Amended 2026-10-02 (neo refresh T2, 24.020): `action` -> `action-filled`; hig maps the role to `action`, so it renders as before.
+    expect(valueOf(primary, 'box-shadow')).toBe('var(--gn-shadow-action-filled)');
     expect(valueOf(base, 'font-weight')).toBe('600');
     expect(valueOf(base, 'border-radius')).toBe('999px');
     expect(valueOf(base, 'gap')).toBe('0.625rem');
@@ -39,10 +40,11 @@ describe('20.022 the primary Button lifts toward the user', () => {
     const hover = ruleExactly(CSS, '.gn-button--primary:hover:not(:disabled)');
     const press = ruleExactly(CSS, '.gn-button--primary:active:not(:disabled)');
     expect(valueOf(hover, 'transform')).toBe('scale(1.04)');
-    expect(valueOf(hover, 'box-shadow')).toBe('var(--gn-shadow-action-near)');
+    // Amended 2026-10-02 (neo refresh T2, 24.020): `action-near` -> `action-filled-near`, `action-press` -> `action-filled-press` below.
+    expect(valueOf(hover, 'box-shadow')).toBe('var(--gn-shadow-action-filled-near)');
     expect(valueOf(hover, 'background')).toBe('var(--gn-accent-edge)');
     expect(valueOf(press, 'transform')).toBe('scale(0.98)');
-    expect(valueOf(press, 'box-shadow')).toBe('var(--gn-shadow-action-press)');
+    expect(valueOf(press, 'box-shadow')).toBe('var(--gn-shadow-action-filled-press)');
     expect(valueOf(press, 'transition-duration')).toBe('var(--gn-motion-feedback)');
     expect(valueOf(ruleExactly(CSS, '.gn-button'), 'transform-origin')).toBe('50% 60%');
     // CONTROL — at rest, no transform.
@@ -77,13 +79,14 @@ describe('20.024 the ghost Button is quiet and outlined with the accessible edge
 });
 
 describe('20.025 the danger Button matches the primary geometry on neutral depth', () => {
-  it('20.025 same size and lift, lift shadows not action shadows', () => {
+  it('20.025 same size and lift, the danger roles (neutral lift in hig) not the action shadows', () => {
     const danger = ruleExactly(CSS, '.gn-button--danger');
     const primary = ruleExactly(CSS, '.gn-button--primary');
     for (const property of ['min-height', 'padding', 'font-size']) {
       expect(valueOf(danger, property), property).toBe(valueOf(primary, property));
     }
-    expect(valueOf(danger, 'box-shadow')).toBe('var(--gn-shadow-lift)');
+    // Amended 2026-10-02 (neo refresh T2, 24.021): `lift` -> `danger`; hig maps the role to `lift`, so it renders as before.
+    expect(valueOf(danger, 'box-shadow')).toBe('var(--gn-shadow-danger)');
     expect(valueOf(ruleExactly(CSS, '.gn-button--danger:hover:not(:disabled)'), 'transform')).toBe('scale(1.04)');
     expect(valueOf(ruleExactly(CSS, '.gn-button--danger:active:not(:disabled)'), 'transform')).toBe('scale(0.98)');
     // CONTROL — not the accent-tinted action shadow.

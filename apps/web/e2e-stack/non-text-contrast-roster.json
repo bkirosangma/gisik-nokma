@@ -1,13 +1,19 @@
 {
-  "headSha": "8e742d18645cb27be17c4a970b0e67d564014832",
-  "producedAt": null,
-  "treeWasClean": null,
-  "provenance": "Every number below describes the tree at `headSha`, at `producedAt` — no other. A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and nothing here re-checks that: the file is regenerated only by a run of this sweep. So read an entry as a measurement, never as a claim about the tree you are standing in.",
-  "backfilled": "T-I2, 2026-09-21, round-2 finding I2. `headSha` is the commit that last wrote THIS file, measured with `/usr/bin/git log -1 --format=%H -- apps/web/e2e-stack/non-text-contrast-roster.json`, not remembered. `producedAt` and `treeWasClean` are null because the run that produced the file did not record them and the commit cannot recover them — the commit's own date, 2026-09-20 03:28:49 +0530, is an UPPER bound on producedAt and nothing more. The generator now writes all four fields itself. `belowCount: 1` with `button.ticket-type-list__move` at 1.41 is the entry this provenance exists to explain: that class was given a rule in `981aa92b`, eight hours after this file was written, and nothing in the file said which run it came from.",
-  "belowCount": 1,
-  "totalClasses": 2,
-  "examined": 13,
-  "highestReading": 3.54,
+  "headSha": "541f81a4e4bf9cc819898af836cab7cc906796a1",
+  "producedAt": "2026-10-02T12:22:04.166Z",
+  "treeWasClean": true,
+  "provenance": "Every number below describes the tree at `headSha`, at `producedAt` — no other. A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and nothing here re-checks that: the file is regenerated only by a run of this sweep under `UPDATE_ROSTER=1`. So read an entry as a measurement, never as a claim about the tree you are standing in. `treeWasClean: false` means an uncommitted edit was in the tree the run measured, and `headSha` then names its BASE rather than what was actually swept.",
+  "belowCount": 0,
+  "exemptions": [
+    {
+      "selector": "nav.gn-bottom-bar",
+      "ratio": 1.1248425183742106,
+      "reason": "container, not a control; its items carry their own >=3:1 cues (icon, label, current-item bar)"
+    }
+  ],
+  "totalClasses": 14,
+  "examined": 35,
+  "highestReading": 6.44,
   "routes": [
     "/sign-in",
     "/workspaces",
@@ -19,21 +25,137 @@
   ],
   "roster": [
     {
-      "selector": "button.ticket-type-list__move",
-      "ratio": 1.41,
-      "border": "rgba(118,118,118,0.3)",
+      "selector": "nav.gn-bottom-bar",
+      "ratio": 1.12,
+      "border": "rgba(176,152,132,0.16)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/workspaces",
+        "/my-work",
+        "/p/:projectId",
+        "/members",
+        "/settings/ticket-types",
+        "/settings/workflows"
+      ]
+    },
+    {
+      "selector": "select",
+      "ratio": 3.81,
+      "border": "rgba(118,118,118,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/members"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost.gn-attention__more",
+      "ratio": 4.04,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,223,210)",
+      "routes": [
+        "/my-work"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/sign-in"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost.gn-sign-in__mark",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/sign-in"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost.gn-project__edit",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/p/:projectId"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost.gn-project__filters",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/p/:projectId"
+      ]
+    },
+    {
+      "selector": "tr.gn-members__row",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/members"
+      ]
+    },
+    {
+      "selector": "button.ticket-type-list__row",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
       "backdrop": "rgb(241,234,227)",
       "routes": [
         "/settings/ticket-types"
       ]
     },
     {
-      "selector": "select",
-      "ratio": 3.54,
-      "border": "rgba(118,118,118,1)",
-      "backdrop": "rgb(235,226,218)",
+      "selector": "button.gn-button.gn-button--ghost.workflow-list__open",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
       "routes": [
+        "/settings/workflows"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--ghost.workflow-list__history",
+      "ratio": 4.39,
+      "border": "rgba(108,108,112,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/settings/workflows"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--primary",
+      "ratio": 6.44,
+      "border": "rgba(45,84,136,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/sign-in",
+        "/workspaces",
+        "/p/:projectId",
         "/members"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--primary.ticket-type-list__new",
+      "ratio": 6.44,
+      "border": "rgba(45,84,136,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/settings/ticket-types"
+      ]
+    },
+    {
+      "selector": "button.gn-button.gn-button--primary.workflow-list__new",
+      "ratio": 6.44,
+      "border": "rgba(45,84,136,1)",
+      "backdrop": "rgb(241,234,227)",
+      "routes": [
+        "/settings/workflows"
       ]
     }
   ],
@@ -49,14 +171,7 @@
         "/sign-in",
         "/workspaces"
       ],
-      "citation": "SUPERSEDED 2026-10-02 (UX fixes T1, owner U5): the neo text field now wears a 1px ring, so this waiver no longer applies to it; kept as the record. Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavySunken, still neoNavy), not re-measured."
-    }
-  ],
-  "exemptions": [
-    {
-      "selector": "nav.gn-bottom-bar",
-      "ratio": 1.12,
-      "reason": "container, not a control; its items carry their own >=3:1 cues (icon, label, current-item bar)"
+      "citation": "SUPERSEDED 2026-10-02 (UX fixes T1, owner U5; then N10, case 24.040): the neo text field no longer relies on a sunken inset alone — its boundary = the `--gn-shadow-field` line layer (N10, 24.040), 3.31 light / 4.86 dark, computed in `neo-refresh.test.ts`, so this waiver no longer applies to it; kept as the record. Owner ruling 2026-09-09 (Task 14 AMENDMENT rule (a)): the empty input takes the pure neo look (sunken, no border) even below 3:1. Originally measured by Task 13 (docs/neo-token-report.md) at 1.16 dark, against the since-reverted neoNavySunken (#3b425b); quoted in packages/ui/src/ui.css's [data-style=\"neo\"] .gn-field__input docblock and case 13.339. Light confirmed by this run's own DOM check; dark is arithmetic (surface === surfaceSunken post-revert, tokens.ts's neoNavySunken, still neoNavy), not re-measured."
     }
   ]
 }

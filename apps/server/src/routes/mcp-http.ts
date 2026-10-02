@@ -6,6 +6,9 @@ import type { Queryable } from '../db/queryable.js';
 import { hashCredential, resolveMcpToken } from '../mcp/token-store.js';
 import { hostedSession } from '../mcp/in-process-fetch.js';
 
+/** A 10 MiB file is ~13.4 MB of base64 inside JSON-RPC; Fastify's default 1 MiB would refuse it (SC20). */
+export const MCP_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
+
 /**
  * The hosted MCP endpoint (remote-MCP plan Task 7, cases 14.260–14.269).
  * Registered ONLY when `MCP_PUBLIC_URL` is set (`app.ts`).
@@ -40,7 +43,7 @@ export function registerMcpHttpRoute(
     });
   }
 
-  app.post('/mcp', async (request, reply) => {
+  app.post('/mcp', { bodyLimit: MCP_BODY_LIMIT_BYTES }, async (request, reply) => {
     // DNS-rebinding defence (spec §6): a browser page on another origin must not be
     // able to drive this door. An ABSENT Origin is a server-to-server connector,
     // which is how Claude and ChatGPT call — so it is admitted. Checked before auth.

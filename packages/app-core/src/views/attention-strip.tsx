@@ -73,8 +73,8 @@ export type AttentionStripProps = {
  * ## Three refusals, and they are the whole component
  *
  * 1. **The reason is the SERVER'S, rendered verbatim.** `routes/attention.ts`
- *    composes it — the template `In an active state since ${istDay} — past the
- *    ${staleDays}-day staleness threshold.` — from the workspace's own thresholds and
+ *    composes it — the template `In an active state since ${day}, past the
+ *    ${staleDays}-day staleness threshold.` (`day` is "10 Jul", the product's day format) — from the workspace's own thresholds and
  *    the IST day arithmetic that decided the item belonged here at all.
  *    Re-deriving it in the browser would give the product two ideas of why
  *    something needs attention, and the browser's would be the one computed

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ULID_REGEX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { writeTools } from '../src/tools/write-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 9. Cases 14.70–14.77.
@@ -24,6 +25,7 @@ function sessionCapturing(result: unknown): { session: Session; sent: unknown[][
     userId: () => USER,
     get: async () => { throw new Error('not a write'); },
     post: async () => { throw new Error('not a write'); },
+    ...NO_TRANSFER,
     postEvents: async (events) => { sent.push(events); return result; },
   };
   return { session, sent };
@@ -116,6 +118,33 @@ describe('every write builds an envelope the SERVER would accept', () => {
     expect(explicit['start']).toBe('focus');
   });
 
+  it('14.450 create_ticket passes markdown, priority, assigneeId ("me"), stateId (born in focus) and dates; four-argument calls are unchanged', async () => {
+    const WSID = '01J0WS000000000000000000AA';
+    const base = { workspaceId: WSID, projectId: '01J0PRJ000000000000000000A', typeId: 'task', title: 'Fix the chiller' };
+    const { session, sent } = sessionCapturing(COMMITTED);
+    await tool('create_ticket', session).handler(base); // control: today's four-argument call
+    expect((sent[0]?.[0] as { payload: Record<string, unknown> }).payload).toEqual({
+      typeId: 'task', projectId: '01J0PRJ000000000000000000A', parentId: null, title: 'Fix the chiller', start: 'backlog',
+    });
+    await tool('create_ticket', session).handler({
+      ...base, markdown: '## Steps\n\n- ring the vendor', priority: 'P2', assigneeId: 'me', stateId: 'todo', startDate: '2026-10-05', dueDate: '2026-10-09',
+    });
+    const envelope = sent[1]?.[0];
+    const payload = (envelope as { payload: Record<string, unknown> }).payload;
+    expect(payload).toMatchObject({
+      start: 'focus', priority: 'P2', assigneeId: USER, stateId: 'todo', startDate: { date: '2026-10-05' }, dueDate: { date: '2026-10-09' },
+    });
+    expect((payload['description'] as { content: Array<{ type: string }> }).content.map((n) => n.type)).toEqual(['heading', 'bulletList']);
+    const parsed = parseEvent({ ...(envelope as object), serverTime: '2026-10-02T10:00:00.000Z', seq: 1 }, domainRegistry);
+    if (!parsed.ok) throw new Error(`${parsed.code}: ${parsed.message}`);
+    // `start: 'backlog'` WITH a stateId is the domain's refusal: say so here, before anything is sent.
+    await expect(tool('create_ticket', session).handler({ ...base, start: 'backlog', stateId: 'todo' })).rejects.toThrow(/backlog ticket has no starting status/);
+    expect(sent).toHaveLength(2);
+    // An empty or blank markdown is no description, not an empty document.
+    await tool('create_ticket', session).handler({ ...base, markdown: '  ' });
+    expect(Object.hasOwn((sent[2]?.[0] as { payload: Record<string, unknown> }).payload, 'description')).toBe(false);
+  });
+
   it('14.72 transition_ticket uses the key `to`, not `toStateId`', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('transition_ticket', session).handler({
@@ -133,14 +162,14 @@ describe('every write builds an envelope the SERVER would accept', () => {
     expect((sent[0]?.[0] as { payload: unknown }).payload).toEqual({ to: 'done' });
   });
 
-  it('14.74 add_comment sends a document object, not a string', async () => {
+  it('14.74 add_comment sends a PARSED document object, not a string and not raw Markdown', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('add_comment', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', text: 'hello',
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', text: '## hello',
     });
     const payload = (sent[0]?.[0] as { payload: { body: unknown } }).payload;
     expect(typeof payload.body).toBe('object');
-    expect(payload.body).toMatchObject({ type: 'doc' });
+    expect(payload.body).toMatchObject({ type: 'doc', content: [{ type: 'heading', attrs: { level: 2 } }] });
   });
 
   it('14.75 assign_ticket sends an explicit null to unassign', async () => {

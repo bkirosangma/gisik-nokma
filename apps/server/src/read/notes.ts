@@ -288,8 +288,10 @@ export async function listNoteComments(db: Queryable, noteId: string): Promise<N
     author_id: string;
     body: unknown;
     recorded_at: Date;
+    edited_at: Date | null;
+    deleted_at: Date | null;
   }>(
-    `SELECT comment_id, author_id, body, recorded_at
+    `SELECT comment_id, author_id, body, recorded_at, edited_at, deleted_at
        FROM proj_note_comments
       WHERE note_id = $1
       ORDER BY workspace_seq`,
@@ -300,6 +302,8 @@ export async function listNoteComments(db: Queryable, noteId: string): Promise<N
     authorId: row.author_id,
     body: row.body,
     recordedAt: row.recorded_at.toISOString(),
+    editedAt: row.edited_at?.toISOString() ?? null,
+    deletedAt: row.deleted_at?.toISOString() ?? null,
   }));
 }
 

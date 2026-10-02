@@ -19,14 +19,15 @@ const PRESS = '.gn-board__card-slot:active > .gn-board-card';
 const DRAG_CLONE = '.gn-board-drag-image > .gn-board-card';
 
 describe('20.041 a board column is a recessed track', () => {
-  it('20.041 track ground, track shadow, track radius, 8px padding, 8px between cards', () => {
+  it('20.041 track ground, track shadow, track radius, 8px padding, a halo between cards (N7)', () => {
     const column = ruleExactly(CSS, '.gn-board__column');
     expect(valueOf(column, 'background')).toBe('var(--gn-surface-track)');
     expect(valueOf(column, 'box-shadow')).toBe('var(--gn-shadow-track)');
     expect(valueOf(column, 'border-radius')).toBe('var(--gn-radius-track)');
     expect(valueOf(column, 'padding')).toBe('0.5rem');
-    expect(valueOf(column, 'gap')).toBe('0.5rem');
-    expect(valueOf(ruleExactly(CSS, '.gn-board__cards'), 'gap')).toBe('0.5rem');
+    // Amended (N7, 24.081): rule 02's 8px between cards is `var(--gn-halo)` — 14px in neo, 8px in hig and minimal.
+    expect(valueOf(column, 'gap')).toBe('var(--gn-halo)');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__cards'), 'gap')).toBe('var(--gn-halo)');
     // CONTROL — nothing on the board paints the 1.14:1 flat fill any more.
     const boardRules = parseRules(CSS).filter((rule) => rule.selectors.some((s) => s.includes('.gn-board')));
     expect(boardRules.length).toBeGreaterThan(20);
@@ -102,9 +103,10 @@ describe('20.045 no hover motion to reduce', () => {
 });
 
 describe('20.046 the column header and the rail sit on the 8pt grid', () => {
-  it('20.046 8px padding and gap, third-tier count, action to the far edge, 16px between columns', () => {
+  it('20.046 halo bottom padding, 8px gap, third-tier count, action to the far edge, 16px between columns', () => {
     const header = ruleExactly(CSS, '.gn-board__column-header');
-    expect(valueOf(header, 'padding')).toBe('0.5rem');
+    // Amended (N7, 24.081): the bottom padding is the halo, so the title clears the first card (neo 14px; hig 8px).
+    expect(valueOf(header, 'padding')).toBe('0.5rem 0.5rem var(--gn-halo)');
     expect(valueOf(header, 'gap')).toBe('0.5rem');
     expect(valueOf(ruleExactly(CSS, '.gn-board__count'), 'color')).toBe('var(--gn-text-subtle)');
     expect(valueOf(ruleExactly(CSS, '.gn-board__column-header > .gn-board__column-action'), 'margin-left')).toBe('auto');
@@ -224,6 +226,7 @@ describe('20.054 three groups 16 apart, lines 8 apart, the footer inside the pad
     expect(valueOf(footer, 'display')).toBe('flex');
     // Amended 2026-10-02 (UX fixes T7, 23.122, audit BRD-02): the footer is ONE row now (D14), so it no longer wraps —
     // the provenance line truncates instead. 23.122 pins the new value and its truncation.
+    // Amended 2026-10-02 (neo follow-up F-1, 23.320): that is the base rule, i.e. up to 1024px; above it an @media arm wraps the footer into two rows.
     expect(valueOf(footer, 'flex-wrap')).toBe('nowrap');
     // CONTROL — the epic and title are one group: the chip adds no margin.
     expect(valueOf(ruleExactly(CSS, '.gn-board-card__epic'), 'margin')).toBe('0');

@@ -16,8 +16,9 @@ import type { SyncStorage } from './storage.js';
  * Raised to 3 by trash series Plan 3, which added `purged_ids`, `sync_notices`
  * and `deleted_items_cache` — three NEW tables, for the same reason the notes
  * tables were: `CREATE TABLE IF NOT EXISTS` is the only DDL this file runs.
+ * Raised to 4 by MCP-everything T4, which added `comment_changes` — a NEW table, for the same reason.
  */
-export const LOCAL_SCHEMA_VERSION = 3;
+export const LOCAL_SCHEMA_VERSION = 4;
 
 // ULID discipline: no column here carries a hand-written shape constraint.
 // `events.id`, `outbox.event_id` and the entity ids are ULIDs, but the ONE
@@ -149,6 +150,16 @@ const TABLES = [
      workspace_seq INTEGER NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS note_comments_note_idx ON note_comments (note_id, workspace_seq)`,
+  /**
+   * Comment edits and deletions (MCP-everything T4, spec §6) — a SIBLING table, not columns on
+   * `note_comments`, because this schema can only CREATE (see `snapshot_provenance` above). One row per
+   * changed comment, ticket or note; `entity_kind`/`entity_id` name the parent so a purge reaches it.
+   */
+  `CREATE TABLE IF NOT EXISTS comment_changes (
+     comment_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
+     edited_at TEXT, edited_by TEXT, deleted_at TEXT, deleted_by TEXT
+   )`,
+  `CREATE INDEX IF NOT EXISTS comment_changes_entity_idx ON comment_changes (entity_kind, entity_id)`,
   `CREATE TABLE IF NOT EXISTS workflows (
      workflow_id TEXT NOT NULL, version INTEGER NOT NULL, def TEXT NOT NULL, PRIMARY KEY (workflow_id, version)
    )`,
@@ -210,6 +221,7 @@ export const LOCAL_TABLE_RULES: Readonly<Record<string, { rule: 'erase' | 'regis
   tickets: { rule: 'erase', why: 'the erased ticket and its LOCAL subtree (parent_id), or every ticket naming an erased project' },
   notes: { rule: 'erase', why: 'the erased note, or every note homed in an erased project' },
   note_comments: { rule: 'erase', why: "an erased note's comments" },
+  comment_changes: { rule: 'erase', why: "an erased ticket's or note's comment edits, by (entity_kind, entity_id); a workspace's by workspace_id" },
   contests: {
     rule: 'erase',
     why: "EVERY contest on an erased ticket, the device's own included — unlike purgeEntity (lost access), a purge is an erasure and a stub embeds the claim whole",

@@ -27,7 +27,8 @@ describe('migrateLocal', () => {
       // the only DDL `migrateLocal` runs, so a table is safe on an existing
       // device and a changed column is not.
       // `purged_ids`, `sync_notices` and `deleted_items_cache` joined with trash Plan 3 (version 3), new tables for the same reason.
-      'contests', 'deleted_items_cache', 'events', 'meta', 'note_comments', 'notes', 'outbox', 'purged_ids',
+      // `comment_changes` joined with MCP-everything T4 (version 4), a new table for the same reason.
+      'comment_changes', 'contests', 'deleted_items_cache', 'events', 'meta', 'note_comments', 'notes', 'outbox', 'purged_ids',
       'snapshot_provenance', 'snapshots', 'sync_notices', 'ticket_types', 'tickets', 'workflows',
     ]);
     const version = await storage.all("SELECT value FROM meta WHERE key = 'schema_version'");
@@ -35,8 +36,8 @@ describe('migrateLocal', () => {
     // against itself is a round-trip check that survives any value change, so a
     // silent version bump would pass. A schema version is exactly the thing that
     // should require a conscious edit here when it moves.
-    expect(LOCAL_SCHEMA_VERSION).toBe(3);
-    expect(version[0]?.value).toBe('3');
+    expect(LOCAL_SCHEMA_VERSION).toBe(4);
+    expect(version[0]?.value).toBe('4');
     await storage.close();
   });
 });

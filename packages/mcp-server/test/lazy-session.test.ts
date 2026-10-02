@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lazySession } from '../src/lazy-session.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * MCP CRUD plan, lane-3 review fix (2026-10-01). Case 14.316.
@@ -18,6 +19,7 @@ describe('lazySession', () => {
         userId: () => 'u1',
         get: async (path) => { calls.push(['get', path, undefined]); return { got: path }; },
         post: async (path, body) => { calls.push(['post', path, body]); return { posted: path }; },
+        ...NO_TRANSFER,
         postEvents: async () => { throw new Error('not used'); },
       };
       return resolved;

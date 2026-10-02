@@ -2168,13 +2168,22 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // `#F1EAE3` too, so the two are still byte-for-byte equal and the assertion
   // still names the same property. Had only one side moved, this would be a
   // real regression rather than a re-pin.
+  //
+  // 2026-10-02 N2 (neo refresh, T3; case 24.007): this literal moved
+  // `#f1eae3` -> `#e6dcd2`. Neo-light `surfaceSunken` is now `neoWellLight`
+  // (`packages/ui/src/tokens.ts`), the well step the ux-fixes U5-U9 rulings
+  // named: "a pressed fill is never lighter than its ground". The pin was not
+  // updated with T3 because this suite runs only in CI. The 2026-09-18
+  // cross-check with the reference's `--segOnBg` (`#F1EAE3`) no longer holds,
+  // by the owner's N2 ruling, not by drift; the same `#e6dcd2` is what the
+  // track assertion below pins for `--gn-surface-track`.
   const surfaceSunken = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--gn-surface-sunken').trim(),
   );
   expect(
     surfaceSunken,
     'the page should have resolved neo\'s own surfaceSunken, not hig/minimal\'s',
-  ).toBe('#f1eae3');
+  ).toBe('#e6dcd2');
 
   // ── The track. Owner 2026-09-15 removed its fill; the styling refresh then ruled it back as a
   // recessed pill track (Plan B Task B2, case 20.211/20.213; ux-fixes U5-U9 name the well step
@@ -2226,13 +2235,23 @@ test('13.362 — the segmented control, driven to phone:true, renders under neo\
   // `.split(',').length >= 2` was tried in an earlier revision and is WRONG
   // for the same reason it always was: `getComputedStyle` renders each
   // layer's colour as `rgba(r, g, b, a)`, which itself contains commas, so
-  // counting commas proves nothing about layer count. The offsets come from
+  // counting commas proves nothing about layer count. The offsets came from
   // `SHADOWS.neo.<theme>.selected`: `inset 3px 3px 6px` +
   // `inset -3px -3px 6px`, identical in both themes.
+  //
+  // 2026-10-02 N9 (neo refresh, T3; cases 24.041 / 13.1726 follow-up): the
+  // pressed segment still reads `--gn-shadow-selected`, but neo now maps that
+  // role to `recess` (`tokens.ts`: `selected: recess`), a control recess sized
+  // to its box: a 3px/5px band plus a 1px lip, so the pinned offsets moved from `3px 3px 6px` /
+  // `-3px -3px 6px` to `3px 3px 5px` / `-1px -1px 1px`. Light only, as the
+  // run is; the dark pair is the same geometry in `shadowNeoBandDark` /
+  // `shadowNeoLipDark`. The old `selected` geometry must be GONE below.
   const selectedTabShadow = await phoneTab.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('inset');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('3px 3px 6px');
-  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-3px -3px 6px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('3px 3px 5px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).toContain('-1px -1px 1px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('3px 3px 6px');
+  expect(selectedTabShadow, `rendered box-shadow: ${selectedTabShadow}`).not.toContain('-3px -3px 6px');
   // The old raised geometry, AND the old (approximated) sunken geometry this
   // case used to pin, must both be GONE — without these, a rule emitting any
   // of them alongside the real one would satisfy the lines above.

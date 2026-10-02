@@ -1338,6 +1338,9 @@ function BoardGroupSection({
           const collapsed =
             !phone && columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false && springOpen !== column.stateId;
           const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
+          // Does this column carry `Close all (N)`? ONE answer for the header's class (F-2, 23.334) and the button, so they cannot
+          // drift: the three terms are explained in the docblock above the button.
+          const canBulkClose = bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0;
           const over = column.stateId === dropTarget;
           const verdict = over ? verdictOf(column.stateId) : 'unknown';
           // A placeholder only in a list that exists (a strip has none) and only for a legal move.
@@ -1467,7 +1470,16 @@ function BoardGroupSection({
               </button>
             ) : (
               <>
-            <header className="gn-board__column-header">
+            <header
+              className={
+                // Neo follow-up F-2 (case 23.334): a phone shows the column's name and count in the picker above the rail, so the
+                // header's own chip row is hidden there; with no `Close all (N)` to carry it has nothing left and the phone arm
+                // drops the whole row (`--bare`).
+                canBulkClose
+                  ? 'gn-board__column-header'
+                  : 'gn-board__column-header gn-board__column-header--bare'
+              }
+            >
               <Chip tone={column.blocked ? 'waiting' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
               {/*
@@ -1475,8 +1487,9 @@ function BoardGroupSection({
                * column's header gains Close all (N) (N = cards in the
                * column)."
                *
-               * THREE terms, and each excludes a different way of rendering a
-               * control that cannot work:
+               * `canBulkClose` (hoisted above, so the header's `--bare` class reads
+               * the same answer) has THREE terms, and each excludes a different
+               * way of rendering a control that cannot work:
                *   - `bulkCloseFor !== null` — no `moves`, no dialog to open
                *     (see the prop's own docblock). Not merely "disabled": there
                *     is no handler to call.
@@ -1496,7 +1509,7 @@ function BoardGroupSection({
                * unaddressable by role and name. The visible text stays exactly
                * the spec's `Close all (N)`.
                */}
-              {bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0 ? (
+              {canBulkClose ? (
                 <button
                   type="button"
                   className="gn-board__column-action"
@@ -2237,8 +2250,9 @@ function BoardCardView({
       </p>
       {/* The card's FOOTER (styling refresh Plan A Task 6): the provenance line and
           the move arrows share one row that reaches into the card's padding,
-          so 44px targets do not grow the card. Layout only — both children
-          are exactly what they were. */}
+          so 44px targets do not grow the card. Above 1024px (neo follow-up F-1, 23.320) they are TWO rows instead:
+          the provenance line, then the controls right-aligned. Layout only — both children are exactly what
+          they were. */}
       <div className="gn-board-card__footer">
         <button
           type="button"
@@ -2928,42 +2942,60 @@ function MoveArrows({
 
   return (
     <div className="gn-board-card__moves">
-      <button
-        type="button"
-        className="gn-board-card__move"
-        disabled={previousTargets.length === 0 || submitting}
-        aria-label={arrowLabel('previous', previousTargets)}
-        onClick={() => arrowClick(previousTargets)}
-      >
-        ‹
-      </button>
-      <button
-        type="button"
-        className="gn-board-card__move"
-        disabled={nextTargets.length === 0 || submitting}
-        aria-label={arrowLabel('next', nextTargets)}
-        onClick={() => arrowClick(nextTargets)}
-      >
-        ›
-      </button>
-      <button
-        type="button"
-        className="gn-board-card__move gn-board-card__move-to"
-        disabled={boardTargets.length === 0 || submitting}
-        aria-label="Move to another state"
-        aria-describedby={boardTargets.length === 0 ? moveRefusalId : undefined}
-        onClick={moveClick}
-      >
-        {/* The word differs by width — "Move" on a phone, "Move to…" above — and the stylesheet picks one
-            (`.gn-board-card__move-label--*`). Both are `aria-hidden`: the accessible name is the one `aria-label`
-            at every width, and a visible word read on top of it would be said twice. */}
-        <span className="gn-board-card__move-label--phone" aria-hidden="true">
-          Move
-        </span>
-        <span className="gn-board-card__move-label--wide" aria-hidden="true">
-          Move to…
-        </span>
-      </button>
+      {/* The controls are ONE group (neo follow-up F-1, case 23.320): above 1024px the stylesheet makes it the footer's
+          second row, right-aligned and never wrapping, while the notice below stays outside it so a refusal can still
+          take its own line. Below that the group is `display: contents`, so the footer lays out as it always did. */}
+      <div className="gn-board-card__controls">
+        <button
+          type="button"
+          className="gn-board-card__move"
+          disabled={previousTargets.length === 0 || submitting}
+          aria-label={arrowLabel('previous', previousTargets)}
+          onClick={() => arrowClick(previousTargets)}
+        >
+          ‹
+        </button>
+        <button
+          type="button"
+          className="gn-board-card__move"
+          disabled={nextTargets.length === 0 || submitting}
+          aria-label={arrowLabel('next', nextTargets)}
+          onClick={() => arrowClick(nextTargets)}
+        >
+          ›
+        </button>
+        <button
+          type="button"
+          className="gn-board-card__move gn-board-card__move-to"
+          disabled={boardTargets.length === 0 || submitting}
+          aria-label="Move to another state"
+          aria-describedby={boardTargets.length === 0 ? moveRefusalId : undefined}
+          onClick={moveClick}
+        >
+          {/* The word differs by width — "Move" on a phone, "Move to…" above — and the stylesheet picks one
+              (`.gn-board-card__move-label--*`). Both are `aria-hidden`: the accessible name is the one `aria-label`
+              at every width, and a visible word read on top of it would be said twice. */}
+          <span className="gn-board-card__move-label--phone" aria-hidden="true">
+            Move
+          </span>
+          <span className="gn-board-card__move-label--wide" aria-hidden="true">
+            Move to…
+          </span>
+        </button>
+        {/* Backlog/closed spec §5.2 — terminal columns only; `category` is
+            computed once above, alongside `previousTargets`/`nextTargets`. */}
+        {category === 'terminal' ? (
+          <button
+            type="button"
+            className="gn-board-card__close"
+            aria-label={`Close ${card.title}`}
+            disabled={submitting}
+            onClick={() => void closeCard()}
+          >
+            Close
+          </button>
+        ) : null}
+      </div>
       {boardTargets.length === 0 ? (
         // Disabled, never absent (as the arrows are): the reason is the board's own refusal sentence, read
         // off the same `transitionOptions` list `moveOutcome` would name — `refusalCopy` drops Backlog itself.
@@ -2973,19 +3005,6 @@ function MoveArrows({
             transitionOptions(workflow, fromStateId).map((option) => option.toStateId),
           )}
         </span>
-      ) : null}
-      {/* Backlog/closed spec §5.2 — terminal columns only; `category` is
-          computed once above, alongside `previousTargets`/`nextTargets`. */}
-      {category === 'terminal' ? (
-        <button
-          type="button"
-          className="gn-board-card__close"
-          aria-label={`Close ${card.title}`}
-          disabled={submitting}
-          onClick={() => void closeCard()}
-        >
-          Close
-        </button>
       ) : null}
       {/*
        * Ruling 28 (coordinator, 2026-09-16) — `ref={noticeRef}` on this

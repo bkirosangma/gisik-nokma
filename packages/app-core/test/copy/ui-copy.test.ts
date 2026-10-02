@@ -127,6 +127,42 @@ describe('23.191 no " · " and no " — " in the strings a person reads', () => 
 });
 
 // ---------------------------------------------------------------------------------------------
+// 23.301 — the strip's server-composed reasons (UX fixes F-8)
+// ---------------------------------------------------------------------------------------------
+
+/** The route whose reason strings the strip prints verbatim. Its other server strings are not read as UI copy here. */
+const ATTENTION_ROUTE = 'apps/server/src/routes/attention.ts';
+
+/** Reason strings that still hold " — ". Each carries its reason. Empty since F-11: the blocked reason was the last. */
+const SERVER_REASON_ALLOWED: readonly AllowEntry[] = [];
+
+describe('23.301 and 23.356 the attention route composes no " — " in a reason a person reads', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds the old stale template)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
+
+    // Control: the scan reads the route's template chunks, so the old stale template is found.
+    const old = 'const reason = `In an active state since ${day} — past the ${n}-day staleness threshold.`;';
+    expect(hitsOf(ATTENTION_ROUTE, old).map((hit) => hit.text)).toEqual([' — past the ']);
+
+    // Control (F-11, 23.356): the BLOCKED template, as it stood at attention.ts:221, is found too. It once passed
+    // because an allow-list entry named it, not because the scan could not see a template tail after a `${}`.
+    const blocked = 'const item = { reason: `In "${stateName}" — a blocked state.` };';
+    expect(hitsOf(ATTENTION_ROUTE, blocked).map((hit) => hit.text)).toEqual(['" — a blocked state.']);
+    expect(withoutAllowed(hitsOf(ATTENTION_ROUTE, blocked).map((hit) => ({ ...hit, file: ATTENTION_ROUTE })), SERVER_REASON_ALLOWED)).toHaveLength(1);
+
+    const serverHits = hitsOf(ATTENTION_ROUTE, readFileSync(resolve(REPO_ROOT, ATTENTION_ROUTE), 'utf8'));
+    expect(withoutAllowed(serverHits, SERVER_REASON_ALLOWED).map(describeHit)).toEqual([]);
+
+    // The allow-list is not stale: every entry still matches a string in the route, and says why.
+    for (const entry of SERVER_REASON_ALLOWED) {
+      expect(serverHits.some((hit) => hit.text.includes(entry.contains))).toBe(true);
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
 // 23.192 — no all-caps text
 // ---------------------------------------------------------------------------------------------
 
@@ -151,6 +187,59 @@ describe('23.192 no stylesheet or inline style sets text-transform: uppercase', 
   it('no UI source string sets it inline', () => {
     const hits = uiStringsMatching(UPPERCASE_RULE);
     expect(hits.map(describeHit)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.360 — the server's response bodies a client shows verbatim (MCP-everything follow-up)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The route files whose message strings reach a client that prints them: the invitation page and
+ * banner show the two invitation bodies, and the token-name refine message is the schema's own words.
+ * Pinned by file (not by a sweep of the routes) so a file the sweep cannot yet vouch for is not
+ * claimed. Each pins a sentence it must still hold, so the scan is proven to be reading its subject.
+ */
+const SERVER_BODY_FILES: ReadonlyArray<{ file: string; holds: string }> = [
+  { file: 'apps/server/src/routes/invites.ts', holds: 'does not open anything' },
+  { file: 'apps/server/src/routes/my-invitations.ts', holds: 'no longer open' },
+  { file: 'apps/server/src/routes/mcp-tokens.ts', holds: 'must not be blank' },
+];
+
+/** Strings in those files that keep " — " because they are not copy a client shows. Each carries its reason. */
+const SERVER_BODY_ALLOWED: readonly AllowEntry[] = [];
+
+describe('23.360 the invitation and token-name bodies hold no " — "', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds a planted body)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
+
+    // Control: the scan reads an object-literal message and a refine message, and never a comment.
+    const planted = [
+      "// lapsed — in a comment",
+      "export const BODY = { error: 'not_found', message: 'It may have lapsed — ask for a new one.' };",
+      "const schema = z.string().refine((v) => v !== '', 'must not be blank — a name of only spaces');",
+      "const ok = 'It may have lapsed. Ask for a new one.';",
+    ].join('\n');
+    expect(hitsOf('apps/server/src/routes/planted.ts', planted).map((hit) => hit.text)).toEqual([
+      'It may have lapsed — ask for a new one.',
+      'must not be blank — a name of only spaces',
+    ]);
+
+    const hits = SERVER_BODY_FILES.flatMap(({ file, holds }) => {
+      const source = readFileSync(resolve(REPO_ROOT, file), 'utf8');
+      // Control: the file is read, and it still holds the sentence this case is about.
+      expect(
+        stringsIn(file, source).some((hit) => hit.text.includes(holds)),
+        `${file} holds "${holds}"`,
+      ).toBe(true);
+      return hitsOf(file, source);
+    });
+    expect(withoutAllowed(hits, SERVER_BODY_ALLOWED).map(describeHit)).toEqual([]);
+  });
+
+  it('reasons are written: every allow-list entry says why it stays', () => {
+    for (const entry of SERVER_BODY_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
   });
 });
 
