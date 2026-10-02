@@ -128,6 +128,25 @@ export function NoteComments({
    * gets no controls (there is no editor to edit in), and the gate decides what commits either way.
    */
   const noteParent = { kind: 'note' as const, id: noteId };
+  /**
+   * What a comment editor can do on a note, built once for the composer AND the in-place edit (T5 FIX 1) so the
+   * two cannot drift: an edit that lacked these found nobody on `@` and no ticket or note on `[[`.
+   */
+  const editorCapabilities = {
+    queryUsers: async (query: string) => mentionCandidatesOf(members, query),
+    queryTickets: buildWorkspaceQueryTickets(dataSource, workspaceId),
+    resolveTicketHref: ticketRefHrefIn(workspaceId),
+    queryNotes: async (query: string) => {
+      const needle = query.trim().toLowerCase();
+      const hits: Array<{ noteId: string; title: string }> = [];
+      for (const candidate of notes) {
+        if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+        hits.push({ noteId: candidate.noteId, title: candidate.title });
+        if (hits.length === 8) break;
+      }
+      return hits;
+    },
+  };
   const actions: CommentActions | undefined =
     user === null || !canComment
       ? undefined
@@ -155,9 +174,7 @@ export function NoteComments({
                 done();
                 return true;
               }}
-              queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
-              queryTickets={buildWorkspaceQueryTickets(dataSource, workspaceId)}
-              resolveTicketHref={ticketRefHrefIn(workspaceId)}
+              {...editorCapabilities}
             />
           ),
           deleteComment: async (comment) => {
@@ -192,19 +209,7 @@ export function NoteComments({
             placeholder="Add a comment"
             submit={submitComment}
             footerNote="Posting records an event citing you."
-            queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
-            queryTickets={buildWorkspaceQueryTickets(dataSource, workspaceId)}
-            resolveTicketHref={ticketRefHrefIn(workspaceId)}
-            queryNotes={async (query: string) => {
-              const needle = query.trim().toLowerCase();
-              const hits: Array<{ noteId: string; title: string }> = [];
-              for (const candidate of notes) {
-                if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-                hits.push({ noteId: candidate.noteId, title: candidate.title });
-                if (hits.length === 8) break;
-              }
-              return hits;
-            }}
+            {...editorCapabilities}
           />
         ) : undefined
       }

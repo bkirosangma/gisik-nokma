@@ -171,6 +171,10 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
+  // The question's Delete while a delete is in flight. A second click would file a second `comment.deleted`, which the
+  // gate refuses (the comment is already deleted), and the alert would then name a refusal for a comment that went.
+  const [deleting, setDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
   const [showEditTime, setShowEditTime] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -328,10 +332,19 @@ function CommentItem({
               type="button"
               className="gn-button gn-button--danger"
               aria-label="Delete comment"
+              disabled={deleting}
               onClick={async () => {
-                const refused = await actions.deleteComment(comment);
-                setConfirming(false);
-                setRefusal(refused);
+                if (deleteInFlight.current) return;
+                deleteInFlight.current = true;
+                setDeleting(true);
+                try {
+                  const refused = await actions.deleteComment(comment);
+                  setConfirming(false);
+                  setRefusal(refused);
+                } finally {
+                  deleteInFlight.current = false;
+                  setDeleting(false);
+                }
               }}
             >
               Delete

@@ -60,8 +60,12 @@ function recording(ingested: SubmittedEvent[]): (events: SubmittedEvent[]) => Pr
   };
 }
 
-function mount(rows: NoteComment[], canModerate: boolean, ingested: SubmittedEvent[]) {
-  const services = stubServices({ getNoteComments: async () => rows });
+function mount(
+  rows: NoteComment[] | (() => Promise<NoteComment[]>),
+  canModerate: boolean,
+  ingested: SubmittedEvent[],
+) {
+  const services = stubServices({ getNoteComments: typeof rows === 'function' ? rows : async () => rows });
   services.dataSource.ingest = recording(ingested);
   render(
     <Providers services={services}>
@@ -99,6 +103,45 @@ describe('26.113–26.115 note comments: edit and delete', () => {
       origin: 'web',
       actorId: 'u_ana',
     });
+  });
+
+  it('26.113 after a committed edit the note thread RELOADS and shows "edited"; before Save it does not', async () => {
+    const ingested: SubmittedEvent[] = [];
+    let reads = 0;
+    mount(
+      async () => {
+        reads += 1;
+        return [row({ commentId: 'c-mine', editedAt: reads > 1 ? '2026-10-02T09:30:00.000Z' : null })];
+      },
+      false,
+      ingested,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: "More actions for Anselma Marak's comment" }));
+    expect(screen.queryByText('edited')).toBeNull(); // control: the first read carries no edit
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const editor = capturedSlotProps.filter((p) => p['submitLabel'] === 'Save').at(-1)!;
+    const submit = editor['submit'] as (s: { type: string; payload: unknown }) => Promise<boolean>;
+    await act(async () => {
+      await submit({ type: 'comment.added', payload: { body: { type: 'doc', content: [] } } });
+    });
+    expect(await screen.findByText('edited')).toBeInTheDocument(); // what the reader SEES, from the second read
+    expect(ingested).toHaveLength(1);
+  });
+
+  it('26.121 the in-place editor takes the composer\'s capabilities: @, :ticket, [[ and the ticket link; none is excluded', async () => {
+    mount([row({ commentId: 'c-mine' })], false, []);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: "More actions for Anselma Marak's comment" }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const KEYS = ['queryUsers', 'queryNotes', 'queryTickets', 'resolveTicketHref'] as const;
+    const composer = capturedSlotProps.filter((p) => p['placeholder'] === 'Add a comment').at(-1)!;
+    const edit = capturedSlotProps.filter((p) => p['submitLabel'] === 'Save').at(-1)!;
+    // CONTROL: the composer's set is non-empty and contains queryUsers, so equality below is not two empty sets.
+    const capsOf = (props: Record<string, unknown>) => KEYS.filter((k) => typeof props[k] === 'function');
+    expect(capsOf(composer)).toContain('queryUsers');
+    expect(capsOf(composer)).toEqual([...KEYS]);
+    expect(capsOf(edit)).toEqual(capsOf(composer));
   });
 
   it('26.114 Delete asks, then files ONE comment.deleted against the note', async () => {

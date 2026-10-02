@@ -1592,6 +1592,7 @@ export function TicketSheet({
               ticketId={ticketId}
               submitLabel="Save"
               footerNote="Saving records an edit citing you."
+              {...commentEditorCapabilities}
               submit={async (submission) => {
                 if (submission.type !== 'comment.added') return false;
                 const [result] = await dataSource.ingest([
@@ -3066,6 +3067,23 @@ export function TicketSheet({
     setEditorError(err instanceof Error ? err.message : String(err));
   };
 
+  /**
+   * What a COMMENT editor can do here, built once for both mounts of it: the composer and the in-place edit
+   * (MCP-everything T5, FIX 1). One object so the two cannot drift — an edit that lacked `queryUsers` found nobody
+   * on `@` while the manual promises that mentions added in an edit notify the new people. `renderEditor` (far above)
+   * reads it when it RENDERS, long after this line has run.
+   */
+  const commentEditorCapabilities = {
+    queryUsers,
+    queryNotes,
+    ...(queryTickets === undefined ? {} : { queryTickets }),
+    ...(resolveTicketHref === undefined ? {} : { resolveTicketHref }),
+    isPurged: purgedComments.isPurged,
+    uploadAttachment,
+    emitAttachmentAdded,
+    onError: reportEditorError,
+  };
+
   // UX fixes T7 (BRD-12, case 23.125): on a phone the sheet opens on its FIELDS (State, Assignee, Priority) and the
   // description editor waits behind "Add a description" / "Edit description". A description that exists stays on
   // the page, read-only, until the button is tapped; a sheet with no editor wired has nothing to collapse. The
@@ -4239,14 +4257,7 @@ export function TicketSheet({
                   ticketId={ticketId}
                   placeholder="Add a comment, or type @ to mention someone"
                   submit={submitComment}
-                  queryUsers={queryUsers}
-                  queryNotes={queryNotes}
-                  {...(queryTickets === undefined ? {} : { queryTickets })}
-                  {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
-                  isPurged={purgedComments.isPurged}
-                  uploadAttachment={uploadAttachment}
-                  emitAttachmentAdded={emitAttachmentAdded}
-                  onError={reportEditorError}
+                  {...commentEditorCapabilities}
                   /*
                     THE POSTING SENTENCE, IN THE FOOTER ROW (spec decision 8; the
                     prototype's `cmtHint` slot at `desktop.dc.html:1329`). It is

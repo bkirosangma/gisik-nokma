@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CommentsThread, type CommentActions, type TicketComment } from '../../src/views/comments-thread.js';
 
@@ -85,6 +85,64 @@ describe('26.110–26.114 comment actions', () => {
     fireEvent.keyDown(screen.getAllByRole('menuitem')[0]!, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(document.activeElement).toBe(more);
+  });
+
+  it('26.112 opening the menu puts focus on its first item', () => {
+    render(<CommentsThread comments={[MINE]} nameOf={nameOf} actions={actions()} />);
+    fireEvent.click(within(item('01MINE')).getByRole('button', { name: /More actions/ }));
+    const [edit] = screen.getAllByRole('menuitem');
+    expect(edit?.textContent).toBe('Edit');
+    expect(document.activeElement).toBe(edit); // the keyboard is IN the menu
+  });
+
+  it('26.112 the arrows, Home and End move between the items and wrap', () => {
+    render(<CommentsThread comments={[MINE]} nameOf={nameOf} actions={actions()} />);
+    fireEvent.click(within(item('01MINE')).getByRole('button', { name: /More actions/ }));
+    const [edit, del] = screen.getAllByRole('menuitem');
+    const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key });
+    expect(document.activeElement).toBe(edit); // control: where it starts
+    press('ArrowDown');
+    expect(document.activeElement).toBe(del);
+    press('ArrowDown');
+    expect(document.activeElement).toBe(edit); // wraps
+    press('ArrowUp');
+    expect(document.activeElement).toBe(del); // wraps back
+    press('Home');
+    expect(document.activeElement).toBe(edit);
+    press('End');
+    expect(document.activeElement).toBe(del);
+  });
+
+  it('26.122 a double click on the question\'s Delete files ONE delete; the button is disabled while it is in flight', async () => {
+    let settle: (value: string | null) => void = () => {};
+    const deleteComment = vi.fn(() => new Promise<string | null>((resolve) => { settle = resolve; }));
+    render(<CommentsThread comments={[MINE]} nameOf={nameOf} actions={actions({ deleteComment })} />);
+    fireEvent.click(within(item('01MINE')).getByRole('button', { name: /More actions/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    const confirm = screen.getByRole('button', { name: 'Delete comment' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(deleteComment).toHaveBeenCalledTimes(1);
+    expect(confirm).toBeDisabled();
+    settle(null);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete comment' })).toBeNull());
+    expect(deleteComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('26.122 control: after a REFUSED delete the question closes and a later delete is allowed again', async () => {
+    const deleteComment = vi.fn(async () => 'No.');
+    render(<CommentsThread comments={[MINE]} nameOf={nameOf} actions={actions({ deleteComment })} />);
+    const ask = () => {
+      fireEvent.click(within(item('01MINE')).getByRole('button', { name: /More actions/ }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    };
+    ask();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete comment' }));
+    await screen.findByRole('alert');
+    ask();
+    expect(screen.getByRole('button', { name: 'Delete comment' })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete comment' }));
+    await waitFor(() => expect(deleteComment).toHaveBeenCalledTimes(2));
   });
 
   it('26.114 Delete asks once; Cancel sends nothing; a refusal is shown and the comment stays', async () => {
