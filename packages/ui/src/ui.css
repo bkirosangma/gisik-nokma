@@ -95,7 +95,8 @@
 }
 .gn-button:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
-  outline-offset: 1px;
+  /* Neo refresh 24.023 (2026-10-02): 3px, not 1px — the primary's 1px accent edge and the 2px ring read as one ring with a gap. The field already sits at 3px (U9). */
+  outline-offset: 3px;
 }
 /* The ONE loud element on a screen (layout rule 01). 48px / 24px / 17px
    (rules 01–02); the accent fill with an `accentEdge` edge ≥ 3:1 (rule 03);
@@ -112,35 +113,38 @@
   background: var(--gn-accent);
   color: var(--gn-accent-text);
   font-size: 1.0625rem;
-  box-shadow: var(--gn-shadow-action);
+  /* A FILLED surface carries no highlight (neo refresh N8, 24.020): one dark fall; hig maps action-filled to its own action, so it is unchanged there. */
+  box-shadow: var(--gn-shadow-action-filled);
 }
 .gn-button--primary:hover:not(:disabled) {
   background: var(--gn-accent-edge);
-  box-shadow: var(--gn-shadow-action-near);
+  box-shadow: var(--gn-shadow-action-filled-near);
   transform: scale(1.04);
 }
 .gn-button--primary:active:not(:disabled) {
-  box-shadow: var(--gn-shadow-action-press);
+  box-shadow: var(--gn-shadow-action-filled-press);
   transform: scale(0.98);
   transition-duration: var(--gn-motion-feedback);
 }
 /* A destructive confirm is its dialog's loud element, so it takes the
-   primary's geometry and lift — on the NEUTRAL `lift` shadows, because the
-   `action` shadow is tinted by the accent. */
+   primary's geometry and lift — on the `danger` roles, which hig and minimal
+   map to the NEUTRAL `lift` shadows (the `action` shadow is tinted by the
+   accent) and neo renders as one dark fall and a red self-coloured press. */
 .gn-button--danger {
   min-height: 3rem;
   padding: 0 1.5rem;
   background: var(--gn-danger);
   color: var(--gn-danger-text);
   font-size: 1.0625rem;
-  box-shadow: var(--gn-shadow-lift);
+  /* Neo refresh N8, 24.021: the danger roles (hig/minimal map them to the neutral lift pair, so those styles are unchanged). */
+  box-shadow: var(--gn-shadow-danger);
 }
 .gn-button--danger:hover:not(:disabled) {
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-danger-near);
   transform: scale(1.04);
 }
 .gn-button--danger:active:not(:disabled) {
-  box-shadow: var(--gn-shadow-lift-press);
+  box-shadow: var(--gn-shadow-danger-press);
   transform: scale(0.98);
   transition-duration: var(--gn-motion-feedback);
 }
@@ -160,6 +164,13 @@
   opacity: var(--gn-disabled-opacity);
   cursor: not-allowed;
 }
+/* A disabled FILLED button is flat in neo (U7 extended, 24.022) — through roles whose hig value is today's shadow, so hig
+   does not change (spec §7). The base `.gn-button:disabled` above is NOT touched. */
+.gn-button--primary:disabled,
+.gn-button--primary[aria-disabled='true'] { box-shadow: var(--gn-shadow-action-filled-disabled); }
+.gn-button--danger:disabled,
+.gn-button--danger[aria-disabled='true'] { box-shadow: var(--gn-shadow-danger-disabled); }
+.gn-button--ghost:disabled { box-shadow: none; }
 /* A QUIET button (`aria-disabled`, still focusable): the same look as a disabled one, from the same token (UX fixes T6, 23.094). */
 .gn-button[aria-disabled='true'] {
   opacity: var(--gn-disabled-opacity);
@@ -8163,9 +8174,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-surface-raised);
   transition: transform 0.15s ease;
 }
-.gn-switch:checked { background: var(--gn-accent); }
-/* 51 − 27 − (2 x 2) = 20px of travel. */
-.gn-switch:checked::after { transform: translateX(1.25rem); }
+.gn-switch:checked { background: var(--gn-accent); box-shadow: none; }
+/* 51 − 27 − (2 x 2) = 20px of travel. Neo refresh 24.024: on the accent track the knob drops its highlight and keeps one small fall (none in hig/minimal). */
+.gn-switch:checked::after { transform: translateX(1.25rem); box-shadow: var(--gn-shadow-knob-on); }
 .gn-switch:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
