@@ -161,4 +161,14 @@ describe('withInflightDedupe', () => {
     await writing;
     t.release();
   });
+
+  it('25.032 a read issued WHILE a write was on the wire is not joined by one issued after it settled: the first may have been answered before the commit', async () => {
+    const t = overtaken();
+    const writing = t.deduped.ingest([]);
+    void t.deduped.query.getMembers('ws'); // during the write
+    await writing;
+    void t.deduped.query.getMembers('ws'); // after it settled
+    expect(t.calls()).toBe(2);
+    t.release();
+  });
 });
