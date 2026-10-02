@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
@@ -1255,39 +1255,74 @@ test('records non-text contrast across the signed-in surface, with a positive co
   };
   const headSha = gitOrNull('rev-parse HEAD');
   const treeWasClean = (gitOrNull('status --porcelain') ?? '') === '';
-  writeFileSync(
-    new URL('./non-text-contrast-roster.json', import.meta.url),
-    `${JSON.stringify(
-      {
-        headSha,
-        producedAt: new Date().toISOString(),
-        treeWasClean,
-        provenance:
-          'Every number below describes the tree at `headSha`, at `producedAt` — no other. ' +
-          'A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and ' +
-          'nothing here re-checks that: the file is regenerated only by a run of this sweep. ' +
-          'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
-          '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
-          '`headSha` then names its BASE rather than what was actually swept.',
-        belowCount: failingBelow.length,
-        exemptions: exemptBelow,
-        totalClasses: roster.length,
-        examined: examinedTotal,
-        highestReading: Number(bestSeen.toFixed(2)),
-        routes: sweptRoutes,
-        roster: roster.map(([selector, r]) => ({
-          selector,
-          ratio: Number(r.ratio.toFixed(2)),
-          border: r.border,
-          backdrop: r.backdrop,
-          routes: r.routes,
-        })),
-        sanctionedWaivers,
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  /*
+   * What the sweep MEASURED, apart from the stamp that says which run measured
+   * it. Only this part is ever compared: `headSha`, `producedAt` and
+   * `treeWasClean` differ on every run by construction.
+   */
+  const measured = {
+    belowCount: failingBelow.length,
+    exemptions: exemptBelow,
+    totalClasses: roster.length,
+    examined: examinedTotal,
+    highestReading: Number(bestSeen.toFixed(2)),
+    routes: sweptRoutes,
+    roster: roster.map(([selector, r]) => ({
+      selector,
+      ratio: Number(r.ratio.toFixed(2)),
+      border: r.border,
+      backdrop: r.backdrop,
+      routes: r.routes,
+    })),
+    sanctionedWaivers,
+  };
+  /*
+   * ## Written only under `UPDATE_ROSTER=1` (F-11, case 23.357)
+   *
+   * It used to be written on EVERY run, like a log. A run on a dirty tree, or
+   * on a stack built from another branch, then left the file modified with a
+   * `headSha` that named the wrong tree, one `git add -A` from being committed
+   * as a record of something it never measured. The three baseline files in
+   * this suite are already explicit acts (`UPDATE_*_BASELINE=1`); this one is
+   * the same. Without the flag the run COMPARES the measurement against the
+   * committed file and fails on any difference (23.358). Run with the flag on
+   * a CLEAN tree, then commit the file.
+   */
+  const rosterUrl = new URL('./non-text-contrast-roster.json', import.meta.url);
+  if (process.env['UPDATE_ROSTER'] === '1') {
+    writeFileSync(
+      rosterUrl,
+      `${JSON.stringify(
+        {
+          headSha,
+          producedAt: new Date().toISOString(),
+          treeWasClean,
+          provenance:
+            'Every number below describes the tree at `headSha`, at `producedAt` — no other. ' +
+            'A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and ' +
+            'nothing here re-checks that: the file is regenerated only by a run of this sweep ' +
+            'under `UPDATE_ROSTER=1`. ' +
+            'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
+            '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
+            '`headSha` then names its BASE rather than what was actually swept.',
+          ...measured,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  } else {
+    const committed = JSON.parse(readFileSync(rosterUrl, 'utf8')) as Record<string, unknown>;
+    const differing = Object.keys(measured).filter(
+      (key) =>
+        JSON.stringify(committed[key]) !== JSON.stringify(measured[key as keyof typeof measured]),
+    );
+    expect(
+      differing,
+      'non-text-contrast-roster.json differs from this run in the listed keys; roster differs, ' +
+        're-run with UPDATE_ROSTER=1 on a clean tree and COMMIT the file',
+    ).toEqual([]);
+  }
   console.log(
     `[non-text-contrast] ${below.length} of ${roster.length} distinct bordered classes below 3:1 ` +
       `(${examinedTotal} bordered elements examined across ${sweptRoutes.length} routes; ` +

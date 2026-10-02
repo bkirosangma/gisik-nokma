@@ -218,7 +218,7 @@ export async function readAttention(
       kind: 'blocked',
       card,
       stateName,
-      reason: `In "${stateName}" — a blocked state.`,
+      reason: `In the blocked state "${stateName}".`,
     });
   }
 
