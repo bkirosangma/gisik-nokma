@@ -25,7 +25,9 @@ import { useAppServices, useCurrentUser } from '../../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../../src/expired-session.js';
 import { mayAdminister, restrictedLine, viewerOf } from '../../../src/workspace-viewer.js';
 import { DocumentTitle } from '../../../src/document-title.js';
-import { ProjectEditForm, type ProjectEditValues } from '../../../src/project-edit-form.js';
+import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from '../../../src/project-edit-form.js';
+import { useWorkspaceGroups } from '../../../src/use-workspace-groups.js';
+import { WorkspacePrefixEdit } from '../../../src/workspace-prefix-edit.js';
 import { bumpProjectsVersion } from '../../../src/projects-version.js';
 import { updateSeeds } from '../../../src/project-update-seeds.js';
 import { GroupedProjects } from '../../../src/grouped-projects.js';
@@ -292,7 +294,12 @@ export default function WorkspaceHomePage() {
    * they had just made — visible to them only as a project that vanished.
    */
   const submit = useCallback(
-    (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void): void => {
+    (
+      build: (actorId: string) => EnvelopeSeed[],
+      whenDone: () => void,
+      /** A form that shows a refusal under its own field claims it (returns true) so the page does not say it twice. */
+      onRefused?: (rule: string, reason: string) => boolean,
+    ): void => {
       setRefusal(null);
       // Refused HERE and not sent, for the same reason the members page refuses
       // a signed-out revoke: `actorId: ''` is turned away by the door's
@@ -343,12 +350,15 @@ export default function WorkspaceHomePage() {
             return;
           }
           // The authority's own words, exactly as the mint, the Create workspace dialog
-          // and the invitation banner carry them.
-          setRefusal(
-            bad.status === 'refused'
-              ? `${bad.rule}: ${bad.reason}`
-              : `${bad.code}: ${bad.message}`,
-          );
+          // and the invitation banner carry them — unless the form that asked
+          // shows them under its own field (22.181).
+          if (!(bad.status === 'refused' && onRefused?.(bad.rule, bad.reason) === true)) {
+            setRefusal(
+              bad.status === 'refused'
+                ? `${bad.rule}: ${bad.reason}`
+                : `${bad.code}: ${bad.message}`,
+            );
+          }
           // Re-read on a refusal too: a partly-committed batch changed the
           // world, and a stale list beside a refusal shows two contradictory
           // things at once.
@@ -521,14 +531,22 @@ function ProjectCard({
   onArchive,
   onEdit,
   onDelete,
+  workspacePrefix,
 }: {
   workspaceId: string;
+  workspacePrefix: string;
   project: ProjectRef;
   countsWithheld: boolean;
   isAdmin: boolean;
   busy: boolean;
   onArchive: (project: ProjectRef) => void;
-  onEdit: (project: ProjectRef, values: ProjectEditValues, whenDone: () => void) => void;
+  onEdit: (
+    project: ProjectRef,
+    values: ProjectEditValues,
+    groups: GroupRow[],
+    whenDone: () => void,
+    onRefused: (rule: string, reason: string) => boolean,
+  ) => void;
   onDelete: (project: ProjectRef) => void;
 }) {
   // MCP CRUD plan Task 2 (owner ruling M1): an owner/admin can rename and
@@ -539,6 +557,9 @@ function ProjectCard({
   // that before they type.
   const [editing, setEditing] = useState(false);
   const editTrigger = useRef<HTMLButtonElement | null>(null);
+  /** The door's reason for a prefix or group refusal, shown by the form under that field (22.181, 22.187). */
+  const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
+  const { groups, reread } = useWorkspaceGroups(workspaceId, isAdmin && editing);
   return (
     <li data-testid={`project-row-${project.id}`}>
       <Card
@@ -617,7 +638,13 @@ function ProjectCard({
             menuLabel={`Actions for ${project.name}`}
             disabled={busy}
             items={[
-              { label: EDIT_LABEL, onSelect: () => setEditing(true) },
+              {
+                label: EDIT_LABEL,
+                onSelect: () => {
+                  setFieldRefusal(null);
+                  setEditing(true);
+                },
+              },
               { label: project.archived ? RESTORE_LABEL : ARCHIVE_LABEL, onSelect: () => onArchive(project) },
               { label: DELETE_TRIGGER_LABEL, onSelect: () => onDelete(project) },
             ]}
@@ -626,9 +653,27 @@ function ProjectCard({
         {isAdmin && editing ? (
           <ProjectEditForm
             idPrefix={`gn-project-${project.id}`}
-            initial={{ name: project.name, description: project.description ?? null }}
+            initial={{
+              name: project.name,
+              description: project.description ?? null,
+              prefix: project.prefix,
+              groupId: project.groupId ?? null,
+            }}
+            workspacePrefix={workspacePrefix}
+            groups={groups}
+            refusal={fieldRefusal}
             busy={busy}
-            onSave={(values) => onEdit(project, values, () => setEditing(false))}
+            onSave={(values) => {
+              setFieldRefusal(null);
+              onEdit(project, values, groups ?? [], () => setEditing(false), (rule, reason) => {
+                if (refusalField(rule) === null) return false;
+                setFieldRefusal({ rule, reason });
+                // Someone made the group first: ask again so the picker can adopt it (22.187). The form
+                // stays open and the person sees the adoption before saving; nothing is resubmitted.
+                if (rule === 'group.name-taken') reread();
+                return true;
+              });
+            }}
             onCancel={() => setEditing(false)}
             returnFocusRef={editTrigger}
           />
@@ -865,7 +910,11 @@ function WorkspaceHome({
   grouping: ProjectGrouping | null;
   groups: GroupRow[] | 'failed' | null;
   onGrouping: (choice: ProjectGrouping) => void;
-  onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  onSubmit: (
+    build: (actorId: string) => EnvelopeSeed[],
+    whenDone: () => void,
+    onRefused?: (rule: string, reason: string) => boolean,
+  ) => void;
   refusal: string | null;
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
@@ -900,21 +949,36 @@ function WorkspaceHome({
   const restricted = restrictedLine(workspace.nameRestrictedProjectCount);
   const archive = (project: ProjectRef): void =>
     onSubmit(() => archiveSeeds(workspace.id, project), () => undefined);
-  const edit = (project: ProjectRef, values: ProjectEditValues, whenDone: () => void): void =>
+  const edit = (
+    project: ProjectRef,
+    values: ProjectEditValues,
+    groupRows: GroupRow[],
+    whenDone: () => void,
+    onRefused: (rule: string, reason: string) => boolean,
+  ): void =>
     onSubmit(
       () =>
         updateSeeds(
           workspace.id,
           project.id,
-          { name: project.name, description: project.description ?? null },
+          {
+            name: project.name,
+            description: project.description ?? null,
+            prefix: project.prefix,
+            groupId: project.groupId ?? null,
+          },
           values,
+          groupRows,
+          newUlid,
         ),
       whenDone,
+      onRefused,
     );
   const renderCard = (project: ProjectRef) => (
     <ProjectCard
       key={project.id}
       workspaceId={workspace.id}
+      workspacePrefix={workspace.prefix}
       project={project}
       countsWithheld={viewer.countsWithheld}
       isAdmin={isAdmin}
@@ -1110,6 +1174,11 @@ function WorkspaceHome({
               ) : null}
             </div>
           )}
+          {/* The workspace's half of every ticket key (prefixes and groups Task 10, 22.185): the same
+              admin gate as the rename beside it. */}
+          {isAdmin ? (
+            <WorkspacePrefixEdit workspaceId={workspace.id} prefix={workspace.prefix} busy={busy} onSubmit={onSubmit} />
+          ) : null}
           {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3):
               a dedicated class, not a structural selector — see that class's
               rule in globals.css for why. */}

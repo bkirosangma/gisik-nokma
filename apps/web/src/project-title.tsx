@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
-import { ProjectEditForm, type ProjectEditValues } from './project-edit-form.js';
+import { newUlid } from '@gisik-nokma/domain';
+import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from './project-edit-form.js';
+import { useWorkspaceGroups } from './use-workspace-groups.js';
 import { updateSeeds } from './project-update-seeds.js';
 import { bumpProjectsVersion, useProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
@@ -42,10 +44,19 @@ export function ProjectTitle({
   const session = useSessionStatus();
   const userId = session.kind === 'signed-in' ? session.user.id : null;
   const version = useProjectsVersion();
-  const [row, setRow] = useState<{ role: string; description: string | null } | null>(null);
+  const [row, setRow] = useState<{
+    role: string;
+    description: string | null;
+    prefix: string;
+    groupId: string | null;
+    workspacePrefix: string;
+  } | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
+  /** A prefix or group refusal, handed to the form to show under its field (22.181, 22.184, 22.187). */
+  const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
+  const { groups, reread } = useWorkspaceGroups(workspaceId, row !== null && mayAdminister(row.role) && editing);
   const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -62,7 +73,13 @@ export function ProjectTitle({
         setRow(
           workspace === undefined || project === undefined
             ? null
-            : { role: workspace.role, description: project.description ?? null },
+            : {
+                role: workspace.role,
+                description: project.description ?? null,
+                prefix: project.prefix,
+                groupId: project.groupId ?? null,
+                workspacePrefix: workspace.prefix,
+              },
         );
       },
       () => {
@@ -78,11 +95,14 @@ export function ProjectTitle({
     (values: ProjectEditValues): void => {
       if (userId === null || row === null) return;
       setRefusal(null);
+      setFieldRefusal(null);
       const seeds = updateSeeds(
         workspaceId,
         projectId,
-        { name: projectName, description: row.description },
+        { name: projectName, description: row.description, prefix: row.prefix, groupId: row.groupId },
         values,
+        groups ?? [],
+        newUlid,
       );
       // Nothing changed: nothing to send, and the act is done.
       if (seeds.length === 0) {
@@ -104,6 +124,10 @@ export function ProjectTitle({
           const bad = results.find((result) => result.status !== 'committed');
           if (bad === undefined) {
             setEditing(false);
+          } else if (bad.status === 'refused' && refusalField(bad.rule) !== null) {
+            setFieldRefusal({ rule: bad.rule, reason: bad.reason });
+            // Someone made the group first: ask again so the picker adopts it; nothing is resubmitted (22.187).
+            if (bad.rule === 'group.name-taken') reread();
           } else {
             setRefusal(
               bad.status === 'refused' ? `${bad.rule}: ${bad.reason}` : `${bad.code}: ${bad.message}`,
@@ -118,7 +142,7 @@ export function ProjectTitle({
         },
       );
     },
-    [dataSource, projectId, projectName, row, userId, workspaceId],
+    [dataSource, groups, projectId, projectName, reread, row, userId, workspaceId],
   );
 
   const canEdit = row !== null && mayAdminister(row.role);
@@ -128,11 +152,15 @@ export function ProjectTitle({
       {canEdit && editing ? (
         <ProjectEditForm
           idPrefix="gn-project-header"
-          initial={{ name: projectName, description: row.description }}
+          initial={{ name: projectName, description: row.description, prefix: row.prefix, groupId: row.groupId }}
+          workspacePrefix={row.workspacePrefix}
+          groups={groups}
+          refusal={fieldRefusal}
           busy={busy}
           onSave={save}
           onCancel={() => {
             setRefusal(null);
+            setFieldRefusal(null);
             setEditing(false);
           }}
           returnFocusRef={trigger}

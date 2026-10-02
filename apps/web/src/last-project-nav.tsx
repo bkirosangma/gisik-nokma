@@ -243,6 +243,12 @@ export function LastProjectNav({
         if (next === null || wrapperRef.current?.contains(next) !== true) close(false);
       }}
     >
+      {/* The visible "Last project:" label (UX fixes Task 3, case 23.044, audit SYS-20, NP-26, WS-08): this item is the
+          project you were last in, not a destination like its neighbours, and the bar now says so. It is a SIBLING before
+          the link, not text inside it, on purpose: the link's accessible name (the `aria-label` below, which the
+          workspace home and the stack suite query by exact name) is unchanged, and WCAG 2.5.3 — a control's name
+          contains its visible label — is not in play because the label is not part of the control. */}
+      <span className="gn-nav__project-label">Last project: </span>
       <Link
         ref={triggerRef}
         href={projectHref}
