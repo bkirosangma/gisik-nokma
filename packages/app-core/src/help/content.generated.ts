@@ -3745,7 +3745,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "italic",
-                      "text": "\"Add a comment — @ to mention someone\""
+                      "text": "\"Add a comment, or type @ to mention someone\""
                     },
                     {
                       "kind": "text",
@@ -4516,7 +4516,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and files the new child under the ticket you are looking at. It is the ordinary \"adding a ticket\" you already know (§5) with the parent filled in for you, so the new child starts in the first state of its workflow and its title is held to the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you correct it rather than retype it."
+                    "text": " and files the new child under the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent filled in for you, so the new child starts in the first state of its workflow and its title is held to the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you correct it rather than retype it."
                   }
                 ]
               },
@@ -5552,7 +5552,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top (\"4 tickets · 1 done\") stays the same however you regroup or collapse. Things with nothing to group under get an honest bucket: "
+                    "text": "Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top (\"4 tickets, 1 done\") stays the same however you regroup or collapse. Things with nothing to group under get an honest bucket: "
                   },
                   {
                     "kind": "bold",
@@ -5598,7 +5598,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "\"default arrangement — you have not arranged this project\""
+                    "text": "\"default arrangement. You have not arranged this project\""
                   },
                   {
                     "kind": "text",
@@ -8223,7 +8223,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Worth a look — none of these block publishing\""
+                    "text": "\"Worth a look (none of these block publishing)\""
                   },
                   {
                     "kind": "text",
@@ -8567,7 +8567,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Built-in type — its place in the hierarchy is fixed.\""
+                    "text": "\"Built-in type. Its place in the hierarchy is fixed.\""
                   },
                   {
                     "kind": "text",
@@ -8856,7 +8856,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "\"Offline — 3 claims waiting to send\""
+                      "text": "\"Offline: 3 claims waiting to send\""
                     }
                   ],
                   [
@@ -13697,7 +13697,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-s-the-list-headed-worth-a-look-none-of-these-block-publ",
-            "title": "What's the list headed \"Worth a look — none of these block publishing\"?",
+            "title": "What's the list headed \"Worth a look (none of these block publishing)\"?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -14882,7 +14882,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-s-the-default-arrangement-you-have-not-arranged-this-pr",
-            "title": "What's the \"default arrangement — you have not arranged this project\" note?",
+            "title": "What's the \"default arrangement. You have not arranged this project\" note?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -16029,7 +16029,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nothing you have to do. Your changes go up in the order you made them, so a ticket is never edited on the server before it has been created there. The status label moves through \"Offline — n claims waiting to send\", then \"Catching up…\", then \"Live\"."
+                    "text": "Nothing you have to do. Your changes go up in the order you made them, so a ticket is never edited on the server before it has been created there. The status label moves through \"Offline: n claims waiting to send\", then \"Catching up…\", then \"Live\"."
                   }
                 ]
               }

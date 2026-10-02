@@ -592,7 +592,7 @@ This is the honest list. Each one is an absence, not a hidden button.
   quietly lost.
 - **You can leave a comment on a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet carries a
-  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. Its button
+  comment thread, with a box at the end of it reading *"Add a comment, or type @ to mention someone"*. Its button
   says **Post**, and the line beside it says what posting does — it records an event citing you. A move
   carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
@@ -766,7 +766,7 @@ you are not allowed to see, the chip reads **"Subtask of a restricted parent"** 
 pressable — see "Restricted parent — exists, but you can't see it" above.
 
 **The add row** at the bottom of the section takes a **New subtask title** and files the new child under
-the ticket you are looking at. It is the ordinary "adding a ticket" you already know (§5) with the parent
+the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent
 filled in for you, so the new child starts in the first state of its workflow and its title is held to
 the same rule as any other: blank, or spaces only, is refused. A refusal keeps what you typed, so you
 correct it rather than retype it.
@@ -987,14 +987,14 @@ A table. You choose two things:
 - **Which columns to show** — from status, assignee, due date, type, progress, **priority**.
 
 Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top
-("4 tickets · 1 done") stays the same however you regroup or collapse. Things with nothing to group
+("4 tickets, 1 done") stays the same however you regroup or collapse. Things with nothing to group
 under get an honest bucket: **"No epic"**, **"Unassigned"**. They do not vanish.
 
 **"Recently assigned"** is a strip pinned at the top: only your own assignments, newest first, ordered
 by when the *system* recorded them so a wrong laptop clock cannot jumble it. A ticket in that strip also
 appears in its normal place further down, so you will see it twice. That is intended.
 
-**"default arrangement — you have not arranged this project"** is a note telling you that what you are
+**"default arrangement. You have not arranged this project"** is a note telling you that what you are
 looking at is the default, not something you chose. Once you pick your own grouping or columns, it
 goes away. If you have only chosen one of the two, it says so about just that half.
 
@@ -1499,7 +1499,7 @@ with the reason written out, for as long as any of them stands.** When it is cle
 
 ### Advisories
 
-There is a separate list headed **"Worth a look — none of these block publishing"**. These are advice,
+There is a separate list headed **"Worth a look (none of these block publishing)"**. These are advice,
 not errors. Typically: you have put a guard on one route into a state, but there is another route in
 without the same guard, so the guard can be walked around. It publishes anyway; it is just telling
 you.
@@ -1563,7 +1563,7 @@ You **can** rename epic, story, task and sub-task, change their icons, and chang
 use. Do it — "Epic" and "Story" mean nothing in a plumbing business or a design studio.
 
 What you **cannot** change is where a built-in type sits in the hierarchy. The rank boxes are locked
-and the message says why: *"Built-in type — its place in the hierarchy is fixed."* So a renamed
+and the message says why: *"Built-in type. Its place in the hierarchy is fixed."* So a renamed
 sub-task will still always need a parent. Custom types you make yourself can be re-ranked in either
 direction later.
 
@@ -1638,7 +1638,7 @@ Both apps show a strip with plain-English states:
 - **"Live"**
 - **"Catching up…"**
 - **"3 claims waiting to send"** (and it gets the singular right: "1 claim")
-- **"Offline — 3 claims waiting to send"**
+- **"Offline: 3 claims waiting to send"**
 - a separate "needs attention" count for changes that were permanently refused
 
 **A change to something that was permanently deleted while you were offline cannot be saved.** When the

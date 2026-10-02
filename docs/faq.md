@@ -471,7 +471,7 @@ flags it and makes you fix it — rather than quietly guessing what you meant.
 No. Layout is for this session only. Come back tomorrow and it will have laid itself out again. Known
 and deliberate for now — do not spend twenty minutes tidying.
 
-**What's the list headed "Worth a look — none of these block publishing"?**
+**What's the list headed "Worth a look (none of these block publishing)"?**
 Advice, not errors. Typically: you have put a guard on one route into a state, but another route in has
 no matching guard, so the guard can be walked around. It publishes anyway. The "Errand with waits"
 template deliberately trips this twice, because it is modelled on a real shop's real process, warts
@@ -734,7 +734,7 @@ No. Grouping only rearranges. It never hides a row and never changes the counts 
 top stays the same however you regroup or collapse. Things with nothing to group under get an honest
 bucket: "No epic", "Unassigned".
 
-**What's the "default arrangement — you have not arranged this project" note?**
+**What's the "default arrangement. You have not arranged this project" note?**
 It is telling you that what you are looking at is the default, not something you chose. Once you pick
 your own grouping or columns it goes away. If you have only chosen one of the two, it says so about
 just that half. Small thing, and it stops you thinking you set something up when you did not.
@@ -1015,7 +1015,7 @@ unconfirmed change alongside the last confirmed version.
 
 **What happens when I get signal back?**
 Nothing you have to do. Your changes go up in the order you made them, so a ticket is never edited on the
-server before it has been created there. The status label moves through "Offline — n claims waiting to
+server before it has been created there. The status label moves through "Offline: n claims waiting to
 send", then "Catching up…", then "Live".
 
 **What if the network fails halfway through sending?**
