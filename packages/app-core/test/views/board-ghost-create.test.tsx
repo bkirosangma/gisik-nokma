@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
-import { applyPendingCreates, applyPendingMoves, retireAgreed, type PendingCreate } from '../../src/views/board-move-state.js';
+import { applyPendingCreates, applyPendingMoves, CREATE_TTL_MS, retireAgreed, usePendingCreates, type PendingCreate } from '../../src/views/board-move-state.js';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
@@ -114,6 +114,47 @@ describe('the ghost card on the board', () => {
     // Control: the sweep does find a fill where there is one (the move's waiting wash).
     const waiting = [...css.matchAll(/\.gn-board__card-slot--waiting::after[^{]*\{([^}]*)\}/g)].map((m) => m[1]!).join('');
     expect(waiting).toMatch(/background/);
+  });
+});
+
+describe('usePendingCreates (spec S5)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('25.094 a ghost is held until a read shows its id, a refusal removes it, and a committed ghost no read shows expires', () => {
+    let current: BoardView | null = view({ todo: [card('tk_a')] });
+    const { result, rerender } = renderHook(() => usePendingCreates(current));
+    act(() => result.current.add(GHOST));
+    expect(result.current.creates.map((c) => c.ticketId)).toEqual(['tk_new']);
+    // A read that does not carry the id retires nothing.
+    rerender();
+    expect(result.current.creates).toHaveLength(1);
+    // The read that carries it retires the ghost (the real card is drawn instead).
+    current = view({ todo: [card('tk_a'), card('tk_new', { key: 'CC-7' })] });
+    rerender();
+    expect(result.current.creates).toHaveLength(0);
+    // A refusal removes it at once; removing an id that is not held changes nothing.
+    current = view({ todo: [card('tk_a')] });
+    rerender();
+    act(() => result.current.add(GHOST));
+    act(() => result.current.remove('tk_new'));
+    expect(result.current.creates).toHaveLength(0);
+    act(() => result.current.remove('tk_new'));
+    // Control: an OPEN write never expires; a committed one the read never shows does.
+    act(() => result.current.add(GHOST));
+    act(() => {
+      vi.advanceTimersByTime(CREATE_TTL_MS * 2);
+    });
+    expect(result.current.creates).toHaveLength(1);
+    act(() => result.current.settle('tk_new'));
+    act(() => {
+      vi.advanceTimersByTime(CREATE_TTL_MS - 1);
+    });
+    expect(result.current.creates).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(2);
+    });
+    expect(result.current.creates).toHaveLength(0);
   });
 });
 
