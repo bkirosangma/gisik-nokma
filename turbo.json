@@ -2,9 +2,11 @@
   "$schema": "https://turbo.build/schema.json",
   // globalEnv is a CACHE-CORRECTNESS list, not a documentation list: a variable
   // that changes what `build`/`test`/`typecheck` PRODUCE must be here, or turbo
-  // will serve a hit computed under a different environment. This lane's gate
-  // runs --force and would never see such a hit; T14's CI job persists the
-  // cache, which is where it would show up.
+  // will serve a hit computed under a different environment. The main-kind
+  // gate (`ctl gate <sha>`, before a merge to main) runs --force and would never
+  // see such a hit; the release-kind gate (`ctl gate <sha> --base release/<x>`,
+  // a task landing) runs with the cache ON, so there it would show up — and so
+  // would T14's CI job, which persists the cache.
   //
   // PLAN 11 TASK 1 added nine variables to apps/server/src/config.ts and NONE
   // of them belongs here. The reason is the same for all nine and it is a
@@ -31,6 +33,14 @@
   // what makes that necessary rather than optional — an undeclared variable
   // reaches such a task as `undefined`, which for DEPLOY_SHA silently becomes
   // the 'dev' default instead of failing.
+  // THE ONE ROOT FILE EVERY PACKAGE READS. Every package's tsconfig `extends`
+  // `../../tsconfig.base.json`, and turbo hashes only a package's OWN files, so an
+  // edit to the base (a `strict` flag, a `target`, a `paths` entry) left every
+  // build, typecheck and test replaying a green log computed under the old
+  // compiler options. MEASURED 2026-10-02 against this repo's `--dry=json`: the
+  // global hash's `files` map was EMPTY. The release-kind gate caches, so this is
+  // no longer hypothetical.
+  "globalDependencies": ["tsconfig.base.json"],
   "globalEnv": [
     "DATABASE_URL",
     "TEST_DATABASE_ADMIN_URL",
@@ -42,8 +52,33 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    // The RN webview bundle: ONE html file, gitignored (`dist-webview/`), read by
+    // `apps/mobile`'s test through `generate-editor-html.mjs --check`. Nothing in
+    // the gate built it before, so a stale copy left on disk by an earlier
+    // `build:webview` produced a false STALE (2026-10-02 01:07, the BRD-08 gate)
+    // — and, worse, a CLEAN checkout produced a false "no-bundle" skip: `--check`
+    // warns and exits 0 when the bundle is absent. Now it is a graph task of its
+    // own with declared outputs, so turbo rebuilds it when `packages/editor`'s
+    // inputs change and restores it from the cache when they did not.
+    "build:webview": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist-webview/**"]
+    },
     "test": {
       "dependsOn": ["^build"]
+    },
+    // `apps/mobile`'s `test` begins with `generate-editor-html.mjs --check`, which
+    // diffs `packages/editor/dist-webview/index.html` (the task above) against the
+    // checked-in `src/editor/editor-html.generated.ts`. The dependency is what makes
+    // the bundle exist and be CURRENT before the check reads it; and because turbo
+    // folds a dependency task's hash into the dependent's, a change to
+    // `packages/editor`'s CSS or source also changes THIS task's hash — it is the
+    // only way the cache sees a bundle it never reads as a file. `$TURBO_DEFAULT$`
+    // is the checked-in generated file, which is mobile's own. The measured trace of
+    // this package's tests found no other read outside it (2026-10-02).
+    "@gisik-nokma/mobile#test": {
+      "dependsOn": ["^build", "@gisik-nokma/editor#build:webview"],
+      "inputs": ["$TURBO_DEFAULT$"]
     },
     // `packages/ui`'s token-discipline suite READS EVERY CLIENT SOURCE TREE FROM
     // DISK (`test/helpers/colour-scan.ts`, via `REPO_ROOT`), so its correct inputs
@@ -62,11 +97,19 @@
     // itself. `$TURBO_DEFAULT$` keeps the package's own files as well; listing
     // only the foreign trees would silence changes to the scanner itself.
     //
-    // THIS LIST IS A COPY OF `CLIENT_SOURCE_ROOTS`, and a copy that stops matching
-    // is exactly the defect this repo names elsewhere — so it is not left to
-    // discipline: `token-discipline.test.ts` PARSES this file and asserts the two
-    // agree, the same way case 13.208 asserts `ci.yml`'s parsed job graph rather
+    // THE LITERAL-TREE ENTRIES ARE A COPY OF `CLIENT_SOURCE_ROOTS`, and a copy that
+    // stops matching is exactly the defect this repo names elsewhere — so it is not
+    // left to discipline: `token-discipline.test.ts` PARSES this file and asserts the
+    // two agree, the same way case 13.208 asserts `ci.yml`'s parsed job graph rather
     // than its text.
+    //
+    // THE FOUR WILDCARD ENTRIES (`apps/*/test/**` ... `packages/*/package.json`) ARE A
+    // DIFFERENT READER IN THE SAME SUITE, found by tracing its real fs reads
+    // (2026-10-02, when the release-kind gate began to cache): the "no package's tests
+    // read outside itself" case reads EVERY package's `test/` tree and `package.json`
+    // to find the escapers. Cached against the client trees alone, a new escaping test
+    // in `packages/domain/test` would leave this guard replaying green over the one
+    // file it exists to read.
     "@gisik-nokma/ui#test": {
       "dependsOn": ["^build"],
       "inputs": [
@@ -78,13 +121,32 @@
         "$TURBO_ROOT$/apps/web/src/**",
         "$TURBO_ROOT$/apps/web/app/**",
         "$TURBO_ROOT$/apps/desktop/src/**",
-        "$TURBO_ROOT$/apps/mobile/src/**"
+        "$TURBO_ROOT$/apps/mobile/src/**",
+        "$TURBO_ROOT$/apps/*/test/**",
+        "$TURBO_ROOT$/packages/*/test/**",
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json"
       ]
     },
     // `reporting-scope-guard.test.ts` walks SEVEN trees (its own `SCANNED_ROOTS`),
     // and three CSS-binding suites read `packages/ui/src/ui.css` — the stylesheet
     // whose class names they assert against rendered markup. A rule deleted from
     // `ui.css` would leave every one of them replaying a green log.
+    //
+    // THE BROAD `apps/**` + `packages/**` ENTRIES (traced 2026-10-02) are the help
+    // suite: `help/*.test.ts` run `scripts/help-content.mjs`, whose "quoted strings are
+    // still in the product" check greps EVERY .ts/.tsx/.js/.mjs/.css/.json/.md file
+    // under `apps/` and `packages/` for the strings `docs/manual.md` quotes. A string
+    // deleted from any screen in any package can turn that red, so this task's honest
+    // input set is the whole product tree and it will miss on almost any code change.
+    // That is the correct answer: the alternatives are a list that omits the file that
+    // broke it, or `cache: false`, which would also forget that a docs-only change
+    // cannot affect it. The `!` entries are NOT optional: turbo's globs walk the disk,
+    // not git, so without them the hash swallows every gitignored build output under
+    // `apps/` and `packages/` (measured: 3431 of 5606 hashed files were `dist/`,
+    // `.next/` and `.turbo/*.log`), and a task whose inputs include its own previous
+    // run's timestamps never hits the cache. They mirror the walker's own
+    // `PRODUCT_SKIP` in `scripts/help-content.mjs`.
     "@gisik-nokma/app-core#test": {
       "dependsOn": ["^build"],
       "inputs": [
@@ -95,7 +157,24 @@
         "$TURBO_ROOT$/packages/ui/src/**",
         "$TURBO_ROOT$/apps/server/src/**",
         "$TURBO_ROOT$/apps/web/src/**",
-        "$TURBO_ROOT$/apps/web/app/**"
+        "$TURBO_ROOT$/apps/web/app/**",
+        "$TURBO_ROOT$/apps/**",
+        "$TURBO_ROOT$/packages/**",
+        "!$TURBO_ROOT$/apps/**/node_modules/**",
+        "!$TURBO_ROOT$/packages/**/node_modules/**",
+        "!$TURBO_ROOT$/apps/**/dist/**",
+        "!$TURBO_ROOT$/packages/**/dist/**",
+        "!$TURBO_ROOT$/apps/**/dist-webview/**",
+        "!$TURBO_ROOT$/packages/**/dist-webview/**",
+        "!$TURBO_ROOT$/apps/**/.next/**",
+        "!$TURBO_ROOT$/apps/**/.turbo/**",
+        "!$TURBO_ROOT$/packages/**/.turbo/**",
+        "!$TURBO_ROOT$/apps/**/coverage/**",
+        "!$TURBO_ROOT$/packages/**/coverage/**",
+        "$TURBO_ROOT$/docs/manual.md",
+        "$TURBO_ROOT$/docs/faq.md",
+        "$TURBO_ROOT$/scripts/help-content.mjs",
+        "$TURBO_ROOT$/scripts/help-quoted-strings-absent.json"
       ]
     },
     // `next-config.test.ts` reads `apps/server/src` to check the shell's config
@@ -106,6 +185,10 @@
     // either test, which is the same class of hole the comment below records for
     // the server suite. Found while adding the second reader, and it is the
     // FIRST reader that was already exposed.
+    // (Reviewed 2026-10-02: `ui` is a declared dependency of `web`, and `ui#build`'s
+    // hash already covers its `src/`, so the `packages/ui/src/**` entry is redundant
+    // today — an equivalent mutant. Kept: it states the reader, and it keeps the hole
+    // closed if the dependency is ever dropped.)
     "@gisik-nokma/web#test": {
       "dependsOn": ["^build"],
       "inputs": [
@@ -119,6 +202,24 @@
     // the compose file, and CI's own workflow. Case 13.208 parses `ci.yml` and
     // asserts its job graph — cached against `apps/server/**` alone, a CI edit that
     // broke the graph would report green.
+    //
+    // THE SECOND HALF OF THIS LIST (traced 2026-10-02, the release-kind gate caches)
+    // is what the original six entries missed — each one a file a server test reads
+    // that a change could break with this task still replaying green:
+    //   `.env.example`            config.test.ts, expired-sessions.test.ts
+    //   `package.json`            node-version.test.ts, compose-dev-contract.test.ts
+    //   `deploy/**`               app-spec-ingress, backup-worker-env (`deploy/do/app.yaml`)
+    //   `docker-compose*.yml`     compose-dev-contract (the root and hot files, not just dev)
+    //   `apps/*/Dockerfile*`      dockerfile-cache-shape reads `apps/web/Dockerfile` and `.dev`
+    //   `apps/*/package.json`,    `check-runbook-commands.mjs` reads every workspace manifest,
+    //   `packages/*/package.json` including the ones `server` does not depend on
+    //   `reference/**`            the seed suites read the frozen convenience-corner board
+    //   `apps/web/e2e-stack/**`   e2e-teardown.test.ts imports `helpers/teardown.ts` from there
+    //   `apps/web/next.config.ts` security-middleware.test.ts reads the web shell's headers
+    // (`web` is not a dependency of `server`, so the last two are invisible to `^build`.)
+    // `packages/app-core/src` (client-contract.test.ts) and `packages/domain/src` are
+    // also read, but both are declared dependencies of `server`, so turbo already folds
+    // their hash in through `^build`.
     "@gisik-nokma/server#test": {
       "dependsOn": ["^build"],
       "inputs": [
@@ -127,7 +228,40 @@
         "$TURBO_ROOT$/docs/**",
         "$TURBO_ROOT$/.github/workflows/**",
         "$TURBO_ROOT$/docker-compose.dev.yml",
-        "$TURBO_ROOT$/test-cases/**"
+        "$TURBO_ROOT$/test-cases/**",
+        "$TURBO_ROOT$/.env.example",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/deploy/**",
+        "$TURBO_ROOT$/docker-compose*.yml",
+        "$TURBO_ROOT$/apps/*/Dockerfile*",
+        "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/reference/**",
+        "$TURBO_ROOT$/apps/web/e2e-stack/**",
+        "$TURBO_ROOT$/apps/web/next.config.ts"
+      ]
+    },
+    // `ticket-editor-slot.test.tsx` and `toolbar-icons-phone.test.tsx` read source in
+    // OTHER packages as text and assert on it: `app-core`'s editor slot and phone-board
+    // hook, `server`'s attachment sniffer, and `mobile`'s generated webview HTML. None
+    // of them is a declared dependency of `editor` (it depends only on `domain`), so
+    // the hash could not see them. Declared as directories, not the four files
+    // measured: the next test to read a sibling should not be the one that finds out.
+    //
+    // The ui test helpers are read too, from a package `editor` does not depend on:
+    // `editor-css-binding.test.ts`, `toolbar-icons-phone.test.tsx`,
+    // `drive-never-inline.test.ts` and `ticket-image.test.ts` import `colour-scan.ts`
+    // and `css-rules.ts` from `packages/ui/test/helpers/`. Without that directory a
+    // change to `css-rules.ts` replays the CSS-binding suite green. (There is no
+    // `packages/ui/test/tsconfig.json` in the tree, so none is declared.)
+    "@gisik-nokma/editor#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/app-core/src/views/**",
+        "$TURBO_ROOT$/apps/server/src/attachments/**",
+        "$TURBO_ROOT$/apps/mobile/src/editor/**",
+        "$TURBO_ROOT$/packages/ui/test/helpers/**"
       ]
     },
     "typecheck": {
