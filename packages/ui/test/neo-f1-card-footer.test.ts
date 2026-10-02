@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 
 /**
  * Neo follow-up F-1 (2026-10-02), cases 23.320–23.323 — the board card's footer above 1024px (audit BRD-02, BRD-03,
@@ -54,5 +54,18 @@ describe('23.321 (BRD-03) above 1024px the provenance line is readable, not trun
     expect(valueOf(ruleExactly(css, '.gn-board-card__move:disabled'), 'opacity')).toBe('var(--gn-disabled-opacity)');
     // CONTROL — the controls group never hides a control: no `display: none` on a move arm outside the phone's one rule.
     expect(valueOf(desktop('.gn-board-card__controls'), 'display')).not.toBe('none');
+  });
+});
+
+describe('23.323 phone and tablet are unchanged', () => {
+  it('23.323 no arm below 1025px touches the footer, the line or the controls group except the phone Move swap', () => {
+    // The desktop arm is the ONLY at-rule that declares the group's flex; the phone arm only swaps the arrows for Move.
+    expect(valueOf(ruleExactly(css, '.gn-board-card__move:not(.gn-board-card__move-to)', '@media (max-width: 40rem)'), 'display')).toBe('none');
+    for (const selector of ['.gn-board-card__footer', '.gn-board-card__provenance', '.gn-board-card__controls', '.gn-board-card__moves']) {
+      const arms = parseRules(css).filter((rule) => rule.selectors.includes(selector) && rule.atRule !== null);
+      expect(arms.map((rule) => rule.atRule), selector).toEqual([DESKTOP]);
+    }
+    // CONTROL — the same scan finds the desktop arm when it is looked for, so the scan can see at-rules.
+    expect(parseRules(css).filter((rule) => rule.selectors.includes('.gn-board-card__controls') && rule.atRule === DESKTOP)).toHaveLength(1);
   });
 });
