@@ -6,7 +6,8 @@ import { cssOf, expectRow, flatBoundaryOffenders, type RosterRow } from './helpe
 const ROWS: RosterRow[] = [
   { sheet: 'ui', selectors: '.gn-help__results', declarations: { background: 'var(--gn-surface-track)', 'box-shadow': 'var(--gn-shadow-track)' } },
   { sheet: 'ui', selectors: '.gn-help__none', declarations: { background: 'var(--gn-surface-track)', 'box-shadow': 'var(--gn-shadow-track)' } },
-  { sheet: 'ui', selectors: '.gn-help__quote', declarations: { background: 'var(--gn-surface-well)', 'box-shadow': 'var(--gn-shadow-track)' } },
+  // Amended 2026-10-02 by 23.095 (UX fixes T6, NP-21): the quote and the legal draft are a tinted FLAT fill, no inset shadow.
+  { sheet: 'ui', selectors: '.gn-help__quote', declarations: { background: 'var(--gn-fill-quaternary)' } },
   { sheet: 'ui', selectors: '.gn-help__code', declarations: { background: 'var(--gn-surface-well)' } },
   { sheet: 'ui', selectors: '.gn-help__table th', declarations: { background: 'var(--gn-surface-well)' } },
   { sheet: 'ui', selectors: '.gn-help__group-toggle:hover', pattern: 'P-HOVER' },
@@ -16,7 +17,7 @@ const ROWS: RosterRow[] = [
     selectors: '.gn-legal__flag',
     declarations: { background: 'var(--gn-surface-well)', 'border-radius': 'var(--gn-radius-card)', 'border-left': '3px solid var(--gn-warning)' },
   },
-  { sheet: 'globals', selectors: '.gn-legal__draft', pattern: 'P-WELL' },
+  { sheet: 'globals', selectors: '.gn-legal__draft', declarations: { background: 'var(--gn-fill-quaternary)' } },
   { sheet: 'globals', selectors: '.gn-notfound__why', pattern: 'P-WELL' },
   { sheet: 'globals', selectors: '.gn-notfound__link', pattern: 'P-QUIET', hover: 'none: a link is never :disabled; its :hover rule is the next row (P-HOVER)' },
   { sheet: 'globals', selectors: '.gn-notfound__link:hover', pattern: 'P-HOVER' },
