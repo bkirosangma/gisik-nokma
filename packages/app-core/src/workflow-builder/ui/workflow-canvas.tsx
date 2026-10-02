@@ -8,12 +8,14 @@ import {
   useReactFlow,
   type Connection,
   type Node,
+  type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ANY_STATE_NODE_ID } from '../layout.js';
 import { AnyStateNode } from './any-state-node.js';
 import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './builder-context.js';
-import { connectionToTransition, toFlowGraph } from './flow-graph.js';
+import { usePhoneBoard } from '../../views/use-phone-board.js';
+import { connectionToTransition, phoneOpeningView, toFlowGraph } from './flow-graph.js';
 import { StateNode } from './state-node.js';
 import { TransitionEdge } from './transition-edge.js';
 
@@ -35,6 +37,7 @@ function CanvasInner() {
   const draft = useDraft();
   const summaryCtx = useSummaryCtx();
   const { fitView } = useReactFlow();
+  const phone = usePhoneBoard();
   const { nodes, edges } = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
 
   const onConnect = useCallback(
@@ -51,6 +54,22 @@ function CanvasInner() {
       store.actions.moveState(key, node.position);
     },
     [store],
+  );
+
+  // F-5 (WF-03): on a phone the whole graph fits only at ~0.28, where a 13px checkbox is drawn at 4px. The canvas opens
+  // at a readable zoom on the start state instead and the reader pans; "Fit to screen" still shows everything.
+  const openOnStart = useCallback(
+    (instance: ReactFlowInstance) => {
+      if (!phone) return;
+      const draftNow = store.getState();
+      const measured = instance.getNode(`s:${draftNow.def.initialStateId}`)?.measured;
+      const { center, zoom } = phoneOpeningView(
+        draftNow,
+        measured?.width !== undefined && measured.height !== undefined ? { width: measured.width, height: measured.height } : undefined,
+      );
+      void instance.setCenter(center.x, center.y, { zoom });
+    },
+    [phone, store],
   );
 
   return (
@@ -70,7 +89,8 @@ function CanvasInner() {
         // and pan survive every change (23.175's control). E4-20 had floored the fit at 1:1 (`minZoom: 1`)
         // so no control was drawn smaller than its CSS; that opened wide graphs cropped (WF-02), so the
         // floor is lowered and `minZoom` is passed to the instance too, which otherwise caps the fit at 0.5.
-        fitView
+        fitView={!phone}
+        onInit={openOnStart}
         minZoom={FIT_MIN_ZOOM}
         fitViewOptions={FIT_OPTIONS}
         defaultEdgeOptions={{ type: 'transition', markerEnd: { type: MarkerType.ArrowClosed } }}
