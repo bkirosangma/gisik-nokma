@@ -226,7 +226,7 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
       '.editor-slot__format',
     ]);
     expect(arm.map((rule) => [...rule.body.matchAll(/(?:^|;|\{)\s*([a-z-]+)\s*:/g)].map((hit) => hit[1]))).toEqual([
-      ['padding-left', 'padding-right'],
+      ['position', 'flex-wrap', 'height', 'padding-left', 'padding-right'],
       ['min-height', 'min-width'],
       ['min-height'],
       ['display'],
