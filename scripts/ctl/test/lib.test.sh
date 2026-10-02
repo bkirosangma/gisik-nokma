@@ -162,7 +162,7 @@ check "13.1704 gate modes: CONTROL — the same stale gate.sh is correct for mai
 check "13.1716 task count: a cached run of 33/33 FAILS the verb, naming the Tasks line" 'out=$(FIXTURE_TASKS=33 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 33 total"'
 check "13.1716 task count: a fresh (main-kind) run of 33/33 FAILS too" 'out=$(FIXTURE_TASKS=33 gbr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 33 total"'
 check "13.1716 task count: a run that is 35 of 36 (a task failed) FAILS" 'out=$(FIXTURE_OK=35 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *35 successful, 36 total"'
-check "13.1716 task count: CONTROL — the same fixture at 36/36 passes, so the 33 arms fail on the count and nothing else" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
+check "13.1716 task count: CONTROL — the same fixture at 36/36 passes, so the failure arms fail on the count and nothing else" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
 ( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
