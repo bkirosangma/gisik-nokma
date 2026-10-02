@@ -43,7 +43,8 @@ export function readTools(session: Session): ToolDefinition[] {
       description:
         'Full-text search across the tickets you can see in one workspace. Returns at most 50 hits ' +
         'and has no pagination — narrow the query or the filter rather than expecting a next page. ' +
-        'Use list_tickets when you need to enumerate.',
+        'A ticket key such as "CCSO-12" (any case) returns that ticket first, also by a key it held before a ' +
+        'prefix change. Use list_tickets when you need to enumerate.',
       inputSchema: {
         workspaceId: z.string().min(1),
         query: z.string().min(1).max(500),
