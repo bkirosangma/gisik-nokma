@@ -94,6 +94,15 @@ export type TicketEditorProps = {
    */
   toolbarPlatform?: 'mac' | 'other';
   /**
+   * The formatting strip is not drawn at all (G-6: the comment editors keep it behind a Format button the slot owns).
+   * Hidden is not disabled: the keymap, the Markdown input rules, paste and the mention and wiki-link menus belong to
+   * the editor and never to the strip, so they all keep working. Absent = drawn, as every other mount has it.
+   */
+  toolbarHidden?: boolean;
+  /** The strip's `id` and its Escape-to-close, passed through to `EditorToolbar` (G-6). */
+  toolbarId?: string;
+  onToolbarClose?: () => void;
+  /**
    * The Attach button's escape hatch (Unit 5) — set to a function that runs
    * `handleFile` (the SAME one `attachmentPaste`'s `handlePaste`/`handleDrop`
    * call) against this editor's live view, so a click routes through the
@@ -309,7 +318,15 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
           read-only: `editable` is `false` for a viewer who may not write, and a
           toolbar of commands that would each be refused is chrome for a door
           that is shut. */}
-      <EditorToolbar editor={editor} editable={editable} platform={props.toolbarPlatform} />
+      {props.toolbarHidden === true ? null : (
+        <EditorToolbar
+          editor={editor}
+          editable={editable}
+          platform={props.toolbarPlatform}
+          {...(props.toolbarId === undefined ? {} : { id: props.toolbarId })}
+          {...(props.onToolbarClose === undefined ? {} : { onClose: props.onToolbarClose })}
+        />
+      )}
       {/* `gn-field__input` beside the editor's own class (owner, 2026-09-22: the
           description and comment areas follow `#gn-new-project-name`). The coat
           — fill and 1px border under `hig`/`minimal`, borderless sunken surface
