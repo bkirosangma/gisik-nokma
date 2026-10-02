@@ -181,11 +181,7 @@ Smoothness add-on G-6, owner 2026-10-02: *"in the ticket and notes comment edito
 ## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)
 
 <!-- G-9 T1 -->
-
 <!-- G-9 T2 -->
-
 <!-- G-9 T3 -->
-
 <!-- G-9 T4 -->
-
 <!-- G-9 T5 -->
