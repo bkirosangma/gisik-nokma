@@ -20,6 +20,7 @@ export const TOOL_NAMES_BY_MODULE = {
   ],
   note: [
     // note begin (T7)
+    'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'get_note_history',
     // note end
   ],
   attachment: [
