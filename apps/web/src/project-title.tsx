@@ -18,7 +18,7 @@ import { mayAdminister } from './workspace-viewer.js';
  * plan Task 2, owner ruling M1) — the same form, the same people and the same
  * `project.updated` as the card on the workspace home.
  *
- * **It reads its own row** (`getMyWorkspaces`, the one shared read) for the two
+ * **It reads its own row** out of the shared `useMyWorkspaces` read (smoothness T6: one request for the nav, the names and this) for the two
  * facts the page does not otherwise hold: the caller's role in this workspace
  * and the project's description. While that read is pending or refused both are
  * `null`, and a `null` role offers NO Edit — the absence claims nothing, where

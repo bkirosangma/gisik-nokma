@@ -130,8 +130,8 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  * the same invented fact the spinner over a refused read produces: the defect
  * this page's own `parentCandidates` note was written about, one tab across. So
  * the calendar and timeline arms use this page's own `error → ShellRefusal,
- * null → Loading…, data → view` shape, and Step 5b's `<p>{board.error ??
- * 'Loading…'}</p>` spellings are NOT adopted for the two existing arms either —
+ * null → skeleton, data → view` shape (the wait is `ProjectTabSkeleton`, smoothness T6, where it was a `Loading…` sentence), and
+ * Step 5b's `<p>{board.error ?? 'Loading…'}</p>` spellings are NOT adopted for the two existing arms either —
  * those would have deleted `ShellRefusal` from the board and the list on the way
  * past.
  *
