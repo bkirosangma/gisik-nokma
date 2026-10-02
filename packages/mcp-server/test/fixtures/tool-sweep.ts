@@ -1,4 +1,23 @@
+import { HttpError } from '../../src/http-client.js';
 import type { Session } from '../../src/session.js';
+
+// definition-admin helpers (T12): one `get` that answers every route the five tools read.
+const SWEEP_WORKFLOW = {
+  id: '01J0WF000000000000000000AA',
+  version: 1,
+  name: 'Flow',
+  initialStateId: 'open',
+  states: [{ id: 'open', name: 'Open', category: 'open' }],
+  transitions: [],
+};
+const SWEEP_TYPE = { id: 'ty2', name: 'Type two', icon: 'tag', rank: 2, workflowId: 'wf', fields: [] };
+const definitionsGet: Session['get'] = async (path) => {
+  if (path === '/v1/me/workspaces') {
+    return { workspaces: [{ workspaceId: 'w', name: 'W', prefix: 'W', role: 'owner', archived: false, projects: [] }] };
+  }
+  if (path.includes('/workflows/')) throw new HttpError(404, {});
+  return { ticketTypes: [{ id: 'ty', name: 'Type', icon: 'tag', rank: 1, workflowId: 'a', fields: [] }], counts: {}, count: 0, key: 'K-1', ticket: { resolved_mode: 'workspace' } };
+};
 
 /** One entry per tool: valid arguments for the 14.88 sweep, and optionally a session override for that tool. */
 export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Session> };
@@ -47,6 +66,14 @@ export const SWEEP: Record<string, SweepEntry> = {
   // member-admin begin (T11)
   // member-admin end
   // definition-admin begin (T12)
+  define_workflow: { args: { workspaceId: 'w', definition: SWEEP_WORKFLOW, confirm_name: 'W' }, session: { get: definitionsGet } },
+  define_ticket_type: { args: { workspaceId: 'w', definition: SWEEP_TYPE, confirm_name: 'W' }, session: { get: definitionsGet } },
+  migrate_ticket_type: {
+    args: { workspaceId: 'w', typeId: 'ty', fromWorkflowId: 'a', toWorkflowId: 'b', stateMap: { open: 'open' }, confirm_name: 'Type' },
+    session: { get: definitionsGet },
+  },
+  set_visibility: { args: { workspaceId: 'w', ticketId: 't', mode: 'project', confirm_name: 'K-1' }, session: { get: definitionsGet } },
+  update_workspace_settings: { args: { workspaceId: 'w', staleDays: 9, confirm_name: 'W' }, session: { get: definitionsGet } },
   // definition-admin end
   // trash begin (T13)
   // trash end
