@@ -128,7 +128,7 @@ const entitySchema = z.object({ kind: z.enum(ENTITY_KINDS), id: z.string() }).su
     path: ['id'],
     message:
       entity.kind === 'membership'
-        ? 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon'
+        ? 'must be a membership entity id, workspaceId:userId (two ULIDs joined by a colon)'
         : 'must be a ULID',
   });
 });
@@ -149,7 +149,7 @@ const entitySchema = z.object({ kind: z.enum(ENTITY_KINDS), id: z.string() }).su
  */
 const requiredPayload = z
   .unknown()
-  .refine((value) => value !== undefined, 'is required — an event with no payload is not a claim');
+  .refine((value) => value !== undefined, 'is required: an event with no payload is not a claim');
 
 /**
  * The regex above proves a membership entity id's SHAPE; it cannot see the
@@ -170,7 +170,7 @@ function refuseMisfiledMembership(
   ctx.addIssue({
     code: z.ZodIssueCode.custom,
     path: ['entity', 'id'],
-    message: "must name this event's own workspace — a membership entity id is workspaceId:userId",
+    message: "must name this event's own workspace: a membership entity id is workspaceId:userId",
   });
 }
 

@@ -12,6 +12,7 @@ import {
   UI_SOURCE_ROOTS,
   cssFiles,
   describeHit,
+  descriptionLines,
   sourceFiles,
   stringsIn,
   uiStringsMatching,
@@ -240,6 +241,160 @@ describe('23.360 the invitation and token-name bodies hold no " — "', () => {
 
   it('reasons are written: every allow-list entry says why it stays', () => {
     for (const entry of SERVER_BODY_ALLOWED) expect(entry.reason.trim().length).toBeGreaterThan(10);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// 23.370 — the domain's refusal messages (HK-3, the follow-up to 23.360)
+// ---------------------------------------------------------------------------------------------
+
+const DOMAIN_SRC = 'packages/domain/src';
+const SPACED_EM_DASH = / — /;
+
+/**
+ * The refusal messages HK-3 rewrote: the zod issue messages and the `parse-event` refusals a client prints
+ * (the MCP server passes a refusal on verbatim). Each pins the sentence its file must still hold, so the
+ * sweep below is proven to be reading its subject.
+ */
+const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
+  { file: 'packages/domain/src/envelope.ts', holds: "must name this event's own workspace" },
+  { file: 'packages/domain/src/events/invites.ts', holds: 'an invite cannot confer ownership' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a backlog ticket has no starting status' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'the ledger accepts only what it can later replay' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'cannot be addressed at all' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'Filing it anywhere else starts a second stream' },
+  { file: 'packages/domain/src/parse-event.ts', holds: 'every invite event carries the inviteId' },
+  { file: 'packages/domain/src/parse-event.ts', holds: "an invite's entity id IS its inviteId" },
+  { file: 'packages/domain/src/validate-workflow.ts', holds: 'every workflow has it without declaring it' },
+  // 23.372 (HK-3b): the zod, contest-provenance and create_ticket refusals are read and still hold their sentences.
+  { file: 'packages/domain/src/display-name.ts', holds: 'a name of only spaces names nothing' },
+  { file: 'packages/domain/src/envelope.ts', holds: 'two ULIDs joined by a colon' },
+  { file: 'packages/domain/src/envelope.ts', holds: 'an event with no payload is not a claim' },
+  { file: 'packages/domain/src/events/invites.ts', holds: 'an address of only spaces reaches nobody' },
+  { file: 'packages/domain/src/events/membership.ts', holds: 'a description of only spaces describes nothing' },
+  { file: 'packages/domain/src/events/membership.ts', holds: 'a project-admin flag is a claim, not a default' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a title of only spaces names nothing' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a field claim with no value' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'nothing sorts below it' },
+  { file: 'packages/domain/src/filter-spec.ts', holds: 'Postgres text cannot carry a NUL byte' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'refused by rule' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'by their clock, ' },
+  { file: 'packages/mcp-server/src/tools/write-tools.ts', holds: 'a backlog ticket has no starting status' },
+];
+
+/**
+ * Strings under `packages/domain/src` that keep " — ": thrown developer errors that name the function
+ * (`applyTicketEvent: ...`) and are never drawn in the UI or returned to a client. Every string a client can
+ * print was rewritten (HK-3 and HK-3b), the one exception being the contest note text, frozen by ruling P39
+ * because it is written into append-only comment bodies. Each entry carries
+ * its reason, and an entry whose string is gone fails `no allow-list entry is stale`.
+ */
+const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
+  { file: 'ticket-state.ts', contains: 'is a purged (redacted) row', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the engine must refuse ticket.created', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'vanished', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the engine must refuse ticket.workflow_rebound', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: 'the version chain has a hole', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ticket-state.ts', contains: '— state "', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'note-state.ts', contains: 'refused —', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'ist-day.ts', contains: 'a day claim is not an instant', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
+  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'frozen by ruling P39 (contest-events.ts): this text is written into append-only comment bodies on convert-to-comment, so re-wording it splits one sentence into two spellings in the ledger' },
+];
+
+const MCP_SRC = 'packages/mcp-server/src';
+
+/** The one reason for the model-facing exemption (planner ruling, 2026-10-02 20:42). */
+const MODEL_FACING_REASON = 'model-facing MCP tool descriptions (and the stdio config error of the same server): text the model reads, not a reply a client prints';
+
+/** A `description:` literal of a tool definition, or `config.ts`: the ONE model-facing exemption. */
+const modelFacing = (hit: { file: string; line: number }, descLines: ReadonlySet<number>): boolean =>
+  hit.file.endsWith('mcp-server/src/config.ts') || descLines.has(hit.line);
+const descriptionLinesOf = (file: string): Set<number> =>
+  descriptionLines(file, readFileSync(resolve(REPO_ROOT, file), 'utf8'));
+
+/** What else keeps " — " in the MCP server: a thrown developer error, never sent to a client. */
+const MCP_DASH_ALLOWED: readonly AllowEntry[] = [
+  { file: 'lazy-session.ts', contains: 'await ready() before using the session', reason: 'developer invariant: a thrown Error that names the call to make, never returned to a client' },
+];
+
+describe('23.370 the domain refusal messages hold no " — "', () => {
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds a planted message)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => SPACED_EM_DASH.test(hit.text));
+
+    // Control: the scan reads a zod message, a custom issue message and a template chunk, and never a comment.
+    const planted = [
+      "// lapsed — in a comment",
+      "const a = z.string().refine((v) => v !== '', 'must not be blank — a name of only spaces');",
+      "const b = { message: \"must name this workspace — a membership id is workspaceId:userId\" };",
+      'const c = { message: `unknown event type \'${type}\' — the ledger accepts only what it can replay` };',
+      "const d = 'must not be blank: a name of only spaces';",
+    ].join('\n');
+    expect(hitsOf('packages/domain/src/planted.ts', planted).map((hit) => hit.text)).toEqual([
+      'must not be blank — a name of only spaces',
+      'must name this workspace — a membership id is workspaceId:userId',
+      "' — the ledger accepts only what it can replay",
+    ]);
+
+    // Control: every site is read, and still holds the sentence this case is about.
+    for (const { file, holds } of DOMAIN_REFUSAL_SITES) {
+      const source = readFileSync(resolve(REPO_ROOT, file), 'utf8');
+      expect(
+        stringsIn(file, source).some((hit) => hit.text.includes(holds)),
+        `${file} holds "${holds}"`,
+      ).toBe(true);
+    }
+
+    const hits = uiStringsMatching(SPACED_EM_DASH, [DOMAIN_SRC]);
+    expect(withoutAllowed(hits, DOMAIN_DASH_ALLOWED).map(describeHit)).toEqual([]);
+
+    // HK-3b: the one MCP reply string a member sees (a create_ticket refusal Claude shows). The tool
+    // descriptions are instructions to the model, not copy a person reads, so they are not swept here.
+    const writeTools = 'packages/mcp-server/src/tools/write-tools.ts';
+    const refusal = stringsIn(writeTools, readFileSync(resolve(REPO_ROOT, writeTools), 'utf8')).filter((hit) =>
+      hit.text.includes('a backlog ticket has no starting status'),
+    );
+    expect(refusal).toHaveLength(1);
+    expect(refusal.filter((hit) => SPACED_EM_DASH.test(hit.text)).map(describeHit)).toEqual([]);
+  });
+
+  it('23.372 the MCP server holds no " — " in a reply, apart from the model-facing descriptions and one developer error (control first)', () => {
+    const tools = 'packages/mcp-server/src/tools/planted-tools.ts';
+    const source = [
+      'export const tools = [',
+      "  { name: 'a',",
+      "    description: 'Move it — a description the model reads',",
+      "    run: () => ({ error: 'refused — pass a comment' }) },",
+      '];',
+    ].join('\n');
+    const plantedHits = stringsIn(tools, source).filter((hit) => SPACED_EM_DASH.test(hit.text));
+    expect(plantedHits.map((hit) => hit.text)).toEqual(['Move it — a description the model reads', 'refused — pass a comment']);
+    expect(plantedHits.filter((hit) => !modelFacing(hit, descriptionLines(tools, source))).map((hit) => hit.text)).toEqual([
+      'refused — pass a comment',
+    ]);
+
+    const hits = uiStringsMatching(SPACED_EM_DASH, [MCP_SRC]);
+    const replies = hits.filter((hit) => !modelFacing(hit, descriptionLinesOf(hit.file)));
+    expect(withoutAllowed(replies, MCP_DASH_ALLOWED).map(describeHit)).toEqual([]);
+  });
+
+  it('23.372 the MCP allow-list is not stale: descriptions and the config error are still found, and each entry says why', () => {
+    const hits = uiStringsMatching(SPACED_EM_DASH, [MCP_SRC]);
+    expect(hits.some((hit) => modelFacing(hit, descriptionLinesOf(hit.file)))).toBe(true);
+    expect(hits.some((hit) => hit.file.endsWith('mcp-server/src/config.ts'))).toBe(true);
+    expect(MODEL_FACING_REASON.trim().length).toBeGreaterThan(10);
+    for (const entry of MCP_DASH_ALLOWED) {
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+      expect(hits.some((hit) => hit.file.endsWith(entry.file) && hit.text.includes(entry.contains)), `${entry.file}: ${entry.contains}`).toBe(true);
+    }
+  });
+
+  it('reasons are written, and no allow-list entry is stale', () => {
+    const hits = uiStringsMatching(SPACED_EM_DASH, [DOMAIN_SRC]);
+    for (const entry of DOMAIN_DASH_ALLOWED) {
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+      expect(hits.some((hit) => hit.file.endsWith(entry.file) && hit.text.includes(entry.contains)), `${entry.file}: ${entry.contains}`).toBe(true);
+    }
   });
 });
 

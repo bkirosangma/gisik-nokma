@@ -50,7 +50,7 @@ describe('workspaceCreatedPayload', () => {
     // this is what taking Plan 1's provisional shape over actually changes.
     expect(rejectionIssues(workspaceCreatedPayload.safeParse({ name: '  ' }))).toContainEqual({
       path: ['name'],
-      message: 'must not be blank — a name of only spaces names nothing',
+      message: 'must not be blank: a name of only spaces names nothing',
     });
     // And the claim survives verbatim: refusing blanks must not become trimming.
     expect(workspaceCreatedPayload.parse({ name: '  Corner  ' })).toEqual({ name: '  Corner  ' });
@@ -101,7 +101,7 @@ describe('workspaceRenamedPayload', () => {
     expect(workspaceRenamedPayload.parse({ name: 'Corner Shop' })).toEqual({ name: 'Corner Shop' });
     expect(rejectionIssues(workspaceRenamedPayload.safeParse({ name: '  ' }))).toContainEqual({
       path: ['name'],
-      message: 'must not be blank — a name of only spaces names nothing',
+      message: 'must not be blank: a name of only spaces names nothing',
     });
   });
 });
@@ -158,7 +158,7 @@ describe('projectCreatedPayload', () => {
       rejectionIssues(projectCreatedPayload.safeParse({ name: 'Delivery', description: '   ' })),
     ).toContainEqual({
       path: ['description'],
-      message: 'must not be blank — a description of only spaces describes nothing',
+      message: 'must not be blank: a description of only spaces describes nothing',
     });
     expect(
       rejectionIssues(
@@ -328,7 +328,7 @@ describe('projectMemberAddedPayload', () => {
     const result = projectMemberAddedPayload.safeParse({ userId: newUlid() });
     expect(rejectionIssues(result)).toContainEqual({
       path: ['projectAdmin'],
-      message: 'is required — a project-admin flag is a claim, not a default',
+      message: 'is required: a project-admin flag is a claim, not a default',
     });
   });
 
@@ -336,7 +336,7 @@ describe('projectMemberAddedPayload', () => {
     const result = projectMemberAddedPayload.safeParse({ userId: newUlid(), projectAdmin: 'true' });
     expect(rejectionIssues(result)).toContainEqual({
       path: ['projectAdmin'],
-      message: 'is required — a project-admin flag is a claim, not a default',
+      message: 'is required: a project-admin flag is a claim, not a default',
     });
   });
 });
