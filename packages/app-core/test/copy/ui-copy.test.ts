@@ -12,6 +12,7 @@ import {
   UI_SOURCE_ROOTS,
   cssFiles,
   describeHit,
+  descriptionLines,
   sourceFiles,
   stringsIn,
   uiStringsMatching,
@@ -300,6 +301,22 @@ const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
   { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'frozen by ruling P39 (contest-events.ts): this text is written into append-only comment bodies on convert-to-comment, so re-wording it splits one sentence into two spellings in the ledger' },
 ];
 
+const MCP_SRC = 'packages/mcp-server/src';
+
+/** The one reason for the model-facing exemption (planner ruling, 2026-10-02 20:42). */
+const MODEL_FACING_REASON = 'model-facing MCP tool descriptions (and the stdio config error of the same server): text the model reads, not a reply a client prints';
+
+/** A `description:` literal of a tool definition, or `config.ts`: the ONE model-facing exemption. */
+const modelFacing = (hit: { file: string; line: number }, descLines: ReadonlySet<number>): boolean =>
+  hit.file.endsWith('mcp-server/src/config.ts') || descLines.has(hit.line);
+const descriptionLinesOf = (file: string): Set<number> =>
+  descriptionLines(file, readFileSync(resolve(REPO_ROOT, file), 'utf8'));
+
+/** What else keeps " — " in the MCP server: a thrown developer error, never sent to a client. */
+const MCP_DASH_ALLOWED: readonly AllowEntry[] = [
+  { file: 'lazy-session.ts', contains: 'await ready() before using the session', reason: 'developer invariant: a thrown Error that names the call to make, never returned to a client' },
+];
+
 describe('23.370 the domain refusal messages hold no " — "', () => {
   it('holds none, apart from the reasoned allow-list (control first: the scan finds a planted message)', () => {
     const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
@@ -339,6 +356,37 @@ describe('23.370 the domain refusal messages hold no " — "', () => {
     );
     expect(refusal).toHaveLength(1);
     expect(refusal.filter((hit) => SPACED_EM_DASH.test(hit.text)).map(describeHit)).toEqual([]);
+  });
+
+  it('23.372 the MCP server holds no " — " in a reply, apart from the model-facing descriptions and one developer error (control first)', () => {
+    const tools = 'packages/mcp-server/src/tools/planted-tools.ts';
+    const source = [
+      'export const tools = [',
+      "  { name: 'a',",
+      "    description: 'Move it — a description the model reads',",
+      "    run: () => ({ error: 'refused — pass a comment' }) },",
+      '];',
+    ].join('\n');
+    const plantedHits = stringsIn(tools, source).filter((hit) => SPACED_EM_DASH.test(hit.text));
+    expect(plantedHits.map((hit) => hit.text)).toEqual(['Move it — a description the model reads', 'refused — pass a comment']);
+    expect(plantedHits.filter((hit) => !modelFacing(hit, descriptionLines(tools, source))).map((hit) => hit.text)).toEqual([
+      'refused — pass a comment',
+    ]);
+
+    const hits = uiStringsMatching(SPACED_EM_DASH, [MCP_SRC]);
+    const replies = hits.filter((hit) => !modelFacing(hit, descriptionLinesOf(hit.file)));
+    expect(withoutAllowed(replies, MCP_DASH_ALLOWED).map(describeHit)).toEqual([]);
+  });
+
+  it('23.372 the MCP allow-list is not stale: descriptions and the config error are still found, and each entry says why', () => {
+    const hits = uiStringsMatching(SPACED_EM_DASH, [MCP_SRC]);
+    expect(hits.some((hit) => modelFacing(hit, descriptionLinesOf(hit.file)))).toBe(true);
+    expect(hits.some((hit) => hit.file.endsWith('mcp-server/src/config.ts'))).toBe(true);
+    expect(MODEL_FACING_REASON.trim().length).toBeGreaterThan(10);
+    for (const entry of MCP_DASH_ALLOWED) {
+      expect(entry.reason.trim().length).toBeGreaterThan(10);
+      expect(hits.some((hit) => hit.file.endsWith(entry.file) && hit.text.includes(entry.contains)), `${entry.file}: ${entry.contains}`).toBe(true);
+    }
   });
 
   it('reasons are written, and no allow-list entry is stale', () => {
