@@ -135,14 +135,14 @@ describe('every write builds an envelope the SERVER would accept', () => {
     expect((sent[0]?.[0] as { payload: unknown }).payload).toEqual({ to: 'done' });
   });
 
-  it('14.74 add_comment sends a document object, not a string', async () => {
+  it('14.74 add_comment sends a PARSED document object, not a string and not raw Markdown', async () => {
     const { session, sent } = sessionCapturing(COMMITTED);
     await tool('add_comment', session).handler({
-      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', text: 'hello',
+      workspaceId: '01J0WS000000000000000000AA', ticketId: '01J0TCK000000000000000000A', text: '## hello',
     });
     const payload = (sent[0]?.[0] as { payload: { body: unknown } }).payload;
     expect(typeof payload.body).toBe('object');
-    expect(payload.body).toMatchObject({ type: 'doc' });
+    expect(payload.body).toMatchObject({ type: 'doc', content: [{ type: 'heading', attrs: { level: 2 } }] });
   });
 
   it('14.75 assign_ticket sends an explicit null to unassign', async () => {

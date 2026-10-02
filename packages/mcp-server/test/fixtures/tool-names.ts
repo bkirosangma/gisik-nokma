@@ -15,10 +15,12 @@ export const TOOL_NAMES_BY_MODULE = {
   project: ['list_projects', 'get_project', 'create_project', 'update_project', 'archive_project', 'restore_project', 'delete_project', 'undelete_project'],
   comment: [
     // comment begin (T6)
+    'list_comments', 'edit_comment', 'delete_comment',
     // comment end
   ],
   note: [
     // note begin (T7)
+    'list_notes', 'get_note', 'create_note', 'update_note', 'link_note', 'delete_note', 'restore_note', 'get_note_history',
     // note end
   ],
   attachment: [
