@@ -1558,6 +1558,8 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     expect(alreadyMemberLine('Anselma')).toBe('Anselma is already in this workspace.');
   });
 
+  // 2026-10-02 (HK-7): 3.991 and 3.992 got the 20 s per-it timeout after CI run 37019480109 (#937) failed them under load: 3.991
+  // timed out at 5000 ms, 3.992 missed its findByText after 2554 ms. Both pass alone in seconds; the file took 67 s on the runner.
   it('3.991 no Project access for any role; the body is exactly address/channel/role; CONTROL: Channel and Role remain', async () => {
     const bodies: unknown[] = [];
     mount({
@@ -1583,17 +1585,18 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
       await waitFor(() => expect(bodies).toHaveLength(expected));
       expect(Object.keys(bodies[expected - 1] as object).sort()).toEqual(['address', 'channel', 'role']);
     }
-  });
+  }, 20_000);
 
   it('3.992 a mailed invitation says so above the link; CONTROL: the link and expiry remain', async () => {
     mount({ listPending: async () => [], mintInvite: async () => MINT_OK(true) });
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
     await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
-    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'))).toHaveAttribute('role', 'status');
+    // A longer find wait than the 1000 ms default: the line renders after the mint round trip and a re-render, which a loaded runner delays (run 37019480109).
+    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'), undefined, { timeout: 10_000 })).toHaveAttribute('role', 'status');
     expect(screen.getByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
     expect(screen.getByText(/It stops working after/)).toBeInTheDocument();
-  });
+  }, 20_000);
 
   it('3.993 a failed mail is an alert, with the link; CONTROL: no emailed line', async () => {
     mount({ listPending: async () => [], mintInvite: async () => MINT_OK(false) });
