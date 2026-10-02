@@ -29,6 +29,9 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 const errand = WORKFLOW_TEMPLATES.find((template) => template.id === 'errand-with-waits')!;
 const HERE = dirname(fileURLToPath(import.meta.url));
 
+/** Read through a call so TypeScript does not keep the narrowing of the `null` just assigned. */
+const current = () => seen.props;
+
 function stubViewport(phone: boolean) {
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: phone && query === '(max-width: 40rem)',
@@ -85,8 +88,8 @@ describe('F-5 the workflow canvas on a phone opens readable, not fitted', () => 
     seen.props = null;
     stubViewport(false);
     mount();
-    expect(seen.props?.fitView).toBe(true);
-    const desktopInit = seen.props?.onInit as ((instance: unknown) => void) | undefined;
+    expect(current()?.fitView).toBe(true);
+    const desktopInit = current()?.onInit as ((instance: unknown) => void) | undefined;
     const untouched = vi.fn();
     desktopInit?.({ setCenter: untouched, getNode: () => undefined });
     expect(untouched).not.toHaveBeenCalled();
