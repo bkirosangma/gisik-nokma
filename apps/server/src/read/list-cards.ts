@@ -43,8 +43,8 @@ import { foldedDefKey, foldedWorkflowDefs } from './workflow-defs.js';
  * Three batched queries for the whole page — types, assignment claims, parent
  * audiences — plus one by-version definition read per distinct
  * `(workflowId, version)` pair, which is at most one per workflow on the page.
- * The per-card N+1 that remains is `rollupFor`'s, inside `assembleTicketCards`,
- * and it is left where it is for the reason that file states.
+ * The rollups come from `assembleTicketCards`, one `rollupsFor` call for the whole page
+ * (smoothness T11; the per-card N+1 that used to remain here is gone).
  */
 export async function assembleListCards(
   db: Queryable,
