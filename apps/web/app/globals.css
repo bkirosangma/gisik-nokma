@@ -1508,7 +1508,8 @@ input, textarea, select { font-family: inherit; }
    not the only signal. Every control is 2.75rem (44px) square or tall; focus is the shared ring. At 40rem or less
    the same markup is an indented list (the arm below). */
 .gn-groups { display: flex; flex-direction: column; gap: 0.75rem; }
-.gn-groups__heading { margin: 0 0 0.25rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; }
+/* The tab's section head: the section token (23.072), as the Workspace tab's `.gn-workspace-settings__title` is. */
+.gn-groups__heading { margin: 0 0 0.25rem; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .gn-groups__lede { margin: 0 0 0.75rem; color: var(--gn-text-muted); }
 .gn-groups__toolbar { display: flex; gap: 0.5rem; }
 .gn-groups__tree,
@@ -5537,8 +5538,9 @@ input, textarea, select { font-family: inherit; }
   max-width: var(--gn-measure);
 }
 
-/* The two settings section heads on a phone take the phone step of the scale (UX fixes Task 5, case 23.072). */
+/* The settings section heads on a phone take the phone step of the scale (UX fixes Task 5, case 23.072). */
 @media (max-width: 40rem) {
+  .gn-groups__heading,
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
 }
