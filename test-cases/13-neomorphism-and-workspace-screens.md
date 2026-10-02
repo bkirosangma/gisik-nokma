@@ -389,6 +389,10 @@ same way).
   DERIVED from the (here, stubbed) `/v1/auth/methods` response — this case changes only what the stub
   answers, not the page's own gating logic — and it is a style witness only, run against a fresh browser
   context where nothing is stored. — (`apps/web/e2e-viewport/responsive.spec.ts`)
+  *Re-pinned 2026-10-02 (neo release CI FIX 2; #931's `viewport` job, which runs only in CI): neo-light
+  `--gn-surface-sunken` reads `#e6dcd2` (N2, `neoWellLight`; was `#f1eae3`), and the pressed segment's rendered
+  `box-shadow` carries `inset`, `3px 3px 5px` and `-1px -1px 1px` (N9, `selected: recess`; was `3px 3px 6px` /
+  `-3px -3px 6px`), with the old pair asserted gone. RED on 5a468e24 (4 of 4 viewports), green after.*
 - **13.363** ✅ The accessible-name floor on `/sign-in` does not fall — no role or label changed in this
   round (the only markup edit is the email placeholder, which carries no accessible name of its own), and
   13.362's phone:true witness runs OUTSIDE the `UNAUTHED_ROUTES` sweep specifically so it cannot move the
