@@ -1772,7 +1772,7 @@ test('layouts at 390, 768 and 1512 are measurably DIFFERENT, not just each self-
  * 13.299 — `/workspaces` WITH THE ROSTER ANSWERING AN EMPTY LIST.
  *
  * THE POSITIVE CONTROL IS THE EMPTY-STATE SENTENCE, AND IT MUST STAY FIRST.
- * `<FoundingForm />` renders OUTSIDE all four branches of this page — loading,
+ * `<CreateWorkspaceButton />` (the founding form's door since 22.151) renders OUTSIDE all four branches of this page — loading,
  * expired, refusal and list alike, deliberately, so that a person who cannot be
  * told which workspaces they are in can still found one. "Create workspace" is
  * therefore visible on a page that never received an answer at all, and
@@ -1850,8 +1850,9 @@ test('13.299 — /workspaces with an EMPTY roster renders the empty state and th
   await expect(
     page.getByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
   ).toBeVisible();
-  // `toHaveCount(1)` rather than `toBeVisible`: two submits sharing this
-  // accessible name would satisfy visibility and would be a real defect.
+  // `toHaveCount(1)` rather than `toBeVisible`: two buttons sharing this
+  // accessible name would satisfy visibility and would be a real defect (the
+  // dialog's own submit is not mounted until the button is pressed).
   await expect(page.getByRole('button', { name: 'Create workspace' })).toHaveCount(1);
   // Only meaningful AFTER the positive above, and worth having: it separates
   // "answered `[]`" from "never answered", the latter being this page's normal

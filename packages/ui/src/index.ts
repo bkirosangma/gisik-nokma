@@ -66,3 +66,8 @@ export { PageIcon } from './select/select-icons.js';
 // two-spellings defect this barrel exists to avoid. All four ship together
 // because the one consumer needs all four, not "for symmetry".
 export { FireIcon, LeafIcon, SnowflakeIcon, FlagIcon } from './icons/priority-icons.js';
+// The Create workspace / Create project / Create ticket buttons' `+` (prefixes/groups
+// Task 8). Three consumers in two packages (`app-core`'s create-ticket flow, `apps/web`'s
+// two pages), none of which can reach into `icons/`; one glyph, exported on the same
+// terms as the icons above.
+export { PlusIcon } from './icons/plus-icon.js';

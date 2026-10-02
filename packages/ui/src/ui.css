@@ -1374,7 +1374,7 @@ a.gn-ticket-sheet__crumb--link {
    the product's own. They overlap on `border`, `background`, `padding` and
    `color`; source order decides, and this one is later.
    Styling refresh Plan B (Task B9): P-QUIET — the constant above is
-   superseded. The header's New ticket is the board's one loud element, so the
+   superseded. The header's Create ticket is the board's one loud element, so the
    empty state's own create action is a quiet outlined 44px pill, washed on
    hover; a second primary would break rule 01. */
 .gn-board__empty-create {
@@ -7482,7 +7482,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    already decided"): raising a `ctlBg` control to neo's raised/inset shadow
    is an OPEN DECISION the repo owner left to a future round, not something
    one page's task should settle piecemeal on one control. Applying it here
-   and not on `.gn-button`'s own Filters/New ticket, three centimetres to
+   and not on `.gn-button`'s own Filters/Create ticket, three centimetres to
    this control's right, would make this the one place in the product that
    quietly took a side on a question everything else has left alone. The
    metric's own colour is left unset (`color: var(--gn-text)`, matching
@@ -7509,7 +7509,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 
 /* The web app on phones — the project header (Plan Task 8, case 21.110). At <=40rem the controls row takes the
    whole width of the head: the search fills the first row with Filters beside it (`order` lifts them above
-   the workflow picker and the active-only switch, which keep their DOM order after them), and New ticket —
+   the workflow picker and the active-only switch, which keep their DOM order after them), and Create ticket —
    the header's one primary button, a direct child — takes a full row of its own. Inside the one 40rem arm and
    AFTER `.gn-project__header` and `.gn-project__search`, so source order decides. `.gn-project__filters` is a
    hook the page puts on the Filters button; nothing paints it above 40rem. The view tabs' scroller lives

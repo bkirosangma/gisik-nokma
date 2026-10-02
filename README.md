@@ -59,9 +59,9 @@ speed.
 
 This is the part a marketing page would leave out. Read it before you decide anything.
 
-- **You cannot create a project unless you are an owner or an admin.** Those two roles get a **New
-  project** form on the workspace page. Everybody else is told why it is not there, in words rather
-  than a button that fails: *"Only an owner or an admin can create a project in this workspace."*
+- **You cannot create a project unless you are an owner or an admin.** Those two roles get a **Create
+  project** button on the workspace page. Everybody else is told why it is not there, in words rather
+  than a button that fails: *"Only an owner or admin can create a project."*
   A brand new
   workspace comes with stages, job types and you as its owner — and, until an owner or admin adds one,
   nowhere to put a job.
