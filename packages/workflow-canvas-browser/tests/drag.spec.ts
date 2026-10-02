@@ -16,6 +16,9 @@ test('25.500/25.501 a dragged state moves live under the pointer and its arrow f
   await dragBy(page, name, 200, 0, { steps: 100, release: false });
   const during = await nodeBox(page, name);
   await expect(node(page, name)).toHaveClass(/\bdragging\b/); // the lifted look's hook (ui.css `.react-flow__node.dragging`)
+  const lifted = node(page, name).locator('.gn-state-node');
+  await expect(lifted).toHaveCSS('transform', /^matrix\(1\.02,/); // lifted scale 1.02
+  await expect(lifted).not.toHaveCSS('box-shadow', 'none'); // on the drag-image shadow (neo, the harness's style)
   expect(during.x - before.x).toBeGreaterThan(192);
   expect(during.x - before.x).toBeLessThan(204);
   expect(await edgePath(page, 0)).not.toBe(pathBefore);
