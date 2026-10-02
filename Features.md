@@ -3697,6 +3697,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
 
+- ✅ **Notes open to READ; the phone layout follows /help; the last note is remembered per device** (smoothness G-3; `apps/web/src/notes/note-document.tsx`, `notes-page.tsx`, `notes-phone-panel.tsx`, `last-note.ts`, `use-remembered-note.ts`; `app/globals.css` `.gn-note-document__head`) — an existing note shows its rendered document with no toolbar and no caret; "Edit note" (top right of the header, every width, only for a person who may edit) mounts the editor and "Done" returns, a new note opens in edit mode. At ≤47.9375rem the tree is /help's floating panel behind /help's round button (same classes, so the same position), holding the one search box and a Notes/Contents switch (Contents = this note's headings; hidden with no note open). Entering `/notes` resumes the note stored in `localStorage` `gn-last-note:<user>:<workspace>` (desktop opens it; a phone keeps the list with it marked current); a gone or deleted note clears the key; storage that throws changes nothing. Cases 25.340–25.354.
+
 ## 23. Comment edit and delete, Markdown bodies
 
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*
