@@ -787,6 +787,23 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
       root.removeEventListener('focusout', onOut);
     };
   }, [phone, editor, editable]);
+  // CARET (G-7 FIX 1 F2, FIX 2 F1): ProseMirror scrolls a caret into the VISUAL viewport with a 5px margin, and the docked bar
+  // covers the bottom of that viewport — so the last visible line put the caret UNDER the bar. While docked, the view's bottom
+  // margin AND threshold are the bar's reach into the visual viewport plus a gap: the caret starts scrolling when it enters
+  // the bar's zone and stops a gap above it. The reach is MEASURED — the distance from the bar's top edge to the visual
+  // viewport's bottom — not the bar's height, because with no keyboard the page's bottom bar lifts the bar (`--gn-bar-lift`)
+  // and the reach is lift + bar. It is re-read whenever the dock offset moves (the `measure` above, and after commit once the
+  // lift has taken effect). The other sides keep ProseMirror's own values (margin 5, threshold 0). Undocking hands back the
+  // default by clearing both props (`someProp` then falls through to 5 and 0).
+  const applyCaretClearance = useCallback((): void => {
+    const bar = toolbarRef.current;
+    if (!editor || editor.isDestroyed || bar === null) return;
+    const vv = window.visualViewport ?? null;
+    const visualBottom = vv === null ? window.innerHeight : vv.offsetTop + vv.height;
+    const reach = Math.max(bar.offsetHeight, Math.round(visualBottom - bar.getBoundingClientRect().top));
+    const bottom = reach + DOCK_CARET_GAP_PX;
+    editor.view.setProps({ scrollMargin: { top: 5, right: 5, bottom, left: 5 }, scrollThreshold: { top: 0, right: 0, bottom, left: 0 } });
+  }, [editor]);
   useLayoutEffect(() => {
     if (!docked) {
       setDockBottom(null);
@@ -796,30 +813,37 @@ export function EditorToolbar({ editor, editable, platform, id, onClose }: Edito
     // how far the visual viewport's bottom edge sits above the layout viewport's.
     setOnModalLayer(toolbarRef.current?.closest('[role="dialog"][aria-modal="true"]') != null);
     const vv = window.visualViewport ?? null;
-    const measure = () => setDockBottom(vv === null ? 0 : Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))));
+    const measure = () => {
+      setDockBottom(vv === null ? 0 : Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))));
+      // The bar's place moved: re-read it now, and once more after the frame (the page's `--gn-bar-lift` follows the same
+      // resize through React's commit, so the bar's rect is only final then).
+      applyCaretClearance();
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(applyCaretClearance);
+    };
+    let frame = 0;
     measure();
     vv?.addEventListener('resize', measure);
     vv?.addEventListener('scroll', measure);
     window.addEventListener('resize', measure);
     return () => {
+      window.cancelAnimationFrame(frame);
       vv?.removeEventListener('resize', measure);
       vv?.removeEventListener('scroll', measure);
       window.removeEventListener('resize', measure);
     };
-  }, [docked]);
-  // CARET (G-7 FIX 1, F2): ProseMirror scrolls a caret into the VISUAL viewport with a 5px margin, and the docked bar covers
-  // the bottom of that viewport — so the last visible line put the caret UNDER the bar. While docked, the view's bottom
-  // margin AND threshold are the bar's height plus a gap: the caret starts scrolling when it enters the bar's zone and
-  // stops a gap above it. The other sides keep ProseMirror's own values (margin 5, threshold 0). Undocking hands back the
-  // default by clearing both props (`someProp` then falls through to 5 and 0).
+  }, [docked, applyCaretClearance]);
   useEffect(() => {
     if (!docked || !editor || editor.isDestroyed) return;
-    const bottom = (toolbarRef.current?.offsetHeight ?? 0) + DOCK_CARET_GAP_PX;
-    editor.view.setProps({ scrollMargin: { top: 5, right: 5, bottom, left: 5 }, scrollThreshold: { top: 0, right: 0, bottom, left: 0 } });
+    applyCaretClearance();
     return () => {
       if (!editor.isDestroyed) editor.view.setProps({ scrollMargin: undefined, scrollThreshold: undefined });
     };
-  }, [docked, editor]);
+  }, [docked, editor, applyCaretClearance]);
+  // After a commit that changed what lifts the bar (the offset, or the modal zeroing of the lift), the rect is final.
+  useEffect(() => {
+    if (docked) applyCaretClearance();
+  }, [docked, dockBottom, onModalLayer, applyCaretClearance]);
   useEffect(() => {
     if (!phone) return;
     measureEdges();

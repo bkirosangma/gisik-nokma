@@ -689,24 +689,75 @@ describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom
     expect(barHeightPx(0)).toBe(56); // CONTROL: hig, minimal and the webview keep the 3.5rem bar
   });
 
-  it('25.440 (F2) while docked the view keeps the caret above the bar: scrollMargin and scrollThreshold have a bottom of at least the bar plus a gap, and undocking (blur, or a desktop mount) restores ProseMirror\'s default', async () => {
+  it('25.440 (F2 + FIX 2 F1) while docked the view keeps the caret above the bar WHEREVER the bar is: scrollMargin and scrollThreshold have a bottom of at least (visual viewport bottom − the bar\'s top) plus a gap — with the keyboard up (lift 0) and with none (the bar lifted over the page\'s bottom bar) — and undocking (blur, or a desktop mount) restores ProseMirror\'s default', async () => {
     const barHeight = 84;
+    const gap = 8;
+    let lift = 0;
+    let vvRef: { height: number; offsetTop: number } | null = null;
     const spy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function offsetHeight(this: HTMLElement) {
       return this.classList.contains('ticket-editor__toolbar') ? barHeight : 0;
     });
+    // jsdom lays nothing out: the docked bar's rect is where CSS would put it — `lift` above the visual viewport's bottom.
+    const realRect = HTMLElement.prototype.getBoundingClientRect;
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: HTMLElement) {
+      if (!this.classList.contains('ticket-editor__toolbar') || vvRef === null) return realRect.call(this);
+      // Inside a modal the bar carries `--gn-bar-lift: 0px` inline, which beats the page's lift.
+      const placed = this.style.getPropertyValue('--gn-bar-lift') === '0px' ? 0 : lift;
+      const top = vvRef.offsetTop + vvRef.height - placed - barHeight;
+      return { x: 0, y: top, top, bottom: top + barHeight, left: 0, right: 390, width: 390, height: barHeight, toJSON: () => ({}) } as DOMRect;
+    });
+    const bottomOf = (editor: Editor): { margin: number; threshold: number } => ({
+      margin: (editor.view.someProp('scrollMargin') as { bottom: number }).bottom,
+      threshold: (editor.view.someProp('scrollThreshold') as { bottom: number }).bottom,
+    });
     try {
-      const { view, editor } = await mountEditor(true, { height: 500 });
+      // NO keyboard, the lift (56 + inset) in effect: the bar spans 56–140px above the visual bottom, so the caret must be
+      // kept at least lift + bar + gap clear — bar + gap alone leaves it up to `lift` px UNDER the bar.
+      lift = 56;
+      const { view, vv, editor } = await mountEditor(true, { height: 844 });
+      vvRef = vv;
       // CONTROL: not docked → no prop, so ProseMirror's own 5px margin applies.
       expect(editor.view.someProp('scrollMargin')).toBeUndefined();
       expect(editor.view.someProp('scrollThreshold')).toBeUndefined();
       focusEditor(view);
+      let now = bottomOf(editor);
+      expect(now.margin, 'no keyboard: lift + bar + gap').toBeGreaterThanOrEqual(lift + barHeight + gap);
+      expect(now.threshold).toBe(now.margin);
+      // The other three sides keep ProseMirror's defaults (margin 5, threshold 0).
       const margin = editor.view.someProp('scrollMargin') as { top: number; right: number; bottom: number; left: number };
       const threshold = editor.view.someProp('scrollThreshold') as { top: number; right: number; bottom: number; left: number };
-      expect(margin.bottom).toBeGreaterThan(barHeight);
-      expect(threshold.bottom).toBe(margin.bottom);
-      // The other three sides keep ProseMirror's defaults (margin 5, threshold 0).
       expect([margin.top, margin.left, margin.right]).toEqual([5, 5, 5]);
       expect([threshold.top, threshold.left, threshold.right]).toEqual([0, 0, 0]);
+      // The keyboard comes up (visual viewport 500px, the page's bar steps aside: lift 0): re-applied on the resize.
+      lift = 0;
+      Object.assign(vv, { height: 500 });
+      act(() => {
+        vv.dispatchEvent(new Event('resize'));
+      });
+      now = bottomOf(editor);
+      expect(now.margin, 'keyboard up: bar + gap').toBeGreaterThanOrEqual(barHeight + gap);
+      expect(now.margin, 'and no more than the bar + gap, the lift is gone').toBeLessThan(barHeight + gap + 10);
+      expect(now.threshold).toBe(now.margin);
+      // The lift can LAG the resize (the page's bar steps aside through a React commit): the event reads the old lift, the
+      // frame after it reads the new one. (Here the keyboard comes up again at 500px with the lift still declared.)
+      lift = 56;
+      Object.assign(vv, { height: 500 });
+      act(() => {
+        vv.dispatchEvent(new Event('resize'));
+      });
+      expect(bottomOf(editor).margin, 'at the event the lift is still the old one').toBe(lift + barHeight + gap);
+      lift = 0;
+      await act(async () => {
+        await new Promise((resolve) => window.requestAnimationFrame(() => resolve(null)));
+      });
+      expect(bottomOf(editor).margin, 'the frame after the resize re-reads the bar\'s place').toBe(barHeight + gap);
+      // Back to no keyboard: the lift returns, so does the room.
+      lift = 56;
+      Object.assign(vv, { height: 844 });
+      act(() => {
+        vv.dispatchEvent(new Event('resize'));
+      });
+      expect(bottomOf(editor).margin, 'keyboard gone again').toBeGreaterThanOrEqual(lift + barHeight + gap);
       // Blur → restored.
       const outside = document.createElement('button');
       document.body.append(outside);
@@ -715,19 +766,52 @@ describe('G-7 FIX 1 (reviewer A, 2026-10-03): shadow room, the caret, the bottom
       expect(editor.view.someProp('scrollThreshold')).toBeUndefined();
       view.unmount();
 
+      // A MODAL layer zeroes the lift AFTER the first measure (a commit later): the margin ends at bar + gap, not lift + …
+      lift = 56;
+      stubPhone(true, { height: 844 });
+      vvRef = window.visualViewport as unknown as { height: number; offsetTop: number };
+      const modalRef: React.MutableRefObject<Editor | null> = { current: null };
+      const modalReady = vi.fn();
+      const inDialog = render(
+        <div role="dialog" aria-modal="true">
+          <TicketEditor {...editorProps()} editorRef={modalRef} onEditorReady={modalReady} initialDoc={DOC} />
+        </div>,
+      );
+      await vi.waitFor(() => expect(modalReady).toHaveBeenCalled());
+      focusEditor(inDialog);
+      expect(bar(inDialog).style.getPropertyValue('--gn-bar-lift')).toBe('0px');
+      expect(bottomOf(modalRef.current as Editor).margin, 'inside a modal there is no lift to clear').toBe(barHeight + gap);
+      inDialog.unmount();
+
       // CONTROL (same `it`): a desktop mount never docks and never sets it.
       const desktop = await mountEditor(false, { height: 500 });
       focusEditor(desktop.view);
       expect(desktop.editor.view.someProp('scrollMargin')).toBeUndefined();
       desktop.view.unmount();
     } finally {
+      rectSpy.mockRestore();
       spy.mockRestore();
     }
   });
 
-  it('25.441 (F3) the docked bar clears the phone bottom bar when no keyboard is up: its bottom is the dock offset PLUS `--gn-bar-lift`, the offset is a variable the bar carries (0px with no keyboard), and inside a modal dialog or sheet (over the bottom bar) the lift is 0', async () => {
+  it('25.441 (F3 + FIX 2 F2) the docked bar clears the phone bottom bar when no keyboard is up: its bottom is the LARGER of the dock offset and `--gn-bar-lift` (never their sum), the offset is a variable the bar carries (0px with no keyboard), and inside a modal dialog or sheet (over the bottom bar) the lift is 0', async () => {
     const docked = phoneRule('.ticket-editor__toolbar--docked');
-    expect(valueOf(docked, 'bottom')).toBe('calc(var(--ticket-editor-dock-bottom, 0px) + var(--gn-bar-lift, 0px))');
+    expect(valueOf(docked, 'bottom')).toBe('max(var(--ticket-editor-dock-bottom, 0px), var(--gn-bar-lift, 0px))');
+    // The rule's VALUE under the states it meets (jsdom computes no CSS: resolve the two variables by hand). The lift is
+    // declared while no keyboard is up (`useKeyboardOpen` calls it open only below 0.75 × innerHeight), so a SMALL inset (an
+    // iOS accessory strip, a suggestion bar) meets the lift — the bar must not float the sum above the visible bottom.
+    const resolve = (offset: number | null, lift: number | null): number => {
+      const text = (valueOf(docked, 'bottom') as string)
+        .replace(/var\(--ticket-editor-dock-bottom, 0px\)/g, `${offset ?? 0}px`)
+        .replace(/var\(--gn-bar-lift, 0px\)/g, `${lift ?? 0}px`);
+      const nums = [...text.matchAll(/(-?\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1]));
+      return text.startsWith('max(') ? Math.max(...nums) : nums.reduce((a, b) => a + b, 0);
+    };
+    expect(resolve(344, null), 'CONTROL: a full keyboard (the lift undeclared) — the offset wins').toBe(344);
+    expect(resolve(344, 0), 'CONTROL: a full keyboard inside a modal (lift zeroed) — the offset wins').toBe(344);
+    expect(resolve(0, 56), 'no keyboard: the lift clears the nav').toBe(56);
+    expect(resolve(30, 56), 'a 30px inset under a 56px nav: the lift, not 86').toBe(56);
+    expect(resolve(80, 56), 'an inset taller than the nav: the inset').toBe(80);
     // No keyboard: the visual viewport is the layout viewport → the variable is 0px (and the lift alone clears the nav).
     const { view } = await mountEditor(true, { height: 844 });
     focusEditor(view);
