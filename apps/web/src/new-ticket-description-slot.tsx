@@ -2,7 +2,7 @@ import { TicketEditorSlot } from '@gisik-nokma/editor';
 import type { EditorSlotComponent } from '@gisik-nokma/app-core';
 
 /**
- * The New ticket dialog's description composer: the SHEET'S OWN slot, with its
+ * The Create ticket dialog's description composer: the SHEET'S OWN slot, with its
  * submit control suppressed (owner request 2026-09-23).
  *
  * ## Why a wrapper rather than the component itself

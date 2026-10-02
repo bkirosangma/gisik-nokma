@@ -43,7 +43,7 @@ describe('3.987 the dialog’s outsider arm', () => {
     render(<NewTicketDialog {...props} lookupPerson={async () => OUT} onCreate={onCreate} />);
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Collect the rent' } });
     await pickOutsider(user);
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: 'user_out', assigneeIsOutsider: true }));
   });
 
@@ -54,7 +54,7 @@ describe('3.987 the dialog’s outsider arm', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Collect the rent' } });
     await user.click(screen.getByRole('combobox', { name: 'Assignee' }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Anselma Marak' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
     expect(onCreate.mock.calls[0]![0]).not.toHaveProperty('assigneeIsOutsider');
   });
 });
@@ -89,10 +89,10 @@ describe('3.988 the flow routes an outsider draft through assignOutsider', () =>
       serverTime: '2026-09-29T10:00:00.000Z',
     }));
     const source = renderFlow(assignOutsider);
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Collect the rent' } });
     await pickOutsider(user);
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
     await vi.waitFor(() => expect(assignOutsider).toHaveBeenCalledTimes(1));
     const [userId, event] = assignOutsider.mock.calls[0]!;
     expect(userId).toBe('user_out');
@@ -104,11 +104,11 @@ describe('3.988 the flow routes an outsider draft through assignOutsider', () =>
     const user = userEvent.setup();
     const assignOutsider = vi.fn();
     const source = renderFlow(assignOutsider);
-    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.click(screen.getByRole('button', { name: 'Create ticket' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Collect the rent' } });
     await user.click(screen.getByRole('combobox', { name: 'Assignee' }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Anselma Marak' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
     await vi.waitFor(() => expect(source.ingested).toHaveLength(1));
     expect(assignOutsider).not.toHaveBeenCalled();
   });

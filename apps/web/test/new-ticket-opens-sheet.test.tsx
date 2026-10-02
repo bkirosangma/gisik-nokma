@@ -157,6 +157,14 @@ beforeEach(() => {
   searchParams = new URLSearchParams();
 });
 
+/** The page header's primary "Create ticket"; an empty board draws a second one (the banner's). */
+const headerCreateTicket = async (): Promise<HTMLElement> => {
+  const all = await screen.findAllByRole('button', { name: 'Create ticket' });
+  const header = all.find((el) => el.classList.contains('gn-button--primary'));
+  if (header === undefined) throw new Error('no primary Create ticket button');
+  return header;
+};
+
 describe('13.1369 creating a ticket opens it', () => {
   it('13.1369 a committed create pushes the NEW TICKET’S OWN ID as ?ticket=, and the sheet opens on it', async () => {
     const ingested: SubmittedEvent[] = [];
@@ -182,9 +190,10 @@ describe('13.1369 creating a ticket opens it', () => {
 
     const view = render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'New ticket' }));
+    // The HEADER's button — an empty board also draws a banner button of the same name (BRD-19).
+    await user.click(await headerCreateTicket());
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the new sign' } });
-    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await user.click(within(screen.getByRole('dialog', { name: 'Create ticket' })).getByRole('button', { name: 'Create ticket' }));
 
     // ARM ONE — the id the page pushed is the id the ledger received. Read back
     // off the INGESTED ENVELOPE rather than asserted as "some string", because
@@ -214,7 +223,7 @@ describe('13.1369 creating a ticket opens it', () => {
     // …and it is the TICKET, not the dialog we were just in: the create form is
     // gone, so "the sheet opened" cannot be satisfied by the modal that was
     // already on screen.
-    expect(screen.queryByRole('button', { name: 'Create' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Create ticket' })).toBeNull();
   });
 
   it('13.1369 CONTROL: with no ?ticket= param, no sheet renders — so the arm above is not reading a page that always shows one', async () => {
@@ -235,7 +244,7 @@ describe('13.1369 creating a ticket opens it', () => {
     // The page has loaded — asserted on something it certainly renders — so the
     // absence below is a page that chose not to draw a sheet, not one that had
     // not rendered yet.
-    await screen.findByRole('button', { name: 'New ticket' });
+    await headerCreateTicket();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

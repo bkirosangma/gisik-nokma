@@ -1,6 +1,6 @@
 import type { ComponentPropsWithRef } from 'react';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'danger-quiet';
 /**
  * `ComponentPropsWithRef<'button'>` so a caller can hold the element — the delete
  * dialog hands its Cancel to `Dialog`'s `initialFocusRef` (trash Plan 4, case
