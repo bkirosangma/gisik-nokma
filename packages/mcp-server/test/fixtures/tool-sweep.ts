@@ -7,6 +7,9 @@ export type SweepEntry = { args: Record<string, unknown>; session?: Partial<Sess
  * Every tool's arguments, valid, so a sweep can drive every handler. Same module blocks, same order, as
  * `tool-names.ts`; a lane edits ONLY between its own `begin`/`end` comments (MCP-everything T3).
  */
+/** The ticket-detail answer the T9 sweep entries read (`key`, `title`, a rank, a workflow). */
+const TICKET_DETAIL = { key: 'W-1', title: 'A ticket', ticketState: { fields: {}, rank: 'm', workflowId: 'wf' }, rollup: null };
+
 export const SWEEP: Record<string, SweepEntry> = {
   // read begin
   search_tickets: { args: { workspaceId: 'w', query: 'q' } },
@@ -44,6 +47,13 @@ export const SWEEP: Record<string, SweepEntry> = {
   // attachment begin (T8)
   // attachment end
   // ticket begin (T9)
+  update_ticket: { args: { workspaceId: 'w', ticketId: 't', title: 'Renamed' } },
+  close_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
+  reopen_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
+  delete_ticket: { args: { workspaceId: 'w', ticketId: 't', confirm_name: 'W-1' }, session: { get: async () => TICKET_DETAIL } },
+  restore_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
+  get_ticket_history: { args: { ticketId: 't' }, session: { get: async () => ({ ticketId: 't', events: [] }) } },
+  rank_ticket: { args: { workspaceId: 'w', ticketId: 't', after: 'n' }, session: { get: async () => TICKET_DETAIL } },
   // ticket end
   // discovery begin (T10)
   // discovery end

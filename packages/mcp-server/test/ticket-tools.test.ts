@@ -39,7 +39,7 @@ const ROUTES: Record<string, unknown> = {
 };
 
 /** A session whose `postEvents` records each BATCH, so "one batch" is a thing a test can count. */
-function fake(routes: Record<string, unknown> = {}, result: unknown = COMMITTED) {
+function fake(routes: Record<string, unknown> = {}, result?: unknown) {
   const batches: Array<Array<Record<string, unknown>>> = [];
   const session: Session = {
     userId: () => ME,
@@ -50,7 +50,7 @@ function fake(routes: Record<string, unknown> = {}, result: unknown = COMMITTED)
     post: async () => ({}),
     postEvents: async (events) => {
       batches.push(events as Array<Record<string, unknown>>);
-      return result;
+      return result ?? { results: events.map(() => COMMITTED.results[0]) }; // one committed result per event, index-aligned
     },
     ...NO_TRANSFER,
   };
@@ -184,6 +184,7 @@ describe('14.454 get_ticket_history', () => {
           line(ulid('F3'), 'ticket.field_set', { fieldId: 'description', value: { type: 'doc', content: [text('secret three')] } }, 'web', 3),
           line(ulid('A4'), 'ticket.assigned', { assigneeId: ME }, 'web', 4),
           line(ulid('D5'), 'comment.deleted', { commentId: ulid('C1') }, 'web', 5),
+          line(ulid('M7'), 'ticket.transitioned', { to: 'done', comment: { text: 'secret five' } }, 'mcp', 7),
           line(ulid('K6'), 'ticket.created', { typeId: 'task', title: 'Chiller', description: { type: 'doc', content: [text('secret four')] } }, 'web', 6),
         ],
       },
@@ -195,9 +196,10 @@ describe('14.454 get_ticket_history', () => {
       { fieldId: 'description' },
       { assigneeId: ME }, // control: an ordinary line keeps its facts
       { commentId: ulid('C1') },
+      { to: 'done' }, // a transition keeps its move, not the words that came with it
       { typeId: 'task', title: 'Chiller' },
     ]);
-    expect(out.events.map((e) => e.origin)).toEqual(['web', 'mcp', 'web', 'web', 'web', 'web']);
+    expect(out.events.map((e) => e.origin)).toEqual(['web', 'mcp', 'web', 'web', 'web', 'mcp', 'web']);
     expect(JSON.stringify(out)).not.toContain('secret');
   });
 
