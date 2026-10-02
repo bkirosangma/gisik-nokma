@@ -723,7 +723,9 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await within(container).findByRole('navigation', { name: 'Notes' });
-    const styled = styledAttributes(CSS);
+    // `data-style` is the document's own style switch (on <html>, read by every `[data-style="neo"] …` rule, G-2 25.324), not a
+    // thing this page renders; the one attribute a Notes rule keys on is the drawer's `data-open`.
+    const styled = styledAttributes(CSS).filter((attribute) => attribute !== 'data-style');
     expect(styled).toEqual(['data-open']);
     const rendered = [...container.querySelectorAll<HTMLElement>('*')].flatMap((el) =>
       el.getAttributeNames().filter((name) => name.startsWith('data-')),

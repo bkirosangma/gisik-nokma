@@ -19,6 +19,7 @@ import {
   haloVariableName,
   radiusVariableName,
   shadowValueOf,
+  SHADOW_REACH_VARIABLE,
   shadowVariableName,
   themeStylesheet,
   themes,
@@ -183,6 +184,8 @@ describe('CSS variable emission', () => {
       '--gn-scroll-fade-size',
       '--gn-fade-from',
       '--gn-fade-to',
+      // The shadow reach (G-2, case 25.321) is derived from the shadow table and emitted for neo only, beside the halo lengths.
+      SHADOW_REACH_VARIABLE,
     ]);
     expect(referenced.filter((name) => name !== undefined && !declared.has(name))).toEqual([]);
     // The walk really read a stylesheet that uses variables — an empty match
