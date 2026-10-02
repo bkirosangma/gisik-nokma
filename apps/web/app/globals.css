@@ -5798,3 +5798,17 @@ input, textarea, select { font-family: inherit; }
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
 }
+
+/* ── ROUTE SHELLS AND THE PENDING LINK HINT (smoothness T5, spec D5/S1/P10; amendment S-R1). Appended after every earlier rule, as
+   the placeholder block in ui.css is. A shell is the page's OWN container (`main.gn-shell`, `.gn-nav`, `.gn-notes__body`, the board's
+   column and card) filled with placeholder parts, so these rules only LAY OUT: none names a fill, a border, a shadow or a style. */
+.gn-nav--skeleton { min-height: var(--app-nav-offset); }
+.gn-shell--skeleton .gn-skeleton-region { display: contents; }
+.gn-project__tabs-skeleton { display: flex; gap: var(--gn-space-2); }
+/* inline-flex + min-width: 0, not inline-block: the link is an inline-flex row whose `.gn-nav__label` child truncates with an ellipsis, and a
+   block-level wrapper in between stops the label shrinking (the workspace and project names then overlap their neighbours). */
+.gn-nav__pending { display: inline-flex; min-width: 0; max-width: 100%; }
+.gn-nav__pending[data-pending="true"] { animation: gnPulse 1600ms var(--gn-motion-ease-out) 100ms infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gn-nav__pending[data-pending="true"] { animation: none; opacity: 0.8; }
+}

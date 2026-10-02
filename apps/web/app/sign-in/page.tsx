@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
 import { authClient } from '../../src/auth-client.js';
 import { BrandMark } from '../../src/brand-mark.js';
+import { FormPageShell } from '../../src/skeletons/page-shells.js';
 
 type Method = 'phone' | 'email';
 
@@ -19,7 +20,7 @@ type Method = 'phone' | 'email';
 export default function SignInPage() {
   return (
     <>
-      <Suspense fallback={<main className="gn-shell gn-shell--centred" />}>
+      <Suspense fallback={<FormPageShell title="Sign in" centred />}>
         <SignInForm />
       </Suspense>
     </>
