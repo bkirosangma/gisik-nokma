@@ -392,3 +392,35 @@ describe('24.083 large surfaces wear the large pair; floating panels the near-lg
     expect(t6Ui).toMatch(/N7[^*]*24\.083[^*]*\*\/\s*box-shadow: var\(--gn-shadow-lift-near\);\s*transform-origin/);
   });
 });
+
+// ---- T7 — the dark-theme sweep (N4 = B; case 24.100)
+describe('24.100 neo dark as a set (N4 = B): same-hex extrusion, one lamp, every text tier readable on every ground a field or card paints', () => {
+  it('24.100 raised = surface = #1b2340; the dark block draws its falls from #0000008c and #000000bf only; the highlight ladder is 16/12/8 %; text floors hold on surface, sunken and well', () => {
+    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe(colorOf('dark', 'surface', 'neo'));
+    expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe('#1b2340');
+    const sheet = themeStylesheet();
+    const darkBlock = sheet.split('[data-style="neo"][data-theme="dark"] {')[1].split('}')[0];
+    // ONLY the shadow-role declarations: the block also carries `--gn-surface-overlay: #00000099` (overlayNavyNeo) and
+    // `--gn-shadow: #000000a6` (scrimDark), which are not layers (reviewer A, FIX 1).
+    const shadowDecls = [...darkBlock.matchAll(/--gn-shadow-[a-z-]+:\s*([^;]+);/g)].map((m) => m[1]);
+    expect(shadowDecls.length, 'the harvest reached the shadow declarations').toBeGreaterThan(30);
+    const layerColours = shadowDecls.flatMap((v) => [...v.matchAll(/#[0-9a-f]{8}/g)].map((m) => m[0]));
+    const falls = layerColours.filter((c) => c.startsWith('#000000'));
+    // the fall and the band, nothing else (neo's drop roles alias near-lg/raised-lg, so no scrim layer reaches this harvest)
+    expect(new Set(falls)).toEqual(new Set(['#0000008c', '#000000bf']));
+    expect(layerColours).toContain('#f2e9e129');
+    expect(layerColours).toContain('#f2e9e11f');
+    expect(layerColours).toContain('#f2e9e114');
+    expect(layerColours).not.toContain('#060a169e');
+    expect(layerColours).not.toContain('#ffffff0d');
+    for (const bg of ['surface', 'surfaceRaised', 'surfaceSunken', 'surfaceWell'] as const) {
+      for (const fg of ['text', 'textMuted', 'textSubtle', 'textAccent'] as const) {
+        expect(contrastRatio(colorOf('dark', fg, 'neo'), colorOf('dark', bg, 'neo')), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // the raised highlight is what lifts a dark card now: visibly above the fall
+    expect(contrastRatio(over('#f2e9e129', '#1b2340'), '#1b2340')).toBeGreaterThan(1.5);
+    // CONTROL: hig dark still separates by fill (13.341's rule (c)).
+    expect(colorOf('dark', 'surfaceRaised', 'hig')).not.toBe(colorOf('dark', 'surface', 'hig'));
+  });
+});
