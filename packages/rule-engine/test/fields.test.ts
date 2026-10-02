@@ -309,7 +309,7 @@ describe('checkTicketFieldSet', () => {
       refused: true,
       rule: 'malformed-payload',
       reason:
-        "This ticket.field_set event's payload is malformed: at value: is required — a field claim with no value would record a clearing nobody made",
+        "This ticket.field_set event's payload is malformed: at value: is required: a field claim with no value would record a clearing nobody made",
     });
   });
 

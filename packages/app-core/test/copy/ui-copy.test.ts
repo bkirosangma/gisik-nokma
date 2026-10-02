@@ -265,14 +265,26 @@ const DOMAIN_REFUSAL_SITES: ReadonlyArray<{ file: string; holds: string }> = [
   { file: 'packages/domain/src/parse-event.ts', holds: 'every invite event carries the inviteId' },
   { file: 'packages/domain/src/parse-event.ts', holds: "an invite's entity id IS its inviteId" },
   { file: 'packages/domain/src/validate-workflow.ts', holds: 'every workflow has it without declaring it' },
+  { file: 'packages/domain/src/display-name.ts', holds: 'a name of only spaces names nothing' },
+  { file: 'packages/domain/src/envelope.ts', holds: 'two ULIDs joined by a colon' },
+  { file: 'packages/domain/src/envelope.ts', holds: 'an event with no payload is not a claim' },
+  { file: 'packages/domain/src/events/invites.ts', holds: 'an address of only spaces reaches nobody' },
+  { file: 'packages/domain/src/events/membership.ts', holds: 'a description of only spaces describes nothing' },
+  { file: 'packages/domain/src/events/membership.ts', holds: 'a project-admin flag is a claim, not a default' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a title of only spaces names nothing' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'a field claim with no value' },
+  { file: 'packages/domain/src/events/ticket-events.ts', holds: 'nothing sorts below it' },
+  { file: 'packages/domain/src/filter-spec.ts', holds: 'Postgres text cannot carry a NUL byte' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'was refused by rule' },
+  { file: 'packages/domain/src/events/contest-events.ts', holds: 'by their clock, refused' },
+  { file: 'packages/mcp-server/src/tools/write-tools.ts', holds: 'a backlog ticket has no starting status' },
 ];
 
 /**
- * Strings under `packages/domain/src` that still hold " — ", outside the sites above. NOT cleared by HK-3:
- * the brief named eight sites, and these are the rest of the same scan's catch. Each carries its reason, and
- * each leaves this list when its sentence is rewritten. The first group are developer invariants (thrown
- * `Error`s that name the function and are never drawn in the UI); the second are refusal and zod messages
- * a client can print and are the follow-up this list exists to show.
+ * Strings under `packages/domain/src` that keep " — ": thrown developer errors that name the function
+ * (`applyTicketEvent: ...`) and are never drawn in the UI or returned to a client. Every string a client can
+ * print, the zod refusals and the contest copy included, was rewritten (HK-3 and HK-3b). Each entry carries
+ * its reason, and an entry whose string is gone fails `no allow-list entry is stale`.
  */
 const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
   { file: 'ticket-state.ts', contains: 'is a purged (redacted) row', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
@@ -283,18 +295,6 @@ const DOMAIN_DASH_ALLOWED: readonly AllowEntry[] = [
   { file: 'ticket-state.ts', contains: '— state "', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
   { file: 'note-state.ts', contains: 'refused —', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
   { file: 'ist-day.ts', contains: 'a day claim is not an instant', reason: 'developer invariant: a thrown Error that names the function, never drawn in the UI' },
-  { file: 'display-name.ts', contains: 'a name of only spaces names nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'envelope.ts', contains: 'two ULIDs joined by a colon', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'envelope.ts', contains: 'an event with no payload is not a claim', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/invites.ts', contains: 'an address of only spaces reaches nobody', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/membership.ts', contains: 'a description of only spaces describes nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/membership.ts', contains: 'a project-admin flag is a claim, not a default', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/ticket-events.ts', contains: 'a title of only spaces names nothing', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/ticket-events.ts', contains: 'a field claim with no value', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/ticket-events.ts', contains: 'nothing sorts below it', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'filter-spec.ts', contains: 'Postgres text cannot carry a NUL byte', reason: 'a zod refusal message a client can print; same class as the HK-3 sites but not in the brief\'s eight (HK-3b)' },
-  { file: 'events/contest-events.ts', contains: '— refused by rule', reason: 'the contest note\'s rule refusal, composed for the contest card a person reads (HK-3b)' },
-  { file: 'events/contest-events.ts', contains: 'by their clock —', reason: 'the contest provenance line a person reads (HK-3b)' },
 ];
 
 describe('23.370 the domain refusal messages hold no " — "', () => {
@@ -327,6 +327,15 @@ describe('23.370 the domain refusal messages hold no " — "', () => {
 
     const hits = uiStringsMatching(SPACED_EM_DASH, [DOMAIN_SRC]);
     expect(withoutAllowed(hits, DOMAIN_DASH_ALLOWED).map(describeHit)).toEqual([]);
+
+    // HK-3b: the one MCP reply string a member sees (a create_ticket refusal Claude shows). The tool
+    // descriptions are instructions to the model, not copy a person reads, so they are not swept here.
+    const writeTools = 'packages/mcp-server/src/tools/write-tools.ts';
+    const refusal = stringsIn(writeTools, readFileSync(resolve(REPO_ROOT, writeTools), 'utf8')).filter((hit) =>
+      hit.text.includes('a backlog ticket has no starting status'),
+    );
+    expect(refusal).toHaveLength(1);
+    expect(refusal.filter((hit) => SPACED_EM_DASH.test(hit.text)).map(describeHit)).toEqual([]);
   });
 
   it('reasons are written, and no allow-list entry is stale', () => {

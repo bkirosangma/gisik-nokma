@@ -105,7 +105,7 @@ export function renderContestedClaimText(payload: ClaimContestedPayload): string
   const { originalEvent, rule, reason } = payload;
   return (
     `Contested claim by ${originalEvent.actorId} at ${formatIstInstant(originalEvent.clientTime)}: ` +
-    `${originalEvent.type} ${JSON.stringify(originalEvent.payload)} — refused by rule "${rule}": ${reason}`
+    `${originalEvent.type} ${JSON.stringify(originalEvent.payload)} was refused by rule "${rule}": ${reason}`
   );
 }
 
@@ -154,7 +154,7 @@ export function renderContestedClaimAttribution(
   actorLabel?: string,
 ): string {
   return (
-    `claimed by ${actorLabel ?? 'Unknown person'} at ${formatIstInstant(claim.clientTime)} by their clock — ` +
+    `claimed by ${actorLabel ?? 'Unknown person'} at ${formatIstInstant(claim.clientTime)} by their clock, ` +
     `refused ${formatIstInstant(claim.contestedAt)}`
   );
 }

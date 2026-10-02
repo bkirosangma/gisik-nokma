@@ -243,7 +243,7 @@ describe('entity id, kind by kind', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'id'],
-      message: 'must be a membership entity id — workspaceId:userId, two ULIDs joined by a colon',
+      message: 'must be a membership entity id, workspaceId:userId (two ULIDs joined by a colon)',
     });
   });
 
@@ -336,7 +336,7 @@ describe('payload is required', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['payload'],
-      message: 'is required — an event with no payload is not a claim',
+      message: 'is required: an event with no payload is not a claim',
     });
   });
 
@@ -345,7 +345,7 @@ describe('payload is required', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['payload'],
-      message: 'is required — an event with no payload is not a claim',
+      message: 'is required: an event with no payload is not a claim',
     });
   });
 
@@ -368,7 +368,7 @@ describe('payload is required', () => {
     expect(result.success).toBe(false);
     expect(rejectionIssues(result)).toContainEqual({
       path: ['payload'],
-      message: 'is required — an event with no payload is not a claim',
+      message: 'is required: an event with no payload is not a claim',
     });
   });
 });

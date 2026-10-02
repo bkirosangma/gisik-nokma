@@ -86,7 +86,7 @@ describe('inviteSentPayload', () => {
   it('planted defect: refuses a blank address, which reaches nobody while looking like one', () => {
     expect(rejectionIssues(inviteSentPayload.safeParse(sent({ address: '   ' })))).toContainEqual({
       path: ['address'],
-      message: 'must not be blank — an address of only spaces reaches nobody',
+      message: 'must not be blank: an address of only spaces reaches nobody',
     });
     expect(rejectionIssues(inviteSentPayload.safeParse(sent({ address: '' })))).toContainEqual({
       path: ['address'],
