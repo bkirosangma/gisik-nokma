@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { COMMENT_DELETE_AUTHORITY_REASON, COMMENT_EDIT_AUTHOR_REASON, COMMENT_PERMISSION_RULE } from '../../src/permissions/check-comment-authority.js';
 import { NOT_A_MEMBER_REASON, PERMISSION_ROLE_RULE } from '../../src/permissions/check-permission.js';
@@ -57,8 +57,14 @@ describe('MCP comments through the hosted door', () => {
     expect(both.isError).toBe(true);
     expect(both.text).toBe('add_comment takes exactly one of markdown or text');
 
-    const notified = await db.pool.query(`SELECT 1 FROM notifications WHERE user_id = $1 AND kind = 'mention'`, [member.userId]);
-    expect(notified.rowCount).toBe(1); // 14.382
+    // The fan-out runs after the commit, so the row arrives a beat later: wait for it rather than read once.
+    await vi.waitFor(
+      async () => {
+        const notified = await db.pool.query(`SELECT 1 FROM notifications WHERE user_id = $1 AND kind = 'mention'`, [member.userId]);
+        expect(notified.rowCount).toBe(1); // 14.382
+      },
+      { timeout: 5000, interval: 50 },
+    );
 
     const plain = await call('add_comment', { workspaceId: ws, ticketId, markdown: 'just a line' });
     expect(plain.isError, plain.text).toBe(false); // control: one paragraph
