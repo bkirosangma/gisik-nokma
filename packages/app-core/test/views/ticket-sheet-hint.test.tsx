@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { TicketRead, WorkflowDef } from '../../src/view-types.js';
+import type { WorkflowDef } from '@gisik-nokma/domain';
+import type { TicketRead } from '../../src/view-types.js';
 import { TicketSheet } from '../../src/views/ticket-sheet.js';
 import { clearLiveQueryCache, liveQueryStoreKey, recallLiveQuery } from '../../src/views/live-query-cache.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
