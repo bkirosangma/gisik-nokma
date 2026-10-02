@@ -540,6 +540,8 @@ jobs:
             turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
+      # G-9 T1: `workflow-canvas-browser`'s `test` drives a real Chromium against its own Vite harness (:3190).
+      - run: pnpm --filter @gisik-nokma/workflow-canvas-browser exec playwright install --with-deps chromium
       - run: pnpm turbo run test --filter='!@gisik-nokma/server'
 
   # apps/web/e2e (Playwright) needs a deployable stack -- Plan 11 Task 13's

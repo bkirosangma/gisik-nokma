@@ -181,6 +181,14 @@ Smoothness add-on G-6, owner 2026-10-02: *"in the ticket and notes comment edito
 ## 25.39 Workflow canvas: live drag, collisions, full-screen editing (G-9)
 
 <!-- G-9 T1 -->
+The canvas moves a dragged state live (G-9 T1, owner 2026-10-03: *"I cannot see the states being dragged"*). Tests: `packages/workflow-canvas-browser/tests/drag.spec.ts` (real Chromium, Vite harness on :3190, on the gate), `packages/app-core/test/workflow-builder/working-nodes.test.ts`. Block 25.500–25.559 (G-9 only); 25.500–25.504 and 25.517 used here (25.518 is not used).
+
+- ✅ **25.500 — a dragged state moves live under the pointer and its arrow follows, BEFORE release.** After a 200 px drag held down, the node's box has moved 192–204 px (React Flow measures the drag from the first move past `nodeDragThreshold` 4 px, so the state trails by that first distance and by nothing after it) and the edge's path differs from before. Without the fix the delta was 0 (RED log: the node did not move until release). Mutation: remove `onNodesChange` from `<ReactFlow>` → red.
+- ✅ **25.501 — control, in 25.500's `it`: a press and release without movement selects the state and does not move it.** Mutation: none of its own (it is the control for 25.500; it stays green when `onNodesChange` is removed).
+- ✅ **25.502 — the working copy follows the draft when no drag is in flight.** (`mergeDraftNodes`.) Mutation: `mergeDraftNodes` returns `working` → red.
+- ✅ **25.503 — a draft change mid-drag keeps the dragged node where the pointer has it, still adds a state created meanwhile, and carries measured sizes; control, same `it`: with no drag in flight the draft position wins.** Mutation: `draggingId` ignored → red.
+- ✅ **25.504 — a drag that starts on a `nodrag` control (the Category select) does not move the state, and the select still opens afterwards.** Mutation: `nodrag` removed from the Category wrapper → red.
+- ✅ **25.517 — Escape during a drag puts the state back at its start, keeps it there while the pointer still moves, and commits nothing on release.** Browser: drag 150 px held, Escape, the box is back at its start; the pointer moves 80 px further, still at its start; release, still at its start and the draft positions are unchanged. Unit (same id, hook level): after `cancelDrag` every later change for the id is dropped and `endDrag` returns null (control, same `it`: without the cancel the last applied position is returned); and `endDrag` in the SAME tick as the drag-end change returns that change's position, not the last rendered one (React Flow emits the change and calls `onNodeDragStop` in one pointer-up handler). Mutations: the Escape listener removed → red; `onNodeDragStop` reads `node.position` instead of `endDrag()` → red; `cancelDrag` clears the gesture instead of marking it cancelled → red; `endDrag` reads rendered `nodes` instead of the gesture's `last` → red.
 <!-- G-9 T2 -->
 <!-- G-9 T3 -->
 <!-- G-9 T4 -->
