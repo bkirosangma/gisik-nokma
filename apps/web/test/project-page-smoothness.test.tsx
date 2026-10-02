@@ -10,7 +10,7 @@ import {
   type TicketListView,
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
-import type { TicketTypeDef } from '@gisik-nokma/domain';
+import { BACKLOG_STATE_ID, type TicketTypeDef } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { clearReadCaches } from '../src/clear-read-caches.js';
 import { rememberLastUserId } from '../src/last-user-id.js';
@@ -341,14 +341,21 @@ describe('the Create ticket control is the same box while it waits (S1; audit SM
 });
 
 describe('the page reads are cached under their own keys (spec S4, D1; audit SM-01)', () => {
-  it('25.078 after the page answers, the board, members, types and workflow-def reads sit in the read cache under their keys', async () => {
-    mount();
+  it('25.078 after the page answers, the board, members, types and both workflow-def reads sit in the read cache under their keys', async () => {
+    // One row in the backlog state, so the backlog's workflow ids are non-empty and its key is `wf:backlog:wf_basic`, not `wf:backlog:`.
+    mount({
+      getTickets: async (): Promise<TicketListView> => ({
+        projectId: 'p_1',
+        rows: [listRow(), listRow({ ticketId: 't_2', key: 'CCSO-8', stateId: BACKLOG_STATE_ID, stateName: 'Backlog', stateCategory: 'open' })],
+      }),
+    });
     await waitFor(() => expect(headerCreate()).toBeEnabled());
     const has = (key: string) => recallLiveQuery(liveQueryStoreKey('ws_1', key)) !== undefined;
     expect(has('board:p_1')).toBe(true);
     expect(has('members:ws_1')).toBe(true);
     expect(has('types:ws_1')).toBe(true);
     expect(has('wf:types:wf_basic')).toBe(true);
+    await waitFor(() => expect(has('wf:backlog:wf_basic')).toBe(true));
     // Control: another project's / workspace's key is empty.
     expect(has('board:p_other')).toBe(false);
     expect(recallLiveQuery(liveQueryStoreKey('ws_other', 'board:p_1'))).toBeUndefined();
@@ -376,6 +383,20 @@ describe('the header names reserve their place (S1, S-R1; audit SM-02)', () => {
     mount({ getMyWorkspaces: () => Promise.reject(new Error('refused')) });
     await waitFor(() => expect(document.querySelector('.gn-project__identity')).not.toBeNull());
     await waitFor(() => expect(document.querySelectorAll('.gn-project__identity .gn-skeleton')).toHaveLength(0));
+    // Control: a SIGNED-OUT viewer never reads the workspaces, so nothing waits on them — no placeholder at first sight, and none after
+    // the page has settled (a guard-less `namesPending` would pulse for ever: their read is `{rows: null, error: null}`).
+    cleanup();
+    clearReadCaches();
+    mockSession = { data: null, isPending: false };
+    mount();
+    const signedOut = await waitFor(() => {
+      const el = document.querySelector('.gn-project__identity');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(signedOut.querySelectorAll('.gn-skeleton')).toHaveLength(0);
+    expect(await screen.findByText('Sign in to create a ticket.')).toBeInTheDocument();
+    expect(signedOut.querySelectorAll('.gn-skeleton')).toHaveLength(0);
   });
 
   it('25.085 ProjectTitle rides the shared workspaces read: one getMyWorkspaces call for the page, and a remount within 30 s makes no second', async () => {

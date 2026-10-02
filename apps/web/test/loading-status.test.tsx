@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * **V6 — the project page's five tab-loading arms announce themselves. Case `13.1056`, amended by smoothness T6 as `25.071`.**
- * (They were bare `<p role="status">Loading…</p>`; T6 made them skeletons whose region is the status — see the sweep below.)
+ * (They were bare `<p role="status">Loading…</p>`; T6 made them skeletons; the region carries no role and the words go out through the shell's polite status region (`useAnnounce`) — see the sweep below.)
  *
  * The finding: five tab-loading arms rendered a bare `<p>Loading…</p>` —
  * calendar, timeline, list, board and backlog — **in a file that uses
