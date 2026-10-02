@@ -1,4 +1,5 @@
 import { clearLiveQueryCache } from '@gisik-nokma/app-core/data';
+import { clearMyWorkspacesCache } from './use-my-workspaces.js';
 
 /**
  * Every read this shell keeps in memory for the signed-in person, emptied in one
@@ -12,4 +13,6 @@ import { clearLiveQueryCache } from '@gisik-nokma/app-core/data';
  */
 export function clearReadCaches(): void {
   clearLiveQueryCache();
+  // The one workspaces read the nav, the project list and the project title share (smoothness T4, FD5).
+  clearMyWorkspacesCache();
 }
