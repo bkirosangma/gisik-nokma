@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
@@ -240,7 +241,7 @@ async function applyNeo(page: Page, theme: Theme): Promise<void> {
     document.documentElement.dataset['theme'] = t;
   }, theme);
   // Neo animates its shadows; read the settled value, not a frame of the transition.
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(350);
 }
 
 /** Two fixtures planted into the live page: the detector must flag the flush one and clear the padded one. */
@@ -263,6 +264,26 @@ async function unplantControls(page: Page): Promise<void> {
   await page.evaluate(() => document.getElementById('neo-clip-control')?.remove());
 }
 
+/**
+ * The Groups tree is the owner's own screenshot (nodes cut along the top and left), and the seeded workspace has no groups: without
+ * nodes the sweep would measure an empty tree and pass. Files one root and one child through the tree's own buttons when none exists.
+ */
+async function ensureGroupNodes(page: Page): Promise<void> {
+  const boxes = page.locator('.gn-groups__box');
+  await page.waitForTimeout(800);
+  if ((await boxes.count()) === 0) {
+    await page.getByRole('button', { name: 'Add group' }).click();
+    await page.locator('.gn-groups__input').fill('Animal Husbandry');
+    await page.locator('.gn-groups__input').press('Enter');
+    await expect(boxes.first(), 'the root group was not filed').toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Add a group under Animal Husbandry' }).click();
+    await page.locator('.gn-groups__input').fill('Dairy');
+    await page.locator('.gn-groups__input').press('Enter');
+    await expect(boxes.nth(1), 'the child group was not filed').toBeVisible({ timeout: 15_000 });
+  }
+  expect(await boxes.count(), 'control: the tree carries group nodes, so the sweep is not of an empty tree').toBeGreaterThan(0);
+}
+
 async function sweepScreen(page: Page, theme: Theme): Promise<{ population: Shadowed[]; cuts: Finding[] }> {
   await applyNeo(page, theme);
   const population = await sweep(page);
@@ -272,6 +293,7 @@ async function sweepScreen(page: Page, theme: Theme): Promise<{ population: Shad
 for (const viewport of VIEWPORTS) {
   for (const theme of THEMES) {
     test(`25.320 ${viewport.key} neo-${theme}: no raised shadow is cut off by a container on any screen`, async ({ page }) => {
+      test.setTimeout(300_000);
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await signIn(page, OWNER_EMAIL);
       await page.goto('/workspaces');
@@ -308,7 +330,13 @@ for (const viewport of VIEWPORTS) {
             await openView('List');
           },
         },
-        { name: 'settings groups', reach: () => visit(`/settings?workspaceId=${workspaceId}&tab=groups`) },
+        {
+          name: 'settings groups',
+          reach: async () => {
+            await visit(`/settings?workspaceId=${workspaceId}&tab=groups`);
+            await ensureGroupNodes(page);
+          },
+        },
         { name: 'settings general', reach: () => visit(`/settings?workspaceId=${workspaceId}&tab=workspace`) },
         { name: 'notes list', reach: () => visit('/notes') },
         {
@@ -363,13 +391,15 @@ for (const viewport of VIEWPORTS) {
         for (const f of real) {
           offenders.push(`${f.element} "${f.text}" in ${f.clipper} | ${screen.name} | ${viewport.key} | neo-${theme} | clipped px ${sidesText(f.clipped)}`);
         }
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(400);
       }
 
       // De-duplicate the identical lines a list of 40 cards produces, keeping the count.
       const counted = new Map<string, number>();
       for (const line of offenders) counted.set(line, (counted.get(line) ?? 0) + 1);
       const report = [...counted].map(([line, n]) => `${n > 1 ? `x${n} ` : ''}${line}`);
+      const dir = process.env['NEO_CLIP_REPORT_DIR'];
+      if (dir !== undefined) writeFileSync(`${dir}/${viewport.key}-${theme}.txt`, `${report.join('\n')}\n`);
       expect(report, `shadows cut off by a container:\n${report.join('\n')}`).toEqual([]);
     });
   }
