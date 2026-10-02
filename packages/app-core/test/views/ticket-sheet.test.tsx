@@ -155,7 +155,8 @@ function renderSheet(
 
 /** The sheet is fully painted only once the workflow read has named the state. */
 async function settled(): Promise<void> {
-  await waitFor(() => expect(screen.getByText(PROVENANCE_LINE)).toBeInTheDocument());
+  // 13.1725 — 4 s, not waitFor's 1 s default: the FIRST test of this 184-test file pays the cold import and render, and on a CI runner under turbo load that missed 1 s (run 36968817666: `Unable to find an element with the text: marked Doing by Anselma Marak`, in a file that took ~102 s against 8 s here). A pass returns the moment the line renders, so the larger budget only changes how long a REAL failure takes to report; it stays under the 5 s per-test default so a hang is still the test's own timeout.
+  await waitFor(() => expect(screen.getByText(PROVENANCE_LINE)).toBeInTheDocument(), { timeout: 4_000 });
 }
 
 /**

@@ -602,6 +602,11 @@ jobs:
         run: |
           echo "THE COMPOSE STACK FAILED TO START. Container state and logs follow."
           docker compose -f docker-compose.dev.yml ps || true
+          # WHY a container is unhealthy: the healthcheck's own last outputs, and the probe run by hand.
+          for c in $(docker compose -f docker-compose.dev.yml ps -aq); do
+            docker inspect --format '{{.Name}} {{json .State.Health}}' "$c" || true
+          done
+          docker compose -f docker-compose.dev.yml exec -T server wget -S -O- http://localhost:3000/healthz || true
           docker compose -f docker-compose.dev.yml logs --tail=100 || true
 
       # Seeding and user creation happen inside the suite's own globalSetup,
