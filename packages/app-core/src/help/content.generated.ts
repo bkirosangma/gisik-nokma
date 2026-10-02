@@ -1794,7 +1794,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " heading row. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks for a name, an optional description and an optional prefix. A new project starts without a group; file it under one with "
+                      "text": " heading row. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks for a name, an optional description, an optional prefix and an optional "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Group"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": the same four boxes as in "
                     },
                     {
                       "kind": "bold",
@@ -1802,7 +1810,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " afterwards."
+                      "text": " (see Group your projects, below), including making a new group on the spot. One press of "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " makes exactly one project, whatever happens with the group. If the group's name is refused or somebody else got there first, the window tells you and keeps what you typed, and pressing "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " again does not make a second project or a second group."
                     }
                   ],
                   [
@@ -1812,7 +1836,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — in a project, near the top by the view tabs, and inside an empty column on the Board (that one is a plainer button without the plus sign, and says "
+                      "text": " — in a project, near the top by the view tabs, and on a project's empty Board, where the banner's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " carries the plus sign too, and inside an empty column on the Board (that one is a plainer button without the plus sign, and says "
                     },
                     {
                       "kind": "bold",
@@ -2221,15 +2253,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " Owners and admins open "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Edit"
-                    },
-                    {
-                      "kind": "text",
-                      "text": " on the project (card or page) and use "
+                      "text": " Owners and admins use "
                     },
                     {
                       "kind": "bold",
@@ -2237,7 +2261,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". It is four boxes, "
+                      "text": " in "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create project"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or open "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on the project (card or page) later. It is four boxes, "
                     },
                     {
                       "kind": "bold",
@@ -7955,7 +7995,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ") draws the workspace's project groups (§3, under Group your projects) as a tree, left to right: one column per level, with a coloured strip on each box naming its level. On a phone the same tree is an indented list. Everybody who is a member of the workspace can read it; a guest is told "
+                    "text": ") draws the workspace's project groups (§3, under Group your projects) as a tree, left to right: one column per level, with a coloured strip on each box naming its level; the boxes inside one group hang from a single vertical line. On a phone the same tree is an indented list. Everybody who is a member of the workspace can read it; a guest is told "
                   },
                   {
                     "kind": "italic",
@@ -8011,7 +8051,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " Enter saves; Escape cancels."
+                      "text": " Enter saves; Escape cancels. Either way the cursor comes back to that group's name, so the next key press carries on from there."
                     }
                   ],
                   [
@@ -8047,7 +8087,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " on each) and delete the sub-groups first."
+                      "text": " on each) and delete the sub-groups first. When you confirm, the cursor moves to the group below it, else the one above it, else the parent, else "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Add group"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "; if you cancel it goes back to that group's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ]
                 ]
@@ -11749,7 +11805,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is in a project, near the top by the view tabs, and inside an empty column on the Board. Each opens a window; nothing is made until you press the button inside it."
+                    "text": " is in a project, near the top by the view tabs, on a project's empty Board and inside an empty column on the Board. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " also takes an optional group, and one press makes exactly one project. Each opens a window; nothing is made until you press the button inside it."
                   }
                 ]
               }

@@ -290,12 +290,15 @@ inside the window.
   want one, a prefix.
 - **Create project** — on a workspace's page, in the **Projects** heading row.
   Owners and admins only; everybody else is told so (§3, under The project problem). The window asks
-  for a name, an optional description and an optional prefix. A new project starts without a group; file
-  it under one with **Edit** afterwards.
-- **Create ticket** — in a project, near the top by the view tabs, and inside an empty column on the
-  Board (that one is a plainer button without the plus sign, and says **Create ticket** too; its full
-  name for a screen reader adds the column's state). The
-  window is described in §5.
+  for a name, an optional description, an optional prefix and an optional **Group**: the same four boxes
+  as in **Edit** (see Group your projects, below), including making a new group on the spot. One press of
+  **Create** makes exactly one project, whatever happens with the group. If the group's name is refused
+  or somebody else got there first, the window tells you and keeps what you typed, and pressing **Create**
+  again does not make a second project or a second group.
+- **Create ticket** — in a project, near the top by the view tabs, and on a project's empty Board, where the
+  banner's **Create ticket** carries the plus sign too, and inside an empty column on the Board (that one is
+  a plainer button without the plus sign, and says **Create ticket** too; its full name for a screen
+  reader adds the column's state). The window is described in §5.
 
 If the door refuses what you asked for — a prefix someone already uses, say — the reason is written
 inside the window and the window stays open, so nothing you typed is lost.
@@ -347,8 +350,8 @@ A workspace with many projects can file them into **groups**, to read them in on
 **four levels**: a level-1 group can hold level-2 groups, which hold level-3 groups, which hold level-4
 groups. A project sits directly under one group, or under none.
 
-- **Filing a project.** Owners and admins open **Edit** on the project (card or page) and use **Group
-  (optional)**. It is four boxes, **Level 1 group** to **Level 4 group**. Each box lists only the groups
+- **Filing a project.** Owners and admins use **Group (optional)** in **Create project**, or open **Edit**
+  on the project (card or page) later. It is four boxes, **Level 1 group** to **Level 4 group**. Each box lists only the groups
   under the one above it, and the next box wakes up once the one above has a value. Pick from the list,
   or type: an exact name picks the group that already exists, and any other name offers **Create “…”** to
   make a new group on the spot. Clearing a box clears the ones below it. If somebody made the same group
@@ -1442,7 +1445,7 @@ Boxes and arrows are not hard. It is the vocabulary around them that trips peopl
 
 **Settings → Groups** (the tab sits between **Workflows** and **Workspace**) draws the workspace's project
 groups (§3, under Group your projects) as a tree, left to right: one column per level, with a coloured strip
-on each box naming its level. On a phone the same tree is an indented list. Everybody who is a member of
+on each box naming its level; the boxes inside one group hang from a single vertical line. On a phone the same tree is an indented list. Everybody who is a member of
 the workspace can read it; a guest is told *"Groups are shown to workspace members."*; a workspace with
 no groups says so.
 
@@ -1450,11 +1453,13 @@ Owners and admins can change it:
 
 - **Add group** adds a top-level group. You type its name into the field that opens and press Enter.
 - The **+** on any box below level 4 adds a group inside it. A level-4 group cannot hold another.
-- **Click a name to rename it.** Enter saves; Escape cancels.
+- **Click a name to rename it.** Enter saves; Escape cancels. Either way the cursor comes back to that
+  group's name, so the next key press carries on from there.
 - **Drag a box up or down among its neighbours** to reorder them. Without a mouse, put the cursor on the
   name and press **Alt** with the up or down arrow. There is no drag on a touch screen.
 - **Delete** asks you to confirm, and is offered only on a group that holds no project and no
-  sub-group. Move the projects out (**Edit** on each) and delete the sub-groups first.
+  sub-group. Move the projects out (**Edit** on each) and delete the sub-groups first. When you confirm, the cursor moves to the group below it, else the one above it, else
+  the parent, else **Add group**; if you cancel it goes back to that group's **Delete**.
 
 Each change is saved as soon as you make it, one at a time. If the product refuses — two groups with the
 same name side by side, or a group still in use — it says why in its own words and the tree stays as it

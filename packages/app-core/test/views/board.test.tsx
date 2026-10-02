@@ -1279,6 +1279,31 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
     // And the glyph accompanies the control rather than replacing one.
     expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
   });
+
+  it('22.245 the empty board\'s Create ticket carries the same plus icon as the header Create buttons and stays quiet, not primary', () => {
+    render(
+      <Board
+        board={{
+          projectId: 'p',
+          groups: [
+            {
+              workflowId: 'wf',
+              workflowName: 'W',
+              columns: [{ stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] }],
+            },
+          ],
+        } as never}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => {}}
+      />,
+    );
+    const banner = screen.getByRole('button', { name: 'Create ticket' });
+    expect(banner).toHaveClass('gn-board__empty-create'); // control: this IS the empty-state action
+    expect(banner.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1); // the header's `+` (PlusIcon)
+    // One primary per view (22.150): the header's Create ticket is it, so nothing on the board is.
+    expect(banner).not.toHaveClass('gn-button--primary');
+    expect(document.querySelectorAll('.gn-button--primary')).toHaveLength(0);
+  });
 });
 
 /**
