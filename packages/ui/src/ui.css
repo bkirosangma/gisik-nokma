@@ -1126,14 +1126,21 @@ a.gn-ticket-sheet__crumb--link {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    text-align: left;
     will-change: transform;
     width: calc((var(--gw0) + (var(--gw1) - var(--gw0)) * var(--p, 0)) * 1px);
-    opacity: calc(1 - var(--gfade, 0) * var(--p, 0));
+    opacity: calc(1 - var(--gfade, 0) * var(--p, 0) * 2);
     transform: translate(
       calc((var(--gx0) + (var(--gx1) - var(--gx0)) * var(--p, 0)) * 1px),
       calc((var(--gy0) + (var(--gy1) - var(--gy0)) * var(--p, 0)) * 1px)
     );
+  }
+  /* A part the compact line folds away keeps its natural wrapped look (it only fades and slides up), so the top of the sheet
+     reads exactly as it did before the header learned to compact. */
+  .gn-sheet[data-compact] .gn-ticket-sheet__crumbs > [data-collapsed] {
+    height: auto;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
   }
   /* The title scales to the crumb size and widens to one line: width and height are in the title's own (pre-scale)
      pixels, so the visible width is `width * scale`. The inline height `TitleField` sets is capped, never fought. */

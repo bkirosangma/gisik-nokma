@@ -194,6 +194,37 @@ test.describe('25.432 the three frames, the overlays and the desktop control', (
 
     const full = await geometry();
     await shot('p0');
+    // FIDELITY AT p = 0: the top of the sheet must read exactly as it did before the header learned to compact. Every moving
+    // element's box is read as laid out now (absolute, placed by transform) and again in the plain flow (compact attribute off,
+    // transforms off, transitions off); each must be within half a pixel. A measurement that counted a stale transform (a button's
+    // own `transform` transition) put Move 240px to the right of where it belongs, which only a comparison like this sees.
+    const drift = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>('.gn-sheet')!;
+      const header = panel.querySelector<HTMLElement>('.gn-sheet__header')!;
+      const boxes = (): number[][] =>
+        Array.from(
+          header.querySelectorAll<HTMLElement>('.gn-ticket-sheet__crumbs > *, .gn-ticket-sheet__title-input, .gn-sheet__close, .gn-sheet__move'),
+        ).map((el) => {
+          const r = el.getBoundingClientRect();
+          return [r.left, r.top, r.width, r.height];
+        });
+      const placed = boxes();
+      const mode = panel.getAttribute('data-compact') ?? 'full';
+      const els = Array.from(header.querySelectorAll<HTMLElement>('*'));
+      panel.removeAttribute('data-compact');
+      for (const el of els) {
+        el.style.transition = 'none';
+        el.style.transform = 'none';
+      }
+      const natural = boxes();
+      panel.setAttribute('data-compact', mode);
+      for (const el of els) el.style.removeProperty('transform');
+      void header.offsetWidth;
+      for (const el of els) el.style.removeProperty('transition');
+      return placed.map((box, i) => box.map((n, k) => Math.abs(n - (natural[i]?.[k] ?? Number.NaN))));
+    });
+    expect(drift.length).toBeGreaterThan(5);
+    for (const box of drift) for (const d of box) expect(d, `p0 box drift ${JSON.stringify(drift)}`).toBeLessThanOrEqual(0.5);
     const first = await frame(page);
     expect(first.mode).toBe('full');
     // p = 0.5 and p = 1 by the scroll that makes them.
@@ -237,6 +268,7 @@ test.describe('25.432 the three frames, the overlays and the desktop control', (
     await page.getByRole('button', { name: 'Show the full title' }).click();
     const peek = page.getByRole('group', { name: 'Full title' });
     await expect(peek).toBeVisible();
+    await page.waitForTimeout(400); // past the card's 130ms fade-in: the frame is the settled card
     await shot('title-overlay');
     const move = page.getByRole('button', { name: 'Move this ticket' });
     await expect(move).toBeVisible();

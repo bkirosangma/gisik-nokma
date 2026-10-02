@@ -292,6 +292,15 @@ export function useSheetHeaderCompact(
     // The natural flow: take the header's absolute layout away for the reads, put it back below.
     // Both happen inside this one task, so no frame paints between them.
     panel.removeAttribute('data-compact');
+    // A button's own `transform` transition would keep the OLD compact transform alive for the reads below (a re-measure would
+    // count it twice), so the movers are read with the transition and the transform both off.
+    const movers = [...(nav === null ? [] : (Array.from(nav.children) as HTMLElement[])), title, close, move].filter(
+      (el): el is HTMLElement => el !== null,
+    );
+    for (const el of movers) {
+      el.style.transition = 'none';
+      el.style.transform = 'none';
+    }
     if (title !== null) {
       title.style.height = 'auto';
       if (title.scrollHeight > 0) title.style.height = `${title.scrollHeight}px`;
@@ -334,7 +343,8 @@ export function useSheetHeaderCompact(
         item.style.setProperty('--gw0', px(r.w));
         item.style.setProperty('--gx1', px(COMPACT_PAD_X + (plan.x[i] ?? 0)));
         item.style.setProperty('--gy1', px(COMPACT_PAD_TOP));
-        item.style.setProperty('--gw1', px(w1));
+        // A collapsed part keeps its width (it only fades and slides), so its text never re-wraps mid-tween.
+        item.style.setProperty('--gw1', px(w1 === 0 ? r.w : w1));
         item.style.setProperty('--gfade', w1 === 0 ? '1' : '0');
         if (w1 === 0) item.setAttribute('data-collapsed', '');
         else item.removeAttribute('data-collapsed');
@@ -373,6 +383,10 @@ export function useSheetHeaderCompact(
       set('--gmy2', hCompact + 6 + 12);
     }
     panel.setAttribute('data-compact', modeRef.current);
+    // Put the transform back and let it land with the transition still off, THEN give the transition back: no tween starts.
+    for (const el of movers) el.style.removeProperty('transform');
+    void header.offsetWidth;
+    for (const el of movers) el.style.removeProperty('transition');
     setFolded(isFolded);
     applyProgress();
   }, [headingRef, applyProgress]);
