@@ -467,6 +467,11 @@ export function useSheetHeaderCompact(
     const onPointer = (event: Event): void => {
       const target = event.target;
       if (target instanceof Element && target.closest('.gn-sheet__peek, [data-peek-opener]') !== null) return;
+      // The title overlay exists to bring Move back: pressing Move is not an outside tap. Closing here would turn Move
+      // inert (`moveInert`) before the click that follows the press lands, so a finger or a mouse could never use it.
+      // The overlay stays open under the Move dialog (so focus returns to a live Move); it is not an opener, so the
+      // press never opens or toggles anything.
+      if (peekRef.current?.kind === 'title' && target instanceof Element && target.closest('.gn-sheet__move') !== null) return;
       closePeek();
     };
     document.addEventListener('keydown', onKey, true);

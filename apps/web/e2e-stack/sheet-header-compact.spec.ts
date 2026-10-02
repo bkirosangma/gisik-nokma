@@ -5,7 +5,7 @@ import { openSeededBoard } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
- * Smoothness G-8 (cases 25.431–25.433): the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same elements, and
+ * Smoothness G-8 (cases 25.431–25.433, 25.436, 25.437): the phone ticket-sheet header compacts with the scroll by TRANSFORMING the same elements, and
  * it does not jitter. Read from a lane-port `next dev` of the worktree, signed in against the stack. LOCAL.
  *
  * ## Running it
@@ -172,6 +172,57 @@ test.describe('25.431 the phone header compacts without jitter', () => {
     const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
     const who = await page.evaluate(() => (window as unknown as { __clsWho: string[] }).__clsWho);
     expect(cls, `layout shifts: ${who.join(' | ')}`).toBe(0);
+  });
+});
+
+test.describe('25.436 Move in the title overlay works by touch', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('a real tap on the small title, then a real tap on Move, opens the Move dialog; a tap outside collapses the overlay and Move is inert again', async ({ page }) => {
+    await openSheet(page);
+    await ensureScrollable(page);
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('.gn-sheet__body')!.scrollTop = 400;
+    });
+    await settle(page);
+    const centre = async (locator: ReturnType<Page['locator']>): Promise<{ x: number; y: number }> => {
+      const box = await locator.boundingBox();
+      if (box === null) throw new Error('no box');
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    };
+    const title = page.getByRole('button', { name: 'Show the full title' });
+    const t = await centre(title);
+    await page.touchscreen.tap(t.x, t.y);
+    const peek = page.getByRole('group', { name: 'Full title' });
+    await expect(peek).toBeVisible();
+    await page.waitForTimeout(400); // past the card's fade-in
+    const move = page.getByRole('button', { name: 'Move this ticket' });
+    await expect(move).not.toHaveAttribute('inert', /.*/);
+    // F1: the press on Move used to count as an outside tap, close the overlay and turn Move inert before its click landed.
+    const m = await centre(move);
+    await page.touchscreen.tap(m.x, m.y);
+    await expect(page.getByRole('dialog')).toHaveCount(2);
+    await expect(page.getByRole('dialog', { name: /Move/ })).toBeVisible();
+    // Back out of the Move dialog (the overlay, still open under it, may take the first Escape).
+    for (let i = 0; i < 3 && (await page.getByRole('dialog', { name: /Move/ }).count()) > 0; i += 1) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(250);
+    }
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+
+    // CONTROL, in the same test: a tap outside collapses the overlay and Move is inert again.
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('.gn-sheet__body')!.scrollTop = 400;
+    });
+    await settle(page);
+    if (!(await peek.isVisible())) {
+      const again = await centre(title);
+      await page.touchscreen.tap(again.x, again.y);
+    }
+    await expect(peek).toBeVisible();
+    await page.touchscreen.tap(195, 700);
+    await expect(peek).toBeHidden();
+    await expect(move).toHaveAttribute('inert', '');
   });
 });
 

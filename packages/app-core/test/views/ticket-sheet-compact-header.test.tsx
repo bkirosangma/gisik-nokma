@@ -315,6 +315,50 @@ describe('the phone sheet', () => {
     expect(moveButton()).toHaveAttribute('inert');
   });
 
+  it('25.435 a press on Move while the title overlay is open is not an outside tap: Move stays live and its click opens the dialog (G-8 FIX 1 F1; G14)', async () => {
+    stubMedia({ phone: true });
+    renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    await settled();
+    await scrollTo(500);
+    const titleGroup = (): HTMLElement | null => screen.queryByRole('group', { name: 'Full title' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show the full title' }));
+    expect(titleGroup()).not.toBeNull();
+    // A real finger or mouse sends pointerdown BEFORE click; jsdom's fireEvent.click alone does not (the gap that hid F1).
+    fireEvent.pointerDown(moveButton());
+    expect(moveButton()).not.toHaveAttribute('inert');
+    expect(titleGroup()).not.toBeNull();
+    expect(panel()).toHaveAttribute('data-peek-state', 'open');
+    fireEvent.click(moveButton());
+    expect(await screen.findByRole('dialog', { name: /Move/ })).toBeInTheDocument();
+    cleanup();
+
+    // The control, in the same it(): a press on the sheet body is an outside tap, and Move goes inert.
+    // Mutant "the Move exemption removed" fails the first half; "no outside tap" fails this half.
+    renderSheet('Shop');
+    await settled();
+    await scrollTo(500);
+    fireEvent.click(screen.getByRole('button', { name: 'Show the full title' }));
+    expect(moveButton()).not.toHaveAttribute('inert');
+    fireEvent.pointerDown(body());
+    expect(moveButton()).toHaveAttribute('inert');
+    await waitFor(() => expect(titleGroup()).toBeNull());
+    cleanup();
+
+    // G14: the "…" opener carries data-peek-opener, so ITS pointerdown does not close the overlay its click opens.
+    renderSheet('A project with a name long enough that the whole line cannot fit on a phone at all');
+    await settled();
+    await scrollTo(500);
+    const fold = screen.getByRole('button', { name: 'Show the full breadcrumb' });
+    fireEvent.pointerDown(fold);
+    fireEvent.click(fold);
+    expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).not.toBeNull();
+    expect(panel()).toHaveAttribute('data-peek-state', 'open');
+    // And a pointerdown on Move while only the CRUMB overlay is open is still an outside tap (Move is exempt for the title overlay only).
+    fireEvent.pointerDown(moveButton());
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Full breadcrumb' })).toBeNull());
+  });
+
   it('25.428 reduced motion switches full and compact at one half, with no in-between value and no overlay transition', async () => {
     stubMedia({ phone: true, reduced: true });
     renderSheet('Shop');
