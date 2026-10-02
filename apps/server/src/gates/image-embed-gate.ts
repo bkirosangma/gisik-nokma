@@ -95,6 +95,14 @@ export function makeImageEmbedGates(): ServerGate[] {
       },
     },
     {
+      // An edit is a new document for the same comment: held to the same rule as the comment it replaces.
+      eventType: 'comment.edited',
+      async check(event, db) {
+        const payload = event.payload as { body?: unknown };
+        return checkDocEmbeds(payload.body ?? null, event.entity.id, db);
+      },
+    },
+    {
       eventType: 'ticket.field_set',
       async check(event, db) {
         const payload = event.payload as { fieldId?: unknown; value?: unknown };

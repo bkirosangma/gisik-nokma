@@ -121,10 +121,10 @@ describe('26.054–26.058 an edit notifies only the mentions it adds', () => {
 
   it('26.056 a description still notifies every mention it carries', async () => {
     const fieldSet = (body: unknown) =>
-      makeCommitted({ workspaceId: fx.WS, actorId: fx.ids.owner, entity: { kind: 'ticket', id: fx.TE }, type: 'ticket.field_set', payload: { fieldId: 'description', value: body } });
-    const before = (await forTicket(fx.ids.memberIn, fx.TE)).length;
+      makeCommitted({ workspaceId: fx.WS, actorId: fx.ids.owner, entity: { kind: 'ticket', id: fx.TP }, type: 'ticket.field_set', payload: { fieldId: 'description', value: body } });
+    const before = (await forTicket(fx.ids.memberIn, fx.TP)).length;
     await commit(fieldSet(docMentioning([fx.ids.memberIn], 'desc one')));
     await commit(fieldSet(docMentioning([fx.ids.memberIn], 'desc two')));
-    expect((await forTicket(fx.ids.memberIn, fx.TE)).length).toBe(before + 2);
+    expect((await forTicket(fx.ids.memberIn, fx.TP)).length).toBe(before + 2);
   });
 });

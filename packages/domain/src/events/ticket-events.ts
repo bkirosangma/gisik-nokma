@@ -210,6 +210,19 @@ export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullab
 /** Body is opaque structured-doc JSON — the editor plan owns its schema. */
 export const commentAddedPayload = z.object({ body: z.record(z.string(), z.unknown()) });
 
+/**
+ * `comment.edited` — the AUTHOR replaces a comment's body (MCP-everything spec §6, M-E9). Filed against
+ * the comment's PARENT (ticket or note), never a comment entity: a comment is a claim on its parent's
+ * history, as `comment.added` is. `commentId` is that `comment.added` event's id — a comment's only identity.
+ */
+export const commentEditedPayload = z.object({ commentId: ulidString, body: z.record(z.string(), z.unknown()) }).strict();
+/** `comment.deleted` — author, or workspace owner/admin. The body leaves every view; the ledger keeps it (spec §6). */
+export const commentDeletedPayload = z.object({ commentId: ulidString }).strict();
+export const COMMENT_EVENT_TYPES = ['comment.added', 'comment.edited', 'comment.deleted'] as const;
+export function isCommentEvent(type: string): boolean {
+  return (COMMENT_EVENT_TYPES as readonly string[]).includes(type);
+}
+
 const mimeType = z.string().regex(/^[\w.+-]+\/[\w.+-]+$/, 'must be a MIME type');
 
 /**

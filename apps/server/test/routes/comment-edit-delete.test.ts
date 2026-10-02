@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
 import { insertAttachment } from '../../src/attachments/attachment-repo.js';
+import { buildServerGates } from '../../src/gates/index.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { buildTestApp } from '../helpers/app.js';
@@ -118,17 +119,21 @@ describe('26.047–26.053 through the door', () => {
     await ok(t, 'comment.edited', { commentId: c, body: doc('after') });
   });
 
-  it("26.053 an edit may embed only this ticket's own image", async () => {
+  it("26.053 an edit may embed only this ticket's own image (the production gate set)", async () => {
+    // `buildTestApp`'s ingest is UNGATED (`index.ts` wires `buildServerGates()` only in production), so this
+    // case drives the production gate set directly, against the ticket's own rows, as `image-embed-gate.test.ts` does.
     const own = newUlid();
     const foreign = newUlid();
     for (const [id, ticketId] of [[own, TICKET], [foreign, OTHER]] as const) {
       await insertAttachment(db.pool, { id, workspaceId: WS, ticketId, uploaderId: me, filename: 'p.png', mime: 'image/png', size: 4, objectKey: `w/${WS}/a/${id}`, sha256: 'a'.repeat(64) });
     }
-    const t = { kind: 'ticket', id: TICKET };
-    const c = await ok(t, 'comment.added', { body: doc('pic soon') });
     const withImage = (attachmentId: string) => ({ type: 'doc', content: [{ type: 'image', attrs: { attachmentId, wrap: 'block', alt: '' } }] });
-    expect(await send(t, 'comment.edited', { commentId: c, body: withImage(foreign) })).toMatchObject({ status: 'refused', rule: 'attachment.embed-unknown' });
-    await ok(t, 'comment.edited', { commentId: c, body: withImage(own) }); // control
+    const edit = (attachmentId: string) =>
+      ({ id: newUlid(), workspaceId: WS, entity: { kind: 'ticket', id: TICKET }, type: 'comment.edited', version: 1, actorId: me, origin: 'web', clientTime: new Date().toISOString(), payload: { commentId: newUlid(), body: withImage(attachmentId) } }) as SubmittedEvent;
+    const gate = buildServerGates().find((g) => g.eventType === 'comment.edited');
+    expect(gate, 'a gate is registered for comment.edited').toBeDefined();
+    expect(await gate!.check(edit(own), db.pool)).toBeNull(); // control: this ticket's own image
+    expect(await gate!.check(edit(foreign), db.pool)).toMatchObject({ rule: 'attachment.embed-unknown' });
   });
 
   it('26.048 rebuild equals live', async () => {

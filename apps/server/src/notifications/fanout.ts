@@ -155,8 +155,16 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     env: EventEnvelope,
     doc: unknown,
     source: 'comment' | 'description',
+    // MCP-everything T2: the body a comment EDIT replaced, so only the mentions the edit adds notify.
+    // `null` (every `comment.added` and every description, which keeps "every mention every time")
+    // means nothing precedes it. `anchorId` is the id the notification's `eventId` carries: the
+    // COMMENT's id for an edit (the thread anchor), the event's own id otherwise. The dedupe key
+    // stays `mention:${env.id}:…`, so an edit's rows never collide with the add's.
+    previous: unknown = null,
+    anchorId: string = env.id,
   ): Promise<void> {
-    const mentioned = extractMentionedUserIds(doc);
+    const before = new Set(previous === null ? [] : extractMentionedUserIds(previous));
+    const mentioned = extractMentionedUserIds(doc).filter((userId) => !before.has(userId));
     if (mentioned.length === 0) return;
     const excerpt = docToPlainText(doc).slice(0, EXCERPT_LENGTH);
     const ticketTitle = await titleOf(env.workspaceId, env.entity.id);
@@ -187,7 +195,7 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
             ticketId: env.entity.id,
             ticketTitle,
             mentionedBy: env.actorId,
-            eventId: env.id,
+            eventId: anchorId,
             source,
             excerpt,
             clientTime: env.clientTime,
@@ -223,6 +231,22 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     return rows[0]?.body ?? null;
   }
 
+  /**
+   * The body a comment carried just BEFORE this edit: its `comment.added`, or its latest earlier
+   * `comment.edited` — strictly below this event's seq, in the parent's own stream, so a replayed
+   * fan-out compares against the version the edit replaced (the `note.body_set` rule, spec §6).
+   */
+  async function previousCommentBodyOf(env: EventEnvelope, commentId: string): Promise<unknown> {
+    const { rows } = await deps.pool.query<{ body: unknown }>(
+      `SELECT payload -> 'body' AS body FROM events
+        WHERE entity_kind = $1 AND entity_id = $2 AND seq < $3
+          AND ((type = 'comment.added' AND id = $4) OR (type = 'comment.edited' AND payload ->> 'commentId' = $4))
+        ORDER BY seq DESC LIMIT 1`,
+      [env.entity.kind, env.entity.id, env.seq, commentId],
+    );
+    return rows[0]?.body ?? null;
+  }
+
   async function noteTitleOf(noteId: string): Promise<string> {
     const { rows } = await deps.pool.query<{ title: string }>('SELECT title FROM proj_notes WHERE note_id = $1', [noteId]);
     return rows[0]?.title ?? '';
@@ -238,8 +262,8 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
    * - **Only NEWLY added mentions notify** (`previous` is the body this event
    *   replaced). A note body is autosaved, so the ticket path's "every mention in
    *   the document, every time" would tell the same person again on every save.
-   *   Comments are never edited, so their `previous` is `null` and every mention
-   *   in one is new.
+   *   A comment's `previous` is `null` on `comment.added` and its prior body on
+   *   `comment.edited`.
    * - **The payload names a note** (`noteMentionNotificationPayloadSchema`), and
    *   the kind stays `mention` so the person's mute setting covers it.
    */
@@ -248,6 +272,7 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
     doc: unknown,
     previous: unknown,
     source: 'note' | 'note-comment',
+    anchorId: string = env.id,
   ): Promise<void> {
     const before = new Set(previous === null ? [] : extractMentionedUserIds(previous));
     const added = extractMentionedUserIds(doc).filter((userId) => !before.has(userId));
@@ -266,7 +291,7 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
             noteId: env.entity.id,
             noteTitle,
             mentionedBy: env.actorId,
-            eventId: env.id,
+            eventId: anchorId,
             source,
             excerpt,
             clientTime: env.clientTime,
@@ -334,11 +359,14 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           // redelivery is one row. A payload with no `assigneeId` fails the
           // handler's parse and addresses nobody: born unassigned.
           await handleAssigned(env);
-        } else if (env.type === 'comment.added') {
+        } else if (env.type === 'comment.added' || env.type === 'comment.edited') {
           const parsed = commentPayloadSchema.safeParse(env.payload);
           if (!parsed.success) return;
-          if (env.entity.kind === 'note') await handleNoteMentions(env, parsed.data.body, null, 'note-comment');
-          else await handleMentions(env, parsed.data.body, 'comment');
+          const commentId = env.type === 'comment.edited' ? String((env.payload as { commentId?: unknown }).commentId) : null;
+          const previous = commentId === null ? null : await previousCommentBodyOf(env, commentId);
+          const anchor = commentId ?? env.id;
+          if (env.entity.kind === 'note') await handleNoteMentions(env, parsed.data.body, previous, 'note-comment', anchor);
+          else await handleMentions(env, parsed.data.body, 'comment', previous, anchor);
         } else if (env.type === 'note.created' || env.type === 'note.body_set') {
           const parsed = noteBodyPayloadSchema.safeParse(env.payload);
           if (parsed.success && parsed.data.body !== undefined) {

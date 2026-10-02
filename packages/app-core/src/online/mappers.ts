@@ -2857,6 +2857,9 @@ export function mapNoteComments(raw: unknown): NoteComment[] {
       authorId: asString(row['authorId'], `${path}.authorId`),
       body: row['body'],
       recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
+      // MCP-everything T2: edit and deletion stamps. The comment UI that shows them is T5's; the mapper only carries them.
+      editedAt: row['editedAt'] === null ? null : asString(row['editedAt'], `${path}.editedAt`),
+      deletedAt: row['deletedAt'] === null ? null : asString(row['deletedAt'], `${path}.deletedAt`),
     };
   });
 }
