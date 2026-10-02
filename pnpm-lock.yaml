@@ -483,6 +483,9 @@ importers:
       '@gisik-nokma/domain':
         specifier: workspace:*
         version: link:../domain
+      '@gisik-nokma/editor':
+        specifier: workspace:*
+        version: link:../editor
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@3.25.76)

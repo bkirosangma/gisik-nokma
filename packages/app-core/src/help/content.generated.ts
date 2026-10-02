@@ -2880,7 +2880,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   }
                 ]
               },
@@ -12780,7 +12780,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.\""
+                    "text": "\"This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.\""
                   },
                   {
                     "kind": "text",

@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { filterSpecSchema } from '@gisik-nokma/domain';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
+import { bodyAsMarkdown } from './markdown-io.js';
+import { readOrNotFound } from './reads.js';
 
 export type ToolDefinition = {
   name: string;
@@ -137,9 +139,18 @@ export function readTools(session: Session): ToolDefinition[] {
       inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1) },
       handler: async (args) => {
         const parsed = z.object({ workspaceId: z.string().min(1), ticketId: z.string().min(1) }).parse(args);
-        return session.get(
+        const detail = (await readOrNotFound(
+          session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
-        );
+          'ticket',
+        )) as { ticketState?: { fields?: Record<string, { value: unknown }> } } & Record<string, unknown>;
+        // The description is a document: answer it as Markdown (with what Markdown cannot show), never as the raw tree.
+        const { description, ...fields } = detail.ticketState?.fields ?? {};
+        return {
+          ...detail,
+          ...(detail.ticketState === undefined ? {} : { ticketState: { ...detail.ticketState, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
+          description: bodyAsMarkdown(description?.value ?? null),
+        };
       },
     },
     {
