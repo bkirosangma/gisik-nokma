@@ -38,6 +38,7 @@ import { peopleProps } from '../people-props.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
+import { writeLastNote } from './last-note.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
 import { ticketChipClickHandler } from './ticket-chip-click.js';
@@ -62,6 +63,17 @@ const NOT_PLACEABLE =
  * ticket on screen.
  */
 type Placement = { ticketId: string; projectId: string | null; notice: string | null };
+
+/**
+ * Notes just created on this page, read by the NEXT mount of that note and cleared by it (smoothness G-3, 25.348):
+ * a new note opens straight in edit mode, every other note opens to READ. `NotesPage` marks the id before it
+ * navigates, and `/notes/<id>` mounts `NoteDocument` afresh, so the signal must outlive the component that raised
+ * it — a module-level set, the same device as `pendingLostAccessToast` in `notes-page.tsx`.
+ */
+const newNoteIds = new Set<string>();
+export function markNoteAsNew(noteId: string): void {
+  newNoteIds.add(noteId);
+}
 
 /**
  * The note itself (notes series Plan 5, spec §9.2, §9.6).
@@ -402,12 +414,33 @@ function NoteDocumentBody({
   // each paint that a draft changed. The headings are reported UP to
   // `NotesPage` — its `<aside>` column is a sibling of this component, not a
   // descendant, so it cannot read this ref itself.
+  //
+  // A read-only editor never emits a draft, and a browser paints the editor a frame after this effect first ran,
+  // so the root is also watched: whatever the editor draws (or redraws) afterwards is read again, once per frame,
+  // and reported only when the headings actually differ (stamping ids is an attribute write, which is not observed).
   useEffect(() => {
     const root = editorRoot.current;
     if (root === null) return;
-    const meta = extractReadingMeta(root);
-    setWordCount(meta.wordCount);
-    onHeadingsChange?.(meta.headings);
+    let reported = '';
+    const read = (): void => {
+      const meta = extractReadingMeta(root);
+      setWordCount(meta.wordCount);
+      const key = JSON.stringify(meta.headings);
+      if (key === reported) return;
+      reported = key;
+      onHeadingsChange?.(meta.headings);
+    };
+    read();
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(read);
+    });
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
 
   // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
@@ -580,6 +613,29 @@ function NoteDocumentBody({
   const [markedHere, setMarkedHere] = useState(false);
   const [restoreRefusal, setRestoreRefusal] = useState<string | null>(null);
 
+  /**
+   * READ or EDIT (smoothness G-3, 25.340–25.349). An existing note opens to read: the rendered document, no
+   * toolbar, no caret. "Edit" switches to the editor and "Done" back. The mode lives here, one per note
+   * (`NoteDocument` is keyed by the note), and starts as `edit` only for a note this page just created.
+   * `editing` is the narrower fact the pane, the title and the Edit button read: allowed AND asked for.
+   */
+  const [mode, setMode] = useState<'read' | 'edit'>(() => (newNoteIds.has(noteId) ? 'edit' : 'read'));
+  useEffect(() => {
+    newNoteIds.delete(noteId);
+  }, [noteId]);
+  const editing = canEditNow && mode === 'edit';
+
+  // Remember the note for this device whenever it is open, reading or editing (G-3 addendum, 25.350). A deleted
+  // note is not remembered: re-entering the Notes area must not land a reader on a Restore banner.
+  const rememberUserId = user?.id ?? null;
+  const rememberWorkspaceId = note?.workspaceId ?? null;
+  const rememberNoteId = note?.noteId ?? null;
+  const rememberDeleted = note?.deleted === true;
+  useEffect(() => {
+    if (rememberUserId === null || rememberWorkspaceId === null || rememberNoteId === null || rememberDeleted) return;
+    writeLastNote(rememberUserId, rememberWorkspaceId, rememberNoteId);
+  }, [rememberUserId, rememberWorkspaceId, rememberNoteId, rememberDeleted]);
+
   if (note === null) {
     return (
       <p className="gn-notes__hint" data-testid="note-document-missing">
@@ -615,19 +671,39 @@ function NoteDocumentBody({
           .gn-breadcrumb__item::before`) draws `/` only BETWEEN two
           rendered siblings, so omitting the `<li>` is what removes its
           separator too, with no second rule needed. */}
-      <nav aria-label="Breadcrumb" className="gn-breadcrumb">
-        <ol className="gn-breadcrumb__list">
-          {workspace !== null && workspace.name !== '' ? (
-            <li className="gn-breadcrumb__item">{workspace.name}</li>
-          ) : null}
-          {homeProjectName !== null ? <li className="gn-breadcrumb__item">{homeProjectName}</li> : null}
-          <li className="gn-breadcrumb__item gn-breadcrumb__item--current">{note.title}</li>
-        </ol>
-      </nav>
+      <div className="gn-note-document__head">
+        <nav aria-label="Breadcrumb" className="gn-breadcrumb">
+          <ol className="gn-breadcrumb__list">
+            {workspace !== null && workspace.name !== '' ? (
+              <li className="gn-breadcrumb__item">{workspace.name}</li>
+            ) : null}
+            {homeProjectName !== null ? <li className="gn-breadcrumb__item">{homeProjectName}</li> : null}
+            <li className="gn-breadcrumb__item gn-breadcrumb__item--current">{note.title}</li>
+          </ol>
+        </nav>
+        {/* Top right of the header, at every width (owner ruling (a): "All screens, Edit button"). Absent for a
+            person who may not edit (`canEditNow` is the editor's own permission) and for a deleted note. */}
+        {canEditNow ? (
+          editing ? (
+            <Button className="gn-note-document__mode" data-testid="note-done" onClick={() => setMode('read')}>
+              Done
+            </Button>
+          ) : (
+            <Button
+              className="gn-note-document__mode"
+              data-testid="note-edit"
+              aria-label="Edit note"
+              onClick={() => setMode('edit')}
+            >
+              Edit
+            </Button>
+          )
+        ) : null}
+      </div>
 
       <NoteTitle
         title={note.title}
-        canEdit={canEditNow}
+        canEdit={editing}
         onRename={(next) => void write('note.renamed', { title: next })}
       />
 
@@ -693,10 +769,11 @@ function NoteDocumentBody({
         }}
       >
         <NoteEditorPane
-          key={`${note.noteId}:${editorGeneration}`}
+          key={`${note.noteId}:${editorGeneration}:${editing ? 'edit' : 'read'}`}
           note={note}
           treeNotes={treeNotes}
           canEdit={canEditNow}
+          editing={editing}
           dataSource={dataSource}
           userId={user?.id ?? ''}
           onDraftChange={setDraft}
@@ -841,6 +918,7 @@ function NoteEditorPane({
   note,
   treeNotes,
   canEdit,
+  editing,
   dataSource,
   userId,
   onDraftChange,
@@ -852,6 +930,12 @@ function NoteEditorPane({
   note: NoteDetail;
   treeNotes: NoteSummary[];
   canEdit: boolean;
+  /**
+   * May the person type right now: `canEdit` AND the page is in edit mode. `canEdit` alone keeps deciding who
+   * sees the recovered-draft banner (a draft is theirs to keep or discard in either mode); `editing` decides
+   * only what the editor does. The pane is remounted when it flips — `TicketEditor` reads `editable` once.
+   */
+  editing: boolean;
   dataSource: DataSource;
   userId: string;
   onDraftChange: (doc: unknown) => void;
@@ -913,7 +997,7 @@ function NoteEditorPane({
       <TicketEditorSlot
         mode="note"
         doc={autosave.initialDoc}
-        readOnly={!canEdit}
+        readOnly={!editing}
         workspaceId={note.workspaceId}
         ticketId=""
         noteId={note.noteId}

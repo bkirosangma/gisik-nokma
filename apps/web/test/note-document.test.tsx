@@ -4,6 +4,7 @@ import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Editor } from '@tiptap/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DELETE_TRIGGER_LABEL } from '@gisik-nokma/app-core';
 import type { Actor, DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -57,7 +58,7 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import { NoteDocument } from '../src/notes/note-document.js';
+import { NoteDocument, markNoteAsNew } from '../src/notes/note-document.js';
 
 const WS_A = '01J9WSLOGISTICS000000000000';
 const P_COLD = '01J9PCOLDROOM00000000000000';
@@ -338,6 +339,8 @@ describe('18.11 The Notes page — the document', () => {
    */
   it('18.199 renders the breadcrumb, the title, the byline with its badges, and the editor over the loaded body', async () => {
     const { container } = renderDocument();
+    // G-3: a note opens to READ; the editable title and the editor are the EDIT mode (25.341).
+    fireEvent.click(await screen.findByTestId('note-edit'));
 
     // The breadcrumb: workspace / project / the note's own title.
     const crumb = await screen.findByRole('navigation', { name: 'Breadcrumb' });
@@ -424,6 +427,7 @@ describe('18.11 The Notes page — the document', () => {
       </Providers>,
     );
 
+    await user.click(await screen.findByTestId('note-edit')); // G-3: a note opens to READ (25.341)
     const title = await screen.findByTestId('note-title');
     title.focus();
     await user.clear(title);
@@ -677,6 +681,7 @@ describe('18.11 The Notes page — the document', () => {
     cleanup();
     mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
     const second = renderDocument({ role: 'member' });
+    fireEvent.click(await screen.findByTestId('note-edit')); // G-3: the author's arm is the EDIT mode (25.341)
     await waitFor(() => expect(slotProps().readOnly).toBe(false));
     expect(screen.getByTestId('note-title')).toHaveAttribute('contenteditable', 'true');
     expect(screen.getByTestId('note-scope').tagName).toBe('BUTTON');
@@ -826,6 +831,7 @@ describe('13.1488 clicking below the text focuses the editor', () => {
   /** MUTATION TARGET: drop the wrapper's onClick handler. */
   it('a click on the wrapper itself (not the editor content) focuses the editor', async () => {
     renderDocument();
+    fireEvent.click(await screen.findByTestId('note-edit')); // G-3: focus-on-click is an EDIT-mode behaviour (25.341)
     const wrapper = await screen.findByTestId('note-editor');
     // SCOPED to the wrapper: a second `TicketEditorSlot` (the comment
     // composer, mode: 'comment') mounts elsewhere on this same page.
@@ -1174,5 +1180,175 @@ describe('19.236–19.239 the note page deletes, and restores what it deleted', 
     await waitFor(() => expect(first.batches).toHaveLength(2));
     // The other note was never marked here: no unmark in front of the restore.
     expect(types(first.batches[1])).toEqual(['note.restored']);
+  });
+});
+
+/**
+ * G-3 (smoothness 25.340–25.345) — a note opens to READ; "Edit" is the editor, "Done" is back.
+ *
+ * The reading view is the SAME editor mounted read-only (`TicketEditor` reads `editable` once, so the pane is
+ * remounted when the mode flips), which is why mentions, ticket refs and note links stay live in it.
+ */
+describe('G-3 the note opens to read; Edit and Done switch to the editor and back', () => {
+  const isEditable = (container: HTMLElement): boolean =>
+    container.querySelector('.ProseMirror')?.getAttribute('contenteditable') === 'true';
+
+  it('25.340 an existing note opens READ-ONLY: not contenteditable, no toolbar, a static title, an Edit note button', async () => {
+    const { container } = renderDocument();
+    const edit = await screen.findByRole('button', { name: 'Edit note' });
+    await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+    expect(container.querySelector('.ProseMirror')?.textContent).toContain('Compressor stopped in the cold room');
+    expect(screen.getByTestId('note-title')).toHaveAttribute('contenteditable', 'false');
+    expect(within(screen.getByTestId('note-editor')).queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    // A tap on the padded area below the text must not raise a caret in a reading view.
+    fireEvent.click(screen.getByTestId('note-editor'));
+    expect(container.querySelector('.ProseMirror')).not.toHaveFocus();
+    // The button is a `.gn-button` (the 44px floor) in the header row, ahead of the title.
+    expect(edit.className).toContain('gn-button');
+    expect(edit.closest('.gn-note-document__head')).not.toBeNull();
+
+    // CONTROL, same it(): Edit is what makes every one of those facts flip.
+    fireEvent.click(edit);
+    await waitFor(() => expect(isEditable(container)).toBe(true));
+    expect(screen.getByTestId('note-title')).toHaveAttribute('contenteditable', 'true');
+    expect(within(screen.getByTestId('note-editor')).getByRole('toolbar')).toBeInTheDocument();
+  });
+
+  it('25.341 Edit leads to the editor and Done returns to reading', async () => {
+    const { container } = renderDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit note' }));
+    await waitFor(() => expect(slotProps().readOnly).toBe(false));
+    expect(screen.queryByRole('button', { name: 'Edit note' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+    expect(screen.getByRole('button', { name: 'Edit note' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    // And back in: the mode is a toggle, not a one-way door.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit note' }));
+    await waitFor(() => expect(isEditable(container)).toBe(true));
+  });
+
+  it('25.342 Done saves what was typed (the pane unmount flush), and a Done with nothing typed saves nothing', async () => {
+    const user = userEvent.setup();
+    const ingested: SubmittedEvent[] = [];
+    const services = world();
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-23T07:00:00.000Z',
+      }));
+    };
+    const { container } = render(
+      <Providers services={services}>
+        <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
+      </Providers>,
+    );
+    // CONTROL first: Edit then Done with nothing typed writes no body.
+    await user.click(await screen.findByRole('button', { name: 'Edit note' }));
+    await waitFor(() => expect(isEditable(container)).toBe(true));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(ingested.filter((event) => event.type === 'note.body_set')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Edit note' }));
+    await waitFor(() => expect(isEditable(container)).toBe(true));
+    const editor = (container.querySelector('.ProseMirror') as unknown as { editor: Editor }).editor;
+    editor.commands.focus('end');
+    editor.view.dispatch(editor.view.state.tr.insertText(' and then restarted'));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(ingested.filter((event) => event.type === 'note.body_set')).toHaveLength(1));
+    expect(JSON.stringify(ingested.find((event) => event.type === 'note.body_set')!.payload)).toContain('and then restarted');
+  });
+
+  it('25.343 a NEW note opens straight in edit mode — once; the next open of it is reading', async () => {
+    markNoteAsNew(NOTE);
+    const first = renderDocument();
+    await waitFor(() => expect(isEditable(first.container)).toBe(true));
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    first.unmount();
+    // CONTROL, same it(): the mark was consumed, so opening the same note again is a reading view.
+    const second = renderDocument();
+    await screen.findByRole('button', { name: 'Edit note' });
+    await waitFor(() => expect(second.container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+  });
+
+  it('25.344 a person who may not edit sees no Edit button; a deleted note offers none either', async () => {
+    const reader = renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await screen.findByTestId('note-title');
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(screen.queryByRole('button', { name: 'Edit note' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    reader.unmount();
+
+    const deleted = renderDocument({ note: noteDetail({ deleted: true }) });
+    await screen.findByTestId('note-deleted-banner');
+    expect(screen.queryByRole('button', { name: 'Edit note' })).toBeNull();
+    deleted.unmount();
+
+    // CONTROL: the author of a live note has the button.
+    renderDocument();
+    expect(await screen.findByRole('button', { name: 'Edit note' })).toBeInTheDocument();
+  });
+
+  it('25.355 headings are reported when the editor paints AFTER the note loaded, with no draft change (the read-only editor never emits one)', async () => {
+    const reported: string[][] = [];
+    const { container } = render(
+      <Providers services={world({})}>
+        <NoteDocument
+          noteId={NOTE}
+          workspaces={[{ ...WS_A_REF, role: 'owner' }]}
+          onHeadingsChange={(headings) => reported.push(headings.map((heading) => heading.text))}
+        />
+      </Providers>,
+    );
+    await screen.findByRole('button', { name: 'Edit note' });
+    await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+    // CONTROL, same it(): what was reported so far does not hold the late heading.
+    expect(reported.flat()).not.toContain('Late heading');
+    // A real browser mounts the editor a frame after the effect that reads the headings has run; model that by
+    // adding the heading to the editor's wrapper afterwards. Nothing edits, so `draft` never changes.
+    const late = document.createElement('h2');
+    late.textContent = 'Late heading';
+    screen.getByTestId('note-editor').appendChild(late);
+    await waitFor(() => expect(reported.at(-1)).toContain('Late heading'));
+    // A paragraph is not a heading: the page is not told again (each report re-renders it), though the frame ran.
+    const reports = reported.length;
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'more words, no new heading';
+    screen.getByTestId('note-editor').appendChild(paragraph);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(reported).toHaveLength(reports);
+  });
+
+  it('25.345 a note link in the reading view is still a link: clicking it opens that note', async () => {
+    const linked = noteDetail({
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'See ' },
+              { type: 'wikiLink', attrs: { noteId: OTHER_NOTE, title: 'Cold room audit' } },
+            ],
+          },
+        ],
+      },
+    });
+    const { container } = renderDocument({ note: linked });
+    await screen.findByRole('button', { name: 'Edit note' });
+    await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
+    const link = await waitFor(() => {
+      const found = container.querySelector<HTMLElement>(`.ProseMirror [data-note-id="${OTHER_NOTE}"]`);
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    fireEvent.click(link);
+    expect(routerPush).toHaveBeenCalledWith(`/notes/${OTHER_NOTE}`);
   });
 });
