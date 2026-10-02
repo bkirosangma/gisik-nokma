@@ -302,8 +302,9 @@ describe('G-3 addendum: the last note opened, per device', () => {
     };
     // Below the fold: 600 - 0 - (200 - 40) / 2 = 520 more than where it started.
     expect(await scrollInto(600, 0)).toBe(520);
-    // CONTROL, same it(): a row already in view (top 80, bottom 120 inside 0..200) leaves the list exactly where it was.
-    expect(await scrollInto(80, 30)).toBe(30);
+    // CONTROL, same it(): a row already in view (top 20, bottom 60 inside 0..200, not at the centre) leaves the list
+    // exactly where it was — centring it would have moved the list to 40.
+    expect(await scrollInto(20, 100)).toBe(100);
   });
 
   it('25.356 the note opened LAST is the one resumed, across workspaces; with the pointer missing or unreadable, list order decides', async () => {

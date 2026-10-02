@@ -280,15 +280,16 @@ describe('G-3 Notes on a phone', () => {
       closed();
 
       // CONTROLS, same it(): a tap inside the panel, and inside a Select's portalled popover, are not "outside".
+      // (Asserted open directly: `open()` would click the panel open again and hide a wrongful close.)
       open();
       fireEvent.pointerDown(within(panel).getByRole('searchbox', { name: 'Search notes' }));
-      open();
+      expect(panel).toHaveAttribute('data-panel-open', 'true');
       const popover = document.createElement('div');
       popover.className = 'gn-select__panel';
       document.body.appendChild(popover);
       fireEvent.pointerDown(popover);
       popover.remove();
-      open();
+      expect(panel).toHaveAttribute('data-panel-open', 'true');
 
       // A Contents link: the headings are read once the editor has painted.
       const list = await within(panel).findByTestId('notes-contents');
