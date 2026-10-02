@@ -500,7 +500,6 @@ export function CalendarView(props: CalendarViewProps) {
                   const key = `${itemIndex}:${item.kind}:${item.ticketId}`;
                   const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
                   // E4-28: a bar's rendered text is the ticket title alone —
-                  // unlike a marker's `item.label` (see the docblock below),
                   // it names no date at all, and the date lives only in the
                   // `title` attribute, which is not reliably read by
                   // assistive tech (it requires hover, which touch/mobile AT
@@ -510,13 +509,18 @@ export function CalendarView(props: CalendarViewProps) {
                   // `WorkspaceLinks` already uses and documents
                   // (`apps/web/app/w/[workspaceId]/page.tsx`).
                   const detailId = `${idPrefix}-detail-${week.days[0]}-${itemIndex}`;
+                  // UX fixes T8 (23.140, audit PV-05): a MARKER names its ticket — `<key> <title>` (the title alone
+                  // for an unkeyed, offline ticket) — and its claim ("needed by 28 Sep — Kiro's claim") moves to the
+                  // tooltip and to a description, the pattern a bar already uses. The chip answers "which ticket",
+                  // which the claim text never did: sitting under another ticket's bar it read as that ticket's.
+                  const markerName = item.kind === 'marker' ? (item.key === null ? item.title : `${item.key} ${item.title}`) : '';
                   return (
                     <li key={key} className="gn-calendar__slot" style={{ gridColumn }}>
                       <button
                         type="button"
                         className={itemClassName(item, unplaceable)}
                         title={item.kind === 'bar' ? item.provenance : item.tooltip}
-                        {...(item.kind === 'bar' ? { 'aria-describedby': detailId } : {})}
+                        aria-describedby={detailId}
                         data-pending={pending ? 'true' : undefined}
                         data-unplaceable={unplaceable ? 'true' : undefined}
                         {...(item.kind === 'marker' && item.marker === 'custom'
@@ -528,21 +532,20 @@ export function CalendarView(props: CalendarViewProps) {
                           item.title
                         ) : (
                           <>
-                            {/* Decorative: the glyph carries the colour, the label
+                            {/* Decorative: the glyph carries the colour, the ticket
                                 carries the meaning, so the accessible name is the
-                                claim and nothing else. */}
+                                ticket (`<key> <title>`) and nothing else — the claim
+                                is the description below. */}
                             <span className="gn-calendar__glyph" aria-hidden="true">
                               ◆
                             </span>
-                            {item.label}
+                            {markerName}
                           </>
                         )}
                       </button>
-                      {item.kind === 'bar' && (
-                        <span id={detailId} className="gn-visually-hidden">
-                          {item.provenance}
-                        </span>
-                      )}
+                      <span id={detailId} className="gn-visually-hidden">
+                        {item.kind === 'bar' ? item.provenance : item.tooltip}
+                      </span>
                     </li>
                   );
                 })}

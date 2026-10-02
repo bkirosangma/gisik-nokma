@@ -282,6 +282,7 @@ need for per-tab filter variants. These eleven tasks build that capability from 
   fixture needs `fields.dueDate`/`fields.title` as real `FieldClaim`s (`fieldClaim()`), not the top-level
   `ListRow.dueDate` convenience field alone — `dateClaimOf`/`titleOf` read `row.fields` verbatim and never
   look at it. Mutation (`dateInputs` from `list.rows`) kills it.
+  **AMENDED 2026-10-02 (23.140):** "Calendar's own due-only marker does not render the ticket's title at all" is no longer true — since 23.140 the marker's accessible name and text are `<key> <title>`, so Calendar COULD now prove this at ticket level too. The Timeline proof is kept as written: it needs no change, it still reads `entry.title` from the side list, and it is the stricter of the two (a due-only ticket sits in the side list there, so the title check cannot be satisfied by a bar or marker that was drawn for a stale input).
 - **13.559** ✅ Clearing the term restores the row and removes the strip on the List tab.
 - `13.517` FLIPPED 2026-09-17 (see its own bullet above): an assignee picked in the sheet now NARROWS the
   list (the row assigned to someone else drops) and discloses through the strip; the note it asserted is
