@@ -2709,6 +2709,7 @@ function ProjectBoard() {
               // first-match reason `apps/web/test/project-page-head.test.tsx`
               // records.
               className="gn-project__rail"
+              fade
               options={PROJECT_VIEW_OPTIONS}
               value={view}
               onChange={setView}
