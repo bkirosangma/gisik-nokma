@@ -1485,6 +1485,14 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
     // `provenance: null`, which is the honest "nobody configured this
     // workspace" this response type exists to keep distinguishable from a
     // claimed 7.
+    // The day in the product's day format ("10 Jul", the year only when it is not
+    // the current IST year), built here from the day string with its own month
+    // names and not by importing the server's label function.
+    const [enteredYear = '', enteredMonth = '', enteredDate = ''] = enteredIstDay.split('-');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const enteredDayLabel =
+      `${Number(enteredDate)} ${monthNames[Number(enteredMonth) - 1]}` +
+      (enteredYear === istDayHere(frozenNow.toISOString()).slice(0, 4) ? '' : ` ${enteredYear}`);
     const expected = {
       workspaceId,
       generatedAt: frozenNow.toISOString(),
@@ -1505,7 +1513,7 @@ describe('GET /v1/workspaces/:workspaceId/attention — with the clock frozen an
           enteredStateAt,
           daysInFlight: expectedDaysInFlight,
           thresholdDays: 7,
-          reason: `In an active state since ${enteredIstDay} — past the 7-day staleness threshold.`,
+          reason: `In an active state since ${enteredDayLabel}, past the 7-day staleness threshold.`,
         },
       ],
     };
