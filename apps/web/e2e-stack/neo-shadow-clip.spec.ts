@@ -384,7 +384,7 @@ for (const viewport of VIEWPORTS) {
             await openView('Board');
             // A click before hydration does nothing (measured on a cold `next dev`); retry until the sheet is up.
             await expect(async () => {
-              await page.locator('.gn-board-card').first().click();
+              await page.locator('.gn-board-card__title').first().click();
               await expect(page.getByRole('dialog').first(), 'clicking a board card did not open the ticket sheet').toBeVisible({ timeout: 3000 });
             }).toPass({ timeout: 30_000 });
             await page.waitForTimeout(600);
