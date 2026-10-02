@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FoundingError } from '@gisik-nokma/app-core/online';
@@ -46,6 +46,21 @@ function mount(founding: GatewayStubs['founding'], workspaces?: () => Promise<ne
 beforeEach(() => push.mockClear());
 
 /**
+ * Prefixes/groups Task 8 (22.151): the founding form is a DIALOG behind the header's
+ * primary "Create workspace". A case that drives the form opens it first, and presses
+ * the DIALOG's own submit — the same words as the opener, so it is scoped, not
+ * found by name across the page.
+ */
+async function openFoundingDialog(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(await screen.findByRole('button', { name: 'Create workspace' }));
+  await screen.findByRole('dialog', { name: 'Create workspace' });
+}
+const submitButton = (): HTMLElement =>
+  within(screen.getByRole('dialog', { name: 'Create workspace' })).getByRole('button', {
+    name: 'Create workspace',
+  });
+
+/**
  * 3.124 THE PLANTED DEFECT THIS FILE EXISTS FOR.
  *
  * The natural place for a founding form is inside the empty-state arm — "no
@@ -59,17 +74,25 @@ beforeEach(() => push.mockClear());
  * decision this correction does NOT take:** *owner, whoever next touches this page.*
  * The person who cannot be told which
  * workspaces they are in is exactly the person who most needs to found one.
+ *
+ * **2026-10-02 (Task 8):** the owner moved the form into a header button and a dialog.
+ * That sits outside every list branch too, so this case's claim — the way to found a
+ * workspace survives a refused list — still holds, now asserted on the button.
  */
 describe('3.124 the founding form is reachable when the workspace list REFUSES', () => {
-  it('renders the form beside the refusal, not instead of it', async () => {
+  it('renders the way to found one beside the refusal, not instead of it', async () => {
     mount({});
     // The refusal is on screen — the default stub refuses `getMyWorkspaces`
     // with the REAL serving-gap table.
     expect(await screen.findByRole('status')).toHaveTextContent('could not be loaded');
-    // …and so is the form.
-    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Name')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
+    // …and so is the way to found one: the header's Create workspace button, whose
+    // dialog carries the form (22.151 moved it there).
+    const opener = screen.getByRole('button', { name: 'Create workspace' });
+    expect(opener).toBeInTheDocument();
+    await userEvent.click(opener);
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' });
+    expect(within(dialog).getByLabelText('Name')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
   });
 
   it('3.125 the empty state offers the second sentence it always needed', async () => {
@@ -80,16 +103,19 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
   });
 
   /**
-   * 13.394 (the `/workspaces` half) — this form is `.gn-workspace-founding`, a
-   * bare column, and NOT `.gn-project-founding` (the raised card the home
-   * page's "New project" row carries — see `workspace-home.test.tsx`'s own
-   * 13.394). Owner feedback item 3, verbatim: *"The create workspace card
-   * shouldnt be that big."*
+   * 13.394 (the `/workspaces` half), AMENDED by Task 8 (22.151): the form is no longer
+   * a bare column beside the list but the body of a DIALOG, so what stays true is that
+   * it is `.gn-workspace-founding`, the form column (and not the retired raised-card
+   * `.gn-project-founding`), and that it exists only once the dialog is open.
    */
-  it('13.394 is a bare column, .gn-workspace-founding, not a raised card', async () => {
+  it('13.394 is the dialog’s form column, .gn-workspace-founding, mounted only while open', async () => {
     mount({});
-    const field = await screen.findByLabelText('Name');
-    const form = field.closest('form');
+    const user = userEvent.setup();
+    await screen.findByRole('button', { name: 'Create workspace' });
+    // CONTROL: before the press there is no form at all.
+    expect(document.querySelector('.gn-workspace-founding')).toBeNull();
+    await openFoundingDialog(user);
+    const form = screen.getByLabelText('Name').closest('form');
     expect(form).not.toBeNull();
     expect(form).toHaveClass('gn-workspace-founding');
     expect(form).not.toHaveClass('gn-project-founding');
@@ -106,8 +132,9 @@ describe('3.126 founding — the happy path', () => {
       },
     });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), 'Convenience Corner');
+    await user.click(submitButton());
     // E5/F5 — the workspace HOME, not `/my-work`. Seconds after founding, every
     // one of My Work's four sections is empty, so the founder landed on four
     // negatives; the home carries the owner's New project form (`manual.md:174`
@@ -134,8 +161,9 @@ describe('3.126 founding — the happy path', () => {
       },
     });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), '   ');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), '   ');
+    await user.click(submitButton());
     await waitFor(() => expect(names).toEqual(['   ']));
   });
 
@@ -151,12 +179,13 @@ describe('3.126 founding — the happy path', () => {
       },
     });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), 'Convenience Corner');
     // Typed in LOWER CASE on purpose: `prefixSchema` refuses lower case rather
     // than normalising it, so the upper-casing has to happen here, at the
     // keyboard. Delete it from the `onChange` and this line fails on `cc`.
     await user.type(screen.getByLabelText('Prefix (optional)'), 'cc');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await user.click(submitButton());
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]).toEqual({ name: 'Convenience Corner', prefix: 'CC' });
   });
@@ -175,8 +204,9 @@ describe('3.126 founding — the happy path', () => {
       },
     });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), 'Convenience Corner');
+    await user.click(submitButton());
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]).toEqual({ name: 'Convenience Corner', prefix: undefined });
   });
@@ -194,28 +224,31 @@ describe('3.128 founding — both refusal shapes render verbatim', () => {
     const message = 'A workspace needs a name. Whitespace alone is not one.';
     mount({ foundWorkspace: async () => Promise.reject(new FoundingError(400, message)) });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), '   ');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), '   ');
+    await user.click(submitButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(push).not.toHaveBeenCalled();
     // The form is still usable — a refusal is not a dead end.
-    expect(screen.getByRole('button', { name: 'Create workspace' })).toBeEnabled();
+    expect(submitButton()).toBeEnabled();
   });
 
   it('3.128 shows the 422 engine reason verbatim', async () => {
     const reason = 'This claim was refused by the ingest gate.';
     mount({ foundWorkspace: async () => Promise.reject(new FoundingError(422, reason)) });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), 'Corner');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), 'Corner');
+    await user.click(submitButton());
     expect(await screen.findByRole('alert')).toHaveTextContent(reason);
   });
 
   it('3.128 says the server gave no reason rather than rendering a blank alert', async () => {
     mount({ foundWorkspace: async () => Promise.reject(new FoundingError(500, null)) });
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Name'), 'Corner');
-    await user.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await openFoundingDialog(user);
+    await user.type(screen.getByLabelText('Name'), 'Corner');
+    await user.click(submitButton());
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('the server did not say why');
     expect(alert.textContent?.trim()).not.toBe('');
