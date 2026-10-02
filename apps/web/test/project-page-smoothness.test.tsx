@@ -50,7 +50,8 @@ vi.mock('../src/auth-client.js', () => ({
 vi.mock('../src/use-can-moderate-comments.js', () => ({ useCanModerateComments: () => false }));
 
 // Records every startTransition / useTransition-started update so a case can tell a transition from a plain set-state.
-const transitions = { start: 0, hook: 0 };
+// `hold`: while set, a `useTransition`-started scope is stashed instead of run, so a case can look at the page BEFORE the transition commits.
+const transitions = { start: 0, hook: 0, hold: false, held: [] as Array<() => void> };
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>();
   return {
@@ -65,7 +66,8 @@ vi.mock('react', async (importOriginal) => {
         pending,
         (scope: () => void) => {
           transitions.hook += 1;
-          start(scope);
+          if (transitions.hold) transitions.held.push(() => start(scope));
+          else start(scope);
         },
       ] as const;
     },
@@ -144,6 +146,8 @@ beforeEach(() => {
   suspendSearchParams = false;
   transitions.start = 0;
   transitions.hook = 0;
+  transitions.hold = false;
+  transitions.held = [];
   mockSession = { data: { user: { id: 'u_kiro', name: 'Kiro' } }, isPending: false };
 });
 afterEach(() => {
@@ -294,6 +298,28 @@ describe('the arms are structural skeletons, never a sentence (S-R1; audit SM-02
     mount({ getTickets: NEVER });
     await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
     expect(await screen.findByTestId('project-tab-skeleton')).toBeInTheDocument();
+  });
+
+  it('25.073 the "Only tickets in progress" switch shows the press at once, while the reads still ask the old key (the two-state split; control: the held scope, once released, asks the new key)', async () => {
+    const getTickets = vi.fn(async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [listRow()] }));
+    mount({ getTickets });
+    await userEvent.click(await screen.findByRole('tab', { name: 'List' }));
+    await screen.findByText(listRow().title);
+    const switchBox = (): HTMLElement => screen.getByRole('checkbox', { name: /Only tickets in progress/ });
+    expect(switchBox()).not.toBeChecked();
+    const asked = getTickets.mock.calls.length;
+    transitions.hold = true;
+    try {
+      await userEvent.click(switchBox());
+      expect(transitions.held).toHaveLength(1); // the toggle's scope was stashed, so the reads have not changed
+      expect(switchBox()).toBeChecked(); // yet the control already shows the press: no snap-back while the transition waits
+      expect(getTickets.mock.calls.length).toBe(asked);
+    } finally {
+      transitions.hold = false;
+    }
+    act(() => transitions.held.splice(0).forEach((release) => release()));
+    await waitFor(() => expect(getTickets.mock.calls.length).toBeGreaterThan(asked)); // control: released, the new key is asked
+    expect(switchBox()).toBeChecked();
   });
 
   it('25.077 a tab switch and the filter toggle each run in a transition; the click still selects the tab', async () => {

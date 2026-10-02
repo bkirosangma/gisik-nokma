@@ -121,7 +121,7 @@ function SwitcherBody({
   projects: ReturnType<typeof useWorkspaceProjects>;
   onNavigate: () => void;
 }) {
-  // Read when the sheet OPENS, through the shared `useMyWorkspaces` the nav's name and project hooks and `/workspaces` use (smoothness
+  // Read when the sheet OPENS, through the shared `useMyWorkspaces` the nav's name and project hooks use (smoothness
   // T8, case 25.120): a remount within its 30 s freshness window makes no second `getMyWorkspaces` call. Never a second endpoint.
   const { rows: workspaces, error } = useMyWorkspaces();
   const liveProjects = (projects ?? []).filter((project) => !project.archived);
