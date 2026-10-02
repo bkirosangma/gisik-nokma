@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { ProjectRef } from '@gisik-nokma/app-core';
-import { useProjectsVersion } from './projects-version.js';
-import { useAppServices, useSessionStatus } from './providers.js';
+import { useSessionStatus } from './providers.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 
 /**
  * The projects of one workspace, out of the ONE shared read.
@@ -109,67 +109,32 @@ export function clearWorkspaceProjectsCache(): void {
 }
 
 export function useWorkspaceProjects(workspaceId: string | undefined): ProjectRef[] | null {
-  const { dataSource } = useAppServices();
   const session = useSessionStatus();
-  // The user is read HERE rather than passed in, because this hook already
-  // reads the session to gate the request — and because a caller that forgot to
-  // pass it would silently fall back to the width of the cache this exists to
-  // narrow.
+  // The user is read HERE rather than passed in, because this hook already reads the session to gate the
+  // request, and because a caller that forgot to pass it would silently fall back to the width of the
+  // cache this exists to narrow.
   const userId = session.kind === 'signed-in' ? session.user.id : null;
-  // Re-asks after a committed project write (rename, archive, founding), see `projects-version.ts`.
-  const version = useProjectsVersion();
-  const [projects, setProjects] = useState<ProjectRef[] | null>(
-    // The remount's head start; `useState`'s initialiser runs once per mount.
-    // MODULE-SCOPED for the reason `use-workspace-name.ts` records for its own
-    // cache: `AppNav` is rendered by each PAGE rather than by the root layout,
-    // so it remounts on every client-side navigation, and without this the
-    // project item would vanish for the tick it takes to read storage and then
-    // come back — the flicker the owner reported for the workspace name.
-    //
-    // No session yet means no answer yet, NOT a cache hit: before the session
-    // resolves there is no user to have read a list FOR.
-    () =>
-      workspaceId === undefined || userId === null
-        ? null
-        : (projectsCache.get(cacheKey(userId, workspaceId)) ?? null),
-  );
+  // The ONE shared read (`use-my-workspaces.ts`): it re-asks after a committed project write (rename,
+  // archive, founding, see `projects-version.ts`), which this hook used to do for itself.
+  const { rows, error } = useMyWorkspaces(workspaceId !== undefined);
+  const found =
+    workspaceId === undefined || userId === null || rows === null
+      ? null
+      : (rows.find((row) => row.id === workspaceId)?.projects ?? null);
 
   useEffect(() => {
-    if (workspaceId === undefined || userId === null) {
-      setProjects(null);
-      return;
-    }
+    if (workspaceId === undefined || userId === null || rows === null) return;
     const key = cacheKey(userId, workspaceId);
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        const found = rows.find((row) => row.id === workspaceId)?.projects ?? null;
-        // A `null` here means the read SUCCEEDED and the workspace is not in
-        // it. EVICTING rather than merely not writing is the load-bearing half,
-        // for the reason the name cache gives: a stale entry left behind would
-        // be re-read by `useState` on the next remount and the list would come
-        // back, one navigation after the product learned it was wrong.
-        //
-        // `[]` is NOT evicted, because it is not a failure: a workspace with no
-        // projects is a served fact, and caching it is what stops the nav
-        // re-asking on every navigation for a workspace it already knows is
-        // empty.
-        if (found === null) projectsCache.delete(key);
-        else projectsCache.set(key, found);
-        setProjects(found);
-      },
-      () => {
-        // Only SUCCESSFUL lookups are cached. A pending or refused read is not
-        // a fact about the workspace's projects, and caching one would turn a
-        // transient failure into a sticky wrong answer.
-        if (!cancelled) setProjects(null);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, userId, workspaceId, version]);
+    // A `null` here means the read SUCCEEDED and the workspace is not in it. EVICTING rather than merely not
+    // writing is the load-bearing half, for the reason the name cache gives. `[]` is NOT evicted: a
+    // workspace with no projects is a served fact, and caching it stops the nav re-asking for it.
+    if (found === null) projectsCache.delete(key);
+    else projectsCache.set(key, found);
+  }, [workspaceId, userId, rows, found]);
 
-  return projects;
+  // No session yet means no answer yet, NOT a cache hit: before the session resolves there is no user to
+  // have read a list FOR. A refused read is omission, never a stale guess.
+  if (workspaceId === undefined || userId === null || error !== null) return null;
+  // The remount's head start while the shared read is pending; a settled read always wins.
+  return rows === null ? (projectsCache.get(cacheKey(userId, workspaceId)) ?? null) : found;
 }
