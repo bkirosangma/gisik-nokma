@@ -63,8 +63,22 @@ export const SWEEP: Record<string, SweepEntry> = {
   delete_comment: { args: { workspaceId: 'w', ticketId: 't', commentId: 'c' } },
   // comment end
   // note begin (T7)
+  list_notes: { args: { workspaceId: 'w' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  get_note: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  create_note: { args: { workspaceId: 'w', title: 'T' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  update_note: { args: { noteId: 'n', title: 'T2' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  link_note: { args: { noteId: 'n', ticketId: 't', action: 'attach' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  delete_note: { args: { noteId: 'n', confirm_name: 'N' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  restore_note: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
+  get_note_history: { args: { noteId: 'n' }, session: { get: async () => ({ note: { noteId: 'n', workspaceId: 'w', homeProjectId: '', authorId: 'u', title: 'N', scope: { mode: 'private' }, attachedTickets: [], deleted: false, createdAt: '2026-10-02T10:00:00.000Z', updatedAt: '2026-10-02T10:00:00.000Z', body: null }, notes: [], versions: [], body: null }) } },
   // note end
   // attachment begin (T8)
+  list_attachments: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async () => ({ attachments: [] }) } },
+  get_attachment: { args: { attachmentId: 'a' }, session: { getBytes: async () => ({ bytes: new TextEncoder().encode('hi'), contentType: 'text/plain', filename: 'a.txt' }) } },
+  add_attachment: {
+    args: { workspaceId: 'w', ticketId: 't', file: { name: 'a.txt', base64: 'aGk=' } },
+    session: { postMultipart: async () => ({ attachmentId: 'a', url: '/v1/attachments/a', mime: 'text/plain', filename: 'a.txt', size: 2, sha256: 'a'.repeat(64) }) },
+  },
   // attachment end
   // ticket begin (T9)
   update_ticket: { args: { workspaceId: 'w', ticketId: 't', title: 'Renamed' } },

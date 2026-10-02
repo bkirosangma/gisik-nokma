@@ -459,7 +459,7 @@ already signed in, there is a **Join [workspace]** button.
   and projects, with a fresh link and a new email. Either way the older link stops working.
 
 If somebody tells you their link does not work, the message they see is: *"This invitation link does
-not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new
+not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new
 one."*
 
 That message sits under a heading, **This invitation can't be used**, with a **Go to sign in** button

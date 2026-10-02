@@ -149,7 +149,7 @@ describe('3.92 createHttpInviteGateway — accepting', () => {
     const body = {
       error: 'not_found',
       message:
-        'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.',
+        'This invitation link does not open anything. It may have been used, withdrawn, or lapsed. Ask whoever invited you for a new one.',
     };
     const http = fakeHttp({
       '/v1/invites/tok_dead/accept': new HttpError(404, '/v1/invites/tok_dead/accept', body),
