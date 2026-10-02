@@ -69,7 +69,7 @@ const workspacesServices = () => {
       getMyWorkspaces: () => {
         calls += 1;
         return calls === 1
-          ? Promise.resolve([{ id: 'ws', name: 'Shop', prefix: 'SH', role: 'owner' as const, archived: false, memberCount: 1 }])
+          ? Promise.resolve([{ id: 'ws', name: 'Shop', prefix: 'SH', role: 'owner' as const, archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] }])
           : new Promise<never>(() => undefined);
       },
     },
