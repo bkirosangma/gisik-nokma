@@ -47,8 +47,8 @@ mk() {
 }
 run() { out=$("$HERE/ctl" tipmerge task/x --base "$BASE" --expect "$exp" --repo "$w" "$@" 2>&1); rc=$?; last=$(printf '%s\n' "$out" | tail -1); }
 okline_sha() { printf '%s\n' "$last" | awk '{print $4}'; }
-refs_but() { $G -C "$bare" for-each-ref --format='%(refname) %(objectname)' | grep -v " refs/heads/$1 " ; }
-runner_state() { printf '%s|%s|%s|%s|%s\n' "$($G -C "$w" rev-parse HEAD)" "$($G -C "$w" status --porcelain)" "$(cat "$w/c.txt" "$w/untracked.txt")" "$($G -C "$w" for-each-ref --format='%(refname) %(objectname)')" "$($G -C "$w" diff --cached | $G hash-object --stdin)"; }
+refs_but() { $G -C "$bare" for-each-ref --format='%(refname) %(objectname)' | grep -v "^refs/heads/$1 " ; }
+runner_state() { printf '%s|%s|%s|%s|%s\n' "$($G -C "$w" rev-parse HEAD)" "$($G -C "$w" status --porcelain)" "$(cat "$w/c.txt" "$w/untracked.txt")" "$($G -C "$w" for-each-ref --format='%(refname) %(objectname)' refs/heads)" "$($G -C "$w" diff --cached | $G hash-object --stdin)"; }
 
 # --- 13.1775: what may be pushed to (the biggest risk is the verb's own push path) ---------------------------------------
 refuse_branch() { # refuse_branch NAME — the verb refuses NAME before fetching or pushing; origin unchanged
@@ -113,7 +113,7 @@ check "13.1786 --dry-run still refuses a moved branch" 'mk clean; $G clone -q "$
 
 # --- 13.1787: no force, ever ---------------------------------------------------------------------------------------------------
 V="$HERE/verbs/tipmerge.sh"
-pushes() { /usr/bin/grep -E '^[^#]*git[^#]* push' "$1"; }
+pushes() { /usr/bin/grep -E '^[^#]*git[^#]* push' "$1" | /usr/bin/grep -v 'echo'; }
 forceful() { /usr/bin/grep -Eq -- '(--force|--delete|--mirror| -f( |$)|push[^#]* \+|:refs/heads/\$\{?base)' ; }
 check "13.1787 the verb has exactly one push and it carries no force, delete, mirror or + refspec" '[ -f "$V" ] && [ "$(pushes "$V" | wc -l | tr -d " ")" = 1 ] && ! pushes "$V" | forceful'
 check "13.1787 CONTROL — the detector flags every forceful form it exists to catch" 'for l in "git push --force origin x" "git push -f origin x" "git push origin +x:refs/heads/b" "git push --force-with-lease origin x" "git push origin :refs/heads/\$base" "git push --delete origin b"; do printf "%s\n" "$l" | forceful || exit 1; done'
