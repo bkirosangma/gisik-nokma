@@ -112,7 +112,7 @@ reset; out=$(rt -- cat "$TURBO"); rc=$?
 check "13.1755 ANSI codes and turbo pkg:task: prefixes are stripped before parsing and printing" '! printf "%s" "$out" | /usr/bin/grep -q $(printf "\033") && ! printf "%s" "$out" | grep -q "gisik-nokma/ui:test:" && printf "%s" "$out" | grep -q "first failure: test/x.test.tsx > comp > draws" && printf "%s" "$out" | grep -q "AssertionError: expected 3 to be 4" && printf "%s" "$out" | grep -q "Tests  1 failed | 9 passed (10)"'
 reset; out=$(rt -- cat "$VHUGE"); rc=$?
 check "13.1756 a run with 400 failures still prints at most 30 lines, counts first" '[ "$(nlines "$out")" -le 30 ] && printf "%s" "$out" | grep -q "Tests  400 failed | 5 passed (405)" && printf "%s" "$out" | grep -q "first failure: test/f0.test.ts"'
-check "13.1756 the digest's own cap holds whatever the caller asks for: MAXLINES 3 on the 400-failure log prints 3 lines" '[ "$(python3 "$HERE/verbs/run-tests-summary.py" "$VHUGE" 3 | wc -l | tr -d " ")" -le 3 ]'
+check "13.1756 the digest's own cap holds whatever the caller asks for: MAXLINES 1 on the 400-failure log prints 1 line" '[ "$(python3 "$HERE/verbs/run-tests-summary.py" "$VHUGE" 1 | wc -l | tr -d " ")" -le 1 ]'
 reset; out=$(rt -- sh -c 'echo started; echo "boom: could not open the db" >&2; exit 2'); rc=$?
 check "13.1757 a crash with no test summary: rc kept, and the log tail shows the cause" '[ $rc -eq 2 ] && printf "%s" "$out" | grep -q "no test summary found" && printf "%s" "$out" | grep -q "boom: could not open the db" && printf "%s" "$out" | grep -q "exit code: 2"'
 
