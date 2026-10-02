@@ -19,18 +19,36 @@ import { listPageRoutes } from '../../../packages/ui/test/helpers/style-patterns
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../..');
 const read = (repoRelative: string): string => readFileSync(resolve(REPO, repoRelative), 'utf8');
-const count = (source: string, pattern: RegExp): number => [...source.matchAll(pattern)].length;
+/** Comments and docblocks name `<h1>` in prose (this very file's own subject), so they are cut before counting. */
+const stripComments = (source: string): string => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const count = (source: string, pattern: RegExp): number => [...stripComments(source).matchAll(pattern)].length;
 
 /** Routes whose level-1 heading is in another file: route → the file that renders it. */
 const DELEGATES: Record<string, string> = {
   'apps/web/app/help/page.tsx': 'packages/app-core/src/help/help-browser.tsx',
   'apps/web/app/mcp/tokens/page.tsx': 'apps/web/src/mcp-tokens-screen.tsx',
+  'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 'apps/web/src/project-title.tsx',
   'apps/web/app/notes/page.tsx': 'apps/web/src/notes/notes-page.tsx',
   'apps/web/app/notes/[noteId]/page.tsx': 'apps/web/src/notes/notes-page.tsx',
   'apps/web/app/w/[workspaceId]/settings/ticket-types/[typeId]/page.tsx': 'apps/web/src/ticket-type-editor-pane.tsx',
   'apps/web/app/w/[workspaceId]/settings/ticket-types/new/page.tsx': 'apps/web/src/ticket-type-editor-pane.tsx',
   'apps/web/app/w/[workspaceId]/settings/workflows/[workflowId]/history/page.tsx':
     'packages/app-core/src/workflow-builder/ui/workflow-history-screen.tsx',
+};
+/** Routes whose source (with its delegate) spells more than one `<h1` because the branches are exclusive: route → count and why. */
+const ALLOWED_DOUBLES: Record<string, { count: number; why: string }> = {
+  'apps/web/app/w/[workspaceId]/page.tsx': {
+    count: 4,
+    why: 'three exclusive ternary branches (error, loading, not in the directory) each paint their own "Workspace" h1 and the ready state paints the renamable one: one renders at a time',
+  },
+  'apps/web/app/w/[workspaceId]/settings/ticket-types/[typeId]/page.tsx': {
+    count: 2,
+    why: 'the delegate file holds the Edit AND the New pane, each defaulting `heading` to h1; the route mounts one of them',
+  },
+  'apps/web/app/w/[workspaceId]/settings/ticket-types/new/page.tsx': {
+    count: 2,
+    why: 'the same delegate file: the route mounts the New pane, never both',
+  },
 };
 /** Routes that never paint: they redirect. */
 const REDIRECTS = ['apps/web/app/page.tsx'];
@@ -45,15 +63,21 @@ describe('23.071 every route renders exactly one h1 (audit WF-07, NP-12)', () =>
     // The table has no stale row and every route is accounted for.
     for (const route of Object.keys(DELEGATES)) expect(routes, `stale delegate ${route}`).toContain(route);
     for (const route of REDIRECTS) expect(routes, `stale redirect ${route}`).toContain(route);
-    const missing: string[] = [];
+    // EXACTLY one per route: too few is a page with no level-1 heading, too many is a second one (the note page's old defect).
+    // A source that legitimately spells two in mutually exclusive branches is listed in ALLOWED_DOUBLES with its reason.
+    const wrong: string[] = [];
     for (const route of routes) {
       if (REDIRECTS.includes(route)) continue;
       const own = count(read(route), H1);
       const delegate = DELEGATES[route];
       const handedOff = delegate === undefined ? 0 : count(read(delegate), H1);
-      if (own + handedOff < 1) missing.push(route);
+      const total = own + handedOff;
+      const allowed = ALLOWED_DOUBLES[route]?.count ?? 1;
+      if (total !== allowed) wrong.push(`${route}: ${total} h1 (expected ${allowed})`);
     }
-    expect(missing).toEqual([]);
+    expect(wrong).toEqual([]);
+    // A stale allowance fails, as a stale delegate does.
+    for (const route of Object.keys(ALLOWED_DOUBLES)) expect(routes, `stale allowance ${route}`).toContain(route);
 
     // The editor route holds its h1 itself since Task 5 (a visually hidden one: the title is the
     // name field), and the history screen's heading is a level 1 and no longer a level 2.
@@ -74,5 +98,8 @@ describe('23.071 every route renders exactly one h1 (audit WF-07, NP-12)', () =>
     expect(count('<h1 className="x">T</h1>', H1)).toBe(1);
     expect(count("export function Pane({ heading = 'h1' }) {}", H1)).toBe(1);
     expect(count('<main><h2>Only a section</h2></main>', H1)).toBe(0);
+    // …a heading named only in a comment is not counted, and a second h1 IS: the exactness check reports it.
+    expect(count('/* the <h1> is below */ <h1>T</h1>', H1)).toBe(1);
+    expect(count('{/* <h1> */}\n<h1>A</h1><h1>B</h1>', H1)).toBe(2);
   });
 });
