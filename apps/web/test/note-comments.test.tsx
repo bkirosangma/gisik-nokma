@@ -54,11 +54,11 @@ const nameOf = (id: string): string => NAMES[id] ?? id;
 
 function comment(over: Partial<NoteComment> & { commentId: string }): NoteComment {
   return {
-    editedAt: null,
-    deletedAt: null,
     authorId: 'u_kiro',
     body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a comment' }] }] },
     recordedAt: '2026-09-23T08:00:00.000Z',
+    editedAt: null,
+    deletedAt: null,
     ...over,
   };
 }
@@ -104,7 +104,7 @@ describe('18.213-18.215 NoteComments', () => {
     });
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     expect(await screen.findByText('Kiro')).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe('18.213-18.215 NoteComments', () => {
     cleanup();
     render(
       <Providers services={stubServices({ getNoteComments: async () => [] })}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('18.213-18.215 NoteComments', () => {
 
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
@@ -175,7 +175,7 @@ describe('18.213-18.215 NoteComments', () => {
 
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
@@ -215,7 +215,7 @@ describe('18.213-18.215 NoteComments', () => {
 
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
@@ -232,7 +232,7 @@ describe('18.213-18.215 NoteComments', () => {
     capturedSlotProps = [];
     render(
       <Providers services={stubServices({ getNoteComments: async () => [] })}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment={false} />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment={false} />
       </Providers>,
     );
     await screen.findByText('No comments yet.');
@@ -278,7 +278,7 @@ describe('18.213-18.215 NoteComments', () => {
 
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
 
@@ -344,7 +344,7 @@ describe('18.213-18.215 NoteComments', () => {
 
     render(
       <Providers services={services}>
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
@@ -383,6 +383,7 @@ describe('18.213-18.215 NoteComments', () => {
           noteId={NOTE}
           nameOf={nameOf}
           canComment
+          canModerate={false}
           notes={[
             { noteId: 'n1', title: 'Cold room' },
             { noteId: 'n2', title: 'Compressor log' },
@@ -411,7 +412,7 @@ describe('18.416 a mention notification opens the comment it names', () => {
       window.location.hash = '';
       render(
         <Providers services={services()}>
-          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
         </Providers>,
       );
       expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
@@ -421,7 +422,7 @@ describe('18.416 a mention notification opens the comment it names', () => {
       window.location.hash = '#comment-c2';
       render(
         <Providers services={services()}>
-          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
         </Providers>,
       );
       await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
@@ -461,7 +462,7 @@ describe('19.191 note comments on the web', () => {
           purgedAmong: async (ids) => (ids.includes(GONE) ? [{ kind: 'note', id: GONE }] : []),
         })}
       >
-        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
     expect(await screen.findByText('Deleted item')).toBeInTheDocument();

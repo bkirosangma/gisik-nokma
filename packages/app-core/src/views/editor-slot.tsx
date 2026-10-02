@@ -152,6 +152,8 @@ export type EditorSlotProps = {
    * prototype's own line of prose.
    */
   footerNote?: string;
+  /** The submit button's label when the default ("Post" / "Save description") is wrong — an in-place comment edit says "Save". */
+  submitLabel?: string;
   // Editor capabilities. All optional: the read-only default ignores every one
   // of them, and a read-only mount supplies none. The real editor requires them
   // for composing, and states the gap honestly when one is missing rather than

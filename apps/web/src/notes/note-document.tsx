@@ -712,6 +712,7 @@ function NoteDocumentBody({
         noteId={note.noteId}
         nameOf={nameOf}
         canComment
+        canModerate={workspace?.role === 'owner' || workspace?.role === 'admin'}
         notes={treeNotes}
         members={members}
       />
@@ -758,6 +759,7 @@ function NoteDocumentBody({
           workspaceId={note.workspaceId}
           ticketId={openTicketId}
           currentUserId={currentUserId}
+          canModerateComments={workspace?.role === 'owner' || workspace?.role === 'admin'}
           attachments={openTicketAttachments.data ?? undefined}
           attachmentsUnavailable={openTicketAttachments.error ?? undefined}
           onClose={closeTicket}

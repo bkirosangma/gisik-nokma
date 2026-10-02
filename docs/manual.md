@@ -604,6 +604,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
   signed-in identity the phone shell does not have yet, so the control is withheld there rather than
   shipped in a shape that always fails silently (E5-44).
+- **You can edit or delete your own comments.** Each comment you wrote has a **…** button: **Edit** opens it in
+  place — change it and press **Save**, or **Cancel** to leave it as it was. An edited comment says *edited* beside
+  its time; press that word (or hold it on a phone) to see when. **Delete** asks once — *Delete this comment? It is
+  removed for everyone.* — and leaves *Comment deleted*, with who wrote it and when, where it was. Only the person
+  who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit
+  notify the new people only. The ticket's History tab reads *Comment edited* and *Comment deleted*.
 - **You can attach a file to a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet's
   **Attachments** tab lists the ticket's files and has its own **Attach a file** button, and the comment
@@ -1941,6 +1947,15 @@ comment that mentions somebody tells them as soon as it is posted. **Only people
 — mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning
 yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
 setting under Account → Notifications, exactly like a mention on a ticket.
+
+### Editing or deleting a comment on a note
+
+A comment on a note works as it does on a ticket. Each comment you wrote has a **…** button: **Edit** opens it in
+place — change it and press **Save**, or **Cancel** to leave it as it was — and an edited comment says *edited*
+beside its time (press the word to see when). **Delete** asks once, *Delete this comment? It is removed for
+everyone.*, and leaves *Comment deleted* with who wrote it and when. Only the person who wrote a comment can edit it;
+they, or a workspace owner or admin, can delete it. A deleted note's comments cannot be changed until the note is
+restored. Mentions you add in an edit notify the new people only.
 
 ### Linking to a ticket or another note
 

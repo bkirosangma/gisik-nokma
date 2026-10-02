@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MappingError, mapTicketComments } from '../../src/online/mappers.js';
+import { MappingError, mapNoteComments, mapTicketComments } from '../../src/online/mappers.js';
 
 /**
  * `mapTicketComments` — the wire shape to the view shape.
@@ -41,9 +41,12 @@ const COMMENT = {
   files: [{ attachmentId: '01PROOF', filename: 'gst-receipt.png', mime: 'image/png' }],
 };
 
+// What the mapper makes of a row an older server sent: the two stamps (26.116) read as `null`.
+const MAPPED = { ...COMMENT, editedAt: null, deletedAt: null };
+
 describe('mapTicketComments', () => {
   it('maps a served thread, keeping every field it read', () => {
-    expect(mapTicketComments({ comments: [COMMENT] })).toEqual([COMMENT]);
+    expect(mapTicketComments({ comments: [COMMENT] })).toEqual([MAPPED]);
   });
 
   it('maps an ANSWERED empty thread to an empty list', () => {
@@ -57,7 +60,7 @@ describe('mapTicketComments', () => {
       ...COMMENT,
       files: [{ attachmentId: '01NOATTACHMENTROW', filename: '01NOATTACHMENTROW', mime: null }],
     };
-    expect(mapTicketComments({ comments: [unresolved] })).toEqual([unresolved]);
+    expect(mapTicketComments({ comments: [unresolved] })).toEqual([{ ...unresolved, editedAt: null, deletedAt: null }]);
   });
 
   it('refuses a file entry whose mime is neither a string nor null', () => {
@@ -83,5 +86,28 @@ describe('mapTicketComments', () => {
     // The control: the same row with a well-formed body maps identically, so
     // the assertion above is about the pass-through and not about the fixture.
     expect(mapTicketComments({ comments: [COMMENT] })[0]?.body).toEqual(COMMENT.body);
+  });
+});
+
+describe('26.116 the mappers carry editedAt and deletedAt', () => {
+  const FULL = { ...COMMENT, editedAt: '2026-10-02T09:30:00.000Z', deletedAt: null };
+  const NOTE_ROW = { commentId: '01NC', authorId: 'u1', body: COMMENT.body, recordedAt: COMMENT.recordedAt };
+
+  it('ticket comments: a full row maps; absent fields read as null; a wrong type is refused with its path', () => {
+    expect(mapTicketComments({ comments: [FULL] })[0]).toMatchObject({ editedAt: '2026-10-02T09:30:00.000Z', deletedAt: null }); // control
+    expect(mapTicketComments({ comments: [{ ...COMMENT, deletedAt: '2026-10-02T10:00:00.000Z', body: null }] })[0]).toMatchObject({ deletedAt: '2026-10-02T10:00:00.000Z', body: null });
+    const older = mapTicketComments({ comments: [COMMENT] })[0];
+    expect(older?.editedAt).toBeNull();
+    expect(older?.deletedAt).toBeNull();
+    expect(() => mapTicketComments({ comments: [{ ...COMMENT, editedAt: 5 }] })).toThrow(/comments\.comments\[0\]\.editedAt/);
+    expect(() => mapTicketComments({ comments: [{ ...COMMENT, deletedAt: 5 }] })).toThrow(MappingError);
+  });
+
+  it('note comments: the same three', () => {
+    expect(mapNoteComments({ comments: [{ ...NOTE_ROW, editedAt: '2026-10-02T09:30:00.000Z', deletedAt: null }] })[0]).toMatchObject({ editedAt: '2026-10-02T09:30:00.000Z', deletedAt: null }); // control
+    const older = mapNoteComments({ comments: [NOTE_ROW] })[0];
+    expect(older?.editedAt).toBeNull();
+    expect(older?.deletedAt).toBeNull();
+    expect(() => mapNoteComments({ comments: [{ ...NOTE_ROW, editedAt: 5 }] })).toThrow(/comments\.comments\[0\]\.editedAt/);
   });
 });

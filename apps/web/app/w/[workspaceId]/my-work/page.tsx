@@ -18,6 +18,7 @@ import { useAppServices, useSessionStatus } from '../../../../src/providers.js';
 import { peopleProps } from '../../../../src/people-props.js';
 import { useActorLabels } from '../../../../src/use-actor-labels.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
+import { useCanModerateComments } from '../../../../src/use-can-moderate-comments.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
 import {
@@ -136,6 +137,8 @@ function MyWorkBoard() {
    */
   const session = useSessionStatus();
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
+  // Owner/admin may delete anyone's comment (MCP-everything T5); the ticket sheet draws Delete from this fact.
+  const canModerateComments = useCanModerateComments(workspaceId);
   const [placement, setPlacement] = useState<Placement | null>(null);
   const attention = useAttention(dataSource, workspaceId);
   // Names the claimant of a contested claim (R3 N4, case 6.256).
@@ -374,6 +377,7 @@ function MyWorkBoard() {
           workspaceId={workspaceId}
           ticketId={openTicketId}
           currentUserId={currentUserId}
+          canModerateComments={canModerateComments}
           attachments={openTicketAttachments.data ?? undefined}
           attachmentsUnavailable={openTicketAttachments.error ?? undefined}
           onClose={closeTicket}

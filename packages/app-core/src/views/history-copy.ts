@@ -186,6 +186,10 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       return 'Restored';
     case 'comment.added':
       return 'Comment added';
+    case 'comment.edited':
+      return 'Comment edited';
+    case 'comment.deleted':
+      return 'Comment deleted';
     /**
      * E5-8 — THE TWO THE FIRST PASS MISSED, and the census is what found them.
      *

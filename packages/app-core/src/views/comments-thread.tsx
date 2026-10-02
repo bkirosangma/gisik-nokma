@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import type { PurgedPredicate } from '@gisik-nokma/domain';
 import { formatDateTime } from '../provenance.js';
 import { renderCommentBody } from './comment-body.js';
@@ -73,7 +73,26 @@ export type TicketComment = {
   body: unknown;
   /** The envelope's `serverTime`, ISO 8601. */
   recordedAt: string;
+  /** The latest edit's `serverTime`; absent or `null` = never edited. */
+  editedAt?: string | null;
+  /** The deletion's `serverTime`; absent or `null` = live. A deleted comment's `body` is `null`. */
+  deletedAt?: string | null;
   files: TicketCommentFile[];
+};
+
+/**
+ * What the HOST lets a viewer do to a comment (MCP-everything spec §6, M-E9). The thread decides only which
+ * controls to DRAW from these facts; the permission gate decides what commits, and its refusal is shown in its
+ * own words (`deleteComment` resolves the sentence).
+ */
+export type CommentActions = {
+  currentUserId: string;
+  /** A workspace owner or admin: may delete anyone's comment, never edit it. */
+  canModerate: boolean;
+  /** The in-place editor for one comment, holding its current body; `done()` closes it. */
+  renderEditor(comment: TicketComment, done: () => void): ReactNode;
+  /** Submits `comment.deleted`; resolves `null` when committed, else the refusal sentence. */
+  deleteComment(comment: TicketComment): Promise<string | null>;
 };
 
 export type CommentsThreadProps = {
@@ -110,6 +129,8 @@ export type CommentsThreadProps = {
   ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   /** Trash Plan 3: which chips point at erased items (they draw "Deleted item"). */
   isPurged?: PurgedPredicate;
+  /** Absent = no edit/delete controls, so every mount that does not opt in is unchanged. */
+  actions?: CommentActions;
 };
 
 /**
@@ -137,13 +158,51 @@ function CommentItem({
   nameOf,
   ticketHref,
   isPurged,
+  actions,
 }: {
   comment: TicketComment;
   nameOf: (actorId: string) => string;
   ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   isPurged?: PurgedPredicate;
+  actions?: CommentActions;
 }): ReactElement {
   const name = nameOf(comment.authorId);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  // The question's Delete while a delete is in flight. A second click would file a second `comment.deleted`, which the
+  // gate refuses (the comment is already deleted), and the alert would then name a refusal for a comment that went.
+  const [deleting, setDeleting] = useState(false);
+  const deleteInFlight = useRef(false);
+  const [showEditTime, setShowEditTime] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Opening the menu moves focus to its first item, so the keyboard is IN it (arrows, Escape) rather than beside it.
+  useEffect(() => {
+    if (menuOpen) menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+  }, [menuOpen]);
+
+  // A deleted comment keeps its author and the time of the deletion and loses everything else: no body, no files,
+  // no controls (a deleted comment is final — the gate refuses any further act on it).
+  if (comment.deletedAt != null) {
+    return (
+      <li className="gn-comment gn-comment--deleted" id={`comment-${comment.commentId}`} data-testid={`comment-${comment.commentId}`}>
+        <span className="gn-comment__avatar" aria-hidden="true">
+          {initialsOf(name)}
+        </span>
+        <div className="gn-comment__column">
+          <p className="gn-comment__meta">
+            <strong className="gn-comment__name">{name}</strong>
+            <span className="gn-comment__time">{formatDateTime(comment.deletedAt)}</span>
+          </p>
+          <p className="gn-comment__deleted">Comment deleted</p>
+        </div>
+      </li>
+    );
+  }
+
   // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
   // plain text. `docToPlainText` still serves the search projection and the
   // notifications; it is a display of last resort and never was this one.
@@ -153,17 +212,153 @@ function CommentItem({
     isPurged ?? (() => false),
     `comment-${comment.commentId}`,
   );
+  const isAuthor = actions !== undefined && actions.currentUserId === comment.authorId;
+  const canDelete = actions !== undefined && (isAuthor || actions.canModerate);
+  const closeMenu = (): void => {
+    setMenuOpen(false);
+    moreRef.current?.focus();
+  };
+  const onMenuKey = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const target =
+      event.key === 'ArrowDown' ? items[(at + 1) % items.length]
+      : event.key === 'ArrowUp' ? items[(at - 1 + items.length) % items.length]
+      : event.key === 'Home' ? items[0]
+      : event.key === 'End' ? items[items.length - 1]
+      : undefined;
+    if (target === undefined) return;
+    event.preventDefault();
+    target.focus();
+  };
   return (
     <li className="gn-comment" id={`comment-${comment.commentId}`} data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
         {initialsOf(name)}
       </span>
       <div className="gn-comment__column">
-        <p className="gn-comment__meta">
-          <strong className="gn-comment__name">{name}</strong>
-          <span className="gn-comment__time">{formatDateTime(comment.recordedAt)}</span>
-        </p>
-        <div className="gn-comment__body">{text}</div>
+        {/* One wrapper for the name row, the "…" button and its menu, so focus leaving ALL of them closes the menu
+            and the button's own click is not mistaken for a click outside. */}
+        <div
+          className="gn-comment__head"
+          onBlur={(event) => {
+            if (menuOpen && !event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+          }}
+        >
+          <p className="gn-comment__meta">
+            <strong className="gn-comment__name">{name}</strong>
+            <span className="gn-comment__time">{formatDateTime(comment.recordedAt)}</span>
+            {comment.editedAt == null ? null : (
+              <button
+                type="button"
+                className="gn-comment__edited"
+                aria-expanded={showEditTime}
+                title={`Edited ${formatDateTime(comment.editedAt)}`}
+                onClick={() => setShowEditTime((open) => !open)}
+              >
+                {showEditTime ? `Edited ${formatDateTime(comment.editedAt)}` : 'edited'}
+              </button>
+            )}
+            {isAuthor || canDelete ? (
+              <button
+                ref={moreRef}
+                type="button"
+                className="gn-comment__more"
+                aria-label={`More actions for ${name}'s comment`}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                …
+              </button>
+            ) : null}
+          </p>
+          {menuOpen ? (
+            <div className="gn-comment__menu" role="menu" ref={menuRef} onKeyDown={onMenuKey}>
+              {isAuthor ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditing(true);
+                  }}
+                >
+                  Edit
+                </button>
+              ) : null}
+              {canDelete ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setRefusal(null);
+                    setConfirming(true);
+                  }}
+                >
+                  Delete
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+        {editing && actions !== undefined ? (
+          <div
+            className="gn-comment__editing"
+            onKeyDown={(event) => {
+              // A key the editor already used (closing its mention list, say) is not a request to abandon the edit.
+              if (event.key === 'Escape' && !event.defaultPrevented) setEditing(false);
+            }}
+          >
+            {actions.renderEditor(comment, () => setEditing(false))}
+            <button type="button" className="gn-button" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="gn-comment__body">{text}</div>
+        )}
+        {confirming && actions !== undefined ? (
+          <div className="gn-comment__confirm" role="group" aria-label="Delete comment">
+            <p>Delete this comment? It is removed for everyone.</p>
+            <button
+              type="button"
+              className="gn-button gn-button--danger"
+              aria-label="Delete comment"
+              disabled={deleting}
+              onClick={async () => {
+                if (deleteInFlight.current) return;
+                deleteInFlight.current = true;
+                setDeleting(true);
+                try {
+                  const refused = await actions.deleteComment(comment);
+                  setConfirming(false);
+                  setRefusal(refused);
+                } finally {
+                  deleteInFlight.current = false;
+                  setDeleting(false);
+                }
+              }}
+            >
+              Delete
+            </button>
+            <button type="button" className="gn-button" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+          </div>
+        ) : null}
+        {refusal === null ? null : (
+          <p className="gn-comment__refusal" role="alert">
+            {refusal}
+          </p>
+        )}
         {comment.files.length > 0 ? (
           <div className="gn-comment__files">
             {comment.files.map((file) => (
@@ -194,6 +389,7 @@ export function CommentsThread({
   composer,
   ticketHref,
   isPurged,
+  actions,
 }: CommentsThreadProps): ReactElement {
   // THREE FACTS, THREE ARMS — and the ORDER of these two lines is the whole
   // fix. A failure outranks a wait: `useLiveQuery` leaves `data` at `null` after
@@ -255,7 +451,7 @@ export function CommentsThread({
       ) : (
         <ul className="gn-comments__list">
           {comments.map((comment) => (
-            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} ticketHref={ticketHref} isPurged={isPurged} />
+            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} ticketHref={ticketHref} isPurged={isPurged} actions={actions} />
           ))}
         </ul>
       )}
