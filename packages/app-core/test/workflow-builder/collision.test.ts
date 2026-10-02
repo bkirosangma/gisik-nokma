@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clampToAvoidOverlap, rectsOverlap, NODE_GAP } from '../../src/workflow-builder/collision.js';
+import * as builder from '../../src/workflow-builder/index.js';
 
 const size = { width: 100, height: 60 };
 const ob = { x: 200, y: 0, width: 100, height: 60 };
@@ -7,6 +8,7 @@ const ob = { x: 200, y: 0, width: 100, height: 60 };
 describe('collision (spec §3.1)', () => {
   it('25.505 a free target is returned unchanged', () => {
     expect(clampToAvoidOverlap({ x: 0, y: 200 }, size, [ob], { x: 0, y: 0 })).toEqual({ x: 0, y: 200 });
+    expect(builder.clampToAvoidOverlap).toBe(clampToAvoidOverlap); // the barrel re-exports it (the only door T3's hook will use)
   });
 
   it('25.506 overlap honours the gap on all four sides: touching within 8 px counts, 9 px apart does not', () => {

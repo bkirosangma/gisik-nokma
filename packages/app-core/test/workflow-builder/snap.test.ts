@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { snapPosition, GRID } from '../../src/workflow-builder/snap.js';
+import * as builder from '../../src/workflow-builder/index.js';
 
 const size = { width: 100, height: 60 };
 const other = { x: 400, y: 160, width: 100, height: 60 };
@@ -8,6 +9,7 @@ const base = { zoom: 1, alt: false, lastValid: { x: 0, y: 0 } };
 describe('snapping (spec §3.2)', () => {
   it('25.511 off-guide positions snap to the 16 px grid', () => {
     expect(snapPosition({ x: 37, y: 9 }, size, [other], base).position).toEqual({ x: 32, y: 16 });
+    expect(builder.snapPosition).toBe(snapPosition); // the barrel re-exports it
   });
 
   it('25.512 a centre within 6 SCREEN px of another centre snaps to it and reports a guide; at zoom 0.25 the flow threshold is 24', () => {
