@@ -29,7 +29,7 @@ export type LiveQueryResult<T> = {
    * control while `data === null` retracts it on every reload, and the measured
    * cost of that was a visible flicker: toggling *Only tickets in progress*
    * changes the list's key, the rows reset to null, and the project header's
-   * Create ticket button was replaced by its "Preparing the Create ticket form…" gate
+   * New ticket button (now *Create ticket*) was replaced by its "Preparing the New ticket form…" gate
    * — a differently-sized element, so the whole header row resized and snapped
    * back, for about 40 ms.
    *

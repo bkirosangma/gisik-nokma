@@ -336,7 +336,7 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     // `<option value="">` one-for-one at the head of the list rather than adding to it.
     expect(await parentOptionLabels(user)).toEqual(['None (project root)', 'Rewire the shop sign']);
     // The paired absence is the REASON, not the old refusal. `"…could be a parent, so
-    // Create ticket is not offered"` was deleted with `createRegion`'s list arm and is
+    // New ticket is not offered"` was deleted with `createRegion`'s list arm and is
     // produced by no source file now, so asserting it absent asserted nothing — it
     // could not have been present. This string can be.
     expect(
