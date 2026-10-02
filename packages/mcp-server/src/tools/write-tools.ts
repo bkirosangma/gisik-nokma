@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { newUlid, plainTextToDoc } from '@gisik-nokma/domain';
+import { newUlid } from '@gisik-nokma/domain';
 import type { Session } from '../session.js';
 import type { ToolDefinition } from './read-tools.js';
+import { MARKDOWN_SYNTAX_HELP, markdownBody, parentOf } from './markdown-io.js';
 import { envelopeFor, submitOne } from './submit.js';
 
 /** One ticket-entity envelope (the four write tools here all act on a ticket). */
@@ -92,22 +93,17 @@ export function writeTools(session: Session): ToolDefinition[] {
     },
     {
       name: 'add_comment',
-      description: 'Add a comment to a ticket, attributed to you.',
-      inputSchema: {
-        workspaceId: z.string().min(1),
-        ticketId: z.string().min(1),
-        text: z.string().min(1),
-      },
+      description: `Add a comment to a ticket (ticketId) or a note (noteId), attributed to you. ${MARKDOWN_SYNTAX_HELP} (\`text\` is the old name of \`markdown\` and is read the same way.)`,
+      inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1).optional(), noteId: z.string().min(1).optional(), markdown: z.string().min(1).optional(), text: z.string().min(1).optional() },
       handler: async (args) => {
         const a = z
-          .object({ workspaceId: z.string().min(1), ticketId: z.string().min(1), text: z.string().min(1) })
+          .object({ workspaceId: z.string().min(1), ticketId: z.string().min(1).optional(), noteId: z.string().min(1).optional(), markdown: z.string().min(1).optional(), text: z.string().min(1).optional() })
           .parse(args);
-        // A document object, not a string — `commentAddedPayload.body` is
-        // `z.record(z.string(), z.unknown())`.
-        return submitOne(
-          session,
-          envelope(session, a.workspaceId, a.ticketId, 'comment.added', { body: plainTextToDoc(a.text) }),
-        );
+        const parent = parentOf(a, 'add_comment');
+        if ((a.markdown === undefined) === (a.text === undefined)) throw new Error('add_comment takes exactly one of markdown or text');
+        // MARKDOWN, not `plainTextToDoc` (the 13:37 defect): the converter stores headings, lists and mentions as the editor would.
+        const body = await markdownBody(session, a.workspaceId, (a.markdown ?? a.text) as string);
+        return submitOne(session, envelopeFor(session, a.workspaceId, parent, 'comment.added', { body }));
       },
     },
     {

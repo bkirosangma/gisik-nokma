@@ -35,6 +35,9 @@ export const SWEEP: Record<string, SweepEntry> = {
   delete_project: { args: { projectId: 'p', confirm_name: 'P' } },
   undelete_project: { args: { projectId: 'p' } },
   // comment begin (T6)
+  list_comments: { args: { workspaceId: 'w', ticketId: 't' }, session: { get: async () => ({ comments: [] }) } },
+  edit_comment: { args: { workspaceId: 'w', ticketId: 't', commentId: 'c', markdown: 'x' } },
+  delete_comment: { args: { workspaceId: 'w', ticketId: 't', commentId: 'c' } },
   // comment end
   // note begin (T7)
   // note end
