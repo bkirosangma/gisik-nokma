@@ -112,6 +112,7 @@ reset; out=$(rt -- cat "$TURBO"); rc=$?
 check "13.1755 ANSI codes and turbo pkg:task: prefixes are stripped before parsing and printing" '! printf "%s" "$out" | /usr/bin/grep -q $(printf "\033") && ! printf "%s" "$out" | grep -q "gisik-nokma/ui:test:" && printf "%s" "$out" | grep -q "first failure: test/x.test.tsx > comp > draws" && printf "%s" "$out" | grep -q "AssertionError: expected 3 to be 4" && printf "%s" "$out" | grep -q "Tests  1 failed | 9 passed (10)"'
 reset; out=$(rt -- cat "$VHUGE"); rc=$?
 check "13.1756 a run with 400 failures still prints at most 30 lines, counts first" '[ "$(nlines "$out")" -le 30 ] && printf "%s" "$out" | grep -q "Tests  400 failed | 5 passed (405)" && printf "%s" "$out" | grep -q "first failure: test/f0.test.ts"'
+check "13.1756 the digest's own cap holds whatever the caller asks for: MAXLINES 3 on the 400-failure log prints 3 lines" '[ "$(python3 "$HERE/verbs/run-tests-summary.py" "$VHUGE" 3 | wc -l | tr -d " ")" -le 3 ]'
 reset; out=$(rt -- sh -c 'echo started; echo "boom: could not open the db" >&2; exit 2'); rc=$?
 check "13.1757 a crash with no test summary: rc kept, and the log tail shows the cause" '[ $rc -eq 2 ] && printf "%s" "$out" | grep -q "no test summary found" && printf "%s" "$out" | grep -q "boom: could not open the db" && printf "%s" "$out" | grep -q "exit code: 2"'
 
@@ -178,11 +179,12 @@ reset
 out=$(rt -- sh -c 'exit 5'); rc=$?
 check "13.1768 the slot is released when the command fails (and the run did happen: rc 5)" '[ $rc -eq 5 ] && printf "%s" "$out" | grep -q "exit code: 5" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
 # exec: $rp is then the verb's own pid, so the TERM reaches its trap. SAMPLE 1 s and generous polls: this arm runs under load in the mutation pass.
-reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30 >/dev/null 2>&1 ) & rp=$!
+reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30.$$ >/dev/null 2>&1 ) & rp=$!
 i=0; while [ $i -lt 120 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
 held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null
 i=0; while [ $i -lt 40 ] && [ -n "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
-check "13.1768 the slot is released when the verb is terminated (SIGTERM), and was held while it ran" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
+child_left=$(pgrep -f "sleep 30\\.$$" | wc -l | tr -d " "); pkill -f "sleep 30\\.$$" 2>/dev/null   # a TERM-ed verb must take the wrapped command down with it
+check "13.1768 the slot is released when the verb is terminated (SIGTERM), was held while it ran, and the wrapped command did not outlive it" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ] && [ "$child_left" -eq 0 ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
 check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
 reset; hold 1; hold 2; rm -f "$fx/ran"; out=$(CTL_SEM_MAX_WAIT=30 rt -- sh -c ': > "$1"' x "$fx/ran"); rc=$?
