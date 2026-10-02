@@ -501,5 +501,12 @@ describe('23.334 a phone drops the column header row the picker already says (au
     expect(within(headerOf('done')).getByRole('button', { name: /^Close all 1 in Done/ })).toBeInTheDocument();
     expect(headerOf('done').classList.contains('gn-board__column-header--bare')).toBe(false);
     expect(headerOf('done').classList.contains('gn-board__column-header')).toBe(true);
+    // An EMPTY terminal column has no `Close all` either (13.790): its header is bare too, or a phone would draw a row whose
+    // chip, count and collapse toggle are all hidden.
+    cleanup();
+    await mount(boardOf(errandGroup({ todo: ['tk_a'], doing: [], waiting: [], done: [] })));
+    await showColumn(/^Done/);
+    expect(within(headerOf('done')).queryByRole('button', { name: /^Close all/ })).toBeNull();
+    expect(headerOf('done').classList.contains('gn-board__column-header--bare')).toBe(true);
   });
 });

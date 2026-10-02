@@ -1338,6 +1338,9 @@ function BoardGroupSection({
           const collapsed =
             !phone && columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false && springOpen !== column.stateId;
           const cardsId = `board-cards-${group.workflowId}-${column.stateId}`;
+          // Does this column carry `Close all (N)`? ONE answer for the header's class (F-2, 23.334) and the button, so they cannot
+          // drift: the three terms are explained in the docblock above the button.
+          const canBulkClose = bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0;
           const over = column.stateId === dropTarget;
           const verdict = over ? verdictOf(column.stateId) : 'unknown';
           // A placeholder only in a list that exists (a strip has none) and only for a legal move.
@@ -1472,7 +1475,7 @@ function BoardGroupSection({
                 // Neo follow-up F-2 (case 23.334): a phone shows the column's name and count in the picker above the rail, so the
                 // header's own chip row is hidden there; with no `Close all (N)` to carry it has nothing left and the phone arm
                 // drops the whole row (`--bare`).
-                bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0
+                canBulkClose
                   ? 'gn-board__column-header'
                   : 'gn-board__column-header gn-board__column-header--bare'
               }
@@ -1484,8 +1487,9 @@ function BoardGroupSection({
                * column's header gains Close all (N) (N = cards in the
                * column)."
                *
-               * THREE terms, and each excludes a different way of rendering a
-               * control that cannot work:
+               * `canBulkClose` (hoisted above, so the header's `--bare` class reads
+               * the same answer) has THREE terms, and each excludes a different
+               * way of rendering a control that cannot work:
                *   - `bulkCloseFor !== null` — no `moves`, no dialog to open
                *     (see the prop's own docblock). Not merely "disabled": there
                *     is no handler to call.
@@ -1505,7 +1509,7 @@ function BoardGroupSection({
                * unaddressable by role and name. The visible text stays exactly
                * the spec's `Close all (N)`.
                */}
-              {bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0 ? (
+              {canBulkClose ? (
                 <button
                   type="button"
                   className="gn-board__column-action"
