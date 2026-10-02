@@ -315,12 +315,16 @@ async function twoRowsInHost(mount: Mounter, side: number): Promise<void> {
   expect(SELECT_WIDTH).toBe(97.5);
 }
 
+// 20 s per `it`, as notes-css (flake 18.226, #898): each `it` mounts the real sheet (or dialog) twice and packs four widths,
+// and asserts geometry, never a duration. The 2026-10-02 LOCAL release gate timed 21.236 out at the 5 s default (load average
+// ~74); alone under that load it took 5250 ms, its siblings 21.233 3560 ms, 21.234 1518 ms, 21.237 1401 ms. The global
+// `testTimeout` is unchanged.
 describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, in the sheet and in the dialog at 360–466', () => {
   it('21.236 the ticket sheet (viewport − 2 × the sheet body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountSheet, hostWidths().sheetSide);
-  });
+  }, 20_000);
   it('21.237 the new-ticket dialog (viewport − 2 × the dialog body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountDialog, hostWidths().dialogSide);
-  });
+  }, 20_000);
 });
 
