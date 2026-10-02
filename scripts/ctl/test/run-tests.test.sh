@@ -178,13 +178,13 @@ check "13.1767 two real processes racing for ONE slot (one stale slot to reclaim
 reset
 out=$(rt -- sh -c 'exit 5'); rc=$?
 check "13.1768 the slot is released when the command fails (and the run did happen: rc 5)" '[ $rc -eq 5 ] && printf "%s" "$out" | grep -q "exit code: 5" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
-# exec: $rp is then the verb's own pid, so the TERM reaches its trap. SAMPLE 1 s and generous polls: this arm runs under load in the mutation pass.
-reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30.$$ >/dev/null 2>&1 ) & rp=$!
+# exec: $rp is then the verb's own pid, so the TERM reaches its trap. The sleep is a GRANDCHILD (sh forks it): only a group-wide stop reaches it. SAMPLE 1 s and generous polls: this arm runs under load in the mutation pass.
+reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sh -c 'sleep "$1"; true' x 30.$$ >/dev/null 2>&1 ) & rp=$!
 i=0; while [ $i -lt 120 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
 held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null
 i=0; while [ $i -lt 40 ] && [ -n "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
 child_left=$(pgrep -f "sleep 30\\.$$" | wc -l | tr -d " "); pkill -f "sleep 30\\.$$" 2>/dev/null   # a TERM-ed verb must take the wrapped command down with it
-check "13.1768 the slot is released when the verb is terminated (SIGTERM), was held while it ran, and the wrapped command did not outlive it" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ] && [ "$child_left" -eq 0 ]'
+check "13.1768 the slot is released when the verb is terminated (SIGTERM), was held while it ran, and the wrapped command and what it spawned did not outlive it" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ] && [ "$child_left" -eq 0 ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
 check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
 reset; hold 1; hold 2; rm -f "$fx/ran"; out=$(CTL_SEM_MAX_WAIT=30 rt -- sh -c ': > "$1"' x "$fx/ran"); rc=$?

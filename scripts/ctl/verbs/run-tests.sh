@@ -30,8 +30,19 @@ if [ "$CTL_DRY_RUN" = 1 ]; then
 fi
 log="$(ctl_log run-tests)"
 child=""
+# Stop the command AND everything under it: it runs in its own process group (set -m below), so `pnpm exec vitest` and its node workers all get
+# the signal. Signalling only the direct child left the vitest workers orphaned at ppid 1 (measured 2026-10-03: two workers after a TERM) — and
+# `ctl gate` fails on any such orphan. TERM first, KILL after 5 s.
+stop_child() {
+  [ -z "$child" ] && return 0
+  kill -TERM -- "-$child" 2>/dev/null
+  local n=0; while [ "$n" -lt 20 ] && kill -0 "$child" 2>/dev/null; do sleep 0.25; n=$((n+1)); done
+  kill -KILL -- "-$child" 2>/dev/null
+  wait "$child" 2>/dev/null
+  return 0
+}
+abort() { local sig="$1"; stop_child; ctl_sem_release; echo "FAIL run-tests $label terminated by signal $sig — slot released"; exit $((128 + sig)); }
 cleanup() { ctl_sem_release; }
-abort() { local sig="$1"; [ -z "$child" ] || { kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null; }; ctl_sem_release; echo "FAIL run-tests $label terminated by signal $sig — slot released"; exit $((128 + sig)); }
 trap cleanup EXIT
 trap 'abort 2' INT
 trap 'abort 15' TERM
@@ -42,8 +53,10 @@ fi
 if [ "$CTL_SEM_REASONS" = "-" ]; then waitline="queue wait: ${CTL_SEM_WAITED}s (slot $CTL_SEM_SLOT/$CTL_SEM_SLOTS)"; else waitline="queue wait: ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS)"; fi
 { echo "# ctl run-tests: $shown"; echo "# $waitline; repo $CTL_REPO"; } > "$log"
 cd "$CTL_REPO" || exit 1
-# The command runs in the background with `wait` so a TERM to the verb is handled at once (bash defers a trap behind a foreground child) and
-# the child can be told to stop; no pipe, so rc is the command's own. A job killed by a signal makes bash print "Terminated" — silenced.
+# The command runs as a background job with `wait`, in its OWN process group (set -m): a TERM to the verb is handled at once (bash defers a trap
+# behind a foreground child) and the whole group can be stopped; no pipe, so rc is the command's own. A job killed by a signal makes bash print
+# "Terminated" — silenced. stdin is /dev/null: a background group that read the terminal would be stopped.
+set -m
 "${cmd[@]}" >> "$log" 2>&1 < /dev/null &
 child=$!
 { wait "$child"; } 2>/dev/null; rc=$?

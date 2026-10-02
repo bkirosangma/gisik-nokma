@@ -707,7 +707,7 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1753 🧪 Everything after `--` reaches the command untouched, including `--dry-run`, `--repo` and `--label`.
 - 13.1754 🧪 A tsc run shows the error count and the first error.
 - 13.1755 🧪 ANSI codes and turbo `pkg:task:` prefixes are stripped before parsing and printing.
-- 13.1756 🧪 A run with 400 failures still prints at most 30 lines, counts first.
+- 13.1756 🧪 A run with 400 failures still prints at most 30 lines, counts first; the digest script itself never prints more than the MAXLINES it is given.
 - 13.1757 🧪 A crash with no test summary keeps its exit code and shows the log tail.
 - 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s.
 - 13.1759 🧪 Both slots held: the third run waits (fake time) until one frees, runs, and names `slots` as the reason.
@@ -717,9 +717,9 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1763 🧪 A sustained swap-in rate at or over the threshold holds the slot back, reason `swap`; one high window is a blip and does not; a rate under the threshold does not.
 - 13.1764 🧪 A running gate has priority: no slot is granted while its marker is live, held slots are untouched, a gate that starts between the claim and the run makes the verb give the slot back and wait.
 - 13.1765 🧪 A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed.
-- 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed.
+- 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed; a dead pid whose recorded start time is empty is stale too.
 - 13.1767 🧪 Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
-- 13.1768 🧪 The slot is released when the command fails and when the verb is terminated.
+- 13.1768 🧪 The slot is released when the command fails and when the verb is terminated, and the wrapped command AND what it spawned die with the verb (a process-group stop — no orphaned vitest workers).
 - 13.1769 🧪 Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots).
 - 13.1770 🧪 A queue wait past `CTL_SEM_MAX_WAIT` exits 75, runs nothing and says `no slot after`.
 - 13.1771 🧪 `--dry-run` prints the plan, takes no slot, runs nothing, exits 0.
