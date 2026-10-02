@@ -2488,3 +2488,125 @@ git commit -m "Smoothness T14: the capture, the CLS/requests ratchet and the re-
 ## Execution handoff
 
 Plan complete and saved beside the spec at `gisik-nokma-lanes/smoothness-2026-10-02/2026-10-02-smoothness.md`; T1 copies both into `docs/superpowers/`. Execution in this repo is by the orchestrator's lanes (controller → dispatcher → lanes → reviewer → gate) on `release/smoothness`, autonomous into the release branch per the standing authorization, never to `main`. **HELD until the owner rules on D1–D13.** For this plan the recommended shape is subagent-driven with the parallel groups in **Order** above: fourteen tasks whose interfaces (T2's primitives, T3's `cacheKey`, T4's shared read, T5's shells) are consumed by the six screen tasks, so a reviewer per task catches a drifted interface before four lanes build on it.
+
+
+## Re-anchored citations (2026-10-02, after neo #931 + MCP #937)
+
+*Appended by smoothness T1 (`task/smoothness-docs`). The plan body above is NOT rewritten: its line numbers are the ones it was verified at, `release/prefix-groups-ux` `4f86b959`. This section maps each one to where the same lines are now, at `release/smoothness` `f27485ec` (= `main`, which holds prefix/groups, neo #931 and MCP #937). **T2–T13 lanes read this map instead of re-deriving it, and still re-read a cited line before editing** (the symbol is the anchor, the line a hint).*
+
+**How it was measured.** Every `path:line` cite in the plan and the spec was found (119 that name a file and a line, over 55 files, plus the continuation forms that follow one: `, 1321, 1488`, `` `:2176-2186` ``, found by hand). Each file was diffed `4f86b959..HEAD` with zero context, the cited lines were mapped through the hunks, and the mapped range was read back in the current file. 41 of the 55 cited files are unchanged since `4f86b959`, so their cites hold as written. The other 14 files carry the 96 rows below (69 distinct ranges; reviewer A counted 38 of the explicit ones, this table also lists the continuation cites and each cite once per plan line it appears on). Where lines moved without being edited the note says so; where a line was edited, or a range grew, the note says what it is now. Each cite keeps the plan line (`P<n>`) or spec line (`S<n>`) it appears on.
+
+| Plan cite (plan line) | Current cite at `release/smoothness` | Note |
+|---|---|---|
+| `apps/web/app/globals.css:169` (P15) | `apps/web/app/globals.css:169-170` | EDITED by neo N7 (24.082): the rule is now `.gn-shell__main { margin-top: max(1.25rem, var(--gn-halo-lg)); … }` at line 170, with a 2-line N7 comment at 169. |
+| `pnpm-lock.yaml:4882` (P31) | `pnpm-lock.yaml:4899` | unchanged lines, moved +17 |
+| `page.tsx:128-131` (P32) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:130-133` | unchanged lines, moved +2 |
+| `page.tsx:133-137` (P32) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:135-139` | unchanged lines, moved +2 |
+| `page.tsx:2169` (P37) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2181` | unchanged lines, moved +12 |
+| `globals.css:4520` (P60) | `apps/web/app/globals.css:4536` | unchanged lines, moved +16 |
+| `views/board.tsx:1345-1356` (P63) | `packages/app-core/src/views/board.tsx:1348-1359` | unchanged lines, moved +3 |
+| `ui.css:1287` (P63) | `packages/ui/src/ui.css:1309` | EDITED by neo N7: `.gn-board__cards` is now `gap: var(--gn-halo)` (was `0.5rem`); same selector, one line, moved +22. |
+| `page.tsx:2407-2410` (P63) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2419-2422` | unchanged lines, moved +12 |
+| `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:133-137` (P1158) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:135-139` | unchanged lines, moved +2 |
+| `packages/app-core/src/views/board.tsx:3051-3061` (P1409) | `packages/app-core/src/views/board.tsx:3070-3080` | unchanged lines, moved +19 |
+| `page.tsx:1299` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1311` | unchanged lines, moved +12 |
+| `page.tsx:322` (P1471) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:326` | unchanged lines, moved +4 |
+| `board.tsx:3061` (P1505) | `packages/app-core/src/views/board.tsx:3080` | unchanged lines, moved +19 |
+| `packages/app-core/src/views/ticket-sheet.tsx:940-951` (P1539) | `packages/app-core/src/views/ticket-sheet.tsx:948-959` | unchanged lines, moved +8 |
+| `views/board.tsx:515` (P1539) | `packages/app-core/src/views/board.tsx:515` | unchanged lines, moved 0 (same numbers) |
+| `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2258-2264` (P1539) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2270-2276` | unchanged lines, moved +12 |
+| `apps/web/src/project-title.tsx:160-176` (P1539) | `apps/web/src/project-title.tsx:160-177` | unchanged lines, moved 0 (same numbers); range grew 17 → 18 lines (an edit inside it) |
+| `board.tsx:515` (P1716) | `packages/app-core/src/views/board.tsx:515` | unchanged lines, moved 0 (same numbers) |
+| `app/w/[workspaceId]/my-work/page.tsx:334-350` (P1739) | `apps/web/app/w/[workspaceId]/my-work/page.tsx:337-353` | unchanged lines, moved +3 |
+| `apps/web/src/app-nav.tsx:528-555` (P1739) | `apps/web/src/app-nav.tsx:528-558` | unchanged lines, moved 0 (same numbers); range grew 28 → 31 lines (an edit inside it) |
+| `apps/web/src/bottom-bar.tsx:114-118` (P1739) | `apps/web/src/bottom-bar.tsx:114-121` | unchanged lines, moved 0 (same numbers); range grew 5 → 8 lines (an edit inside it) |
+| `comments-thread.tsx:251` (P1739) | `packages/app-core/src/views/comments-thread.tsx:453` | unchanged lines, moved +202 |
+| `use-is-phone.ts:26-35` (P1859) | `apps/web/src/use-is-phone.ts:29-38` | unchanged lines, moved +3 |
+| `app-nav.tsx:528-533` (P1859) | `apps/web/src/app-nav.tsx:528-533` | unchanged lines, moved 0 (same numbers) |
+| `bottom-bar.tsx:114-118` (P1859) | `apps/web/src/bottom-bar.tsx:114-121` | unchanged lines, moved 0 (same numbers); range grew 5 → 8 lines (an edit inside it) |
+| `globals.css:4520` (P1879) | `apps/web/app/globals.css:4536` | unchanged lines, moved +16 |
+| `apps/web/src/notes/note-document.tsx:155-200` (P1882) | `apps/web/src/notes/note-document.tsx:155-200` | unchanged lines, moved 0 (same numbers) |
+| `apps/web/src/notes/note-comments.tsx:128` (P1882) | `apps/web/src/notes/note-comments.tsx:202` | unchanged lines, moved +74 |
+| `apps/web/app/globals.css:4520` (P1882) | `apps/web/app/globals.css:4536` | unchanged lines, moved +16 |
+| `note-document.tsx:159-168` (P1936) | `apps/web/src/notes/note-document.tsx:159-168` | unchanged lines, moved 0 (same numbers) |
+| `globals.css:4520` (P1954) | `apps/web/app/globals.css:4536` | unchanged lines, moved +16 |
+| `note-comments.tsx:128` (P1954) | `apps/web/src/notes/note-comments.tsx:202` | unchanged lines, moved +74 |
+| `note-document.tsx:921` (P1954) | `apps/web/src/notes/note-document.tsx:923` | unchanged lines, moved +2 |
+| `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:49-50` (P1978) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:49-50` | unchanged lines, moved 0 (same numbers) |
+| `app/w/[workspaceId]/my-work/page.tsx:14` (P1978) | `apps/web/app/w/[workspaceId]/my-work/page.tsx:14` | unchanged lines, moved 0 (same numbers) |
+| `bottom-bar.tsx:8-16` (P2057) | `apps/web/src/bottom-bar.tsx:8-16` | unchanged lines, moved 0 (same numbers) |
+| `ui.css:1287` (P2208) | `packages/ui/src/ui.css:1309` | EDITED by neo N7: `.gn-board__cards` is now `gap: var(--gn-halo)` (was `0.5rem`); same selector, one line, moved +22. |
+| `packages/app-core/src/views/board.tsx:1345-1356` (P2211) | `packages/app-core/src/views/board.tsx:1348-1359` | unchanged lines, moved +3 |
+| `packages/ui/src/ui.css:1287` (P2211) | `packages/ui/src/ui.css:1309` | EDITED by neo N7: `.gn-board__cards` is now `gap: var(--gn-halo)` (was `0.5rem`); same selector, one line, moved +22. |
+| `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:683` (P2211) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:695` | unchanged lines, moved +12 |
+| `board.tsx:1845` (P2268) | `packages/app-core/src/views/board.tsx:1858` | unchanged lines, moved +13 |
+| `ui.css:1287` (P2268) | `packages/ui/src/ui.css:1309` | EDITED by neo N7: `.gn-board__cards` is now `gap: var(--gn-halo)` (was `0.5rem`); same selector, one line, moved +22. The plan's literal rule text at P2268 (`gap: 0.5rem; contain: content;`) is stale: the live rule is `.gn-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gn-halo); }`; add `contain: content` to THAT rule and keep `gap: var(--gn-halo)` (neo N7 / 24.082). |
+| `board.tsx:1914` (P2268) | `packages/app-core/src/views/board.tsx:1927` | unchanged lines, moved +13 |
+| `page.tsx:2407-2410` (P2268) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2419-2422` | unchanged lines, moved +12 |
+| `page.tsx:2193` (P37) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2205` | unchanged lines, moved +12 |
+| `page.tsx:2265` (P37) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2277` | unchanged lines, moved +12 |
+| `board.tsx:1845` (P63) | `packages/app-core/src/views/board.tsx:1858` | unchanged lines, moved +13 |
+| `ui.css:1601` (P63) | `packages/ui/src/ui.css:1623` | unchanged lines, moved +22 |
+| `globals.css:2517` (P1386) | `apps/web/app/globals.css:2519` | unchanged lines, moved +2 |
+| `page.tsx:322` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:326` | unchanged lines, moved +4 |
+| `page.tsx:350` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:354` | unchanged lines, moved +4 |
+| `page.tsx:379-388` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:383-392` | unchanged lines, moved +4 |
+| `page.tsx:451-458` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:455-462` | unchanged lines, moved +4 |
+| `page.tsx:2176-2186` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2188-2198` | unchanged lines, moved +12 |
+| `page.tsx:2295-2360` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2307-2372` | unchanged lines, moved +12 |
+| `page.tsx:3089` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3103` | unchanged lines, moved +14 |
+| `page.tsx:3127` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3141` | unchanged lines, moved +14 |
+| `page.tsx:3262` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3276` | unchanged lines, moved +14 |
+| `page.tsx:3411` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3425` | unchanged lines, moved +14 |
+| `page.tsx:3592` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:3606` | unchanged lines, moved +14 |
+| `page.tsx:1321` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1333` | unchanged lines, moved +12 |
+| `page.tsx:1488` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1500` | unchanged lines, moved +12 |
+| `page.tsx:1878` (P1409) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1890` | unchanged lines, moved +12 |
+| `page.tsx:350` (P1471) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:354` | unchanged lines, moved +4 |
+| `page.tsx:379-388` (P1478) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:383-392` | unchanged lines, moved +4 |
+| `page.tsx:2176-2186` (P1507) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2188-2198` | unchanged lines, moved +12 |
+| `page.tsx:2295-2360` (P1515) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2307-2372` | unchanged lines, moved +12 |
+| `ticket-sheet.tsx:1277-1332` (P1539) | `packages/app-core/src/views/ticket-sheet.tsx:1285-1340` | unchanged lines, moved +8 |
+| `ticket-sheet.tsx:1884-1920` (P1539) | `packages/app-core/src/views/ticket-sheet.tsx:1948-1984` | unchanged lines, moved +64 |
+| `ticket-sheet.tsx:3186-3190` (P1539) | `packages/app-core/src/views/ticket-sheet.tsx:3267-3271` | unchanged lines, moved +81 |
+| `board.tsx:2676-2700` (P1539) | `packages/app-core/src/views/board.tsx:2690-2714` | unchanged lines, moved +14 |
+| `ticket-sheet.tsx:940` (P1693) | `packages/app-core/src/views/ticket-sheet.tsx:948` | unchanged lines, moved +8 |
+| `ticket-sheet.tsx:1884-1920` (P1693) | `packages/app-core/src/views/ticket-sheet.tsx:1948-1984` | unchanged lines, moved +64 |
+| `ticket-sheet.tsx:3186` (P1693) | `packages/app-core/src/views/ticket-sheet.tsx:3267` | unchanged lines, moved +81 |
+| `ticket-sheet.tsx:1277-1332` (P1693) | `packages/app-core/src/views/ticket-sheet.tsx:1285-1340` | unchanged lines, moved +8 |
+| `ticket-sheet.tsx:944-951` (P1693) | `packages/app-core/src/views/ticket-sheet.tsx:952-959` | unchanged lines, moved +8 |
+| `board.tsx:2676-2700` (P1716) | `packages/app-core/src/views/board.tsx:2690-2714` | unchanged lines, moved +14 |
+| `note-document.tsx:343` (P1882) | `apps/web/src/notes/note-document.tsx:343` | unchanged lines, moved 0 (same numbers) |
+| `note-document.tsx:366` (P1882) | `apps/web/src/notes/note-document.tsx:366` | unchanged lines, moved 0 (same numbers) |
+| `note-document.tsx:462` (P1882) | `apps/web/src/notes/note-document.tsx:462` | unchanged lines, moved 0 (same numbers) |
+| `note-document.tsx:405-411` (P1882) | `apps/web/src/notes/note-document.tsx:405-411` | unchanged lines, moved 0 (same numbers) |
+| `note-document.tsx:702` (P1882) | `apps/web/src/notes/note-document.tsx:702` | unchanged lines, moved 0 (same numbers) |
+| `note-document.tsx:921` (P1882) | `apps/web/src/notes/note-document.tsx:923` | unchanged lines, moved +2 |
+| `note-document.tsx:896-910` (P1882) | `apps/web/src/notes/note-document.tsx:898-912` | unchanged lines, moved +2 |
+| `note-document.tsx:178-194` (P1954) | `apps/web/src/notes/note-document.tsx:178-194` | unchanged lines, moved 0 (same numbers) |
+| `ui.css:1601` (P2208) | `packages/ui/src/ui.css:1623` | unchanged lines, moved +22 |
+| `ui.css:1601` (P2211) | `packages/ui/src/ui.css:1623` | unchanged lines, moved +22 |
+| `board.tsx:1845-1853` (P2211) | `packages/app-core/src/views/board.tsx:1858-1866` | unchanged lines, moved +13 |
+| `page.tsx:850` (P2211) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:862` | unchanged lines, moved +12 |
+| `page.tsx:1721` (P2211) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1733` | unchanged lines, moved +12 |
+| `ui.css:1601` (P2268) | `packages/ui/src/ui.css:1623` | unchanged lines, moved +22 |
+| `board.tsx:1086` (P2268) | `packages/app-core/src/views/board.tsx:1086` | unchanged lines, moved 0 (same numbers) |
+| `board.tsx:1948` (P2268) | `packages/app-core/src/views/board.tsx:1961` | unchanged lines, moved +13 |
+| `page.tsx:850` (P2268) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:862` | unchanged lines, moved +12 |
+| `page.tsx:1721` (P2268) | `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1733` | unchanged lines, moved +12 |
+
+**The two append anchors.** Both T2 and T5 append to the END of a stylesheet, which still works; the numbers moved.
+
+| Plan text | Now | Note |
+|---|---|---|
+| `packages/ui/src/ui.css` last rule, "line 8904 at `4f86b959`" (P112, spec S96) | `packages/ui/src/ui.css`, **9236** lines; the last rule ends at 9236 (`transform: translate(-50%, -50%);` then `}`) | append after it; the marker comment stays the anchor |
+| `apps/web/app/globals.css` last rule, "line 5657 at `4f86b959`" (P1153) | `apps/web/app/globals.css`, **5686** lines; the last rule is the `.gn-workspace-settings__title, .gn-mcp-tokens__subtitle` phone arm closing at 5686 | append after it |
+
+**MOOT by neo #931 (shipped; 2026-10-02).**
+
+- **P2 (plan line 15) and spec lines 3, 36 and 93: "the neo refresh runs in parallel on `release/neo-refresh` and owns …"** is moot. Neo is on `main`. The line ranges it lists as neo-owned (`ui.css` 96–99, 1168–1178, 7176–7180, 7252–7258, 8097–8153, `globals.css:169` and 2942–2945) were neo's to edit and are now ordinary history: read the current text, do not trust those numbers.
+- **The "Parallel-safe with neo" column of the File structure table (plan line 50) and each task's "**Parallel-safe with neo: yes/no**" line** (plan lines 112, 526, 914, 1153, 1406, 1535, 1736, 1879, 1974, 2091, 2208, 2288, 2377) are moot: there is no neo branch to collide with. The append-only rule for `ui.css` and `globals.css` stays as a convention (it keeps diffs small), not as a collision guard.
+- **P1 (plan line 14), "cut `release/smoothness` from `main` after `release/prefix-groups-ux` has merged"**, is satisfied: `release/smoothness` is `f27485ec`.
+- **Features and the catalogue.** §22 sits between §21 (neo) and §23 (MCP everything); bucket 25 sits between 24 (neo) and 26 (MCP). Neither is renumbered. Plan line 20 ("Bucket 24 / Features §21 belong to the neo refresh") is still true; add "bucket 26 / §23 belong to MCP everything".
+
+**OPEN, for the planner before T2 (found while re-anchoring; not decided here).** Spec §4.3 (S94) says the skeleton fill is `var(--gn-surface-track)` and that "in neo this is the flat surface, which U7 defines as not interactive". After neo, `surfaceTrack` in the neo arms maps to the well step (`neoWellLight` / `neoWellDark`, `packages/ui/src/tokens.ts:1104`, `:1121`), the recess fill that the neo segmented track and nav use. The skeleton would paint in the recess colour. The spec anticipated a re-value ("the skeleton follows the token"), but the "flat, not interactive" rationale no longer holds. T2's fill cases (25.01x) need a ruling: keep `surfaceTrack`, or a flat role.
