@@ -488,3 +488,18 @@ describe('23.127 (U-T7 fix 1) a gated move\'s comment step and its refusal are v
     expect(selectedTab()).toEqual(['Doing 1']);
   });
 });
+
+describe('23.334 a phone drops the column header row the picker already says (audit BRD-06, neo follow-up F-2)', () => {
+  const headerOf = (stateId: string) => columnOf(stateId).querySelector('.gn-board__column-header') as HTMLElement;
+
+  it('23.334 a column header with nothing but its chip and count is `--bare` (the phone arm does not draw it); one carrying `Close all (N)` is not', async () => {
+    await mount(boardOf(errandGroup({ todo: ['tk_a'], doing: [], waiting: [], done: ['tk_d'] })));
+    // The picked column is "To do": no terminal column, no `Close all`, so the header is bare.
+    expect(headerOf('todo').classList.contains('gn-board__column-header--bare')).toBe(true);
+    await showColumn(/^Done/);
+    // CONTROL (same it): the terminal column holding a card keeps its header, `Close all (1)` inside it.
+    expect(within(headerOf('done')).getByRole('button', { name: /^Close all 1 in Done/ })).toBeInTheDocument();
+    expect(headerOf('done').classList.contains('gn-board__column-header--bare')).toBe(false);
+    expect(headerOf('done').classList.contains('gn-board__column-header')).toBe(true);
+  });
+});

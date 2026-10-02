@@ -1467,7 +1467,16 @@ function BoardGroupSection({
               </button>
             ) : (
               <>
-            <header className="gn-board__column-header">
+            <header
+              className={
+                // Neo follow-up F-2 (case 23.334): a phone shows the column's name and count in the picker above the rail, so the
+                // header's own chip row is hidden there; with no `Close all (N)` to carry it has nothing left and the phone arm
+                // drops the whole row (`--bare`).
+                bulkCloseFor !== null && column.category === 'terminal' && column.cards.length > 0
+                  ? 'gn-board__column-header'
+                  : 'gn-board__column-header gn-board__column-header--bare'
+              }
+            >
               <Chip tone={column.blocked ? 'waiting' : column.category}>{column.name}</Chip>
               <span className="gn-board__count">{column.cards.length}</span>
               {/*

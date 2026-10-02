@@ -2917,6 +2917,7 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   (Post-commit mutation: dropping `min-height` from the new rule reddens it.) —
   (`apps/web/test/project-page-head.test.tsx`)
 - **13.1383** 🧪 **THE PAINT: THE CONTROLS ROW NEVER MOVES; THE RAIL MOVES ONLY WHERE THE SENTENCE WRAPS.**
+  **AMENDED 2026-10-02:** phones collapse the empty band (owner 2026-10-02) — at ≤40rem `.gn-project__scope-row:empty` is `display: none` (case 23.332), so the band is reserved only above 40rem; the measurement below is a desktop/tablet one.
   ⚠ This opening asserted "nothing moves … at **1000 px and 1280 px** … the note row is **18 px** tall in
   both states" before anyone measured it, and the measurement below falsifies the 1000 px half. It is
   rewritten rather than left standing with a correction bolted underneath, because the first sentence is

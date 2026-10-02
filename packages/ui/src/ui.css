@@ -2133,6 +2133,12 @@ a.gn-ticket-sheet__crumb--link {
   .gn-board__column { flex: 0 0 100%; scroll-snap-align: start; }
   .gn-board__column-collapse { display: none; }
   .gn-board__column-strip { display: none; }
+  /* Neo follow-up F-2 (case 23.334, audit BRD-06): the picker above the rail already says "To do 2", so the column's own chip
+     and count are the same sentence twice and cost a 30px row before the first card. `Close all (N)` is the header's only
+     other occupant and stays; a header with nothing else (`--bare`, set by `board.tsx`) is not drawn at all. */
+  .gn-board__column-header > .gn-chip,
+  .gn-board__column-header > .gn-board__count { display: none; }
+  .gn-board__column-header--bare { display: none; }
   .gn-board-card__move:not(.gn-board-card__move-to) { display: none; }
   .gn-board-card__move-to {
     display: inline-flex;
@@ -2362,6 +2368,16 @@ a.gn-ticket-sheet__crumb--link {
    declaration below reddens by name rather than leaving the tray open in a
    browser with every suite green. */
 .gn-list__columns-tray[hidden] { display: none; }
+/* The List's controls on a phone (neo follow-up F-2, case 23.335, audit PV-03). The rows are stacked blocks at this width (the
+   <=64rem band above), so a Columns chooser has no columns to choose and goes, tray included; the count sentence takes a line of
+   its own, and Group by and Bulk close share the one control row under it instead of wrapping onto two. AFTER the base rules. */
+@media (max-width: 40rem) {
+  .gn-list__columns-toggle,
+  .gn-list__columns-tray { display: none; }
+  .gn-list { gap: 0.5rem; }
+  .gn-list__controls { gap: 0.5rem 0.875rem; }
+  .gn-list__summary { flex: 1 0 100%; }
+}
 /* "Column chip" (`:2796`): `display:inline-flex;align-items:center;gap:8px;
    min-height:36px;padding:0 12px;border:none;border-radius:999px;
    background:var(--cardBg);box-shadow:var(--cardShadow);color:var(--label);
@@ -7693,6 +7709,21 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-project__header > .gn-button--primary { order: 1; margin-left: auto; }
 }
 
+/* The project header on a phone (neo follow-up F-2, cases 23.330-23.333, audit BRD-06 and PV-03): the first card sat at 78% of a
+   390x844 screen under a header that spent 283px on controls. At <=40rem the workflow picker and the in-progress switch live in the
+   Filters sheet (`page.tsx` does not render them inline on a phone; the two rules here cover the frames before script runs), and
+   the scope-note band, reserved above so the note never moves anything (owner 2026-09-23, 13.1383), collapses while it has no
+   words (owner 2026-10-02): it is the one band a phone cannot spare. Desktop and tablet keep the reserved band. AFTER
+   `.gn-project__scope-row`, `.gn-project__head` and `.gn-project__workflow-select`: source order decides. */
+@media (max-width: 40rem) {
+  .gn-project { gap: 0.5rem; }
+  .gn-project__head { margin-top: 0.5rem; row-gap: 0.25rem; }
+  .gn-project__breadcrumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gn-project__scope-row:empty { display: none; }
+  .gn-project__header > .gn-project__workflow-select,
+  .gn-project__header > .gn-switch-row { display: none; }
+}
+
 /* ── The Filters sheet (board-prototype-port, Task 5, 2026-09-16).
    Metrics: spec, Filters sheet `:1367-1417`; the plan's own prototype→product
    table (`docs/superpowers/plans/2026-09-16-board-prototype-port.md:33-52`)
@@ -7726,6 +7757,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    ambiguity the house scrims already carry between each other) rather than
    silently favouring one. */
 .gn-filters__scrim { position: fixed; inset: 0; background: var(--gn-surface-overlay); z-index: 40; }
+/* The phone-only `Show` section's workflow picker fills the panel (neo follow-up F-2, 23.330). */
+.gn-filters__select { width: 100%; }
 .gn-filters__panel {
   position: fixed; inset-block: 0; inset-inline-end: 0;
   width: min(23.75rem, 100%);

@@ -84,6 +84,7 @@ import { peopleProps } from '../../../../../src/people-props.js';
 import { ticketSheetPath } from '../../../../../src/ticket-location.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../../src/ticket-ref-callbacks.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
+import { useIsPhone } from '../../../../../src/use-is-phone.js';
 import { ProjectTitle } from '../../../../../src/project-title.js';
 import {
   DEFAULT_PROJECT_TAB,
@@ -619,6 +620,14 @@ function ProjectBoard() {
    * landed, but a keyboard exit always leaves focus somewhere real.
    */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /**
+   * Neo follow-up F-2 (cases 23.330/23.331, audit BRD-06, PV-03): on a phone the workflow picker and the in-progress switch are NOT
+   * in the header, they are in the Filters sheet (spec `ux-fixes-design.md` 3.1: "filters and secondary controls behind ONE
+   * Filters button"). `false` until the effect reads the query, so the server's markup and the first client render both draw
+   * the inline controls; the stylesheet's phone arm (`.gn-project__header > .gn-project__workflow-select`) hides them for that
+   * first frame.
+   */
+  const isPhone = useIsPhone();
   /**
    * V1 (round-2 ruling, 2026-09-21) — the New-ticket flow's dialog, lifted so the
    * BOARD'S empty state can open it.
@@ -2468,7 +2477,7 @@ function ProjectBoard() {
                   at the moment of selection, so it is always valid when
                   written; only the READ side ever needs to fall back.
                 */}
-                {board.data !== null && board.data.groups.length > 1 ? (
+                {!isPhone && board.data !== null && board.data.groups.length > 1 ? (
                   <select
                     className="gn-project__workflow-select"
                     aria-label="Workflow"
@@ -2512,9 +2521,11 @@ function ProjectBoard() {
                   narrowed, which is the same class of lie as a narrowed one claiming
                   to be whole and is the reason this control exists.
                 */}
-                <Switch checked={activeOnly} onChange={setActiveOnly}>
-                  Only tickets in progress
-                </Switch>
+                {isPhone ? null : (
+                  <Switch checked={activeOnly} onChange={setActiveOnly}>
+                    Only tickets in progress
+                  </Switch>
+                )}
                 {/*
                   THE FILTERS BUTTON (Task 5). Task 4's own report left it
                   unrendered on purpose ("An inert Filters button is a button
@@ -3851,6 +3862,20 @@ function ProjectBoard() {
         boardStateOptions={boardStateOptions}
         boardLoaded={board.data !== null}
         boardError={board.error}
+        phoneScope={
+          isPhone
+            ? {
+                workflows:
+                  board.data !== null && board.data.groups.length > 1
+                    ? board.data.groups.map((group) => ({ id: group.workflowId, name: group.workflowName }))
+                    : null,
+                workflowValue: resolvedWorkflowFilter,
+                onWorkflowChange: setWorkflowFilter,
+                activeOnly,
+                onActiveOnlyChange: setActiveOnly,
+              }
+            : null
+        }
       />
 
       {/*
@@ -3983,6 +4008,18 @@ type FiltersSheetProps = {
   boardLoaded: boolean;
   /** Same pending-vs-refused distinction as `membersError`, for the State section. */
   boardError: string | null;
+  /**
+   * Neo follow-up F-2 (case 23.330): the two page-scope controls the header drops on a phone, passed ONLY on a phone (`null`
+   * everywhere else, where the header still carries them and the sheet must not duplicate them). `workflows` is `null` for a
+   * project with zero or one workflow (no real choice; the header's own gate, judged against the whole board).
+   */
+  phoneScope: {
+    workflows: Array<{ id: string; name: string }> | null;
+    workflowValue: string;
+    onWorkflowChange: (next: string) => void;
+    activeOnly: boolean;
+    onActiveOnlyChange: (next: boolean) => void;
+  } | null;
 };
 
 /**
@@ -4086,6 +4123,7 @@ function FiltersSheet({
   boardStateOptions,
   boardLoaded,
   boardError,
+  phoneScope,
 }: FiltersSheetProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const headingId = useId();
@@ -4212,6 +4250,32 @@ function FiltersSheet({
           </h2>
         </div>
         <div className="gn-filters__body">
+          {/* Neo follow-up F-2 (23.330): the header's workflow picker and in-progress switch, moved here on a phone. The select
+              carries the header's own class so it paints the same control, and its own `Workflow` name; the switch is the same
+              shared `Switch` with the same words. Both write the page's state, so the header and the sheet can never disagree. */}
+          {phoneScope === null ? null : (
+            <fieldset className="gn-filters__section">
+              <legend className="gn-filters__section-label">Show</legend>
+              {phoneScope.workflows === null ? null : (
+                <select
+                  className="gn-project__workflow-select gn-filters__select"
+                  aria-label="Workflow"
+                  value={phoneScope.workflowValue}
+                  onChange={(event) => phoneScope.onWorkflowChange(event.target.value)}
+                >
+                  <option value="all">All workflows</option>
+                  {phoneScope.workflows.map((workflow) => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Switch checked={phoneScope.activeOnly} onChange={phoneScope.onActiveOnlyChange}>
+                Only tickets in progress
+              </Switch>
+            </fieldset>
+          )}
           {personSection('Assignee', 'assigneeIds')}
           {/* The words are the manual's own; the strip's after-the-fact
               sentence is not removed, because it still fires on the board for
