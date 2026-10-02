@@ -921,6 +921,9 @@
   border: none;
   border-radius: var(--gn-radius-control);
   background: transparent;
+  /* N3 quiet depth (Features §21), the same three steps `.gn-button--ghost` takes: rest on `quiet`, toward you on
+     hover, pressed on :active. The tokens are `none` in hig and minimal, so only neo changes (no [data-style] block). */
+  box-shadow: var(--gn-shadow-quiet);
   color: var(--gn-text-muted);
   font: inherit;
   font-weight: 600;
@@ -931,6 +934,9 @@
 .editor-slot__format:hover {
   background: var(--gn-fill-quaternary);
   box-shadow: var(--gn-shadow-quiet-near);
+}
+.editor-slot__format:active {
+  box-shadow: var(--gn-shadow-quiet-press);
 }
 .editor-slot__format[aria-expanded='true'] {
   background: var(--gn-fill-secondary);

@@ -550,6 +550,10 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
             aria-label={toolbarShown ? 'Hide formatting' : 'Show formatting'}
             aria-expanded={toolbarShown}
             aria-controls={toolbarId}
+            // A pointer press must not move focus off the text (a mousedown on a <button> focuses it in every
+            // browser, and the editor would blur and lose its caret). The package's own precedent:
+            // `TablePicker`, `LinkEditorPopover`, `TableFloatingToolbar`. Keyboard activation is unchanged.
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => setToolbarShown(!toolbarShown)}
           >
             <span aria-hidden="true">Aa</span>

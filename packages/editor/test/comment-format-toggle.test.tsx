@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { act, fireEvent, render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Editor } from '@tiptap/core';
 import {
@@ -190,7 +191,7 @@ describe('G-6 the comment composers hide the formatting toolbar behind a Format 
     view.unmount();
   });
 
-  it('25.386 opening the toolbar leaves focus in the text; Escape inside the toolbar closes it and returns focus to the Format button', async () => {
+  it('25.386 a pointer press on Format, opening or closing, leaves focus in the text; Escape inside the toolbar closes it and returns focus to the Format button', async () => {
     const { view, editor } = await mount(makeProps());
     const button = formatButton(view.container) as HTMLButtonElement;
     act(() => {
@@ -202,7 +203,17 @@ describe('G-6 the comment composers hide the formatting toolbar behind a Format 
     pm.tabIndex = 0;
     act(() => pm.focus());
     expect(document.activeElement).toBe(pm);
-    fireEvent.click(button);
+    // The REAL pointer sequence (mousedown, focus, mouseup, click): `fireEvent.click` dispatches only `click` and never
+    // moves focus in jsdom, so it could not see a button that takes focus on press (reviewer B, FIX 1).
+    const user = userEvent.setup();
+    await user.click(button);
+    expect(toolbar(view.container)).not.toBeNull();
+    expect(document.activeElement).toBe(pm);
+    // …and the press that closes it leaves the caret where it was too.
+    await user.click(button);
+    expect(toolbar(view.container)).toBeNull();
+    expect(document.activeElement).toBe(pm);
+    await user.click(button);
     expect(toolbar(view.container)).not.toBeNull();
     expect(document.activeElement).toBe(pm);
 
@@ -240,6 +251,14 @@ describe('G-6 the comment composers hide the formatting toolbar behind a Format 
     expect(base).toContain('min-height: 32px');
     expect(base).not.toContain('--gn-shadow-raised');
     expect(rule('.editor-slot__format:focus-visible')).toContain('--gn-focus-ring');
+    // N3 quiet depth (Features §21): rests on `quiet`, comes toward you on hover, presses on :active. The tokens are
+    // `none` in hig and minimal, so only neo changes; no [data-style] block.
+    expect(base).toContain('box-shadow: var(--gn-shadow-quiet);');
+    expect(rule('.editor-slot__format:hover')).toContain('box-shadow: var(--gn-shadow-quiet-near);');
+    expect(rule('.editor-slot__format:active')).toContain('box-shadow: var(--gn-shadow-quiet-press);');
+    // The press is declared AFTER the hover (equal specificity: source order decides while the button is hovered AND pressed).
+    expect(css.indexOf('.editor-slot__format:active {')).toBeGreaterThan(css.indexOf('.editor-slot__format:hover {'));
+    expect(css.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\[data-style[^\]]*\][^{]*\.editor-slot__format/);
     // The phone arm must come AFTER the base rule (same specificity: source order decides).
     const baseAt = css.indexOf('.editor-slot__format {');
     const phone = css.indexOf('@media (max-width: 40rem)', baseAt);
@@ -248,6 +267,22 @@ describe('G-6 the comment composers hide the formatting toolbar behind a Format 
     expect(arm).toMatch(/\.editor-slot__format\s*\{[^}]*min-height: 2\.75rem[^}]*min-width: 2\.75rem/);
     // Control: the Attach rule beside it IS raised, so the assertion above can fail.
     expect(rule('.editor-slot__attach')).toContain('--gn-shadow-raised');
+  });
+
+  it('25.390 a change made in another tab (the storage event) reaches a mounted comment editor; an event for another key does not', async () => {
+    const { view } = await mount(makeProps());
+    expect(toolbar(view.container)).toBeNull();
+    // Control: an event for an unrelated key changes nothing, even with the stored choice already flipped.
+    act(() => {
+      window.localStorage.setItem(KEY, 'shown');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'some-other-key' }));
+    });
+    expect(toolbar(view.container)).toBeNull();
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: KEY }));
+    });
+    expect(toolbar(view.container)).not.toBeNull();
+    view.unmount();
   });
 
   it('25.389 every comment editor in the product reaches the slot as mode="comment" (four hosts), so the toggle covers the sheet composer, the comment edit and both note-comment editors', () => {
