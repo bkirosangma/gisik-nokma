@@ -10,10 +10,11 @@ const webView = readFileSync(join(HERE, 'editor-web-view.tsx'), 'utf8');
 const rem = (value: string): number => Number.parseFloat(value) * 16;
 
 describe('the webview reserves the editor band before the page paints (spec §3.3; audit SM-13)', () => {
-  it("25.217 EDITOR_MIN_HEIGHT is the editor's own phone bar plus its content floor (read from editor.css), the frame carries it, and the WebView draws a skeleton of that height while it loads", () => {
-    const bar = editorCss.match(/--ticket-editor-bar-h:\s*([\d.]+rem)/)?.[1];
+  it("25.217 EDITOR_MIN_HEIGHT is one phone tool row plus the editor's content floor (read from editor.css), the frame carries it, and the WebView draws a skeleton of that height while it loads", () => {
+    const phoneArm = editorCss.slice(editorCss.indexOf('@media (max-width: 40rem)'));
+    const bar = phoneArm.match(/\.ticket-editor__tool\s*\{\s*min-height:\s*([\d.]+rem)/)?.[1];
     const content = editorCss.match(/\.ticket-editor__content\s*\{\s*min-height:\s*([\d.]+rem)/)?.[1];
-    expect(bar, 'the phone bar height token exists').toBeDefined();
+    expect(bar, "the phone tool row's min-height exists").toBeDefined();
     expect(content, 'the content floor exists').toBeDefined();
     expect(EDITOR_MIN_HEIGHT).toBe(rem(bar ?? '0') + rem(content ?? '0'));
     expect(EDITOR_FRAME_STYLE).toEqual({ minHeight: EDITOR_MIN_HEIGHT });
