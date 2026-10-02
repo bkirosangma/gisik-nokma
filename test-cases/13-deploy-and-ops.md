@@ -701,28 +701,28 @@ Why: raw vitest/tsc/build output was 4.4–6.4 M characters of tool results per 
 
 Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.1733` across every `origin/*` head updated in the last 14 days and every local branch; the block is written here in the first minting commit). All twenty-five are **🧪, not ✅, on purpose** — the same reason as `13.1501`–`13.1512`: every one is an arm in `scripts/ctl/test/run-tests.test.sh`, executed by `pnpm check:ctl` / `ctl selftest`, and each check's name starts with its case id, but `scripts/check-case-citations.mjs` reads only `apps/` and `packages/`. Fixtures: PATH stubs for `memory_pressure` / `sysctl` / `vm_stat` that read files, a fake clock file (a sleep advances it and runs a hook), planted slot directories with live or dead pids, and a fixture repo for the gate; `13.1767` and `13.1774` use the real clock and real processes.
 
-- 13.1750 ❌ A passing run: the whole output goes to a log file under `~/.cache/gisik-ctl/run-tests-*.log`, stdout is at most 30 lines and carries the counts, the log path and the exit code, and the last line is `OK run-tests`.
-- 13.1751 ❌ A failing vitest run: the first failure's test name and its assertion are in the summary, with both count lines; the last line is `FAIL run-tests`.
-- 13.1752 ❌ The exit code is the command's own — 3 stays 3, 0 stays 0, a signal-killed command reports 128+signal — and is printed.
-- 13.1753 ❌ Everything after `--` reaches the command untouched, including `--dry-run`, `--repo` and `--label`.
-- 13.1754 ❌ A tsc run shows the error count and the first error.
-- 13.1755 ❌ ANSI codes and turbo `pkg:task:` prefixes are stripped before parsing and printing.
-- 13.1756 ❌ A run with 400 failures still prints at most 30 lines, counts first.
-- 13.1757 ❌ A crash with no test summary keeps its exit code and shows the log tail.
-- 13.1758 ❌ Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s.
-- 13.1759 ❌ Both slots held: the third run waits (fake time) until one frees, runs, and names `slots` as the reason.
-- 13.1760 ❌ The slot count is configurable: a `slots` file in the sem dir, else `CTL_TEST_SLOTS`, else 2; the file wins.
-- 13.1761 ❌ Low free memory holds the slot back until it recovers, reason `pressure`.
-- 13.1762 ❌ The kernel pressure level gates too (2 and 4 wait, 1 does not), and the probe never passes a simulate flag to `memory_pressure`.
-- 13.1763 ❌ A sustained swap-in rate at or over the threshold holds the slot back, reason `swap`; one high window is a blip and does not; a rate under the threshold does not.
-- 13.1764 ❌ A running gate has priority: no slot is granted while its marker is live, held slots are untouched, a gate that starts between the claim and the run makes the verb give the slot back and wait.
-- 13.1765 ❌ A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed.
-- 13.1766 ❌ Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed.
-- 13.1767 ❌ Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
-- 13.1768 ❌ The slot is released when the command fails and when the verb is terminated.
-- 13.1769 ❌ Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots).
-- 13.1770 ❌ A queue wait past `CTL_SEM_MAX_WAIT` exits 75, runs nothing and says `no slot after`.
-- 13.1771 ❌ `--dry-run` prints the plan, takes no slot, runs nothing, exits 0.
-- 13.1772 ❌ `ctl gate` writes its priority marker only around the real gate run (not on `--dry-run`), removes it on green, red and exit, and does it from `verbs/gate.sh` (the gate-lock scripts are untouched).
-- 13.1773 ❌ `ctl help` lists `run-tests`, and `ctl selftest` runs the suite and a `run-tests --dry-run` step.
-- 13.1774 ❌ The real thing: two parallel runs overlap and a third waits at least 2 s for one of them to finish and logs that wait.
+- 13.1750 🧪 A passing run: the whole output goes to a log file under `~/.cache/gisik-ctl/run-tests-*.log`, stdout is at most 30 lines and carries the counts, the log path and the exit code, and the last line is `OK run-tests`.
+- 13.1751 🧪 A failing vitest run: the first failure's test name and its assertion are in the summary, with both count lines; the last line is `FAIL run-tests`.
+- 13.1752 🧪 The exit code is the command's own — 3 stays 3, 0 stays 0, a signal-killed command reports 128+signal — and is printed.
+- 13.1753 🧪 Everything after `--` reaches the command untouched, including `--dry-run`, `--repo` and `--label`.
+- 13.1754 🧪 A tsc run shows the error count and the first error.
+- 13.1755 🧪 ANSI codes and turbo `pkg:task:` prefixes are stripped before parsing and printing.
+- 13.1756 🧪 A run with 400 failures still prints at most 30 lines, counts first.
+- 13.1757 🧪 A crash with no test summary keeps its exit code and shows the log tail.
+- 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s.
+- 13.1759 🧪 Both slots held: the third run waits (fake time) until one frees, runs, and names `slots` as the reason.
+- 13.1760 🧪 The slot count is configurable: a `slots` file in the sem dir, else `CTL_TEST_SLOTS`, else 2; the file wins.
+- 13.1761 🧪 Low free memory holds the slot back until it recovers, reason `pressure`.
+- 13.1762 🧪 The kernel pressure level gates too (2 and 4 wait, 1 does not), and the probe never passes a simulate flag to `memory_pressure`.
+- 13.1763 🧪 A sustained swap-in rate at or over the threshold holds the slot back, reason `swap`; one high window is a blip and does not; a rate under the threshold does not.
+- 13.1764 🧪 A running gate has priority: no slot is granted while its marker is live, held slots are untouched, a gate that starts between the claim and the run makes the verb give the slot back and wait.
+- 13.1765 🧪 A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed.
+- 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed.
+- 13.1767 🧪 Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
+- 13.1768 🧪 The slot is released when the command fails and when the verb is terminated.
+- 13.1769 🧪 Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots).
+- 13.1770 🧪 A queue wait past `CTL_SEM_MAX_WAIT` exits 75, runs nothing and says `no slot after`.
+- 13.1771 🧪 `--dry-run` prints the plan, takes no slot, runs nothing, exits 0.
+- 13.1772 🧪 `ctl gate` writes its priority marker only around the real gate run (not on `--dry-run`), removes it on green, red and exit, and does it from `verbs/gate.sh` (the gate-lock scripts are untouched).
+- 13.1773 🧪 `ctl help` lists `run-tests`, and `ctl selftest` runs the suite and a `run-tests --dry-run` step.
+- 13.1774 🧪 The real thing: two parallel runs overlap and a third waits at least 2 s for one of them to finish and logs that wait.

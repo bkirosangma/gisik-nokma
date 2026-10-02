@@ -100,7 +100,7 @@ ctl_sem_swap_why() {
 # entering the queue to the grant, minus the final probe's own sampling window: a measurement, not a wait) and CTL_SEM_REASONS (a+b, "-" none).
 # Returns 75 when CTL_SEM_MAX_WAIT elapses first (nothing claimed).
 ctl_sem_acquire() {
-  local label="$1" sem n N free start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
+  local label="$1" sem n N free got start now reasons="" why max="${CTL_SEM_MAX_WAIT:-1800}"
   sem="$(ctl_sem_dir)"; start="$(ctl_sem_now)"; CTL_SEM_SLOT=""
   while :; do
     CTL_SEM_PROBE_SECS=0; why=""; N="$(ctl_sem_slots)"; CTL_SEM_SLOTS="$N"
@@ -111,12 +111,18 @@ ctl_sem_acquire() {
       if [ -z "$free" ]; then why=slots
       elif ! ctl_sem_pressure_why > /dev/null; then why=pressure
       elif ! ctl_sem_swap_why > /dev/null; then why=swap
-      elif mkdir "$sem/slot-$free" 2>/dev/null; then
-        printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/slot-$free/holder.tmp" && mv "$sem/slot-$free/holder.tmp" "$sem/slot-$free/holder"
-        if [ -n "${CTL_SEM_CLAIM_HOOK:-}" ]; then "$CTL_SEM_CLAIM_HOOK"; fi
-        if ctl_sem_gate_live; then rm -rf "$sem/slot-$free"; why=gate
-        else CTL_SEM_SLOT="$free"; break; fi
-      else why=slots; fi   # lost the race for that slot to another waiter
+      else
+        # Claim ANY free slot, not the one seen before the probes: a sibling that probed with us may have taken it meanwhile (measured
+        # 2026-10-03: three runs started together, the second lost slot 1 to the first and sat out a whole poll for slot 2, which was free).
+        got=""; n=1; while [ "$n" -le "$N" ]; do if mkdir "$sem/slot-$n" 2>/dev/null; then got="$n"; break; fi; n=$((n+1)); done
+        if [ -z "$got" ]; then why=slots
+        else
+          printf '%s|%s|%s|%s\n' "$$" "$(ctl_sem_lstart $$)" "$label" "$(ctl_sem_now)" > "$sem/slot-$got/holder.tmp" && mv "$sem/slot-$got/holder.tmp" "$sem/slot-$got/holder"
+          if [ -n "${CTL_SEM_CLAIM_HOOK:-}" ]; then "$CTL_SEM_CLAIM_HOOK"; fi
+          if ctl_sem_gate_live; then rm -rf "$sem/slot-$got"; why=gate
+          else CTL_SEM_SLOT="$got"; break; fi
+        fi
+      fi
     fi
     case "+$reasons+" in *"+$why+"*) ;; *) reasons="${reasons:+$reasons+}$why";; esac
     now="$(ctl_sem_now)"
