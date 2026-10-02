@@ -143,25 +143,20 @@ const SERVER_REASON_ALLOWED: readonly AllowEntry[] = [
 ];
 
 describe('23.301 the attention route composes no " — " in a reason a person reads', () => {
-  const serverHits = (): ReturnType<typeof stringsIn> =>
-    stringsIn(ATTENTION_ROUTE, readFileSync(resolve(REPO_ROOT, ATTENTION_ROUTE), 'utf8')).filter((hit) =>
-      MIDDLE_DOT_OR_DASH.test(hit.text),
-    );
+  it('holds none, apart from the reasoned allow-list (control first: the scan finds the old stale template)', () => {
+    const hitsOf = (file: string, source: string): ReturnType<typeof stringsIn> =>
+      stringsIn(file, source).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text));
 
-  it('control: the scan reads the route\'s template chunks, so the old stale template is found', () => {
+    // Control: the scan reads the route's template chunks, so the old stale template is found.
     const old = 'const reason = `In an active state since ${day} — past the ${n}-day staleness threshold.`;';
-    expect(stringsIn(ATTENTION_ROUTE, old).filter((hit) => MIDDLE_DOT_OR_DASH.test(hit.text)).map((hit) => hit.text)).toEqual([
-      ' — past the ',
-    ]);
-  });
+    expect(hitsOf(ATTENTION_ROUTE, old).map((hit) => hit.text)).toEqual([' — past the ']);
 
-  it('the route holds none, apart from the reasoned allow-list', () => {
-    expect(withoutAllowed(serverHits(), SERVER_REASON_ALLOWED).map(describeHit)).toEqual([]);
-  });
+    const serverHits = hitsOf(ATTENTION_ROUTE, readFileSync(resolve(REPO_ROOT, ATTENTION_ROUTE), 'utf8'));
+    expect(withoutAllowed(serverHits, SERVER_REASON_ALLOWED).map(describeHit)).toEqual([]);
 
-  it('the allow-list is not stale: every entry still matches a string in the route', () => {
+    // The allow-list is not stale: every entry still matches a string in the route, and says why.
     for (const entry of SERVER_REASON_ALLOWED) {
-      expect(serverHits().some((hit) => hit.text.includes(entry.contains))).toBe(true);
+      expect(serverHits.some((hit) => hit.text.includes(entry.contains))).toBe(true);
       expect(entry.reason.trim().length).toBeGreaterThan(10);
     }
   });
