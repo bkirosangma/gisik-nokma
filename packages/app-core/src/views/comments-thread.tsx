@@ -280,7 +280,13 @@ function CommentItem({
             ) : null}
           </p>
           {menuOpen ? (
-            <div className="gn-comment__menu" role="menu" ref={menuRef} onKeyDown={onMenuKey}>
+            <div
+              className="gn-comment__menu"
+              role="menu"
+              aria-label={`More actions for ${name}'s comment`}
+              ref={menuRef}
+              onKeyDown={onMenuKey}
+            >
               {isAuthor ? (
                 <button
                   type="button"
