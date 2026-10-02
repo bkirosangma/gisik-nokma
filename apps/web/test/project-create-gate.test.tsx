@@ -472,7 +472,7 @@ describe('3.144 the write door is never offered an empty actor', () => {
       getPreferences: async () => EMPTY_PREFERENCES,
     });
 
-  it('WHILE THE SESSION RESOLVES: a wait state, not a button — the window a fast click used to post through', async () => {
+  it('WHILE THE SESSION RESOLVES: a busy, DISABLED button (smoothness T6, 25.074) — a fast click goes nowhere, which is the window it used to post through', async () => {
     // `useCurrentUser()` answers null here AND when signed out, and the page
     // used to collapse both to `actorId: ''`. The event reached
     // `POST /v1/events` and `checkRolePermission` refused it
@@ -481,8 +481,13 @@ describe('3.144 the write door is never offered an empty actor', () => {
     // who they were.
     session = { data: null, isPending: true };
     render(<Providers services={servedWorld()}><ProjectPage /></Providers>);
-    expect(await screen.findByText('Preparing the Create ticket form…')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Create ticket' })).not.toBeInTheDocument();
+    // The control is the real trigger's box in a busy state (S1), not a sentence: it cannot be clicked into a create with no actor.
+    const waiting = (await screen.findAllByRole('button', { name: 'Create ticket' }))[0]!;
+    expect(waiting).toBeDisabled();
+    expect(waiting).toHaveAttribute('aria-busy', 'true');
+    await userEvent.click(waiting);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing the Create ticket form…')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign in to create a ticket.')).not.toBeInTheDocument();
   });
 
