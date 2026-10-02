@@ -345,8 +345,8 @@ What changes and what does not:
 - **The workspace's prefix works the same way**, for every project at once. A workspace may take back one
   of its own old prefixes.
 
-Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and
-search by them, but it cannot change a prefix.
+Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix —
+but only after it has shown you what would change and you have confirmed with the old letters.
 
 ### Group your projects
 
@@ -2029,12 +2029,28 @@ do it yourself.
 - **Workspaces.** See the workspaces you belong to, start a new one (you become its owner), rename one,
   archive or restore one, and delete one or bring it back.
 - **Projects.** See a workspace's projects, start one, change its name or description, archive or restore
-  it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts
-  one, but it cannot change a prefix afterwards; do that yourself (§3).
+  it, file it in a group, and delete one or bring it back. The assistant can give a new project a short
+  prefix when it starts one, and an owner or admin can have it change that prefix later (§3).
 - **People.** See who is in a workspace. If you are a guest, you are shown only the people on the tickets
   shared with you — never the full list, and never anyone's email address.
 - **Tickets.** Read them one project at a time, or across a whole workspace at once — *everything assigned to
   me* works — and add, move, comment on and assign them.
+- **Notes.** Read, write and change notes — the whole body, one section under a heading, or a few lines at the end —
+  move them, attach them to tickets, and delete or bring them back.
+- **Comments.** Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete
+  anyone's). Mentions like *@Asha* notify only people who can read the ticket or note.
+- **Files.** Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back.
+- **Every ticket action** — change any field, close and reopen, reorder the backlog, see a ticket's history, delete
+  one or bring it back.
+- **Your work and your inbox.** What is on your plate, what needs attention, your notifications (and marking them
+  read), and invitations waiting for you.
+- **Admin, with a check first.** Inviting and removing people, roles, prefixes, groups, workflows, ticket types,
+  who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing
+  happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the
+  item's current name.
+
+**Formatting comes through.** The assistant writes in Markdown, so headings, lists, bold text, links, mentions and
+ticket links appear in comments and notes exactly as if you had typed them in the app.
 
 **Deleting is never final here.** When your assistant deletes a workspace or a project it goes to **Deleted
 items** on your Account page, where you or the assistant can bring it back for 15 days. Nothing is erased.

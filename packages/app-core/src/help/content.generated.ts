@@ -2215,7 +2215,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and search by them, but it cannot change a prefix."
+                    "text": "Your assistant (§16) can read the numbers, search by them and, for an owner or an admin, change a prefix — but only after it has shown you what would change and you have confirmed with the old letters."
                   }
                 ]
               }
@@ -10897,7 +10897,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, but it cannot change a prefix afterwards; do that yourself (§3)."
+                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, file it in a group, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, and an owner or admin can have it change that prefix later (§3)."
                     }
                   ],
                   [
@@ -10927,7 +10927,88 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " works — and add, move, comment on and assign them."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Notes."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Read, write and change notes — the whole body, one section under a heading, or a few lines at the end — move them, attach them to tickets, and delete or bring them back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Comments."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Comment on tickets and notes, and edit or delete its own comments (an owner or admin can delete anyone's). Mentions like "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "@Asha"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " notify only people who can read the ticket or note."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Files."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Attach a file of up to 10 MB to a ticket, or a picture to a note, and read attachments back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Every ticket action"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — change any field, close and reopen, reorder the backlog, see a ticket's history, delete one or bring it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Your work and your inbox."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " What is on your plate, what needs attention, your notifications (and marking them read), and invitations waiting for you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Admin, with a check first."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Inviting and removing people, roles, prefixes, groups, workflows, ticket types, who can see a ticket and workspace settings. For each, the assistant first shows you what would change; nothing happens until it repeats the exact name of what it is changing — the person, the address, the ticket key or the item's current name."
+                    }
                   ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Formatting comes through."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The assistant writes in Markdown, so headings, lists, bold text, links, mentions and ticket links appear in comments and notes exactly as if you had typed them in the app."
+                  }
                 ]
               },
               {

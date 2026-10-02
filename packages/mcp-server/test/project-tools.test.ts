@@ -12,6 +12,7 @@ const USER = '01J0A5ER0000000000000000AA';
 const WS = '01J0WS000000000000000000AA';
 const WS2 = '01J0WS000000000000000001AA';
 const P = '01J0PR000000000000000000AA';
+const GROUP = '01J0GR000000000000000000AA';
 const COMMITTED = { results: [{ status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-10-01T10:00:00.000Z' }] };
 const COMMITTED_TWO = {
   results: [
@@ -111,11 +112,27 @@ describe('14.317–14.324 project tools', () => {
     expect(f.sent[0]?.[0]).toMatchObject({ type: 'project.updated', origin: 'mcp', actorId: USER, workspaceId: WS, entity: { kind: 'project', id: P } });
     expect(parses(f.sent[0]?.[0])).toBe(true);
     const sentBefore = f.sent.length;
-    await expect(tool('update_project', f.session).handler({ projectId: P })).rejects.toThrow(/name or description/);
+    await expect(tool('update_project', f.session).handler({ projectId: P })).rejects.toThrow(/name, description or groupId/);
     expect(f.sent).toHaveLength(sentBefore); // nothing sent for a no-op
-    // The prefix is immutable (FD3): the tool has no such argument, so it cannot be passed.
-    expect(Object.keys(tool('update_project', f.session).inputSchema)).toEqual(['projectId', 'name', 'description']);
+    // The prefix is changed through `change_prefix`, not here (FD3): the tool has no `prefix` argument. T13 added `groupId` (14.552).
+    expect(Object.keys(tool('update_project', f.session).inputSchema)).toEqual(['projectId', 'name', 'description', 'groupId']);
     await expect(tool('update_project', f.session).handler({ projectId: 'nope', name: 'X' })).rejects.toThrow('project not found or not visible to you');
+  });
+
+  it('14.552 the texts name change_prefix, and update_project files a project in a group (null ungroups)', async () => {
+    const f = fake();
+    const create = tool('create_project', f.session).description;
+    const update = tool('update_project', f.session).description;
+    for (const d of [create, update]) {
+      expect(d).not.toMatch(/cannot be changed|fixed when the project is created/);
+      expect(d).toContain('change_prefix');
+    }
+    expect(update).toContain('groupId');
+    await tool('update_project', f.session).handler({ projectId: P, groupId: GROUP });
+    await tool('update_project', f.session).handler({ projectId: P, groupId: null });
+    await tool('update_project', f.session).handler({ projectId: P, name: 'Shop floor' }); // control: a name-only update is unchanged
+    expect(f.sent.map((b) => (b[0] as { payload: unknown }).payload)).toStrictEqual([{ groupId: GROUP }, { groupId: null }, { name: 'Shop floor' }]);
+    for (const b of f.sent) expect(parses(b[0])).toBe(true);
   });
 
   it('14.319 archive/delete refuse without or with a wrong confirm_name, naming the expected name, and send nothing', async () => {

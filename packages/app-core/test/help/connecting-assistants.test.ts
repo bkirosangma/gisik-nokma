@@ -130,3 +130,29 @@ describe('14.337 §16 says what the assistant can do, and the safety rules for d
     expect(text(entry('What connecting does'))).not.toContain('exact name');
   });
 });
+
+describe('14.553 §16 lists every kind of act, the preview-then-exact-name rule, and Markdown', () => {
+  it('14.553 notes, comments, files, ticket acts, inbox and admin are named; admin acts preview first; bodies are Markdown', () => {
+    const can = text(entry('What your assistant can do'));
+    for (const word of ['notes', 'comments', 'edit or delete', '10 mb', 'picture', 'every ticket action', 'reorder the backlog', 'history', 'notifications', 'invitations', 'admin']) {
+      expect(can, word).toContain(word);
+    }
+    // Admin acts: the preview first, then the exact name — by the words the section uses.
+    expect(can).toContain('first shows you what would change');
+    expect(can).toContain('repeats the exact name');
+    expect(can).toContain('ticket key');
+    expect(can).toContain('formatting comes through');
+    expect(can).toContain('writes in markdown');
+    // The stale sentence is gone: the assistant CAN change a prefix now (§3 says the same).
+    expect(can).not.toContain('cannot change a prefix');
+    const prefixes = manual().sections.find((s) => s.id.startsWith('3-'));
+    expect(prefixes, '§3 exists').toBeDefined();
+    const prefixText = prefixes!.entries.map((e) => text(e)).join(' ');
+    expect(prefixText).toContain('change a prefix'); // control: the §3 sentence is still there, so its absence-of-"cannot" below is a real reading
+    expect(prefixText).not.toContain('cannot change a prefix');
+    expect(prefixText).not.toContain('not for your assistant');
+    // CONTROL, same `it`: the older entry still carries its own rule, so the check reads this entry and not a stale one.
+    expect(can).toContain('15 days');
+    expect(can).toContain('exact name');
+  });
+});

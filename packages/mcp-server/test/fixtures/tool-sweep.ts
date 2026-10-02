@@ -31,6 +31,7 @@ const TICKET_DETAIL = { key: 'W-1', title: 'A ticket', ticketState: { fields: {}
 
 export const SWEEP: Record<string, SweepEntry> = {
   // read begin
+  search: { args: { workspaceId: 'w', query: 'q' } },
   search_tickets: { args: { workspaceId: 'w', query: 'q' } },
   list_tickets: { args: { projectId: 'p' } },
   get_ticket: { args: { workspaceId: 'w', ticketId: 't' } },
@@ -115,5 +116,6 @@ export const SWEEP: Record<string, SweepEntry> = {
   update_workspace_settings: { args: { workspaceId: 'w', staleDays: 9, confirm_name: 'W' }, session: { get: definitionsGet } },
   // definition-admin end
   // trash begin (T13)
+  list_deleted: { args: {} },
   // trash end
 };

@@ -25,14 +25,14 @@ import { envelopeFor, submitBatch, submitOne } from './submit.js';
  * CURRENT name, read from the directory at call time and never remembered: a
  * check against a name read earlier would let a delete through on an old name
  * (plan Review Focus 1). `update_project` has no `prefix` argument: the prefix
- * is changed by an owner or admin through the app (the event carries one since
- * the prefixes and groups plan Task 1; the MCP gains no such tool there).
+ * is changed by an owner or admin through `change_prefix` (member-admin-tools.ts), behind a confirmation.
  */
 const NOT_FOUND = 'project not found or not visible to you';
 const projectId = z.string().min(1);
 const workspaceId = z.string().min(1);
 const name = z.string().min(1);
 const description = z.string().max(500);
+const groupId = z.string().min(1).nullable();
 const include = z.array(z.enum(['archived', 'deleted'])).optional();
 
 type Found = { workspace: DirectoryWorkspace; project: DirectoryProject };
@@ -129,7 +129,7 @@ export function projectTools(session: Session): ToolDefinition[] {
         'Create a project in a workspace; you become its project admin. Only a workspace owner or admin ' +
         'can. `description` (optional, up to 500 characters) says what the project is for; `prefix` ' +
         '(optional, 1 to 3 capital letters) is the second half of every ticket key in it, and is derived ' +
-        'from the name when left out. The prefix cannot be changed later. Answers with the committed events; ' +
+        'from the name when left out. An owner or admin can change it later with change_prefix. Answers with the committed events; ' +
         'find the new project\'s id with list_projects.',
       inputSchema: {
         workspaceId,
@@ -162,20 +162,21 @@ export function projectTools(session: Session): ToolDefinition[] {
     {
       name: 'update_project',
       description:
-        'Change a project\'s name and/or description. Give at least one; a key you leave out is left ' +
-        'alone, and `description: ""` clears the description. Only a workspace owner or admin can. The ' +
-        'prefix is fixed when the project is created and cannot be changed.',
-      inputSchema: { projectId, name: name.optional(), description: description.optional() },
+        'Change a project\'s name, description and/or group. Give at least one; a key you leave out is left ' +
+        'alone, and `description: ""` clears the description. Only a workspace owner or admin can. ' +
+        'To change its prefix use change_prefix; to file it in a group pass groupId (null takes it out of its group).',
+      inputSchema: { projectId, name: name.optional(), description: description.optional(), groupId: groupId.optional() },
       handler: async (args) => {
-        const a = z.object({ projectId, name: name.optional(), description: description.optional() }).parse(args);
-        if (a.name === undefined && a.description === undefined) {
-          throw new Error('update_project needs a new name or description (or both)');
+        const a = z.object({ projectId, name: name.optional(), description: description.optional(), groupId: groupId.optional() }).parse(args);
+        if (a.name === undefined && a.description === undefined && a.groupId === undefined) {
+          throw new Error('update_project needs a new name, description or groupId');
         }
         const { workspace } = await findProject(session, a.projectId);
         const payload = {
           ...(a.name === undefined ? {} : { name: a.name }),
           // An empty description is how an assistant says "clear it"; the event spells that `null`.
           ...(a.description === undefined ? {} : { description: a.description === '' ? null : a.description }),
+          ...(a.groupId === undefined ? {} : { groupId: a.groupId }),
         };
         return submitOne(
           session,
