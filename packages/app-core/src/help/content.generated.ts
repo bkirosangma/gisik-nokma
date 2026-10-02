@@ -5233,7 +5233,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Nothing in the backlog — new tickets land here.\""
+                    "text": "\"Nothing in the backlog. Tickets you add land here.\""
                   },
                   {
                     "kind": "text",
@@ -5241,7 +5241,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Nothing in the backlog — epics appear in the List.\""
+                    "text": "\"Nothing in the backlog. Epics appear in the List.\""
                   }
                 ]
               }
@@ -5448,7 +5448,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No tickets here yet — create one.\""
+                    "text": "\"No tickets here yet. Create one.\""
                   },
                   {
                     "kind": "text",

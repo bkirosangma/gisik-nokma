@@ -98,7 +98,7 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
   it('3.125 the empty state offers the second sentence it always needed', async () => {
     mount({}, async () => []);
     const empty = await screen.findByText(/No workspaces yet/);
-    expect(empty).toHaveTextContent('Ask an admin for an invite link — or create your own.');
+    expect(empty).toHaveTextContent('Ask an admin for an invite link, or create your own.');
     expect(screen.getByRole('button', { name: 'Create workspace' })).toBeInTheDocument();
   });
 

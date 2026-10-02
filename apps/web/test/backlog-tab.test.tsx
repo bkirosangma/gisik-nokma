@@ -155,7 +155,7 @@ describe('13.594 the Backlog tab', () => {
 
 /** 13.596 — the empty copy when the project holds no backlog rows. */
 describe('13.596 the Backlog tab, empty', () => {
-  it('shows "Nothing in the backlog. New tickets land here." with no backlog rows', async () => {
+  it('shows "Nothing in the backlog. Tickets you add land here." with no backlog rows', async () => {
     const focusedRow = row({ ticketId: 'ft_1', title: 'Focused ticket' });
     render(
       <Providers services={servedWorld([focusedRow])}>
@@ -164,7 +164,7 @@ describe('13.596 the Backlog tab, empty', () => {
     );
     await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
     expect(
-      await screen.findByText('Nothing in the backlog. New tickets land here.'),
+      await screen.findByText('Nothing in the backlog. Tickets you add land here.'),
     ).toBeInTheDocument();
   });
 });
@@ -175,7 +175,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
    * SERVER read (`listFilter`, above `useTicketList`), and a backlog ticket's
    * category is `open` — so with the toggle on, every backlog row is stripped
    * before any screen-level fold sees it. The Backlog tab then rendered
-   * *"Nothing in the backlog. New tickets land here."* over a project that may
+   * *"Nothing in the backlog. Tickets you add land here."* over a project that may
    * hold plenty, and nothing on the tab said the toggle was why. The file itself
    * recorded this as `RECORDED, NOT FIXED`.
    *
@@ -221,7 +221,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
 
     expect(await screen.findByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeInTheDocument();
     expect(
-      screen.queryByText('Nothing in the backlog. New tickets land here.'),
+      screen.queryByText('Nothing in the backlog. Tickets you add land here.'),
     ).toBeNull();
     // And the backlog's own row is really gone from the read — without this the
     // case would pass against a page that never narrowed anything.
@@ -244,7 +244,7 @@ describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)
     await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
 
     expect(
-      await screen.findByText('Nothing in the backlog. New tickets land here.'),
+      await screen.findByText('Nothing in the backlog. Tickets you add land here.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeNull();
   });

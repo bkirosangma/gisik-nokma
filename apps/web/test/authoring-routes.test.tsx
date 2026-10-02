@@ -71,7 +71,7 @@ function rosterWhereIAm(role: WorkspaceMember['role']): WorkspaceMember[] {
 }
 
 const READ_ONLY_COPY =
-  'You can look, not touch — only a workspace owner or admin can change workflows and ticket types.';
+  'You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.';
 
 describe('the template gallery is a route-level authoring entry point, and a member is not offered it', () => {
   /**

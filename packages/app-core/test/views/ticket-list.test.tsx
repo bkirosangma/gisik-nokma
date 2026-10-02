@@ -1169,11 +1169,11 @@ describe('13.596 emptyCopy renders only when a caller passes one, over a zero-ro
         onPrefsChange={vi.fn()}
         labels={LABELS}
         onOpenTicket={vi.fn()}
-        emptyCopy="Nothing in the backlog — new tickets land here."
+        emptyCopy="Nothing in the backlog. Tickets you add land here."
       />,
     );
     expect(screen.getByTestId('list-empty')).toHaveTextContent(
-      'Nothing in the backlog — new tickets land here.',
+      'Nothing in the backlog. Tickets you add land here.',
     );
   });
 

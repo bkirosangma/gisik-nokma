@@ -920,8 +920,8 @@ visible when the backlog is grouped; hover one and it says so. Each row also has
 moves that ticket into its workflow.
 
 It does not leave closed tickets out, unlike the Calendar and the Timeline below. When it is empty it says
-so: *"Nothing in the backlog — new tickets land here."* — or, when the only thing it would have listed
-was an epic, *"Nothing in the backlog — epics appear in the List."*
+so: *"Nothing in the backlog. Tickets you add land here."* — or, when the only thing it would have listed
+was an epic, *"Nothing in the backlog. Epics appear in the List."*
 
 ### Board
 
@@ -969,7 +969,7 @@ in that state by definition. There is no switch you flip on an individual ticket
 need a state built for it.
 
 **If the board is empty** it says **which** emptiness it is. A project with no tickets at all gets
-*"No tickets here yet — create one."* A project whose only tickets are epics gets *"No tickets in this
+*"No tickets here yet. Create one."* A project whose only tickets are epics gets *"No tickets in this
 view — epics appear in the List."* — an epic is real work that this view does not draw, so "create one"
 would name the wrong remedy and the List is where it lives.
 

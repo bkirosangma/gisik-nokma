@@ -185,7 +185,7 @@ describe('23.193 formatDay is the one day renderer', () => {
   });
 
   it("the card's provenance line renders its day through it (23.123 keeps its own cases)", () => {
-    const claim = { actorId: 'u1', actorName: 'Anselma Marak', serverTime: '2025-08-19T10:00:00.000Z' };
+    const claim = { actorId: 'u1', actorName: 'Anselma Marak', clientTime: '2025-08-19T10:00:00.000Z', serverTime: '2025-08-19T10:00:00.000Z' };
     expect(formatCardProvenance('Doing', claim, '2026-10-02')).toBe('Moved to Doing by Anselma Marak on 19 Aug 2025');
     const thisYear = { ...claim, serverTime: '2026-08-19T10:00:00.000Z' };
     expect(formatCardProvenance('Doing', thisYear, '2026-10-02')).toBe('Moved to Doing by Anselma Marak on 19 Aug');

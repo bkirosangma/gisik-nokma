@@ -584,8 +584,8 @@ describe('AccountPage — Sessions', () => {
     ]);
     const user = userEvent.setup();
     mount();
-    expect(await screen.findByText('Chrome on Mac · 7F3K')).toBeInTheDocument();
-    expect(screen.getByText('Unknown device · Q2ZA')).toBeInTheDocument();
+    expect(await screen.findByText('Chrome on Mac (7F3K)')).toBeInTheDocument();
+    expect(screen.getByText('Unknown device (Q2ZA)')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/v1/me/devices', { credentials: 'include' });
     const readsBefore = deviceReads();
     await user.click(screen.getByRole('button', { name: /^Sign out this device/ }));
