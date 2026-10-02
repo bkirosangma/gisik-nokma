@@ -40,7 +40,9 @@ import type { HelpEntry } from '../../src/help/types.js';
  *
  * `productText(REPO_ROOT)` — the same function `check:help` calls, walking
  * `apps/` and `packages/`, excluding `content.generated.ts` (a copy of the
- * corpus, which would make every quoted string "found" inside itself).
+ * corpus, which would make every quoted string "found" inside itself) and, since F-7
+ * (2026-10-02), every test file and test directory (`isTestPath`): a string only a test
+ * asserts is not one the product shows.
  *
  * Mutation witnessed: hand-editing one checked entry's quoted string to a
  * value no product file contains reddened `missing`, naming that string;

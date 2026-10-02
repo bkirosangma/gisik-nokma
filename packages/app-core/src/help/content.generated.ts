@@ -14991,7 +14991,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "They come in pages of fifty with a \"load more\" that picks up exactly where the last one stopped — no repeats, no gaps."
+                    "text": "They come in pages of fifty with a \"Load more\" that picks up exactly where the last one stopped — no repeats, no gaps."
                   }
                 ]
               }

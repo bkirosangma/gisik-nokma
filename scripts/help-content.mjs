@@ -408,9 +408,10 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
  * whole batch exists for, so the exclusion is stated here by name.
  */
 /**
- * A test file or a test directory (F-7, 2026-10-02): `test/`, `tests/`, `__tests__/`, any directory whose name starts
- * `e2e` (`e2e`, `e2e-stack`, `e2e-viewport`), and files named `x.test.y` or `x.spec.y`. The path is the one segment or the whole
- * root-relative path, `/`-separated.
+ * A test file or a path inside a test directory (F-7, 2026-10-02). A test DIRECTORY is `test`,
+ * `tests`, `__tests__` or any name that starts `e2e` (`e2e`, `e2e-stack`, `e2e-viewport`); a test FILE
+ * is named `x.test.y` or `x.spec.y`. `path` is root-relative and `/`-separated; a trailing `/` says it
+ * names a directory, so the walk asks about directories and files with this one function.
  *
  * A manual quotation that is "found" only in a test's fixture string is not shown in the product, so
  * the haystack leaves tests out: the same reason it leaves out comments (`stripComments`) and the
@@ -420,10 +421,12 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
  * @returns {boolean}
  */
 export function isTestPath(path) {
-  const segments = path.split('/');
-  const file = segments[segments.length - 1] ?? '';
-  if (/\.(test|spec)\.[^/]+$/.test(file)) return true;
-  return segments.some((seg) => seg === 'test' || seg === 'tests' || seg === '__tests__' || seg.startsWith('e2e'));
+  const isDirectory = path.endsWith('/');
+  const segments = path.split('/').filter((seg) => seg !== '');
+  const last = segments.pop() ?? '';
+  const isTestDir = (name) => name === 'test' || name === 'tests' || name === '__tests__' || name.startsWith('e2e');
+  if (segments.some(isTestDir)) return true;
+  return isDirectory ? isTestDir(last) : /\.(test|spec)\.[^/]+$/.test(last);
 }
 
 const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
@@ -468,7 +471,7 @@ const COMMENTED_EXT = /\.(ts|tsx|js|jsx|mjs|css)$/;
 /**
  * Every product file's text, joined — the haystack a quoted string is looked for in.
  * Comments are removed from source and stylesheets (see `stripComments`); JSON and
- * Markdown are read whole.
+ * Markdown are read whole. Test files and test directories are left out (`isTestPath`, F-7).
  *
  * @param {string} root
  * @returns {string}
@@ -479,7 +482,7 @@ export function productText(root) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (PRODUCT_SKIP.has(entry.name)) continue;
       const p = join(dir, entry.name);
-      if (isTestPath(relative(root, p).split(sep).join('/'))) continue;
+      if (isTestPath(relative(root, p).split(sep).join('/') + (entry.isDirectory() ? '/' : ''))) continue;
       if (entry.isDirectory()) walk(p);
       else if (PRODUCT_EXT.test(entry.name) && !p.endsWith(GENERATED_COPY)) {
         const raw = readFileSync(p, 'utf8');
@@ -531,6 +534,24 @@ export function compareAbsent({ documents, product, baseline }) {
   }
   const resolved = baseline.absent.filter((s) => !absentNow.has(s)).sort();
   return { checked, undeclared, resolved };
+}
+
+/**
+ * The baseline's `reasons` map (F-7): the one-line why beside a declared absence. `absent` stays a plain
+ * list so an old entry is valid with no reason; a reason is checked when one is given. A reason for a
+ * string that is not in `absent` describes nothing (the entry was deleted or renamed), and a reason too
+ * short to say why is a placeholder.
+ *
+ * @param {{absent: string[], reasons?: Record<string, string>}} baseline
+ * @returns {string[]} one sentence per problem, empty when the reasons are sound
+ */
+export function reasonProblems(baseline) {
+  const problems = [];
+  for (const [span, reason] of Object.entries(baseline.reasons ?? {})) {
+    if (!baseline.absent.includes(span)) problems.push(`a reason for "${span}", which is not in "absent"`);
+    else if (typeof reason !== 'string' || reason.trim().length <= 10) problems.push(`the reason for "${span}" is too short to say why`);
+  }
+  return problems;
 }
 
 // ── The self-test, run before any --check certifies anything ─────────────────
@@ -842,6 +863,12 @@ function main() {
         'claim). If the absence is intended — a worked example, a paraphrase of a screen — declare it in ' +
         `${BASELINE} with that reason beside it.`,
     );
+    process.exit(1);
+  }
+  const unsound = reasonProblems(baseline);
+  if (unsound.length > 0) {
+    console.error(`help-content: ${BASELINE} has unsound reasons:`);
+    for (const problem of unsound) console.error(`  ${problem}`);
     process.exit(1);
   }
   if (resolved.length > 0) {
