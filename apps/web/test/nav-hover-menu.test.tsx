@@ -68,6 +68,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/**
+ * `getMyWorkspaces` reads one bar mount sends. Three, and all three predate U-T14: the workspace name (`useWorkspaceLookup`),
+ * Last project's list (`useWorkspaceProjects` in `LastProjectNav`) and the phone switcher's (`useWorkspaceProjects` in
+ * `PhoneSwitcher`, mounted but hidden above 40rem). The workspace dropdown adds NONE: its rows ride the name's read.
+ */
+const BAR_MOUNT_READS = 3;
 const sleep = (ms: number) => new Promise<void>((settle) => setTimeout(settle, ms));
 
 function project(over: Partial<ProjectRef> & { id: string }): ProjectRef {
@@ -223,7 +229,38 @@ describe('23.251 / 23.252 the close delay', () => {
     expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeNull();
   });
 
-  it('23.252 a pending close is cancelled by unmount and by Escape (no state set on a gone component, no late reopen)', async () => {
+  it('23.252 the pointer leaving with the focus OUTSIDE, then focus arriving inside the delay: the list the reader just focused stays open (the timer re-checks focus)', async () => {
+    rememberTwo();
+    renderBar(servicesFor([WS_1]));
+    const trigger = await projectTrigger();
+    await userEvent.hover(trigger);
+    const menu = await screen.findByRole('menu', { name: 'Projects' });
+    const row = within(menu).getAllByRole('menuitem')[0] as HTMLElement;
+    // The pointer leaves with focus nowhere near the item, so the leave guard lets the timer start …
+    expect(document.body).toHaveFocus();
+    await userEvent.unhover(trigger);
+    // … and before it fires, focus arrives on a ROW (a Tab from the trigger, or a script). A row has no focus handler of
+    // its own, so only the timer's re-check keeps the list the reader just focused open.
+    await act(async () => row.focus());
+    await sleep(NAV_MENU_CLOSE_DELAY_MS * 2);
+    expect(row).toHaveFocus();
+    expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    // CONTROL (same `it`): focus onto the TRIGGER inside the delay also keeps it open — there `onFocus` cancels the timer
+    // outright (so this half cannot judge the re-check; the row half above does).
+    await act(async () => (document.activeElement as HTMLElement).blur());
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Projects' })).toBeNull());
+    await userEvent.hover(trigger);
+    await screen.findByRole('menu', { name: 'Projects' });
+    await userEvent.unhover(trigger);
+    await act(async () => trigger.focus());
+    await sleep(NAV_MENU_CLOSE_DELAY_MS * 2);
+    expect(screen.queryByRole('menu', { name: 'Projects' })).not.toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('23.252 unmount with a close pending raises no error', async () => {
     rememberTwo();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const { unmount } = renderBar(servicesFor([WS_1]));
@@ -329,6 +366,35 @@ describe('23.254–23.257 the workspace name opens the same dropdown', () => {
     expect(screen.getByRole('link', { name: 'Workspaces' })).toHaveAttribute('href', '/workspaces');
     // The Last project item is a SIBLING, not inside the workspace group.
     expect(name.closest('.gn-nav__workspace-group')?.querySelector('.gn-nav__project')).toBeNull();
+  });
+
+  it('23.254 ONE getMyWorkspaces read per bar feeds both the name and the dropdown rows; a refused read gives neither', async () => {
+    let calls = 0;
+    renderBar(
+      servicesFor(async () => {
+        calls += 1;
+        return LIVE_3;
+      }),
+    );
+    const name = await workspaceTrigger();
+    await waitFor(() => expect(name).toHaveAttribute('aria-haspopup', 'menu'));
+    await userEvent.hover(name);
+    const menu = await screen.findByRole('menu', { name: 'Workspaces' });
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2);
+    // The dropdown's rows came from the name's own read: a second request for them would make this 4.
+    expect(calls).toBe(BAR_MOUNT_READS);
+
+    // CONTROL (same `it`): a refused read gives no name and no list.
+    cleanup();
+    clearWorkspaceNameCache();
+    renderBar(
+      servicesFor(async () => {
+        throw new Error('refused');
+      }),
+    );
+    await sleep(50);
+    expect(screen.queryByRole('link', { name: 'Convenience Corner' })).toBeNull();
+    expect(screen.queryByRole('menu', { name: 'Workspaces' })).toBeNull();
   });
 
   it('23.254 the row of the page you are on is marked aria-current', async () => {
