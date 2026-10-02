@@ -1,4 +1,4 @@
-import { clearLiveQueryCache } from '@gisik-nokma/app-core';
+import { clearLiveQueryCache } from '@gisik-nokma/app-core/data';
 
 /**
  * Every read this shell keeps in memory for the signed-in person, emptied in one

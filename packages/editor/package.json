@@ -14,12 +14,19 @@
       "types": "./dist/webview/bridge.d.ts",
       "default": "./dist/webview/bridge.js"
     },
+    "./upload": {
+      "types": "./dist/upload.d.ts",
+      "default": "./dist/upload.js"
+    },
     "./markdown-doc": {
       "types": "./dist/markdown-doc/index.d.ts",
       "default": "./dist/markdown-doc/index.js"
     },
     "./editor.css": "./src/styles/editor.css"
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:webview": "vite build --config vite.webview.config.ts",

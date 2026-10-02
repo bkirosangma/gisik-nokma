@@ -47,7 +47,7 @@ import {
   writeFailureCopy,
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
-import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
+import { TicketEditorSlot, prefetchEditor, uploadAttachmentHttp } from '../../../../../src/editor-slot.js';
 import {
   Avatar,
   Chip,
@@ -1403,8 +1403,11 @@ function ProjectBoard() {
     top. it should not scroll"*). `openParentTicket` below is the one door this
     does NOT blanket — see its own note.
   */
-  const openTicket = (ticketId: string) =>
+  const openTicket = (ticketId: string) => {
+    // The editor is its own chunk (smoothness T10): start fetching it as the sheet opens, not when the sheet first renders it.
+    prefetchEditor();
     router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`, { scroll: false });
+  };
   const closeTicket = () =>
     router.push(`/w/${workspaceId}/p/${projectId}`, { scroll: false });
   /**
