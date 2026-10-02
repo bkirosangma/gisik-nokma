@@ -2,6 +2,7 @@ import { PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/
 import type { DataSource, DataSourceQuery } from '../data-source.js';
 import type { Actor, FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { SessionExpiredError } from '../session-expired.js';
+import { readEpoch } from '../read-epoch.js';
 import { HttpError, createHttpClient, type FetchLike, type HttpClient } from './http.js';
 import {
   boardWorkspaceId,
@@ -46,6 +47,9 @@ import { createStreamSubscriber, type WebSocketLike } from './stream.js';
 
 /** The contract is 1..100 — `MAX_BATCH_SIZE` in `apps/server/src/routes/events.ts`. */
 export const MAX_INGEST_BATCH = 100;
+
+/** One roster join per workspace per this many milliseconds (smoothness T3, FD7): "fresh per read" became "fresh per burst". */
+export const ROSTER_BURST_MS = 1000;
 
 export type OnlineDataSourceDeps = {
   /** HTTP origin — '' when a shell proxies same-origin (Next rewrites). */
@@ -132,14 +136,20 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
   const http: HttpClient = createHttpClient(deps.baseUrl, fetchImpl);
 
   /**
-   * The workspace roster, fetched fresh for every board, ticket and list read.
+   * The workspace roster, joined at most once per second per workspace
+   * (smoothness T3, FD7). It was "fresh for every board, ticket and list read";
+   * a stream frame on the project page fires about seven reloads at once, each
+   * joining it, so one burst is now one join (`ROSTER_BURST_MS`).
    *
-   * NOT cached across calls, deliberately: a cached roster keeps naming somebody
-   * whose membership was revoked, on a surface whose whole job is saying who
-   * claimed what. A 404 (this caller may not read the roster — a guest gets one
-   * from `door(..., 'no-guests')`) yields an EMPTY roster rather than
-   * propagating, because "no name known" is what an empty roster means and it is
-   * what `mapAssignee` already handles.
+   * Cached only for the burst, deliberately: a longer cache keeps naming
+   * somebody whose membership was revoked, on a surface whose whole job is
+   * saying who claimed what. A membership revoked mid-second is named for under
+   * a second. The memo is stamped with the read epoch, so a sign-out (and a
+   * different person's read) never reuses the previous person's join, and a
+   * failed join is dropped at once rather than remembered. A 404 (this caller may
+   * not read the roster — a guest gets one from `door(..., 'no-guests')`) yields
+   * an EMPTY roster rather than propagating, because "no name known" is what an
+   * empty roster means and it is what `mapAssignee` already handles.
    *
    * ONE call per read, never one per page: `getTickets` walks up to `LIST_PAGE_CAP`
    * pages and joins ONCE before mapping them (case 13.1290). A join inside the
@@ -147,16 +157,29 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
    * change between them — and, worse, a membership revoked mid-walk could name
    * the same person two ways inside one view.
    */
+  const rosterBurst = new Map<string, { at: number; epoch: number; promise: Promise<Map<string, string>> }>();
   async function workspaceRoster(workspaceId: string): Promise<Map<string, string>> {
+    const now = Date.now();
+    const epoch = readEpoch();
+    const hit = rosterBurst.get(workspaceId);
+    if (hit !== undefined && hit.epoch === epoch && now - hit.at < ROSTER_BURST_MS) return hit.promise;
     // Two reads, in parallel, one join. The roster is the directory and hides a
     // guest from a non-admin; the names-only read names them anyway. Either may
     // be refused (a guest viewer gets a 404 from both) and each refusal is an
     // empty answer, never a failure of the read that asked.
-    const [raw, names] = await Promise.all([
-      http.get(`/v1/workspaces/${workspaceId}/members`),
-      actorNames(workspaceId),
-    ]);
-    return withActorNames(raw === null ? new Map() : rosterByActorId(mapActors(raw)), names);
+    const promise = (async () => {
+      const [raw, names] = await Promise.all([
+        http.get(`/v1/workspaces/${workspaceId}/members`),
+        actorNames(workspaceId),
+      ]);
+      return withActorNames(raw === null ? new Map() : rosterByActorId(mapActors(raw)), names);
+    })();
+    const entry = { at: now, epoch, promise };
+    rosterBurst.set(workspaceId, entry);
+    promise.catch(() => {
+      if (rosterBurst.get(workspaceId) === entry) rosterBurst.delete(workspaceId);
+    });
+    return promise;
   }
 
   async function actorNames(workspaceId: string): Promise<Actor[]> {

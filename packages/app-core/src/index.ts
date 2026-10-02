@@ -29,7 +29,20 @@ export {
   type PrecheckResult,
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
-export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
+export { useLiveQuery, type LiveQueryOptions, type LiveQueryResult } from './views/use-live-query.js';
+export {
+  LIVE_QUERY_CACHE_MAX,
+  LIVE_QUERY_CACHE_TTL_MS,
+  clearLiveQueryCache,
+  forgetLiveQuery,
+  liveQueryAgeMs,
+  liveQueryStoreKey,
+  recallLiveQuery,
+  rememberLiveQuery,
+} from './views/live-query-cache.js';
+export { scheduleReload, subscribeReloads } from './views/reload-scheduler.js';
+export { withInflightDedupe } from './inflight-dedupe.js';
+export { readEpoch } from './read-epoch.js';
 export { useActorNames } from './views/use-actor-names.js';
 export {
   Board,
