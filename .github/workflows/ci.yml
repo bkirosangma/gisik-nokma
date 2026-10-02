@@ -618,11 +618,26 @@ jobs:
         run: pnpm turbo run build --filter=@gisik-nokma/domain
 
       - name: run the deployed-stack E2E
+        env:
+          # passkey-registration.spec.ts logs its WebAuthn setup, console and request trail (13.1731).
+          GISIK_E2E_DIAG: "1"
         run: pnpm run test:e2e:stack
 
       - name: stack logs on failure
         if: failure()
-        run: docker compose -f docker-compose.dev.yml logs --tail=200 || true
+        run: |
+          docker compose -f docker-compose.dev.yml logs --tail=200 || true
+          # the registration ceremony's server side, for the passkey hang (13.1731)
+          docker compose -f docker-compose.dev.yml logs --no-color --tail=800 server | grep -i "passkey\|webauthn\|/v1/auth\|error" || true
+
+      - name: upload the E2E traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-stack-test-results
+          path: apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: tear the stack down
         if: always()

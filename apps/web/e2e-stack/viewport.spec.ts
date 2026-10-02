@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { sweepBorders } from './helpers/non-text-contrast.js';
+import { splitByExemption } from './helpers/contrast-exemptions.js';
 import {
   RATCHETED,
   readAccessibleBaseline,
@@ -1164,6 +1165,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
 
   const roster = [...worst.entries()].sort((a, b) => a[1].ratio - b[1].ratio);
   const below = roster.filter(([, r]) => r.ratio < 3);
+  // 13.1730 — the ONE owner-exempted class (`nav.gn-bottom-bar`, a container); exact-signature match, see helpers/contrast-exemptions.ts.
+  const { failing: failingBelow, exempt: exemptBelow } = splitByExemption(below);
 
   /*
    * 13.356 — the SANCTIONED waiver. Not a `worst` entry (nothing this sweep
@@ -1261,7 +1264,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
           'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
           '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
           '`headSha` then names its BASE rather than what was actually swept.',
-        belowCount: below.length,
+        belowCount: failingBelow.length,
+        exemptions: exemptBelow,
         totalClasses: roster.length,
         examined: examinedTotal,
         highestReading: Number(bestSeen.toFixed(2)),
@@ -1317,7 +1321,7 @@ test('records non-text contrast across the signed-in surface, with a positive co
    * stays honest no matter how many borders the product ends up with.
    */
   expect(
-    below.map(([selector, r]) => `${selector} ${r.ratio.toFixed(2)}`),
+    failingBelow.map(([selector, r]) => `${selector} ${r.ratio.toFixed(2)}`),
     'non-text contrast regressed — these classes render below WCAG 1.4.11 3:1',
   ).toEqual([]);
 

@@ -1849,7 +1849,7 @@ test('13.299 — /workspaces with an EMPTY roster renders the empty state and th
 
   // ── POSITIVE CONTROL. Awaited, and gated on the stubbed `[]`.
   await expect(
-    page.getByText('No workspaces yet. Ask an admin for an invite link — or create your own.'),
+    page.getByText('No workspaces yet. Ask an admin for an invite link, or create your own.'),
   ).toBeVisible();
   // `toHaveCount(1)` rather than `toBeVisible`: two buttons sharing this
   // accessible name would satisfy visibility and would be a real defect (the
