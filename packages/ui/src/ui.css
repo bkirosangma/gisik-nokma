@@ -6425,7 +6425,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--gn-fill-secondary` is a real, distinct token in every style (a translucent
    fill over the surface, never `none` — the same token `.gn-refusal` uses), so
    this is a genuine background change everywhere; the sunken shadow layers on
-   top where the style has a real one (neo). */
+   top where the style has a real one (neo; **N9, 24.043: in neo the hover is now the compact RAISE, the
+   `[data-style="neo"] .gn-help__toggle:hover` arm below, and the sunken layer no longer applies there**). */
 .gn-help__toggle:hover { background: var(--gn-fill-secondary); box-shadow: var(--gn-shadow-sunken); }
 /* N9 (case 24.043): in neo hover LIFTS and press recesses, so the hover arm is the compact raise. hig/minimal keep the rule above. */
 [data-style="neo"] .gn-help__toggle:hover { box-shadow: var(--gn-shadow-raised-compact); }
@@ -7027,7 +7028,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Manual/FAQ switch and the ticket-type editor — which is the point: the
    reference defines the component once. */
 [data-style="neo"] .gn-segmented__item--on {
-  /* `surfaceSunken`, not the base rule's `surfaceRaised` — CONFIRMED against
+  /* **AMENDED 2026-10-02 (neo refresh N2, N10; cases 24.041, 24.040): what this rule reads NOW.** The ground is `--gn-surface-track`
+     (declared below), not `surfaceSunken`: N2 made `surfaceSunken` the well, and a pressed segment is never lighter than the track
+     it is cut into. The fields no longer take a "sunken shadow" either: N10 gave them `--gn-shadow-field`. The history below
+     records the 2026-09 reasoning and its first sentence is no longer what the rule paints.
+
+     `surfaceSunken`, not the base rule's `surfaceRaised` — CONFIRMED against
      the reference rather than reasoned from the word "sunken". Its own
      `--segOnBg` under `neo` is `#F1EAE3` light and `#1B2340` dark, and those
      are byte-for-byte this product's `surfaceSunken` in the same two arms
@@ -7173,6 +7179,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: not-allowed;
 }
 /* ── OWNER RULING 2026-10-02 (U5, UX fixes T1; case 23.002): under `neo` a text field is sunken AND ringed.
+   **(SUPERSEDED for neo by the N10 paragraph below, 2026-10-02: the neo field wears no ring now. The U5 heading above and the
+   "ring" paragraph below are history; the rule at the foot of this block is what renders.)**
 
    History, kept because it is the reason this rule is shaped as it is. On 2026-09-09 (Task 14 AMENDMENT rule (a))
    the owner ruled the empty neo input "pure neo look": sunken, `border: none`, even though its shadow edge measured
@@ -7181,7 +7189,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the owner reversed the waiver for TEXT FIELDS: **"borders on buttons only" became "borders on buttons and text
    fields".** It stays in full for cards, wells, notices and rows, which keep their shadow-only edge.
 
-   The ring is a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
+   (U5, SUPERSEDED for neo by N10 below.) The ring was a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
    raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
    `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
    to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
@@ -7190,8 +7198,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    OWNER RULING N10 (2026-10-02, "go with B in neumorphic"; case 24.040): a neo text field has NO uniform rim. Its boundary is the
    recess edge — a crisp 1px line at >= 3:1 on one side, as WCAG 1.4.11's partial-edge example allows (light: the dark line
    top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 4.38 against the page).
-   The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the U5 ring through the base rule above;
-   `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
+   The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the base rule's `--gn-border` edge above
+   (13.291; U5's ring was neo-only, so there is no ring for them to keep); `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
 [data-style="neo"] .gn-field__input {
   border: 1px solid transparent;
   background: var(--gn-surface-sunken);
@@ -7549,7 +7557,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font: inherit;
   font-size: 1.0625rem;
 }
-/* U5 (case 23.002): the project search is a text field, so under `neo` it wears the ring too. It had no neo arm and no
+/* U5 (case 23.002) — SUPERSEDED by N10 (24.040; the inline line in the rule below): the neo project search is the rim-less neo field, not ringed. U5 wrote: the project search is a text field, so under `neo` it wears the ring too. It had no neo arm and no
    border at all (`border: none` above, the sunken shadow alone), which measured 1.18 in light. */
 [data-style="neo"] .gn-project__search {
   /* N10 (case 24.040) supersedes the ring: the same rim-less field the other three neo arms wear. */

@@ -60,6 +60,9 @@ card-scale) and is recorded here only for completeness, not as a call.
   the neo rule is no longer borderless. It is sunken AND ringed — `border: 1px solid var(--gn-field-rim)`
   (≥ 3:1) — and the 1.24/1.16 waiver above is retired for text fields; cards, wells, notices and rows keep
   their shadow-only edge. The test asserts the ring and that `border: none` is gone.**
+  **AMENDED 2026-10-02 by N10 (neo refresh, case 24.040): the ring is retired.** The neo rule is `border: 1px solid transparent`
+  (so the box keeps its size) with `box-shadow: var(--gn-shadow-field)`, whose line layer is the boundary. The test now asserts
+  the transparent border, the `field` shadow, the sunken ground, and that `border: none` stays gone; the ring text above is history.
 - **13.340** ✅ No `[data-style="…"]` block anywhere in `ui.css` touches `.gn-button` — a positive scan
   (at least one `[data-style]` block must exist, so "found none" cannot pass by finding nothing), which
   makes 13.289's unconditional assertion the WHOLE story for every style: ghost/secondary controls keep
@@ -277,7 +280,9 @@ at all; `/workspaces` gained one new element (the role label, 13.357).
   image: both DOM checks passed (`border: none` and a real `box-shadow` on `/sign-in` and `/workspaces`),
   the roster now sweeps 7 routes (19 elements examined, unchanged — no bordered element exists on either
   new route), `belowCount: 0`, and `non-text-contrast-roster.json`'s `sanctionedWaivers` carries exactly
-  the entry above. — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
+  the entry above. **AMENDED 2026-10-02 by N10 (24.040): the ring is retired, so the DOM check now expects `border-style: solid`
+  with a TRANSPARENT colour (`rgba(0, 0, 0, 0)`), not a ring, and a `box-shadow` that contains the light-theme line
+  `rgb(137, 115, 98)` (`viewport.spec.ts`).** — (`apps/web/e2e-stack/viewport.spec.ts`, `apps/web/e2e-stack/helpers/non-text-contrast.ts`)
 - **13.357** ✅ `WorkspaceRef` gains `role`; `mapWorkspaceRefs` reads it (`GET /v1/me/workspaces` has
   disclosed `role` since the route first answered, per its own docblock — only the client-side read was
   missing) and each `/workspaces` card renders its own caller role. The additions table's one

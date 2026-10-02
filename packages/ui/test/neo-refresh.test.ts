@@ -306,7 +306,9 @@ describe('24.043 hover lifts, press recesses: the neo help toggle no longer pres
   it('24.043 a [data-style="neo"] .gn-help__toggle:hover arm reads raised-compact; the unscoped rule keeps sunken; the segmented item and nav links transition box-shadow', () => {
     expect(valueOf(ruleExactly(t3Ui, '[data-style="neo"] .gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
     expect(valueOf(ruleExactly(t3Ui, '.gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-sunken)'); // CONTROL: none in hig/minimal, as today
-    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item'), 'transition')).toContain('box-shadow');
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item'), 'transition')).toContain('box-shadow'); // CONTROL: the base item eases box-shadow
+    // FIX 1 (reviewer A on a21d6f71): the reduced-motion arm turns that ease off — the press still lands, instantly (delete the arm → red)
+    expect(valueOf(ruleExactly(t3Ui, '.gn-segmented__item', '@media (prefers-reduced-motion: reduce)'), 'transition')).toBe('none');
     expect(valueOf(ruleExactly(t3Globals, '.gn-nav a'), 'transition')).toContain('box-shadow');
   });
 });
