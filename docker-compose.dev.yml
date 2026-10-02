@@ -239,7 +239,8 @@ services:
     volumes:
       - ./reference:/app/reference:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/healthz > /dev/null"]
+      # 127.0.0.1, NOT localhost: the server listens on IPv4 only, and on a CI runner the container has an IPv6 loopback, so busybox wget resolves localhost to ::1 first and is REFUSED (never falling back); Docker Desktop has no ::1 and falls back, which hid this locally (13.1727).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/healthz > /dev/null"]
       interval: 3s
       timeout: 5s
       retries: 40

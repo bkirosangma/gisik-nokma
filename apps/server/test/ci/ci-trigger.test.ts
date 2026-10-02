@@ -85,3 +85,26 @@ describe('13.1722 no gitlink is committed, and agent worktrees are ignored', () 
     expect(gitlinksIn(`100644 abc 0\tREADME.md\n${line}\n`)).toEqual([line]);
   });
 });
+
+describe('13.1727 the dev stack probes its own server over IPv4, not through `localhost`', () => {
+  // The server listens on IPv4 only. On a CI runner the container has an IPv6 loopback, so busybox
+  // `wget http://localhost:3000` tries ::1 first and gets "Connection refused" without falling back
+  // (run 36970366578: FailingStreak 40, `server` unhealthy, `e2e` red); Docker Desktop has no ::1,
+  // which is why it worked on every dev machine.
+  const probeOf = (text: string): string => {
+    const doc = parse(text) as { services: { server: { healthcheck: { test: string[] } } } };
+    return doc.services.server.healthcheck.test.join(' ');
+  };
+  const compose = readFileSync(join(REPO_ROOT, 'docker-compose.dev.yml'), 'utf8');
+
+  it('the server healthcheck dials 127.0.0.1:3000/healthz', () => {
+    expect(probeOf(compose)).toMatch(/http:\/\/127\.0\.0\.1:3000\/healthz/);
+    expect(probeOf(compose)).not.toMatch(/localhost/);
+  });
+
+  it('CONTROL: the reader sees the broken spelling when it is present', () => {
+    const broken = compose.replace('http://127.0.0.1:3000/healthz', 'http://localhost:3000/healthz');
+    expect(broken).not.toBe(compose);
+    expect(probeOf(broken)).toMatch(/localhost/);
+  });
+});
