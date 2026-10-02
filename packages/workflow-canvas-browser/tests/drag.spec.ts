@@ -38,14 +38,18 @@ test('25.500/25.501 a dragged state moves live under the pointer and its arrow f
   expect(Object.keys(positions).length).toBeGreaterThan(0);
 });
 
-test('25.500 a dragged state that was not selected is raised above its neighbours while held; control: before the press it is not', async ({ page }) => {
+test('25.500 a dragged state is raised above its neighbours by the lifted rule, not by React Flow\'s own selected z; control: the same inline z-index is not overridden before the press', async ({ page }) => {
   await openHarness(page);
   const name = await page.locator('.gn-state-node__name').nth(1).innerText();
-  const zOf = () => node(page, name).evaluate((el) => Number(getComputedStyle(el).zIndex));
-  await expect(node(page, name).locator('.gn-state-node')).not.toHaveClass(/gn-state-node--selected/); // React Flow's own selected z (1000) must not stand in for the rule
-  expect(await zOf()).toBeLessThan(1000);
+  const wrapper = node(page, name);
+  const zOf = () => wrapper.evaluate((el) => Number(getComputedStyle(el).zIndex));
+  // React Flow selects the state it drags and gives a SELECTED node an inline z of 1000, so the rule's 1000 is only visible once the
+  // inline value is replaced: with a low inline z the computed value is the inline one at rest and the rule's `!important` 1000 while held.
+  await wrapper.evaluate((el) => { el.style.zIndex = '1'; });
+  expect(await zOf()).toBe(1); // control
   await dragBy(page, name, 100, 0, { steps: 50, release: false });
-  await expect(node(page, name)).toHaveClass(/\bdragging\b/);
+  await expect(wrapper).toHaveClass(/\bdragging\b/);
+  await wrapper.evaluate((el) => { el.style.zIndex = '1'; });
   expect(await zOf()).toBe(1000);
   await page.mouse.up();
 });
