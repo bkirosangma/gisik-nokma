@@ -279,6 +279,10 @@ export function registerWorkspaceRoutes(
             // stored-or-derived fork into one value, so a render site has
             // nothing to decide; see `read/visible-projects.ts`.
             prefix: project.prefix,
+            // The group this project is filed under — ALWAYS PRESENT, `null` when ungrouped
+            // (prefixes and groups Task 6). A null is an answer, not a withholding, so the
+            // key is never omitted: the mapper refuses a row without it.
+            groupId: project.groupId,
             // `counts === null` is the WITHHOLDING, decided once in
             // `visibleProjectCounts` and never re-asked here. Inside a served
             // map, a project with no row is an honest 0 — the aggregation

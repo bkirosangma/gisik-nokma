@@ -273,6 +273,14 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
       // default-deny shape already supported a new class, which is why adding
       // one is three lines rather than a redesign.
       return 'admin';
+    case 'group':
+      // Project groups (prefixes and groups plan Task 6): `'withheld'`, fail-closed, for the
+      // reason the notes series' Plan 1 gave: no replica table folds `group.*` yet, so a streamed
+      // group event would reach a client that cannot fold it. The tree is read online through
+      // `GET /v1/workspaces/:id/groups` (owner/admin/member). A later task that wants the tree
+      // live on a replica flips this to `'workspace'` (non-guests) in the same change that adds
+      // the fold — one line, and the compile-time switch is what makes it a decision.
+      return 'withheld';
     case 'note':
       // The notes series' own class (Plan 2 of 6, spec §5.1). Plan 1 returned
       // `'withheld'` here and said why: it shipped no `notes` replica table, so
