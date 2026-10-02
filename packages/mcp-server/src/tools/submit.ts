@@ -1,4 +1,4 @@
-import { newSubmittedEvent, type SubmittedEvent } from '@gisik-nokma/domain';
+import { newSubmittedEvent, type EntityKind, type SubmittedEvent } from '@gisik-nokma/domain';
 import { HttpError } from '../http-client.js';
 import type { Session } from '../session.js';
 
@@ -62,7 +62,7 @@ export async function submitBatch(session: Session, events: SubmittedEvent[]): P
 export function envelopeFor(
   session: Session,
   workspaceId: string,
-  entity: { kind: 'workspace' | 'project' | 'ticket'; id: string },
+  entity: { kind: EntityKind; id: string },
   type: string,
   payload: unknown,
 ): SubmittedEvent {

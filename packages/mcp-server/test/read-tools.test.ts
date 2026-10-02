@@ -8,6 +8,7 @@ import { projectTools } from '../src/tools/project-tools.js';
 import { readTools } from '../src/tools/read-tools.js';
 import { workspaceTools } from '../src/tools/workspace-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 8. Cases 14.60–14.66.
@@ -18,6 +19,7 @@ function sessionRecording(answer: unknown): { session: Session; paths: string[] 
     userId: () => '01J0USER0000000000000000AA',
     get: async (path) => { paths.push(path); return answer; },
     post: async () => { throw new Error('not a read'); },
+    ...NO_TRANSFER,
     postEvents: async () => { throw new Error('not a read'); },
   };
   return { session, paths };
@@ -133,6 +135,7 @@ function sessionAnswering(answers: Record<string, Answer>): { session: Session; 
       return answer;
     },
     post: async () => { throw new Error('not a read'); },
+    ...NO_TRANSFER,
     postEvents: async () => { throw new Error('not a read'); },
   };
   return { session, paths };
@@ -297,6 +300,7 @@ describe('list_tickets filters (14.331, 14.333)', () => {
       userId: () => 'u',
       get: async (path) => { gets.push(path); return { groups: [] }; },
       post: async () => ({}),
+      ...NO_TRANSFER,
       postEvents: async () => ({}),
     };
     const server = new McpServer({ name: 'gisik-nokma', version: '0.1.0' });
