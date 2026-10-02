@@ -1529,6 +1529,11 @@ input, textarea, select { font-family: inherit; }
   border-top: 2px solid var(--gn-border);
 }
 .gn-groups__children > .gn-groups__node { gap: 0; }
+/* `gap: 0` above puts the child's stub flush against its box, but it also removed the gap between that child's box
+   and ITS OWN children column, so at level 2 and below the column's `::before` ran over the box's last 1rem (next
+   to the ⊕) and the spine touched the box. The offset restores the 1rem a root node gets from the node's `gap`, which
+   is exactly the length of `.gn-groups__children::before`. */
+.gn-groups__children > .gn-groups__node > .gn-groups__children { margin-left: 1rem; }
 .gn-groups__children > .gn-groups__node::before {
   content: '';
   flex: 0 0 1rem;

@@ -410,6 +410,10 @@ describe('22.208 at 40rem the tree is an indented list', () => {
     const children = ruleExactly(css, '.gn-groups__children', PHONE);
     expect(valueOf(children, 'margin-left')).toBe('1rem');
     expect(valueOf(children, 'border-left')).toBe('0');
+    // The offset that keeps a non-root column off its box (22.210) is the SAME 1rem: it cannot double the indent here.
+    expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node > .gn-groups__children'), 'margin-left')).toBe(
+      valueOf(children, 'margin-left'),
+    );
     // The connectors are a column-form device: the list form draws none (the indent is the structure).
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::before', PHONE), 'display')).toBe('none');
     expect(valueOf(ruleExactly(css, '.gn-groups__children::before', PHONE), 'display')).toBe('none');
@@ -450,6 +454,12 @@ describe('22.210 real level columns joined by real connectors', () => {
       expect(valueOf(rule, 'content'), selector).not.toBeNull();
       expect(valueOf(rule, 'border-top'), selector).toMatch(/^[1-9]\d*px solid /);
     }
+    // A NON-root node's `gap: 0` (stub flush with its box) must not also close the gap between that node's box and its
+    // OWN children column: the offset rule restores it, and it equals the column connector's length, so the
+    // connector ends at the box's edge instead of painting over it.
+    const offset = ruleExactly(css, '.gn-groups__children > .gn-groups__node > .gn-groups__children');
+    expect(valueOf(offset, 'margin-left')).toBe(valueOf(ruleExactly(css, '.gn-groups__children::before'), 'width'));
+    expect(valueOf(offset, 'margin-left')).toBe('1rem');
   });
 });
 
