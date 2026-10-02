@@ -32,4 +32,9 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 
 ## 26.3 The offline replica (T4)
 
+- ✅ **26.090 — the local schema is version 4 with a `comment_changes` table, and `LOCAL_TABLE_RULES` names it (`erase`, by entity) so the 19.172 census stays green;** control: a version-3 database migrates by `CREATE TABLE IF NOT EXISTS` with its rows intact. Mutation: omit the rule → 19.172 reddens naming the table.
+- ✅ **26.091 — a note comment edited then deleted on the server reads, offline, as the new body with `editedAt`, then as `body: null` with `deletedAt`; the author and time are kept;** control: a sibling comment is unchanged. Mutation: skip `applyCommentChange` for notes → the old body is served.
+- ✅ **26.092 — offline search follows the comment: after an edit the old word does not find the ticket and the new one does; after a delete neither does; a sibling comment's word still does;** control: before the edit the old word finds it. Mutation: keep scanning raw `comment.added` payloads → the deleted text is found.
+- ✅ **26.093 — a redelivered edit or delete changes nothing more (at-least-once safe), and an entity purge or a scope revoke erases its `comment_changes` rows;** control: another ticket's rows survive. Mutation: no `comment_changes` delete in `purgeEntity` → a row survives the purge.
+
 ## 26.4 The app (T5)

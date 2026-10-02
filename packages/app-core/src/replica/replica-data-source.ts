@@ -1300,9 +1300,8 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         authorId: c.authorId,
         body: c.body,
         recordedAt: c.recordedAt,
-        // The replica does not carry edits or deletions yet (MCP-everything T4 teaches it).
-        editedAt: null,
-        deletedAt: null,
+        editedAt: c.editedAt,
+        deletedAt: c.deletedAt,
       }));
     },
     getNoteHistory: async (workspaceId, noteId) => {

@@ -156,7 +156,7 @@ describe('the replica holds notes (Plan 2 of 6)', () => {
     expect(await columnNames(v1, 'tickets')).toEqual(before);
     const version = await v1.all("SELECT value FROM meta WHERE key = 'schema_version'");
     expect(version[0]?.['value']).toBe(String(LOCAL_SCHEMA_VERSION));
-    expect(LOCAL_SCHEMA_VERSION).toBe(3);
+    expect(LOCAL_SCHEMA_VERSION).toBe(4);
 
     // And the DDL's OWN idea of `tickets` is still the version-1 one. On an
     // existing device `IF NOT EXISTS` hides a widened column, so the check above
