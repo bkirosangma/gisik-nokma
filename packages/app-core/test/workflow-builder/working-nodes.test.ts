@@ -10,6 +10,56 @@ describe('25.502 the working copy follows the draft', () => {
   it('re-derives positions and membership from the draft when no drag is in flight', () => {
     expect(mergeDraftNodes([n('a', 0), n('b', 10)], [n('a', 5)], null).map((m) => [m.id, m.position.x])).toEqual([['a', 0], ['b', 10]]);
   });
+
+  it('25.502 (hook level) follows a new draft: a state added and another moved show up; control, same it: before the rerender it is the first draft', () => {
+    const first = [n('a', 0), n('b', 10)];
+    const second = [n('a', 0), n('b', 99), n('c', 50)];
+    const { result, rerender } = renderHook(({ d }) => useWorkingNodes(d), { initialProps: { d: first } });
+    expect(result.current.nodes.map((m) => [m.id, m.position.x])).toEqual([['a', 0], ['b', 10]]); // control
+    rerender({ d: second });
+    expect(result.current.nodes.map((m) => [m.id, m.position.x])).toEqual([['a', 0], ['b', 99], ['c', 50]]);
+  });
+});
+
+// F1: the draft owns membership, selection and placement. Only `select`, `dimensions` and the live gesture's own position reach the canvas.
+describe('25.502 (hook level) onNodesChange is an allow-list: React Flow edits the draft does not know about are dropped', () => {
+  const draft = [n('a', 10), n('b', 400)];
+  const snapshot = () => JSON.stringify(draft);
+  const ids = (nodes: Node[]) => nodes.map((m) => [m.id, m.position.x]);
+
+  it('a remove change (React Flow\'s Backspace) leaves the node and the draft alone; control, same it: a select and a dimensions change on it ARE applied', () => {
+    const before = snapshot();
+    const { result } = renderHook(() => useWorkingNodes(draft));
+    act(() => result.current.onNodesChange([{ type: 'remove', id: 'a' }]));
+    expect(ids(result.current.nodes)).toEqual([['a', 10], ['b', 400]]);
+    expect(result.current.nodes).toEqual(draft);
+    expect(snapshot()).toBe(before);
+    act(() => result.current.onNodesChange([{ type: 'select', id: 'a', selected: true }, { type: 'dimensions', id: 'a', dimensions: { width: 210, height: 118 } }]));
+    expect(result.current.nodes[0]!.selected).toBe(true);
+    expect(result.current.nodes[0]!.measured).toEqual({ width: 210, height: 118 });
+  });
+
+  it('a position change with no gesture (an arrow-key nudge) moves nothing; control, same it: the same change during a gesture on that id IS applied', () => {
+    const before = snapshot();
+    const { result } = renderHook(() => useWorkingNodes(draft));
+    act(() => result.current.onNodesChange([moved('a', 14, false)]));
+    expect(ids(result.current.nodes)).toEqual([['a', 10], ['b', 400]]);
+    expect(snapshot()).toBe(before);
+    act(() => result.current.beginDrag('a'));
+    act(() => result.current.onNodesChange([moved('a', 14, true)]));
+    expect(ids(result.current.nodes)).toEqual([['a', 14], ['b', 400]]);
+  });
+
+  it('a position change for ANOTHER id during a gesture (a multi-drag move) moves nothing; control, same it: the same kind for the gesture id IS applied', () => {
+    const before = snapshot();
+    const { result } = renderHook(() => useWorkingNodes(draft));
+    act(() => result.current.beginDrag('a'));
+    act(() => result.current.onNodesChange([moved('b', 420, true)]));
+    expect(ids(result.current.nodes)).toEqual([['a', 10], ['b', 400]]);
+    expect(snapshot()).toBe(before);
+    act(() => result.current.onNodesChange([moved('a', 30, true)]));
+    expect(ids(result.current.nodes)).toEqual([['a', 30], ['b', 400]]);
+  });
 });
 
 describe('25.503 a draft change mid-drag keeps the dragged node where the pointer has it', () => {

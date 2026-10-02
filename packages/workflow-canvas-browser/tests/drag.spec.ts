@@ -11,6 +11,16 @@ test('25.500/25.501 a dragged state moves live under the pointer and its arrow f
   await dragBy(page, name, 0, 0, { steps: 1 });
   expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
   await expect(node(page, name).locator('.gn-state-node')).toHaveClass(/gn-state-node--selected/);
+  // F1: the working copy owns the dragged id's position and measured sizes only. React Flow's own edits (Backspace deletes the selected
+  // node) must not reach the canvas while the draft keeps the state; the control above is the selected class on the node being deleted.
+  const nodeCount = await page.locator('.react-flow__node').count();
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.react-flow__node')).toHaveCount(nodeCount);
+  expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
+  await expect(node(page, name)).toBeVisible();
+  // F3: `nodeDragThreshold={4}`: 4 px in 1 px steps never starts a drag (`distance > 4`); the React Flow default 1 would move the box ~2 px.
+  await dragBy(page, name, 4, 0, { steps: 4 });
+  expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
   // the case (25.500). `nodeDragThreshold={4}`: React Flow measures the drag from the first move past 4 px, so the state trails the
   // pointer by that first distance (6 px at 2 px per move) and by nothing after it.
   await dragBy(page, name, 200, 0, { steps: 100, release: false });
@@ -26,6 +36,18 @@ test('25.500/25.501 a dragged state moves live under the pointer and its arrow f
   await page.mouse.up();
   const positions = await readDraftPositions(page);
   expect(Object.keys(positions).length).toBeGreaterThan(0);
+});
+
+test('25.500 a dragged state that was not selected is raised above its neighbours while held; control: before the press it is not', async ({ page }) => {
+  await openHarness(page);
+  const name = await page.locator('.gn-state-node__name').nth(1).innerText();
+  const zOf = () => node(page, name).evaluate((el) => Number(getComputedStyle(el).zIndex));
+  await expect(node(page, name).locator('.gn-state-node')).not.toHaveClass(/gn-state-node--selected/); // React Flow's own selected z (1000) must not stand in for the rule
+  expect(await zOf()).toBeLessThan(1000);
+  await dragBy(page, name, 100, 0, { steps: 50, release: false });
+  await expect(node(page, name)).toHaveClass(/\bdragging\b/);
+  expect(await zOf()).toBe(1000);
+  await page.mouse.up();
 });
 
 test('25.504 a drag that starts on a nodrag control (the Category select) does not move the state; the control still opens', async ({ page }) => {
