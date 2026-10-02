@@ -546,6 +546,7 @@ describe('13.371 the shape the directory already served is unchanged', () => {
           // Also derived, from the project's own name, at the resolved end of
           // the stored-or-derived fork (`read/visible-projects.ts`).
           prefix: 'SO',
+          groupId: null,
           archived: false,
           description: null,
           ticketCount: 0,

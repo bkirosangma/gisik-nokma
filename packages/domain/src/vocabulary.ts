@@ -1,4 +1,10 @@
 import {
+  groupCreatedPayload,
+  groupDeletedPayload,
+  groupRenamedPayload,
+  groupReorderedPayload,
+} from './events/groups.js';
+import {
   membershipGrantedPayload,
   membershipRevokedPayload,
   projectArchivedPayload,
@@ -446,6 +452,36 @@ domainRegistry.register({
   version: 1,
   entityKind: 'project',
   payloadSchema: projectUpdatedPayload,
+});
+
+/**
+ * The project-group vocabulary (prefixes and groups plan Task 6). All four are
+ * filed against a `group` entity and are workspace owner/admin acts (the door's
+ * `ADMIN_ONLY_TYPES`). The tree rules live at the door; the shapes in `./events/groups.ts`.
+ */
+domainRegistry.register({
+  type: 'group.created',
+  version: 1,
+  entityKind: 'group',
+  payloadSchema: groupCreatedPayload,
+});
+domainRegistry.register({
+  type: 'group.renamed',
+  version: 1,
+  entityKind: 'group',
+  payloadSchema: groupRenamedPayload,
+});
+domainRegistry.register({
+  type: 'group.reordered',
+  version: 1,
+  entityKind: 'group',
+  payloadSchema: groupReorderedPayload,
+});
+domainRegistry.register({
+  type: 'group.deleted',
+  version: 1,
+  entityKind: 'group',
+  payloadSchema: groupDeletedPayload,
 });
 
 /**

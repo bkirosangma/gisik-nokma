@@ -1577,12 +1577,24 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
           // into one value, so a null here is not a project without a prefix
           // but a route that did not resolve one. `asString` refuses it.
           prefix: asString(row['prefix'], `${projectPath}.prefix`),
+          // Required key, nullable value (prefixes and groups Task 6): `null` is "ungrouped", a
+          // MISSING key is a construction site that forgot the field and is refused.
+          groupId: nullableGroupId(row, `${projectPath}.groupId`),
           ticketCount: withheldOrNumber(row, 'ticketCount', `${projectPath}.ticketCount`),
           blockedCount: withheldOrNumber(row, 'blockedCount', `${projectPath}.blockedCount`),
         };
       }),
     };
   });
+}
+
+/** `string | null`, and the KEY must be present: absent is a route that did not answer, not "ungrouped". */
+function nullableGroupId(row: Record<string, unknown>, path: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(row, 'groupId')) {
+    throw new MappingError(path, 'a project group key — a string, or null when ungrouped; never omitted');
+  }
+  const value = row['groupId'];
+  return value === null ? null : asString(value, path);
 }
 
 /**

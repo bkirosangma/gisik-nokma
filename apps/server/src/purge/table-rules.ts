@@ -87,6 +87,7 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
     by: ['workspace_id', 'project_id'],
     why: 'A project’s former prefixes (prefixes and groups plan Task 2): they qualify the project row, so they go with the project, or with the workspace. Nothing survives to re-derive.',
   },
+  proj_groups: { rule: 'erase', by: ['workspace_id'], why: 'The workspace’s group tree (names only, no entity of a project); goes with its workspace.' },
   proj_invites: {
     rule: 'rederive',
     by: ['workspace_id'],

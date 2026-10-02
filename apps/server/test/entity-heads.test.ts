@@ -105,6 +105,8 @@ describe('proj_entity_heads', () => {
       // Plan 4 Task 9 Step 3b, INSERTED at its §8 position (fourth) rather
       // than appended.
       'proj_projects',
+      // Prefixes and groups Task 6: the group tree, directly after proj_projects.
+      'proj_groups',
       // Plan 3 Chain B Task 10, §8 position 5 — INSERTED between proj_projects
       // and proj_memberships.
       'proj_tickets',
