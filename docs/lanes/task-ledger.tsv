@@ -574,3 +574,17 @@ mcp-everything	11	in-flight	-	-	landed in release/mcp-everything as #929; reache
 mcp-everything	12	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	13	in-flight	-	-	landed in release/mcp-everything as #935; reaches main with that release
 mcp-everything	14	todo	-	-	not started; owner step, runs after the merge to main (Q6)
+smoothness	1	todo	-	-	not started; the spec and plan themselves land via task/smoothness-docs, the 25 catalogue bucket and Features §22 are this task
+smoothness	2	todo	-	-	not started
+smoothness	3	todo	-	-	not started
+smoothness	4	todo	-	-	not started
+smoothness	5	todo	-	-	not started
+smoothness	6	todo	-	-	not started
+smoothness	7	todo	-	-	not started
+smoothness	8	todo	-	-	not started
+smoothness	9	todo	-	-	not started
+smoothness	10	todo	-	-	not started
+smoothness	11	todo	-	-	not started
+smoothness	12	todo	-	-	not started
+smoothness	13	todo	-	-	not started
+smoothness	14	todo	-	-	not started
