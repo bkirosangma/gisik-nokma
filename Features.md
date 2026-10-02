@@ -3697,6 +3697,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
 
+- ⚙️ **Loading primitives (smoothness T2; amendment S-R1; cases 25.010–25.019 incl. 25.017b–d; `packages/ui/src/components/skeleton.tsx`, `pending.tsx`, `use-wait.ts`, `announce.tsx`, `button.tsx`, the `LOADING PLACEHOLDERS` block at the end of `ui.css`, `tokens.ts`)** — `Skeleton` (`line`/`block`/`circle` parts, `card` fallback) and `SkeletonRegion`; `Pending`; `useWait` (150 ms before, 350 ms hold); `Button busy`/`busyLabel`; `AnnounceRegion`/`useAnnounce` (the one polite live region); and the new `surfacePlaceholder` colour role (hig/minimal: the track primitive, unchanged look; neo: a flat step off `surface`, never the well). Nothing renders them yet: T5–T9 and T13 build each screen's skeleton from its real component plus these parts.
+
 ## 23. Comment edit and delete, Markdown bodies
 
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*
