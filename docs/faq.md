@@ -87,7 +87,7 @@ Each has a button that says **Create**; the ones in the page headers are bright,
 is at the top of the Workspaces page. **Create project** is on a workspace's page, in the Projects
 heading row — owners and admins only. **Create ticket** is in a project, near the top by the view tabs,
 on a project's empty Board and inside an empty stage on the Board. **Create project** also takes an optional
-group, and one press makes exactly one project. Each opens a window; nothing is made until you press the button
+group, and one press never makes more than one project. Each opens a window; nothing is made until you press the button
 inside it.
 
 **Can I change a project's prefix, or the workspace's?**

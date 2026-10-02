@@ -734,7 +734,15 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": ". It opens a menu of the workspace's other projects."
+                  "text": ". Point at either, or move the keyboard cursor onto it, and it opens a list: your other workspaces under the workspace's name (with only one workspace it stays a plain link), the workspace's other projects under "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Last project:"
+                },
+                {
+                  "kind": "text",
+                  "text": ". The list stays open while the pointer moves down onto it and closes a fifth of a second after the pointer leaves. It shows eight rows and scrolls past that. With the keyboard, the up and down arrows move through the rows and Escape closes the list and leaves the cursor on the name."
                 }
               ],
               [
@@ -1818,7 +1826,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " makes exactly one project, whatever happens with the group. If the group's name is refused or somebody else got there first, the window tells you and keeps what you typed, and pressing "
+                      "text": " never makes more than one project. If the group's name is refused, or the prefix is, that press makes no project: the window says why and keeps what you typed. Pressing "
                     },
                     {
                       "kind": "bold",
@@ -1826,7 +1834,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " again does not make a second project or a second group."
+                      "text": " again then makes the one project, never a second one and never a second group."
                     }
                   ],
                   [
@@ -1844,7 +1852,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " carries the plus sign too, and inside an empty stage on the Board (that one is a plainer button without the plus sign, and says "
+                      "text": " carries the plus sign too, and inside an empty stage on the Board (that one is a plainer button under a plus sign, and says "
                     },
                     {
                       "kind": "bold",
@@ -11813,7 +11821,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " also takes an optional group, and one press makes exactly one project. Each opens a window; nothing is made until you press the button inside it."
+                    "text": " also takes an optional group, and one press never makes more than one project. Each opens a window; nothing is made until you press the button inside it."
                   }
                 ]
               }

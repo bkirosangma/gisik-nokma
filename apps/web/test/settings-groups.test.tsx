@@ -644,15 +644,15 @@ describe('22.226 22.243 keyboard focus after the delete dialog closes', () => {
     // Beta has Chi after it.
     await user.click(within(await openDelete(user, 'Beta')).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Beta' })).toBeNull());
-    expect(document.activeElement).toBe(nameButton('Chi'));
+    await waitFor(() => expect(document.activeElement).toBe(nameButton('Chi')));
     // Chi is now the last of its list: Alpha is before it.
     await user.click(within(await openDelete(user, 'Chi')).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Chi' })).toBeNull());
-    expect(document.activeElement).toBe(nameButton('Alpha'));
+    await waitFor(() => expect(document.activeElement).toBe(nameButton('Alpha')));
     // Deep is an only child: its parent Gamma.
     await user.click(within(await openDelete(user, 'Deep')).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Deep' })).toBeNull());
-    expect(document.activeElement).toBe(nameButton('Gamma'));
+    await waitFor(() => expect(document.activeElement).toBe(nameButton('Gamma')));
   });
 
   it('22.243 focus waits until the deleted row is gone: while the door has not answered it is NOT on the neighbour, once the re-read takes the row it is', async () => {
@@ -668,7 +668,7 @@ describe('22.226 22.243 keyboard focus after the delete dialog closes', () => {
     // CONTROL — the same run: once the door answers and the row is taken away, focus lands on Chi.
     answer();
     await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Beta' })).toBeNull());
-    expect(document.activeElement).toBe(nameButton('Chi'));
+    await waitFor(() => expect(document.activeElement).toBe(nameButton('Chi')));
   });
 
   it('22.243 the last group of all has no neighbour, no parent and, once gone, no tree: focus goes to Add group', async () => {
@@ -676,7 +676,7 @@ describe('22.226 22.243 keyboard focus after the delete dialog closes', () => {
     render(<Harness initial={[group('g-solo', null, 1, 'Solo', R1)]} />);
     await user.click(within(await openDelete(user, 'Solo')).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.queryByRole('tree')).toBeNull());
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add group' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add group' })));
   });
 
   it('22.243 Cancel and Escape give focus back to the row\'s Delete button; a refused delete does too', async () => {

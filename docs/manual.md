@@ -138,8 +138,12 @@ There is a small bar across the top of nearly every screen. Inside a workspace i
 - **Settings** — this workspace's own screens: its ticket types, its workflows, its project groups,
   and the workspace itself (§11 and §12).
 - The **workspace's name**, linking to its home page, with the project you were last in beside it —
-  set apart by a thin divider and labelled **Last project:**. It opens a menu of the workspace's other
-  projects.
+  set apart by a thin divider and labelled **Last project:**. Point at either, or move the keyboard cursor
+  onto it, and it opens a list: your other workspaces under the workspace's name (with only one workspace
+  it stays a plain link), the workspace's other projects under **Last project:**. The list stays open while
+  the pointer moves down onto it and closes a fifth of a second after the pointer leaves. It shows eight
+  rows and scrolls past that. With the keyboard, the up and down arrows move through the rows and Escape
+  closes the list and leaves the cursor on the name.
 - **Inbox** — a small icon at the right-hand end, with a dot on it when you have unread messages.
 - **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
   and **Sign out**.
@@ -292,12 +296,12 @@ inside the window.
   Owners and admins only; everybody else is told so (§3, under The project problem). The window asks
   for a name, an optional description, an optional prefix and an optional **Group**: the same four boxes
   as in **Edit** (see Group your projects, below), including making a new group on the spot. One press of
-  **Create** makes exactly one project, whatever happens with the group. If the group's name is refused
-  or somebody else got there first, the window tells you and keeps what you typed, and pressing **Create**
-  again does not make a second project or a second group.
+  **Create** never makes more than one project. If the group's name is refused, or the prefix is, that press
+  makes no project: the window says why and keeps what you typed. Pressing **Create** again then makes the
+  one project, never a second one and never a second group.
 - **Create ticket** — in a project, near the top by the view tabs, and on a project's empty Board, where the
   banner's **Create ticket** carries the plus sign too, and inside an empty stage on the Board (that one is
-  a plainer button without the plus sign, and says **Create ticket** too; its full name for a screen
+  a plainer button under a plus sign, and says **Create ticket** too; its full name for a screen
   reader adds the stage). The window is described in §5.
 
 If the door refuses what you asked for — a prefix someone already uses, say — the reason is written
