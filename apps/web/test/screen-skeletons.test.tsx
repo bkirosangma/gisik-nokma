@@ -249,7 +249,15 @@ describe('25.135 a skeleton means "a read is in flight", never "the value is nul
     await waitFor(() => expect(busyRegions()).toEqual([]));
   });
 
-  it('25.135 Workspaces and Inbox: a refused read shows its refusal and no region', async () => {
+  it('25.135 Workspaces and Inbox: an ANSWERED-EMPTY list and a refused read leave no region (the empty state, the refusal)', async () => {
+    render(
+      <Providers services={stubServices({ getMyWorkspaces: async () => [] }, { myInvitations: { list: async () => [] }, ...noUnread })}>
+        <WorkspacesPage />
+      </Providers>,
+    );
+    await screen.findByText(/No workspaces yet/);
+    await waitFor(() => expect(busyRegions()).toEqual([]));
+    cleanup();
     render(
       <Providers services={stubServices({ getMyWorkspaces: () => Promise.reject(new Error('no list')) }, { myInvitations: { list: async () => [] }, ...noUnread })}>
         <WorkspacesPage />

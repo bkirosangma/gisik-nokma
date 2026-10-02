@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -127,6 +127,9 @@ describe('25.134 every submit is a busy button while its call is in flight', () 
     magicLink.mockReturnValueOnce(link.promise);
     await user.click(screen.getByRole('button', { name: 'Send magic link' }));
     expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+    // A submit that does not come through the disabled button (Enter in the field) is ignored while the call is open: the `run` guard.
+    fireEvent.submit(screen.getByRole('textbox', { name: /Email/ }).closest('form') as HTMLFormElement);
+    expect(magicLink).toHaveBeenCalledTimes(1);
     act(() => link.resolve({ error: { message: 'nope' } }));
     await screen.findByRole('button', { name: 'Send magic link' });
     // Passkey
