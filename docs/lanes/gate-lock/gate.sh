@@ -3,16 +3,40 @@
 # one lock implementation in this lane and this is not it. Two copies of a lock
 # is two things to keep in step, and the one that drifts is the one nobody reads.
 #
-#   gate.sh <logfile>
+#   GATE_MODE=fresh|cached gate.sh <logfile>
 #
 # Run it with run_in_background:true. Never inline its body: a lock acquired in
 # one Bash tool call and used in another records a `$$` that dies immediately.
 #
-# --concurrency=1 (was 2) per the cross-lane protocol fix of 2026-09-06: five
+# TWO MODES (owner, 2026-10-02: "do the caching and whatever to run the gate faster").
+#
+#   fresh  (the default) — `--force --concurrency=1`: every task re-run, nothing
+#          replayed from the turbo cache. This is the RELEASE gate (`ctl gate <sha>`,
+#          before a merge to main) and the safety net that makes `cached` acceptable
+#          below it. Unset GATE_MODE means fresh, so a hand-run of this file can
+#          never silently pick the weaker mode.
+#   cached — turbo's cache ON (no --force) and `--concurrency=1`: a task whose
+#          inputs are unchanged replays its green log. This is a TASK LANDING
+#          (`ctl gate <sha> --base release/<x>`). It is only as sound as turbo.json's
+#          `inputs`; the cross-package readers are audited there, and
+#          scripts/ctl/test/gate-cache.test.sh proves a changed reader input misses.
+#
+# fresh keeps --concurrency=1 per the cross-lane protocol fix of 2026-09-06: five
 # lanes on one 16 GB box drove free memory to ~66 MB and swap to 65%. The gate is
-# slower and it finishes.
+# slower and it finishes. cached keeps --concurrency=1 too. It was first built at 2 (the brief), and 2 of 3 realistic
+# runs with several test suites MISSING together failed with 5 s vitest timeouts in app-core's jsdom
+# component tests (2026-10-02, 7.4 s and 5.3 s; the same tests pass alone in <1 s): two heavy vitest
+# pools at once oversubscribe this box. The saving comes from the cache, not from parallelism.
+# The machine lock below still admits ONE gate at a time.
 set -u
-OUT="${1:?usage: gate.sh <logfile>}"
+OUT="${1:?usage: GATE_MODE=fresh|cached gate.sh <logfile>}"
+# Unset means fresh; set-but-empty is NOT unset (`-`, not `:-`) and falls to the refusal below.
+MODE="${GATE_MODE-fresh}"
+case "$MODE" in
+  fresh)  TURBO_FLAGS=(--force --concurrency=1) ;;
+  cached) TURBO_FLAGS=(--concurrency=1) ;;
+  *) echo "FATAL: GATE_MODE='$MODE' is not fresh|cached — refusing rather than guessing a mode." >&2; exit 2 ;;
+esac
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # WHICH TREE THIS GATES. Until v3.2 this was hard-coded to Lane E's worktree,
 # and these files are copied between lanes: a peer that copied the FILE gated
@@ -32,5 +56,7 @@ if [ ! -e "$REPO/.git" ]; then
 fi
 
 cd "$REPO" || exit 3
+# What actually runs is stated on the console, so the verb reads the mode from what RAN, not from what it asked for.
+echo "GATE_MODE=$MODE TURBO_FLAGS=${TURBO_FLAGS[*]}"
 exec bash "$HERE/locked-test.sh" "$OUT" \
-  pnpm turbo run build test typecheck --force --concurrency=1
+  pnpm turbo run build test typecheck "${TURBO_FLAGS[@]}"
