@@ -958,14 +958,25 @@ export function HelpBrowser() {
     setQuery(next);
   };
   const wasSearching = useRef(false);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     if (wasSearching.current && !searching) {
       const was = savedScroll.current;
       savedScroll.current = null;
       if (was !== null && Math.abs(window.scrollY - was) > 1) window.scrollTo(0, was);
     }
+    // The first results of a search made from deep in the document are drawn above the reader: bring them into view,
+    // just once (not on later keystrokes) and only when they are not already in view. Focus stays in the field.
+    if (!wasSearching.current && searching && !phone) {
+      const at = resultsRef.current;
+      if (at !== null) {
+        const margin = Number.parseFloat(getComputedStyle(at).scrollMarginTop) || 0;
+        const top = at.getBoundingClientRect().top;
+        if (top < margin - 1 || top > window.innerHeight - 1) at.scrollIntoView({ block: 'start' });
+      }
+    }
     wasSearching.current = searching;
-  }, [searching]);
+  }, [searching, phone]);
   // Following a result (or any link) makes the old position stale: clearing afterwards must not yank the reader
   // back from the entry they chose.
   useEffect(() => {
@@ -1021,7 +1032,11 @@ export function HelpBrowser() {
             shipped wording here to replace.
           */}
           <h1 className="gn-help__title">Help</h1>
-          {phone ? null : output}
+          {phone || !searching ? null : (
+            <div ref={resultsRef} className="gn-help__results-anchor">
+              {output}
+            </div>
+          )}
 
           {/*
             The flat `.gn-help__toc` — a wrapped row of every section link — stood

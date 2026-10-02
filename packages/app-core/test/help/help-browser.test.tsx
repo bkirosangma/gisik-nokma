@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HELP_CONTENT } from '../../src/help/content.generated.js';
 import * as groupsModule from '../../src/help/groups.js';
 import { HELP_GROUPS } from '../../src/help/groups.js';
@@ -632,6 +632,12 @@ describe('23.232–23.237 Help — the floating menu on a phone', () => {
     expect(reduced, 'no reduced-motion rule for the panel').toBeDefined();
     expect(reduced!.selectors).toContain('.gn-help__sidebar');
     expect(valueOf(reduced!.body, 'transition')).toBe('none');
+    // F2 (fix 1): a CLOSED panel is invisible AND out of the tab order and the accessibility tree — `visibility`, whose
+    // change waits for the exit transition. CONTROL: the open rule has no entrance delay.
+    const closed = ruleExactly(css, ".gn-help__sidebar[data-panel-open='false']", PHONE);
+    expect(valueOf(closed, 'visibility')).toBe('hidden');
+    expect(valueOf(closed, 'transition')).toContain('visibility 0s linear 120ms');
+    expect(valueOf(ruleExactly(css, '.gn-help__sidebar', PHONE), 'transition')).toContain('visibility 0s linear 0s');
     // CONTROL — motion is there to remove: the full-motion rules do declare a transform transition.
     expect(valueOf(ruleExactly(css, '.gn-help__sidebar', PHONE), 'transition')).toMatch(/transform/);
     expect(valueOf(ruleExactly(css, ".gn-help__sidebar[data-panel-open='false']", PHONE), 'transition')).toMatch(/transform/);
@@ -688,6 +694,77 @@ describe('23.239 Help — desktop search lives in the pinned header', () => {
       if (original !== undefined) Object.defineProperty(window, 'scrollY', original);
       else Reflect.deleteProperty(window, 'scrollY');
     }
+  });
+
+  describe('23.239 the first results of a search from deep in the document are brought into view (fix 1)', () => {
+    const scrollIntoView = vi.fn();
+    let rectTop = 0;
+    let original: PropertyDescriptor | undefined;
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView as unknown as typeof Element.prototype.scrollIntoView;
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+        return { top: this.classList.contains('gn-help__results-anchor') ? rectTop : 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect;
+      });
+      original = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      if (original !== undefined) Object.defineProperty(window, 'scrollY', original);
+      else Reflect.deleteProperty(window, 'scrollY');
+    });
+
+    it('23.239 with the page at 1200 the first character that returns results scrolls them into view, once; focus stays in the field; clearing restores 1200', async () => {
+      let y = 1200;
+      Object.defineProperty(window, 'scrollY', { configurable: true, get: () => y });
+      const scrollTo = vi.fn();
+      window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+      rectTop = -4000; // the results are drawn thousands of pixels above the reader
+      const user = userEvent.setup();
+      const { container } = render(<HelpBrowser />);
+      const search = screen.getByRole('searchbox');
+      await user.type(search, 'invite');
+      const anchor = container.querySelector('.gn-help__results-anchor') as HTMLElement;
+      expect(anchor).not.toBeNull();
+      expect(anchor.querySelector('.gn-help__results, .gn-help__none')).not.toBeNull();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(anchor);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      // Not on later keystrokes while the query stays non-empty, and never a focus move.
+      await user.type(search, 's');
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(search).toHaveFocus();
+      // The existing behaviour is untouched: clearing puts the reader back at 1200.
+      y = 0;
+      await user.clear(search);
+      expect(scrollTo).toHaveBeenCalledWith(0, 1200);
+    });
+
+    it('23.239 CONTROL — a reader at the top, with the results already in view, is not scrolled', async () => {
+      Object.defineProperty(window, 'scrollY', { configurable: true, get: () => 0 });
+      rectTop = 300;
+      const user = userEvent.setup();
+      render(<HelpBrowser />);
+      await user.type(screen.getByRole('searchbox'), 'invite');
+      expect(document.querySelector('.gn-help__results-anchor')).not.toBeNull();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('23.239 CONTROL — on a phone the results are in the panel and nothing is scrolled', async () => {
+      mockPhone(true);
+      Object.defineProperty(window, 'scrollY', { configurable: true, get: () => 1200 });
+      rectTop = -4000;
+      const user = userEvent.setup();
+      const { container } = render(<HelpBrowser />);
+      await user.click(screen.getByRole('button', { name: 'Contents and search' }));
+      await user.type(screen.getByRole('searchbox'), 'invite');
+      expect(container.querySelector('.gn-help__results-anchor')).toBeNull();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('23.239 the anchor rests below the app bar: it carries the same scroll-margin-top as a section', () => {
+      expect(valueOf(ruleExactly(readUiCss(), '.gn-help__results-anchor'), 'scroll-margin-top')).toBe('calc(var(--app-nav-offset, 0px) + 1rem)');
+    });
   });
 });
 

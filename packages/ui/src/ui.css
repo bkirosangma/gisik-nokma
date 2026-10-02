@@ -6803,6 +6803,9 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-help__entry {
   scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
 }
+/* The desktop search results' wrapper (UX fixes T13 fix 1, 23.239): the first line lands just below the app bar
+   when a search from deep in the document brings them into view. */
+.gn-help__results-anchor { scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem); }
 .gn-help__section { margin-bottom: 2.5rem; }
 /* The section eyebrow — `MANUAL · GETTING STARTED`. 13px/18px/600 with 0.4px
    tracking (0.4 ÷ 13 = 0.0308em) and 6px to the `h2`, all from the reference.
