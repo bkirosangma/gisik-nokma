@@ -1316,6 +1316,13 @@ describe('G-3 the note opens to read; Edit and Done switch to the editor and bac
     late.textContent = 'Late heading';
     screen.getByTestId('note-editor').appendChild(late);
     await waitFor(() => expect(reported.at(-1)).toContain('Late heading'));
+    // A paragraph is not a heading: the page is not told again (each report re-renders it), though the frame ran.
+    const reports = reported.length;
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'more words, no new heading';
+    screen.getByTestId('note-editor').appendChild(paragraph);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(reported).toHaveLength(reports);
   });
 
   it('25.345 a note link in the reading view is still a link: clicking it opens that note', async () => {
