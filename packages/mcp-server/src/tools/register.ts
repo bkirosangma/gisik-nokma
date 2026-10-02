@@ -45,6 +45,11 @@ export function allTools(session: Session): ToolDefinition[] {
 export type ToolCallEvent = { tool: string; outcome: 'ok' | 'error'; durationMs: number };
 export type RegisterHooks = { onCall?(event: ToolCallEvent): void };
 
+/** Every tool of `allTools`, registered on `server` through `registerToolDefinitions`. */
+export function registerTools(server: McpServer, session: LazySession, hooks: RegisterHooks = {}): void {
+  registerToolDefinitions(server, session, allTools(session), hooks);
+}
+
 /**
  * The ONE place that knows the MCP SDK's registration API. Everything else in
  * this package speaks `ToolDefinition`, so an SDK upgrade that moves this
@@ -73,12 +78,11 @@ export type RegisterHooks = { onCall?(event: ToolCallEvent): void };
  * and the result are what a person typed and what their workspace holds; a log
  * line that could carry them would be a second copy of the ledger with none of
  * its access rules. The stdio entry point passes no hooks and is unchanged.
+ *
+ * This is the registration LOOP itself; `registerTools` is `allTools` through it. It is exported so a
+ * test can push a fake `ToolDefinition` through the REAL code (case 14.363). A handler that answers a
+ * `ToolReply` (an image, today) passes its blocks through as they are; every other answer is ONE JSON text block.
  */
-export function registerTools(server: McpServer, session: LazySession, hooks: RegisterHooks = {}): void {
-  registerToolDefinitions(server, session, allTools(session), hooks);
-}
-
-/** The registration loop itself (the docblock above moves here unchanged), so a test can push a fake `ToolDefinition` through it. */
 export function registerToolDefinitions(
   server: McpServer,
   session: LazySession,

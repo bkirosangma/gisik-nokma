@@ -130,6 +130,24 @@ describe('14.360–14.369 plumbing', () => {
     await expect(session.postMultipart('/v1/attachments', {}, { name: 'x', bytes: new Uint8Array() })).rejects.toMatchObject({ status: 403 });
     expect(seen.at(-1)).toBe('multipart:fresh');
     expect(logins).toBe(1); // a 403 is the answer, not a reason to log in again
+
+    // The upload half: its own session (a stale token), so `postMultipart` itself is what meets the 401.
+    const second = { ...config, tokenPath: join(mkdtempSync(join(tmpdir(), 'gisik-t3-')), 'mcp-token') };
+    await writeCachedToken(second.tokenPath, { token: 'stale', userId: 'old' });
+    const uploads: string[] = [];
+    const uploader: GisikClient = {
+      ...client,
+      postMultipart: async (_path, _fields, _file, token) => {
+        uploads.push(`multipart:${token}`);
+        if (token === 'stale') throw new HttpError(401, null);
+        return { attachmentId: 'a' };
+      },
+    };
+    const before = logins;
+    const uploadSession = await createSession({ config: second, client: uploader, prompt: () => {}, sleep: async () => {}, now: () => 0 });
+    await expect(uploadSession.postMultipart('/v1/attachments', {}, { name: 'x', bytes: new Uint8Array() })).resolves.toEqual({ attachmentId: 'a' });
+    expect(uploads).toEqual(['multipart:stale', 'multipart:fresh']);
+    expect(logins).toBe(before + 1);
   });
 
   it('14.367 envelopeFor takes any domain entity kind', () => {
