@@ -1128,6 +1128,8 @@ test('records non-text contrast across the signed-in surface, with a positive co
   // already covers it; its founding form is the other place the field renders.
   await page.goto('/workspaces', { waitUntil: 'networkidle' });
   absorb('/workspaces', await sweepBorders(page));
+  // The founding form is mounted ONLY while the "Create workspace" dialog is open (workspaces/page.tsx `CreateWorkspaceButton`), so the field this asserts on does not exist until it is opened. 13.1729.
+  await page.getByRole('button', { name: 'Create workspace' }).first().click();
   await assertSunkenNoBorderField('/workspaces');
 
   // `readWorkspaceId` carries the same "could not read a workspace id" refusal and RETURNS a
