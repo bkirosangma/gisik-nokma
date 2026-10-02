@@ -552,7 +552,7 @@ are in the first screen.
 Under the ticket's title, above the tabs, there is a short line of chips: the state it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
 *"Closed by … on …"* chip once it is closed. Directly below that line is where the ticket sits: *"At project
-root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent — exists, but you
+root"*, or a *"Subtask of …"* chip that opens the ticket above it, or *"Restricted parent: it exists, but you
 can't see it"*.
 
 The Details tab then reads top to bottom: the **description** box first, then the field rows — **State**,
@@ -730,7 +730,7 @@ straight away.
   be done first. This is the one rule that sits above every workflow and cannot be turned off — you
   will see it named in the workflow editor as a fixed system rule.
 
-### "5 of 8 done · 2 restricted"
+### "5 of 8 done, 2 restricted"
 
 Five of its eight children are finished, and two of those eight are hidden **from you** — not from
 everybody, from you, because of who can see what.
@@ -740,7 +740,7 @@ true total and tells you part of it is not yours to see. If nothing is hidden, i
 "restricted" part at all. If a ticket has no children at all, no progress number shows — not "0 of 0",
 just nothing.
 
-### "Restricted parent — exists, but you can't see it"
+### "Restricted parent: it exists, but you can't see it"
 
 This means the ticket really does belong to a bigger ticket, and you are not allowed to see what that bigger
 ticket is — not even its title. The product deliberately tells you a parent *exists* rather than making
@@ -756,11 +756,11 @@ Open a ticket and its panel carries a **Subtasks** section, sitting between the 
 fields. It has four parts.
 
 **The heading** reads "Subtasks", and when the ticket has children it carries their progress on the same
-line — **"Subtasks · 3 of 5 done"**, with **"· 2 restricted"** added when some of them are not yours to
-see.
+line, in brackets after it — **Subtasks (3 of 5 done)** — with **, 2 restricted** added inside the brackets
+when some of them are not yours to see.
 
-**The children**, one line each, with **each child's own state** beside it: *"Order the brochures ·
-To do"*. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
+**The children**, one line each, with **each child's own state** beside it: *Order the brochures* with a
+**To do** chip. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of
 its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty
 space to interpret.
 
@@ -768,8 +768,8 @@ space to interpret.
 Rebrand for Kalita Tea"**. Press it and that parent's panel opens in place of the one you were reading.
 It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in
 turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one
-you are not allowed to see, the chip reads **"Subtask of a restricted parent"** instead and is not
-pressable — see "Restricted parent — exists, but you can't see it" above.
+you are not allowed to see, the line reads "Restricted parent: it exists, but you can't see it" instead,
+and there is nothing to press.
 
 **The add row** at the bottom of the section takes a **New subtask title** and files the new child under
 the ticket you are looking at. It is the ordinary way of adding a ticket that you already know (§5) with the parent
@@ -1079,7 +1079,7 @@ is simply empty. So turning the switch on changes what the line **says** and nev
 **looks like** — nothing above or below it moves.
 
 > **Read that last sentence carefully.** The switch **does not affect the Board** — and a project opens
-> on the Board the first time you look at it. So you can turn it on, read "done are excluded", and be
+> on the Board the first time you look at it. So you can turn it on, read "Not started and done are both excluded", and be
 > looking at a Done column full of done cards. The note exists precisely because of this.
 
 > **And the Backlog is the odd one of the four.** The switch narrows the list, calendar and timeline; on

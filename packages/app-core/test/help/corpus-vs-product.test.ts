@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareAbsent, quotedSpans } from '../../../../scripts/help-content.mjs';
+import { compareAbsent, quotedSpans, stripComments } from '../../../../scripts/help-content.mjs';
 
 /**
  * Case 15.35 — the half of `check:help` that is about the PRODUCT rather than
@@ -118,6 +118,26 @@ describe('15.35 the help corpus against the product', () => {
     expect(right.undeclared).toEqual([]);
     // The bound: a blank line ends the search, so a stray quote cannot swallow a paragraph.
     expect(quotedSpans('a "stray\n\nb" c')).toEqual([]);
+  });
+
+  /**
+   * 23.197 (U-T11b addendum). The product haystack used to include comments, so a docblock that quoted the old
+   * "5 of 8 done · 2 restricted" kept the stale manual heading green. Comments are now stripped before the lookup.
+   */
+  it('23.197 — a stale quote that exists only inside a COMMENT is reported; the same text in a string literal is found', () => {
+    const documents = [{ id: 'd', source: 'docs/d.md', text: 'It reads "5 of 8 done · 2 restricted" now.' }];
+    const baseline = { absent: [] };
+    const commented = '/** "5 of 8 done · 2 restricted" */\nconst a = 1; // "5 of 8 done · 2 restricted"\n';
+    const stale = compareAbsent({ documents, product: stripComments(commented), baseline });
+    expect(stale.undeclared.map((u) => u.span)).toEqual(['5 of 8 done · 2 restricted']);
+    // CONTROL: the same text as a string literal is the product's, so the red above is the comment being dropped.
+    const live = compareAbsent({ documents, product: stripComments("const a = '5 of 8 done · 2 restricted';\n"), baseline });
+    expect(live.undeclared).toEqual([]);
+    // CONTROL: `//` inside a string is not a comment, and a JSX apostrophe does not swallow the next line.
+    expect(stripComments("const u = 'http://x'; // gone\n")).toContain('http://x');
+    expect(stripComments("<p>can't</p>\n/* gone */ const keep = 1;\n")).toContain('const keep = 1;');
+    // CSS: `//` is an ordinary character in a url, but a block comment is still a comment.
+    expect(stripComments('a{background:url(//cdn/x.png)} /* gone */', { lineComments: false })).not.toContain('gone');
   });
 
   it('15.35 — an emphasis ARTEFACT whose content carries * is not read as a product string', () => {

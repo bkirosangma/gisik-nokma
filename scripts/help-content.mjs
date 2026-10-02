@@ -429,36 +429,20 @@ const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
  * @returns {string}
  */
 export function stripComments(text, { lineComments = true } = {}) {
-  let out = '';
-  let i = 0;
-  const n = text.length;
-  while (i < n) {
-    const c = text[i];
-    const next = text[i + 1];
-    if (c === '/' && next === '*') {
-      const end = text.indexOf('*/', i + 2);
-      i = end === -1 ? n : end + 2;
-      out += ' ';
-    } else if (lineComments && c === '/' && next === '/') {
-      const end = text.indexOf('\n', i);
-      i = end === -1 ? n : end;
-    } else if (c === '"' || c === "'" || c === '`') {
-      let j = i + 1;
-      while (j < n && text[j] !== c) {
-        if (text[j] === '\\') j += 1;
-        else if (text[j] === '\n' && c !== '`') break;
-        j += 1;
-      }
-      const end = Math.min(j + 1, n);
-      out += text.slice(i, end);
-      i = end;
-    } else {
-      out += c;
-      i += 1;
-    }
-  }
-  return out;
+  if (!text.includes('/')) return text;
+  const tokens = lineComments ? COMMENT_TOKENS : BLOCK_COMMENT_TOKENS;
+  return text.replace(tokens, (token) => {
+    if (token.startsWith('/*')) return ' ';
+    if (token.startsWith('//')) return '';
+    return token;
+  });
 }
+
+// One native pass instead of a character loop (the loop added ~3 s to a tree walk of ~10 000 files). Strings are
+// matched so a `//` or `/*` inside one is text; a '…' or "…" that meets a newline ends there; a `…` may span lines.
+const COMMENT_TOKENS =
+  /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?|`(?:\\[\s\S]|[^`\\])*`?/g;
+const BLOCK_COMMENT_TOKENS = /\/\*[\s\S]*?(?:\*\/|$)|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?|`(?:\\[\s\S]|[^`\\])*`?/g;
 
 const COMMENTED_EXT = /\.(ts|tsx|js|jsx|mjs|css)$/;
 
@@ -703,6 +687,28 @@ const CASES = [
         b.checked === 1 &&
         b.undeclared.length === 0 &&
         stray.length === 0
+      );
+    },
+  },
+  {
+    name: 'PLANTED: a stale quote that survives only inside a COMMENT is reported; the same text in a string stays found',
+    run: () => {
+      // U-T11b addendum. A docblock quoted the old "5 of 8 done · 2 restricted" and kept the stale manual heading green.
+      const doc = [{ id: 'd', source: 'docs/d.md', text: 'It reads "5 of 8 done · 2 restricted" now.' }];
+      const bare = { absent: [] };
+      const commented = '/** "5 of 8 done · 2 restricted" */\nconst a = 1; // "5 of 8 done · 2 restricted"\n';
+      const literal = "const a = '5 of 8 done · 2 restricted';\n";
+      const red = compareAbsent({ documents: doc, product: stripComments(commented), baseline: bare });
+      // CONTROL 1: the same text as a string literal is still the product's, so the red above is the comment being dropped.
+      const green = compareAbsent({ documents: doc, product: stripComments(literal), baseline: bare });
+      // CONTROL 2: `//` inside a string is text, and a JSX apostrophe does not swallow the line after it.
+      const url = stripComments("const u = 'http://x'; // gone\n");
+      const jsx = stripComments("<p>can't</p>\n/* gone */ const keep = 1;\n");
+      return (
+        red.undeclared.length === 1 &&
+        green.undeclared.length === 0 &&
+        url.includes('http://x') && !url.includes('gone') &&
+        jsx.includes('const keep = 1;') && !jsx.includes('gone')
       );
     },
   },

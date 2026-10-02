@@ -3431,7 +3431,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Restricted parent — exists, but you can't see it\""
+                    "text": "\"Restricted parent: it exists, but you can't see it\""
                   },
                   {
                     "kind": "text",
@@ -4369,7 +4369,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "5-of-8-done-2-restricted",
-            "title": "\"5 of 8 done · 2 restricted\"",
+            "title": "\"5 of 8 done, 2 restricted\"",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -4400,8 +4400,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "restricted-parent-exists-but-you-can-t-see-it",
-            "title": "\"Restricted parent — exists, but you can't see it\"",
+            "id": "restricted-parent-it-exists-but-you-can-t-see-it",
+            "title": "\"Restricted parent: it exists, but you can't see it\"",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -4469,23 +4469,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " reads \"Subtasks\", and when the ticket has children it carries their progress on the same line — "
+                    "text": " reads \"Subtasks\", and when the ticket has children it carries their progress on the same line, in brackets after it — "
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Subtasks · 3 of 5 done\""
+                    "text": "Subtasks (3 of 5 done)"
                   },
                   {
                     "kind": "text",
-                    "text": ", with "
+                    "text": " — with "
                   },
                   {
                     "kind": "bold",
-                    "text": "\"· 2 restricted\""
+                    "text": ", 2 restricted"
                   },
                   {
                     "kind": "text",
-                    "text": " added when some of them are not yours to see."
+                    "text": " added inside the brackets when some of them are not yours to see."
                   }
                 ]
               },
@@ -4510,11 +4510,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Order the brochures · To do\""
+                    "text": "Order the brochures"
                   },
                   {
                     "kind": "text",
-                    "text": ". A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
+                    "text": " with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "To do"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip. A subtask is a ticket in its own right — it gets a state, an assignee, a date and a history of its own. If a ticket has no children at all, the section says so plainly rather than leaving you an empty space to interpret."
                   }
                 ]
               },
@@ -4535,15 +4543,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Press it and that parent's panel opens in place of the one you were reading. It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one you are not allowed to see, the chip reads "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "\"Subtask of a restricted parent\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " instead and is not pressable — see \"Restricted parent — exists, but you can't see it\" above."
+                    "text": ". Press it and that parent's panel opens in place of the one you were reading. It names the parent directly above and never a whole chain: the parent's own panel draws its own chip in turn, so you walk a family tree one step at a time rather than being handed a path. If the parent is one you are not allowed to see, the line reads \"Restricted parent: it exists, but you can't see it\" instead, and there is nothing to press."
                   }
                 ]
               },
@@ -6090,7 +6090,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                    "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"Not started and done are both excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
                   }
                 ]
               },
@@ -13104,7 +13104,7 @@ export const HELP_CONTENT: HelpContent = [
           },
           {
             "id": "what-does-5-of-8-done-2-restricted-mean",
-            "title": "What does \"5 of 8 done · 2 restricted\" mean?",
+            "title": "What does \"5 of 8 done, 2 restricted\" mean?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -13171,8 +13171,8 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "restricted-parent-exists-but-you-can-t-see-it-what-is-that",
-            "title": "\"Restricted parent — exists, but you can't see it.\" What is that?",
+            "id": "what-does-restricted-parent-it-exists-but-you-can-t-see-it-m",
+            "title": "What does \"Restricted parent: it exists, but you can't see it\" mean?",
             "blocks": [
               {
                 "kind": "paragraph",
@@ -14805,7 +14805,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards."
+                    "text": " So you can turn it on, read \"Not started and done are both excluded\", and be looking at a Done column full of done cards."
                   }
                 ]
               }
@@ -15549,7 +15549,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " It shows that line even when you have picked \"everyone in the workspace\" and even to somebody who cannot change the setting. Showing it only on the private option would let people assume the other options exclude the owner."
+                    "text": " It shows that line even when you have picked \"Everyone in the workspace\" and even to somebody who cannot change the setting. Showing it only on the private option would let people assume the other options exclude the owner."
                   }
                 ]
               }
