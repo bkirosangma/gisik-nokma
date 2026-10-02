@@ -153,6 +153,8 @@ export {
   type NewTicketDraft,
 } from './views/new-ticket-dialog.js';
 export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';
+export { usePendingCreates, type PendingCreate } from './views/board-move-state.js';
+export { useOptimisticTicket, type TicketOverlay } from './views/optimistic-ticket.js';
 export { OutsiderFinder } from './views/outsider-finder.js';
 export type { AssignOutsider, LookedUpPerson, LookupPerson } from './people/types.js';
 export { outsiderIngest } from './people/outsider-ingest.js';

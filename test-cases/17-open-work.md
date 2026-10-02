@@ -376,8 +376,9 @@ Commit alike.** The dialog is mounted for the sheet's whole life (`open={moveOpe
 move — which only calls `setMoveOpen(false)` — the comment is still in state, and `submit` puts it on the
 wire for the NEXT move: **a comment written about move A is recorded as the comment for move B.**
 
-- **17.072** ✅ After one committed move, reopening the dialog and choosing the same destination finds an
-  EMPTY comment box. The first move's arm is the control — its comment REACHES THE WIRE, asserted on the
+- **17.072** ✅ After one committed move, reopening the dialog and choosing the next destination (the way back,
+  Doing — the sheet now SHOWS the ticket in Done the moment the first move is written, so Done is no longer a
+  destination) finds an EMPTY comment box. The first move's arm is the control — its comment REACHES THE WIRE, asserted on the
   ingested payload — without which "empty on reopen" would be satisfiable by a box that never held
   anything. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 
