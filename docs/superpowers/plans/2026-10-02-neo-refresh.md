@@ -12,14 +12,14 @@
 
 ## Preconditions
 - **P1:** `release/neo-refresh` is cut from `release/prefix-groups-ux` at `4f86b959` (owner, 2026-10-02 ~12:30). When that release merges to `main`, a MERGETIP of `main` into `release/neo-refresh` follows. Line numbers below are `origin/release/prefix-groups-ux` at `b61d6e5e`; a lane re-greps each cited selector before editing (the selector is the anchor, the line a hint).
-- **P2:** the spec and this plan land as the release branch's first PR, with the bucket and Features section opened empty (T9's first commit, done first).
+- **P2:** the spec and this plan land as PR #911 (docs only, `docs/neo-refresh-plan`). The bucket `test-cases/24-neo-refresh.md`, the `test-cases/README.md` row, the baseline key and Features §21 open in T9's OWN first commit — already pushed by lane 4 as `9c7321b1` ("Neo refresh T9: bucket 24 and Features §21 opened"); every later task flips its cases there.
 
 ## Global Constraints
-- **Neo only.** `hig` and `minimal` render every shadow role and surface byte-identically to today (spec §6–7). T1's snapshot test is the guard.
+- **Neo only, ZERO drift.** `hig` and `minimal` render every selector the plan switches exactly as today (spec §7: the mechanism per site). Two guards in T1: 24.002 (every role's value and every surface, against a pre-refresh snapshot) and 24.009 (the consumer door: `(selector, old role, new role)` equality in hig and minimal). The one accepted shared move is the button `outline-offset` 1px → 3px (24.023).
 - **Tokens, never literals:** every colour or length added to CSS is a `--gn-*` variable generated from `tokens.ts` (`token-discipline.test.ts` scans both stylesheets).
 - **Every `shadow*` primitive is an 8-digit alpha hex** and never equals a `CONTRAST_PAIRS` colour (`packages/ui/test/tokens.test.ts:285–309`). Opaque line colours are written `…ff`.
 - **No `[data-style]` block may touch `.gn-button`** (case 13.340, `packages/ui/test/components.test.tsx:941–947`); buttons change through tokens.
-- **Every new `ShadowRole` is added to `SHADOW_ROLES` (`tokens.ts:1880`) AND to `EXPECTED_SHADOW_ROLES` in 13.411 (`tokens.test.ts:421`)**, or the role never reaches the stylesheet / the test never notices.
+- **Every new `ShadowRole` (twenty: see T1 Interfaces) is added to `SHADOW_ROLES` (`tokens.ts:1880`) AND to `EXPECTED_SHADOW_ROLES` in 13.411 (`tokens.test.ts:421`)**, or the role never reaches the stylesheet / the test never notices. `themeStylesheet()` emits each variable **9** times (three blocks per style: light, the OS-dark `@media` arm, explicit dark — `tokens.ts:1957–1990`).
 - **Contrast floors:** text 4.5 on every neo ground a field or well paints; non-text edges 3.0; the one-sided neo field line is asserted like a border (spec §5).
 - **CSS-rule tests:** `ruleExactly(css, selectorOrList, atRule)` matches the rule's EXACT selector list — a two-selector rule is passed as an array, never a comma-joined string (`packages/ui/test/helpers/css-rules.ts:67–85`); `valueOf` returns the LAST declaration.
 - **Catalogue:** bucket `test-cases/24-neo-refresh.md` (3-digit `24.001`…), Features `## 21. Neo refresh (N1–N10)`, registered in `test-cases/README.md` and `scripts/fixtures/check-case-citations-baseline.json` (`"24-neo-refresh.md": 0`). RED first, a control in the same `it`, a named mutation per case, case ids in test names.
@@ -34,7 +34,7 @@
 5. **Reduced motion hides the press** — with transitions off the shadow swap must still happen. Expected: the inset appears instantly. Pinned by T4 case 24.065 (the reduced-motion arm sets `transition: none`, not `box-shadow: none`).
 
 ## Seam map (verified 2026-10-02 against `b61d6e5e`)
-`tokens.ts`: primitives `shadowNeo*` 375–399, `neoNavy`/`neoNavyRaised` 211/230, `neoWell*` 263–264, `STYLE_COLOR_OVERRIDES.neo` 1042–1074, `ShadowRole` 1295–1309, `SHADOWS` 1343–1622 (neo 1473–1621), `shadowValueOf` 1630, `CONTRAST_PAIRS` 1645–1830 (56 rows), `colorOf` 1839, `SHADOW_ROLES` 1880, `themeStylesheet` 1957. `ui.css`: `.gn-button` 75, `:focus-visible` 96, `--primary` 108/117/122, `--danger` 130/138/142, `:disabled` 159, `.gn-chip` neo 232, `.gn-card` 274, `.gn-dialog` 443, `.gn-sheet` 469, `.gn-toast` 506, `.gn-sheet__close` 959/978, `.gn-board__column` 1168, `__column-header` 1208, `__cards` 1287, `.gn-board-card` 1473, slot hover/active 1622–1623, drag clone 1642, `.gn-row-action` 2022/2037, `.gn-list__column-option` 2372, `__column-box` 2394, checked 2448, `.gn-select__panel` 4235, `.gn-popover` 4256, `.workflow-rebind-dialog` 4556, `.template-gallery__door` 4689/4707/4712, `.workflow-builder-screen__name` neo 4804, `.gn-help__search-input` neo 6289, `.gn-help__toggle:hover` 6428, `.gn-segmented` 6931, `__item` 6946, `__item--on` 6980, neo `--on` 7017, `.gn-field` 7075, `.gn-field__input` 7101, `:focus-visible` 7146, `:disabled` 7157, neo field 7176, neo disabled 7191, raised trigger 7240, `--ghost` 7252/7258, `--danger-quiet` 7268, `.gn-project__search` 7521 (neo 7535), `.gn-filters__panel` 7688, `.gn-switch` 8097, `::after` 8124, `:checked` 8136, `:checked::after` 8138, `:disabled` 8151–8153, `.gn-infotip__panel` 8216. `globals.css`: `.gn-shell__main` 169, `.gn-workspace-list` 266, door hover/active 533/538, `.gn-account__section` 793, `.gn-workspace-home__link` 1183/1210/1215, `.gn-nav` 2078, `.gn-nav a:hover` 2900, current 2915, neo current 2942, `.gn-theme-toggle` 2969, neo sign-in mark 3085, task checkbox neo 4892. Tests: `tokens.test.ts` 13.347 (359), 13.411 (414, `EXPECTED_SHADOW_ROLES` 421), 13.412 (460–484), neo-dark fill (539–546), sunken-compact pins (338–343); `styling-tokens.test.ts` 20.011 (146–152); `neo-ux-fixes.test.ts` 23.002 (80–99), 23.006 (164–186), 23.007 (188–207); `components.test.tsx` 13.289 (590), 13.291 (619), 13.339 (648), 13.340 (941); `styling-buttons.test.ts` 20.021–20.024 (25–90); `styling-board.test.ts` 20.041 (22–29), 20.046 (105–114); `styling-surfaces.test.ts` (9–24); `styling-b2-fields.test.ts` 20.213 (38–45); `apps/web/e2e-stack/viewport.spec.ts` 1093–1113; `apps/web/e2e-stack/non-text-contrast-roster.json`.
+`tokens.ts`: primitives `shadowNeo*` 375–399, `neoNavy`/`neoNavyRaised` 211/230, `neoWell*` 263–264, `STYLE_COLOR_OVERRIDES.neo` 1042–1074, `ShadowRole` 1295–1309, `SHADOWS` 1343–1622 (neo 1473–1621), `shadowValueOf` 1630, `CONTRAST_PAIRS` 1645–1830 (56 rows), `colorOf` 1839, `SHADOW_ROLES` 1880, `themeStylesheet` 1957. `ui.css`: `.gn-button` 75, `:focus-visible` 96, `--primary` 108/117/122, `--danger` 130/138/142, `:disabled` 159, `.gn-chip` neo 232, `.gn-card` 274, `.gn-dialog` 443, `.gn-sheet` 469, `.gn-toast` 506, `.gn-dialog__close, .gn-sheet__close` 958–975 (a group of 2; hover/focus group of 4 at 976–979), `.gn-board__column` 1168, `__column-header` 1208, `__cards` 1287, `.gn-board-card` 1473, slot hover/active 1622–1623, drag clone 1642, `.gn-row-action` 2022/2037, `.gn-list__column-option` 2372, `__column-box` 2394, checked 2448, `.gn-select__panel` 4235, `.gn-popover` 4256, `.workflow-rebind-dialog` 4556, `.template-gallery__door` 4689/4707/4712, `.workflow-builder-screen__name` neo 4804, `.gn-help__search-input` neo 6289, `.gn-help__toggle:hover` 6428, `.gn-segmented` 6931, `__item` 6946, `__item--on` 6980, neo `--on` 7017, `.gn-field` 7075, `.gn-field__input` 7101, `:focus-visible` 7146, `:disabled` 7157, neo field 7176, neo disabled 7191, raised trigger 7240, `--ghost` 7252/7258, `--danger-quiet` 7268, `.gn-project__search` 7521 (neo 7535), `.gn-filters__panel` 7688, `.gn-switch` 8097, `::after` 8124, `:checked` 8136, `:checked::after` 8138, `:disabled` 8151–8153, `.gn-infotip__panel` 8216. `globals.css`: `.gn-shell__main` 169, `.gn-workspace-list` 266, door hover 533–534 and active 538–539 (groups of 2: workspace + project door), `.gn-account__section` 793, `.gn-workspace-home__link` 1183/1210/1215, `.gn-nav` 2078, `.gn-nav a:hover` 2900, current 2915, neo current 2942, `.gn-theme-toggle` 2969, `.mention-popup, .wikilink-popup, .ticketref-popup` 2170–2172 (a group of 3), `.gn-skip` 40, `.gn-toc-launcher__panel` 4147, `.wikilink-preview` 5049, `.table-toolbar` 5122, neo sign-in mark 3085, task checkbox neo 4892. Tests: `tokens.test.ts` 13.347 (359), 13.411 (414, `EXPECTED_SHADOW_ROLES` 421), 13.412 (460–484), neo-dark fill (539–546), sunken-compact pins (338–343); `styling-tokens.test.ts` 20.011 (146–152); `neo-ux-fixes.test.ts` 23.002 (80–99), 23.006 (164–186), 23.007 (188–207); `components.test.tsx` 13.289 (590), 13.291 (619), 13.339 (648–657), 13.340 (941–947); `styling-buttons.test.ts` 20.021–20.024 (25–78), 20.025 (79–91); `styling-board.test.ts` 20.041 (22–29), 20.046 (105–114); `styling-surfaces.test.ts` (9–24); `styling-b2-fields.test.ts` 20.213 (38–45); `apps/web/e2e-stack/viewport.spec.ts` 1093–1113; `apps/web/e2e-stack/non-text-contrast-roster.json`.
 
 ## File structure (by task)
 | Task | Area | Main files |
@@ -62,14 +62,14 @@
 
 **Interfaces:**
 - Consumes: `shadowValueOf(style, theme, role)`, `colorOf(theme, role, style)`, `primitives`, `CONTRAST_PAIRS`, `SHADOW_ROLES`, `themeStylesheet()` (all exported from `tokens.ts`); `contrastRatio(a, b)` and `over(src, dst)` from `packages/ui/test/helpers/contrast.ts`.
-- Produces: new `ShadowRole` members `'raised-lg' | 'near-lg' | 'near' | 'raised-compact' | 'recess' | 'field' | 'quiet' | 'quiet-near' | 'quiet-press' | 'action-filled' | 'action-filled-near' | 'action-filled-press' | 'danger' | 'danger-near' | 'danger-press' | 'knob-on'`, emitted as `--gn-shadow-raised-lg` … `--gn-shadow-knob-on` by `shadowVariableName`. New primitives (spec §3.1): `shadowNeoDarkLight #a89c918c`, `shadowNeoDarkDark #0000008c`, `shadowNeoDarkSunkenLight #a89c9199`, `shadowNeoBandLight #a89c91cc`, `shadowNeoBandDark #000000bf`, `shadowNeoHighlightLight #fffaf4b3` (REUSED name, new value), `shadowNeoHighlightDark #f2e9e129`, `shadowNeoHighlightCompactLight #fffaf480`, `shadowNeoHighlightCompactDark #f2e9e11f`, `shadowNeoHighlightSunkenLight #fffaf480`, `shadowNeoHighlightSunkenDark #f2e9e114`, `shadowNeoLipLight #fffaf4cc`, `shadowNeoLipDark #f2e9e159`, `shadowNeoLineLight #897362ff`, `shadowNeoLineDark #7d88a8ff`, `shadowNeoAccentPressLight #264a77ff`, `shadowNeoAccentPressDark #5f7fabff`, `shadowNeoDangerPressLight #772018ff`, `shadowNeoDangerPressDark #bf4f49ff`. Surfaces: neo `surfaceSunken` → `neoWellLight`/`neoWellDark`; neo-dark `surfaceRaised` → `neoNavy`.
+- Produces: twenty new `ShadowRole` members `'raised-lg' | 'near-lg' | 'near' | 'raised-compact' | 'recess' | 'field' | 'quiet' | 'quiet-near' | 'quiet-press' | 'action-filled' | 'action-filled-near' | 'action-filled-press' | 'action-filled-disabled' | 'danger' | 'danger-near' | 'danger-press' | 'danger-disabled' | 'knob-on' | 'drop' | 'drop-side'`, emitted as `--gn-shadow-raised-lg` … `--gn-shadow-drop-side` by `shadowVariableName`. New primitives (spec §3.1): `shadowNeoDarkLight #a89c918c`, `shadowNeoDarkDark #0000008c` (the ONLY dark fall; there is no `shadowNeoDarkSunkenDark`), `shadowNeoDarkSunkenLight #a89c9199`, `shadowNeoBandLight #a89c91cc`, `shadowNeoBandDark #000000bf`, `shadowNeoHighlightLight #fffaf4b3` (REUSED name, new value), `shadowNeoHighlightDark #f2e9e129`, `shadowNeoHighlightCompactLight #fffaf480`, `shadowNeoHighlightCompactDark #f2e9e11f`, `shadowNeoHighlightSunkenLight #fffaf480`, `shadowNeoHighlightSunkenDark #f2e9e114`, `shadowNeoLipLight #fffaf4cc`, `shadowNeoLipDark #f2e9e159`, `shadowNeoLineLight #897362ff`, `shadowNeoLineDark #7d88a8ff`, `shadowNeoAccentPressLight #264a77ff`, `shadowNeoAccentPressDark #5f7fabff`, `shadowNeoDangerPressLight #772018ff`, `shadowNeoDangerPressDark #bf4f49ff`. Surfaces: neo `surfaceSunken` → `neoWellLight`/`neoWellDark`; neo-dark `surfaceRaised` → `neoNavy`.
 
 - [ ] **Step 1: Snapshot hig and minimal BEFORE touching tokens (the control for 24.002)**
 
 Run (Node 22, from `packages/ui` on the untouched release branch):
 ```bash
-node -e "
-const t = require('./dist/tokens.js');
+node --input-type=module -e "
+const t = await import('./dist/tokens.js');
 const out = {};
 for (const style of ['hig','minimal']) for (const theme of ['light','dark']) {
   out[style+'/'+theme] = Object.fromEntries(t.SHADOW_ROLES.map(r => [r, t.shadowValueOf(style, theme, r)]));
@@ -158,8 +158,8 @@ describe('24.003 the sized pairs (spec §3.3; N7)', () => {
       expect(shadowValueOf('neo', theme, 'sheet')).toBe(shadowValueOf('neo', theme, 'raised-lg'));
       expect(shadowValueOf('neo', theme, 'lift-drag')).toBe(`14px 14px 32px ${d[theme]}, -14px -14px 32px ${h[theme]}`);
     }
-    // CONTROL: hig's raised-lg is its raised, minimal's is none.
-    expect(shadowValueOf('hig', 'light', 'raised-lg')).toBe(shadowValueOf('hig', 'light', 'raised'));
+    // CONTROL: hig's raised-lg is its LIFT (the hig nav bar must not change), minimal's is none.
+    expect(shadowValueOf('hig', 'light', 'raised-lg')).toBe(shadowValueOf('hig', 'light', 'lift'));
     expect(shadowValueOf('minimal', 'dark', 'raised-lg')).toBe('none');
   });
 });
@@ -191,7 +191,7 @@ describe('24.005 the neo field role: one crisp line per theme at >= 3:1 (spec §
     expect(shadowValueOf('neo', 'dark', 'field')).toBe('inset 3px 3px 5px #000000bf, inset -1px -1px 0px #7d88a8ff');
     expect(contrastRatio('#897362', colorOf('light', 'surfaceSunken', 'neo'))).toBeGreaterThanOrEqual(3.0); // 3.31
     expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceSunken', 'neo'))).toBeGreaterThanOrEqual(3.0); // 4.86
-    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceRaised', 'neo'))).toBeGreaterThanOrEqual(3.0); // vs the card
+    expect(contrastRatio('#7d88a8', colorOf('dark', 'surfaceRaised', 'neo'))).toBeGreaterThanOrEqual(3.0); // 4.38 vs the page (= the dark raised, N4)
     // CONTROL: hig and minimal have no field role (they keep the rim).
     expect(shadowValueOf('hig', 'light', 'field')).toBe('none');
     expect(shadowValueOf('minimal', 'dark', 'field')).toBe('none');
@@ -212,9 +212,22 @@ describe('24.006 filled surfaces carry no highlight (spec §4; N8)', () => {
       for (const role of ['action-filled', 'action-filled-near', 'danger', 'danger-near'] as const) {
         expect(shadowValueOf('neo', theme, role).split(',').length, `${theme}/${role} has one layer`).toBe(1);
       }
+      // a disabled filled button is flat in neo, today's shadow in hig (spec §7)
+      expect(shadowValueOf('neo', theme, 'action-filled-disabled')).toBe('none');
+      expect(shadowValueOf('neo', theme, 'danger-disabled')).toBe('none');
+      expect(shadowValueOf('hig', theme, 'action-filled-disabled')).toBe(before[`hig/${theme}`]['action']);
+      expect(shadowValueOf('hig', theme, 'danger-disabled')).toBe(before[`hig/${theme}`]['lift']);
       expect(shadowValueOf('hig', theme, 'action-filled')).toBe(before[`hig/${theme}`]['action']);
       expect(shadowValueOf('hig', theme, 'danger')).toBe(before[`hig/${theme}`]['lift']);
       expect(shadowValueOf('hig', theme, 'danger-press')).toBe(before[`hig/${theme}`]['lift-press']);
+      // the two generic drops become roles whose hig AND minimal values are today's literal drops
+      const scrim = theme === 'light' ? '#1c1b1866' : '#000000a6';
+      for (const style of ['hig', 'minimal'] as const) {
+        expect(shadowValueOf(style, theme, 'drop')).toBe(`0px 8px 24px ${scrim}`);
+        expect(shadowValueOf(style, theme, 'drop-side')).toBe(`-12px 0px 40px ${scrim}`);
+      }
+      expect(shadowValueOf('neo', theme, 'drop')).toBe(shadowValueOf('neo', theme, 'near-lg'));
+      expect(shadowValueOf('neo', theme, 'drop-side')).toBe(shadowValueOf('neo', theme, 'sheet'));
     }
     // the press shades are the fill x 0.75, stated so a palette edit recomputes them
     expect(primitives.shadowNeoAccentPressLight).toBe('#264a77ff'); // blue600 #33629f x 0.75
@@ -242,13 +255,56 @@ describe('24.007 surfaces: sunken = the well, dark raised = the page hex (N2, N4
 });
 
 describe('24.008 every new role reaches the stylesheet under every style x theme (13.411 extended)', () => {
-  it('24.008 the sixteen new roles are in SHADOW_ROLES and emitted six times each', () => {
-    const NEW = ['raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on'] as const;
+  it('24.008 the twenty new roles are in SHADOW_ROLES and emitted nine times each (3 styles x light, OS-dark arm, explicit dark)', () => {
+    const NEW = ['raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'action-filled-disabled', 'danger', 'danger-near', 'danger-press', 'danger-disabled', 'knob-on', 'drop', 'drop-side'] as const;
     const sheet = themeStylesheet();
     for (const role of NEW) {
       expect(SHADOW_ROLES).toContain(role);
-      expect(sheet.split(`--gn-shadow-${role}:`).length - 1, role).toBe(6);
+      expect(sheet.split(`--gn-shadow-${role}:`).length - 1, role).toBe(9);
     }
+    // CONTROL: an existing role is emitted the same nine times, so the count is the emitter's, not the roles'.
+    expect(sheet.split('--gn-shadow-raised:').length - 1).toBe(9);
+  });
+});
+
+describe('24.009 the consumer door: every selector the plan switches renders in hig and minimal exactly as today (spec §7, zero drift)', () => {
+  /** (selector, the role it reads today, the role it reads after this plan). Switched in T2–T6; the table is the contract. */
+  const SWITCHES: ReadonlyArray<[string, ShadowRole, ShadowRole]> = [
+    ['.gn-nav', 'lift', 'raised-lg'],
+    ['.gn-dialog', 'lift-near', 'near-lg'], ['.gn-select__panel', 'lift-near', 'near-lg'], ['.gn-popover', 'lift-near', 'near-lg'],
+    ['.gn-infotip__panel', 'lift-near', 'near-lg'], ['.gn-nav__menu', 'lift-near', 'near-lg'], ['.gn-card-menu__list', 'lift-near', 'near-lg'],
+    ['.mention-popup, .wikilink-popup, .ticketref-popup', 'lift-near', 'near-lg'], ['.gn-skip', 'lift-near', 'near-lg'],
+    ['.gn-toc-launcher__panel', 'lift-near', 'near-lg'], ['.wikilink-preview', 'lift-near', 'near-lg'], ['.table-toolbar', 'lift-near', 'near-lg'],
+    ['.gn-button--primary', 'action', 'action-filled'], ['.gn-button--primary:hover', 'action-near', 'action-filled-near'],
+    ['.gn-button--primary:active', 'action-press', 'action-filled-press'], ['.gn-button--primary:disabled', 'action', 'action-filled-disabled'],
+    ['.gn-button--danger', 'lift', 'danger'], ['.gn-button--danger:hover', 'lift-near', 'danger-near'],
+    ['.gn-button--danger:active', 'lift-press', 'danger-press'], ['.gn-button--danger:disabled', 'lift', 'danger-disabled'],
+    ['.gn-list__column-option', 'lift', 'raised-compact'],
+  ];
+  /** Selectors that gain a role where they read NONE today: the role must be none in hig and minimal. */
+  const NEW_READERS: ReadonlyArray<[string, ShadowRole]> = [
+    ['.gn-button--ghost', 'quiet'], ['.gn-button--ghost:hover', 'quiet-near'], ['.gn-button--ghost:active', 'quiet-press'],
+    ['.gn-dialog__close, .gn-sheet__close', 'quiet'], ['.gn-row-action', 'quiet'],
+    ['.gn-switch:checked::after', 'knob-on'],
+  ];
+  it('24.009 for every switched selector the new role equals the old role in hig and minimal, both themes; every new reader is none there; the two literal drops render today\'s value through their roles', () => {
+    for (const style of ['hig', 'minimal'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        for (const [selector, oldRole, newRole] of SWITCHES) {
+          expect(shadowValueOf(style, theme, newRole), `${style}/${theme} ${selector}`).toBe(shadowValueOf(style, theme, oldRole));
+        }
+        for (const [selector, role] of NEW_READERS) {
+          expect(shadowValueOf(style, theme, role), `${style}/${theme} ${selector}`).toBe('none');
+        }
+        // `.workflow-rebind-dialog` (`0 8px 24px var(--gn-shadow)`) and `.gn-filters__panel` (`-0.75rem 0 2.5rem var(--gn-shadow)`) today
+        const scrim = colorOf(theme, 'shadow', style);
+        expect(shadowValueOf(style, theme, 'drop'), `${style}/${theme} .workflow-rebind-dialog`).toBe(`0px 8px 24px ${scrim}`);
+        expect(shadowValueOf(style, theme, 'drop-side'), `${style}/${theme} .gn-filters__panel`).toBe(`-12px 0px 40px ${scrim}`);
+      }
+    }
+    // CONTROL: the same table does NOT hold for neo — that is the refresh.
+    expect(shadowValueOf('neo', 'light', 'raised-lg')).not.toBe(shadowValueOf('neo', 'light', 'lift'));
+    expect(shadowValueOf('neo', 'light', 'quiet')).not.toBe('none');
   });
 });
 ```
@@ -281,7 +337,7 @@ Expected: FAIL — `primitives.shadowNeoDarkLight` undefined; `shadowValueOf` ty
   /** The 1px lip on a control recess: 80% light (1.24), 35% dark (2.85). */
   shadowNeoLipLight: '#fffaf4cc',
   shadowNeoLipDark: '#f2e9e159',
-  /** The neo field's crisp boundary (N10, one-sided per WCAG 1.4.11): #897362 is 3.31 on #e6dcd2; #7d88a8 is 4.86 on #141a33 and 3.85 on the page. Opaque, written as 8 digits for the shadow sweep. */
+  /** The neo field's crisp boundary (N10, one-sided per WCAG 1.4.11): #897362 is 3.31 on #e6dcd2; #7d88a8 is 4.86 on #141a33 and 4.38 on the page (= the dark raised, N4). Opaque, written as 8 digits for the shadow sweep. */
   shadowNeoLineLight: '#897362ff',
   shadowNeoLineDark: '#7d88a8ff',
   /** Press shades = the fill x 0.75 (finding 8): blue600 #33629f, blue300 #7fa9e4, neoLightDanger #9e2a20, red300 #ff6961. */
@@ -302,9 +358,10 @@ export type ShadowRole =
   | 'raised-lg' | 'near-lg' | 'near' | 'raised-compact'
   | 'recess' | 'field'
   | 'quiet' | 'quiet-near' | 'quiet-press'
-  | 'action-filled' | 'action-filled-near' | 'action-filled-press'
-  | 'danger' | 'danger-near' | 'danger-press'
-  | 'knob-on';
+  | 'action-filled' | 'action-filled-near' | 'action-filled-press' | 'action-filled-disabled'
+  | 'danger' | 'danger-near' | 'danger-press' | 'danger-disabled'
+  | 'knob-on'
+  | 'drop' | 'drop-side';
 ```
 
 Neo, both themes, written once as helpers above `SHADOWS` so light and dark cannot drift:
@@ -339,13 +396,19 @@ function neoShadows(L: NeoLamp): Record<ShadowRole, readonly ShadowLayer[]> {
     quiet: raisedCompact, 'quiet-near': raised, 'quiet-press': recess,
     'action-filled': filled, 'action-filled-near': filledNear,
     'action-filled-press': [{ x: 2, y: 2, blur: 5, colour: L.accentPress, inset: true }],
+    'action-filled-disabled': [],
     danger: filled, 'danger-near': filledNear,
     'danger-press': [{ x: 2, y: 2, blur: 5, colour: L.dangerPress, inset: true }],
+    'danger-disabled': [],
     'knob-on': [{ x: 1, y: 2, blur: 4, colour: L.d }],
+    drop: nearLg, 'drop-side': raisedLg,
   };
 }
+/** hig/minimal: today's two literal drops (`0 8px 24px var(--gn-shadow)`, `-0.75rem 0 2.5rem var(--gn-shadow)`) as role layers, so the two rules render exactly as today there. */
+const DROP = { light: [{ x: 0, y: 8, blur: 24, colour: 'scrimLight' as PrimitiveName }], dark: [{ x: 0, y: 8, blur: 24, colour: 'scrimDark' as PrimitiveName }] };
+const DROP_SIDE = { light: [{ x: -12, y: 0, blur: 40, colour: 'scrimLight' as PrimitiveName }], dark: [{ x: -12, y: 0, blur: 40, colour: 'scrimDark' as PrimitiveName }] };
 ```
-and in `SHADOWS`: `neo: { light: neoShadows(NEO_LIGHT), dark: neoShadows(NEO_DARK) }`. For `hig` add to BOTH theme blocks, pointing at the existing arrays by name (extract `const higLightRaised = [...]` etc. so the alias is the same object): `'raised-lg': raised, 'near-lg': liftNear, near: liftNear, 'raised-compact': lift, recess: [], field: [], quiet: [], 'quiet-near': [], 'quiet-press': [], 'action-filled': action, 'action-filled-near': actionNear, 'action-filled-press': actionPress, danger: lift, 'danger-near': liftNear, 'danger-press': liftPress, 'knob-on': []`. For `minimal` add every new role as `[]`. Append the sixteen names to `SHADOW_ROLES` (`:1880`).
+and in `SHADOWS`: `neo: { light: neoShadows(NEO_LIGHT), dark: neoShadows(NEO_DARK) }`. For `hig` add to BOTH theme blocks, pointing at the existing arrays by name (extract `const higLightRaised = [...]` etc. so the alias is the same object): `'raised-lg': lift, 'near-lg': liftNear, near: liftNear, 'raised-compact': lift, recess: [], field: [], quiet: [], 'quiet-near': [], 'quiet-press': [], 'action-filled': action, 'action-filled-near': actionNear, 'action-filled-press': actionPress, 'action-filled-disabled': action, danger: lift, 'danger-near': liftNear, 'danger-press': liftPress, 'danger-disabled': lift, 'knob-on': [], drop: DROP[theme], 'drop-side': DROP_SIDE[theme]` (note `raised-lg` = `lift`, NOT `raised`: the hig nav reads `lift` today). For `minimal` add every new role as `[]` EXCEPT `drop: DROP[theme]` and `'drop-side': DROP_SIDE[theme]` (minimal renders the two literal drops today and must keep them). Append the twenty names to `SHADOW_ROLES` (`:1880`).
 
 - [ ] **Step 6: Remap the surfaces** (`tokens.ts:1047`, `1063–1064`)
 
@@ -374,7 +437,7 @@ Update the `STYLE_COLOR_OVERRIDES` docblock (`:1021–1023`) and `neoNavyRaised`
 - [ ] **Step 8: Run to verify GREEN**
 
 Run: `cd packages/ui && pnpm build > /tmp/neo-build.log 2>&1; tail -3 /tmp/neo-build.log; pnpm exec vitest run test/neo-refresh.test.ts test/tokens.test.ts test/styling-tokens.test.ts test/neo-ux-fixes.test.ts test/field-placeholder-contrast.test.ts test/token-discipline.test.ts > /tmp/neo-t1.log 2>&1; tail -30 /tmp/neo-t1.log`
-Expected: PASS. If `field-placeholder-contrast.test.ts` reddens on neo dark, it composites `fill-quaternary` over `surfaceRaised` (now `#1b2340`): change its neo rows to composite over `surfaceSunken` (the field's real ground) and record the new reading (`#a3a3a8` on `#141a33` = 6.82).
+Expected: PASS except **18.306 neo/light on surfaceSunken** (`field-placeholder-contrast.test.ts:40–56`), which goes RED: `fillWarmNeo4 #b098841a` over the well `#e6dcd2` is `#e0d5ca`, and `textSubtle #5e5e62` on it is **4.469** < 4.5 (dark: `#24273b`, 5.854, clears). **Planner ruling (FIX 1, 2026-10-02): re-model 18.306 for neo, not the palette** — after T3 a neo field paints `surface-sunken` with no `fill-quaternary`, so the neo rows composite on the field's real ground (4.77 light, 6.82 dark); hig/minimal rows keep the composite model. **Ruled (planner, 2026-10-02 ~13:00, option (a)):** apply the re-model in this step, AND fix the pre-existing tinted-label defect found by the sweep: add `[data-style="neo"] .gn-ticket-sheet__field--tinted dt { color: var(--gn-text-muted); }` to `packages/ui/src/ui.css` beside the `.gn-ticket-sheet__field--tinted dt` rule (`ui.css:3210`), with case **24.010** in `neo-refresh.test.ts`: `contrastRatio(colorOf('light','textMuted','neo'), over(colorOf('light','fillQuaternary','neo'), colorOf('light','surfaceTrack','neo'))) >= 4.5` AND `ruleExactly(css, '[data-style="neo"] .gn-ticket-sheet__field--tinted dt')` reads `var(--gn-text-muted)`; CONTROL in the same `it`: `textSubtle` on that composite is `< 4.5` (4.469). Mutation: delete the neo arm → 24.010 red. hig and minimal are unchanged (24.009's guard covers the selector list). `textSubtleLight` is NOT changed.
 
 - [ ] **Step 9: Mutations (each must go RED, then revert)**
   - set `shadowNeoHighlightLight` back to `#fffffff2` → 24.001 and 24.003 red;
@@ -438,13 +501,16 @@ describe('24.021 the confirm button takes the danger roles: a self-coloured red 
   });
 });
 
-describe('24.022 a disabled filled button paints no shadow ("no depth" = "not interactive", U7 extended)', () => {
-  it('24.022 .gn-button:disabled sets box-shadow: none beside its opacity', () => {
-    const d = ruleExactly(ui, '.gn-button:disabled');
-    expect(valueOf(d, 'box-shadow')).toBe('none');
-    expect(valueOf(d, 'opacity')).toBe('var(--gn-disabled-opacity)');
-    // CONTROL: aria-disabled (quiet, still focusable) keeps the same look.
-    expect(valueOf(ruleExactly(ui, ".gn-button[aria-disabled='true']"), 'box-shadow')).toBe('none');
+describe('24.022 a disabled filled button is flat in neo through neo-valued roles; hig keeps today\'s disabled shadow (spec §7)', () => {
+  it('24.022 the primary and the confirm read action-filled-disabled / danger-disabled when disabled; the base :disabled rule is untouched', () => {
+    expect(valueOf(ruleExactly(ui, ['.gn-button--primary:disabled', ".gn-button--primary[aria-disabled='true']"]), 'box-shadow')).toBe('var(--gn-shadow-action-filled-disabled)');
+    expect(valueOf(ruleExactly(ui, ['.gn-button--danger:disabled', ".gn-button--danger[aria-disabled='true']"]), 'box-shadow')).toBe('var(--gn-shadow-danger-disabled)');
+    expect(valueOf(ruleExactly(ui, '.gn-button--ghost:disabled'), 'box-shadow')).toBe('none'); // hig/minimal quiet is none already
+    const base = ruleExactly(ui, '.gn-button:disabled');
+    expect(valueOf(base, 'box-shadow')).toBeNull();
+    expect(valueOf(base, 'opacity')).toBe('var(--gn-disabled-opacity)');
+    // CONTROL: in hig the disabled primary still renders its action shadow (24.009 pins the role equality).
+    expect(shadowValueOf('hig', 'light', 'action-filled-disabled')).toBe(shadowValueOf('hig', 'light', 'action'));
   });
 });
 
@@ -468,17 +534,17 @@ describe('24.024 the on-switch knob carries one dark fall and no highlight (N8)'
 });
 
 describe('24.025 cards, doors and board cards press into the surface (N1): every :active site reads lift-press, which neo renders inset', () => {
-  it('24.025 the six press sites read var(--gn-shadow-lift-press) and no card rule transforms', () => {
-    const sites: Array<[string, string]> = [
-      [ui, '.gn-board__card-slot:active > .gn-board-card'],
-      [ui, '.template-gallery__door:active'],
-      [globals, '.gn-workspace-home__link:active'],
-      [globals, '.gn-card:has(> .gn-workspace-card__door:active)'],
+  it('24.025 the four press sites read var(--gn-shadow-lift-press) and no card rule transforms', () => {
+    const sites: Array<[string, string | readonly string[]]> = [
+      [ui, '.gn-board__card-slot:active > .gn-board-card'],                                   // ui.css:1623
+      [ui, '.template-gallery__door:active'],                                                  // ui.css:4712
+      [globals, '.gn-workspace-home__link:active'],                                            // globals.css:1215
+      [globals, ['.gn-card:has(> .gn-workspace-card__door:active)', '.gn-card:has(> .gn-project-card__door:active)']], // globals.css:538–539, a group of 2
     ];
     for (const [css, sel] of sites) {
       const body = ruleExactly(css, sel);
-      expect(valueOf(body, 'box-shadow'), sel).toBe('var(--gn-shadow-lift-press)');
-      expect(valueOf(body, 'transform'), sel).toBeNull();
+      expect(valueOf(body, 'box-shadow'), String(sel)).toBe('var(--gn-shadow-lift-press)');
+      expect(valueOf(body, 'transform'), String(sel)).toBeNull();
     }
     // the rule the ruling rests on: a shadow change, not motion
     expect(valueOf(ruleExactly(ui, '.gn-board-card'), 'transition')).toContain('box-shadow');
@@ -493,7 +559,7 @@ describe('24.026 the drag clone keeps its lift while the source card presses', (
 });
 ```
 
-- [ ] **Step 2: RED** — `cd packages/ui && pnpm exec vitest run test/neo-refresh.test.ts -t "24.02" > /tmp/neo-t2.log 2>&1; tail -30 /tmp/neo-t2.log`. Expected: 24.020–24.024 FAIL (old variables), 24.025–24.026 PASS (controls already true — note it in the commit).
+- [ ] **Step 2: RED** — `cd packages/ui && pnpm exec vitest run test/neo-refresh.test.ts -t "24.02" > /tmp/neo-t2.log 2>&1; tail -30 /tmp/neo-t2.log`. Expected: 24.020–24.024 FAIL (old variables), 24.025–24.026 PASS (the sites already read `lift-press`/`lift-drag`; the inversion is T1's token value — note it in the commit).
 
 - [ ] **Step 3: Implement** (`ui.css`)
 
@@ -526,8 +592,13 @@ describe('24.026 the drag clone keeps its lift while the source card presses', (
 .gn-button--danger { /* ... existing lines ... */ box-shadow: var(--gn-shadow-danger); }
 .gn-button--danger:hover:not(:disabled) { box-shadow: var(--gn-shadow-danger-near); transform: scale(1.04); }
 .gn-button--danger:active:not(:disabled) { box-shadow: var(--gn-shadow-danger-press); transform: scale(0.98); transition-duration: var(--gn-motion-feedback); }
-.gn-button:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; box-shadow: none; }
-.gn-button[aria-disabled='true'] { opacity: var(--gn-disabled-opacity); cursor: not-allowed; box-shadow: none; }
+/* A disabled FILLED button is flat in neo (U7 extended, 24.022) — through roles whose hig value is today's shadow, so hig
+   does not change (spec §7). The base `.gn-button:disabled` (`:159`) is NOT touched. */
+.gn-button--primary:disabled,
+.gn-button--primary[aria-disabled='true'] { box-shadow: var(--gn-shadow-action-filled-disabled); }
+.gn-button--danger:disabled,
+.gn-button--danger[aria-disabled='true'] { box-shadow: var(--gn-shadow-danger-disabled); }
+.gn-button--ghost:disabled { box-shadow: none; }
 ```
 and at `:8136–8138`:
 ```css
@@ -535,11 +606,11 @@ and at `:8136–8138`:
 /* Neo refresh 24.024: on the accent track the knob drops its highlight and keeps one small fall (none in hig/minimal). */
 .gn-switch:checked::after { transform: translateX(1.25rem); box-shadow: var(--gn-shadow-knob-on); }
 ```
-Amend `styling-buttons.test.ts:28/42/45` (20.021–20.022: `action` → `action-filled`, `action-near` → `action-filled-near`, `action-press` → `action-filled-press`) and `:86` (20.025: `lift` → `danger`) with a dated note; 20.023's `not.toBe(primary)` still holds (`danger` ≠ `action-filled` in hig: `lift` vs `action`).
+Amend `styling-buttons.test.ts:28/42/45` (20.021–20.022: `action` → `action-filled`, `action-near` → `action-filled-near`, `action-press` → `action-filled-press`) and `:86` (20.025: `lift` → `danger`) with a dated note; 20.025's `not.toBe(primary)` assertion (`styling-buttons.test.ts:90`) still holds (`danger` ≠ `action-filled` in hig: `lift` vs `action`).
 
 - [ ] **Step 4: GREEN** — `pnpm exec vitest run test/neo-refresh.test.ts test/styling-buttons.test.ts test/components.test.tsx > /tmp/neo-t2.log 2>&1; tail -30 /tmp/neo-t2.log`. Expected: PASS, 13.340 included (no `[data-style]` button block was written).
 
-- [ ] **Step 5: Mutations** — put `var(--gn-shadow-action)` back on the primary → 24.020 red; drop `box-shadow: none` from `:disabled` → 24.022 red; set `outline-offset: 1px` → 24.023 red; write `[data-style="neo"] .gn-button--primary { box-shadow: none }` → 13.340 red (the guard the lane must respect).
+- [ ] **Step 5: Mutations** — put `var(--gn-shadow-action)` back on the primary → 24.020 red; write `box-shadow: none` on the base `.gn-button:disabled` → 24.022 red; set `outline-offset: 1px` → 24.023 red; write `[data-style="neo"] .gn-button--primary { box-shadow: none }` → 13.340 red (the guard the lane must respect).
 
 - [ ] **Step 6: Catalogue + commit** — cases 24.020–24.026 ✅ in §24.2; Features §21 bullet "✅ **Press inverts; filled surfaces carry one fall** (N1, N8)".
 ```bash
@@ -552,9 +623,9 @@ git commit -m "Neo refresh T2: press inverts, filled fills carry no highlight (2
 ### Task 3: The sunken family and the rim-less neo field (N2, N9, N10)
 
 **Files:**
-- Modify: `packages/ui/src/ui.css:7176–7180` (`[data-style="neo"] .gn-field__input`), `:7191–7196` (neo disabled, unchanged but asserted), `:6289–6293` (`[data-style="neo"] .gn-help__search-input`), `:7535–7537` (`[data-style="neo"] .gn-project__search`), `:4804–4808` (`[data-style="neo"] .workflow-builder-screen__name`), `:6931–6938` (`.gn-segmented`), `:6946–6978` (`.gn-segmented__item`: add a transition), `:7017–7054` (neo `--on`: `background: var(--gn-surface-track)`), `:6428` (`.gn-help__toggle:hover`)
+- Modify: `packages/ui/src/ui.css:7176–7180` (`[data-style="neo"] .gn-field__input`), `:7191–7196` (neo disabled, unchanged but asserted), `:6289–6293` (`[data-style="neo"] .gn-help__search-input`), `:7535–7537` (`[data-style="neo"] .gn-project__search`), `:4804–4808` (`[data-style="neo"] .workflow-builder-screen__name`), `:6931–6938` (`.gn-segmented`), `:6946–6978` (`.gn-segmented__item`: add a transition), `:7017–7054` (neo `--on`: `background: var(--gn-surface-track)`), `:6428` (`.gn-help__toggle:hover` stays as is; a NEW `[data-style="neo"] .gn-help__toggle:hover` arm follows it)
 - Modify: `apps/web/app/globals.css:2942–2945` (neo nav current → `recess`), `:2887–2899` (`.gn-nav a`: add `box-shadow` to the transition), `:4892–4897` (task checkbox → `sunken-compact`)
-- Modify: `packages/ui/test/components.test.tsx:648–690` (13.339), `packages/ui/test/neo-ux-fixes.test.ts:80–99` (23.002), `packages/ui/test/styling-b2-fields.test.ts:38–45` (20.213 stays green — assert it)
+- Modify: `packages/ui/test/components.test.tsx:648–657` (13.339), `packages/ui/test/neo-ux-fixes.test.ts:80–99` (23.002), `packages/ui/test/styling-b2-fields.test.ts:38–45` (20.213 stays green — assert it)
 - Modify: `apps/web/e2e-stack/viewport.spec.ts:1093–1113` (`assertSunkenNoBorderField`), `apps/web/e2e-stack/non-text-contrast-roster.json` (the sanctioned neo-field note)
 - Test: `packages/ui/test/neo-refresh.test.ts`
 
@@ -612,9 +683,10 @@ describe('24.042 the task checkbox takes the chip-sized inset and keeps its stro
   });
 });
 
-describe('24.043 hover lifts, press recesses: the help toggle no longer presses on hover', () => {
-  it('24.043 .gn-help__toggle:hover reads raised-compact; the segmented item and nav links transition box-shadow', () => {
-    expect(valueOf(ruleExactly(ui, '.gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+describe('24.043 hover lifts, press recesses: the neo help toggle no longer presses on hover (hig/minimal untouched)', () => {
+  it('24.043 a [data-style="neo"] .gn-help__toggle:hover arm reads raised-compact; the unscoped rule keeps sunken; the segmented item and nav links transition box-shadow', () => {
+    expect(valueOf(ruleExactly(ui, '[data-style="neo"] .gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    expect(valueOf(ruleExactly(ui, '.gn-help__toggle:hover'), 'box-shadow')).toBe('var(--gn-shadow-sunken)'); // CONTROL: none in hig/minimal, as today
     expect(valueOf(ruleExactly(ui, '.gn-segmented__item'), 'transition')).toContain('box-shadow');
     expect(valueOf(ruleExactly(globals, '.gn-nav a'), 'transition')).toContain('box-shadow');
   });
@@ -642,7 +714,7 @@ describe('24.044 a neo field inside a dark well still has a visible edge (Review
 ```css
 /* OWNER RULING N10 (2026-10-02, "go with B in neumorphic"; case 24.040): a neo text field has NO uniform rim. Its boundary is the
    recess edge — a crisp 1px line at >= 3:1 on one side, as WCAG 1.4.11's partial-edge example allows (light: the dark line
-   top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 3.85 against the page).
+   top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 4.38 against the page).
    The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the U5 ring through the base rule above;
    `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
 [data-style="neo"] .gn-field__input {
@@ -651,13 +723,13 @@ describe('24.044 a neo field inside a dark well still has a visible edge (Review
   box-shadow: var(--gn-shadow-field);
 }
 ```
-Same three lines in `[data-style="neo"] .gn-help__search-input` (`:6289`), `[data-style="neo"] .gn-project__search` (`:7535`, which today adds only the ring — give it the full three) and `[data-style="neo"] .workflow-builder-screen__name` (`:4804`). Add after `.gn-segmented` (`:6938`): `[data-style="neo"] .gn-segmented { box-shadow: var(--gn-shadow-recess); }` (the base keeps `track` for hig). In `[data-style="neo"] .gn-segmented__item--on` (`:7017`) change `background: var(--gn-surface-sunken)` → `var(--gn-surface-track)` (N2; the docblock there already anticipates a palette that separates them). `.gn-segmented__item` (`:6946`): add `transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);` and a reduced-motion arm `transition: none`. `.gn-help__toggle:hover` (`:6428`): `var(--gn-shadow-sunken)` → `var(--gn-shadow-raised-compact)`. `globals.css:2942`: `var(--gn-shadow-sunken)` → `var(--gn-shadow-recess)`; `.gn-nav a` (`:2887`) transition gains `box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)`; `:4892` task checkbox `var(--gn-shadow-sunken)` → `var(--gn-shadow-sunken-compact)`.
+Same three lines in `[data-style="neo"] .gn-help__search-input` (`:6289`), `[data-style="neo"] .gn-project__search` (`:7535`, which today adds only the ring — give it the full three) and `[data-style="neo"] .workflow-builder-screen__name` (`:4804`). Add after `.gn-segmented` (`:6938`): `[data-style="neo"] .gn-segmented { box-shadow: var(--gn-shadow-recess); }` (the base keeps `track` for hig). In `[data-style="neo"] .gn-segmented__item--on` (`:7017`) change `background: var(--gn-surface-sunken)` → `var(--gn-surface-track)` (N2; the docblock there already anticipates a palette that separates them). `.gn-segmented__item` (`:6946`): add `transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);` and a reduced-motion arm `transition: none`. `.gn-help__toggle:hover` (`:6428`) is UNCHANGED; add after it `[data-style="neo"] .gn-help__toggle:hover { box-shadow: var(--gn-shadow-raised-compact); }` (hig/minimal keep `sunken` = none). `globals.css:2942`: `var(--gn-shadow-sunken)` → `var(--gn-shadow-recess)`; `.gn-nav a` (`:2887`) transition gains `box-shadow var(--gn-motion-move) var(--gn-motion-ease-out)`; `:4892` task checkbox `var(--gn-shadow-sunken)` → `var(--gn-shadow-sunken-compact)`.
 
 Amend: `components.test.tsx:648` (13.339) → "under neo the field input is sunken on the well with the recess line and a transparent border (N10) — hig/minimal keep their border"; `neo-ux-fixes.test.ts:87–98` (23.002) → border `'1px solid transparent'`, shadow `'var(--gn-shadow-field)'`, dated "amended by N10, 24.040"; `viewport.spec.ts:1093–1113` → keep `borderStyle === 'solid'`, add `expect(style.borderColor).toBe('rgba(0, 0, 0, 0)')` and `expect(style.boxShadow).toContain(theme === 'dark' ? 'rgb(125, 136, 168)' : 'rgb(137, 115, 98)')` (the line layer, read via `getComputedStyle`), with the comment re-written: the boundary is the line layer, ≥3:1, computed from the token; `non-text-contrast-roster.json`: the sanctioned neo-field entry's note says "boundary = the `--gn-shadow-field` line layer (N10, 24.040), 3.31 light / 4.86 dark, computed in `neo-refresh.test.ts`".
 
 - [ ] **Step 4: GREEN** — `pnpm exec vitest run test/neo-refresh.test.ts test/neo-ux-fixes.test.ts test/components.test.tsx test/styling-b2-fields.test.ts test/styling-tokens.test.ts > /tmp/neo-t3.log 2>&1; tail -30 /tmp/neo-t3.log`; then `cd ../../apps/web && pnpm exec vitest run test/sign-in-neo-restyle.test.ts > /tmp/neo-t3b.log 2>&1; tail -10 /tmp/neo-t3b.log`. Expected: PASS (20.212's `flatBoundaryOffenders` sees a transparent border, not a flat boundary — if it reddens, add the four neo field selectors to its `KEPT` list with the N10 citation).
 
-- [ ] **Step 5: Mutations** — restore `border: 1px solid var(--gn-field-rim)` on the field arm → 24.040 red; make `--on` read `--gn-surface-sunken` → 24.041 red; swap `#7d88a8` for `#6f7997` in `shadowNeoLineDark` → 24.044 still green (3.96) but 24.005 red (the pin) — record both.
+- [ ] **Step 5: Mutations** — restore `border: 1px solid var(--gn-field-rim)` on the field arm → 24.040 red; make `--on` read `--gn-surface-sunken` → 24.041 red; move the `raised-compact` line into the unscoped `.gn-help__toggle:hover` → 24.043's control red; swap `#7d88a8` for `#6f7997` in `shadowNeoLineDark` → 24.044 still green (3.96) but 24.005 red (the pin) — record both.
 
 - [ ] **Step 6: Catalogue + commit** — 24.040–24.044 ✅ in §24.3; Features §21 bullet "✅ **The neo field without a rim; recesses sized to the box** (N2, N9, N10) — hig/minimal keep the ring".
 ```bash
@@ -670,7 +742,7 @@ git commit -m "Neo refresh T3: sunken family and the rim-less neo field (24.040-
 ### Task 4: Depth on ghost and icon buttons (N3)
 
 **Files:**
-- Modify: `packages/ui/src/ui.css:7252–7258` (`.gn-button--ghost`, `:hover`), `:959–981` (`.gn-sheet__close`), `:2022–2041` (`.gn-row-action`), `:148–157` (the reduced-motion arm of `.gn-button`)
+- Modify: `packages/ui/src/ui.css:7252–7258` (`.gn-button--ghost`, `:hover`), `:958–981` (the `.gn-dialog__close, .gn-sheet__close` group — the dialog's close is the same icon button and takes the same depth), `:2018–2041` (`.gn-row-action`), `:148–157` (the reduced-motion arm of `.gn-button`)
 - Test: `packages/ui/test/neo-refresh.test.ts`; `packages/ui/test/styling-buttons.test.ts:65–75` (20.024 stays green)
 
 **Interfaces:**
@@ -694,14 +766,17 @@ describe('24.060 ghost buttons keep their border and gain the quiet depth, throu
   });
 });
 
-describe('24.061 icon buttons (the sheet close, the row actions) take the same quiet depth', () => {
-  it('24.061 .gn-sheet__close and .gn-row-action read quiet at rest and quiet-press on :active, keep their hover fill, and go flat when disabled', () => {
-    for (const sel of ['.gn-sheet__close', '.gn-row-action']) {
-      expect(valueOf(ruleExactly(ui, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-quiet)');
-      expect(valueOf(ruleExactly(ui, `${sel}:active:not(:disabled)`), 'box-shadow'), sel).toBe('var(--gn-shadow-quiet-press)');
-    }
-    expect(valueOf(ruleExactly(ui, ['.gn-sheet__close:hover', '.gn-sheet__close:focus-visible']), 'background')).toBe('var(--gn-fill-tertiary)');
+describe('24.061 icon buttons (the dialog and sheet close, the row actions) take the same quiet depth', () => {
+  it('24.061 the close group and .gn-row-action read quiet at rest and quiet-press on :active, keep their hover fill, and go flat when disabled', () => {
+    expect(valueOf(ruleExactly(ui, ['.gn-dialog__close', '.gn-sheet__close']), 'box-shadow')).toBe('var(--gn-shadow-quiet)');          // ui.css:958, a group of 2
+    expect(valueOf(ruleExactly(ui, ['.gn-dialog__close:active:not(:disabled)', '.gn-sheet__close:active:not(:disabled)']), 'box-shadow')).toBe('var(--gn-shadow-quiet-press)');
+    expect(valueOf(ruleExactly(ui, '.gn-row-action'), 'box-shadow')).toBe('var(--gn-shadow-quiet)');
+    expect(valueOf(ruleExactly(ui, '.gn-row-action:active:not(:disabled)'), 'box-shadow')).toBe('var(--gn-shadow-quiet-press)');
+    // the hover/focus fill is a group of 4 at ui.css:976–979
+    expect(valueOf(ruleExactly(ui, ['.gn-dialog__close:hover', '.gn-dialog__close:focus-visible', '.gn-sheet__close:hover', '.gn-sheet__close:focus-visible']), 'background')).toBe('var(--gn-fill-tertiary)');
     expect(valueOf(ruleExactly(ui, ['.gn-row-action:disabled', '.gn-list__bulk-close:disabled']), 'box-shadow')).toBe('none');
+    // CONTROL: hig/minimal render none for quiet, so these icon buttons are unchanged there (24.009 pins it).
+    expect(shadowValueOf('hig', 'dark', 'quiet')).toBe('none');
   });
 });
 
@@ -732,7 +807,7 @@ describe('24.065 reduced motion removes the transition, never the shadow (Review
 .gn-button--ghost:hover:not(:disabled) { background: var(--gn-fill-quaternary); box-shadow: var(--gn-shadow-quiet-near); }
 .gn-button--ghost:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }
 ```
-`.gn-sheet__close` (`:959`): add `box-shadow: var(--gn-shadow-quiet); transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out), background-color var(--gn-motion-feedback) ease-out;` and a new rule `.gn-sheet__close:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }`. `.gn-row-action` (`:2022`): the same two lines and `.gn-row-action:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }`; `:2018` (`:disabled`) gains `box-shadow: none`. The reduced-motion arm (`:148–157`) already sets `transition: none` on `.gn-button`; add `.gn-sheet__close, .gn-row-action { transition: none; }` to it.
+The `.gn-dialog__close, .gn-sheet__close` group (`:958`): add `box-shadow: var(--gn-shadow-quiet); transition: box-shadow var(--gn-motion-move) var(--gn-motion-ease-out), background-color var(--gn-motion-feedback) ease-out;` (the dialog's close is the same icon button and gets the same depth — decided here, not left to the lane) and a new grouped rule `.gn-dialog__close:active:not(:disabled), .gn-sheet__close:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }`. `.gn-row-action` (`:2022`): the same two lines and `.gn-row-action:active:not(:disabled) { box-shadow: var(--gn-shadow-quiet-press); }`; `:2018` (`:disabled`) gains `box-shadow: none`. The reduced-motion arm (`:148–157`) already sets `transition: none` on `.gn-button`; add `.gn-sheet__close, .gn-row-action { transition: none; }` to it.
 
 - [ ] **Step 4: GREEN** — `pnpm exec vitest run test/neo-refresh.test.ts test/styling-buttons.test.ts test/components.test.tsx test/styling-sheet.test.ts > /tmp/neo-t4.log 2>&1; tail -20 /tmp/neo-t4.log`. Expected: PASS; 20.024 (ghost border/fill) and 13.289 untouched.
 
@@ -761,13 +836,20 @@ git commit -m "Neo refresh T4: quiet depth on ghost and icon buttons (24.060, 24
 ```ts
 describe('24.070 the neo switch: a recessed off track on the well colour, a raised knob, the accent on-track kept (N6, FD2)', () => {
   it('24.070 the neo switch arm reads well + recess; the knob reads raised-compact and keeps its border-strong ring; disabled is flat', () => {
-    const track = ruleExactly(ui, '[data-style="neo"] .gn-switch');
+    // the OFF arms are scoped :not(:checked), so the base `.gn-switch:checked` (0,2,0; ui.css:8136) is never out-cascaded
+    const track = ruleExactly(ui, '[data-style="neo"] .gn-switch:not(:checked)');
     expect(valueOf(track, 'background')).toBe('var(--gn-surface-well)');
     expect(valueOf(track, 'box-shadow')).toBe('var(--gn-shadow-recess)');
-    const knob = ruleExactly(ui, '[data-style="neo"] .gn-switch::after');
+    const knob = ruleExactly(ui, '[data-style="neo"] .gn-switch:not(:checked)::after');
     expect(valueOf(knob, 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
+    // the ON arms restate the accent and the knob fall AFTER the off arms, at (0,3,0)/(0,3,1), so they win in neo
+    const on = ruleExactly(ui, '[data-style="neo"] .gn-switch:checked');
+    expect(valueOf(on, 'background')).toBe('var(--gn-accent)');
+    expect(valueOf(on, 'box-shadow')).toBe('none');
+    expect(valueOf(ruleExactly(ui, '[data-style="neo"] .gn-switch:checked::after'), 'box-shadow')).toBe('var(--gn-shadow-knob-on)');
     expect(valueOf(ruleExactly(ui, '.gn-switch::after'), 'border')).toBe('1px solid var(--gn-border-strong)');
     expect(valueOf(ruleExactly(ui, ['[data-style="neo"] .gn-switch:disabled', '[data-style="neo"] .gn-switch:disabled::after']), 'box-shadow')).toBe('none');
+    // the cascade is read for real in T8 (24.115: computed background and knob shadow, checked and unchecked)
     // CONTROL: the base (hig/minimal) switch is unchanged — fill-secondary track, no shadow.
     const base = ruleExactly(ui, '.gn-switch');
     expect(valueOf(base, 'background')).toBe('var(--gn-fill-secondary)');
@@ -782,13 +864,15 @@ describe('24.071 the neo column checkbox: a recessed box when off, a flat accent
     expect(valueOf(box, 'background')).toBe('var(--gn-surface-sunken)');
     expect(valueOf(box, 'box-shadow')).toBe('var(--gn-shadow-sunken-compact)');
     expect(valueOf(box, 'border')).toBe('1px solid var(--gn-border)');
+    expect(valueOf(box, 'box-sizing')).toBe('border-box'); // the 1px stays inside the 18px box; hig/minimal (content-box, no border) are untouched
+    expect(valueOf(ruleExactly(ui, '.gn-list__column-box'), 'border')).toBeNull();
     const on = ruleExactly(ui, "[data-style=\"neo\"] .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box");
     expect(valueOf(on, 'box-shadow')).toBe('none');
     expect(valueOf(on, 'border-color')).toBe('transparent');
     // the pill around it is a 44px control: raised-compact, not the card pair
     expect(valueOf(ruleExactly(ui, '.gn-list__column-option'), 'box-shadow')).toBe('var(--gn-shadow-raised-compact)');
-    // CONTROL: the base box is the flat fill hig/minimal keep.
-    expect(valueOf(ruleExactly(ui, '.gn-list__column-box'), 'background')).toBe('var(--gn-fill-secondary)');
+    // CONTROL: the base box is the flat fill hig/minimal keep (ui.css:2394–2402: fill-tertiary).
+    expect(valueOf(ruleExactly(ui, '.gn-list__column-box'), 'background')).toBe('var(--gn-fill-tertiary)');
   });
 });
 ```
@@ -801,13 +885,17 @@ describe('24.071 the neo column checkbox: a recessed box when off, a flat accent
 /* Neo refresh N6 (2026-10-02; 24.070): the switch gets a neo arm. The OFF track is a recess on the well colour, the knob is
    raised on the compact pair and keeps its border-strong ring (the 2.95 debt recorded above is untouched); the ON track
    stays the flat accent (FD2: a switch's on-state is its value), its knob carries one fall (`knob-on`, T2). Disabled is flat. */
-[data-style="neo"] .gn-switch {
+/* CASCADE (reviewer A, FIX 1): an unscoped `[data-style="neo"] .gn-switch` (0,2,0) would come AFTER `.gn-switch:checked`
+   (0,2,0; `:8136`) and paint the well over the accent. So the OFF arms are scoped `:not(:checked)` AND the ON arms restate
+   the accent and `knob-on` at (0,3,0)/(0,3,1), after them. */
+[data-style="neo"] .gn-switch:not(:checked) {
   background: var(--gn-surface-well);
   box-shadow: var(--gn-shadow-recess);
   transition: background 0.15s ease, box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
 }
-[data-style="neo"] .gn-switch::after { box-shadow: var(--gn-shadow-raised-compact); }
-[data-style="neo"] .gn-switch:checked { box-shadow: none; }
+[data-style="neo"] .gn-switch:not(:checked)::after { box-shadow: var(--gn-shadow-raised-compact); }
+[data-style="neo"] .gn-switch:checked { background: var(--gn-accent); box-shadow: none; }
+[data-style="neo"] .gn-switch:checked::after { box-shadow: var(--gn-shadow-knob-on); }
 [data-style="neo"] .gn-switch:disabled,
 [data-style="neo"] .gn-switch:disabled::after { box-shadow: none; }
 ```
@@ -818,6 +906,7 @@ and after `.gn-list__column-option input[type='checkbox']:checked + .gn-list__co
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken-compact);
   border: 1px solid var(--gn-border);
+  box-sizing: border-box; /* the 1px stays inside the 18px box; the BASE rule is untouched, so hig/minimal keep 18px content-box */
 }
 [data-style="neo"] .gn-list__column-option input[type='checkbox']:checked + .gn-list__column-box {
   background: var(--gn-accent);
@@ -825,11 +914,11 @@ and after `.gn-list__column-option input[type='checkbox']:checked + .gn-list__co
   border-color: transparent;
 }
 ```
-and in `.gn-list__column-option` (`:2380`): `box-shadow: var(--gn-shadow-lift)` → `var(--gn-shadow-raised-compact)` (hig maps `raised-compact` to `lift`, so hig is unchanged). The base `.gn-list__column-box` (`:2394`) gets `border: 1px solid transparent` so the neo arm's 1px does not reflow.
+and in `.gn-list__column-option` (`:2380`): `box-shadow: var(--gn-shadow-lift)` → `var(--gn-shadow-raised-compact)` (hig maps `raised-compact` to `lift`, so hig is unchanged). The base `.gn-list__column-box` (`:2394`) is NOT touched (a transparent border there would grow hig/minimal from 18px to 20px under content-box; neither sheet sets `box-sizing` on it).
 
 - [ ] **Step 4: GREEN** — `pnpm exec vitest run test/neo-refresh.test.ts test/components.test.tsx test/styling-b6-list.test.ts > /tmp/neo-t5.log 2>&1; tail -20 /tmp/neo-t5.log`. Expected: PASS (13.671's focus ring on the box is untouched; if `styling-b6-list` pins `--gn-shadow-lift` on the pill, amend it with the N6 note).
 
-- [ ] **Step 5: Mutations** — delete `[data-style="neo"] .gn-switch::after` → 24.070 red; give the checked box `var(--gn-shadow-sunken-compact)` → 24.071 red; change the base `.gn-switch` background → 24.070's control red.
+- [ ] **Step 5: Mutations** — delete `[data-style="neo"] .gn-switch:checked` → 24.070 red (and 24.115's computed background in T8); drop `:not(:checked)` from the off arm → 24.070 red; give the checked box `var(--gn-shadow-sunken-compact)` → 24.071 red; change the base `.gn-switch` background → 24.070's control red.
 
 - [ ] **Step 6: Catalogue + commit** — 24.070–24.071 ✅ in §24.5; Features §21 "✅ **Switch and checkbox neo arms** (N6)".
 ```bash
@@ -843,8 +932,8 @@ git commit -m "Neo refresh T5: switch and checkbox neo arms (24.070, 24.071)"
 
 **Files:**
 - Modify: `packages/ui/src/tokens.ts` (new `halo` lengths beside `radii` `:1081–1095`; emitted in `declarationsFor` `:1897–1904`)
-- Modify: `packages/ui/src/ui.css:1168–1178` (`.gn-board__column` gap), `:1208–1214` (`__column-header` padding), `:1287` (`__cards` gap), `:443–449` (`.gn-dialog` → `near-lg`), `:4235–4242` (`.gn-select__panel` → `near-lg`), `:4256–4263` (`.gn-popover` → `near-lg`), `:8216` (`.gn-infotip__panel` → `near-lg`), `:4556` (`.workflow-rebind-dialog` generic drop → `near-lg`), `:7688` (`.gn-filters__panel` generic drop → `sheet`)
-- Modify: `apps/web/app/globals.css:169` (`.gn-shell__main` margin-top), `:793–798` (`.gn-account__section` gap), `:2078–2083` (`.gn-nav` → `raised-lg`), `:2736`, `:5368`, `:2172` (menus/popups → `near-lg`)
+- Modify: `packages/ui/src/ui.css:1168–1178` (`.gn-board__column` gap), `:1208–1214` (`__column-header` padding), `:1287` (`__cards` gap), `:443–449` (`.gn-dialog` → `near-lg`), `:4235–4242` (`.gn-select__panel` → `near-lg`), `:4256–4263` (`.gn-popover` → `near-lg`), `:8216` (`.gn-infotip__panel` → `near-lg`), `:4556` (`.workflow-rebind-dialog` generic drop → `drop`), `:7688` (`.gn-filters__panel` generic drop → `drop-side`)
+- Modify: `apps/web/app/globals.css:169` (`.gn-shell__main` margin-top), `:793–798` (`.gn-account__section` gap), `:2078–2083` (`.gn-nav` → `raised-lg`), `:2736`, `:5368`, `:2170–2172` (the `.mention-popup, .wikilink-popup, .ticketref-popup` group), `:40` (`.gn-skip`), `:4147` (`.gn-toc-launcher__panel`), `:5049` (`.wikilink-preview`), `:5122` (`.table-toolbar`) — every floating panel → `near-lg` (hig `near-lg` = `lift-near`, so unchanged there)
 - Modify: `packages/ui/test/styling-board.test.ts:22–29` (20.041), `:105–114` (20.046); `packages/ui/test/styling-surfaces.test.ts:21` (dialog pin)
 - Test: `packages/ui/test/neo-refresh.test.ts`
 
@@ -860,18 +949,18 @@ import { halo, haloVariableName } from '../src/tokens.js';
 describe('24.080 the halo tokens: offset + blur of each raised pair, per style (spec §3.4; N7)', () => {
   it('24.080 neo 23/14/6, hig 8/8/3, minimal 0, emitted under every style selector', () => {
     expect(halo.neo).toEqual({ lg: '23px', card: '14px', compact: '6px' });
-    expect(halo.hig).toEqual({ lg: '8px', card: '8px', compact: '3px' });
-    expect(halo.minimal).toEqual({ lg: '0px', card: '0px', compact: '0px' });
+    expect(halo.hig).toEqual({ lg: '8px', card: '8px', compact: '3px' });      // kept by choice: today's spacing
+    expect(halo.minimal).toEqual({ lg: '8px', card: '8px', compact: '3px' });  // same: zero drift (spec §7)
     expect(haloVariableName('card')).toBe('--gn-halo');
     expect(haloVariableName('lg')).toBe('--gn-halo-lg');
     const sheet = themeStylesheet();
     expect(sheet).toContain('[data-style="neo"] {');
     expect(sheet.match(/--gn-halo: 14px;/g)?.length).toBe(3);   // neo light, OS-dark arm, data-theme dark
-    expect(sheet.match(/--gn-halo: 8px;/g)?.length).toBe(3);    // hig
+    expect(sheet.match(/--gn-halo: 8px;/g)?.length).toBe(6);    // hig and minimal
   });
 });
 
-describe('24.081 the board clears the card halo: 14px in neo, 8px in hig, through one token (N7; rule 02 amended)', () => {
+describe('24.081 the board clears the card halo: 14px in neo, 8px in hig and minimal, through one token (N7; rule 02 amended)', () => {
   it('24.081 column gap, cards gap and the column-header bottom padding read var(--gn-halo)', () => {
     expect(valueOf(ruleExactly(ui, '.gn-board__column'), 'gap')).toBe('var(--gn-halo)');
     expect(valueOf(ruleExactly(ui, '.gn-board__cards'), 'gap')).toBe('var(--gn-halo)');
@@ -891,16 +980,18 @@ describe('24.082 the listed crowding sites clear their neighbour\'s halo', () =>
 });
 
 describe('24.083 large surfaces wear the large pair; floating panels the near-lg; the two generic drops are gone', () => {
-  it('24.083 nav, sheet, dialog, popovers, menus, infotip read raised-lg/near-lg/sheet; no rule in either sheet uses var(--gn-shadow) as a drop', () => {
+  it('24.083 nav, sheet, dialog, popovers, menus, infotip read raised-lg/near-lg/sheet; the two generic drops read drop/drop-side (today\'s value in hig and minimal, 24.009); no rule in either sheet uses var(--gn-shadow) as a drop', () => {
     expect(valueOf(ruleExactly(globals, '.gn-nav'), 'box-shadow')).toBe('var(--gn-shadow-raised-lg)');
     expect(valueOf(ruleExactly(ui, '.gn-sheet'), 'box-shadow')).toBe('var(--gn-shadow-sheet)');
-    for (const sel of ['.gn-dialog', '.gn-select__panel', '.gn-popover', '.gn-infotip__panel', '.workflow-rebind-dialog']) {
+    for (const sel of ['.gn-dialog', '.gn-select__panel', '.gn-popover', '.gn-infotip__panel']) {
       expect(valueOf(ruleExactly(ui, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
     }
-    for (const sel of ['.gn-nav__menu', '.gn-card-menu__list', '.ticketref-popup']) {
+    expect(valueOf(ruleExactly(ui, '.workflow-rebind-dialog'), 'box-shadow')).toBe('var(--gn-shadow-drop)');
+    for (const sel of ['.gn-nav__menu', '.gn-card-menu__list', '.gn-skip', '.gn-toc-launcher__panel', '.wikilink-preview', '.table-toolbar']) {
       expect(valueOf(ruleExactly(globals, sel), 'box-shadow'), sel).toBe('var(--gn-shadow-near-lg)');
     }
-    expect(valueOf(ruleExactly(ui, '.gn-filters__panel'), 'box-shadow')).toBe('var(--gn-shadow-sheet)');
+    expect(valueOf(ruleExactly(globals, ['.mention-popup', '.wikilink-popup', '.ticketref-popup']), 'box-shadow')).toBe('var(--gn-shadow-near-lg)'); // globals.css:2170, a group of 3
+    expect(valueOf(ruleExactly(ui, '.gn-filters__panel'), 'box-shadow')).toBe('var(--gn-shadow-drop-side)');
     expect(ui).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
     expect(globals).not.toMatch(/box-shadow:[^;]*var\(--gn-shadow\)/);
     // CONTROL: cards keep the card pair.
@@ -915,11 +1006,11 @@ describe('24.083 large surfaces wear the large pair; floating panels the near-lg
 
 `tokens.ts`, beside `radii`:
 ```ts
-/** Halo clearance (neo refresh N7, 2026-10-02): offset + blur of each raised pair. Readable text outside a raised element sits at least this far from its edge; where a layout cannot open up, lift the text (`position: relative; z-index: 1`) — never clip the highlight. Lengths, like the radii: no colour discipline. */
+/** Halo clearance (neo refresh N7, 2026-10-02): in neo, offset + blur of each raised pair. Readable text outside a raised element sits at least this far from its edge; where a layout cannot open up, lift the text (`position: relative; z-index: 1`) — never clip the highlight. hig and minimal carry TODAY's spacing (8px board gap), kept by choice and NOT derived (hig `raised` would give 4, `lift` 24): the token exists for them only so the shared rules render exactly as today (spec §7). Lengths, like the radii: no colour discipline. */
 export type HaloStep = 'lg' | 'card' | 'compact';
 export const halo: Record<StyleName, Record<HaloStep, string>> = {
   hig: { lg: '8px', card: '8px', compact: '3px' },
-  minimal: { lg: '0px', card: '0px', compact: '0px' },
+  minimal: { lg: '8px', card: '8px', compact: '3px' },
   neo: { lg: '23px', card: '14px', compact: '6px' },
 };
 export function haloVariableName(step: HaloStep): string {
@@ -928,13 +1019,13 @@ export function haloVariableName(step: HaloStep): string {
 ```
 and in `declarationsFor` add `const haloDecls = (['lg', 'card', 'compact'] as HaloStep[]).map((s) => `${haloVariableName(s)}: ${halo[style][s]};`);` to the joined list. Export `halo`, `haloVariableName` from `packages/ui/src/index.ts`.
 
-`ui.css`: `.gn-board__column` `gap: 0.5rem` → `gap: var(--gn-halo);`; `.gn-board__cards` `gap: 0.5rem` → `var(--gn-halo)`; `.gn-board__column-header` `padding: 0.5rem` → `padding: 0.5rem 0.5rem var(--gn-halo);` with the comment "N7 (2026-10-02, 24.081): the title clears the first card's halo — 14px in neo, 8px in hig (rule 02's 8px becomes 14px for neo)". `.gn-dialog`, `.gn-select__panel`, `.gn-popover`, `.gn-infotip__panel`: `var(--gn-shadow-lift-near)` → `var(--gn-shadow-near-lg)`. `.workflow-rebind-dialog` `box-shadow: 0 8px 24px var(--gn-shadow)` → `var(--gn-shadow-near-lg)`; `.gn-filters__panel` `box-shadow: -0.75rem 0 2.5rem var(--gn-shadow)` → `var(--gn-shadow-sheet)`. `globals.css`: `.gn-nav` `var(--gn-shadow-lift)` → `var(--gn-shadow-raised-lg)`; `.gn-nav__menu`, `.gn-card-menu__list`, `.ticketref-popup` → `var(--gn-shadow-near-lg)`; `.gn-shell__main` `margin-top: 1.25rem` → `max(1.25rem, var(--gn-halo-lg))`; `.gn-account__section` `gap: 0.75rem` → `max(0.75rem, var(--gn-halo))`.
+`ui.css`: `.gn-board__column` `gap: 0.5rem` → `gap: var(--gn-halo);`; `.gn-board__cards` `gap: 0.5rem` → `var(--gn-halo)`; `.gn-board__column-header` `padding: 0.5rem` → `padding: 0.5rem 0.5rem var(--gn-halo);` with the comment "N7 (2026-10-02, 24.081): the title clears the first card's halo — 14px in neo, 8px in hig (rule 02's 8px becomes 14px for neo)". `.gn-dialog`, `.gn-select__panel`, `.gn-popover`, `.gn-infotip__panel`: `var(--gn-shadow-lift-near)` → `var(--gn-shadow-near-lg)`. `.workflow-rebind-dialog` `box-shadow: 0 8px 24px var(--gn-shadow)` → `var(--gn-shadow-drop)`; `.gn-filters__panel` `box-shadow: -0.75rem 0 2.5rem var(--gn-shadow)` → `var(--gn-shadow-drop-side)` (both render today's literal in hig and minimal through the role, 24.009). `globals.css`: `.gn-nav` `var(--gn-shadow-lift)` → `var(--gn-shadow-raised-lg)` (= hig `lift`); `.gn-nav__menu`, `.gn-card-menu__list`, the `.mention-popup, .wikilink-popup, .ticketref-popup` group, `.gn-skip`, `.gn-toc-launcher__panel`, `.wikilink-preview`, `.table-toolbar` → `var(--gn-shadow-near-lg)`; `.gn-shell__main` `margin-top: 1.25rem` → `max(1.25rem, var(--gn-halo-lg))`; `.gn-account__section` `gap: 0.75rem` → `max(0.75rem, var(--gn-halo))`.
 
 Amend `styling-board.test.ts:27–29` and `:107` (20.041, 20.046: `'0.5rem'` → `'var(--gn-halo)'` / `'0.5rem 0.5rem var(--gn-halo)'`, dated "N7, 24.081: rule 02's 8px is 14px in neo"), `styling-surfaces.test.ts:21` (dialog → `near-lg`), and the "8px between cards" sentence in the `.gn-board__column` docblock (`ui.css:1160–1167`).
 
 - [ ] **Step 4: GREEN** — `pnpm build > /tmp/neo-build.log 2>&1; tail -3 /tmp/neo-build.log; pnpm exec vitest run test/neo-refresh.test.ts test/styling-board.test.ts test/styling-surfaces.test.ts test/styling-b3-floating.test.ts test/tokens.test.ts > /tmp/neo-t6.log 2>&1; tail -30 /tmp/neo-t6.log`; then `cd ../../apps/web && pnpm exec vitest run test/shared-components-ux.test.ts test/suggestion-popup-styling.test.ts > /tmp/neo-t6b.log 2>&1; tail -10 /tmp/neo-t6b.log`. Expected: PASS (amend any `lift-near` pin on a floating panel with the N7 note; `tokens.test.ts:156` "every var(--gn-…) in ui.css names a declared role" must accept `--gn-halo*` — extend its allow-list the way `--gn-radius-*` and `--gn-shadow-*` are accepted).
 
-- [ ] **Step 5: Mutations** — set `halo.neo.card` to `'8px'` → 24.080 red; put `gap: 0.5rem` back on `.gn-board__cards` → 24.081 red and 20.041 red; restore the generic drop on `.workflow-rebind-dialog` → 24.083 red.
+- [ ] **Step 5: Mutations** — set `halo.neo.card` to `'8px'` → 24.080 red; set `halo.minimal.card` to `'0px'` → 24.080 red (the minimal-drift guard); put `gap: 0.5rem` back on `.gn-board__cards` → 24.081 red and 20.041 red; restore the generic drop on `.workflow-rebind-dialog` → 24.083 red; map hig `raised-lg` to `raised` → 24.009 red (`.gn-nav` row).
 
 - [ ] **Step 6: Catalogue + commit** — 24.080–24.083 ✅ in §24.6; Features §21 "✅ **Halo clearance and sized pairs** (N7): `--gn-halo-lg/--gn-halo/--gn-halo-compact`, the 14px board in neo, rule 02 amended"; amend the rule-02 line in `docs/superpowers/plans/2026-09-29-styling-system-refresh.md:1897` with a pointer ("8px → `var(--gn-halo)`, N7 2026-10-02").
 ```bash
@@ -947,9 +1038,9 @@ git commit -m "Neo refresh T6: halo clearance tokens, the 14px board, sized pair
 ### Task 7: The dark-theme sweep (N4 = B) and the docblocks
 
 **Files:**
-- Modify: `packages/ui/src/tokens.ts:212–231` (`neoNavyRaised` docblock: retired by N4 = B), `:1010–1041` (`STYLE_COLOR_OVERRIDES` docblock: the N2/N4 lines), `:1322–1342` (the `SHADOWS` docblock: the neo table is derived, not transcribed), `:365–373` (shadow-primitives docblock)
+- Modify: `packages/ui/src/tokens.ts:213–229` (`neoNavyRaised` docblock: retired by N4 = B), `:1010–1041` (`STYLE_COLOR_OVERRIDES` docblock: the N2/N4 lines), `:1322–1342` (the `SHADOWS` docblock: the neo table is derived, not transcribed), `:365–373` (shadow-primitives docblock)
 - Modify: `docs/neo-token-report.md` (regenerate the neo rows with `design-system/tools/neo_tokens_probe.py` if it still runs; otherwise append a dated section with the §5 table)
-- Test: `packages/ui/test/neo-refresh.test.ts`; `packages/ui/test/tokens.test.ts:521–556` (13.341 and the neo-dark case)
+- Test: `packages/ui/test/neo-refresh.test.ts`; `packages/ui/test/tokens.test.ts:521–547` (13.341 and the neo-dark case)
 
 **Interfaces:**
 - Consumes: `colorOf`, `contrastRatio`, `over`, `shadowValueOf`.
@@ -963,11 +1054,14 @@ describe('24.100 neo dark as a set (N4 = B): same-hex extrusion, one lamp, every
     expect(colorOf('dark', 'surfaceRaised', 'neo')).toBe(colorOf('dark', 'surface', 'neo'));
     const sheet = themeStylesheet();
     const darkBlock = sheet.split('[data-style="neo"][data-theme="dark"] {')[1].split('}')[0];
-    const darkLayers = [...darkBlock.matchAll(/#[0-9a-f]{8}/g)].map((m) => m[0]);
-    const falls = darkLayers.filter((c) => c.startsWith('#000000'));
-    expect(new Set(falls)).toEqual(new Set(['#0000008c', '#000000bf']));   // the fall and the band, nothing else
-    expect(darkBlock).toContain('#f2e9e129'); expect(darkBlock).toContain('#f2e9e11f'); expect(darkBlock).toContain('#f2e9e114');
-    expect(darkBlock).not.toContain('#060a169e'); expect(darkBlock).not.toContain('#ffffff0d');
+    // ONLY the shadow-role declarations: the block also carries `--gn-surface-overlay: #00000099` (overlayNavyNeo) and
+    // `--gn-shadow: #000000a6` (scrimDark), which are not layers (reviewer A, FIX 1).
+    const shadowDecls = [...darkBlock.matchAll(/--gn-shadow-[a-z-]+:\s*([^;]+);/g)].map((m) => m[1]);
+    const layerColours = shadowDecls.flatMap((v) => [...v.matchAll(/#[0-9a-f]{8}/g)].map((m) => m[0]));
+    const falls = layerColours.filter((c) => c.startsWith('#000000'));
+    expect(new Set(falls)).toEqual(new Set(['#0000008c', '#000000bf']));   // the fall and the band, nothing else (neo's drop roles alias near-lg/sheet, so no scrim layer here)
+    expect(layerColours).toContain('#f2e9e129'); expect(layerColours).toContain('#f2e9e11f'); expect(layerColours).toContain('#f2e9e114');
+    expect(layerColours).not.toContain('#060a169e'); expect(layerColours).not.toContain('#ffffff0d');
     for (const bg of ['surface', 'surfaceRaised', 'surfaceSunken', 'surfaceWell'] as const) {
       for (const fg of ['text', 'textMuted', 'textSubtle', 'textAccent'] as const) {
         expect(contrastRatio(colorOf('dark', fg, 'neo'), colorOf('dark', bg, 'neo')), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
@@ -1000,7 +1094,7 @@ git commit -m "Neo refresh T7: dark sweep, docblocks, token report (24.100)"
 ### Task 8: Browser verification, LOCAL, both neo themes plus hig/minimal regression
 
 **Files:**
-- Create: `apps/web/e2e-stack/neo-depth.spec.ts`
+- Create: `apps/web/e2e-stack/neo-depth.spec.ts` (imports `signIn`/`OWNER_EMAIL` from `e2e-stack/helpers/sign-in.ts` and `readWorkspaceId`/`seededProjectHref` from `e2e-stack/helpers/board.ts`, as `viewport.spec.ts:5–6` does; no helper moves)
 - Modify: `apps/web/e2e-stack/viewport.spec.ts:1093–1113` (already amended in T3; this task runs it)
 - Output: `gisik-nokma-lanes/neo-refresh-verify/<date>/` screenshots (outside the repo)
 
@@ -1012,6 +1106,8 @@ git commit -m "Neo refresh T7: dark sweep, docblocks, token report (24.100)"
 
 ```ts
 import { expect, test } from '@playwright/test';
+import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
+import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 const THEMES = ['light', 'dark'] as const;
 const LINE = { light: 'rgb(137, 115, 98)', dark: 'rgb(125, 136, 168)' };
@@ -1051,16 +1147,40 @@ for (const theme of THEMES) {
   });
 
   test(`24.112 neo-${theme}: board cards sit 14px apart and 14px under the column title (N7)`, async ({ page }) => {
-    await page.goto('/sign-in'); // sign in with the e2e-stack owner, then open the first project's board — reuse signIn() from viewport.spec.ts
-    // (the helper lives in viewport.spec.ts; move `signIn` into ./helpers/session.ts in this task so both specs import it)
-    const { signIn, OWNER_EMAIL } = await import('./helpers/session.js');
-    await signIn(page, OWNER_EMAIL);
-    await page.goto('/p/first', { waitUntil: 'networkidle' });
+    await signIn(page, OWNER_EMAIL);                       // e2e-stack/helpers/sign-in.ts, as viewport.spec.ts:6 imports it
+    await page.goto('/workspaces');
+    const workspaceId = await readWorkspaceId(page);      // e2e-stack/helpers/board.ts:73
+    const href = await seededProjectHref(page, workspaceId); // board.ts:116 — the seeded project's /w/<id>/p/<projectId> href
+    await page.goto(href, { waitUntil: 'networkidle' });
     await page.evaluate((t) => { document.documentElement.dataset.style = 'neo'; document.documentElement.dataset.theme = t; }, theme);
     const gap = await page.locator('.gn-board__cards').first().evaluate((el) => getComputedStyle(el).gap);
     expect(gap).toBe('14px');
     const pad = await page.locator('.gn-board__column-header').first().evaluate((el) => getComputedStyle(el).paddingBottom);
     expect(pad).toBe('14px');
+  });
+
+  test(`24.115 neo-${theme}: the switch cascade — off paints the well recess, on paints the accent with the knob-on fall (FIX 1 item 4)`, async ({ page }) => {
+    await signIn(page, OWNER_EMAIL);
+    await page.goto('/workspaces');
+    const workspaceId = await readWorkspaceId(page);
+    await page.goto(await seededProjectHref(page, workspaceId), { waitUntil: 'networkidle' }); // the project page renders <Switch> (page.tsx:2515)
+    await page.evaluate((t) => { document.documentElement.dataset.style = 'neo'; document.documentElement.dataset.theme = t; }, theme);
+    const sw = page.locator('.gn-switch').first();
+    const read = () => sw.evaluate((el) => { const c = getComputedStyle(el); const k = getComputedStyle(el, '::after'); return { bg: c.backgroundColor, track: c.boxShadow, knob: k.boxShadow, checked: (el as HTMLInputElement).checked }; });
+    const first = await read();
+    if (first.checked) await sw.click();
+    const off = await read();
+    expect(off.checked).toBe(false);
+    expect(off.bg).toBe(theme === 'light' ? 'rgb(230, 220, 210)' : 'rgb(20, 26, 51)'); // the well
+    expect(off.track).toMatch(/inset 3px 3px 5px/);
+    expect(off.knob.split('px,').length).toBe(2); // raised-compact: a pair
+    await sw.click();
+    const on = await read();
+    expect(on.checked).toBe(true);
+    expect(on.bg).toBe(theme === 'light' ? 'rgb(51, 98, 159)' : 'rgb(127, 169, 228)'); // the accent, not the well
+    expect(on.track).toBe('none');
+    expect(on.knob.split('px,').length).toBe(1); // knob-on: one fall, no highlight
+    if (!first.checked) await sw.click(); // leave the setting as found
   });
 }
 
@@ -1092,50 +1212,33 @@ for (const style of ['hig', 'minimal'] as const) {
 }
 ```
 
-- [ ] **Step 2: Run it LOCAL** — `cd apps/web && pnpm exec playwright test e2e-stack/neo-depth.spec.ts e2e-stack/viewport.spec.ts > /tmp/neo-t8.log 2>&1; tail -40 /tmp/neo-t8.log`. Expected: PASS on the dev stack built from the release branch (`ctl rebuild` first). Quote the run in the PR as LOCAL.
+- [ ] **Step 2: Run it LOCAL** — `cd apps/web && pnpm exec playwright test -c playwright.stack.config.ts e2e-stack/neo-depth.spec.ts e2e-stack/viewport.spec.ts > /tmp/neo-t8.log 2>&1; tail -40 /tmp/neo-t8.log` (the stack config: `apps/web/package.json:13` `test:e2e:stack`; the default config's `testDir` is `./e2e` and would match nothing). Expected: PASS on the dev stack built from the release branch (`ctl rebuild` first). Quote the run in the PR as LOCAL.
 
 - [ ] **Step 3: Critique the screenshots** against the bench (`gisik-nokma-lanes/neo-mockup-2026-10-02/index.html` AFTER panes) at 100% and 200%: card lift without a halo over text; field reads pressed with a flat floor and a crisp line; primary one fall, blue-on-blue press; ghost raised with its border; hig and minimal frames identical to their pre-refresh captures (`audit-ux-recheck-2026-10-02/`). Anything that differs from the bench is a defect in T1–T6, not a bench error: fix there and re-run.
 
-- [ ] **Step 4: Catalogue + commit** — 24.110–24.114 ✅ (🧪 where the assertion is a screenshot judgement) in §24.8; Features §21 "🧪 **Browser verification of the neo refresh** (LOCAL)".
+- [ ] **Step 4: Catalogue + commit** — 24.110–24.115 ✅ (🧪 where the assertion is a screenshot judgement) in §24.8; Features §21 "🧪 **Browser verification of the neo refresh** (LOCAL)".
 ```bash
-git add apps/web/e2e-stack/neo-depth.spec.ts apps/web/e2e-stack/helpers/session.ts apps/web/e2e-stack/viewport.spec.ts test-cases/24-neo-refresh.md Features.md
-git commit -m "Neo refresh T8: browser verification in both neo themes and hig/minimal regression (24.110-24.114)"
+git add apps/web/e2e-stack/neo-depth.spec.ts apps/web/e2e-stack/viewport.spec.ts test-cases/24-neo-refresh.md Features.md
+git commit -m "Neo refresh T8: browser verification in both neo themes, the switch cascade, hig/minimal regression (24.110-24.115)"
 ```
 
 ---
 
 ### Task 9: Catalogue, Features, docs
 
+**Status:** the opening commit is DONE — lane 4 pushed it as `9c7321b1` ("Neo refresh T9: bucket 24 and Features §21 opened": `test-cases/24-neo-refresh.md`, the `test-cases/README.md` row, `scripts/fixtures/check-case-citations-baseline.json` `"24-neo-refresh.md": 0`, Features `## 21`). PR #911 (this spec and plan) carries only the two docs. What remains of T9 is the running upkeep below.
+
 **Files:**
-- Create: `test-cases/24-neo-refresh.md` (first commit of the release branch, all cases ❌; later tasks flip them)
-- Modify: `test-cases/README.md` (register §24 after the §23 paragraph), `scripts/fixtures/check-case-citations-baseline.json` (`"24-neo-refresh.md": 0`), `Features.md` (new `## 21. Neo refresh (N1–N10, 2026-10-02)` after §20, line 3649)
-- Create: `docs/superpowers/specs/2026-10-02-neo-refresh-design.md` and `docs/superpowers/plans/2026-10-02-neo-refresh.md` (copied from `gisik-nokma-lanes/neo-refresh-docs/`)
+- Modify (per task, in that task's commit): `test-cases/24-neo-refresh.md` (flip ❌ → ✅/🧪 as each case's test lands, cite the id in the test name), `Features.md` §21 (one bullet per task, texts given in each task's last step)
 - Modify: `docs/superpowers/plans/2026-09-29-styling-system-refresh.md:1897` (rule 02 pointer, done in T6)
 
-- [ ] **Step 1: Open the bucket** (`test-cases/24-neo-refresh.md` header)
+- [ ] **Step 1: Keep the bucket honest** — every case line in §24.x carries its `it` title verbatim, its ruling ("(N5)") and its control in a trailing sentence; a case flips only in the commit that lands its test (`pnpm check:citations` is the ratchet: the baseline key stays 0 while every ✅ is cited).
 
-```markdown
-# §24 — The neo refresh (rulings N1–N10)
+- [ ] **Step 2: Features §21** — the lead paragraph names the ten rulings and the bench; one bullet per task with its file path, legend ✅/⚙️/🧪.
 
-**Opened 2026-10-02 by the neo refresh plan** (`docs/superpowers/plans/2026-10-02-neo-refresh.md`; spec `docs/superpowers/specs/2026-10-02-neo-refresh-design.md`; the bench the owner ruled from: `gisik-nokma-lanes/neo-mockup-2026-10-02/index.html`). Mirrors `Features.md` §21. Ships as the release after prefix/groups/UX fixes.
+- [ ] **Step 3: Checks before each task's PR** — `pnpm check:citations > /tmp/neo-t9.log 2>&1; tail -5 /tmp/neo-t9.log` and `pnpm check:tasks` (rc=1 is pre-existing at the base 4f86b959 from ux-fixes rows; a NEW failure naming plan 30 `neo-refresh` is this plan's).
 
-3-DIGIT PADDED `24.001`–`24.999`, blocks per task: T1 24.001–019 · T2 24.020–039 · T3 24.040–059 · T4 24.060–069 · T5 24.070–079 · T6 24.080–099 · T7 24.100–109 · T8 24.110–129 · T9 24.130–139.
-
-## 24.1 The token layer (T1)
-- ❌ **24.001 — the neo shadow primitives are derived from the surface …** (one line per case, the `it` title verbatim; every case names its ruling: "(N5)")
-…
-```
-Write every case line from the `describe` titles in T1–T8 (24.001–24.008, 24.020–24.026, 24.040–24.044, 24.060/061/065, 24.070–071, 24.080–083, 24.100, 24.110–114) starting ❌, each with its control named in a trailing sentence.
-
-- [ ] **Step 2: Features §21** — one bullet per task (the texts given in each task's last step), legend ✅/⚙️/🧪, each with its file path; a lead paragraph naming the ten rulings and the bench.
-
-- [ ] **Step 3: Checks** — `pnpm check:citations > /tmp/neo-t9.log 2>&1; tail -5 /tmp/neo-t9.log` (the baseline key must exist; the count is 0 until a task flips a case and cites it) and `pnpm check:tasks` if the repo's task check reads plans.
-
-- [ ] **Step 4: Commit** (this commit lands FIRST on the release branch, before T1)
-```bash
-git add test-cases/24-neo-refresh.md test-cases/README.md scripts/fixtures/check-case-citations-baseline.json Features.md docs/superpowers/specs/2026-10-02-neo-refresh-design.md docs/superpowers/plans/2026-10-02-neo-refresh.md
-git commit -m "Neo refresh: spec, plan, bucket 24 and Features §21 opened"
-```
+- [ ] **Step 4: Nothing to commit separately** — T9's opening commit already landed (`9c7321b1`); the spec and plan land through PR #911. Each task's own commit carries its catalogue lines.
 
 ---
 
@@ -1148,19 +1251,21 @@ git commit -m "Neo refresh: spec, plan, bucket 24 and Features §21 opened"
 | `.gn-dialog`, `.gn-select__panel`, `.gn-popover`, `.gn-infotip__panel`, `.gn-nav__menu`, `.gn-card-menu__list`, `.ticketref-popup`, `.wikilink-preview`, `.table-toolbar`, `.gn-toc-launcher__*`, `.gn-skip` | `lift-near` (10/24) | `near-lg` (10/24) | T6 |
 | hover on cards/doors/board cards | `lift-near` | `lift-near` (= `near` 6/14) | T1 |
 | press on cards/doors/board cards | `lift-press` (outset 4/10) | `lift-press` (= `recess`, inset) | T1, T2 |
-| `.gn-button--primary` | `action*` | `action-filled*` | T2 |
-| `.gn-button--danger` | `lift*` | `danger*` | T2 |
-| `.gn-button--ghost`, `.gn-sheet__close`, `.gn-row-action` | none | `quiet*` | T4 |
+| `.gn-button--primary` | `action*` | `action-filled*` (+ `action-filled-disabled` when disabled) | T2 |
+| `.gn-button--danger` | `lift*` | `danger*` (+ `danger-disabled` when disabled) | T2 |
+| `.gn-button--ghost`, `.gn-dialog__close`, `.gn-sheet__close`, `.gn-row-action` | none | `quiet*` | T4 |
 | neo fields (4 arms) | `sunken` + rim | `field`, transparent border | T3 |
 | `.gn-segmented` (neo arm), nav current (neo), `--on` | `track` / `sunken` / `selected` | `recess` / `recess` / `selected` (= recess) | T3 |
 | wells: `.gn-board__column`, trays, `.gn-help__results`, timeline/calendar grids, `.gn-saved-filters__name`, `.gn-contest-banner`, `.gn-notfound__why` | `track` / `sunken` (4/9) | `track` / `sunken` (3/6) | T1 |
 | chips, badges, `.workflow-list__state`, `.gn-board__column-empty-icon` | `sunken-compact` (2/4) | `sunken-compact` (1/3) | T1 |
 | task checkbox, `.gn-list__column-box` (neo) | `sunken` / flat | `sunken-compact` | T3, T5 |
-| `.gn-switch` (neo) | flat | `recess` track, `raised-compact` knob, `knob-on` | T2, T5 |
-| `.workflow-rebind-dialog`, `.gn-filters__panel` | generic `var(--gn-shadow)` drops | `near-lg` / `sheet` | T6 |
+| `.gn-switch` (neo, `:not(:checked)` arms + `:checked` arms) | flat | `recess` track, `raised-compact` knob off; accent track, `knob-on` on | T2, T5 |
+| `.gn-help__toggle:hover` (neo arm only) | `sunken` | `raised-compact` | T3 |
+| `.workflow-rebind-dialog`, `.gn-filters__panel` | generic `var(--gn-shadow)` drops | `drop` / `drop-side` (neo = near-lg / sheet; hig and minimal = today's drops) | T6 |
 
 ## Self-review (run 2026-10-02 against the spec)
 1. **Spec coverage:** §3.1 primitives → T1; §3.2 surfaces → T1 (+ T7 docblocks); §3.3 roles → T1, consumers → T2–T6 (Appendix A); §3.4 halo → T6; §3.5 focus/transitions → T2 (buttons), T3 (segmented, nav), T4 (icon buttons), T5 (switch); §4 rules → T2 (filled), T1/T2 (press), T3 (N2 fill, N10 field); §5 floors → 24.005, 24.007, 24.044, 24.100; §6 unchanged → 24.002 and the controls in every case; §7 scoping → 24.002, 24.060, 13.340; §8 risks → risk 2 handled in T1 step 8, risk 5 in T3, risk 6 in T3, risk 4 measured in T8 (24.112; the phone clamp 23.120 is re-run by the gate), risk 1 and 3 are stated for the reviewer. No gap found.
 2. **Placeholder scan:** none ("sign in … reuse signIn()" in T8 names the helper to extract, with its new path).
 3. **Type consistency:** `ShadowRole` names used in CSS variables match T1's union (`--gn-shadow-action-filled-press`, `--gn-shadow-quiet-near`, `--gn-shadow-knob-on`, `--gn-shadow-near-lg`, `--gn-shadow-recess`, `--gn-shadow-field`); `halo`/`haloVariableName` defined in T6 and used only there and in T8's px reading; `neoShadows(lamp)` is internal to `tokens.ts`.
-4. **Review Focus:** 1 → 24.002 (T1); 2 → 24.044 (T3); 3 → 24.023 (T2) + 24.113 (T8); 4 → 24.026 (T2); 5 → 24.065 (T4).
+4. **Review Focus:** 1 → 24.002 + 24.009 (T1); 2 → 24.044 (T3); 3 → 24.023 (T2) + 24.113 (T8); 4 → 24.026 (T2); 5 → 24.065 (T4). The switch cascade (FIX 1 item 4) → 24.070 (T5) + 24.115 (T8).
+5. **FIX 1 (reviewer A, 2026-10-02) applied:** zero drift for hig/minimal (items 1a–f, via `raised-lg` = hig `lift`, 8/8/3 halos for both, the neo help-toggle arm, `drop`/`drop-side`, the disabled roles, the neo-only column-box border) with the guard 24.009; the counts/scans in 24.008 (×9) and 24.100 (`--gn-shadow-*` only); grouped selectors passed as arrays (door active, the close group, the popup group, the disabled button pairs); 24.071's control (`fill-tertiary`); 24.025 lists its four sites; T8 uses the stack config, the existing helpers and the seeded project href, and pins the switch cascade (24.115); 18.306 ruled (re-model for neo) but HELD on the tinted-`dt` finding; the §5 numbers and the citations corrected; Appendix A's four floating sites added to T6; P2/T9 rewritten around `9c7321b1`.
