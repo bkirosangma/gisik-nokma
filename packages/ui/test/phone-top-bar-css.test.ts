@@ -39,7 +39,7 @@ describe('21.013 the page title is one line at ≤40rem', () => {
   it('21.013 nowrap + ellipsis at the phone size, on the shared title and the account override; above 40rem the title rule is unchanged', () => {
     for (const selector of ['.gn-page-title', '.gn-account .gn-page-title']) {
       const phone = ruleExactly(css, selector, PHONE);
-      expect(valueOf(phone, 'font-size'), selector).toBe('1.375rem');
+      expect(valueOf(phone, 'font-size'), selector).toBe('var(--gn-title-page-phone)'); // 22px: the token (AMENDED 2026-10-02, UX fixes Task 5, case 23.070)
       expect(valueOf(phone, 'line-height'), selector).toBe('1.75rem');
     }
     const title = ruleExactly(css, '.gn-page-title', PHONE);
@@ -48,9 +48,9 @@ describe('21.013 the page title is one line at ≤40rem', () => {
     expect(valueOf(title, 'text-overflow')).toBe('ellipsis');
     // CONTROL — above 40rem the display size is still 34px/41px and nothing truncates.
     const base = ruleExactly(css, '.gn-page-title');
-    expect(valueOf(base, 'font-size')).toBe('2.125rem');
+    expect(valueOf(base, 'font-size')).toBe('var(--gn-title-page)'); // 34px (AMENDED 2026-10-02, case 23.070)
     expect(valueOf(base, 'white-space')).toBeNull();
     expect(valueOf(base, 'text-overflow')).toBeNull();
-    expect(valueOf(ruleExactly(css, '.gn-account .gn-page-title'), 'font-size')).toBe('2.125rem');
+    expect(valueOf(ruleExactly(css, '.gn-account .gn-page-title'), 'font-size')).toBe('var(--gn-title-page)');
   });
 });

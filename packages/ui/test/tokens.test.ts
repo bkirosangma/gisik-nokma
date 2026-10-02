@@ -19,6 +19,8 @@ import {
   shadowVariableName,
   themeStylesheet,
   themes,
+  titleScale,
+  titleVariableName,
   type FontRole,
   type StyleName,
   type ThemeName,
@@ -132,6 +134,23 @@ describe('CSS variable emission', () => {
    * and the colour is simply gone. Measured: adding `--gn-nonexistent` to
    * ui.css reddens this and no other test in the repo.
    */
+  it('23.070 the type scale is emitted once per step in the bare :root block, as the six --gn-title-* variables', () => {
+    const sheet = themeStylesheet();
+    const bare = /^:root \{([^}]*)\}/m.exec(sheet)?.[1] ?? '';
+    expect(bare.length).toBeGreaterThan(0);
+    for (const step of Object.keys(titleScale) as Array<keyof typeof titleScale>) {
+      expect(bare).toContain(`${titleVariableName(step)}: ${titleScale[step].size};`);
+      expect(bare).toContain(`${titleVariableName(step, true)}: ${titleScale[step].phone};`);
+      expect(sheet.split(`${titleVariableName(step)}:`).length - 1).toBe(1);
+    }
+    // CONTROL (same it): the names are the six the stylesheet rules read.
+    expect(Object.keys(titleScale).map((step) => titleVariableName(step as keyof typeof titleScale))).toEqual([
+      '--gn-title-page',
+      '--gn-title-section',
+      '--gn-title-group',
+    ]);
+  });
+
   it('every var(--gn-…) in ui.css names a declared role', () => {
     const css = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
     const referenced = [...new Set([...css.matchAll(/var\((--gn-[a-z0-9-]*)\)/g)].map((hit) => hit[1]))];
@@ -145,6 +164,8 @@ describe('CSS variable emission', () => {
       ...([1, 2, 3] as const).map(spaceVariableName),
       // The prose measure (case 23.043) is declared once in the bare :root block, beside the spacing tokens.
       '--gn-measure',
+      // The type scale (case 23.070) is declared once in the bare :root block too: three steps, each with a phone step.
+      ...(Object.keys(titleScale) as Array<keyof typeof titleScale>).flatMap((step) => [titleVariableName(step), titleVariableName(step, true)]),
       ...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),
       // The phone bar / top-bar heights (case 21.003) are declared once in the bare :root block, not as colour roles.
       '--gn-phone-bar-height',
@@ -1913,8 +1934,10 @@ describe('13.894 — the ticket-type list stripes the 1-indexed EVEN rows, and t
     // otherwise be unpinned.
     const body = declarationsFor(UI_CSS_TEXT, '.ticket-type-list__title');
     if (body === null) throw new Error('.ticket-type-list__title rule not found in ui.css');
-    // `20px/25px/600` at `desktop.dc.html:820`, carried as rem at the 16px root.
-    expect(body).toMatch(/font-size:\s*1\.25rem/);
+    // `20px/25px/600` at `desktop.dc.html:820`, carried as rem at the 16px root — and, since UX fixes Task 5 (case 23.072,
+    // AMENDED 2026-10-02), read through the section-title token, whose value IS that 20px.
+    expect(body).toMatch(/font-size:\s*var\(--gn-title-section\)/);
+    expect(titleScale.section.size).toBe('1.25rem');
     expect(body).toMatch(/line-height:\s*1\.5625rem/);
     expect(body).toMatch(/font-weight:\s*600/);
     // The metrics are the delta; the text is not. Stated so a reader does not

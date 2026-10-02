@@ -183,7 +183,7 @@ describe('21.171 the builder header wraps and Publish stays the one primary', ()
     expect(valueOf(row, 'align-items')).toBe('stretch');
     const name = ruleExactly(ui, '.workflow-builder-screen__name', PHONE);
     expect(valueOf(name, 'min-height')).toBe('2.75rem');
-    expect(valueOf(name, 'font-size')).toBe('1.5rem');
+    expect(valueOf(name, 'font-size')).toBe('var(--gn-title-page-phone)'); // 22px; was a literal 1.5rem (AMENDED 2026-10-02, UX fixes Task 5, case 23.070)
     expect(valueOf(name, 'line-height')).toBe('2rem');
     expect(valueOf(ruleExactly(ui, '.workflow-builder-screen__actions', PHONE), 'width')).toBe('100%');
     expect(valueOf(ruleExactly(ui, '.publish-controls', PHONE), 'flex')).toBe('1 1 100%');
@@ -198,7 +198,7 @@ describe('21.171 the builder header wraps and Publish stays the one primary', ()
     expect(valueOf(base, 'flex-wrap')).toBe('wrap');
     expect(valueOf(base, 'justify-content')).toBe('space-between');
     expect(valueOf(base, 'flex-direction')).toBeNull();
-    expect(valueOf(ruleExactly(ui, '.workflow-builder-screen__name'), 'font-size')).toBe('2.125rem');
+    expect(valueOf(ruleExactly(ui, '.workflow-builder-screen__name'), 'font-size')).toBe('var(--gn-title-page)'); // 34px (AMENDED 2026-10-02, UX fixes Task 5, case 23.070)
     expect(valueOf(ruleExactly(ui, '.publish-controls__publish'), 'align-self')).toBe('flex-start');
     expect(valueOf(ruleExactly(ui, '.workflow-builder-screen__actions'), 'flex-wrap')).toBe('wrap');
   });
@@ -238,19 +238,16 @@ describe('21.172 workflow list / history / new: one column; the template doors s
 });
 
 describe('21.173 ticket types: form fields full width; the reorder targets stay ≥44px', () => {
-  it('21.173 the field rows put the name and type on a full row each, Add field fills the width, and Save takes its own row; the editor stacks', () => {
+  it('21.173 the field rows put the name and type on a full row each, Add field fills the width, and Save keeps its own width beside Cancel (no longer a full row, case 23.074); the editor stacks', () => {
     const fields = ruleExactly(ui, ['.fields-editor__name', '.fields-editor__type'], PHONE);
     expect(valueOf(fields, 'flex')).toBe('1 1 100%');
     expect(valueOf(fields, 'min-width')).toBe('0');
     expect(valueOf(ruleExactly(ui, '.fields-editor__add', PHONE), 'align-self')).toBe('stretch');
-    expect(valueOf(ruleExactly(ui, '.ticket-type-editor__save', PHONE), 'flex')).toBe('1 1 100%');
-    expect(valueOf(ruleExactly(globals, '.gn-type-editor-header__actions', PHONE), 'flex')).toBe('1 1 100%');
+    // AMENDED 2026-10-02 (UX fixes Task 5, case 23.074): the Save and the header actions are no longer a full row; 23.074 pins their absence.
     expect(valueOf(ruleExactly(ui, '.ticket-type-list__new', PHONE), 'flex')).toBe('1 1 100%');
     after(ui, ['.fields-editor__name', '.fields-editor__type'], [['.fields-editor__name'], ['.fields-editor__type']]);
     after(ui, ['.fields-editor__add']);
-    after(ui, ['.ticket-type-editor__save']);
     after(ui, ['.ticket-type-list__new'], [['.ticket-type-list__header']]);
-    after(globals, ['.gn-type-editor-header__actions']);
     // The two-column editor stacks at the phone width (it did before this task; pinned so it stays so).
     expect(valueOf(ruleExactly(ui, '.ticket-type-editor__layout', PHONE), 'grid-template-columns')).toBe('minmax(0, 1fr)');
     after(ui, ['.ticket-type-editor__layout']);

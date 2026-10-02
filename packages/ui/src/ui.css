@@ -2400,8 +2400,8 @@ a.gn-ticket-sheet__crumb--link {
   background: var(--gn-surface-track);
   box-shadow: var(--gn-shadow-track);
   border-radius: var(--gn-radius-card);
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
+  font-size: var(--gn-title-section);
+  line-height: 1.5625rem;
   font-weight: 600;
   color: var(--gn-text);
 }
@@ -2680,8 +2680,8 @@ a.gn-ticket-sheet__crumb--link {
    serves both. At <=40rem the table stops being a table: it, its body and each row become blocks/flex lines,
    the column-header row is clipped (visually hidden, not removed), the title cell takes the first line and the
    key · state · assignee · due cells wrap beneath it as small meta. The bulk-select checkbox is lifted to its
-   own 44px square at the row's start (the row reserves room with `:has`). The bulk-close bar's slot takes a
-   full row and the Confirm close button fills it, the cancel ✕ beside it. Inside the one arm and AFTER
+   own 44px square at the row's start (the row reserves room with `:has`). (The bulk-close bar's slot took a
+   full row here until UX fixes Task 5, case 23.073: it now sits in the toolbar row at its own width.) Inside the one arm and AFTER
    every base rule it overrides.
 
    THE ARM IS 64rem, NOT 40rem (UX fixes Task 4, owner ruling U3, case 23.052; it was 40rem when written, case 21.111): the
@@ -2721,9 +2721,6 @@ a.gn-ticket-sheet__crumb--link {
   }
   .gn-list__table-cell--title { order: -1; flex: 1 0 100%; min-width: 0; padding: 0; }
   .gn-list__table-cell--data { padding: 0; font-size: 0.8125rem; line-height: 1.125rem; white-space: normal; }
-  .gn-list__controls-end { flex: 1 1 100%; margin-left: 0; display: flex; }
-  .gn-list__bulk { flex: 1 1 100%; display: flex; }
-  .gn-list__bulk-close { flex: 1 1 auto; }
 }
 /* The attention strip is the prototype's tinted card, adopted WHOLE (owner
    ruling, 2026-09-18): `--tintWarning` fill, `--cardR` radius, `18px 20px`
@@ -2828,7 +2825,7 @@ a.gn-ticket-sheet__crumb--link {
 .gn-attention__claim { color: var(--gn-text-muted); font-size: 0.85rem; }
 
 .gn-my-work { display: flex; flex-direction: column; gap: 1.2rem; }
-.gn-my-work__heading { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--gn-text-muted); }
+.gn-my-work__heading { margin: 0 0 0.5rem; font-size: var(--gn-title-section); line-height: 1.5625rem; color: var(--gn-text-muted); }
 .gn-my-work__empty { color: var(--gn-text-muted); margin: 0; }
 .gn-my-work__item,
 .gn-my-work__contested { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
@@ -4216,7 +4213,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    blob `6d7b67c0a52c`), carried as rem at the 16px root this product sets. Was
    `1rem` with no line-height of its own, so it inherited the UA's normal
    leading and sat visibly lighter and smaller than the drawing. */
-.ticket-type-list__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+.ticket-type-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .ticket-type-list__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 /* The web app on phones — New ticket type is the list's one primary on its own full row (Plan Task 11, case 21.173).
    Inside the one 40rem arm, AFTER `.ticket-type-list__header`. */
@@ -4403,10 +4400,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    radius, beside a shared `Button` that is 44px, border-less and
    control-radiused, against a prototype that draws 44. */
 .ticket-type-editor__save { align-self: flex-start; }
-/* The web app on phones — the ticket type editor's Save takes its own full row (Plan Task 11, case 21.173). */
-@media (max-width: 40rem) {
-  .ticket-type-editor__save { flex: 1 1 100%; }
-}
+/* The web app on phones — the ticket type editor's Save keeps its own width beside Cancel (UX fixes Task 5, case 23.074;
+   it took a full row under case 21.173). */
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {
@@ -4695,7 +4690,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
   font: inherit;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
@@ -4812,7 +4807,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
     min-height: 28rem;
   }
   .workflow-builder-screen__title-row { flex-direction: column; align-items: stretch; }
-  .workflow-builder-screen__name { min-height: 2.75rem; font-size: 1.5rem; line-height: 2rem; }
+  .workflow-builder-screen__name { min-height: 2.75rem; font-size: var(--gn-title-page-phone); line-height: 2rem; }
   .workflow-builder-screen__actions { width: 100%; }
   .workflow-builder-screen__add-state,
   .workflow-builder-screen__panels { flex: 1 1 0; min-height: 2.75rem; }
@@ -6079,7 +6074,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* The 14px that used to live here is now `.gn-help__intro`'s `gap` — same
      distance, but it survives the column becoming a flex container. */
   margin: 0;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
@@ -7127,7 +7122,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 }
 .gn-page-header__title {
   margin: 0;
-  font-size: 2.1rem;
+  font-size: var(--gn-title-page);
   line-height: 1.2;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -7190,7 +7185,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Styling refresh Plan B (Task B5): 16px between the header's groups (rule 02). */
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
-.gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+.gn-project__title { font-size: var(--gn-title-page); line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
 /* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
    OWN page. It sits under the title as its own line rather than inside the
    heading, so a screen reader hears the project's name as the heading and the
@@ -7707,7 +7702,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .workflow-list__load-error { margin: 0; color: var(--gn-text); }
 .workflow-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
 .workflow-list__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-list__title { margin: 0; font-size: 1rem; }
+.workflow-list__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-list__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-list__empty { margin: 0; color: var(--gn-text-muted); }
 /* `minmax(20rem, …)` is the prototype's own `minmax(320px,1fr)` (`:849`) — the
@@ -7793,7 +7788,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.75rem;
 }
 .workflow-history__heading { display: flex; flex-direction: column; gap: 0.15rem; }
-.workflow-history__title { margin: 0; font-size: 1rem; }
+.workflow-history__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; }
 .workflow-history__subtitle { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .workflow-history__versions {
   display: flex;
@@ -8638,3 +8633,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-note-badge--project { background: var(--gn-tint-warning); }
 .gn-note-badge--inherit { background: var(--gn-fill-secondary); }
 .gn-note-badge--explicit { background: var(--gn-fill-quaternary); }
+
+/* ── The type scale on a phone (UX fixes Task 5, cases 23.070 / 23.072; audit SYS-02, WF-05, WF-06, SET-17, NP-15) ────
+   Every page title reads `--gn-title-page` (34px) and, here, `--gn-title-page-phone` (22px); every section head reads
+   `--gn-title-section` (20px) and `--gn-title-section-phone` (18px). The tokens are emitted once by `themeStylesheet()`
+   (`tokens.ts`), so no rule spells a size. The workflow editor's name field takes its phone size in its own arm above
+   (`.workflow-builder-screen__name`); the project title stays ONE line and ellipsises, as a header row should. */
+@media (max-width: 40rem) {
+  .gn-help__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-page-header__title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; }
+  .gn-project__title {
+    font-size: var(--gn-title-page-phone);
+    line-height: 1.75rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .gn-list__section-title,
+  .gn-my-work__heading,
+  .workflow-list__title,
+  .workflow-history__title,
+  .ticket-type-list__title { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
+}

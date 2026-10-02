@@ -509,7 +509,7 @@ describe('the 404, ported from the export without taking its copy', () => {
     const block = heading?.[1] ?? '';
     for (const decl of [
       'max-width: 72ch',
-      'font-size: 34px',
+      'font-size: var(--gn-title-page)', // 34px: the page-title token (AMENDED 2026-10-02, UX fixes Task 5, case 23.070)
       'line-height: 41px',
       'font-weight: 700',
       'letter-spacing: -0.4px',
@@ -528,7 +528,7 @@ describe('the 404, ported from the export without taking its copy', () => {
     // show, and asserted as the PAIR so a bare `font-size` edit cannot satisfy
     // it by accident.
     expect(css.replace(/\s+/g, ' ')).toContain(
-      '.gn-notfound__title, .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }',
+      '.gn-notfound__title, .gn-legal__title { font-size: var(--gn-title-page-phone); line-height: 1.25; }' // 22px, was 1.35rem (AMENDED 2026-10-02, UX fixes Task 5, case 23.070),
     );
   });
 

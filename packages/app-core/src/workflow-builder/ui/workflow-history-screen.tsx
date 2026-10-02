@@ -123,7 +123,7 @@ export function WorkflowHistoryScreen(props: {
     <section className="workflow-history">
       <header className="workflow-history__header">
         <div className="workflow-history__heading">
-          <h2 className="workflow-history__title">Version history</h2>
+          <h1 className="workflow-history__title">Version history</h1>
           <p className="workflow-history__subtitle">
             Publishing records a version. Nothing already recorded is rewritten.
           </p>

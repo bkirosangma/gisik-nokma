@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRules, readUiCss, ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
 import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns.js';
 
 /**
@@ -167,16 +167,15 @@ describe('21.111 List / Backlog: the table becomes stacked rows, the bulk-close 
     onlyInPhoneArm(ui, '.gn-list__table-row');
   });
 
-  it('21.111 the bulk-close bar is full width: the controls slot takes its own row and the Confirm close button fills it; above 64rem it stays right-aligned', () => {
-    const end = ruleExactly(ui, '.gn-list__controls-end', BAND);
-    expect(valueOf(end, 'flex')).toBe('1 1 100%');
-    expect(valueOf(end, 'margin-left')).toBe('0');
-    expect(valueOf(end, 'display')).toBe('flex');
-    const bulk = ruleExactly(ui, '.gn-list__bulk', BAND);
-    expect(valueOf(bulk, 'flex')).toBe('1 1 100%');
-    expect(valueOf(bulk, 'display')).toBe('flex');
-    expect(valueOf(ruleExactly(ui, '.gn-list__bulk-close', BAND), 'flex')).toBe('1 1 auto');
-    for (const selectors of [['.gn-list__controls-end'], ['.gn-list__bulk'], ['.gn-list__bulk-close']]) after(ui, selectors, [selectors], BAND);
+  it('21.111 the bulk-close bar is NOT a full-width stacked pill: no band rule gives the controls slot, the bar or the close button a full row; above 64rem it stays right-aligned', () => {
+    // AMENDED 2026-10-02 (UX fixes Task 5, case 23.073; audit PV-03): this case pinned the opposite — a controls slot
+    // at `flex: 1 1 100%` and a bulk bar that filled it — which is the "full-width stacked pill before content" the
+    // phone header pattern removes. The bar now sits in the toolbar row at its own width.
+    for (const selector of ['.gn-list__controls-end', '.gn-list__bulk', '.gn-list__bulk-close']) {
+      for (const rule of rulesNaming(ui, selector).filter((r) => r.atRule === BAND || r.atRule === PHONE)) {
+        expect(valueOf(rule.body, 'flex') ?? '', `${selector} under ${rule.atRule}`).not.toMatch(/100%$/);
+      }
+    }
 
     // CONTROL — desktop: the slot hugs the right edge and the bar is an inline pair.
     expect(valueOf(ruleExactly(ui, '.gn-list__controls-end'), 'margin-left')).toBe('auto');

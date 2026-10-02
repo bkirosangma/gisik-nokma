@@ -196,7 +196,7 @@ input, textarea, select { font-family: inherit; }
    −0.85px-vs−0.4px measurement this value avoids. */
 .gn-page-title {
   margin: 1.2rem 0 0.4rem;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   font-weight: 700;
   letter-spacing: -0.0118em;
@@ -750,7 +750,7 @@ input, textarea, select { font-family: inherit; }
    fuller note. */
 .gn-account .gn-page-title {
   margin: 0;
-  font-size: 2.125rem;
+  font-size: var(--gn-title-page);
   line-height: 2.5625rem;
   letter-spacing: -0.0118em;
 }
@@ -2332,14 +2332,14 @@ input, textarea, select { font-family: inherit; }
      house's heading step below the 34px display type (1.375rem / 1.75rem). The account page pins
      its own 34px (`.gn-account .gn-page-title`, two classes deep), so it needs its own line here. */
   .gn-page-title {
-    font-size: 1.375rem;
+    font-size: var(--gn-title-page-phone);
     line-height: 1.75rem;
     letter-spacing: -0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .gn-account .gn-page-title { font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; }
+  .gn-account .gn-page-title { font-size: var(--gn-title-page-phone); line-height: 1.75rem; letter-spacing: -0.01em; }
 }
 
 /* ── THE BOTTOM BAR, 64rem AND BELOW (mobile-web plan Task 3, cases 21.028–21.031; widened from the 40rem phone arm to the tablet
@@ -2963,7 +2963,7 @@ input, textarea, select { font-family: inherit; }
 .gn-legal__title {
   max-width: 72ch;
   margin: 0 0 0.75rem;
-  font-size: 34px;
+  font-size: var(--gn-title-page);
   line-height: 41px;
   font-weight: 700;
   letter-spacing: -0.4px;
@@ -3349,7 +3349,7 @@ input, textarea, select { font-family: inherit; }
      unitless value, so the phone's typography is byte-for-byte what it was:
      this line restores a decision, it does not take one. */
   .gn-notfound__title,
-  .gn-legal__title { font-size: 1.35rem; line-height: 1.25; }
+  .gn-legal__title { font-size: var(--gn-title-page-phone); line-height: 1.25; }
   .gn-notfound__actions { flex-direction: column; align-items: stretch; }
   .gn-notfound__link { justify-content: center; }
 
@@ -3617,7 +3617,7 @@ input, textarea, select { font-family: inherit; }
    card holding a card is the shape `.gn-mcp-tokens__card--account` exists to
    avoid. No font-size: the subtitle inherits the weight-only emphasis `__name` uses. */
 .gn-mcp-tokens__hosted { margin-top: 1.5rem; }
-.gn-mcp-tokens__subtitle { margin: 0 0 0.75rem; font-weight: 600; }
+.gn-mcp-tokens__subtitle { margin: 0 0 0.75rem; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .gn-mcp-tokens__connect { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
 .gn-mcp-tokens__url { overflow-wrap: anywhere; }
 /* ── The MCP rows on a phone (mobile-web plan Task 10, cases 21.150 and 21.152): on `/mcp/tokens` and
@@ -3717,7 +3717,7 @@ input, textarea, select { font-family: inherit; }
    colour in this block. */
 .gn-workspace-settings { display: flex; flex-direction: column; gap: 0.9rem; }
 .gn-workspace-settings__header { display: flex; flex-direction: column; gap: 0.15rem; }
-.gn-workspace-settings__title { margin: 0; font-size: 1.25rem; line-height: 1.5625rem; font-weight: 600; }
+.gn-workspace-settings__title { margin: 0; font-size: var(--gn-title-section); line-height: 1.5625rem; font-weight: 600; }
 .gn-workspace-settings__summary { margin: 0; font-size: 0.85rem; color: var(--gn-text-muted); }
 .gn-workspace-settings__card { padding: 1.25rem; }
 .gn-workspace-settings__fields { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -3789,11 +3789,9 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
 }
 
-/* The web app on phones — the ticket type editor's header actions take the whole row, so Save (full width, see
-   `.ticket-type-editor__save` in `ui.css`) is not squeezed beside the title (Plan Task 11, case 21.173). AFTER the base. */
-@media (max-width: 40rem) {
-  .gn-type-editor-header__actions { flex: 1 1 100%; }
-}
+/* The web app on phones — the ticket type editor's header keeps Cancel and Save on ONE row (UX fixes Task 5, case 23.074,
+   audit TT-09). It used to give the actions row the whole width (`flex: 1 1 100%`, case 21.173) so the Save could fill its own
+   line; the row now wraps only when the title and both buttons truly do not fit, and the Save keeps its own width. */
 
 /* The inbox's header ROW — the title and the filter tabs, which the prototype
    puts on one line (its bulk action shares the row and is not built yet).
@@ -5363,4 +5361,10 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__empty,
 .gn-notes__hint {
   max-width: var(--gn-measure);
+}
+
+/* The two settings section heads on a phone take the phone step of the scale (UX fixes Task 5, case 23.072). */
+@media (max-width: 40rem) {
+  .gn-workspace-settings__title,
+  .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
 }
