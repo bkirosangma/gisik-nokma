@@ -42,7 +42,9 @@ function fake(sniffed = 'image/png', over: { routes?: Record<string, unknown>; d
     getBytes: async () => over.download ?? { bytes: Buffer.from(PNG_B64, 'base64'), contentType: 'image/png', filename: 'dot.png' },
     postMultipart: async (path, fields, file) => {
       uploads.push({ path, fields, name: file.name, size: file.bytes.length });
-      return { attachmentId: A, url: `/v1/attachments/${A}`, mime: sniffed, filename: file.name, size: file.bytes.length, sha256: 'a'.repeat(64) };
+      // The real route answers `sanitizeFilename(name)` (it strips `/`, `"`, `\\` and controls): answer a name that DIFFERS from the one sent,
+      // so a tool that records the caller's name instead of the server's cannot pass.
+      return { attachmentId: A, url: `/v1/attachments/${A}`, mime: sniffed, filename: file.name.replace(/[/"\\]/g, ''), size: file.bytes.length, sha256: 'a'.repeat(64) };
     },
   };
   return { session, uploads, sent, gets };
@@ -57,13 +59,13 @@ const parses = (envelope: Record<string, unknown> | undefined) => parseEvent({ .
 describe('14.430 add_attachment to a ticket', () => {
   it('14.430 uploads the bytes (ticketId field), then records attachment.added from the SERVER answer', async () => {
     const f = fake('image/png');
-    await tool('add_attachment', f.session).handler({ workspaceId: WS, ticketId: T, file: { name: 'shot.jpg', base64: PNG_B64 } });
-    expect(f.uploads).toEqual([{ path: '/v1/attachments', fields: { ticketId: T }, name: 'shot.jpg', size: 70 }]);
+    await tool('add_attachment', f.session).handler({ workspaceId: WS, ticketId: T, file: { name: 'shot/"1".jpg', base64: PNG_B64 } });
+    expect(f.uploads).toEqual([{ path: '/v1/attachments', fields: { ticketId: T }, name: 'shot/"1".jpg', size: 70 }]);
     expect(f.sent).toHaveLength(1);
-    // `.jpg` by name, but the server sniffed a PNG: the event carries what the server said.
+    // `.jpg` by name, but the server sniffed a PNG and sanitized `shot/"1".jpg` to `shot1.jpg`: the event carries what the server said.
     expect(f.sent[0]).toMatchObject({
       type: 'attachment.added', entity: { kind: 'ticket', id: T }, origin: 'mcp', workspaceId: WS,
-      payload: { kind: 'upload', attachmentId: A, filename: 'shot.jpg', mime: 'image/png', size: 70, sha256: 'a'.repeat(64) },
+      payload: { kind: 'upload', attachmentId: A, filename: 'shot1.jpg', mime: 'image/png', size: 70, sha256: 'a'.repeat(64) },
     });
     expect(parses(f.sent[0])).toBe(true); // CONTROL: the envelope is one the server would accept
   });
@@ -74,9 +76,13 @@ describe('14.431 add_attachment to a note', () => {
     const f = fake('image/png');
     await expect(tool('add_attachment', f.session).handler({ workspaceId: WS, noteId: N, file: { name: 'report.pdf', base64: PNG_B64 } })).rejects.toThrow(/A note holds images/);
     expect(f.uploads).toEqual([]);
-    // CONTROL: the image case.
-    await tool('add_attachment', f.session).handler({ workspaceId: WS, noteId: N, file: { name: 'dot.png', base64: PNG_B64 } });
-    expect(f.uploads).toEqual([{ path: '/v1/attachments', fields: { noteId: N }, name: 'dot.png', size: 70 }]);
+    // CONTROL (a): a ticket takes the same non-image file, so the refusal is the note's rule and not the file's.
+    const onTicket = fake('application/pdf');
+    await tool('add_attachment', onTicket.session).handler({ workspaceId: WS, ticketId: T, file: { name: 'report.pdf', base64: PNG_B64 } });
+    expect(onTicket.uploads).toHaveLength(1);
+    // CONTROL (b): the image case. The name is sanitized by the server (`dot/"1".png` -> `dot1.png`) and the image's alt is the SERVER's name.
+    await tool('add_attachment', f.session).handler({ workspaceId: WS, noteId: N, file: { name: 'dot/"1".png', base64: PNG_B64 } });
+    expect(f.uploads).toEqual([{ path: '/v1/attachments', fields: { noteId: N }, name: 'dot/"1".png', size: 70 }]);
     expect(f.sent).toHaveLength(1);
     const body = (f.sent[0]!['payload'] as { body: { content: unknown[] } }).body;
     expect(f.sent[0]).toMatchObject({ type: 'note.body_set', entity: { kind: 'note', id: N }, origin: 'mcp', workspaceId: WS });
@@ -84,7 +90,7 @@ describe('14.431 add_attachment to a note', () => {
     expect(body.content).toEqual([
       NOTE_BODY.content[0],
       { type: 'image', attrs: { attachmentId: A2, wrap: 'block' } },
-      { type: 'image', attrs: { attachmentId: A, wrap: 'block', alt: 'dot.png' } },
+      { type: 'image', attrs: { attachmentId: A, wrap: 'block', alt: 'dot1.png' } },
     ]);
     expect(parses(f.sent[0])).toBe(true);
     // A `.png` that the server sniffs as a PDF is refused AFTER the upload, and no body is written.
@@ -206,8 +212,17 @@ describe('14.436 list_attachments', () => {
     expect(note.gets).toEqual([`/v1/notes/${N}`]); // the note route, never the ticket one
     expect(out.images).toEqual([{ attachmentId: A2 }]);
     expect(out.note).toContain("A note's files are the images in its body");
-    const pagedNote = (await tool('list_attachments', note.session).handler({ workspaceId: WS, noteId: N, limit: 1 })) as { nextCursor: string | null };
-    expect(pagedNote.nextCursor).toBeNull();
+    // a note pages the same way: TWO embedded images, so `limit: 1` has a next page and the cursor reaches the second
+    const twoImages = fake('image/png', { routes: { [`/v1/notes/${N}`]: { note: { noteId: N, workspaceId: WS, title: 'N', body: { ...NOTE_BODY, content: [
+      { type: 'image', attrs: { attachmentId: A, wrap: 'block' } }, { type: 'image', attrs: { attachmentId: A2, wrap: 'block' } },
+    ] } } } } });
+    const noteArgs = { workspaceId: WS, noteId: N };
+    const noteFirst = (await tool('list_attachments', twoImages.session).handler({ ...noteArgs, limit: 1 })) as { images: unknown[]; nextCursor: string | null };
+    expect(noteFirst.images).toEqual([{ attachmentId: A }]);
+    expect(noteFirst.nextCursor).toBe('1');
+    const noteSecond = (await tool('list_attachments', twoImages.session).handler({ ...noteArgs, limit: 1, cursor: '1' })) as { images: unknown[]; nextCursor: string | null };
+    expect(noteSecond.images).toEqual([{ attachmentId: A2 }]);
+    expect(noteSecond.nextCursor).toBeNull();
 
     // an unseen ticket / note: one sentence, not "answered 404"
     const gone: Session = { ...empty.session, get: async () => { throw new HttpError(404, { error: 'not-found' }); } };
