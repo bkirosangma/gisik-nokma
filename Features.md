@@ -3691,6 +3691,12 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 - ✅ **F-8: the stale reason reads "since 10 Jul, past the 7-day staleness threshold."** (cases 23.300–23.302; `staleReason` in `apps/server/src/routes/attention.ts`, `docs/manual.md`) — no spaced em dash and no ISO date in a reason a person reads; the manual quotes the sentences the server composes.
 - ✅ **F-9: the Style control spells "Neumorphic"** (owner 2026-10-02; cases 23.310–23.311; `apps/web/src/style-toggle.tsx`) — the Account page's third option and its description line; no product source, manual or FAQ spells "Neomorphic".
 
+## 22. Smoothness: loading, optimism and placeholders
+
+*Every screen paints a same-shape placeholder instead of a sentence or a blank, renders from memory on a return visit, shows a write the moment it is made and rolls it back honestly on refusal, and carries only the code the route needs. Owner decisions D1–D13 and D2b accepted 2026-10-02 (~13:50). Spec `docs/superpowers/specs/2026-10-02-smoothness-design.md`; plan `docs/superpowers/plans/2026-10-02-smoothness.md` (14 tasks, ledger plan `smoothness`); audit findings SM-01–SM-16. Mirrored by `test-cases/25-smoothness.md`, 3-digit padded. Ships on `release/smoothness`, after neo (§21) and MCP everything (§23).*
+
+<!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
+
 ## 23. Comment edit and delete, Markdown bodies
 
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*
