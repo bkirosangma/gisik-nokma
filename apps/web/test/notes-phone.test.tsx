@@ -154,7 +154,6 @@ describe('G-3 Notes on a phone', () => {
     expect(panel).toHaveAttribute('data-panel-open', 'false');
     // The drawer toggle and the bottom-left launcher are the DESKTOP forms; neither is drawn on a phone.
     expect(document.querySelector('.gn-notes__tree-toggle')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'On this page' })).toBeNull();
 
     fireEvent.click(launcher);
     expect(launcher).toHaveAttribute('aria-expanded', 'true');
@@ -170,6 +169,8 @@ describe('G-3 Notes on a phone', () => {
     );
     expect(list.querySelector('a')!.className).toBe('gn-help__nav-link');
     expect(list.querySelectorAll('li[data-heading-level="3"]')).toHaveLength(1);
+    // The bottom-left launcher is the DESKTOP form; with the headings known (so it WOULD draw) it is absent here.
+    expect(screen.queryByRole('button', { name: 'On this page' })).toBeNull();
 
     // CONTROL, same it(): the Notes pane is the list, and the headings are gone.
     fireEvent.click(within(panel).getByRole('tab', { name: 'Notes' }));
@@ -185,6 +186,8 @@ describe('G-3 Notes on a phone', () => {
     expect(screen.queryByRole('button', { name: 'Notes and contents' })).toBeNull();
     expect(screen.queryByTestId('notes-panel')).toBeNull();
     expect(document.querySelector('.gn-notes__tree-toggle')).not.toBeNull();
+    // ...and it is the headings that make that launcher draw, so the phone arm's absence above is a real one.
+    expect(await screen.findByRole('button', { name: 'On this page' })).toBeInTheDocument();
   });
 
   it('25.347 the floating button sits where /help’s does: the same classes, and no rule of Notes’ own moves it', async () => {
