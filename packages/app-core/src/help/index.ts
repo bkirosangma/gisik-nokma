@@ -13,7 +13,6 @@ export {
   HELP_GROUPS,
   helpGroupTitle,
   helpNav,
-  helpNextSection,
   type HelpGroup,
   type HelpNavGroup,
 } from './groups.js';
