@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { WorkflowDef } from '@gisik-nokma/domain';
+import { createClientStateCache } from '../../src/cache.js';
 import { Board, type BoardMoveCapability } from '../../src/views/board.js';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
-import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
+import { WS, boardCardSeed, ticketStateSeed, WF_ERRAND } from '../helpers/seed.js';
 
 /**
  * Smoothness T12 (audit SM-10) — a board of hundreds of cards re-renders ONE slot when one card is grabbed, not all of
@@ -158,5 +160,164 @@ describe('25.205 a memoised slot still drops exactly once, and a same-column dro
     expect(source.ingested).toHaveLength(1);
     expect(source.ingested[0]![0]!.payload).toEqual({ to: 'doing' });
     expect(source.ingested[0]![0]!.entity).toMatchObject({ id: 'tk_b' });
+  });
+});
+
+/** Three cards in `todo` and the errand columns: the shape 25.205 uses, named once for 25.207 and 25.209. */
+function threeCardBoard(): BoardView {
+  return {
+    projectId: 'prj_1',
+    groups: [
+      {
+        workflowId: 'wf-errand',
+        workflowVersion: 1,
+        workflowName: 'Errand',
+        columns: [
+          {
+            stateId: 'todo',
+            name: 'To do',
+            category: 'open',
+            blocked: false,
+            creatable: true,
+            cards: ['tk_a', 'tk_b', 'tk_c'].map((ticketId) => boardCardSeed({ ticketId, title: `Ticket ${ticketId}` })),
+          },
+          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
+          { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Case 25.207 — the page hands `Board` NEW `onOpenTicket` and `onMoved` closures on every render, and a memo-skipped slot
+ * must still call the NEWEST one (the latest-ref), never the one it was last rendered with. Each half has its control:
+ * before the page re-renders, the FIRST closure is the one that fires (so "the old one is not called" is a measurement).
+ */
+describe('25.207 a memo-skipped slot calls the newest callbacks the page gave it', () => {
+  it('25.207 a click opens through the newest onOpenTicket and a drop reports through the newest onMoved', async () => {
+    const board = threeCardBoard();
+    const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND });
+    const firstOpen = vi.fn();
+    const secondOpen = vi.fn();
+    const firstMoved = vi.fn();
+    const secondMoved = vi.fn();
+    const pageOf = (onOpenTicket: (id: string) => void, onMoved: () => void) => (
+      <Board
+        board={board}
+        onOpenTicket={onOpenTicket}
+        moves={{ dataSource: source, workspaceId: WS, currentUserId: 'user_kiro', onMoved }}
+      />
+    );
+    const view = render(pageOf(firstOpen, firstMoved));
+    await waitFor(() => expect(document.querySelectorAll('[draggable="true"]').length).toBe(3));
+
+    // CONTROL — before any page re-render the first closures are the live ones.
+    fireEvent.click(screen.getByText('Ticket tk_a'));
+    expect(firstOpen).toHaveBeenCalledWith('tk_a');
+    const first = dragData();
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_a'), { dataTransfer: first });
+    fireEvent.drop(screen.getByTestId('board-column-doing'), { dataTransfer: first });
+    await waitFor(() => expect(firstMoved).toHaveBeenCalledTimes(1));
+    fireEvent.dragEnd(screen.getByTestId('ticket-card-tk_a'), { dataTransfer: first });
+
+    // THE PROPERTY — the page re-renders with NEW closures; the other cards' slots are memo-skipped.
+    view.rerender(pageOf(secondOpen, secondMoved));
+    await act(async () => {});
+    fireEvent.click(screen.getByText('Ticket tk_b'));
+    expect(secondOpen).toHaveBeenCalledTimes(1);
+    expect(secondOpen).toHaveBeenCalledWith('tk_b');
+    expect(firstOpen).toHaveBeenCalledTimes(1);
+
+    const second = dragData();
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_c'), { dataTransfer: second });
+    fireEvent.drop(screen.getByTestId('board-column-doing'), { dataTransfer: second });
+    await waitFor(() => expect(secondMoved).toHaveBeenCalledTimes(1));
+    expect(firstMoved).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Case 25.209 — the capability a slot's `MoveArrows` receives is REBUILT by the board (so it can stay still while the page's
+ * `moves` object changes), and the two OPTIONAL fields it carries must still reach the card after a page re-render: the
+ * `cache` the instant pre-check reads, and the `uploadEvidence` the Move dialog's file input calls. Both go through a
+ * memo-skipped slot; each half has its own control (the same flow without the field shows the absence on screen).
+ */
+describe('25.209 the rebuilt move capability still carries cache and uploadEvidence to a memo-skipped card', () => {
+  const GATED: WorkflowDef = {
+    ...WF_ERRAND,
+    transitions: WF_ERRAND.transitions.map((transition) =>
+      transition.from === 'todo' && transition.to === 'doing' ? { ...transition, rules: [{ kind: 'require-evidence' }] } : transition,
+    ),
+  };
+
+  function cacheOf(ids: string[]) {
+    const cache = createClientStateCache();
+    for (const id of ids) {
+      cache.upsertTicket(
+        ticketStateSeed({
+          id,
+          stateId: 'todo',
+          stateCategory: 'open',
+          transitions: [{ toStateId: 'todo', actorId: 'user_anselma', seq: 3, workflowId: 'wf-errand', workflowVersion: 1 }],
+        }),
+      );
+    }
+    cache.upsertWorkflowDef(GATED);
+    return cache;
+  }
+
+  /** Render, re-render the page with a FRESH `moves` object, then open the Move dialog on `tk_b` (a skipped slot). */
+  async function moveDialogOnSkippedSlot(extra: () => Partial<BoardMoveCapability>) {
+    const board = threeCardBoard();
+    const source = createFakeDataSource({ getWorkflowDef: async () => GATED });
+    const pageOf = () => (
+      <Board
+        board={board}
+        onOpenTicket={() => {}}
+        moves={{ dataSource: source, workspaceId: WS, currentUserId: 'user_kiro', onMoved: () => {}, ...extra() }}
+      />
+    );
+    const view = render(pageOf());
+    await waitFor(() => expect(document.querySelectorAll('[draggable="true"]').length).toBe(3));
+    view.rerender(pageOf());
+    await act(async () => {});
+    fireEvent.click(within(screen.getByTestId('ticket-card-tk_b')).getByRole('button', { name: 'Move to Doing' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
+    return { dialog, view };
+  }
+
+  it('25.209 (i) the instant pre-check evaluates against the cache; without one it says nothing', async () => {
+    const cache = cacheOf(['tk_a', 'tk_b', 'tk_c']);
+    const withCache = await moveDialogOnSkippedSlot(() => ({ cache }));
+    // THE PROPERTY — the engine ran against the cache and named the rule the candidate (no evidence) breaks.
+    expect(await within(withCache.dialog).findByText(/instant check: require-evidence/)).toBeInTheDocument();
+    withCache.view.unmount();
+
+    // CONTROL — the same flow with no cache answers `not-evaluated`, which draws nothing.
+    const without = await moveDialogOnSkippedSlot(() => ({}));
+    await act(async () => {});
+    expect(within(without.dialog).queryByText(/instant check/)).toBeNull();
+  });
+
+  it('25.209 (ii) a file attached in a card\'s Move dialog is uploaded for THAT card, through the newest uploader', async () => {
+    const file = new File(['receipt'], 'receipt.png', { type: 'image/png' });
+    const staleUpload = vi.fn(async () => ({ attachmentId: 'att_stale' }));
+    const upload = vi.fn(async () => ({ attachmentId: 'att_1' }));
+    let current = staleUpload;
+    const first = await moveDialogOnSkippedSlot(() => ({ uploadEvidence: current }));
+    first.view.unmount();
+    current = upload;
+    const { dialog } = await moveDialogOnSkippedSlot(() => ({ uploadEvidence: current }));
+    fireEvent.change(within(dialog).getByLabelText(/Evidence/), { target: { files: [file] } });
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+    expect(upload).toHaveBeenCalledWith(file, 'tk_b');
+    expect(staleUpload).not.toHaveBeenCalled();
+    cleanup();
+
+    // CONTROL — a capability with no uploader says so, and offers no file input.
+    const bare = await moveDialogOnSkippedSlot(() => ({}));
+    expect(within(bare.dialog).getByText(/Evidence upload is not available/)).toBeInTheDocument();
+    expect(within(bare.dialog).queryByLabelText(/Evidence/)).toBeNull();
   });
 });
