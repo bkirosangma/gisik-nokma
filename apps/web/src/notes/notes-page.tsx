@@ -207,7 +207,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   }, [dataSource, workspaces]);
 
   return (
-    <main id="gn-main" className="gn-shell gn-shell--wide">
+    <main id="gn-main" className="gn-shell gn-shell--wide gn-notes-page">
       <AppNav />
       <div className="gn-notes" data-testid="notes-page">
         <div className="gn-notes__header">

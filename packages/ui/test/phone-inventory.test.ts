@@ -41,9 +41,9 @@ describe('21.003 phone tokens', () => {
       expect(firstBlock, declaration).toContain(declaration);
       expect(stylesheet.split(declaration).length - 1, `${declaration} declared once`).toBe(1);
     }
-    // CONTROL — no rule inside a 40rem arm of either sheet spells the bar height as a literal.
+    // CONTROL — no rule inside a 40rem or 64rem (the bar's own arm since UX fixes Task 4) arm of either sheet spells the bar height as a literal.
     for (const css of [readUiCss(), readGlobalsCss()]) {
-      const phone = parseRules(css).filter((rule) => rule.atRule === '@media (max-width: 40rem)');
+      const phone = parseRules(css).filter((rule) => rule.atRule === '@media (max-width: 40rem)' || rule.atRule === '@media (max-width: 64rem)');
       for (const rule of phone) expect(rule.body, rule.selectors.join(', ')).not.toMatch(/(?:^|[;\s])height:\s*3\.5rem/);
     }
   });

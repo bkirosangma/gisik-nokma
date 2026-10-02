@@ -430,7 +430,7 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
       ['.workflow-builder-screen__header', 'flex-direction: column'],
       ['.workflow-builder-screen__title-row', 'justify-content: space-between'],
       ['.workflow-builder-screen__actions', 'flex-wrap: wrap'],
-      ['.workflow-builder-screen__name', 'font-size: 2.125rem'],
+      ['.workflow-builder-screen__name', 'font-size: var(--gn-title-page)'], // 34px (AMENDED 2026-10-02, UX fixes Task 5, case 23.070)
       ['.workflow-builder-screen__name:focus-visible', 'var(--gn-focus-ring)'],
       ['.workflow-builder-screen__name:disabled', 'var(--gn-surface-sunken)'],
       [
@@ -715,7 +715,7 @@ describe('13.770 the workflow name is the title and stays a control', () => {
     expect(pageTitle.length).toBeGreaterThan(0);
     expect(nameField.length).toBeGreaterThan(0);
     for (const declaration of [
-      'font-size: 2.125rem',
+      'font-size: var(--gn-title-page)', // AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): both rules read the page-title token
       'line-height: 2.5625rem',
       'font-weight: 700',
       'letter-spacing: -0.0118em',

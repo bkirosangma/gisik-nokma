@@ -12,7 +12,7 @@ import { NotesPage } from '../../src/notes/notes-page.js';
  */
 export default function NotesRoute() {
   return (
-    <Suspense fallback={<main className="gn-shell gn-shell--wide" />}>
+    <Suspense fallback={<main className="gn-shell gn-shell--wide gn-notes-page" />}>
       <NotesPage />
     </Suspense>
   );

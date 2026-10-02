@@ -1148,6 +1148,35 @@ export function spaceVariableName(step: SpaceStep): string {
 }
 
 /**
+ * The prose measure (UX fixes Task 3, case 23.043, audit SYS-16): the longest
+ * line a reading column or a helper sentence runs to. Like spacing it varies
+ * with neither style nor theme, so it is emitted ONCE under the bare `:root`
+ * and every prose container reads `max-width: var(--gn-measure)` — tables, the
+ * board and the other work surfaces never do.
+ */
+export const measure = '70ch';
+export const MEASURE_VARIABLE = '--gn-measure';
+
+/**
+ * The title scale (UX fixes Task 5, cases 23.070 and 23.072, audit SYS-02, WF-05, WF-06, SET-10,
+ * SET-17, NP-15): three steps, each with a phone step, so every page title is one of a few sizes and
+ * not a size somebody typed. `page` is a route's title (34px, 22px on a phone — the sizes the six
+ * page-title rules already spelled), `section` heads a block inside a page (20px, 18px) and is always
+ * larger than the item titles beneath it (the card and row titles are 17px), and `group` is the step
+ * between that and the item (17px, 16px). Like spacing it varies with neither style nor theme, so it
+ * is emitted ONCE under the bare `:root` and the rules read `font-size: var(--gn-title-…)`.
+ */
+export const titleScale = {
+  page: { size: '2.125rem', phone: '1.375rem' },
+  section: { size: '1.25rem', phone: '1.125rem' },
+  group: { size: '1.0625rem', phone: '1rem' },
+} as const;
+export type TitleStep = keyof typeof titleScale;
+export function titleVariableName(step: TitleStep, phone = false): string {
+  return phone ? `--gn-title-${step}-phone` : `--gn-title-${step}`;
+}
+
+/**
  * The phone shell's two heights (mobile-web plan Task 1, case 21.003): the
  * bottom bar and the slim top bar at ≤40rem. Like spacing and motion they vary
  * with neither style nor theme, so they are emitted ONCE under the bare `:root`
@@ -1939,6 +1968,8 @@ export function themeStylesheet(): string {
       Object.keys(spacing) as unknown as SpaceStep[]
     )
       .map((step) => `${spaceVariableName(step)}: ${spacing[step]};`)
+      .join(' ')} ${MEASURE_VARIABLE}: ${measure}; ${(Object.keys(titleScale) as TitleStep[])
+      .map((step) => `${titleVariableName(step)}: ${titleScale[step].size}; ${titleVariableName(step, true)}: ${titleScale[step].phone};`)
       .join(' ')} ${(Object.keys(motion) as MotionKey[])
       .map((key) => `${motionVariableName(key)}: ${motion[key]};`)
       .join(' ')} ${(Object.keys(phone) as PhoneKey[])

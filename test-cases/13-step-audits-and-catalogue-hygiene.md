@@ -88,7 +88,7 @@ run's own summary line before it will report anything, which is the same rule th
   target asserts `app/help/page.tsx` exists on disk — "the route exists" was the audit's own reason for
   calling this a bounded addition rather than a wire gap, and if that page is ever removed this reddens
   here rather than shipping a link into a 404. (`apps/web/app/not-found.tsx`)
-- ✅ **13.688 — both headings take the export's 34/41/700/-0.4px at 72ch, and the 404 is a centred
+- ✅ **13.688 — both headings take the export's 34/41/700/-0.4px at 72ch, and the 404 is a centred AMENDED 2026-10-02 (UX fixes Task 5, case 23.070): the 34px and the phone 1.35rem are now `var(--gn-title-page)` and `var(--gn-title-page-phone)` (34px / 22px; the phone size moved from 21.6px to 22px).
   520px column.** Read from the CSS SOURCE, because that is where those numbers live and jsdom resolves
   neither an external stylesheet nor `ch` — a computed-style assertion here would measure nothing and
   pass. The positive control is the RETIRED value: `1.6rem` must be absent from the rule, or the

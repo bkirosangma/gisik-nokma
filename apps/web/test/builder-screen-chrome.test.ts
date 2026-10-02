@@ -38,7 +38,7 @@ describe('10.164 the chrome around the builder screen is published as tokens and
     expect(token('--app-nav-offset')).toBe('4.35rem');
 
     // The rules that DRAW the chrome read the tokens (no second literal), so changing one moves the screen with it.
-    expect(rule('.gn-shell')).toMatch(/padding:\s*0 1\.25rem var\(--gn-shell-pad-bottom\);/);
+    expect(rule('.gn-shell')).toMatch(/padding:\s*0 var\(--gn-space-3\) var\(--gn-shell-pad-bottom\);/);
     const crumb = rule('.gn-builder-crumb');
     expect(crumb).toMatch(/margin:\s*var\(--gn-builder-crumb-gap\) 0 0;/);
     expect(crumb).toMatch(/line-height:\s*var\(--gn-builder-crumb-line\);/);
@@ -46,6 +46,6 @@ describe('10.164 the chrome around the builder screen is published as tokens and
 
   it('10.164 the narrow shell keeps its own 2rem padding — the screen is only bounded above 64.0625rem, where the token applies', () => {
     const narrow = /@media \(max-width: 60rem\)\s*\{\s*\.gn-shell\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? '';
-    expect(narrow).toMatch(/padding:\s*0 0\.75rem 2rem;/);
+    expect(narrow).toMatch(/padding:\s*0 var\(--gn-space-3\) 2rem;/);
   });
 });

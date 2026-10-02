@@ -84,6 +84,25 @@ describe('WorkflowHistoryScreen', () => {
    * screen that rendered only version numbers, or the latest definition twice,
    * satisfies every count in the case above and fails here.
    */
+  /**
+   * 23.071 — the screen's heading is the page's ONE level-1 heading (UX fixes Task 5, audit WF-07):
+   * the history route renders no other, so an `h2` left the page with none.
+   */
+  it('23.071 "Version history" is a level-1 heading and the only one; no level-2 heading carries that name', async () => {
+    render(
+      <WorkflowHistoryScreen
+        workspaceId={newUlid()}
+        workflowId={WORKFLOW_ID}
+        gateway={createFakeGateway({ workflows: [v1, v2] })}
+      />,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Version history' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    // CONTROL: the screen did render its versions (the heading is not the only thing there).
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Version history' })).toBeNull();
+  });
+
   it('13.940 renders a superseded version with its own content, not a version number', async () => {
     render(
       <WorkflowHistoryScreen
