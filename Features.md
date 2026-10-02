@@ -3697,6 +3697,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 <!-- smoothness bullets: append below, one per task, in task order, each when its task lands -->
 
+- ⚙️ **One workspaces read, the last user id, a quiet badge** (smoothness T4; audit SM-02, SM-05, SM-15; cases 25.041-25.044, 25.046, 25.047; `apps/web/src/use-my-workspaces.ts`, `last-user-id.ts`, `use-workspace-name.ts`, `use-workspace-projects.ts`, `use-project-name.ts`, `providers.tsx`, `inbox-nav-link.tsx`) — the nav's workspace name and dropdown, the project list and the project title share ONE `getMyWorkspaces` read per person (keyed by user id and data source, re-read on a project write and at the next mount after 30 s, refusals not kept); `resolveSession` stores `gn-last-user-id` so a screen can read its remembered tab in the first frame; the inbox badge stops polling a hidden tab. Refetch on focus and reconnect (25.045) waits for T3's cache.
+
 ## 23. Comment edit and delete, Markdown bodies
 
 *Comments on tickets and notes can be edited by their author and deleted by their author or a workspace owner/admin; every body (note, description, comment) reads and writes as Markdown through one pure converter. Spec `docs/superpowers/specs/2026-10-02-mcp-everything-design.md`; plan `docs/superpowers/plans/2026-10-02-mcp-everything.md`. Mirrored by `test-cases/26-comments-and-markdown.md`. (§21 is neo and §22 is smoothness, on other release branches.)*

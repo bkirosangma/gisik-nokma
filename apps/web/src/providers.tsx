@@ -30,6 +30,7 @@ import {
   type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
+import { rememberLastUserId } from './last-user-id.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
 import { signInWithNext, withSignInOnExpiredWrite } from './expired-session.js';
@@ -298,6 +299,8 @@ type Resolved =
 function resolveSession(session: ReturnType<typeof authClient.useSession>): Resolved {
   const user = session.data?.user;
   if (user !== undefined && user !== null) {
+    // The id outlives the page so a screen can read ITS remembered tab in the first frame (spec D9).
+    if (lastKnownUser?.id !== user.id && typeof window !== 'undefined') rememberLastUserId(user.id);
     lastKnownUser = {
       id: user.id,
       name: user.name,
@@ -312,6 +315,7 @@ function resolveSession(session: ReturnType<typeof authClient.useSession>): Reso
   }
   if (session.isPending) return { kind: 'loading' };
   lastKnownUser = null;
+  if (typeof window !== 'undefined') rememberLastUserId(null);
   return { kind: 'signed-out' };
 }
 

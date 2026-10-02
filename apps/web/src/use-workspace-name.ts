@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
-import { useAppServices, useSessionStatus } from './providers.js';
+import { useSessionStatus } from './providers.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 
 /**
  * The current workspace's own SERVED name (Round 19b, owner feedback item 2).
@@ -62,56 +63,30 @@ export function clearWorkspaceNameCache(): void {
  * neither sorted nor re-derived. `[]` is what the caller renders no dropdown for, so a pending read, a refused one and a
  * viewer with a single workspace all give the same answer: the name stays a plain link.
  *
- * It rides this hook rather than making a second request because the name's `.then` already holds the rows: one bar
- * mount sends ONE request, which case 23.254 counts. `others` is not cached across mounts, unlike the name: the only
- * cost of a cold start is the dropdown appearing a tick after the name, whereas a cached list could offer a workspace
- * the viewer has since left. The name's own semantics are exactly the ones documented above.
+ * It rides the shared read (`use-my-workspaces.ts`) rather than making a second request: one page sends ONE `getMyWorkspaces`, which case 23.254 counts and case 25.041 pins across every consumer. `others` follows the shared rows, so a remount paints it at once and a stale list is refreshed by the shared read's own rules (a project write, or the next mount after 30 s); a cold start still shows the name a tick before the dropdown, and a refused read gives `[]`. The name's own semantics are exactly the ones documented above.
  */
 export function useWorkspaceLookup(workspaceId: string | undefined): {
   name: string | null;
   others: readonly WorkspaceRef[];
 } {
-  const { dataSource } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
-  const [name, setName] = useState<string | null>(
-    // The remount's head start; `useState`'s initialiser runs once per mount.
-    () => (workspaceId === undefined ? null : (nameCache.get(workspaceId) ?? null)),
-  );
-  const [others, setOthers] = useState<readonly WorkspaceRef[]>([]);
+  const { rows, error } = useMyWorkspaces(workspaceId !== undefined);
 
+  // The read SUCCEEDED and the workspace is not in it: you were removed, or it is gone. EVICTING rather than
+  // merely not writing is the load-bearing half: a stale entry left behind would be re-read by the next
+  // remount and the name would come back, one navigation after the product learned it was wrong.
+  const found = workspaceId === undefined || rows === null ? null : (rows.find((row) => row.id === workspaceId)?.name ?? null);
   useEffect(() => {
-    if (workspaceId === undefined || !signedIn) {
-      setName(null);
-      setOthers([]);
-      return;
-    }
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        const found = rows.find((row) => row.id === workspaceId)?.name ?? null;
-        // A `null` here means the read SUCCEEDED and the workspace is not in
-        // it — you were removed, or it is gone. EVICTING rather than merely not
-        // writing is the load-bearing half: a stale entry left behind would be
-        // re-read by `useState` on the next remount and the name would come
-        // back, one navigation after the product learned it was wrong.
-        if (found === null) nameCache.delete(workspaceId);
-        else nameCache.set(workspaceId, found);
-        setName(found);
-        setOthers(rows.filter((row) => !row.archived && row.id !== workspaceId));
-      },
-      () => {
-        if (cancelled) return;
-        setName(null);
-        setOthers([]);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, workspaceId, signedIn]);
+    if (workspaceId === undefined || rows === null) return;
+    if (found === null) nameCache.delete(workspaceId);
+    else nameCache.set(workspaceId, found);
+  }, [workspaceId, rows, found]);
 
+  if (workspaceId === undefined || !signedIn || error !== null) return { name: null, others: [] };
+  // The remount's head start while the shared read is still pending; a settled read always wins.
+  const name = rows === null ? (nameCache.get(workspaceId) ?? null) : found;
+  const others = rows === null ? [] : rows.filter((row) => !row.archived && row.id !== workspaceId);
   return { name, others };
 }
 
