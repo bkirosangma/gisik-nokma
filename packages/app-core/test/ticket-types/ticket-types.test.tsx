@@ -839,7 +839,7 @@ describe('TicketTypeEditorScreen — creating a custom type', () => {
     renderEditor(null);
     const list = await screen.findByTestId('rank-implications-list');
     expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'Two pickers will re-order: the board’s New ticket menu and MCP’s create_ticket.',
+      'Two pickers will re-order: the board’s Create ticket menu and MCP’s create_ticket.',
       'Can sit under: Epic, Story · or at the project root.',
       'Published workflows are versioned — nothing already recorded is rewritten.',
     ]);

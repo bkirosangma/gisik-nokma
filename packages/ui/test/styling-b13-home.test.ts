@@ -66,10 +66,11 @@ describe('20.322 no door card transforms or filters', () => {
   });
 });
 describe('20.323 raised panels on the home', () => {
-  it('20.323 section cards and the founding panel on lift; the project card stays positioned', () => {
+  it('20.323 section cards on lift; the project card stays positioned (the founding panel it once also named is gone, Task 8)', () => {
     // CONTROL — `.gn-project-card` keeps `position: relative` (its door's `::after` hit area depends on it).
     expectRow({ sheet: 'globals', selectors: '.gn-project-card', declarations: { position: 'relative' } });
     expectRow({ sheet: 'globals', selectors: '.gn-workspace-home__link', pattern: 'P-RAISED' });
-    expectRow({ sheet: 'globals', selectors: '.gn-project-founding', pattern: 'P-RAISED' });
+    // The home's raised founding panel (`.gn-project-founding`) was deleted with its row (prefixes/groups Task 8, 22.152).
+    expect(cssOf('globals')).not.toMatch(/\.gn-project-founding/);
   });
 });

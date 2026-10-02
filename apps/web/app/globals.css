@@ -276,8 +276,7 @@ input, textarea, select { font-family: inherit; }
 /* The prototype caps this screen at 1180px (`desktop.dc.html:178`), not at
    `.gn-shell`'s 80rem. The cap is PER-SCREEN in the prototype — the
    workspace home uses 1100px — so it lives here rather than widening or
-   narrowing every route that shares the shell. `.gn-workspace-founding`
-   existing apart from `.gn-project-founding` is the same precedent.
+   narrowing every route that shares the shell.
 
    `.gn-workspaces` keeps ONLY what `.gn-shell` does not already provide, and
    that is deliberate rather than an oversight: `.gn-shell` is not a spare
@@ -314,10 +313,21 @@ input, textarea, select { font-family: inherit; }
   margin: 0;
 }
 
+/* A two-column grid since prefixes/groups Task 8: the title and summary stack in the
+   first column, and the one primary — Create workspace — takes the second, vertically
+   centred against them. At phone width it drops under them (the grid collapses to one
+   column), full width. */
 .gn-workspaces__head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1rem;
+  row-gap: 0.25rem;
+  align-items: center;
+}
+.gn-workspaces__head > .gn-button { grid-column: 2; grid-row: 1 / span 2; }
+@media (max-width: 40rem) {
+  .gn-workspaces__head { grid-template-columns: minmax(0, 1fr); }
+  .gn-workspaces__head > .gn-button { grid-column: 1; grid-row: auto; margin-top: 0.5rem; }
 }
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
@@ -1110,7 +1120,7 @@ input, textarea, select { font-family: inherit; }
    (`repeat(auto-fit, minmax(240px, 1fr))`) — the same responsive pattern
    `.gn-workspace-home__projects` uses, so a phone gets one column and a wide
    screen gets five without a breakpoint. Round 20 moved this grid BELOW the
-   projects and the founding form, where the reference puts it; only its
+   projects, where the reference puts it; only its
    margins changed with the move — the grid, the notes and every href did not,
    and 13.387 is scoped by the nav's accessible name rather than by position. */
 /* Round 19b: the header row — the 56px monogram and the title+meta column.
@@ -1197,6 +1207,9 @@ input, textarea, select { font-family: inherit; }
    steps up to the reference's 22px/28px now that it is a section heading on
    the page rather than a caption inside a card. */
 .gn-workspace-home__projects-heading { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin: 1.4rem 0 0.75rem; }
+/* Task 8 (22.152): the archived toggle and the admin-only Create project button share the
+   heading row's trailing side; `wrap` lets them drop under the heading on a phone. */
+.gn-workspace-home__projects-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
 .gn-workspace-home__heading { margin: 0; font-size: 1.375rem; line-height: 1.75rem; font-weight: 600; }
 /* Round 21 (owner: "3 columns like for workspaces"): a FIXED three-track grid
    with `.gn-workspace-list`'s own two breakpoints, replacing Round 20's
@@ -1362,7 +1375,7 @@ input, textarea, select { font-family: inherit; }
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
-/* The non-admin refusal note where the founding form would be (Round 19b,
+/* The non-admin refusal note that stands where Create project is not offered (Round 19b,
    owner feedback item 4's last bullet) — `--gn-fill-quaternary`, the role the
    reference's own "fill4 box" describes, already used elsewhere in this
    package (`packages/ui/src/ui.css`), so no new token pair needs measuring. */
@@ -1482,67 +1495,22 @@ input, textarea, select { font-family: inherit; }
   .gn-settings__content { flex: 1 1 auto; }
 }
 
-/* ── Two founding-form class families (Round 19b, owner feedback item 3). ───
-   Until now both forms shared `.gn-founding`, a raised card. The owner's
-   reference draws them differently and item 3's own words — "shouldn't be
-   that big" — were said of the `/workspaces` one specifically, so a shared
-   class could not answer both at once without either shrinking the home's
-   form or leaving the workspace list's oversized. */
-
-/* `.gn-workspace-founding` — the `/workspaces` "New workspace" block. A bare
-   column beside the list, NOT a raised card: no `.gn-card` ancestor, no
-   surface fill, no shadow, and a `max-width` (420px, the reference's own)
-   that is the whole reason this exists as a separate rule rather than a
-   modifier on the card-shaped one below. */
+/* ── The Create workspace dialog's form (prefixes/groups Task 8, case 22.151). ───
+   Until Task 8 two founding forms sat open on their pages: `.gn-workspace-founding`
+   under the `/workspaces` list (Round 19b, owner feedback item 3) and the home's
+   raised-card inline "New project" row. Both are dialogs behind a primary button
+   now, so the card, its inline row, its heading and its phone rules are deleted:
+   nothing renders them. What is left is the one form column that fills the dialog
+   (the dialog is its own surface, so no card and no width cap here). */
 .gn-workspace-founding {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  margin-top: 2.125rem;
-  max-width: 26.25rem;
 }
-.gn-workspace-founding__heading {
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.5625rem;
-  font-weight: 600;
-}
-.gn-workspace-founding__submit { align-self: flex-start; }
-/* Phone (mobile-web plan Task 7, case 21.090): the 420px cap goes, so the block is the screen's
-   width, and the submit takes the line — a full-width target, not a pill stranded at the start.
-   AFTER the two base rules above: at equal specificity the later rule decides. */
-@media (max-width: 40rem) {
-  .gn-workspace-founding { max-width: none; }
-  .gn-workspace-founding__submit { align-self: stretch; }
-}
-
-/* `.gn-project-founding` — the workspace home's "New project" row. A raised
-   card (Task 15's reasoning for `.gn-card`'s own roles applies unchanged:
-   `--gn-radius-card`/`--gn-shadow-raised`, so it reads as a raised surface
-   under `neo` exactly like the cards beside it) with an INLINE field+button
-   row rather than a stacked column — the reference's layout, and the reason
-   this is not simply `.gn-workspace-founding` reused: that one is deliberately
-   NOT a card, and this one deliberately is. */
-.gn-project-founding {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-end;
-  margin-top: 1.1rem;
-  padding: 1rem;
-  background: var(--gn-surface-raised);
-  border-radius: var(--gn-radius-card);
-  /* Styling refresh Plan B (Task B13): P-RAISED — the lit-edge `lift` shadow. */
-  box-shadow: var(--gn-shadow-lift);
-}
-.gn-project-founding__field { flex: 1; min-width: 13.75rem; }
-/* Phone (case 21.091): the New project row stacks — the field over the button, both the card's
-   width. Without this the field wraps at its 13.75rem floor and the button sits under it at
-   content width, a second, smaller target. The floor goes so a narrow phone never forces overflow. */
-@media (max-width: 40rem) {
-  .gn-project-founding { flex-direction: column; align-items: stretch; }
-  .gn-project-founding__field { min-width: 0; }
-}
+.gn-workspace-founding__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.25rem; }
+/* The Create project dialog's own form — the same column, plus a Cancel/Create row. */
+.gn-project-create { display: flex; flex-direction: column; gap: 0.75rem; }
+.gn-project-create__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.25rem; }
 
 /* Task 8 (workspaces-prototype-port, 2026-09-15) — the invitations banner
    becomes a flat warning wash, not a card you could open. The prototype
@@ -3585,8 +3553,8 @@ input, textarea, select { font-family: inherit; }
    gains none — no empty span, per the render's own comment. */
 .gn-mcp-tokens__name { font-weight: 600; }
 /* The inline naming form, drawn in the row's action slot while one row is being
-   renamed. `flex-wrap` and `align-items: flex-end` are `.gn-project-founding`'s
-   own pair, for the same reason: the input and its buttons are a single row at
+   renamed. `flex-wrap` and `align-items: flex-end` are the pair the home's old
+   project row used, for the same reason: the input and its buttons are a single row at
    wide widths and must not overlap when the row is narrow. */
 .gn-mcp-tokens__naming { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
 .gn-mcp-tokens__naming .gn-field { min-width: 12rem; }
@@ -5228,7 +5196,7 @@ input, textarea, select { font-family: inherit; }
 /* ══ trash-4-ui: end ══ */
 
 /* ══ access-and-invites: begin ══
-   Access plan Tasks 7–8 (2026-09-29). The outsider finder inside the New ticket
+   Access plan Tasks 7–8 (2026-09-29). The outsider finder inside the Create ticket
    dialog and the ticket sheet, and the invite form's two status lines. Tokens
    only (no raw colours); every control 44px tall. */
 .gn-outsider-finder {

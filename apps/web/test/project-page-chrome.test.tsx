@@ -127,7 +127,7 @@ describe('the project page names itself from the same read AppNav already makes'
     // layer has flushed at least once — the two reads are independent, but
     // React settles them in the same pass here.
     await screen.findByText(
-      /This workspace.s ticket types, so New ticket is not offered could not be loaded/,
+      /This workspace.s ticket types, so Create ticket is not offered could not be loaded/,
     );
 
     expect(document.querySelector('.gn-project__breadcrumb')).toBeNull();
