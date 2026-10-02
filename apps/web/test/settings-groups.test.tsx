@@ -578,7 +578,7 @@ describe('22.215 the page reports what the server said', () => {
 });
 
 /** The tree held in state, so a committed `group.deleted` takes its row away the way the page's re-read does. */
-function Harness({ initial, result }: { initial: GroupRow[]; result?: GroupActionResult }) {
+function Harness({ initial, result, hold }: { initial: GroupRow[]; result?: GroupActionResult; hold?: Promise<void> }) {
   const [groups, setGroups] = useState(initial);
   return (
     <GroupsTree
@@ -586,6 +586,7 @@ function Harness({ initial, result }: { initial: GroupRow[]; result?: GroupActio
       canEdit
       groups={groups}
       onSubmit={async (action) => {
+        if (hold !== undefined) await hold; // the door has not answered yet
         if (result !== undefined && !result.ok) return result;
         if (action.type === 'group.deleted') setGroups((rows) => rows.filter((row) => row.id !== action.id));
         return OK;
@@ -622,6 +623,12 @@ describe('22.242 keyboard focus returns to the row after a rename', () => {
     await user.type(screen.getByRole('textbox', { name: 'Rename Beta' }), 'Bravo{Enter}');
     await screen.findByRole('alert');
     expect(screen.getByRole('textbox', { name: 'Rename Beta' })).toHaveFocus();
+    // …and the refusal leaves no stale focus want behind: opening ANOTHER group's rename afterwards keeps focus on
+    // ITS field and does not send it back to Beta's name button, which the abandoned want would name.
+    await user.click(nameButton('Alpha'));
+    const alpha = screen.getByRole('textbox', { name: 'Rename Alpha' });
+    expect(alpha).toHaveFocus();
+    expect(document.activeElement).not.toBe(nameButton('Beta'));
   });
 });
 
@@ -646,6 +653,22 @@ describe('22.243 keyboard focus after the delete dialog closes', () => {
     await user.click(within(await openDelete(user, 'Deep')).getByRole('button', { name: 'Delete group' }));
     await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Deep' })).toBeNull());
     expect(document.activeElement).toBe(nameButton('Gamma'));
+  });
+
+  it('22.243 focus waits until the deleted row is gone: while the door has not answered it is NOT on the neighbour, once the re-read takes the row it is', async () => {
+    const user = userEvent.setup();
+    let answer!: () => void;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    render(<Harness initial={GROUPS} hold={held} />);
+    await user.click(within(await openDelete(user, 'Beta')).getByRole('button', { name: 'Delete group' }));
+    // The ingest is held: Beta's row is still in the tree, and focus must not have jumped to Chi yet.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('treeitem', { name: 'Beta' })).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(nameButton('Chi'));
+    // CONTROL — the same run: once the door answers and the row is taken away, focus lands on Chi.
+    answer();
+    await waitFor(() => expect(screen.queryByRole('treeitem', { name: 'Beta' })).toBeNull());
+    expect(document.activeElement).toBe(nameButton('Chi'));
   });
 
   it('22.243 the last group of all has no neighbour, no parent and, once gone, no tree: focus goes to Add group', async () => {

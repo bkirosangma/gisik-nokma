@@ -1485,48 +1485,71 @@ function NewProjectForm({
     // while making that refusal unreachable — the Create workspace dialog on
     // `/workspaces` states the same choice about the same door.
     //
-    // The ULID is minted per SUBMISSION, inside the builder: a retry after a
-    // refusal is a new project, not a second attempt at an id the ledger may
-    // already hold.
+    // TWO CALLS, groups first (P-T13 fix 1, 22.246 / 22.247). The door is NOT atomic (`ingest-service.ts`
+    // `ingestAll` commits each event on its own and goes on after a refusal), so a `group.created` refused
+    // `group.name-taken` inside the founding batch would leave `project.created` and `member_added` committed
+    // with no group, and the retry would mint a SECOND project. So the new groups' `group.created` events go in
+    // their own call, before any project event exists: a refusal there founds nothing and the picker adopts the
+    // existing group (22.241). Only when they all commit is the founding batch sent, filed under the deepest id.
+    // With no new group wanted the first builder answers no seeds, and the page's `submit` treats an empty batch
+    // as done at once, so a project with no new group is still ONE call.
+    //
+    // The ULIDs are minted per SUBMISSION, inside the builders. The project's own id is minted in the founding
+    // builder only, which runs once the groups are settled, so no refusal of a group can have committed a project
+    // under an id the retry forgets. A refusal of the founding batch itself is still a new attempt with a new id.
+    const onGroupRefused = fieldRefusalHandler(setFieldRefusal, reread, ['group']);
     setFieldRefusal(null);
+    let filedUnder: string | null = group.groupId;
     onSubmit(
-      (actorId) => {
-        // The group's own events go FIRST, in the same batch (22.241): `groupSeeds` makes one `group.created` per
-        // new name and answers the id the project files under, or `null` when no group was chosen (22.240's
-        // control: then there is no `groupId` and `foundingSeeds` adds no `project.updated`).
+      () => {
+        if (group.pendingNames.length === 0) return [];
         const chosen = groupSeeds(workspaceId, groups ?? [], group, newUlid);
-        return [
-          ...chosen.seeds,
-          ...foundingSeeds(
-          workspaceId,
-          newUlid(),
-          name,
-          actorId,
-          // `''` is the input UNTOUCHED, and an optional field left untouched
-          // makes no claim — so it is passed as `undefined`, which
-          // `foundingSeeds` turns into an ABSENT key rather than an empty
-          // string. Anything else goes AS TYPED, exactly as the name does and
-          // for the same reason: a whitespace-only description reaches the
-          // domain schema and is refused there with its own sentence, rather
-          // than being silently repaired here into "no description" — which
-          // would make that refusal unreachable from the one form that can
-          // produce a description at all.
-          description === '' ? undefined : description,
-          // Same `''` rule one line up, for the same reason: an untouched
-          // optional box makes no claim, so it becomes an ABSENT key rather
-          // than an empty string — and a prefix left off is not "no key", it
-          // is a key whose half is derived from the name.
-          prefix === '' ? undefined : prefix,
-          chosen.groupId ?? undefined,
-        ),
-        ];
+        filedUnder = chosen.groupId;
+        return chosen.seeds;
       },
-      // The dialog closes on a COMMITTED answer only; the form unmounts with it, so
-      // there is nothing to clear by hand.
-      onDone,
+      () => {
+        // The new groups are committed (or none were wanted): hold them as EXISTING picks, so a founding refusal
+        // followed by a retry sends no second `group.created` (22.247), and re-read so the picker can draw them.
+        if (group.pendingNames.length > 0) {
+          setGroup({ groupId: filedUnder, pendingNames: [] });
+          reread();
+        }
+        onSubmit(
+          (actorId) =>
+            foundingSeeds(
+              workspaceId,
+              newUlid(),
+              name,
+              actorId,
+              // `''` is the input UNTOUCHED, and an optional field left untouched
+              // makes no claim — so it is passed as `undefined`, which
+              // `foundingSeeds` turns into an ABSENT key rather than an empty
+              // string. Anything else goes AS TYPED, exactly as the name does and
+              // for the same reason: a whitespace-only description reaches the
+              // domain schema and is refused there with its own sentence, rather
+              // than being silently repaired here into "no description" — which
+              // would make that refusal unreachable from the one form that can
+              // produce a description at all.
+              description === '' ? undefined : description,
+              // Same `''` rule one line up, for the same reason: an untouched
+              // optional box makes no claim, so it becomes an ABSENT key rather
+              // than an empty string — and a prefix left off is not "no key", it
+              // is a key whose half is derived from the name.
+              prefix === '' ? undefined : prefix,
+              // No group chosen: no `groupId`, so `foundingSeeds` adds no `project.updated` (22.240's control).
+              filedUnder ?? undefined,
+            ),
+          // The dialog closes on a COMMITTED answer only; the form unmounts with it, so
+          // there is nothing to clear by hand.
+          onDone,
+          // The founding batch's last event files the group, so a refusal of THAT is about the field (22.241); a
+          // `project.prefix-taken` is not (`owns` is `group` only) and stays the dialog's own alert line (22.156).
+          onGroupRefused,
+        );
+      },
       // A refusal about the group stays in the dialog under the picker; `group.name-taken` re-reads the groups
       // so the picker adopts the existing one (22.241, as 22.187 on the Edit form). Nothing is resubmitted.
-      fieldRefusalHandler(setFieldRefusal, reread, ['group']),
+      onGroupRefused,
     );
   };
 
