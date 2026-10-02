@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { openSeededBoard } from './helpers/board.js';
+import { SEEDED_PROJECT_NAME, openSeededBoard } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
@@ -111,10 +111,24 @@ async function wheelTo(page: Page, targetTop: number, step: number, record: Fram
   throw new Error(`the wheel never reached ${targetTop}`);
 }
 
+/** A project name longer than a phone line: the sheet's breadcrumb has to wrap it at p = 0, as it always did. */
+const LONG_PROJECT_NAME = 'Shop operations for the whole neighbourhood and every outlet we run across the district';
+
+async function useLongProjectName(page: Page): Promise<void> {
+  await page.route(`${ORIGIN}/v1/**`, async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    await route.fulfill({ response, body: body.split(SEEDED_PROJECT_NAME).join(LONG_PROJECT_NAME) });
+  });
+}
+
 test.describe('25.431 the phone header compacts without jitter', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test('a small-step wheel scroll down and back up: the content moves by exactly the scroll delta, no in-flow height changes, CLS 0', async ({ page }) => {
+  // The seed name, and (FIX 1) a project name that wraps at p = 0: the reserved space is the measured full height either way.
+  for (const long of [false, true]) {
+  test(`a small-step wheel scroll down and back up: the content moves by exactly the scroll delta, no in-flow height changes, CLS 0 (${long ? 'long' : 'seed'} project name)`, async ({ page }) => {
+    if (long) await useLongProjectName(page);
     await openSheet(page);
     await ensureScrollable(page);
     await page.mouse.move(195, 500);
@@ -173,6 +187,7 @@ test.describe('25.431 the phone header compacts without jitter', () => {
     const who = await page.evaluate(() => (window as unknown as { __clsWho: string[] }).__clsWho);
     expect(cls, `layout shifts: ${who.join(' | ')}`).toBe(0);
   });
+  }
 });
 
 test.describe('25.436 Move in the title overlay works by touch', () => {
@@ -223,6 +238,92 @@ test.describe('25.436 Move in the title overlay works by touch', () => {
     await page.touchscreen.tap(195, 700);
     await expect(peek).toBeHidden();
     await expect(move).toHaveAttribute('inert', '');
+  });
+});
+
+test.describe('25.437 a long project name at p = 0 lays out exactly as the un-compacted header', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('every crumb is shown whole and wrapped, each separator beside its crumb, no empty row; at p = 1 the line folds to a lone "…"', async ({ page }) => {
+    await useLongProjectName(page);
+    await openSheet(page);
+    await ensureScrollable(page);
+    const crumbs = async (): Promise<{ text: string; sep: boolean; top: number; bottom: number; scrollW: number; clientW: number; overflow: string; visible: string }[]> =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll<HTMLElement>('.gn-ticket-sheet__crumbs > *')).map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            text: el.textContent ?? '',
+            sep: el.classList.contains('gn-ticket-sheet__crumb-sep'),
+            top: r.top,
+            bottom: r.bottom,
+            scrollW: el.scrollWidth,
+            clientW: el.clientWidth,
+            overflow: getComputedStyle(el).textOverflow,
+            visible: el.innerText,
+          };
+        }),
+      );
+    await expect(page.getByTestId('sheet-crumb-project')).toContainText('for the whole neighbourhood');
+    const top = await crumbs();
+    expect(top.some((c) => c.text.includes('neighbourhood')), 'the long name is on the page').toBe(true);
+    for (const c of top) {
+      // Every crumb is shown whole: no horizontal overflow and no ellipsis clipping.
+      expect(c.scrollW, `"${c.text}" is cut off`).toBeLessThanOrEqual(c.clientW);
+      expect(c.overflow, `"${c.text}" is clipped with an ellipsis`).not.toBe('ellipsis');
+    }
+    // Each › shares a row with the crumb before it, unless that crumb filled its whole row (the flow puts the › on the next row then,
+    // exactly as the un-compacted header does); and no row is empty: consecutive rows are at most one flow gap apart.
+    const rows = [...new Set(top.map((c) => Math.round(c.top)))].sort((a, b) => a - b);
+    expect(rows.length).toBeGreaterThan(1);
+    for (let i = 1; i < top.length; i += 1) {
+      if (!top[i]!.sep) continue;
+      const before = top[i - 1]!;
+      expect(Math.abs(top[i]!.top - before.top) <= 2 || top[i]!.top >= before.bottom - 2, `"›" at ${top[i]!.top} against "${before.text}" at ${before.top}-${before.bottom}`).toBe(true);
+    }
+    const bands = [...top].sort((a, b) => a.top - b.top);
+    for (let i = 1; i < bands.length; i += 1) {
+      expect(bands[i]!.top - Math.max(...bands.slice(0, i).map((c) => c.bottom)), `an empty row above "${bands[i]!.text}"`).toBeLessThan(10);
+    }
+    // FIDELITY: the placed boxes are the natural flow's (the same drift check as 25.432, with the long name).
+    const drift = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>('.gn-sheet')!;
+      const header = panel.querySelector<HTMLElement>('.gn-sheet__header')!;
+      const boxes = (): number[][] =>
+        Array.from(header.querySelectorAll<HTMLElement>('.gn-ticket-sheet__crumbs > *, .gn-ticket-sheet__title-input, .gn-sheet__close, .gn-sheet__move')).map((el) => {
+          const r = el.getBoundingClientRect();
+          return [r.left, r.top, r.width, r.height];
+        });
+      const placed = boxes();
+      const mode = panel.getAttribute('data-compact') ?? 'full';
+      const els = Array.from(header.querySelectorAll<HTMLElement>('*'));
+      panel.removeAttribute('data-compact');
+      for (const el of els) {
+        el.style.transition = 'none';
+        el.style.transform = 'none';
+      }
+      const natural = boxes();
+      panel.setAttribute('data-compact', mode);
+      for (const el of els) el.style.removeProperty('transform');
+      void header.offsetWidth;
+      for (const el of els) el.style.removeProperty('transition');
+      return placed.map((box, i) => box.map((n, k) => Math.abs(n - (natural[i]?.[k] ?? Number.NaN))));
+    });
+    for (const box of drift) for (const d of box) expect(d, `p0 box drift with the long name ${JSON.stringify(drift)}`).toBeLessThanOrEqual(0.5);
+    if (REPORT_DIR !== '') {
+      mkdirSync(REPORT_DIR, { recursive: true });
+      await page.screenshot({ path: resolve(REPORT_DIR, 'sheet-header-long-p0.png') });
+    }
+
+    // CONTROL, same test: at p = 1 the line is folded (the "…" button exists) and the button reads exactly "…".
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('.gn-sheet__body')!.scrollTop = 500;
+    });
+    await settle(page);
+    const fold = page.getByRole('button', { name: 'Show the full breadcrumb' });
+    await expect(fold).toHaveCount(1);
+    expect(await fold.evaluate((el) => (el as HTMLElement).innerText)).toBe('…');
+    if (REPORT_DIR !== '') await page.screenshot({ path: resolve(REPORT_DIR, 'sheet-header-long-p1.png') });
   });
 });
 

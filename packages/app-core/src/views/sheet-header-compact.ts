@@ -276,6 +276,9 @@ export function useSheetHeaderCompact(
     parts.panel.style.setProperty('--p', px(p));
     if (p >= 0.999) parts.panel.setAttribute('data-settled', '');
     else parts.panel.removeAttribute('data-settled');
+    // At p = 0 the crumbs lay out as the un-compacted header does (wrapped, whole); compaction starts the moment p leaves 0.
+    if (p === 0) parts.panel.setAttribute('data-top', '');
+    else parts.panel.removeAttribute('data-top');
     const next = p >= 0.5 ? 'compact' : 'full';
     if (next !== modeRef.current) {
       modeRef.current = next;
@@ -404,6 +407,7 @@ export function useSheetHeaderCompact(
       if (parts !== null) {
         parts.panel.removeAttribute('data-compact');
         parts.panel.removeAttribute('data-settled');
+        parts.panel.removeAttribute('data-top');
         parts.panel.removeAttribute('data-peek');
       }
     },

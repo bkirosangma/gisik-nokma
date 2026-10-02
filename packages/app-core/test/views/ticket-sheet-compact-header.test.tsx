@@ -45,7 +45,10 @@ function stubGeometry(): void {
   Element.prototype.getBoundingClientRect = function rect(this: Element): DOMRect {
     let width = 0;
     if (this.classList.contains('gn-sheet__header')) width = 390;
-    else if (this.parentElement?.classList.contains('gn-ticket-sheet__crumbs')) width = (this.textContent ?? '').length * 7;
+    else if (this.parentElement?.classList.contains('gn-ticket-sheet__crumbs')) {
+      // A crumb part is 7px a character; the fold button (and an ancestor button) stands for 10px of padding a span does not have.
+      width = (this.textContent ?? '').length * 7 + (this.tagName === 'BUTTON' ? 10 : 0);
+    }
     return { x: 0, y: 0, left: 0, top: 0, right: width, bottom: 0, width, height: width > 0 ? 18 : 0, toJSON: () => ({}) } as DOMRect;
   };
 }
@@ -228,6 +231,29 @@ describe('the phone sheet', () => {
     const nav = screen.getByRole('navigation', { name: 'Ticket location' });
     expect(nav).toContainElement(screen.getByTestId('sheet-crumb-workspace'));
     expect(nav).toContainElement(screen.getByTestId('sheet-crumb-ticket'));
+
+    // F3 (G-8 FIX 1): the fold button renders the lone "…" glyph (CSS shows it, and hides the name, once the header has settled at p = 1);
+    // its accessible name stays "Show the full breadcrumb", and the glyph is not read out twice.
+    const dots = fold.querySelector('.gn-ticket-sheet__fold-dots');
+    expect(dots).toHaveTextContent('…');
+    expect(dots).toHaveAttribute('aria-hidden', 'true');
+    expect(fold.querySelector('.gn-ticket-sheet__fold-label')).toHaveTextContent('A project with a name long enough');
+
+    // G10 (mutant: the collapsed crumbs are never made inert): the folded-away crumbs (the parent and its separators) are out of the
+    // tab order at compact; the control: they are focusable again at full.
+    const collapsed = (): HTMLElement[] => Array.from(nav.querySelectorAll<HTMLElement>('[data-collapsed]'));
+    expect(collapsed().length).toBeGreaterThan(0);
+    for (const item of collapsed()) expect(item).toHaveAttribute('inert');
+    // The kept crumbs (workspace, the "…", the key) are NOT inert.
+    expect(fold).not.toHaveAttribute('inert');
+    expect(screen.getByTestId('sheet-crumb-ticket')).not.toHaveAttribute('inert');
+    // G15 (mutant: no re-measure when the mode flips): the project crumb became the fold button on the flip, and the measure ran AGAIN
+    // against it (the stub gives a button 10px a span lacks): its natural width is the new element's.
+    const name = 'A project with a name long enough that the whole line cannot fit on a phone at all';
+    expect(screen.getByTestId('sheet-crumb-project').style.getPropertyValue('--gw0')).toBe(String(name.length * 7 + 10 + 7));
+    await scrollTo(0);
+    expect(panel()).toHaveAttribute('data-compact', 'full');
+    for (const item of collapsed()) expect(item).not.toHaveAttribute('inert');
   });
 
   it('25.425 the breadcrumb overlay opens on "…" and collapses on an outside tap, Escape and any scroll, leaving scrollTop alone', async () => {
@@ -272,6 +298,20 @@ describe('the phone sheet', () => {
     fireEvent.pointerDown(overlay()!);
     expect(overlay()).not.toBeNull();
     open();
+    await waitFor(() => expect(overlay()).toBeNull());
+
+    // G12 (mutant: back at the top an open overlay stays open): the scroll-close does not cover a mode flip that has no scroll event (a
+    // re-measure after a title edit finds the scroller at the top). Open the overlay, put the scroller at 0 WITHOUT a scroll event,
+    // then edit the title (a re-measure): the mode flips to full and the overlay closes. Control: before the edit it was open.
+    open();
+    expect(overlay()).not.toBeNull();
+    Object.defineProperty(body(), 'scrollTop', { value: 0, configurable: true, writable: true });
+    expect(overlay()).not.toBeNull();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Ticket title'), { target: { value: 'File the GST return, now' } });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    });
+    expect(panel()).toHaveAttribute('data-compact', 'full');
     await waitFor(() => expect(overlay()).toBeNull());
   });
 

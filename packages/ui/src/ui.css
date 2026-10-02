@@ -1148,7 +1148,11 @@ a.gn-ticket-sheet__crumb--link {
     );
   }
   /* A part the compact line folds away keeps its natural wrapped look (it only fades and slides up), so the top of the sheet
-     reads exactly as it did before the header learned to compact. */
+     reads exactly as it did before the header learned to compact. The same holds for EVERY part while the sheet is at the top
+     (`data-top`, p = 0: "fully expanded if the sheet is scrolled back to the top"): a project name longer than the line wraps
+     there as it always did, instead of being cut off with an ellipsis; the one-line nowrap form starts with the first pixel of
+     scroll. The reserved space (`--gh-h0`) is the measured full height either way. */
+  .gn-sheet[data-compact][data-top] .gn-ticket-sheet__crumbs > *,
   .gn-sheet[data-compact] .gn-ticket-sheet__crumbs > [data-collapsed] {
     height: auto;
     overflow: visible;
@@ -1243,6 +1247,10 @@ a.gn-ticket-sheet__crumb--link {
     text-align: left;
     color: var(--gn-text-accent);
   }
+  .gn-ticket-sheet__fold-dots { display: none; }
+  /* F3 (G-8 FIX 1): at p = 1 the folded middle is exactly "…" (the pinned shape), not the name clipped to "S..". */
+  .gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-label { display: none; }
+  .gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-dots { display: inline; }
   button.gn-ticket-sheet__crumb--fold:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
   /* The two overlays: below the compact header, over the content, no layout and no scroll change. */
   .gn-sheet[data-compact] .gn-sheet__peek {

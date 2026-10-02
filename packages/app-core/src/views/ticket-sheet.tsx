@@ -2862,7 +2862,11 @@ export function TicketSheet({
         aria-expanded={fold.expanded}
         onClick={fold.onToggle}
       >
-        {label}
+        {/* The name narrows with the travel; once the header has settled (p = 1) CSS shows only the lone "…" (both stay in the DOM so a re-measure still reads the name's natural width). */}
+        <span className="gn-ticket-sheet__fold-label">{label}</span>
+        <span className="gn-ticket-sheet__fold-dots" aria-hidden="true">
+          …
+        </span>
       </button>
     ) : href === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>

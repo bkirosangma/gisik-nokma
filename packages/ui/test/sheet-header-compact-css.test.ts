@@ -80,6 +80,27 @@ describe('25.434 the header leaves the flow and every child moves by transform a
     expect(flat(valueOf(reduced, 'transition'))).toBe('none');
   });
 
+  it('25.434 at p = 0 (data-top) every crumb part wraps whole as the un-compacted header does; the folded middle shows only "…" once settled (G-8 FIX 1 F2, F3)', () => {
+    const top = ruleExactly(
+      css,
+      ['.gn-sheet[data-compact][data-top] .gn-ticket-sheet__crumbs > *', '.gn-sheet[data-compact] .gn-ticket-sheet__crumbs > [data-collapsed]'],
+      PHONE,
+    );
+    expect(flat(valueOf(top, 'height'))).toBe('auto');
+    expect(flat(valueOf(top, 'white-space'))).toBe('normal');
+    expect(flat(valueOf(top, 'text-overflow'))).toBe('clip');
+    expect(flat(valueOf(top, 'overflow'))).toBe('visible');
+    // CONTROL — the generic compact rule it overrides is the one-line nowrap form with an ellipsis, and it comes FIRST (the override wins on source order).
+    const generic = compact('.gn-ticket-sheet__crumbs > *');
+    expect(flat(valueOf(generic, 'white-space'))).toBe('nowrap');
+    expect(flat(valueOf(generic, 'text-overflow'))).toBe('ellipsis');
+    expect(css.indexOf('.gn-sheet[data-compact] .gn-ticket-sheet__crumbs > * {')).toBeLessThan(css.indexOf('[data-top] .gn-ticket-sheet__crumbs > *'));
+    // F3: the dots are hidden by default and swap with the name only when settled.
+    expect(flat(valueOf(ruleExactly(css, '.gn-ticket-sheet__fold-dots', PHONE), 'display'))).toBe('none');
+    expect(flat(valueOf(ruleExactly(css, '.gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-label', PHONE), 'display'))).toBe('none');
+    expect(flat(valueOf(ruleExactly(css, '.gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-dots', PHONE), 'display'))).toBe('inline');
+  });
+
   it('25.434 the ✕ keeps a 44px hit area while shrunk, and the overlays hang below the compact header without a layout of their own', () => {
     expect(flat(valueOf(compact('.gn-sheet__close::after'), 'inset'))).toBe('calc(var(--p, 0) * -13px)');
     const peek = compact('.gn-sheet__peek');
