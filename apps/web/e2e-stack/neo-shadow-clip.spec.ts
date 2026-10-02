@@ -253,6 +253,46 @@ async function applyNeo(page: Page, theme: Theme): Promise<void> {
   await page.waitForTimeout(350);
 }
 
+/**
+ * The cost of the reach padding: a scroller handed the same box back with a negative margin reaches over its neighbours, and a scroller
+ * paints (and takes the pointer) over an earlier non-positioned sibling. For every visible interactive element, probe four points just
+ * inside its edges; a point whose top hit is a NEGATIVE-MARGIN scroller that does not contain the element is a click it has lost.
+ */
+async function stolenClicks(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out = new Set<string>();
+    const negativeScroller = (start: Element | null): Element | null => {
+      for (let n = start; n !== null; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        const negative = [cs.marginTop, cs.marginRight, cs.marginBottom, cs.marginLeft].some((m) => parseFloat(m) < 0);
+        if (negative && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) return n;
+      }
+      return null;
+    };
+    for (const el of document.querySelectorAll('a, button, input, select, textarea, [role="tab"], [role="button"]')) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      const points: [number, number][] = [
+        [r.left + r.width / 2, r.top + 2],
+        [r.left + r.width / 2, r.bottom - 2],
+        [r.left + 2, r.top + r.height / 2],
+        [r.right - 2, r.top + r.height / 2],
+      ];
+      for (const [x, y] of points) {
+        if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) continue;
+        const hit = document.elementFromPoint(x, y);
+        if (hit === null || el.contains(hit) || hit.contains(el)) continue;
+        const scroller = negativeScroller(hit);
+        if (scroller !== null && !scroller.contains(el)) {
+          const classes = (e: Element): string => [...e.classList].slice(0, 2).map((c) => `.${c}`).join('');
+          out.add(`${el.tagName.toLowerCase()}${classes(el)} "${(el.textContent ?? '').trim().slice(0, 20)}" covered by ${scroller.tagName.toLowerCase()}${classes(scroller)}`);
+        }
+      }
+    }
+    return [...out];
+  });
+}
+
 /** Two fixtures planted into the live page: the detector must flag the flush one and clear the padded one. */
 async function plantControls(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -264,7 +304,10 @@ async function plantControls(page: Page): Promise<void> {
       `<div style="position:absolute;left:40px;top:40px;width:120px;height:80px;overflow:hidden">` +
       `<div id="neo-clip-flush" style="width:120px;height:80px;box-shadow:${shadow}"></div></div>` +
       `<div style="position:absolute;left:240px;top:40px;width:120px;height:80px;overflow:hidden;padding:14px">` +
-      `<div id="neo-clip-padded" style="width:92px;height:52px;box-shadow:${shadow}"></div></div>`;
+      `<div id="neo-clip-padded" style="width:92px;height:52px;box-shadow:${shadow}"></div></div>` +
+      // a button with a negative-margin scroller laid over its foot: the click the padding takes
+      `<button id="neo-clip-button" style="position:absolute;left:440px;top:40px;width:80px;height:40px">b</button>` +
+      `<div style="position:absolute;left:420px;top:70px;width:120px;height:60px;overflow:auto;margin:-20px;padding:20px"></div>`;
     document.body.append(host);
   });
 }
@@ -411,12 +454,14 @@ for (const viewport of VIEWPORTS) {
             planted.some((f) => f.id === 'neo-clip-padded'),
             'control: the padded twin (14px of room) is not reported',
           ).toBe(false);
+          expect((await stolenClicks(page)).some((l) => l.includes('covered by')), 'control: a button under a negative-margin scroller is reported as covered').toBe(true);
           await unplantControls(page);
           controlsChecked = true;
         }
         const { population, cuts } = await sweepScreen(page, theme);
         expect(population.length, `${screen.name}: no element with a box-shadow was found, so the sweep measured nothing`).toBeGreaterThan(0);
         const allowed = (f: Finding): boolean => ALLOW.some((a) => a.element.test(f.element) && a.clipper.test(f.clipper));
+        for (const line of await stolenClicks(page)) offenders.push(`${line} | ${screen.name} | ${viewport.key} | neo-${theme} | the reach padding takes the click`);
         const seen = new Set<string>();
         const real = cuts.filter((f) => !allowed(f)).filter((f) => {
           const key = `${f.element}|${f.clipper}|${f.text}|${sidesText(f.clipped)}`;
