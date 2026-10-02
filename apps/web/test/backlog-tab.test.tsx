@@ -937,3 +937,27 @@ describe('13.712 the unranked backlog tail — option B: rank first, then move',
     expect(screen.queryByText(/^Refused by the server/)).not.toBeInTheDocument();
   });
 });
+
+/** 23.144 — the rank controls say which order they change (audit PV-14; the grouped view does not show it). */
+describe('23.144 Move up / Move down name the order they change', () => {
+  it('23.144 each button carries a tooltip saying it moves the row in the whole backlog order, and its accessible name is unchanged', async () => {
+    const FIRST = backlogRow('br_1', 'First', 'g');
+    const SECOND = backlogRow('br_2', 'Second', 'n');
+    render(
+      <Providers services={servedWorld([FIRST, SECOND])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+    await screen.findByText('First');
+
+    const down = screen.getByRole('button', { name: 'Move First down' });
+    const up = screen.getByRole('button', { name: 'Move Second up' });
+    expect(down).toHaveAttribute('title', 'Move down in backlog order — the order of the whole backlog, not only this group');
+    expect(up).toHaveAttribute('title', 'Move up in backlog order — the order of the whole backlog, not only this group');
+
+    // CONTROL — the tooltip is the controls' own: Start sits in the same cell and says nothing about the order.
+    const start = screen.getAllByRole('button', { name: /^Start/ })[0];
+    expect(start?.getAttribute('title') ?? '').not.toContain('backlog order');
+  });
+});

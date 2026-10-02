@@ -39,6 +39,11 @@ export type TicketDatesInput = {
   state: TicketState;
   pendingFieldIds: readonly string[];
   customDateFields?: readonly CustomDateField[];
+  /**
+   * The ticket's key (`CCSO-4`), or `null`/absent when the ledger holds no prefix (an offline ticket). The calendar
+   * names a marker by it (UX fixes T8, 23.140): a marker that said only "needed by 28 Sep" never said WHICH ticket.
+   */
+  key?: string | null;
 };
 
 /**
