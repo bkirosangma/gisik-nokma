@@ -4,6 +4,7 @@ import {
   TIMELINE_EMPTY_COPY,
   TIMELINE_OUT_OF_WINDOW_COPY,
   TIMELINE_SIDE_LIST_COPY,
+  TIMELINE_SIDE_LIST_NO_DATES_COPY,
   TIMELINE_SIDE_LIST_UNDRAWABLE_COPY,
 } from '../../src/claims/claim-labels.js';
 import type { TicketDatesInput } from '../../src/claims/ticket-dates.js';
@@ -133,7 +134,9 @@ describe('11.52 bars require BOTH claims (planted defects — invariant 4)', () 
     expect(allRows(m)).toHaveLength(0);
     expect(m.sideList[0]!.reason).toBe('no-dates');
     expect(m.sideList[0]!.note).toBe(NO_DATES_NOTE);
-    expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_COPY);
+    // 23.143: a list of ONLY undated tickets says so, instead of asking for a start AND a due date they may not need.
+    expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_NO_DATES_COPY);
+    expect(m.sideListCopy).not.toBe(TIMELINE_SIDE_LIST_COPY);
   });
 
   it('start after due is shown as the contradiction it is — no bar, both claims named', () => {
@@ -177,8 +180,8 @@ describe('11.53 the side-list heading is true of every entry under it', () => {
    * THE fixture the plan has no version of: two DIFFERENT reasons in one list.
    * Every side-list case in the plan text holds a single reason, so none of
    * them can see a heading that is true of one entry and false of the next.
-   * "until it carries both a claimed start and a claimed needed-by" states a
-   * leaving condition the contradictory ticket already satisfies.
+   * "Add a start and a due date to place a ticket on the timeline" asks for
+   * something the contradictory ticket already has.
    */
   it('a contradiction in the list retires the plain heading — it carries both and is still here', () => {
     const m = model([
@@ -194,7 +197,7 @@ describe('11.53 the side-list heading is true of every entry under it', () => {
     expect(m.sideList.map((entry) => entry.reason)).toEqual(['no-dates', 'start-after-due']);
     expect(m.sideListCopy).toBe(TIMELINE_SIDE_LIST_UNDRAWABLE_COPY);
     // Named literally: the plain heading's claim is FALSE of the second entry.
-    expect(TIMELINE_SIDE_LIST_COPY).toContain('until it carries both');
+    expect(TIMELINE_SIDE_LIST_COPY).toContain('Add a start and a due date');
   });
 
   it('an empty side list keeps the plain heading', () => {
@@ -1156,5 +1159,20 @@ describe('13.1037 hideEpicRows also takes a HALF-dated epic out of the side list
     });
     expect(bare.sideList).toEqual([]);
     expect(bare.groups).toEqual([]);
+  });
+});
+
+describe('23.142 todayDay is an index into THIS window, and null outside it', () => {
+  it('23.142 todayDay is null for a today before the anchor or after the window end, and the right index inside (explicit anchor)', () => {
+    // The window is 17 Aug – 11 Oct (ANCHOR's Monday, eight weeks): day indices 0–55.
+    expect(model([], { today: '2026-08-19' }).todayDay).toBe(2);
+    // The edges are INSIDE: the first day and the last day.
+    expect(model([], { today: WINDOW_START }).todayDay).toBe(0);
+    expect(model([], { today: WINDOW_END }).todayDay).toBe(55);
+    // One day either side is outside — each bound is its own claim (`>= windowStart`, `<= windowEnd`).
+    expect(model([], { today: '2026-08-16' }).todayDay).toBeNull();
+    expect(model([], { today: '2026-10-12' }).todayDay).toBeNull();
+    // No `today` at all: no line.
+    expect(model([]).todayDay).toBeNull();
   });
 });

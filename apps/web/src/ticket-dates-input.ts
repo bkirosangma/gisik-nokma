@@ -93,7 +93,8 @@ export function toTicketDatesInput(
     fields: row.fields,
     transitions: [],
   };
-  return { state, pendingFieldIds: [], customDateFields };
+  // The row's key (`CCSO-4`, or null with no prefix): the calendar names a marker by it (UX fixes T8, 23.140).
+  return { state, pendingFieldIds: [], customDateFields, key: row.key };
 }
 
 /**
