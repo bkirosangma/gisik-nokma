@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ProjectPageSkeleton } from '../../../../../src/skeletons/page-shells.js';
 import {
@@ -612,6 +612,10 @@ function ProjectBoard() {
    * below.
    */
   const [filter, setFilter] = useState<FilterSpec>({});
+  // The narrowings the board and the List read are computed from this, so typing in the search box (which writes
+  // `filter` and must paint at once) never waits on re-filtering a large board: React renders the box first and the
+  // narrowing after, abandoning the second if another keystroke arrives (smoothness T12, audit SM-10; owner D12).
+  const deferredFilter = useDeferredValue(filter);
 
   /**
    * THE FILTERS SHEET (Task 5) — open/closed state, and the trigger's own
@@ -695,34 +699,34 @@ function ProjectBoard() {
    */
   const boardFilter: BoardFilterSpec = useMemo(
     () => ({
-      text: filter.text,
-      assigneeIds: filter.assigneeIds,
-      typeIds: filter.typeIds,
-      stateIds: filter.stateIds,
-      stateCategories: filter.stateCategories,
-      projectIds: filter.projectIds,
+      text: deferredFilter.text,
+      assigneeIds: deferredFilter.assigneeIds,
+      typeIds: deferredFilter.typeIds,
+      stateIds: deferredFilter.stateIds,
+      stateCategories: deferredFilter.stateCategories,
+      projectIds: deferredFilter.projectIds,
       // The exclude half, the same five — `collaboratorIds` deliberately dropped
       // (`BoardFilterSpec.exclude` cannot carry it; `describeUnappliedBoardAxes`
       // discloses it). Exclude-mode spec §1/§3.
       exclude:
-        filter.exclude === undefined
+        deferredFilter.exclude === undefined
           ? undefined
           : {
-              assigneeIds: filter.exclude.assigneeIds,
-              typeIds: filter.exclude.typeIds,
-              stateIds: filter.exclude.stateIds,
-              stateCategories: filter.exclude.stateCategories,
-              projectIds: filter.exclude.projectIds,
+              assigneeIds: deferredFilter.exclude.assigneeIds,
+              typeIds: deferredFilter.exclude.typeIds,
+              stateIds: deferredFilter.exclude.stateIds,
+              stateCategories: deferredFilter.exclude.stateCategories,
+              projectIds: deferredFilter.exclude.projectIds,
             },
     }),
     [
-      filter.text,
-      filter.assigneeIds,
-      filter.typeIds,
-      filter.stateIds,
-      filter.stateCategories,
-      filter.projectIds,
-      filter.exclude,
+      deferredFilter.text,
+      deferredFilter.assigneeIds,
+      deferredFilter.typeIds,
+      deferredFilter.stateIds,
+      deferredFilter.stateCategories,
+      deferredFilter.projectIds,
+      deferredFilter.exclude,
     ],
   );
 
@@ -821,32 +825,32 @@ function ProjectBoard() {
    */
   const listFilterSpec: ListFilterSpec = useMemo(
     () => ({
-      text: filter.text,
-      assigneeIds: filter.assigneeIds,
-      typeIds: filter.typeIds,
-      stateIds: filter.stateIds,
-      stateCategories: filter.stateCategories,
-      projectIds: filter.projectIds,
-      dueBefore: filter.dueBefore,
-      dueAfter: filter.dueAfter,
-      fields: filter.fields,
+      text: deferredFilter.text,
+      assigneeIds: deferredFilter.assigneeIds,
+      typeIds: deferredFilter.typeIds,
+      stateIds: deferredFilter.stateIds,
+      stateCategories: deferredFilter.stateCategories,
+      projectIds: deferredFilter.projectIds,
+      dueBefore: deferredFilter.dueBefore,
+      dueAfter: deferredFilter.dueAfter,
+      fields: deferredFilter.fields,
       // Task 11 (spec §5.5): the List tab honours the Closed control's
-      // EXPLICIT choice only — `filter.closed` itself, never defaulted to
+      // EXPLICIT choice only — `deferredFilter.closed` itself, never defaulted to
       // `false` the way Calendar/Timeline's own `datesNarrowing` does below.
       // An unset control shows every ticket on the List tab, open or closed.
-      closed: filter.closed,
+      closed: deferredFilter.closed,
       exclude:
-        filter.exclude === undefined
+        deferredFilter.exclude === undefined
           ? undefined
           : {
-              assigneeIds: filter.exclude.assigneeIds,
-              typeIds: filter.exclude.typeIds,
-              stateIds: filter.exclude.stateIds,
-              stateCategories: filter.exclude.stateCategories,
-              projectIds: filter.exclude.projectIds,
+              assigneeIds: deferredFilter.exclude.assigneeIds,
+              typeIds: deferredFilter.exclude.typeIds,
+              stateIds: deferredFilter.exclude.stateIds,
+              stateCategories: deferredFilter.exclude.stateCategories,
+              projectIds: deferredFilter.exclude.projectIds,
             },
     }),
-    [filter],
+    [deferredFilter],
   );
 
   /**
@@ -886,12 +890,12 @@ function ProjectBoard() {
    */
   const datesNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
-    const effectiveClosed = filter.closed ?? (showClosedOnDates ? undefined : false);
+    const effectiveClosed = deferredFilter.closed ?? (showClosedOnDates ? undefined : false);
     const rows = listNarrowing.rows.filter((row) =>
       matchesListRow(row, projectId, { ...listFilterSpec, closed: effectiveClosed }),
     );
     return { rows, shown: rows.length, total: list.rows.length };
-  }, [list.rows, listNarrowing, listFilterSpec, filter.closed, showClosedOnDates, projectId]);
+  }, [list.rows, listNarrowing, listFilterSpec, deferredFilter.closed, showClosedOnDates, projectId]);
 
   const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
 
