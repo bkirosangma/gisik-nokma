@@ -471,7 +471,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         defaultHome={{ workspaceId: workspaces?.[0]?.id ?? '', projectId: '' }}
         onCreated={(noteId) => {
           setCreateOpen(false);
-          // A new note opens straight in edit mode (G-3, 25.348).
+          // A new note opens straight in edit mode (G-3, 25.343; through this door, 25.357).
           markNoteAsNew(noteId);
           router.push(`/notes/${noteId}`);
         }}

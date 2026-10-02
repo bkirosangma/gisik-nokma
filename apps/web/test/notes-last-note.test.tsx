@@ -4,7 +4,7 @@ import { HELP_PHONE_QUERY } from '@gisik-nokma/app-core';
 import type { DataSourceQuery, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
-import { lastNoteKey } from '../src/notes/last-note.js';
+import { lastNoteKey, lastWorkspaceKey } from '../src/notes/last-note.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -35,6 +35,7 @@ const NOTE_A = '01J9NOTECOLDROOM000000000000';
 const NOTE_B = '01J9NOTEQUIET0000000000000';
 const NOTE_GONE = '01J9NOTEGONE00000000000000';
 const NOTE_DELETED = '01J9NOTEDELETED000000000000';
+const NOTE_THROWS = '01J9NOTETHROWS0000000000000';
 
 function ws(id: string, name: string): WorkspaceRef {
   return {
@@ -84,6 +85,7 @@ function world() {
       getMembers: async () => [{ id: 'u_kiro', name: 'Kiro', role: 'owner' }],
       // The read is per WORKSPACE: a key naming a note under the wrong workspace must not resolve.
       getNote: async (workspaceId: string, id: string) => {
+        if (id === NOTE_THROWS) throw new Error('offline'); // a read that FAILS, as opposed to one that answers null
         const note = NOTES[id];
         return note !== undefined && note.workspaceId === workspaceId ? note : null;
       },
@@ -206,6 +208,18 @@ describe('G-3 addendum: the last note opened, per device', () => {
       expect(screen.queryByText('That note is no longer shared with you.')).toBeNull();
       cleanup();
     }
+    // A read that THROWS (the network, not an answer) keeps the key: a flaky connection must not erase a good memory.
+    // The `null` answers above are the control: those DO clear.
+    window.localStorage.clear();
+    replace.mockClear();
+    window.localStorage.setItem(lastNoteKey('u_kiro', WS_A), NOTE_THROWS);
+    renderPage();
+    const flaky = await screen.findByRole('navigation', { name: 'Notes' });
+    expect(await within(flaky).findByTestId(`note-row-${NOTE_A}`)).toBeInTheDocument();
+    await settle();
+    expect(window.localStorage.getItem(lastNoteKey('u_kiro', WS_A))).toBe(NOTE_THROWS);
+    expect(replace).not.toHaveBeenCalled();
+    cleanup();
     // CONTROL: a readable remembered note is NOT cleared.
     window.localStorage.clear();
     window.localStorage.setItem(lastNoteKey('u_kiro', WS_A), NOTE_A);
@@ -255,6 +269,77 @@ describe('G-3 addendum: the last note opened, per device', () => {
     // CONTROL, same it(): a desktop viewport DOES open it directly.
     cleanup();
     stubPhone(false);
+    renderPage();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/notes/${NOTE_A}`));
+  });
+
+  it('25.354 on a phone the remembered note is scrolled into view inside the list when it is below the fold, and a visible one leaves the list where it was', async () => {
+    const rect = (top: number, height: number): DOMRect =>
+      ({ top, height, bottom: top + height, left: 0, right: 300, width: 300, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    // jsdom lays nothing out: the list is 200px tall at the top of the page, and the current row sits where the case says.
+    const scrollInto = async (rowTop: number, startAt: number): Promise<number> => {
+      const original = Element.prototype.getBoundingClientRect;
+      vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+        if (this.classList.contains('gn-help__nav')) return rect(0, 200);
+        const list = this.getAttribute('aria-current') === 'page' ? this.closest<HTMLElement>('.gn-help__nav') : null;
+        // The row moves up the page by however far the list has scrolled, as a laid-out row would.
+        if (list !== null) return rect(rowTop - (list.scrollTop - startAt), 40);
+        return original.call(this);
+      });
+      stubPhone(true);
+      window.localStorage.clear();
+      window.localStorage.setItem(lastNoteKey('u_kiro', WS_A), NOTE_A);
+      const view = renderPage();
+      const panel = await screen.findByTestId('notes-panel');
+      const nav = panel.querySelector<HTMLElement>('.gn-help__nav')!;
+      nav.scrollTop = startAt;
+      await within(panel).findByTestId(`note-row-${NOTE_A}`);
+      await settle();
+      const at = nav.scrollTop;
+      view.unmount();
+      vi.restoreAllMocks();
+      return at;
+    };
+    // Below the fold: 600 - 0 - (200 - 40) / 2 = 520 more than where it started.
+    expect(await scrollInto(600, 0)).toBe(520);
+    // CONTROL, same it(): a row already in view (top 80, bottom 120 inside 0..200) leaves the list exactly where it was.
+    expect(await scrollInto(80, 30)).toBe(30);
+  });
+
+  it('25.356 the note opened LAST is the one resumed, across workspaces; with the pointer missing or unreadable, list order decides', async () => {
+    // Open A in the first workspace, then B in the second, leave, and re-enter: B, not the first workspace's A.
+    renderPage(NOTE_A);
+    await waitFor(() => expect(window.localStorage.getItem(lastNoteKey('u_kiro', WS_A))).toBe(NOTE_A));
+    cleanup();
+    renderPage(NOTE_B);
+    await waitFor(() => expect(window.localStorage.getItem(lastNoteKey('u_kiro', WS_B))).toBe(NOTE_B));
+    expect(window.localStorage.getItem(lastWorkspaceKey('u_kiro'))).toBe(WS_B);
+    expect(lastWorkspaceKey('u_kiro')).toBe('gn-last-note-workspace:u_kiro');
+    // The pointer is the user's, not another user's, and the per-workspace keys stay as pinned.
+    expect(window.localStorage.getItem(lastWorkspaceKey('u_other'))).toBeNull();
+    expect(window.localStorage.getItem(lastNoteKey('u_kiro', WS_A))).toBe(NOTE_A);
+    cleanup();
+    replace.mockClear();
+    renderPage();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/notes/${NOTE_B}`));
+    expect(replace).not.toHaveBeenCalledWith(`/notes/${NOTE_A}`);
+
+    // CONTROL, same it(): with the pointer MISSING both keys remain and list order resumes the first workspace's note.
+    window.localStorage.removeItem(lastWorkspaceKey('u_kiro'));
+    cleanup();
+    replace.mockClear();
+    renderPage();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(`/notes/${NOTE_A}`));
+
+    // CONTROL, same it(): with the pointer UNREADABLE (storage throws for that key only) the same.
+    window.localStorage.setItem(lastWorkspaceKey('u_kiro'), WS_B);
+    const realGetItem = Storage.prototype.getItem;
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+      if (key === lastWorkspaceKey('u_kiro')) throw new DOMException('blocked', 'SecurityError');
+      return realGetItem.call(this, key);
+    });
+    cleanup();
+    replace.mockClear();
     renderPage();
     await waitFor(() => expect(replace).toHaveBeenCalledWith(`/notes/${NOTE_A}`));
   });

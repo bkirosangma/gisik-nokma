@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import type { DataSource, WorkspaceRef } from '@gisik-nokma/app-core';
-import { clearLastNote, readLastNote } from './last-note.js';
+import { clearLastNote, readLastNote, readLastWorkspace } from './last-note.js';
 
 export type RememberedNote = { noteId: string; workspaceId: string };
 
 /**
  * The note this device last had open, VERIFIED to still be readable (smoothness G-3 addendum, 25.351–25.353).
  *
- * `/notes` spans every workspace and the key is per workspace, so the rule is: walk `workspaces` in the order the
- * page lists them and take the first one whose key names a note that still answers. A note that answers `null`
+ * `/notes` spans every workspace and the key is per workspace, so the rule is: try the workspace the per-user pointer
+ * names (the one whose note was opened last) first, then walk the rest in the order the page lists them, and take the
+ * first one whose key names a note that still answers. A note that answers `null`
  * (gone, or no longer shared) or that is deleted is dropped SILENTLY and its key cleared — a deleted note still
  * answers, with a flag and a Restore banner, and landing a reader there on entry would be the opposite of "pick up
  * where I was". A read that THROWS clears nothing: a flaky network must not erase a good memory.
@@ -38,7 +39,12 @@ export function useRememberedNote({
     }
     let cancelled = false;
     void (async () => {
-      for (const workspace of workspaces) {
+      const pointer = readLastWorkspace(userId);
+      const ordered =
+        pointer === null
+          ? workspaces
+          : [...workspaces.filter((workspace) => workspace.id === pointer), ...workspaces.filter((workspace) => workspace.id !== pointer)];
+      for (const workspace of ordered) {
         const noteId = readLastNote(userId, workspace.id);
         if (noteId === null) continue;
         let note;

@@ -140,7 +140,8 @@ export function NotesContents({ headings, query }: { headings: ReadingMeta['head
 /**
  * While the panel is open: Escape and a tap outside close it (a tap inside a portalled Select popover is not
  * outside), and focus goes back to the button — /help's behaviour (23.234), minus the `/` shortcut, which Notes
- * has never had. On open the current note's row is scrolled into view INSIDE the list by its own `scrollTop`
+ * has never had. On open the current note's row is scrolled into view INSIDE the list by its own `scrollTop` when it
+ * is out of view
  * (`scrollIntoView` would move the page too); the rows arrive after the workspaces read, so a short observer
  * waits for the row instead of assuming it is there.
  */
@@ -192,6 +193,8 @@ export function useNotesPanelBehaviour({
       if (current === null) return false;
       const within = nav.getBoundingClientRect();
       const at = current.getBoundingClientRect();
+      // A row already inside the list stays where it is; one above or below the fold is centred (25.354).
+      if (at.top >= within.top && at.bottom <= within.bottom) return true;
       nav.scrollTop += at.top - within.top - (within.height - at.height) / 2;
       return true;
     };
