@@ -29,6 +29,7 @@ export * from './events/ticket-events.js';
 export * from './events/note-events.js';
 export * from './note-state.js';
 export * from './events/membership.js';
+export * from './events/groups.js';
 export * from './events/visibility.js';
 export * from './events/invites.js';
 export * from './events/contest-events.js';

@@ -210,73 +210,58 @@ export const primitives = {
   /** `neo` dark surface — the export's own value, matching `neoPaper`'s light-mode role: ONE hex for surface/raised/sunken, depth from shadow alone. */
   neoNavy: '#1b2340',
   /**
-   * **REVERTED to `neoNavy` (owner, 2026-09-10: "revert to prototype's
-   * exact dark hex and fix the accent colour ratio instead" — in response
-   * to the dark+neo input box reading visibly lighter/flatter than the
-   * prototype's own screenshot).** These were previously stepped lighter
-   * (see the retained derivation below) under owner ruling #386 to satisfy
-   * a "dark surfaces must separate by fill" requirement (rule (c)) while
-   * keeping the BARE `accent` role legible as TEXT against them at 4.5:1 —
-   * a real constraint at the time the derivation below was written.
+   * **`neoNavyRaised` steps lighter again: `#1b2340` → `#232c50` (owner ruling U8, 2026-10-02; UX fixes T1).**
+   * The raised surface in neo dark used to be the SAME hex as `neoNavy` (the 2026-09-10 revert: "revert to
+   * prototype's exact dark hex"), so a raised card in the dark theme had only its shadow to separate it from the
+   * page, and the audit measured that as flat (BRD-21, ENT-19, SYS-07). This step separates it from the page by
+   * 1.14 (`neoNavy` ↔ `neoNavyRaised`, fill alone; the shadow does the rest) and the raised highlight (`shadowNeoRaisedHighlightDark`) goes 7% → 12% with it.
    *
-   * **That constraint stopped binding the SAME DAY it was written, before
-   * anyone next touched this file.** The Round 2d change (also
-   * 2026-09-09) split `accent` into two roles — `accent` (a fill only, no
-   * text guarantee) and `textAccent` (the role actually derived to read as
-   * text; see `textAccentDark`'s own docblock, which independently accounts
-   * for `neoNavySunken`) — so "does bare `accent` clear 4.5 as text against
-   * `surfaceRaised`" is a question `CONTRAST_PAIRS` no longer asks: it
-   * names `textAccent`, never `accent`, on `surface`/`surfaceRaised`. The
-   * derivation below solved a problem that had already stopped existing by
-   * the time this value was next revisited — it was never wrong, its
-   * premise just went stale.
+   * **The old docblock that called this collision a mathematical impossibility is retired, and the reason it was
+   * wrong is kept here.** It argued that lightening `neoNavy` far enough to separate by fill pushed the bare
+   * `accent` below 4.5:1 as text, a luminance window "empty by about 0.00002". That arithmetic was done against the accent `#409cff`, which the
+   * owner's neo-round palette RETIRED the same week (`#3A6DB0`/`#7FA9E4`; today `blue600`/`blue300`), and `accent`
+   * stopped being a text role altogether when Round 2d split it into `accent` (fill) and `textAccent` (text). The
+   * window was never empty for the colours the product ships; it was empty for a colour it had already dropped.
    *
-   * **Verified empirically before reverting, not assumed:** with both
-   * values set to `neoNavy`, every declared `CONTRAST_PAIRS` row for
-   * `neo`/dark still passes — with MORE margin than before, because a
-   * darker background only helps light-coloured foregrounds (`text`,
-   * `textMuted`, `textAccent`, `accentText`) read more clearly, never less.
-   * `tokens.test.ts`'s rule (c) separation test ("13.341") now exempts
-   * `neo` from the dark-separation floor entirely, the same way it always
-   * exempted `neo` in LIGHT (see `neoPaper`'s own comment above) — this
-   * style's whole visual language is shadow-only depth, and holding dark
-   * to a fill-separation floor light was never held to was the
-   * inconsistency, not a rule `neo` needed to keep.
-   *
-   * The original derivation is kept below as the historical record of a
-   * real, carefully-measured trade-off — it just no longer governs this
-   * value.
-   *
-   * ---
-   *
-   * **DERIVED, not measured — ruling item 3(b) [SUPERSEDED, see above].**
-   * The export's `neo` dark raised and sunken are the SAME hex as surface
-   * (separation 1.00, rule (c) fails outright). The ruling requires
-   * deriving steps giving at least `hig`/`minimal` dark's own separation
-   * (surface↔raised 1.214, surface↔sunken 1.460, measured against
-   * `#141a2e`/`#20294a`/`#2a3560`).
-   *
-   * **`surfaceRaised` falls narrowly short of that floor (1.204 vs 1.214,
-   * −0.8%) and this is deliberate, not an error.** Lightening `neoNavy`
-   * (`#1b2340`) far enough to hit 1.214 pushes its luminance past what keeps
-   * `accent` (`#409cff`, kept SHIPPED by ruling item 2) at ≥4.5 against it —
-   * a declared `CONTRAST_PAIRS` row (`accent` on `surfaceRaised`). The two
-   * requirements are mathematically incompatible for this base/accent pair:
-   * the luminance window `raised` would need occupies is empty by about
-   * 0.00002 (an accent-side ceiling of L≈0.03242 against a separation-side
-   * floor of L≈0.03262), independent of which hue is chosen — not a
-   * near-miss to be nudged away, a genuine collision between the amendment's
-   * two rulings. Recorded here rather than escalated because the accessible
-   * value is the one already gated by a passing test (`CONTRAST_PAIRS` is
-   * the harder, tested invariant across the whole project); the separation
-   * shortfall is 99.2% of the target and both raised↔sunken (1.292 vs
-   * 1.202) and surface↔sunken (1.555 vs 1.460) clear their floors with
-   * margin. `accent` on `neoNavyRaised` measures 4.528. **This `accent`
-   * pairing is itself retired — see above — which is exactly what makes
-   * the collision moot rather than merely tolerated.**
+   * **Measured on `#232c50` (the `CONTRAST_PAIRS` rows and 23.006):** `accent` 5.62, `textAccent` ≥ 4.5,
+   * `textSubtle` 5.40 (`neoTextSubtleDark`), `text` and `textMuted` higher. `neoNavySunken` stays `neoNavy`: fields keep their ground and
+   * are recessed by their shadow alone.
    */
-  neoNavyRaised: '#1b2340',
+  neoNavyRaised: '#232c50',
   neoNavySunken: '#1b2340',
+  /**
+   * `neo` DARK `textSubtle` (UX fixes T1, found by 18.306 on the first run): `textSubtleDark` `#a0a0a5` reads 5.21 on
+   * the lifted `neoNavyRaised`, but a field's placeholder sits on its translucent fill COMPOSITED over that surface
+   * (`#313755`), where it measured 4.46, under the 4.5 the neo contexts are held to (`field-placeholder-contrast.test.ts`).
+   * `#a3a3a8` is the smallest neutral lift that clears it (4.62 composited, 5.40 on raised, 6.82 on the well); `hig`
+   * and `minimal` dark keep `#a0a0a5` (their floor is 3 and they did not move). Mapped for `neo`/dark only.
+   */
+  neoTextSubtleDark: '#a3a3a8',
+  /**
+   * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
+   *
+   * **U5: a neo text field wears a 1px full ring.** The shadow edge of the sunken field measured 1.18 light and
+   * 1.00 dark, so an empty field carried no boundary a person could find (SYS-05, WS-04, NP-25, TT-14). The ring
+   * is the `fieldRim` role (`--gn-field-rim`). `neoFieldRimLight` is the owner's first light value, measured on
+   * `neoPaper` (3.75); once the light well steps (U8, below) the ring has to clear the well too, and
+   * `neoFieldRimOnWellLight` is that value: 3.75 on `neoPaper`, 3.31 on `neoWellLight`. The role maps to the
+   * on-well value so ONE ring reads on paper and on the well; `neoFieldRimLight` is kept as the recorded
+   * pre-step value and is mapped by no role.
+   *
+   * **`neoFieldRimDark` is `#6f7997`, NOT the owner's `#6b7491`** (planner ruling 03:15, owner reviews in the
+   * morning report). U8 lifts neo-dark `surfaceRaised` to `#232c50`, on which `#6b7491` measures 2.93, under the
+   * 3.0 floor WCAG 1.4.11 sets for a boundary (and 23.001 declares for every surface a field sits on). `#6f7997`
+   * is the smallest hue-preserving lift: 3.14 on raised, 3.57 on surface, 3.96 on the dark well.
+   *
+   * **U8: the track and the well step in neo.** `neoWellLight` `#e6dcd2` and `neoWellDark` `#141a33` replace the
+   * one-hex `neoPaper`/`neoNavy` those two grounds used, so a recessed well reads as recessed by fill as well as
+   * by its shadow. `surfaceSunken` (the field ground) is unchanged.
+   */
+  neoFieldRimLight: '#927c6a',
+  neoFieldRimOnWellLight: '#897362',
+  neoFieldRimDark: '#6f7997',
+  neoWellLight: '#e6dcd2',
+  neoWellDark: '#141a33',
 
   /**
    * The four-step FILL hierarchy R1(c) separates by. Eight-digit hex, not
@@ -391,7 +376,7 @@ export const primitives = {
   shadowNeoHighlightLight: '#fffffff2',
   shadowNeoSunkenDarkLight: '#b0988499',
   shadowNeoRaisedDarkDark: '#060a169e',
-  shadowNeoRaisedHighlightDark: '#f2e9e112',
+  shadowNeoRaisedHighlightDark: '#f2e9e11f',
   shadowNeoSunkenDarkDark: '#00000099',
   shadowNeoSunkenHighlightDark: '#ffffff0d',
   /**
@@ -673,8 +658,9 @@ export const primitives = {
    * INSIDE a raised panel (the sheet's field group). Both measure below 1.5:1
    * against the ground around them (1.08 / 1.10), on purpose: they are
    * identified by the `track` shadow (Task 2), not by fill — rule 04, "light
-   * from above". Under neo both roles resolve to the neo surface, as every neo
-   * ground does (depth is shadow-only there, `STYLE_COLOR_OVERRIDES` below).
+   * from above". Under neo they step to `neoWellLight`/`neoWellDark` (UX fixes
+   * T1, owner U8, 2026-10-02): before that both resolved to the one-hex neo
+   * surface and read by shadow alone (`STYLE_COLOR_OVERRIDES` below).
    */
   trackWarm: '#e8ded4',
   trackNavy: '#10152a',
@@ -744,6 +730,13 @@ export const TOKEN_ROLES = [
    */
   'surfaceTrack',
   'surfaceWell',
+  /**
+   * The 1px RING of a text field (owner ruling U5, 2026-10-02; UX fixes T1) — `--gn-field-rim`. Under `neo` it is
+   * the dedicated ring colour (`neoFieldRimOnWellLight` / `neoFieldRimDark`, ≥ 3:1 on `surface`, `surfaceRaised`,
+   * `surfaceSunken` and `surfaceWell`). Under `hig` and `minimal` it is the field's EXISTING edge (`border`), so
+   * the role is defined in every style and a field rule can read it without a style test. Never text.
+   */
+  'fieldRim',
   'text',
   'textMuted',
   /**
@@ -917,6 +910,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceOverlay: 'overlayWarmHig',
     surfaceTrack: 'trackWarm',
     surfaceWell: 'wellWarm',
+    fieldRim: 'grayAccessible',
     text: 'labelWarmLight',
     textMuted: 'inkMuted',
     textSubtle: 'textSubtleLight',
@@ -957,6 +951,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceOverlay: 'overlayNavyHig',
     surfaceTrack: 'trackNavy',
     surfaceWell: 'wellNavy',
+    fieldRim: 'grayAccessibleDark',
     text: 'labelWarmDark',
     textMuted: 'fogMuted',
     textSubtle: 'textSubtleDark',
@@ -1003,6 +998,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
  * rather than left, because this change adds five more and a wrong count now
  * would be wrong by eleven.
  *
+ * **UX fixes T1 (2026-10-02): both arms gain `fieldRim` (the neo ring), and `surfaceTrack`/`surfaceWell` step to
+ * `neoWellLight`/`neoWellDark`; the dark arm's `surfaceRaised` (`neoNavyRaised`) is now `#232c50`, not `neoNavy`, and
+ * its `textSubtle` is `neoTextSubtleDark` so a placeholder still clears 4.5 composited on it.**
+ *
  * **T5 (2026-09-18): the light arm gains the five semantic colours the
  * refreshed export's light-neo block declares.** The mapping is by MEANING,
  * not by variable name — the export names two of them after hues (`--pink`,
@@ -1027,8 +1026,9 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoPaper',
       surfaceSunken: 'neoPaper',
       surfaceOverlay: 'overlayWarmNeo',
-      surfaceTrack: 'neoPaper',
-      surfaceWell: 'neoPaper',
+      surfaceTrack: 'neoWellLight',
+      surfaceWell: 'neoWellLight',
+      fieldRim: 'neoFieldRimOnWellLight',
       fillTertiary: 'fillWarmNeo3',
       fillQuaternary: 'fillWarmNeo4',
       danger: 'neoLightDanger',
@@ -1043,8 +1043,10 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoNavyRaised',
       surfaceSunken: 'neoNavySunken',
       surfaceOverlay: 'overlayNavyNeo',
-      surfaceTrack: 'neoNavy',
-      surfaceWell: 'neoNavy',
+      surfaceTrack: 'neoWellDark',
+      surfaceWell: 'neoWellDark',
+      fieldRim: 'neoFieldRimDark',
+      textSubtle: 'neoTextSubtleDark',
       fillTertiary: 'fillNavyNeo3',
       fillQuaternary: 'fillNavyNeo4',
     },
@@ -1739,6 +1741,29 @@ export const CONTRAST_PAIRS: ReadonlyArray<{ fg: TokenRole; bg: TokenRole; minim
   { fg: 'accentText', bg: 'accentEdge', minimum: 4.5 },
   { fg: 'border', bg: 'surfaceRaised', minimum: 3 },
   { fg: 'border', bg: 'surfaceWell', minimum: 3 },
+  /**
+   * UX fixes T1 (owner rulings U5 and U8, 2026-10-02; cases 23.001, 23.006, 23.007, 23.009). Eight rows, so the
+   * roster is 52.
+   *
+   * - The neo field RING (`fieldRim`, a non-text boundary, 3:1) on the four grounds a field sits on. Under `hig`
+   *   and `minimal` it is `border`, which already clears these. Neo measures 3.31 (light, on the well) and
+   *   3.14 (dark, on the lifted raised surface; the binding pair that moved `neoFieldRimDark` off the owner's
+   *   `#6b7491`, 2.93 there).
+   * - `textAccent` and `textSubtle` on `surfaceRaised` (4.5) were ALREADY rows (`textAccent`, Round 2d;
+   *   `textSubtle`, 2026-09-15), so none is added here. U8's neo-dark raised step to `#232c50` re-clears both (5.40
+   *   for neo's `textSubtle`), and 23.006 asserts those neo-dark readings. `accent` on `#232c50` (5.62) is asserted
+   *   by 23.006 and is NOT a row: it is a fill, and `tokens.ts` retired that pairing as a text guarantee.
+   * - `textAccent` (4.5) and the `accent` FILL (3) on the track and the well, now that neo's steps are real
+   *   fills. `text`, `textMuted` and `textSubtle` on both were already rows.
+   */
+  { fg: 'fieldRim', bg: 'surface', minimum: 3 },
+  { fg: 'fieldRim', bg: 'surfaceRaised', minimum: 3 },
+  { fg: 'fieldRim', bg: 'surfaceSunken', minimum: 3 },
+  { fg: 'fieldRim', bg: 'surfaceWell', minimum: 3 },
+  { fg: 'textAccent', bg: 'surfaceTrack', minimum: 4.5 },
+  { fg: 'textAccent', bg: 'surfaceWell', minimum: 4.5 },
+  { fg: 'accent', bg: 'surfaceTrack', minimum: 3 },
+  { fg: 'accent', bg: 'surfaceWell', minimum: 3 },
 ];
 
 /**

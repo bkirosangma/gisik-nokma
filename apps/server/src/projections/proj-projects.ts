@@ -141,7 +141,8 @@ export const projProjects: Projection = {
         `UPDATE proj_projects
             SET name = COALESCE($3, name),
                 description = CASE WHEN $4::boolean THEN $5 ELSE description END,
-                prefix = COALESCE($6, prefix)
+                prefix = COALESCE($6, prefix),
+                group_id = CASE WHEN $7::boolean THEN $8 ELSE group_id END
           WHERE project_id = $1 AND workspace_id = $2`,
         [
           event.entity.id,
@@ -150,6 +151,10 @@ export const projProjects: Projection = {
           payload.description !== undefined,
           payload.description ?? null,
           payload.prefix ?? null,
+          // `groupId` follows `description`'s rule: `null` is a real value (UNGROUP)
+          // and must not COALESCE away, so presence is its own flag. Task 6.
+          payload.groupId !== undefined,
+          payload.groupId ?? null,
         ],
       );
       return;

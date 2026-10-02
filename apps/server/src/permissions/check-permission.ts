@@ -1,4 +1,6 @@
 import {
+  groupCreatedPayload,
+  groupRenamedPayload,
   inviteSentPayload,
   membershipGrantedPayload,
   membershipRevokedPayload,
@@ -6,6 +8,8 @@ import {
   noteCreatedPayload,
   noteDetachedPayload,
   projectCreatedPayload,
+  projectUpdatedPayload,
+  istDayOf,
   ticketAssignedPayload,
   ticketCollaboratorPayload,
   ticketCreatedPayload,
@@ -16,7 +20,7 @@ import { REFUSAL_RULES, type Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
-import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
+import { projectPrefixHistory } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkLifecycle } from './check-lifecycle.js';
@@ -64,6 +68,28 @@ export const PROJECT_UNKNOWN_RULE = 'project.unknown';
  * project, and is being asked to choose a different half of its key.
  */
 export const PROJECT_PREFIX_TAKEN_RULE = 'project.prefix-taken';
+
+/**
+ * The project-group door's rule ids (prefixes and groups plan Task 6). Their own
+ * ids, none of them `permission.role`: the caller MAY file groups, and is being
+ * told which tree rule the claim breaks.
+ */
+export const GROUP_UNKNOWN_RULE = 'group.unknown';
+export const GROUP_LEVEL_MISMATCH_RULE = 'group.level-mismatch';
+export const GROUP_NAME_TAKEN_RULE = 'group.name-taken';
+export const GROUP_IN_USE_RULE = 'group.in-use';
+export const GROUP_HAS_CHILDREN_RULE = 'group.has-children';
+/** `project.updated {groupId}` naming a group that is not a live group of this workspace. */
+export const PROJECT_GROUP_UNKNOWN_RULE = 'project.group-unknown';
+
+/**
+ * A project claiming a prefix ANOTHER project has moved off (spec §3.1,
+ * 2026-10-02). The old ticket keys (`SO-3`) still resolve to the project that
+ * held it, so handing the prefix on would make one key name two tickets. Its own
+ * id, apart from `project.prefix-taken`, because the remedy differs: a taken
+ * prefix may be freed by the other project moving, a reserved one never is.
+ */
+export const PROJECT_PREFIX_RESERVED_RULE = 'project.prefix-reserved';
 
 /**
  * The envelope-origin refusal's rule and reason, character for character.
@@ -349,6 +375,9 @@ function refuseWith(rule: string, reason: string): Refusal {
  */
 const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   'workflow.defined',
+  // Prefixes/groups Task 3. A workspace's prefix is the first half of every
+  // ticket key in it, so moving it is a workspace-administration act.
+  'workspace.prefix_changed',
   'ticket-type.defined',
   'project.created',
   'ticket.workflow_rebound',
@@ -388,6 +417,13 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   // workspace — so the same workspace admin/owner question answers it.
   'project.deleted',
   'project.undeleted',
+  // Prefixes and groups plan Task 6 (spec §5, FD4): the group tree is workspace
+  // structure, the same class of act as founding a project, so owner/admin only.
+  // A member never files, renames, reorders or deletes a group.
+  'group.created',
+  'group.renamed',
+  'group.reordered',
+  'group.deleted',
 ]);
 
 /**
@@ -1012,7 +1048,7 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
 }
 
 /**
- * May this project be founded under the prefix it names?
+ * May this project be founded under, or move to, the prefix it names?
  *
  * ## The owner's ruling, and why it is a door and not a display rule
  *
@@ -1051,46 +1087,244 @@ export async function checkProjectExists(db: Queryable, env: EventEnvelope): Pro
  * being handed a sentence about a prefix — and, like `checkProjectExists`, it
  * runs strictly after `checkRolePermission` so a non-member cannot use it to
  * enumerate the workspace's prefixes.
+ *
+ * ## Prefixes/groups Task 3: `project.updated` too, and RESERVED prefixes
+ *
+ * The same question is now asked of a `project.updated` that carries a
+ * `prefix`, and the answer has two refusals (the sets are disjoint — a prefix
+ * one project holds is never another's former one — so their order only fixes
+ * which text a damaged history would get):
+ *
+ *  1. `project.prefix-taken` — another project's CURRENT prefix (above).
+ *  2. `project.prefix-reserved` — a prefix another project has moved OFF, from
+ *     `projectPrefixHistory`. Its old ticket keys still point at that project,
+ *     so the prefix cannot be reused. The text names the holder's CURRENT name
+ *     and the day it moved off (IST, `d MMM`).
+ *
+ * **"Another" is by project id on BOTH, never by value.** A project may take
+ * back a prefix it once held (SO → SH → SO), and a retry of an earlier event of
+ * its own — `SO → SH` re-delivered after `SH → SO` — must reach the ledger's
+ * `duplicate-event-id` rather than be refused here for a prefix that is its own
+ * former one. A workspace's own former prefixes carry no reservation (spec
+ * §3.1), so `workspace.prefix_changed` has no check here.
  */
-export async function checkProjectPrefixUnique(
+export async function checkPrefixReservation(
   db: Queryable,
   env: EventEnvelope,
 ): Promise<Refusal | null> {
-  if (env.type !== 'project.created') {
+  let prefix: string | undefined;
+  if (env.type === 'project.created') {
+    prefix = projectCreatedPayload.parse(env.payload).prefix;
+  } else if (env.type === 'project.updated') {
+    prefix = projectUpdatedPayload.parse(env.payload).prefix;
+  } else {
     return null;
   }
-  const parsed = projectCreatedPayload.parse(env.payload);
-  if (parsed.prefix === undefined) {
+  if (prefix === undefined) {
     return null;
   }
-  const resolved = await projectPrefixesInWorkspace(db, env.workspaceId);
+  const history = await projectPrefixHistory(db, env.workspaceId);
   // ⚠ "ANOTHER project", and the distinction is a defect fix rather than a
-  // nicety. `projectPrefixesInWorkspace` resolves EVERY project in the
-  // workspace, including the one this event names — whose `proj_projects` row
-  // already exists, because the first delivery wrote it. So asking the set
-  // whether it holds this prefix answered YES for the project's own
-  // `project.created` re-delivered, and that retry was refused with
-  // `project.prefix-taken` instead of the `duplicate-event-id` the ledger
-  // answers. Reachable from `POST /v1/events` and `POST /v1/sync`, where a
-  // retry is the ordinary way a client recovers from a lost response; no test
-  // covered it, because every case in `project-prefix-unique.test.ts` uses a
-  // FRESH project id.
+  // nicety. The history covers EVERY project in the workspace, including the one
+  // this event names — whose `proj_projects` row already exists, because the
+  // first delivery wrote it. So asking whether the set holds this prefix
+  // answered YES for the project's own `project.created` re-delivered, and that
+  // retry was refused with `project.prefix-taken` instead of the
+  // `duplicate-event-id` the ledger answers. Reachable from `POST /v1/events`
+  // and `POST /v1/sync`, where a retry is the ordinary way a client recovers
+  // from a lost response; no test covered it, because every case in
+  // `project-prefix-unique.test.ts` uses a FRESH project id.
   //
   // Filtered by project ID and not by value: the resolution guarantees one
   // project per prefix, so filtering by value would also be correct today — and
   // would stop being correct the moment that guarantee moved.
-  const taken = new Set(
-    [...resolved.entries()]
-      .filter(([projectId]) => projectId !== env.entity.id)
-      .map(([, prefix]) => prefix),
-  );
-  if (!taken.has(parsed.prefix)) {
-    return null;
+  const others = [...history].filter(([projectId]) => projectId !== env.entity.id);
+  if (others.some(([, held]) => held.current === prefix)) {
+    return refuseWith(
+      PROJECT_PREFIX_TAKEN_RULE,
+      `Another project in this workspace already uses the prefix ${prefix}. A prefix identifies a project's tickets — ${prefix}-1, ${prefix}-2 — so two projects cannot share one. Choose a different prefix.`,
+    );
   }
-  return refuseWith(
-    PROJECT_PREFIX_TAKEN_RULE,
-    `Another project in this workspace already uses the prefix ${parsed.prefix}. A prefix identifies a project's tickets — ${parsed.prefix}-1, ${parsed.prefix}-2 — so two projects cannot share one. Choose a different prefix.`,
+  for (const [projectId, held] of others) {
+    // The LATEST move off, should a prefix have been left more than once.
+    const left = held.former.filter((former) => former.prefix === prefix).at(-1);
+    if (left === undefined) {
+      continue;
+    }
+    const holder = await currentProjectName(db, env.workspaceId, projectId);
+    return refuseWith(
+      PROJECT_PREFIX_RESERVED_RULE,
+      `${prefix} was ${possessive(holder)} prefix until ${dayMonthIst(left.until)}. Its old ticket keys still point there, so it can't be reused.`,
+    );
+  }
+  return null;
+}
+
+/** The project's CURRENT name (a rename moves it; the founding name does not). */
+async function currentProjectName(db: Queryable, workspaceId: string, projectId: string): Promise<string> {
+  const { rows } = await db.query<{ name: string }>(
+    'SELECT name FROM proj_projects WHERE workspace_id = $1 AND project_id = $2',
+    [workspaceId, projectId],
   );
+  return rows[0]?.name ?? 'another project';
+}
+
+/** `Shop operations'`, `Store's` — a name ending in `s` takes a bare apostrophe. */
+function possessive(name: string): string {
+  return name.endsWith('s') ? `${name}'` : `${name}'s`;
+}
+
+const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `1 Oct` — the IST day of an instant, spelled out so it never depends on the host's ICU. */
+function dayMonthIst(instant: string): string {
+  const [, month, day] = istDayOf(instant).split('-').map(Number) as [number, number, number];
+  return `${day} ${MONTH_ABBREVIATIONS[month - 1]}`;
+}
+
+/**
+ * The project-group tree's door (prefixes and groups plan Task 6, spec R3/R4,
+ * review focus 3). `null` for every event that is not a group event or a
+ * `project.updated` carrying a `groupId`.
+ *
+ * The payload SCHEMAS check shape (level 1–4, parent null exactly at L1); this
+ * checks the claim against the TREE, which is other rows a schema cannot see:
+ *
+ * - `group.created`: the parent is a live group of THIS workspace
+ *   (`group.unknown`, same sentence for a stranger's id as for a fabricated one),
+ *   `level = parent.level + 1` (`group.level-mismatch`), and no sibling already
+ *   has the name, ignoring case (`group.name-taken`). The same name under a
+ *   DIFFERENT parent is a different group (R4), which the unique index
+ *   `proj_groups_sibling_name` states the same way.
+ * - `group.renamed`: the group exists; the new name is free among its siblings.
+ * - `group.reordered`: the group exists (a rank has no tree rule of its own).
+ * - `group.deleted`: no project points at it (`group.in-use`), and no group is
+ *   under it (`group.has-children`). In-use is asked FIRST: it is the sentence a
+ *   person can act on by moving a project, whereas an unknown group says nothing.
+ * - `project.updated {groupId: <id>}`: the group is a live group of this workspace
+ *   (`project.group-unknown`). `groupId: null` ungroups and needs no check.
+ *
+ * "In use" counts EVERY `proj_projects` row filed under the group, trashed ones
+ * included: a trashed project still points at it and would dangle if the group
+ * went (undelete would bring back a project filed under nothing).
+ *
+ * A re-delivered `group.created` (a sync retry of a committed one) must not be
+ * refused as a taken name by its OWN row, so the sibling query excludes the
+ * event's own entity id; a re-delivered `group.deleted` meets an absent group and
+ * is told `group.unknown`, which a client treats as the end of that claim.
+ *
+ * Ordering: after `checkRolePermission`, so only an owner/admin ever reaches it
+ * and nobody else can use these sentences to enumerate a workspace's groups.
+ */
+export async function checkGroupRules(db: Queryable, env: EventEnvelope): Promise<Refusal | null> {
+  switch (env.type) {
+    case 'group.created': {
+      const payload = groupCreatedPayload.parse(env.payload);
+      if (payload.parentId !== null) {
+        const parent = await readGroup(db, env.workspaceId, payload.parentId);
+        if (parent === null) {
+          return refuseWith(GROUP_UNKNOWN_RULE, groupUnknownReason());
+        }
+        if (payload.level !== parent.level + 1) {
+          return refuseWith(
+            GROUP_LEVEL_MISMATCH_RULE,
+            `A level ${payload.level} group goes under a level ${payload.level - 1} group.`,
+          );
+        }
+      }
+      return siblingNameRefusal(db, env, payload.parentId, payload.name);
+    }
+    case 'group.renamed': {
+      const payload = groupRenamedPayload.parse(env.payload);
+      const group = await readGroup(db, env.workspaceId, env.entity.id);
+      if (group === null) {
+        return refuseWith(GROUP_UNKNOWN_RULE, groupUnknownReason());
+      }
+      return siblingNameRefusal(db, env, group.parentId, payload.name);
+    }
+    case 'group.reordered': {
+      const group = await readGroup(db, env.workspaceId, env.entity.id);
+      return group === null ? refuseWith(GROUP_UNKNOWN_RULE, groupUnknownReason()) : null;
+    }
+    case 'group.deleted': {
+      const group = await readGroup(db, env.workspaceId, env.entity.id);
+      if (group === null) {
+        return refuseWith(GROUP_UNKNOWN_RULE, groupUnknownReason());
+      }
+      const projects = await db.query<{ name: string }>(
+        'SELECT name FROM proj_projects WHERE workspace_id = $1 AND group_id = $2 ORDER BY project_id',
+        [env.workspaceId, env.entity.id],
+      );
+      if (projects.rows.length > 0) {
+        const first = projects.rows[0]!.name;
+        const others = projects.rows.length - 1;
+        return refuseWith(
+          GROUP_IN_USE_RULE,
+          others === 0
+            ? `${first} is in this group. Move it out first.`
+            : `${first} and ${others} other ${others === 1 ? 'project' : 'projects'} are in this group. Move them out first.`,
+        );
+      }
+      const children = await db.query(
+        'SELECT 1 FROM proj_groups WHERE workspace_id = $1 AND parent_id = $2 LIMIT 1',
+        [env.workspaceId, env.entity.id],
+      );
+      if (children.rows.length > 0) {
+        return refuseWith(GROUP_HAS_CHILDREN_RULE, 'This group has groups under it. Delete those first.');
+      }
+      return null;
+    }
+    case 'project.updated': {
+      const payload = projectUpdatedPayload.parse(env.payload);
+      if (payload.groupId === undefined || payload.groupId === null) {
+        return null;
+      }
+      const group = await readGroup(db, env.workspaceId, payload.groupId);
+      return group === null
+        ? refuseWith(PROJECT_GROUP_UNKNOWN_RULE, 'That group does not exist in this workspace.')
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function groupUnknownReason(): string {
+  return 'That group does not exist in this workspace.';
+}
+
+/** One live group of this workspace, or `null` — scoped, so another workspace's id is simply not found. */
+async function readGroup(
+  db: Queryable,
+  workspaceId: string,
+  groupId: string,
+): Promise<{ level: number; parentId: string | null } | null> {
+  const { rows } = await db.query<{ level: number; parent_id: string | null }>(
+    'SELECT level, parent_id FROM proj_groups WHERE group_id = $1 AND workspace_id = $2',
+    [groupId, workspaceId],
+  );
+  const row = rows[0];
+  return row === undefined ? null : { level: row.level, parentId: row.parent_id };
+}
+
+/** A sibling (same workspace, same parent, name equal ignoring case) other than the event's own group. */
+async function siblingNameRefusal(
+  db: Queryable,
+  env: EventEnvelope,
+  parentId: string | null,
+  name: string,
+): Promise<Refusal | null> {
+  const { rows } = await db.query<{ name: string }>(
+    `SELECT name FROM proj_groups
+      WHERE workspace_id = $1 AND COALESCE(parent_id, '') = COALESCE($2::text, '')
+        AND lower(name) = lower($3) AND group_id <> $4
+      LIMIT 1`,
+    [env.workspaceId, parentId, name, env.entity.id],
+  );
+  const taken = rows[0];
+  return taken === undefined
+    ? null
+    : refuseWith(GROUP_NAME_TAKEN_RULE, `There is already a group called ${taken.name} here.`);
 }
 
 /**
@@ -1727,14 +1961,23 @@ export async function checkPermission(
   if (projectRefusal !== null) {
     return projectRefusal;
   }
-  // FIFTH — the prefix a project is founded under must be free in its
-  // workspace (owner ruling 2026-09-20). Grouped with the project-shaped
+  // FIFTH — the prefix a project is founded under, or moves to, must be free in
+  // its workspace and not reserved to another project (owner ruling 2026-09-20;
+  // reservation: prefixes/groups Task 3). Grouped with the project-shaped
   // questions above and, like them, strictly downstream of the role gates: a
   // caller with no standing to found a project is told that, and never gets a
   // sentence about which prefixes are in use.
-  const prefixRefusal = await checkProjectPrefixUnique(ctx.db, env);
+  const prefixRefusal = await checkPrefixReservation(ctx.db, env);
   if (prefixRefusal !== null) {
     return prefixRefusal;
+  }
+  // Prefixes and groups Task 6: the group tree's own questions (parent, level, sibling
+  // names, in-use, a project filed under a real group). Downstream of the role gate for the
+  // reason `checkGroupRules` states, and before the lifecycle pass: it reads only
+  // `proj_groups` and `proj_projects`, which a lifecycle verdict cannot change.
+  const groupRefusal = await checkGroupRules(ctx.db, env);
+  if (groupRefusal !== null) {
+    return groupRefusal;
   }
   // SIXTH — trash series, Plan 1 Task 4 (spec §4). State refusals ("already
   // deleted", "delete it first", "unmark it first") for the eight lifecycle
