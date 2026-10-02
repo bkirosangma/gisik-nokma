@@ -936,6 +936,8 @@ function WorkspaceHome({
 }) {
   const viewer = viewerOf(workspace.role);
   const isAdmin = mayAdminister(workspace.role);
+  /** Whose collapsed groups the grouped view remembers (smoothness G-1, 25.303). */
+  const viewerId = useCurrentUser()?.id;
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
   /**
@@ -1339,7 +1341,7 @@ function WorkspaceHome({
         // and badged rather than moved to a section of their own. See `shown`'s
         // own comment above for the order and what it costs.
         groupedView ? (
-          <GroupedProjects groups={groups} projects={shown} renderCard={renderCard} />
+          <GroupedProjects groups={groups} projects={shown} renderCard={renderCard} userId={viewerId} workspaceId={workspace.id} />
         ) : (
           <ul className="gn-workspace-home__projects">{shown.map(renderCard)}</ul>
         )

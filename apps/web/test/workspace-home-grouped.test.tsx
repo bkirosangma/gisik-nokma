@@ -99,9 +99,11 @@ function sectionNameOf(projectId: string): string | null {
   const heading = section?.getAttribute('aria-labelledby');
   return heading === null || heading === undefined ? null : (document.getElementById(heading)?.textContent ?? null);
 }
-/** Every level strip's accessible name, in document order. */
-const stripNames = (): string[] =>
-  [...document.querySelectorAll('[data-level]')].map((strip) => strip.getAttribute('aria-label') ?? '');
+/** Every group section's level and name, in document order (the level guide is CSS; the section carries the level). */
+const sectionLevels = (): string[] =>
+  [...document.querySelectorAll('section[data-level]')].map(
+    (section) => `Level ${section.getAttribute('data-level')} group: ${document.getElementById(section.getAttribute('aria-labelledby') ?? '')?.textContent}`,
+  );
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -163,9 +165,9 @@ describe('22.122 the Grouped choice is remembered per user', () => {
 describe('22.140 the grouped view nests the groups, level by level', () => {
   it('22.140 L1→L4 sections in rank order, each with its level strip, and a project sits in its own group’s section', async () => {
     await showGrouped();
-    await screen.findByRole('img', { name: 'Level 1 group: Retail' });
+    await screen.findByRole('region', { name: 'Retail' });
     // Rank order at every depth, whatever order the wire served: Retail before Operations; Stores before Online.
-    expect(stripNames()).toEqual([
+    expect(sectionLevels()).toEqual([
       'Level 1 group: Retail',
       'Level 2 group: Stores',
       'Level 3 group: Kiosks',
@@ -173,8 +175,7 @@ describe('22.140 the grouped view nests the groups, level by level', () => {
       'Level 2 group: Online',
       'Level 1 group: Operations',
     ]);
-    const strip = screen.getByRole('img', { name: 'Level 3 group: Kiosks' });
-    expect(strip).toHaveAttribute('data-level', '3');
+    expect(screen.getByRole('region', { name: 'Kiosks' })).toHaveAttribute('data-level', '3');
     expect(sectionNameOf('p1')).toBe('Stores');
     expect(sectionNameOf('p6')).toBe('Kiosks');
     expect(sectionNameOf('p4')).toBe('Carts');
@@ -233,16 +234,16 @@ describe('22.142 the plain view is unchanged', () => {
   });
 });
 
-describe('22.143 each level strip uses its own level token', () => {
-  it('22.143 the rule for .gn-group-section__strip[data-level="N"] paints var(--gn-level-N), for N = 1…4', () => {
+describe('22.143 each level guide uses its own level token', () => {
+  it('22.143 the rule for .gn-group-section[data-level="N"]::before paints var(--gn-level-N), for N = 1…4', () => {
     const globals = readGlobalsCss();
     for (const level of [1, 2, 3, 4]) {
-      const rule = ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`);
+      const rule = ruleExactly(globals, `.gn-group-section[data-level="${level}"]::before`);
       expect(valueOf(rule, 'background'), `level ${level}`).toBe(`var(--gn-level-${level})`);
     }
     // CONTROL: the four rules are four rules, not one shared one — a test that cannot fail would pass here too.
     const painted = new Set(
-      [1, 2, 3, 4].map((level) => valueOf(ruleExactly(globals, `.gn-group-section__strip[data-level="${level}"]`), 'background')),
+      [1, 2, 3, 4].map((level) => valueOf(ruleExactly(globals, `.gn-group-section[data-level="${level}"]::before`), 'background')),
     );
     expect(painted.size).toBe(4);
   });

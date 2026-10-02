@@ -1389,20 +1389,65 @@ input, textarea, select { font-family: inherit; }
 .gn-project-card__chevron { flex: none; color: var(--gn-text-muted); }
 .gn-project-card__door:hover .gn-project-card__chevron,
 .gn-project-card__door:focus-visible .gn-project-card__chevron { color: var(--gn-text); }
-/* Grouped view (prefixes and groups Task 7, cases 22.140/22.141): each group is a section headed by its
-   name and a level strip, and a child group nests inside its parent. The strip's colour is the LEVEL's
-   (ruling R5, `--gn-level-N`), never the group's own; the strip is also named, so colour is never the only
-   signal. The ungrouped section has no strip: it is not a level. */
+/* Grouped view (prefixes and groups Task 7, cases 22.140/22.141; collapse and guides, smoothness G-1, cases
+   25.300-25.307): each group is a section headed by a disclosure button and its name, and a child group nests
+   inside its parent's body. The LEVEL GUIDE is the section's own `::before`: one 2px line down its left edge, from the
+   heading row (the section's top) to the bottom of its last child (the section's bottom), like an IDE's bracket
+   guide, so 1-4 parallel guides show each group's extent. Its colour is the LEVEL's (ruling R5, `--gn-level-N`), never
+   the group's own. It is decoration drawn by CSS (no element, no text, no contrast pair) and flat in every style:
+   a line, not a surface, so no style gives it a shadow. A collapsed group's body is `hidden`, so its section is
+   its heading row and so is its guide. The ungrouped section has no `data-level`: it is not a level, so it has no
+   guide and no indent. */
 .gn-grouped-projects { display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-group-section { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
-.gn-group-section .gn-group-section { margin-left: 1rem; }
-.gn-group-section__head { display: flex; align-items: center; gap: 0.625rem; }
+.gn-group-section[data-level] { position: relative; padding-inline-start: 0.875rem; }
+.gn-group-section[data-level]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.gn-group-section[data-level="1"]::before { background: var(--gn-level-1); }
+.gn-group-section[data-level="2"]::before { background: var(--gn-level-2); }
+.gn-group-section[data-level="3"]::before { background: var(--gn-level-3); }
+.gn-group-section[data-level="4"]::before { background: var(--gn-level-4); }
+.gn-group-section__head { display: flex; align-items: center; gap: 0.25rem; }
 .gn-group-section__name { margin: 0; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
-.gn-group-section__strip { flex: none; align-self: stretch; width: 0.375rem; min-height: 1.5rem; border-radius: 999px; }
-.gn-group-section__strip[data-level="1"] { background: var(--gn-level-1); }
-.gn-group-section__strip[data-level="2"] { background: var(--gn-level-2); }
-.gn-group-section__strip[data-level="3"] { background: var(--gn-level-3); }
-.gn-group-section__strip[data-level="4"] { background: var(--gn-level-4); }
+/* The count a collapsed heading carries: "<name> · N projects". */
+.gn-group-section__count { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* A real `<button>` (44px target) whose caret is a separate aria-hidden span, so its accessible name is exactly
+   "Collapse <name>" / "Expand <name>"; `▸` closed, `▾` open, keyed off the `aria-expanded` the button writes (the
+   board's workflow caret is the precedent, `.gn-board__workflow-caret`). */
+.gn-group-section__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin-inline-start: -0.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-group-section__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+.gn-group-section__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-group-section__caret::after { content: '▸'; }
+.gn-group-section__toggle[aria-expanded='true'] .gn-group-section__caret::after { content: '▾'; }
+/* The body is `display: flex`, which outranks the UA sheet's own `hidden`: without this rule the attribute that
+   collapses a group is decoration (the pair is asserted together, 25.305). */
+.gn-group-section__body { display: flex; flex-direction: column; gap: 0.75rem; }
+.gn-group-section__body[hidden] { display: none; }
+@media (max-width: 40rem) {
+  .gn-group-section[data-level] { padding-inline-start: 0.5rem; }
+}
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
@@ -1560,6 +1605,9 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
   border-left: 2px solid transparent;
 }
+/* A collapsed node's column is `hidden` (so its controls cannot take focus); `display: flex` above outranks the UA's
+   own `hidden`, so the attribute needs saying again (25.310, 25.313). */
+.gn-groups__children[hidden] { display: none; }
 .gn-groups__children::before {
   content: '';
   position: absolute;
@@ -1578,11 +1626,32 @@ input, textarea, select { font-family: inherit; }
   bottom: -0.5rem;
   background: var(--gn-border);
 }
-.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after { top: calc(1.625rem - 1px); }
+.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after {
+  top: calc(1.625rem - 1px);
+  border-radius: 1px 1px 0 0;
+}
 .gn-groups__children > .gn-groups__node:not(:only-child):last-child::after {
   bottom: auto;
   height: calc(0.5rem + 1.625rem + 1px);
+  border-radius: 0 0 1px 1px;
 }
+/* THE SPINE IS THE LEVEL GUIDE (smoothness G-1, 25.313): the one vertical line of a children column, from the
+   parent's row (the first child's elbow is on the parent's own row) to the last child's elbow, painted in the
+   PARENT's level colour (the column carries `data-level` = its parent's level) with the elbows that join it, so
+   the tree shows each group's extent in its colour without a second line beside the first. Flat: a line, not a
+   surface, so no style gives it a shadow. */
+.gn-groups__children[data-level="1"]::before,
+.gn-groups__children[data-level="1"] > .gn-groups__node::before { border-top-color: var(--gn-level-1); }
+.gn-groups__children[data-level="2"]::before,
+.gn-groups__children[data-level="2"] > .gn-groups__node::before { border-top-color: var(--gn-level-2); }
+.gn-groups__children[data-level="3"]::before,
+.gn-groups__children[data-level="3"] > .gn-groups__node::before { border-top-color: var(--gn-level-3); }
+.gn-groups__children[data-level="4"]::before,
+.gn-groups__children[data-level="4"] > .gn-groups__node::before { border-top-color: var(--gn-level-4); }
+.gn-groups__children[data-level="1"] > .gn-groups__node::after { background: var(--gn-level-1); }
+.gn-groups__children[data-level="2"] > .gn-groups__node::after { background: var(--gn-level-2); }
+.gn-groups__children[data-level="3"] > .gn-groups__node::after { background: var(--gn-level-3); }
+.gn-groups__children[data-level="4"] > .gn-groups__node::after { background: var(--gn-level-4); }
 .gn-groups__children > .gn-groups__node { gap: 0; }
 /* `gap: 0` above puts the child's stub flush against its box, but it also removed the gap between that child's box
    and ITS OWN children column, so at level 2 and below the column's `::before` ran over the box's last 1rem (next
@@ -1644,6 +1713,25 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer;
 }
 .gn-groups__add:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+/* The disclosure sits in the Delete slot: a node with children is never deletable, so a box never holds both and
+   every box keeps its width. Its caret is a separate aria-hidden span (the name stays "Collapse <name>"). */
+.gn-groups__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-groups__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+.gn-groups__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-groups__caret::after { content: '▸'; }
+.gn-groups__toggle[aria-expanded='true'] .gn-groups__caret::after { content: '▾'; }
 .gn-groups__name--button:focus-visible,
 .gn-groups__add:focus-visible,
 .gn-groups__input:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
@@ -1656,7 +1744,13 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 @media (max-width: 40rem) {
   .gn-groups__node { display: block; }
-  .gn-groups__children { margin-left: 1rem; border-left: 0; padding-left: 0; margin-top: 0.5rem; }
+  /* The list form's guide is the column's own 2px border, in the parent's level colour, from the box above to the
+     last child's bottom (25.307). */
+  .gn-groups__children { margin-left: 1rem; border-left: 2px solid var(--gn-border); padding-left: 0.5rem; margin-top: 0.5rem; }
+  .gn-groups__children[data-level="1"] { border-left-color: var(--gn-level-1); }
+  .gn-groups__children[data-level="2"] { border-left-color: var(--gn-level-2); }
+  .gn-groups__children[data-level="3"] { border-left-color: var(--gn-level-3); }
+  .gn-groups__children[data-level="4"] { border-left-color: var(--gn-level-4); }
   .gn-groups__children::before { display: none; }
   .gn-groups__children > .gn-groups__node::before { display: none; }
   .gn-groups__children > .gn-groups__node::after { display: none; }

@@ -411,7 +411,8 @@ describe('22.208 at 40rem the tree is an indented list', () => {
     expect(valueOf(node, 'display')).toBe('block');
     const children = ruleExactly(css, '.gn-groups__children', PHONE);
     expect(valueOf(children, 'margin-left')).toBe('1rem');
-    expect(valueOf(children, 'border-left')).toBe('0');
+    // The indent's line is the level guide (G-1, 25.307): 2px, no longer 0.
+    expect(valueOf(children, 'border-left')).toBe('2px solid var(--gn-border)');
     // The offset that keeps a non-root column off its box (22.210) is the SAME 1rem: it cannot double the indent here.
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node > .gn-groups__children'), 'margin-left')).toBe(
       valueOf(children, 'margin-left'),

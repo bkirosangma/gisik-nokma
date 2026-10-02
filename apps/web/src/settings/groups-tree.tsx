@@ -10,6 +10,7 @@ import {
   type GroupRow,
 } from '@gisik-nokma/domain';
 import { Button, Dialog, PlusIcon } from '@gisik-nokma/ui';
+import { useCollapsedGroups } from '../use-group-collapse.js';
 
 /** One thing the tree asks the page to file. The page turns it into a claim; the tree knows no envelope. */
 export type GroupAction =
@@ -23,6 +24,8 @@ export type GroupActionResult = { ok: true } | { ok: false; message: string };
 
 export type GroupsTreeProps = {
   workspaceId: string;
+  /** Whose collapsed branches are remembered (with `workspaceId`); without it a collapse lasts the page's life. */
+  userId?: string | undefined;
   /** Workspace owner or admin: the door refuses every group event from anyone else, so the controls are not drawn. */
   canEdit: boolean;
   groups: readonly GroupRow[];
@@ -134,9 +137,17 @@ function NameField({
  * a vertical list of siblings needs none of that), and Alt+↑/↓ on the name is the non-pointer path. The new rank
  * is `rankBetween` of the two siblings the box lands between. There is no touch drag: a phone reorders through
  * the keyboard path only.
+ *
+ * Every node with children collapses (smoothness G-1, cases 25.310-25.313): a toggle in the box's Delete slot (a
+ * node with children is never deletable, so the slot is free and every box keeps its width), `aria-expanded` on the
+ * treeitem, and the WAI-ARIA keys on the name and the toggle — → opens a closed node and enters an open one, ← closes
+ * an open node and, on a closed one or a leaf, goes to the parent. A collapsed node's children column is `hidden`,
+ * so its controls are not focusable. The same column carries its PARENT's level (`data-level`): the spine is the
+ * level guide, painted from `--gn-level-N`.
  */
-export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTreeProps): ReactElement {
+export function GroupsTree({ workspaceId, userId, canEdit, groups, onSubmit }: GroupsTreeProps): ReactElement {
   const base = useId();
+  const { collapsed, toggle, expand } = useCollapsedGroups('gn-groups-tree-collapsed', userId, workspaceId);
   const [adding, setAdding] = useState<string | 'root' | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<GroupRow | null>(null);
@@ -172,6 +183,14 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
   useEffect(() => {
     if (focusNext.current !== null && focusIf(focusNext.current)) focusNext.current = null;
   });
+  /** Focus a group's own stop: its name button, or the toggle when the name is plain text (a read-only tree). */
+  const focusGroup = (id: string): void => {
+    root.current
+      ?.querySelector<HTMLElement>(
+        `[data-group-id="${CSS.escape(id)}"] > .gn-groups__box :is(.gn-groups__name--button, .gn-groups__toggle)`,
+      )
+      ?.focus();
+  };
 
   /** Files one action; true when it committed. A second action waits for the first to answer. */
   const submit = async (action: GroupAction): Promise<boolean> => {
@@ -285,11 +304,30 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
     const nameId = `${base}-${group.id}`;
     const deletable = group.projectCount === 0 && group.childCount === 0;
     const addingHere = adding === group.id;
+    const hasChildren = node.children.length > 0;
+    const open = !collapsed.has(group.id);
+    const childrenId = `${nameId}-children`;
     const onNameKey = (event: KeyboardEvent<HTMLButtonElement>): void => {
       if (!event.altKey) return;
       if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         event.preventDefault();
         moveBy(group, event.key === 'ArrowUp' ? -1 : 1);
+      }
+    };
+    /** → and ←, from the name or the toggle (never from the rename field, whose arrows move its caret). */
+    const onBoxKey = (event: KeyboardEvent<HTMLDivElement>): void => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+      if (!(event.target as HTMLElement).closest('.gn-groups__name--button, .gn-groups__toggle')) return;
+      event.preventDefault();
+      if (event.key === 'ArrowRight') {
+        if (!hasChildren) return;
+        if (!open) expand(group.id);
+        else if (node.children[0] !== undefined) focusGroup(node.children[0].group.id);
+      } else if (hasChildren && open) {
+        toggle(group.id);
+      } else if (group.parentId !== null && groups.some((candidate) => candidate.id === group.parentId)) {
+        focusGroup(group.parentId);
       }
     };
     return (
@@ -302,6 +340,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
         aria-labelledby={renaming === group.id ? undefined : nameId}
         aria-label={renaming === group.id ? group.name : undefined}
         aria-selected={false}
+        aria-expanded={hasChildren ? open : undefined}
         className="gn-groups__node"
         data-group-id={group.id}
       >
@@ -324,6 +363,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
           onDragEnd={() => {
             dragging.current = null;
           }}
+          onKeyDown={onBoxKey}
         >
           <span
             role="img"
@@ -359,6 +399,18 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
               {group.name}
             </span>
           )}
+          {hasChildren ? (
+            <button
+              type="button"
+              className="gn-groups__toggle"
+              aria-expanded={open}
+              aria-controls={childrenId}
+              aria-label={`${open ? 'Collapse' : 'Expand'} ${group.name}`}
+              onClick={() => toggle(group.id)}
+            >
+              <span className="gn-groups__caret" aria-hidden="true" />
+            </button>
+          ) : null}
           {canEdit && deletable ? (
             <Button
               variant="danger-quiet"
@@ -376,6 +428,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
               aria-label={`Add a group under ${group.name}`}
               onClick={() => {
                 setRefusal(null);
+                expand(group.id);
                 setAdding(group.id);
               }}
             >
@@ -384,7 +437,13 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
           ) : null}
         </div>
         {node.children.length > 0 || addingHere ? (
-          <ul role="group" className="gn-groups__children">
+          <ul
+            role="group"
+            id={childrenId}
+            className="gn-groups__children"
+            data-level={group.level}
+            hidden={!open && !addingHere}
+          >
             {node.children.map(renderNode)}
             {addingHere ? renderDraft(group) : null}
           </ul>
