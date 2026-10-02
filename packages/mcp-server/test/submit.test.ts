@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { submitBatch } from '../src/tools/submit.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * MCP CRUD plan, Task 5. Case 14.302.
  */
 const ok = (i: number) => ({ status: 'committed', eventId: `e${i}`, seq: i, serverTime: '2026-10-01T10:00:00.000Z' });
 function session(results: unknown[]): Session {
-  return { userId: () => 'U', get: async () => ({}), post: async () => ({}), postEvents: async () => ({ results }) };
+  return { userId: () => 'U', get: async () => ({}), post: async () => ({}), postEvents: async () => ({ results }), ...NO_TRANSFER };
 }
 
 describe('14.302 submitBatch', () => {

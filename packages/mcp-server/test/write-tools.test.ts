@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ULID_REGEX, domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { writeTools } from '../src/tools/write-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * Plan: MCP server, Task 9. Cases 14.70–14.77.
@@ -24,6 +25,7 @@ function sessionCapturing(result: unknown): { session: Session; sent: unknown[][
     userId: () => USER,
     get: async () => { throw new Error('not a write'); },
     post: async () => { throw new Error('not a write'); },
+    ...NO_TRANSFER,
     postEvents: async (events) => { sent.push(events); return result; },
   };
   return { session, sent };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { domainRegistry, parseEvent } from '@gisik-nokma/domain';
 import { projectTools } from '../src/tools/project-tools.js';
 import type { Session } from '../src/session.js';
+import { NO_TRANSFER } from './fixtures/fake-session.js';
 
 /**
  * MCP CRUD plan, Task 7. Cases 14.317–14.324 (the plan's `get_project` case is
@@ -48,6 +49,7 @@ function fake(answer: unknown = COMMITTED, deleted: unknown[] = []) {
       return structuredClone(path === '/v1/me/workspaces' ? { workspaces } : path === '/v1/me/deleted-items' ? { items: deleted } : {});
     },
     post: async () => ({}),
+    ...NO_TRANSFER,
     postEvents: async (events) => {
       sent.push(events);
       return answer;
