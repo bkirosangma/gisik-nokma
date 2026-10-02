@@ -688,37 +688,22 @@ function ProjectBoard() {
   const [showClosedOnDates, setShowClosedOnDates] = useState(false);
 
   /**
-   * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
-   * field list, restated here exactly once. `boardNarrowing` below and
-   * `activeFilterChips` further down BOTH read this SAME value; before the
-   * review that asked for this, they were two independently hand-written
-   * lists of "which axes exist" that had already drifted (the chip builder
-   * only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
-   * `buildFilterChips` for the full account. A future axis added to
-   * `BoardFilterSpec` now has exactly one object literal to update, not two.
+   * THE ONE ENUMERATION of the six axes a board can answer — `boardSpecOf` (module scope, below), `Pick`'s own
+   * field list restated exactly once. `boardNarrowing` below and `activeFilterChips` further down BOTH read a spec made
+   * by it; before the review that asked for this, they were two independently hand-written lists of "which axes exist"
+   * that had already drifted (the chip builder only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
+   * `buildFilterChips` for the full account. A future axis added to `BoardFilterSpec` now has exactly one object literal
+   * to update, not two.
+   *
+   * TWO COPIES, ONE SHAPE (Smoothness T12). `boardFilter` is made from the DEFERRED filter and is the board's narrowing
+   * input only (`boardNarrowing`): the search box paints at once and the board narrows a render later. `liveBoardFilter`
+   * is made from the LIVE filter and feeds the two chip lists (`activeFilterChips`, `listFilterChips`), so a chip's ×
+   * and a sheet toggle repaint the strip at once instead of waiting for the narrowing.
    */
   const boardFilter: BoardFilterSpec = useMemo(
-    () => ({
-      text: deferredFilter.text,
-      assigneeIds: deferredFilter.assigneeIds,
-      typeIds: deferredFilter.typeIds,
-      stateIds: deferredFilter.stateIds,
-      stateCategories: deferredFilter.stateCategories,
-      projectIds: deferredFilter.projectIds,
-      // The exclude half, the same five — `collaboratorIds` deliberately dropped
-      // (`BoardFilterSpec.exclude` cannot carry it; `describeUnappliedBoardAxes`
-      // discloses it). Exclude-mode spec §1/§3.
-      exclude:
-        deferredFilter.exclude === undefined
-          ? undefined
-          : {
-              assigneeIds: deferredFilter.exclude.assigneeIds,
-              typeIds: deferredFilter.exclude.typeIds,
-              stateIds: deferredFilter.exclude.stateIds,
-              stateCategories: deferredFilter.exclude.stateCategories,
-              projectIds: deferredFilter.exclude.projectIds,
-            },
-    }),
+    () => boardSpecOf(deferredFilter),
+    // The six axes and `exclude` only — `closed` and the list-only axes changing must not rebuild the board's spec.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       deferredFilter.text,
       deferredFilter.assigneeIds,
@@ -728,6 +713,11 @@ function ProjectBoard() {
       deferredFilter.projectIds,
       deferredFilter.exclude,
     ],
+  );
+  const liveBoardFilter: BoardFilterSpec = useMemo(
+    () => boardSpecOf(filter),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filter.text, filter.assigneeIds, filter.typeIds, filter.stateIds, filter.stateCategories, filter.projectIds, filter.exclude],
   );
 
   /**
@@ -2006,7 +1996,7 @@ function ProjectBoard() {
   const activeFilterChips = useMemo(
     () =>
       buildFilterChips(
-        boardFilter,
+        liveBoardFilter,
         {
           assigneeName: nameOf,
           typeName: (id) => typeNameById.get(id) ?? id,
@@ -2014,7 +2004,7 @@ function ProjectBoard() {
         },
         setFilter,
       ),
-    [boardFilter, nameOf, typeNameById, boardStateNames],
+    [liveBoardFilter, nameOf, typeNameById, boardStateNames],
   );
 
   /**
@@ -2096,7 +2086,7 @@ function ProjectBoard() {
   const listFilterChips = useMemo(
     () =>
       buildFilterChips(
-        { ...boardFilter, closed: filter.closed },
+        { ...liveBoardFilter, closed: filter.closed },
         {
           assigneeName: nameOf,
           typeName: (id) => typeNameById.get(id) ?? id,
@@ -2104,7 +2094,7 @@ function ProjectBoard() {
         },
         setFilter,
       ),
-    [boardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
+    [liveBoardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
   );
 
   /**
@@ -3976,6 +3966,32 @@ export const FILTERS_SHEET_CLEARABLE_AXES = [
   'closed',
   'exclude',
 ] as const satisfies readonly (keyof FilterSpec)[];
+
+/**
+ * THE ONE ENUMERATION of the six axes a board can answer, plus the exclude half's five (`collaboratorIds` deliberately
+ * dropped: `BoardFilterSpec.exclude` cannot carry it, and `describeUnappliedBoardAxes` discloses it — exclude-mode spec
+ * §1/§3). The page calls it twice, on the deferred filter for the narrowing and on the live one for the chips.
+ */
+function boardSpecOf(spec: FilterSpec): BoardFilterSpec {
+  return {
+    text: spec.text,
+    assigneeIds: spec.assigneeIds,
+    typeIds: spec.typeIds,
+    stateIds: spec.stateIds,
+    stateCategories: spec.stateCategories,
+    projectIds: spec.projectIds,
+    exclude:
+      spec.exclude === undefined
+        ? undefined
+        : {
+            assigneeIds: spec.exclude.assigneeIds,
+            typeIds: spec.exclude.typeIds,
+            stateIds: spec.exclude.stateIds,
+            stateCategories: spec.exclude.stateCategories,
+            projectIds: spec.exclude.projectIds,
+          },
+  };
+}
 
 /**
  * Resets every axis named in `FILTERS_SHEET_CLEARABLE_AXES` to `undefined`,
