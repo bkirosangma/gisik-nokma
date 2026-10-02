@@ -1439,6 +1439,7 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-group-section__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
 .gn-group-section__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-group-section__caret { font-size: 1.25rem; line-height: 1; }
 .gn-group-section__caret::after { content: '▸'; }
 .gn-group-section__toggle[aria-expanded='true'] .gn-group-section__caret::after { content: '▾'; }
 /* The body is `display: flex`, which outranks the UA sheet's own `hidden`: without this rule the attribute that
@@ -1713,6 +1714,24 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer;
 }
 .gn-groups__add:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+/* The Delete control is the add control's twin in size and placement: a 44px round target around a ~20px red ⊖ glyph
+   (G-1c, 25.315). Flat in every style: no fill, rim or shadow of its own, only the hover wash `.gn-groups__add` has. */
+.gn-groups__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-danger);
+  cursor: pointer;
+}
+.gn-groups__delete:hover { background: var(--gn-fill-quaternary); }
+.gn-groups__delete:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 /* The disclosure sits in the Delete slot: a node with children is never deletable, so a box never holds both and
    every box keeps its width. Its caret is a separate aria-hidden span (the name stays "Collapse <name>"). */
 .gn-groups__toggle {
@@ -1730,6 +1749,7 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-groups__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
 .gn-groups__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-groups__caret { font-size: 1.25rem; line-height: 1; }
 .gn-groups__caret::after { content: '▸'; }
 .gn-groups__toggle[aria-expanded='true'] .gn-groups__caret::after { content: '▾'; }
 .gn-groups__name--button:focus-visible,
@@ -1745,8 +1765,8 @@ input, textarea, select { font-family: inherit; }
 @media (max-width: 40rem) {
   .gn-groups__node { display: block; }
   /* The list form's guide is the column's own 2px border, in the parent's level colour, from the box above to the
-     last child's bottom (25.307). */
-  .gn-groups__children { margin-left: 1rem; border-left: 2px solid var(--gn-border); padding-left: 0.5rem; margin-top: 0.5rem; }
+     last child's bottom (25.307): it starts at the box above (no margin), so the line is continuous with the heading row. */
+  .gn-groups__children { margin-left: 1rem; border-left: 2px solid var(--gn-border); padding-left: 0.5rem; margin-top: 0; padding-top: 0.5rem; }
   .gn-groups__children[data-level="1"] { border-left-color: var(--gn-level-1); }
   .gn-groups__children[data-level="2"] { border-left-color: var(--gn-level-2); }
   .gn-groups__children[data-level="3"] { border-left-color: var(--gn-level-3); }

@@ -276,6 +276,8 @@ describe('25.307 phones keep a 2px guide and may shrink the indent', () => {
     // The tree's list form draws its guide as the column's own border: 2px, in the level colour, no shorter than the column.
     const column = ruleExactly(css, '.gn-groups__children', PHONE);
     expect(valueOf(column, 'border-left')).toBe('2px solid var(--gn-border)');
+    // It starts AT the box above (no margin gap), the padding carries the first child's spacing inside the line.
+    expect(valueOf(column, 'margin-top')).toBe('0');
     for (const n of [1, 2, 3, 4]) {
       expect(valueOf(ruleExactly(css, `.gn-groups__children[data-level="${n}"]`, PHONE), 'border-left-color')).toBe(`var(--gn-level-${n})`);
     }
@@ -469,5 +471,49 @@ describe('25.313 the tree spine IS the level guide: one line, in the parent’s 
     expect(columnOf('Gamma')).toHaveAttribute('data-level', '3');
     // CONTROL: a leaf has no column.
     expect(columnOf('Beta')).toBeNull();
+  });
+});
+
+describe('25.315 a group’s Delete is a small red ⊖ icon button, not a text button (G-1c)', () => {
+  const css = cssOf('globals');
+  it('25.315 the row shows no "Delete" text: an aria-hidden SVG circle + bar inside a button named "Delete <group>" with the same title', () => {
+    tree();
+    const button = screen.getByRole('button', { name: 'Delete Beta' });
+    expect(button).toHaveAttribute('title', 'Delete Beta');
+    expect(button.textContent).toBe('');
+    expect(within(item('Beta')).queryByText(/^Delete$/)).toBeNull();
+    const svg = button.querySelector('svg')!;
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
+    expect(svg.querySelector('circle')).not.toBeNull();
+    expect(svg.querySelector('path')).not.toBeNull();
+    // CONTROL: the dialog's confirm keeps its words — only the in-row control lost them.
+    expect(button.className).toBe('gn-groups__delete');
+  });
+
+  it('25.315 the glyph takes the danger role, the target is 2.75rem square like the add control, and no style adds chrome', () => {
+    const rule = ruleExactly(css, '.gn-groups__delete');
+    expect(valueOf(rule, 'color')).toBe('var(--gn-danger)');
+    expect(valueOf(rule, 'width')).toBe('2.75rem');
+    expect(valueOf(rule, 'height')).toBe('2.75rem');
+    expect(valueOf(rule, 'background')).toBe('transparent');
+    expect(valueOf(rule, 'box-shadow')).toBe('none');
+    const add = ruleExactly(css, '.gn-groups__add');
+    expect(valueOf(add, 'width')).toBe(valueOf(rule, 'width'));
+    expect(valueOf(add, 'height')).toBe(valueOf(rule, 'height'));
+    const styleArms = (source: string) =>
+      parseRules(source).filter((r) => r.selectors.some((sel) => sel.includes('data-style') && sel.includes('.gn-groups__delete')));
+    // CONTROL: the check sees a style arm when there is one, so the empty answer below is a finding.
+    expect(styleArms(`${css}\n[data-style="neo"] .gn-groups__delete { box-shadow: var(--gn-shadow-lift); }`)).not.toEqual([]);
+    expect(styleArms(css)).toEqual([]);
+  });
+
+  it('25.315 Delete still opens the confirmation and Cancel hands focus back to the icon button', async () => {
+    tree();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Delete Beta' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Delete group' })).toHaveTextContent('Delete group');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete Beta' }));
   });
 });

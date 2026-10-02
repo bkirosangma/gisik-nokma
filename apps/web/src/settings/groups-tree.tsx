@@ -12,6 +12,21 @@ import {
 import { Button, Dialog, PlusIcon } from '@gisik-nokma/ui';
 import { useCollapsedGroups } from '../use-group-collapse.js';
 
+/**
+ * The ⊖ of a group's Delete control (smoothness G-1c, case 25.315): a circle and a bar, drawn with the same terms as
+ * `PlusIcon` (24x24, `fill="none"`, `aria-hidden`). Its ink is the danger role through the button's CSS, so it follows
+ * theme and style; the button's `aria-label` names the action, the glyph never speaks.
+ */
+function MinusCircleIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12h8" />
+    </svg>
+  );
+}
+
 /** One thing the tree asks the page to file. The page turns it into a claim; the tree knows no envelope. */
 export type GroupAction =
   | { type: 'group.created'; id: string; payload: GroupCreatedPayload }
@@ -412,14 +427,15 @@ export function GroupsTree({ workspaceId, userId, canEdit, groups, onSubmit }: G
             </button>
           ) : null}
           {canEdit && deletable ? (
-            <Button
-              variant="danger-quiet"
+            <button
+              type="button"
               className="gn-groups__delete"
               aria-label={`Delete ${group.name}`}
+              title={`Delete ${group.name}`}
               onClick={() => setConfirming(group)}
             >
-              Delete
-            </Button>
+              <MinusCircleIcon />
+            </button>
           ) : null}
           {canEdit && group.level < 4 ? (
             <button

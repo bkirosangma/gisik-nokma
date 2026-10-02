@@ -362,10 +362,10 @@ describe('22.206 Delete shows only on an unused group, and confirms', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Beta' }));
     const dialog = await screen.findByRole('dialog');
     expect(onSubmit).not.toHaveBeenCalled();
-    // CONTROL — Cancel files nothing; the confirm is the filled danger, the in-list button the quiet one.
+    // CONTROL — Cancel files nothing; the confirm is the filled danger, the in-list control the ⊖ icon button (G-1c).
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Delete Beta' })).toHaveClass('gn-button--danger-quiet');
+    expect(screen.getByRole('button', { name: 'Delete Beta' })).toHaveClass('gn-groups__delete');
     await user.click(screen.getByRole('button', { name: 'Delete Beta' }));
     const confirm = within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete group' });
     expect(confirm).toHaveClass('gn-button--danger');
