@@ -12,9 +12,10 @@ import { PhoneSwitcher } from "./phone-switcher.js";
 import { useSessionStatus } from "./providers.js";
 import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
+import { NavHoverMenu } from "./nav-hover-menu.js";
 import { isWithin } from "./path-within.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
-import { useWorkspaceName } from "./use-workspace-name.js";
+import { useWorkspaceLookup } from "./use-workspace-name.js";
 
 /**
  * `AppNav` — CONTEXTUAL (Round 19b, owner feedback item 2).
@@ -219,7 +220,8 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
     workspaceId ?? (remembered.status === "remembered" ? remembered.workspaceId : undefined);
   const fromMemory = workspaceId === undefined && remembered.status === "remembered";
 
-  const workspaceName = useWorkspaceName(effectiveWorkspaceId);
+  // ONE read feeds both the name and the dropdown's rows (U-T14, case 23.254).
+  const { name: workspaceName, others: otherWorkspaces } = useWorkspaceLookup(effectiveWorkspaceId);
 
   /**
    * **A REMEMBERED workspace must prove itself; a ROUTED one need not.**
@@ -232,7 +234,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
    * offer a link that cannot resolve. That is the whole reason the Board item
    * was removed.
    *
-   * So the proof is `workspaceName !== null`, which `useWorkspaceName` derives
+   * So the proof is `workspaceName !== null`, which `useWorkspaceLookup` (`useWorkspaceName` is its `name`) derives
    * from `getMyWorkspaces()` — the ONE shared read this bar already makes. No
    * second request, and no second definition of "reachable" to drift from the
    * first.
@@ -316,15 +318,28 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         <div className="gn-nav__more">
         {/* The workspace's own served name — ONE source, `getMyWorkspaces`, never
             a second derivation. Omitted (not id, not a placeholder) until the
-            name arrives or if the read fails; see `useWorkspaceName` above. */}
+            name arrives or if the read fails; see `useWorkspaceLookup` above. */}
         {!noWorkspace && workspaceName !== null ? (
-          <Link
-            href={`/w/${effectiveWorkspaceId}`}
-            aria-current={current(`/w/${effectiveWorkspaceId}`)}
-            className="gn-nav__workspace"
-          >
-            <span className="gn-nav__label">{workspaceName}</span>
-          </Link>
+          /* A click goes to the workspace home, as it always did. Hover or focus (U-T14, owner 2026-10-02) opens the list
+             of the viewer's OTHER workspaces through the same `NavHoverMenu` Last project uses; with none, `enabled` is
+             false and this is the plain link it was (no `aria-haspopup`). The separate Workspaces link is untouched. */
+          <NavHoverMenu
+            className="gn-nav__workspace-group"
+            menuLabel="Workspaces"
+            enabled={otherWorkspaces.length > 0}
+            items={otherWorkspaces.map((workspace) => ({
+              id: workspace.id,
+              href: `/w/${workspace.id}`,
+              label: workspace.name,
+              current: pathname === `/w/${workspace.id}`,
+            }))}
+            trigger={{
+              href: `/w/${effectiveWorkspaceId}`,
+              className: "gn-nav__workspace",
+              current: current(`/w/${effectiveWorkspaceId}`) === "page",
+              children: <span className="gn-nav__label">{workspaceName}</span>,
+            }}
+          />
         ) : null}
         {/* IMMEDIATELY RIGHT OF THE WORKSPACE NAME (owner, 2026-09-18) — the
             project you were last in, opening on hover into a dropdown of the
