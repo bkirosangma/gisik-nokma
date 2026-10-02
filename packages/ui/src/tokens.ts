@@ -247,7 +247,6 @@ export const primitives = {
    * `textSubtleLight` `#5e5e62` read 4.47 — under the neo floor of 4.5. `#5b5b5f` reads 4.68 there and 5.67 on paper. Same
    * precedent as `neoTextSubtleDark`. `hig`/`minimal` keep `textSubtleLight`.
    */
-  neoTextSubtleLight: '#5b5b5f',
   /**
    * ## The neo field RIM and the well step (owner rulings U5 and U8, 2026-10-02; UX fixes T1)
    *
@@ -1069,7 +1068,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
  *
  * **Neo refresh T1 (2026-10-02; N2, N4 = B): both arms' `surfaceSunken` step to the well (`neoWellLight`/`neoWellDark`) — a pressed fill
  * is never lighter than its ground — and the dark arm's `surfaceRaised` returns to `neoNavy` (`neoNavyRaised`'s U8 step is retired).
- * The light arm gains `textSubtle: neoTextSubtleLight` so a placeholder still clears 4.5 composited on the well.**
+ * The light arm keeps `textSubtleLight`: 18.306 is re-modelled for neo (the field paints the well, no `fillQuaternary`), not the palette moved.**
  *
  * **T5 (2026-09-18): the light arm gains the five semantic colours the
  * refreshed export's light-neo block declares.** The mapping is by MEANING,
@@ -1094,7 +1093,6 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surface: 'neoPaper',
       surfaceRaised: 'neoPaper',
       surfaceSunken: 'neoWellLight', // N2 (2026-10-02): a pressed fill is never lighter than its ground
-      textSubtle: 'neoTextSubtleLight', // 4.5 on the field's composited placeholder ground (18.306)
       surfaceOverlay: 'overlayWarmNeo',
       surfaceTrack: 'neoWellLight',
       surfaceWell: 'neoWellLight',
@@ -1373,7 +1371,11 @@ export type ShadowRole =
   | 'danger'
   | 'danger-near'
   | 'danger-press'
-  | 'knob-on';
+  | 'knob-on'
+  | 'action-filled-disabled'
+  | 'danger-disabled'
+  | 'drop'
+  | 'drop-side';
 
 /** One `box-shadow` layer: geometry as plain numbers (not colour, outside the discipline scanner's remit) plus one alpha-colour primitive. */
 type ShadowLayer = {
@@ -1386,16 +1388,18 @@ type ShadowLayer = {
   inset?: boolean;
 };
 
-/** The sixteen roles the neo refresh added (2026-10-02, N1–N10). `hig` and `minimal` carry them too, as aliases or `[]`, so a shared consumer reads one name in every style. */
+/** The twenty roles the neo refresh added (2026-10-02, N1–N10). `hig` and `minimal` carry them too, as aliases or `[]`, so a shared consumer reads one name in every style. */
 type RefreshShadowRole =
   | 'raised-lg' | 'near-lg' | 'near' | 'raised-compact'
   | 'recess' | 'field'
   | 'quiet' | 'quiet-near' | 'quiet-press'
   | 'action-filled' | 'action-filled-near' | 'action-filled-press'
   | 'danger' | 'danger-near' | 'danger-press'
-  | 'knob-on';
+  | 'knob-on'
+  | 'action-filled-disabled' | 'danger-disabled'
+  | 'drop' | 'drop-side';
 
-/** `minimal` draws no shadow, so every refresh role is `[]` there. */
+/** `minimal` draws no shadow, so every refresh role is `[]` there — except `drop`/`drop-side`, the scrim drops minimal already painted (plan T1 Step 5). */
 const NO_REFRESH_SHADOWS: Record<RefreshShadowRole, readonly ShadowLayer[]> = {
   'raised-lg': [], 'near-lg': [], near: [], 'raised-compact': [],
   recess: [], field: [],
@@ -1403,6 +1407,18 @@ const NO_REFRESH_SHADOWS: Record<RefreshShadowRole, readonly ShadowLayer[]> = {
   'action-filled': [], 'action-filled-near': [], 'action-filled-press': [],
   danger: [], 'danger-near': [], 'danger-press': [],
   'knob-on': [],
+  'action-filled-disabled': [], 'danger-disabled': [],
+  drop: [], 'drop-side': [],
+};
+
+/** The scrim drops `.gn-dialog`-class panels and the sheet already painted as a literal `var(--gn-shadow)` (hig and minimal), now named roles. Neo reads its own pair instead. */
+const DROP: Record<ThemeName, readonly ShadowLayer[]> = {
+  light: [{ x: 0, y: 8, blur: 24, colour: 'scrimLight' }],
+  dark: [{ x: 0, y: 8, blur: 24, colour: 'scrimDark' }],
+};
+const DROP_SIDE: Record<ThemeName, readonly ShadowLayer[]> = {
+  light: [{ x: -12, y: 0, blur: 40, colour: 'scrimLight' }],
+  dark: [{ x: -12, y: 0, blur: 40, colour: 'scrimDark' }],
 };
 
 /**
@@ -1410,10 +1426,10 @@ const NO_REFRESH_SHADOWS: Record<RefreshShadowRole, readonly ShadowLayer[]> = {
  * resolves, under hig, to the exact layers it painted before, so hig is byte-identical (case 24.002). `recess`, `field` and the
  * `quiet*` roles are `[]` — hig keeps its field rim and draws no depth on ghost/icon buttons.
  */
-function higRefresh(base: Record<Exclude<ShadowRole, RefreshShadowRole>, readonly ShadowLayer[]>): Record<ShadowRole, readonly ShadowLayer[]> {
+function higRefresh(theme: ThemeName, base: Record<Exclude<ShadowRole, RefreshShadowRole>, readonly ShadowLayer[]>): Record<ShadowRole, readonly ShadowLayer[]> {
   return {
     ...base,
-    'raised-lg': base.raised,
+    'raised-lg': base.lift,
     'near-lg': base['lift-near'],
     near: base['lift-near'],
     'raised-compact': base.lift,
@@ -1429,6 +1445,10 @@ function higRefresh(base: Record<Exclude<ShadowRole, RefreshShadowRole>, readonl
     'danger-near': base['lift-near'],
     'danger-press': base['lift-press'],
     'knob-on': [],
+    'action-filled-disabled': base.action,
+    'danger-disabled': base.lift,
+    drop: DROP[theme],
+    'drop-side': DROP_SIDE[theme],
   };
 }
 
@@ -1486,6 +1506,10 @@ function neoShadows(L: NeoLamp): Record<ShadowRole, readonly ShadowLayer[]> {
     danger: filled, 'danger-near': filledNear,
     'danger-press': [{ x: 2, y: 2, blur: 5, colour: L.dangerPress, inset: true }],
     'knob-on': [{ x: 1, y: 2, blur: 4, colour: L.d }],
+    'action-filled-disabled': [],
+    'danger-disabled': [],
+    drop: nearLg,
+    'drop-side': raisedLg,
   };
 }
 
@@ -1512,7 +1536,7 @@ function neoShadows(L: NeoLamp): Record<ShadowRole, readonly ShadowLayer[]> {
  */
 const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly ShadowLayer[]>>> = {
   hig: {
-    light: higRefresh({
+    light: higRefresh('light', {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigLight' }],
@@ -1582,7 +1606,7 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
         { x: -24, y: 0, blur: 48, spread: -16, colour: 'shadowSheetLight' },
       ],
     }),
-    dark: higRefresh({
+    dark: higRefresh('dark', {
       raised: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
       sunken: [],
       overlay: [{ x: 0, y: 1, blur: 3, colour: 'shadowHigDark' }],
@@ -1637,8 +1661,8 @@ const SHADOWS: Record<StyleName, Record<ThemeName, Record<ShadowRole, readonly S
     }),
   },
   minimal: {
-    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS },
-    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS },
+    light: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS, drop: DROP.light, 'drop-side': DROP_SIDE.light },
+    dark: { raised: [], sunken: [], overlay: [], 'sunken-compact': [], selected: [], lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: [], ...NO_REFRESH_SHADOWS, drop: DROP.dark, 'drop-side': DROP_SIDE.dark },
   },
   neo: { light: neoShadows(NEO_LIGHT), dark: neoShadows(NEO_DARK) },
 };
@@ -1930,6 +1954,10 @@ export const SHADOW_ROLES: readonly ShadowRole[] = [
   'danger-near',
   'danger-press',
   'knob-on',
+  'action-filled-disabled',
+  'danger-disabled',
+  'drop',
+  'drop-side',
 ];
 const FONT_ROLES: readonly FontRole[] = ['sans', 'mono'];
 

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './helpers/colour-scan.js';
 import { contrastRatio, over } from './helpers/contrast.js';
+import { readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
 import {
   CONTRAST_PAIRS,
   SHADOW_ROLES,
@@ -73,8 +74,9 @@ describe('24.003 the sized pairs (spec §3.3; N7)', () => {
       expect(shadowValueOf('neo', theme, 'sheet')).toBe(shadowValueOf('neo', theme, 'raised-lg'));
       expect(shadowValueOf('neo', theme, 'lift-drag')).toBe(`14px 14px 32px ${d[theme]}, -14px -14px 32px ${h[theme]}`);
     }
-    // CONTROL: hig's raised-lg is its raised, minimal's is none.
-    expect(shadowValueOf('hig', 'light', 'raised-lg')).toBe(shadowValueOf('hig', 'light', 'raised'));
+    // CONTROL: hig's raised-lg is its LIFT (FIX 1 item 1b: `.gn-nav` read lift and must not change), minimal's is none.
+    expect(shadowValueOf('hig', 'light', 'raised-lg')).toBe(shadowValueOf('hig', 'light', 'lift'));
+    expect(shadowValueOf('hig', 'dark', 'raised-lg')).toBe(shadowValueOf('hig', 'dark', 'lift'));
     expect(shadowValueOf('minimal', 'dark', 'raised-lg')).toBe('none');
   });
 });
@@ -131,6 +133,22 @@ describe('24.006 filled surfaces carry no highlight (spec §4; N8)', () => {
       expect(shadowValueOf('hig', theme, 'danger')).toBe(before[`hig/${theme}`]['lift']);
       expect(shadowValueOf('hig', theme, 'danger-press')).toBe(before[`hig/${theme}`]['lift-press']);
     }
+    // the disabled roles: neo draws nothing on a dead button, hig keeps what it painted (FIX 1 item 1e)
+    for (const theme of ['light', 'dark'] as const) {
+      expect(shadowValueOf('neo', theme, 'action-filled-disabled')).toBe('none');
+      expect(shadowValueOf('neo', theme, 'danger-disabled')).toBe('none');
+      expect(shadowValueOf('hig', theme, 'action-filled-disabled')).toBe(before[`hig/${theme}`]['action']);
+      expect(shadowValueOf('hig', theme, 'danger-disabled')).toBe(before[`hig/${theme}`]['lift']);
+    }
+    // the two generic drops: scrim in hig/minimal (today's literals), the sheet/near-lg pair in neo
+    expect(shadowValueOf('hig', 'light', 'drop')).toBe('0px 8px 24px #1c1b1866');
+    expect(shadowValueOf('hig', 'dark', 'drop')).toBe('0px 8px 24px #000000a6');
+    expect(shadowValueOf('minimal', 'light', 'drop-side')).toBe('-12px 0px 40px #1c1b1866');
+    expect(shadowValueOf('minimal', 'dark', 'drop-side')).toBe('-12px 0px 40px #000000a6');
+    for (const theme of ['light', 'dark'] as const) {
+      expect(shadowValueOf('neo', theme, 'drop')).toBe(shadowValueOf('neo', theme, 'near-lg'));
+      expect(shadowValueOf('neo', theme, 'drop-side')).toBe(shadowValueOf('neo', theme, 'sheet'));
+    }
     // the press shades are the fill x 0.75, stated so a palette edit recomputes them
     expect(primitives.shadowNeoAccentPressLight).toBe('#264a77ff'); // blue600 #33629f x 0.75
     expect(primitives.shadowNeoDangerPressLight).toBe('#772018ff'); // neoLightDanger #9e2a20 x 0.75
@@ -157,17 +175,70 @@ describe('24.007 surfaces: sunken = the well, dark raised = the page hex (N2, N4
 });
 
 describe('24.008 every new role reaches the stylesheet under every style x theme (13.411 extended)', () => {
-  it('24.008 the sixteen new roles are in SHADOW_ROLES and emitted as often as an existing role (every style x theme block)', () => {
-    const NEW = ['raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on'] as const;
+  it('24.008 the twenty new roles are in SHADOW_ROLES and emitted nine times each (three blocks per style x hig/minimal/neo)', () => {
+    const NEW = [
+      'raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press',
+      'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on',
+      'action-filled-disabled', 'danger-disabled', 'drop', 'drop-side',
+    ] as const;
     const sheet = themeStylesheet();
     const count = (role: string) => sheet.split(`--gn-shadow-${role}:`).length - 1;
-    // CONTROL: an existing role is declared once per block of `themeStylesheet()`: three per style (light, explicit dark,
-    // prefers-color-scheme dark) x hig/minimal/neo = 9. The plan said "six"; the new roles are held to the existing role's count.
-    const expected = count('raised');
-    expect(expected).toBeGreaterThanOrEqual(6);
     for (const role of NEW) {
       expect(SHADOW_ROLES).toContain(role);
-      expect(count(role), role).toBe(expected);
+      expect(count(role), role).toBe(9);
     }
+    // CONTROL: an existing role is emitted the same nine times, so the count is the emitter's, not the roles'.
+    expect(count('raised')).toBe(9);
+  });
+});
+
+describe('24.009 the consumer door: every selector the plan switches renders in hig and minimal exactly as today (spec §7, zero drift)', () => {
+  /** (selector, the role it reads today, the role it reads after this plan). Switched in T2–T6; the table is the contract. */
+  const SWITCHES: ReadonlyArray<[string, ShadowRole, ShadowRole]> = [
+    ['.gn-nav', 'lift', 'raised-lg'],
+    ['.gn-dialog', 'lift-near', 'near-lg'], ['.gn-select__panel', 'lift-near', 'near-lg'], ['.gn-popover', 'lift-near', 'near-lg'],
+    ['.gn-infotip__panel', 'lift-near', 'near-lg'], ['.gn-nav__menu', 'lift-near', 'near-lg'], ['.gn-card-menu__list', 'lift-near', 'near-lg'],
+    ['.mention-popup, .wikilink-popup, .ticketref-popup', 'lift-near', 'near-lg'], ['.gn-skip', 'lift-near', 'near-lg'],
+    ['.gn-toc-launcher__panel', 'lift-near', 'near-lg'], ['.wikilink-preview', 'lift-near', 'near-lg'], ['.table-toolbar', 'lift-near', 'near-lg'],
+    ['.gn-button--primary', 'action', 'action-filled'], ['.gn-button--primary:hover', 'action-near', 'action-filled-near'],
+    ['.gn-button--primary:active', 'action-press', 'action-filled-press'], ['.gn-button--primary:disabled', 'action', 'action-filled-disabled'],
+    ['.gn-button--danger', 'lift', 'danger'], ['.gn-button--danger:hover', 'lift-near', 'danger-near'],
+    ['.gn-button--danger:active', 'lift-press', 'danger-press'], ['.gn-button--danger:disabled', 'lift', 'danger-disabled'],
+    ['.gn-list__column-option', 'lift', 'raised-compact'],
+  ];
+  /** Selectors that gain a role where they read NONE today: the role must be none in hig and minimal. */
+  const NEW_READERS: ReadonlyArray<[string, ShadowRole]> = [
+    ['.gn-button--ghost', 'quiet'], ['.gn-button--ghost:hover', 'quiet-near'], ['.gn-button--ghost:active', 'quiet-press'],
+    ['.gn-dialog__close, .gn-sheet__close', 'quiet'], ['.gn-row-action', 'quiet'],
+    ['.gn-switch:checked::after', 'knob-on'],
+  ];
+  it('24.009 for every switched selector the new role equals the old role in hig and minimal, both themes; every new reader is none there; the two literal drops render today\'s value through their roles', () => {
+    for (const style of ['hig', 'minimal'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        for (const [selector, oldRole, newRole] of SWITCHES) {
+          expect(shadowValueOf(style, theme, newRole), `${style}/${theme} ${selector}`).toBe(shadowValueOf(style, theme, oldRole));
+        }
+        for (const [selector, role] of NEW_READERS) {
+          expect(shadowValueOf(style, theme, role), `${style}/${theme} ${selector}`).toBe('none');
+        }
+        // `.workflow-rebind-dialog` (`0 8px 24px var(--gn-shadow)`) and `.gn-filters__panel` (`-0.75rem 0 2.5rem var(--gn-shadow)`) today
+        const scrim = colorOf(theme, 'shadow', style);
+        expect(shadowValueOf(style, theme, 'drop'), `${style}/${theme} .workflow-rebind-dialog`).toBe(`0px 8px 24px ${scrim}`);
+        expect(shadowValueOf(style, theme, 'drop-side'), `${style}/${theme} .gn-filters__panel`).toBe(`-12px 0px 40px ${scrim}`);
+      }
+    }
+    // CONTROL: the same table does NOT hold for neo — that is the refresh.
+    expect(shadowValueOf('neo', 'light', 'raised-lg')).not.toBe(shadowValueOf('neo', 'light', 'lift'));
+    expect(shadowValueOf('neo', 'light', 'quiet')).not.toBe('none');
+  });
+});
+
+describe('24.010 the tinted ticket-sheet label stays legible in neo (FIX 1 item 5, planner ruling 2026-10-02)', () => {
+  it('24.010 textMuted clears 4.5 on the tinted label ground and the neo arm reads it; textSubtle does not (the control)', () => {
+    const ground = over(colorOf('light', 'fillQuaternary', 'neo'), colorOf('light', 'surfaceTrack', 'neo'));
+    expect(contrastRatio(colorOf('light', 'textMuted', 'neo'), ground)).toBeGreaterThanOrEqual(4.5);
+    expect(valueOf(ruleExactly(readUiCss(), '[data-style="neo"] .gn-ticket-sheet__field--tinted dt'), 'color')).toBe('var(--gn-text-muted)');
+    // CONTROL: the base rule's `textSubtle` is 4.469 on that composite — the defect the arm fixes.
+    expect(contrastRatio(colorOf('light', 'textSubtle', 'neo'), ground)).toBeLessThan(4.5);
   });
 });

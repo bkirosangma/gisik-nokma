@@ -310,7 +310,9 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
 
   it('shadowValueOf renders "none" where a style×theme has no layers, and a real box-shadow otherwise', () => {
     for (const theme of THEME_NAMES) {
-      for (const role of SHADOW_ROLE_NAMES) {
+      // AMENDED 2026-10-02 (neo refresh T1, FIX 1 item 1d): `drop`/`drop-side` are the scrim drops `.workflow-rebind-dialog` and
+      // `.gn-filters__panel` already painted in minimal as literals, now named roles — 24.009 pins their values.
+      for (const role of SHADOW_ROLE_NAMES.filter((r) => r !== 'drop' && r !== 'drop-side')) {
         expect(shadowValueOf('minimal', theme, role)).toBe('none');
       }
     }
@@ -421,8 +423,8 @@ describe('the style axis (Task 14, 2026-09-09)', () => {
     // point, see the docblock above), so a role added to `SHADOWS`/`ShadowRole`
     // without a matching addition HERE stays uncovered by this case, silently.
     // The nine styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012; lift-drag for Task 5A) — added HERE by hand, which is the point of this literal.
-    // The sixteen neo-refresh roles (2026-10-02, 24.008) — added HERE by hand, which is the point of this literal.
-    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet', 'raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on'] as const;
+    // The twenty neo-refresh roles (2026-10-02, 24.008) — added HERE by hand, which is the point of this literal.
+    const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet', 'raised-lg', 'near-lg', 'near', 'raised-compact', 'recess', 'field', 'quiet', 'quiet-near', 'quiet-press', 'action-filled', 'action-filled-near', 'action-filled-press', 'danger', 'danger-near', 'danger-press', 'knob-on', 'action-filled-disabled', 'danger-disabled', 'drop', 'drop-side'] as const;
     const stylesheet = themeStylesheet();
     for (const style of STYLE_NAMES) {
       for (const theme of THEME_NAMES) {

@@ -76,20 +76,35 @@ const STYLES: StyleName[] = ['hig', 'minimal', 'neo'];
 const THEMES: ThemeName[] = ['light', 'dark'];
 const SURFACES = ['surface', 'surfaceRaised', 'surfaceSunken'] as const;
 
-describe('18.306 textSubtle on the field background, composited, clears its style-specific floor', () => {
+/**
+ * ## Re-modelled for neo (neo refresh T1 Step 8; planner ruling FIX 1 item 5, 2026-10-02)
+ *
+ * T1 steps neo `surfaceSunken` to the well (`#e6dcd2` light, `#141a33` dark), and from T3 the neo field paints that
+ * ground with NO `fillQuaternary` over it (it is a recess, not a tinted pane). So the neo rows measure `textSubtle` on the
+ * field's real ground, `surfaceSunken`, raw: 4.77 light, 6.82 dark, floor 4.5. The old composite model would have read
+ * 4.469 in neo-light (`fillWarmNeo4` over the well is `#e0d5ca`), a ground no neo field paints. hig/minimal keep the
+ * composite model and the owner's floor of 3. The palette is unchanged: `textSubtleLight` stays.
+ */
+describe('18.306 textSubtle on the field background clears its style-specific floor', () => {
   for (const style of STYLES) {
-    const minimum = style === 'neo' ? 4.5 : 3;
     for (const theme of THEMES) {
+      if (style === 'neo') {
+        it(`${style}/${theme} on surfaceSunken (the field's own ground, no fill over it): textSubtle ≥ 4.5`, () => {
+          const textSubtle = colorOf(theme, 'textSubtle', style);
+          const ground = colorOf(theme, 'surfaceSunken', style);
+          const ratio = contrastRatio(textSubtle, ground);
+          expect(ratio, `${style}/${theme}: ground=${ground} ratio=${ratio}`).toBeGreaterThanOrEqual(4.5);
+        });
+        continue;
+      }
       for (const surfaceRole of SURFACES) {
-        it(`${style}/${theme} on ${surfaceRole}: textSubtle on composited fillQuaternary ≥ ${minimum}`, () => {
+        it(`${style}/${theme} on ${surfaceRole}: textSubtle on composited fillQuaternary ≥ 3`, () => {
           const textSubtle = colorOf(theme, 'textSubtle', style);
           const fillQuaternary = colorOf(theme, 'fillQuaternary', style);
           const surface = colorOf(theme, surfaceRole, style);
           const composited = compositeOver(fillQuaternary, surface);
           const ratio = contrastRatio(textSubtle, composited);
-          expect(ratio, `${style}/${theme}/${surfaceRole}: composited=${composited} ratio=${ratio}`).toBeGreaterThanOrEqual(
-            minimum,
-          );
+          expect(ratio, `${style}/${theme}/${surfaceRole}: composited=${composited} ratio=${ratio}`).toBeGreaterThanOrEqual(3);
         });
       }
     }
