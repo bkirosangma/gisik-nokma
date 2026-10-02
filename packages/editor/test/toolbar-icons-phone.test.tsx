@@ -11,7 +11,7 @@ import { ruleExactly, valueOf } from '../../ui/test/helpers/css-rules.js';
 
 /**
  * Mobile web — the Notes toolbar: icons instead of word labels (every width), a visible name on hover /
- * focus / long-press, and at ≤40rem a "More tools" tray so the bar is at most two rows. Cases 21.135 –
+ * focus / long-press, and at ≤40rem a "More tools" tray so the bar is at most two rows (21.136/138/140 AMENDED 2026-10-02 by G-7: one docked row and a bottom sheet, cases 25.400–25.416). Cases 21.135 –
  * 21.139 (§21.9). The two-row WIDTH budget is `apps/web/test/notes-toolbar-phone.test.tsx` (21.137): it
  * needs the web app's stylesheet.
  */
@@ -40,8 +40,16 @@ const ALL_NAMES = [
   'Insert note',
   'Insert ticket',
 ];
-const PHONE_BAR_NAMES = ['Undo', 'Redo', 'Bold', 'Italic', 'Link', 'Bullet list', 'Numbered list', 'Task item'];
-const TRAY_NAMES = ALL_NAMES.filter((name) => !PHONE_BAR_NAMES.includes(name));
+/** G-7 (25.400): the phone bar's tools in order, the heading select after the task list; More is outside the scroller. */
+const PHONE_BAR_NAMES = ['Bold', 'Italic', 'Bullet list', 'Task item', 'Link', 'Insert ticket', 'Insert note'];
+/** G-7 (25.407): the bottom sheet holds exactly the other ten, in this order. */
+const SHEET_NAMES = ['Undo', 'Redo', 'Numbered list', 'Strikethrough', 'Code', 'Quote', 'Code block', 'Collapsible', 'Horizontal rule', 'Insert table'];
+const sheetCell = (name: string): HTMLButtonElement => {
+  const cell = [...document.body.querySelectorAll<HTMLButtonElement>('.ticket-editor__sheet-cell')].find((c) => c.querySelector('.ticket-editor__sheet-label')?.textContent === name);
+  if (cell === undefined) throw new Error(`no sheet cell named ${name}`);
+  return cell;
+};
+const sheetOpen = (): boolean => document.body.querySelector('.ticket-editor__sheet') !== null;
 
 /** jsdom has no `PointerEvent`, so `fireEvent.pointerDown(el, { pointerType })` would drop the type. */
 class TestPointerEvent extends MouseEvent {
@@ -189,12 +197,11 @@ describe('21.135 every tool button keeps its accessible name AND shows it as a t
 
 describe('21.136 no tool button shows a bare word — every one is one decorative SVG', () => {
   for (const phone of [false, true]) {
-    it(`21.136 every .ticket-editor__tool has no text and exactly one aria-hidden svg (${phone ? 'phone, bar and tray' : 'desktop'})`, async () => {
+    it(`21.136 every .ticket-editor__tool has no text and exactly one aria-hidden svg (${phone ? 'phone bar; AMENDED by G-7: the sheet cells carry a label by design, 25.407' : 'desktop'})`, async () => {
       const { view } = await mount(phone);
-      if (phone) fireEvent.click(tool(view, 'More tools'));
       const buttons = toolButtons(view);
       // CONTROL: the loop covers every tool (and More on a phone), not an empty list.
-      expect(buttons.length).toBe(phone ? ALL_NAMES.length + 1 : ALL_NAMES.length);
+      expect(buttons.length).toBe(phone ? PHONE_BAR_NAMES.length + 1 : ALL_NAMES.length);
       for (const button of buttons) {
         const name = button.getAttribute('aria-label');
         expect(button.textContent, `${name} has visible text`).toBe('');
@@ -216,33 +223,34 @@ describe('21.136 no tool button shows a bare word — every one is one decorativ
   });
 });
 
-describe('21.138 at ≤40rem the bar keeps eight tools plus the heading select, and the rest sit behind "More tools"', () => {
-  it('21.138 the bar is undo, redo, bold, italic, link, bullet, numbered, task, heading select, More; the tray holds the other nine', async () => {
+describe('21.138 (AMENDED 2026-10-02 by G-7) at ≤40rem the bar keeps seven tools plus the heading select, and the rest sit in the "More tools" sheet', () => {
+  it('21.138 the bar is bold, italic, bullet, task, heading select, link, insert ticket, insert note, More; the sheet holds the other ten', async () => {
     const { view } = await mount(true);
     const toolbar = view.container.querySelector('.ticket-editor__toolbar') as HTMLElement;
-    expect(PHONE_VISIBLE_TOOLS).toEqual(['undo', 'redo', 'bold', 'italic', 'link', 'list', 'orderedList', 'task']);
+    expect(PHONE_VISIBLE_TOOLS).toEqual(['bold', 'italic', 'list', 'task', 'link', 'insertTicket', 'insertNote']);
 
-    // Closed: only the eight and More are buttons; the nine are not in the DOM at all.
+    // Closed: only the seven and More are buttons; the ten are not in the DOM at all.
     expect(namesOf(toolButtons(view))).toEqual([...PHONE_BAR_NAMES, 'More tools']);
-    for (const name of TRAY_NAMES) expect(view.container.querySelector(`[aria-label="${name}"]`), `${name} is hidden`).toBeNull();
+    for (const name of SHEET_NAMES) expect(view.container.querySelector(`[aria-label="${name}"]`), `${name} is hidden`).toBeNull();
     // Visual order: the heading select follows the task list, and More is last.
     const order = [...toolbar.querySelectorAll('button.ticket-editor__tool, select')].map((el) => el.getAttribute('aria-label'));
-    expect(order).toEqual([...PHONE_BAR_NAMES, 'Heading level', 'More tools']);
+    expect(order).toEqual(['Bold', 'Italic', 'Bullet list', 'Task item', 'Heading level', 'Link', 'Insert ticket', 'Insert note', 'More tools']);
     const more = tool(view, 'More tools');
     expect(more.getAttribute('aria-expanded')).toBe('false');
     expect(more.getAttribute('aria-controls')).toBeNull();
     expect(more.hasAttribute('aria-pressed')).toBe(false);
 
-    // Open: the nine appear, in bar order, in ONE named group that More controls.
+    // Open: the ten appear, in order, in ONE dialog that More controls.
     fireEvent.click(more);
     expect(more.getAttribute('aria-expanded')).toBe('true');
-    const tray = view.container.querySelector('.ticket-editor__tray') as HTMLElement;
-    expect(tray.getAttribute('role')).toBe('group');
-    expect(tray.getAttribute('aria-label')).toBe('More tools');
-    expect(more.getAttribute('aria-controls')).toBe(tray.id);
-    expect(namesOf([...tray.querySelectorAll('button')])).toEqual(TRAY_NAMES);
+    const sheet = document.body.querySelector('.ticket-editor__sheet') as HTMLElement;
+    expect(sheet.getAttribute('role')).toBe('dialog');
+    expect(sheet.getAttribute('aria-label')).toBe('More tools');
+    expect(more.getAttribute('aria-controls')).toBe(sheet.id);
+    expect([...sheet.querySelectorAll('.ticket-editor__sheet-label')].map((el) => el.textContent)).toEqual(SHEET_NAMES);
     // The bar's own tools did not move.
-    expect(namesOf(toolButtons(view).filter((b) => !tray.contains(b)))).toEqual([...PHONE_BAR_NAMES, 'More tools']);
+    expect(namesOf(toolButtons(view))).toEqual([...PHONE_BAR_NAMES, 'More tools']);
+    fireEvent.keyDown(sheet, { key: 'Escape' });
     view.unmount();
   });
 });
@@ -272,44 +280,43 @@ describe('21.139 desktop has no "More tools": all seventeen tools and the headin
   });
 });
 
-describe('21.140 the "More tools" tray behaves like a toolbar disclosure', () => {
-  it('21.140 a tray tool runs its command and closes the tray; Escape closes it and returns focus to More', async () => {
+describe('21.140 (AMENDED 2026-10-02 by G-7) the "More tools" sheet behaves like a disclosure', () => {
+  it('21.140 a sheet tool runs its command and closes the sheet; Escape closes it and returns focus to the editor; More toggles it', async () => {
     const { view, editor } = await mount(true);
     editor.commands.selectAll();
     const more = tool(view, 'More tools');
 
-    // A tray tool is the same ToolButton: it toggles a mark and reports `aria-pressed`.
+    // A sheet tool is the same command: it toggles a mark and reports `aria-pressed`.
     fireEvent.click(more);
-    const strike = tool(view, 'Strikethrough');
+    const strike = sheetCell('Strikethrough');
     expect(strike.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(strike);
     expect(JSON.stringify(editor.getJSON())).toContain('"type":"strike"');
-    expect(view.container.querySelector('.ticket-editor__tray')).toBeNull();
+    expect(sheetOpen()).toBe(false);
     expect(more.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(more);
-    expect(tool(view, 'Strikethrough').getAttribute('aria-pressed')).toBe('true');
+    expect(sheetCell('Strikethrough').getAttribute('aria-pressed')).toBe('true');
 
-    // Escape inside the tray closes it and focus goes back to More.
-    fireEvent.keyDown(tool(view, 'Quote'), { key: 'Escape' });
-    expect(view.container.querySelector('.ticket-editor__tray')).toBeNull();
-    expect(document.activeElement).toBe(more);
+    // Escape inside the sheet closes it; focus goes back to the text (G-7: the editor, not More).
+    fireEvent.keyDown(sheetCell('Quote'), { key: 'Escape' });
+    expect(sheetOpen()).toBe(false);
+    expect(view.container.querySelector('.ProseMirror')?.contains(document.activeElement)).toBe(true);
 
-    // CONTROL: a second press of More toggles it shut; the table size grid keeps the tray open until a size is chosen.
+    // CONTROL: a second More press shuts it; the table cell keeps the sheet open for its size grid.
     fireEvent.click(more);
-    expect(view.container.querySelector('.ticket-editor__tray')).not.toBeNull();
+    expect(sheetOpen()).toBe(true);
     fireEvent.click(more);
-    expect(view.container.querySelector('.ticket-editor__tray')).toBeNull();
+    expect(sheetOpen()).toBe(false);
     fireEvent.click(more);
-    fireEvent.click(tool(view, 'Insert table'));
-    expect(view.container.querySelector('.ticket-editor__tray')).not.toBeNull();
-    expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    fireEvent.click(sheetCell('Insert table'));
+    expect(sheetOpen()).toBe(true);
+    expect(document.body.querySelector('.ticket-editor__table-picker')).not.toBeNull();
 
-    // Picking a size inserts the table AND closes the tray (the grid's own `onSelect` closes both).
-    const cell = view.container.querySelector('.ticket-editor__table-cell[aria-label="2 × 3 table"]') as HTMLElement;
+    // Picking a size inserts the table AND closes the sheet.
+    const cell = document.body.querySelector('.ticket-editor__table-cell[aria-label="2 × 3 table"]') as HTMLElement;
     fireEvent.click(cell);
     expect(editor.getJSON().content?.some((node) => node.type === 'table')).toBe(true);
-    expect(view.container.querySelector('.ticket-editor__tray')).toBeNull();
-    expect(view.container.querySelector('[role="group"][aria-label="More tools"]')).toBeNull();
+    expect(sheetOpen()).toBe(false);
     expect(more.getAttribute('aria-expanded')).toBe('false');
     view.unmount();
   });

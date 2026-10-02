@@ -50,7 +50,9 @@ describe('21.137 at ≤40rem the notes toolbar packs into at most two rows at 36
     for (const viewport of [360, 375, 390, 412, 466]) {
       expect(pack(phone.toolbar, viewport - 24, rules).rows, `phone bar at viewport ${viewport}`).toBeLessThanOrEqual(2);
     }
-    expect(pack(phone.toolbar, TOOLBAR_AT_360, rules).rows).toBe(2);
+    // AMENDED 2026-10-02 (G-7): the row count is no longer the contract: the phone bar is ONE row that scrolls sideways
+    // (case 25.401), so the model's exact `2` at 360 is dropped and its `≤ 2` bound above stays as a backstop.
+    expect(pack(phone.toolbar, TOOLBAR_AT_360, rules).rows).toBeLessThanOrEqual(2);
     phone.editor.destroy();
     phone.view.unmount();
 
@@ -63,13 +65,14 @@ describe('21.137 at ≤40rem the notes toolbar packs into at most two rows at 36
     desktop.view.unmount();
   });
 
-  it('21.137 the phone arm drops the dividers (in editor.css, unscoped), and the group still wraps', () => {
+  it('21.137 the phone arm drops the dividers (in editor.css, unscoped); AMENDED by G-7: the group no longer wraps and the tray rule is gone', () => {
     const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && rule.selectors.some((selector) => /ticket-editor__tool-divider/.test(selector)));
     expect(arm.map((rule) => rule.selectors.join(', '))).toEqual(['.ticket-editor__tool-divider']);
     expect(valueOf(arm[0]?.body ?? '', 'display')).toBe('none');
-    // CONTROL: the base divider is drawn (so `none` is a change), and the tray is a full-width wrapping row.
+    // CONTROL: the base divider is drawn (so `none` is a change); the old tray (a full-width wrapping row) is gone, and the
+    // group's phone rule is the one-row `nowrap` (25.401) while its base still wraps for the desktop.
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-divider'), 'display')).toBeNull();
-    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tray'), 'flex-basis')).toBe('100%');
-    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tray'), 'flex-wrap')).toBe('wrap');
+    expect(parseRules(editorCss).filter((rule) => rule.selectors.some((selector) => selector.includes('ticket-editor__tray')))).toEqual([]);
+    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('nowrap');
   });
 });

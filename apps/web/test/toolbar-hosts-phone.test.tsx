@@ -127,11 +127,12 @@ async function mountDialog(phone: boolean): Promise<Mounted & { unmount: () => v
 }
 
 const barTools = (toolbar: HTMLElement): (string | null)[] =>
-  [...toolbar.querySelectorAll<HTMLElement>(':scope > .ticket-editor__tool-group .ticket-editor__tool')].map((button) => button.getAttribute('aria-label'));
-const toolNamed = (root: HTMLElement, name: string): HTMLButtonElement => {
-  const found = root.querySelector<HTMLButtonElement>(`.ticket-editor__tool[aria-label="${name}"]`);
-  if (found === null) throw new Error(`no toolbar control named ${name}`);
-  return found;
+  [...toolbar.querySelectorAll<HTMLElement>('.ticket-editor__tool')].map((button) => button.getAttribute('aria-label'));
+/** G-7: a sheet cell by its visible label (the sheet is a portal on the body, not inside the toolbar). */
+const sheetCell = (name: string): HTMLButtonElement => {
+  const cell = [...document.body.querySelectorAll<HTMLButtonElement>('.ticket-editor__sheet-cell')].find((c) => c.querySelector('.ticket-editor__sheet-label')?.textContent === name);
+  if (cell === undefined) throw new Error(`no sheet cell named ${name}`);
+  return cell;
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -141,22 +142,21 @@ type Mounter = (phone: boolean) => Promise<Mounted & { unmount: () => void }>;
 /** One host's phone/desktop pair — the same body serves 21.233 (sheet) and 21.234 (dialog). */
 async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
   const phone = await mount(true);
-  // The phone bar: "More tools" is there; the three tray-only tools are NOT on the bar.
+  // The phone bar (AMENDED by G-7: seven tools, and the sheet holds the rest): "More tools" is there; the three sheet-only tools are NOT on the bar.
   expect(within(phone.toolbar).getByRole('button', { name: 'More tools' })).toBeInTheDocument();
   const onBar = barTools(phone.toolbar);
   for (const { name } of TRAY_TOOLS) expect(onBar, `${name} must not be on the phone bar`).not.toContain(name);
-  expect(onBar).toHaveLength(9);
+  expect(onBar).toHaveLength(8); // G-7: seven tools and More (the heading select is not a `.ticket-editor__tool`)
 
   // Every tray-only tool is REACHABLE: More opens the tray, the tool is in it, pressing it inserts its node.
   for (const { name, node } of TRAY_TOOLS) {
     expect(phone.host.querySelector(`.ProseMirror ${node}`), `${node} before ${name}`).toBeNull();
     fireEvent.click(within(phone.toolbar).getByRole('button', { name: 'More tools' }));
-    const tray = phone.toolbar.querySelector<HTMLElement>('.ticket-editor__tray');
-    expect(tray, `More opens the tray for ${name}`).not.toBeNull();
-    fireEvent.click(toolNamed(tray as HTMLElement, name));
+    expect(document.body.querySelector('.ticket-editor__sheet'), `More opens the sheet for ${name}`).not.toBeNull();
+    fireEvent.click(sheetCell(name));
     await waitFor(() => expect(phone.host.querySelector(`.ProseMirror ${node}`), `${name} inserts a ${node}`).not.toBeNull());
-    // Running a tray tool closes the tray (21.140), so the next loop pass opens it again.
-    expect(phone.toolbar.querySelector('.ticket-editor__tray')).toBeNull();
+    // Running a sheet tool closes the sheet (21.140), so the next loop pass opens it again.
+    expect(document.body.querySelector('.ticket-editor__sheet')).toBeNull();
   }
   phone.unmount();
 
@@ -201,12 +201,13 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     for (const base of ['.ticket-editor__tool', '.ticket-editor__heading-select', '.ticket-editor__tool-divider']) {
       expect(indexOfRule(base, PHONE), `${base}: the phone rule comes after the base`).toBeGreaterThan(indexOfRule(base, null));
     }
-    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('wrap');
+    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('nowrap'); // G-7: one scrolling row
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'padding-left')).toBe('0.25rem');
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'padding-right')).toBe('0.25rem');
+    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'flex-wrap')).toBe('nowrap');
     expect(indexOfRule('.ticket-editor__tool-group', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__tool-group', null));
     expect(indexOfRule('.ticket-editor__toolbar', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__toolbar', null));
-    // The arm is EXACTLY these six rules, none scoped under a host (`.gn-notes …` was the Notes-only form that left
+    // The arm is EXACTLY these rules (G-7 added the one-row declarations to the toolbar and the group rules and appended its own block, 25.411–25.416), none scoped under a host (`.gn-notes …` was the Notes-only form that left
     // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here. The sixth is
     // smoothness G-6's Format button (25.388): the comment composers' footer control, floored at 44px on a phone and
     // placed after its own base rule, which sits below the strip's rules in the file.
