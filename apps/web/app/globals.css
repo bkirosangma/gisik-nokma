@@ -55,8 +55,8 @@ textarea:focus::placeholder {
   border-radius: var(--gn-radius-control);
   background: var(--gn-surface-raised);
   color: var(--gn-text);
-  /* Styling refresh Plan B (Task B4): lift-near — it floats above the bar when focused (rule 04). */
-  box-shadow: var(--gn-shadow-lift-near);
+  /* Styling refresh Plan B (Task B4): lift-near — it floats above the bar when focused (rule 04); N7 (2026-10-02, 24.083): read as `near-lg`, the same value in hig and minimal. */
+  box-shadow: var(--gn-shadow-near-lg);
 }
 .gn-skip:focus {
   left: 0.75rem;
@@ -166,7 +166,8 @@ input, textarea, select { font-family: inherit; }
 /* The page gutter is ONE 24px (`--gn-space-3`) at every width (UX fixes Task 3, case 23.041, audit SYS-14, WS-05,
    SET-19; it was 20px, and 12px at ≤60rem). `.gn-nav__inner` and the sign-in phone arm read the same token. */
 .gn-shell { max-width: 80rem; margin: 0 auto; padding: 0 var(--gn-space-3) var(--gn-shell-pad-bottom); }
-.gn-shell__main { margin-top: 1.25rem; display: flex; flex-direction: column; gap: 1.1rem; }
+/* N7 (2026-10-02, 24.082): the heading clears the nav's large halo — 23px in neo, 20px (today) in hig and minimal. */
+.gn-shell__main { margin-top: max(1.25rem, var(--gn-halo-lg)); display: flex; flex-direction: column; gap: 1.1rem; }
 @media (max-width: 60rem) {
   .gn-shell { padding: 0 var(--gn-space-3) 2rem; }
 }
@@ -794,7 +795,8 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.75rem;
+  /* N7 (2026-10-02, 24.082): 14px in neo so the section's controls clear its card's raised pair; 12px (today) in hig and minimal. */
+  gap: max(0.75rem, var(--gn-halo));
   padding: 1.25rem;
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
@@ -1164,7 +1166,7 @@ input, textarea, select { font-family: inherit; }
    here rather than by giving `.gn-shell` a top padding, which would move the
    first element of every route that uses it (`/account`, `/inbox`,
    `/settings`, `/workspaces`, `/help`, every `/w/*` screen) for a complaint
-   about one. `1.25rem` matches `.gn-shell__main`'s own `margin-top`, the
+   about one. `1.25rem` matches `.gn-shell__main`'s own `margin-top` in hig and minimal (neo takes `max(1.25rem, var(--gn-halo-lg))`, N7), the
    spacing this shell already uses between the bar and the content beneath it,
    rather than a new number measured for this one header. */
 .gn-workspace-home__header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; }
@@ -2082,7 +2084,7 @@ input, textarea, select { font-family: inherit; }
   z-index: 20;
   background: var(--gn-surface);
   /* Styling refresh Plan B (Task B4): P-RAISED's lit-edge `lift` shadow — the sticky bar's depth (rule 04). */
-  box-shadow: var(--gn-shadow-lift);
+  box-shadow: var(--gn-shadow-raised-lg);
 }
 /* Raised off the page, on request — same `--gn-shadow-raised` role as
    `.gn-theme-toggle` and `.gn-card` above, reused rather than a bespoke
@@ -2166,13 +2168,13 @@ input, textarea, select { font-family: inherit; }
    (`packages/ui/src/ui.css`) — a picker reads as the same kind of floating
    control wherever the product draws one, rather than the browser's bare
    `Canvas` colour the wiki-link and ticket-ref popups drew before this.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .mention-popup,
 .wikilink-popup,
 .ticketref-popup {
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   padding: 0.25rem;
 }
 .mention-popup__item,
@@ -2732,7 +2734,7 @@ input, textarea, select { font-family: inherit; }
   box-shadow: 0 0 0 0.125rem var(--gn-surface);
 }
 
-/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-nav__menu {
   position: absolute;
   inset-inline-end: 0;
@@ -2743,7 +2745,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.375rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   /* Above page content. The nav is the topmost chrome and this hangs off it. */
   z-index: 50;
 }
@@ -2773,7 +2775,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.375rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -2892,7 +2894,8 @@ input, textarea, select { font-family: inherit; }
   letter-spacing: -0.1px;
   color: var(--gn-text-muted);
   text-decoration: none;
-  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out,
+    box-shadow var(--gn-motion-move) var(--gn-motion-ease-out);
   background: transparent;
   border: none;
   cursor: pointer;
@@ -2938,11 +2941,15 @@ input, textarea, select { font-family: inherit; }
    Styling refresh Plan B (Task B4 follow-up): the `button` twin is listed too.
    The base current-item rule above raises `a` AND `button`, so a neo rule for
    `a` alone left a current `<button>` (the account menu's items) raised while
-   its `<a>` peers were pressed in. */
+   its `<a>` peers were pressed in.
+
+   **AMENDED 2026-10-02 (neo refresh N9, case 24.041): the rule now reads `--gn-shadow-recess`, the box-sized control inset, not
+   `--gn-shadow-sunken`.** The paragraph above ("let `--gn-shadow-sunken` do the work", the 4px/-4px geometry) is the history of
+   what the rule used to read; `sunken` is kept for wells and tracks. The ground is still `--gn-surface-sunken`. */
 [data-style="neo"] .gn-nav a[aria-current='page'],
 [data-style="neo"] .gn-nav button[aria-current='page'] {
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-recess); /* N9 (case 24.041): a control inset, box-sized */
 }
 /* The lit link also draws a 3px bar under its label, in the SAME `--gn-nav-indicator` the bottom bar's indicator uses
    (UX fixes Task 3, case 23.044, audit SYS-20): the current page reads in the top nav exactly as it does in the bar,
@@ -4142,7 +4149,7 @@ input, textarea, select { font-family: inherit; }
 /* Opens UPWARD from the button, since the button itself sits at the
    viewport's bottom edge — `.gn-nav__menu`'s own floating-panel geometry
    (surface/radius/shadow), turned to open the other way.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-toc-launcher__panel {
   position: absolute;
   left: 0;
@@ -4154,7 +4161,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.75rem;
   background: var(--gn-surface-raised);
   border-radius: var(--gn-radius-card);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
 }
 
 /* One workspace's own branch of the tree — a plain spacing rule; the visible
@@ -4882,17 +4889,19 @@ input, textarea, select { font-family: inherit; }
    1rem box (inset 4px) and the row's 0.5rem gap follows it (text at 32px). The posted row had the
    box at 0px and text at 23.2px (`ui.css`'s 0.45rem gap), so a list shifted sideways when sent.
    inset = (1.5 - 1) / 2 = 0.25rem; gap = 1.5 + 0.5 - 0.25 - 1 = 0.75rem (case 9.482). */
-/* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
-   the unchecked box takes the same coat, the checked one stays a flat accent.
-   The coat alone is NOT an edge: neo's sunken surface IS its surface (`#1b2340`
-   both in dark) and the inset shadow is 5% white, so the box vanished. It keeps
+/* `neo` fields are sunken and, since N10 (2026-10-02, 24.040), rim-less: they read `--gn-shadow-field`
+   (`[data-style="neo"] .gn-field__input`). The unchecked box does NOT take that coat: it takes the sunken
+   GROUND (`--gn-surface-sunken`, the well since N2) with its own chip-sized inset, `--gn-shadow-sunken-compact`
+   (N9, 24.042), because a field-sized recess is wrong for a ~1rem box. The checked one stays a flat accent.
+   (History, 2026-09-29: the then coat alone was NOT an edge, because neo's sunken surface WAS its surface, `#1b2340`
+   in dark, and the inset shadow was 5% white, so the box vanished; N2 and N9 changed both, and the border below stays.) It keeps
    `--gn-border-strong` (5.37:1 dark, 4.39:1 light on the neo surface; WCAG 1.4.11
    asks 3:1, case 9.481). */
 [data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
 [data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked) {
   border-color: var(--gn-border-strong);
   background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
+  box-shadow: var(--gn-shadow-sunken-compact); /* N9 (case 24.042): chip-sized inset for a ~1rem box */
 }
 
 /* The fenced code block. `.editor-codeblock`'s own `position: relative` is
@@ -5044,10 +5053,10 @@ input, textarea, select { font-family: inherit; }
    (packages/editor cannot reach these tokens; this file can). Unscoped, to
    match editor.css's own unscoped `.wikilink-preview` rule — the card is
    appended to `document.body`, outside `.ticket-editor__content`.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .wikilink-preview {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   border: none;
   border-radius: var(--gn-radius-card);
 }
@@ -5117,10 +5126,10 @@ input, textarea, select { font-family: inherit; }
    rule). This file's override never reaches the mobile WebView (its bundle
    loads editor.css alone) — see that file's own comment on the same rule
    for why the split is structured this way regardless.
-   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+   Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .table-toolbar {
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
   border: none;
   border-radius: var(--gn-radius-card);
 }
@@ -5363,7 +5372,7 @@ input, textarea, select { font-family: inherit; }
 .gn-card-menu__trigger:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text); }
 .gn-card-menu__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-card-menu__trigger:disabled { opacity: var(--gn-disabled-opacity); cursor: not-allowed; }
-/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius. */
+/* Styling refresh Plan B (Task B3): P-FLOAT — a panel floating above the page rests on `lift-near` with the card radius (N7, 2026-10-02: the role is now `near-lg` — hig and minimal the same value, 24.083). */
 .gn-card-menu__list {
   position: absolute;
   top: calc(100% + 0.25rem);
@@ -5374,7 +5383,7 @@ input, textarea, select { font-family: inherit; }
   padding: 0.375rem;
   border-radius: var(--gn-radius-card);
   background: var(--gn-surface-raised);
-  box-shadow: var(--gn-shadow-lift-near);
+  box-shadow: var(--gn-shadow-near-lg);
 }
 /* UX fixes T2 (case 23.023): the row's overflow ("More actions for <name>") sits beside the role control. `.gn-members`
    is `overflow: auto` (the phone's sideways scroll), so a menu opening BELOW the last row's trigger would add a scroll

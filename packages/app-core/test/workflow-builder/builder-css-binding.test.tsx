@@ -468,7 +468,8 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
     // loop above (its selector is a compound starting with an attribute).
     const neo =
       /\[data-style="neo"\] \.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(ALL_ROLES_IN_UI_CSS)?.[1] ?? '';
-    expect(neo).toContain('box-shadow: var(--gn-shadow-sunken)');
+    // amended 2026-10-02 by N10 (case 24.040): the rim-less neo field reads the `field` shadow, not `sunken`.
+    expect(neo).toContain('box-shadow: var(--gn-shadow-field)');
   });
 
   /**
@@ -734,7 +735,8 @@ describe('13.770 the workflow name is the title and stays a control', () => {
     const neo = /\[data-style="neo"\] \.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(
       ALL_ROLES_IN_UI_CSS,
     )?.[1];
-    expect(neo).toContain('box-shadow: var(--gn-shadow-sunken)');
+    // amended 2026-10-02 by N10 (case 24.040): the rim-less neo field reads the `field` shadow, not `sunken`.
+    expect(neo).toContain('box-shadow: var(--gn-shadow-field)');
   });
 });
 

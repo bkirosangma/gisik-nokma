@@ -645,15 +645,15 @@ describe('R1(c) at the component layer', () => {
    * value, because the base rule's `border: 1px solid var(--gn-border)` would
    * otherwise cascade in and still paint.
    */
-  it('13.339 under neo the field input is sunken and ringed (U5) — hig/minimal keep their border', () => {
+  it('13.339 under neo the field input is sunken on the well with the recess line and a transparent border (N10, 24.040; was the U5 ring) — hig/minimal keep their border', () => {
     const base = rule('.gn-field__input');
     const neo = rule('[data-style="neo"] .gn-field__input');
     expect(neo, 'the neo override must be a distinct rule, not a re-match of the base').not.toBe(base);
     expect(base).toMatch(/border:\s*1px solid var\(--gn-border\)/);
-    expect(neo).toMatch(/border:\s*1px solid var\(--gn-field-rim\)/);
+    expect(neo).toMatch(/border:\s*1px solid transparent/);
     expect(neo).not.toMatch(/border:\s*none/);
     expect(neo).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
-    expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\)/);
+    expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-field\)/);
   });
 
   /**
@@ -961,7 +961,8 @@ describe('Select panel/option styling', () => {
   // reads `--gn-shadow-lift-near`, which resolves to neo's own larger raised pair through the
   // token, so the panel is still shadow-only under neo without a `[data-style]` restatement.
   it('the neo panel gets shadow-only elevation, through the base rule and the token', () => {
-    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-lift-near\)/);
+    // N7 (2026-10-02, 24.083): the base rule reads `near-lg` (hig/minimal: = `lift-near`, no drift).
+    expect(rule('.gn-select__panel')).toMatch(/box-shadow:\s*var\(--gn-shadow-near-lg\)/);
     expect(UI_CSS).not.toMatch(/\[data-style="neo"\]\s+\.gn-select__panel\s*\{/);
   });
 

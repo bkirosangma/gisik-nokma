@@ -79,21 +79,20 @@ describe('23.001 the field rim is a role, defined in every style and theme (audi
   });
 });
 
-describe('23.002 neo text fields wear a 1px full ring and keep the sunken shadow (audit SYS-05, WS-04, NP-25, TT-14)', () => {
+// AMENDED 2026-10-02 by N10 (owner, "go with B in neumorphic"; case 24.040): the 1px full ring is retired for neo. Every neo field arm is now
+// `border: 1px solid transparent` with `box-shadow: var(--gn-shadow-field)` (the one-sided >= 3:1 line, asserted in 24.044); hig/minimal keep the ring.
+describe('23.002 neo text fields: no rim, the field shadow carries the boundary (audit SYS-05, WS-04, NP-25, TT-14; amended by N10, 24.040)', () => {
   const NEO_FIELDS = [
     '[data-style="neo"] .gn-field__input',
     '[data-style="neo"] .gn-help__search-input',
     '[data-style="neo"] .workflow-builder-screen__name',
     '[data-style="neo"] .gn-project__search',
   ];
-  it('23.002 every neo field arm has border: 1px solid var(--gn-field-rim) and box-shadow: var(--gn-shadow-sunken)', () => {
+  it('23.002 every neo field arm has border: 1px solid transparent and box-shadow: var(--gn-shadow-field) (amended by N10, 24.040)', () => {
     for (const selector of NEO_FIELDS) {
       const body = ruleExactly(ui, selector);
-      expect(valueOf(body, 'border'), selector).toBe('1px solid var(--gn-field-rim)');
-      // The project search keeps its sunken shadow in its BASE rule; the neo arm only adds the ring.
-      const base = selector.replace('[data-style="neo"] ', '');
-      const shadow = valueOf(body, 'box-shadow') ?? valueOf(ruleExactly(ui, base), 'box-shadow');
-      expect(shadow, selector).toBe('var(--gn-shadow-sunken)');
+      expect(valueOf(body, 'border'), selector).toBe('1px solid transparent');
+      expect(valueOf(body, 'box-shadow'), selector).toBe('var(--gn-shadow-field)');
     }
     // CONTROL: the base (hig) field rule is unchanged, so the ring is neo's own.
     expect(valueOf(ruleExactly(ui, '.gn-field__input'), 'border')).toBe('1px solid var(--gn-border)');
@@ -142,10 +141,10 @@ describe('23.004 a neo disabled field is flat: no ring, no inset, muted text, AF
       const disabledAt = rules.findIndex((rule) => rule.selectors.includes(disabled));
       expect(disabledAt, `${disabled} after ${neoBase}`).toBeGreaterThan(indexOfRule(neoBase));
     }
-    // CONTROL: an enabled neo field still has its ring and its inset.
+    // CONTROL: an enabled neo field still has its recess edge (amended by N10, 24.040: a transparent border and the `field` shadow, no ring).
     const enabled = ruleExactly(ui, '[data-style="neo"] .gn-field__input');
-    expect(valueOf(enabled, 'border')).toBe('1px solid var(--gn-field-rim)');
-    expect(valueOf(enabled, 'box-shadow')).toBe('var(--gn-shadow-sunken)');
+    expect(valueOf(enabled, 'border')).toBe('1px solid transparent');
+    expect(valueOf(enabled, 'box-shadow')).toBe('var(--gn-shadow-field)');
   });
 });
 

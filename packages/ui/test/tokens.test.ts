@@ -16,6 +16,7 @@ import {
   motionVariableName,
   spaceVariableName,
   primitives,
+  haloVariableName,
   radiusVariableName,
   shadowValueOf,
   shadowVariableName,
@@ -161,6 +162,10 @@ describe('CSS variable emission', () => {
       radiusVariableName('card'),
       radiusVariableName('control'),
       radiusVariableName('track'),
+      // The halo clearance lengths (N7, case 24.080) are emitted per style like the radii.
+      haloVariableName('lg'),
+      haloVariableName('card'),
+      haloVariableName('compact'),
       ...SHADOW_ROLE_NAMES.map(shadowVariableName),
       ...FONT_ROLE_NAMES.map(fontVariableName),
       ...([1, 2, 3] as const).map(spaceVariableName),
