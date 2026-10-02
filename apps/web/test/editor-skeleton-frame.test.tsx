@@ -99,3 +99,50 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
     expect(view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
   });
 });
+
+describe('25.184 the strip skeleton has the real bar\'s items, per breakpoint', () => {
+  const tools = (root: Element) => root.querySelectorAll('.ticket-editor__tool').length;
+  const skeletonSet = (which: 'desktop' | 'phone') => {
+    const view = render(<EditorSkeleton mode="description" />);
+    const set = view.container.querySelector(`.gn-editor-skeleton__set--${which}`)!;
+    const result = {
+      groups: set.querySelectorAll('.ticket-editor__tool-group').length,
+      tools: set.querySelectorAll('.gn-editor-skeleton__tool').length,
+      selects: set.querySelectorAll('.gn-editor-skeleton__select').length,
+    };
+    view.unmount();
+    return result;
+  };
+  const realBar = async (phone: boolean) => {
+    const original = window.matchMedia;
+    // Absent in jsdom, which the editor reads as "not a phone"; stubbed to a match for the phone arm.
+    if (phone) window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} })) as never;
+    try {
+      const view = render(<RealTicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="w" ticketId="t" />);
+      await waitFor(() => expect(view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull());
+      const bar = view.container.querySelector('.ticket-editor__toolbar')!;
+      const result = {
+        groups: bar.querySelectorAll('.ticket-editor__tool-group').length,
+        tools: tools(bar),
+        selects: bar.querySelectorAll('.ticket-editor__heading-select').length,
+      };
+      view.unmount();
+      return result;
+    } finally {
+      if (original === undefined) delete (window as { matchMedia?: unknown }).matchMedia;
+      else window.matchMedia = original;
+    }
+  };
+
+  it('25.184 desktop and phone: the same group count, tool count and heading select as the real toolbar', async () => {
+    const desktop = await realBar(false);
+    const phone = await realBar(true);
+    expect(skeletonSet('desktop')).toEqual(desktop);
+    expect(skeletonSet('phone')).toEqual(phone);
+    // Control, in the same it(): the two real bars differ and are not degenerate (17 tools on desktop; the eight phone tools plus More).
+    expect(desktop.tools).toBe(17);
+    expect(phone.tools).toBe(9);
+    expect(desktop.selects).toBe(1);
+    expect(phone.selects).toBe(1);
+  });
+});

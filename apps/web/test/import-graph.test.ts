@@ -11,6 +11,7 @@ const ALIASES: Record<string, string> = {
   '@gisik-nokma/app-core/online': join(PKGS, 'app-core/src/online/index.ts'),
   '@gisik-nokma/app-core': join(PKGS, 'app-core/src/index.ts'),
   '@gisik-nokma/editor/upload': join(PKGS, 'editor/src/upload.ts'),
+  '@gisik-nokma/editor/comment-toolbar-pref': join(PKGS, 'editor/src/comment-toolbar-pref.ts'),
   '@gisik-nokma/editor': join(PKGS, 'editor/src/index.ts'),
   '@gisik-nokma/ui': join(PKGS, 'ui/src/index.ts'),
 };
@@ -43,9 +44,12 @@ function staticGraph(entry: string, seen = new Set<string>()): Set<string> {
   return seen;
 }
 
-// `editor/src/upload.ts` is the fetch helper's own subpath (no Tiptap), so a static edge to it is not an edge to the editor.
+// `editor/src/upload.ts` is the fetch helper's own subpath and `editor/src/comment-toolbar-pref.ts` the stored Format choice's (the
+// editor skeleton reads it before the editor loads, FIX 2 F4); neither imports Tiptap or any other editor file (React only), so a
+// static edge to either is not an edge to the editor. 25.171's control walks both and finds no `npm:@tiptap`.
+const LIGHT_EDITOR_SUBPATHS = ['/editor/src/upload.ts', '/editor/src/comment-toolbar-pref.ts'];
 const reachesEditor = (graph: string[]) =>
-  graph.filter((f) => (f.includes('/editor/src/') && !f.endsWith('/editor/src/upload.ts')) || f.startsWith('npm:@tiptap'));
+  graph.filter((f) => (f.includes('/editor/src/') && !LIGHT_EDITOR_SUBPATHS.some((light) => f.endsWith(light))) || f.startsWith('npm:@tiptap'));
 const reachesCanvas = (graph: string[]) => graph.filter((f) => f.includes('workflow-builder/ui/workflow-canvas') || f.startsWith('npm:@xyflow'));
 const reachesManual = (graph: string[]) => graph.filter((f) => f.includes('help/content.generated'));
 
@@ -65,6 +69,11 @@ describe('route import graphs (spec D6, S9; audit SM-04)', () => {
     // static walk from the slot's own importer still stops at the `import()`; and a file that imports the
     // editor statically (the notes document) does reach it.
     expect(readFileSync(join(WEB, 'src/editor-slot.tsx'), 'utf8')).toMatch(/import\('@gisik-nokma\/editor'\)/);
+    // The two light subpaths are light for real: walked on their own they reach no Tiptap module and no other editor file.
+    for (const light of ['@gisik-nokma/editor/upload', '@gisik-nokma/editor/comment-toolbar-pref']) {
+      const graph = [...staticGraph(ALIASES[light]!)];
+      expect(graph.filter((f) => f.startsWith('npm:') || (f.includes('/editor/src/') && f !== ALIASES[light])), light).toEqual([]);
+    }
     expect(reachesEditor([...staticGraph(join(WEB, 'src/notes/note-document.tsx'))]).length).toBeGreaterThan(0);
   });
 

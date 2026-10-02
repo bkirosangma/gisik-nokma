@@ -18,6 +18,10 @@
       "types": "./dist/upload.d.ts",
       "default": "./dist/upload.js"
     },
+    "./comment-toolbar-pref": {
+      "types": "./dist/comment-toolbar-pref.d.ts",
+      "default": "./dist/comment-toolbar-pref.js"
+    },
     "./markdown-doc": {
       "types": "./dist/markdown-doc/index.d.ts",
       "default": "./dist/markdown-doc/index.js"

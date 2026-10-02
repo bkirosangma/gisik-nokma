@@ -38,7 +38,14 @@ export const TicketEditorSlot = (props: TicketEditorSlotProps) => {
     };
   }, [Editor]);
   if (Editor === null) {
-    return <EditorSkeleton mode={props.mode} attach={props.uploadAttachment !== undefined} readOnly={props.readOnly} />;
+    return (
+      <EditorSkeleton
+        mode={props.mode}
+        attach={props.uploadAttachment !== undefined}
+        readOnly={props.readOnly}
+        {...(props.submitSlot === undefined ? {} : { submitSlot: props.submitSlot })}
+      />
+    );
   }
   return <Editor {...props} />;
 };
