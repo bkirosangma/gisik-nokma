@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type DragEvent, type KeyboardEvent, type ReactElement } from 'react';
 import {
   newUlid,
   rankBetween,
@@ -143,6 +143,35 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
   const [refusal, setRefusal] = useState<string | null>(null);
   const dragging = useRef<string | null>(null);
   const inFlight = useRef(false);
+  const root = useRef<HTMLDivElement>(null);
+  /**
+   * Where keyboard focus goes once the tree has settled (P-T13, 22.242 / 22.243). A rename field, a delete
+   * dialog and a re-read each unmount the element that had focus, and the browser then drops it on `<body>`, so a
+   * keyboard user lost their place after every tree operation. `name` and `delete` are a group's own controls;
+   * `tree` is the tree itself (the Add group button once nothing is left to hold it). `after` names a group whose
+   * row must be GONE first: a delete lands focus on its neighbour only when the re-read has removed the row.
+   */
+  type FocusWant = { kind: 'name' | 'delete'; id: string; after?: string } | { kind: 'tree'; after?: string };
+  const focusNext = useRef<FocusWant | null>(null);
+  /** Moves focus to `want` when its element is there (and any row it waits on is gone); true when it did. */
+  const focusIf = (want: FocusWant): boolean => {
+    const host = root.current;
+    if (host === null) return false;
+    const row = (id: string): HTMLElement | null => host.querySelector(`[data-group-id="${CSS.escape(id)}"]`);
+    if (want.after !== undefined && row(want.after) !== null) return false;
+    const target =
+      want.kind === 'tree'
+        ? (host.querySelector<HTMLElement>('.gn-groups__tree') ?? host.querySelector<HTMLElement>('.gn-groups__toolbar button'))
+        : (row(want.id)?.querySelector<HTMLElement>(
+            want.kind === 'name' ? ':scope > .gn-groups__box .gn-groups__name--button' : ':scope > .gn-groups__box .gn-groups__delete',
+          ) ?? null);
+    if (target === null) return false;
+    target.focus();
+    return true;
+  };
+  useEffect(() => {
+    if (focusNext.current !== null && focusIf(focusNext.current)) focusNext.current = null;
+  });
 
   /** Files one action; true when it committed. A second action waits for the first to answer. */
   const submit = async (action: GroupAction): Promise<boolean> => {
@@ -173,11 +202,36 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
   };
 
   const rename = async (group: GroupRow, name: string): Promise<void> => {
+    focusNext.current = { kind: 'name', id: group.id };
     if (name === group.name) {
       setRenaming(null);
       return;
     }
     if (await submit({ type: 'group.renamed', id: group.id, payload: { name } })) setRenaming(null);
+    else focusNext.current = null; // a refused rename keeps its field open, and its input has focus
+  };
+
+  /**
+   * Files the delete and decides where focus goes: the next sibling, else the previous one, else the parent, else the
+   * tree (22.243). It is worked out BEFORE the delete, from the list the person was looking at, and lands once the
+   * re-read has taken the row away. A refusal keeps the row, so focus goes back to its Delete button.
+   */
+  const remove = async (group: GroupRow): Promise<void> => {
+    const siblings = siblingsOf(groups, group.parentId);
+    const at = siblings.findIndex((sibling) => sibling.id === group.id);
+    const neighbour = siblings[at + 1] ?? siblings[at - 1];
+    const owner = neighbour?.id ?? group.parentId;
+    focusNext.current = owner === null || owner === undefined ? { kind: 'tree', after: group.id } : { kind: 'name', id: owner, after: group.id };
+    if (!(await submit({ type: 'group.deleted', id: group.id, payload: {} }))) {
+      focusNext.current = null;
+      focusIf({ kind: 'delete', id: group.id });
+    }
+  };
+
+  /** Closing the dialog without deleting (Cancel, Escape) hands focus back to the Delete button that opened it. */
+  const closeConfirm = (): void => {
+    if (confirming !== null) focusNext.current = { kind: 'delete', id: confirming.id };
+    setConfirming(null);
   };
 
   /** Move `group` so it sits at index `at` of its siblings with itself removed. */
@@ -282,7 +336,10 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
               label={`Rename ${group.name}`}
               initial={group.name}
               onCommit={(name) => void rename(group, name)}
-              onCancel={() => setRenaming(null)}
+              onCancel={() => {
+                focusNext.current = { kind: 'name', id: group.id };
+                setRenaming(null);
+              }}
             />
           ) : canEdit ? (
             <button
@@ -339,7 +396,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
   const forest = buildForest(groups);
   const empty = groups.length === 0;
   return (
-    <div className="gn-groups" data-workspace-id={workspaceId}>
+    <div className="gn-groups" data-workspace-id={workspaceId} ref={root}>
       {canEdit ? (
         <div className="gn-groups__toolbar">
           <Button
@@ -363,7 +420,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
         <p className="gn-groups__empty">{canEdit ? GROUPS_EMPTY_SENTENCE : GROUPS_EMPTY_READ_ONLY}</p>
       ) : null}
       {!empty || adding === 'root' ? (
-        <ul role="tree" aria-label="Project groups" className="gn-groups__tree">
+        <ul role="tree" aria-label="Project groups" className="gn-groups__tree" tabIndex={-1}>
           {forest.map(renderNode)}
           {adding === 'root' ? renderDraft(null) : null}
         </ul>
@@ -371,7 +428,7 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
       <Dialog
         open={confirming !== null}
         title={`Delete the group “${confirming?.name ?? ''}”?`}
-        onClose={() => setConfirming(null)}
+        onClose={closeConfirm}
         describedBy={`${base}-delete-body`}
       >
         <div className="gn-groups__confirm">
@@ -379,13 +436,13 @@ export function GroupsTree({ workspaceId, canEdit, groups, onSubmit }: GroupsTre
             This group has no projects and no sub-groups, so nothing is filed under it. Deleting it cannot be undone.
           </p>
           <div className="gn-groups__confirm-actions">
-            <Button onClick={() => setConfirming(null)}>Cancel</Button>
+            <Button onClick={closeConfirm}>Cancel</Button>
             <Button
               variant="danger"
               onClick={() => {
                 const target = confirming;
                 setConfirming(null);
-                if (target !== null) void submit({ type: 'group.deleted', id: target.id, payload: {} });
+                if (target !== null) void remove(target);
               }}
             >
               Delete group

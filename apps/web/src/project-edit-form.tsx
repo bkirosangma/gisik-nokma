@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Button } from '@gisik-nokma/ui';
 import { prefixSchema, type GroupRow } from '@gisik-nokma/domain';
-import { GroupPicker, type GroupChoice } from './group-picker.js';
+import type { GroupChoice } from './group-picker.js';
+import { ProjectGroupField, refusalField, type EditRefusal } from './project-group-field.js';
 import { PrefixChangeConfirm } from './prefix-change-confirm.js';
 
 export interface ProjectEditValues {
@@ -14,15 +15,7 @@ export interface ProjectEditValues {
   group: GroupChoice;
 }
 
-/** What a door refusal says, split out so a screen can hand it to the form. */
-export type EditRefusal = { rule: string; reason: string };
-
-/** The field a refusal is ABOUT, or `null` when it belongs to the whole act (shown by the screen). */
-export function refusalField(rule: string): 'prefix' | 'group' | null {
-  if (rule === 'project.prefix-reserved' || rule === 'project.prefix-taken') return 'prefix';
-  if (rule.startsWith('group.')) return 'group';
-  return null;
-}
+export { refusalField, type EditRefusal };
 
 /**
  * The inline form behind every project "Edit" (MCP CRUD plan Task 2; prefixes and groups plan Task 10):
@@ -85,7 +78,6 @@ export function ProjectEditForm({
   const prefixId = `${idPrefix}-edit-prefix`;
   const prefixHintId = `${idPrefix}-edit-prefix-hint`;
   const prefixRefusalId = `${idPrefix}-edit-prefix-refusal`;
-  const groupRefusalId = `${idPrefix}-edit-group-refusal`;
   const field = refusal === null ? null : refusalField(refusal.rule);
   const prefixDescribedBy = [!prefixOk ? prefixHintId : null, field === 'prefix' ? prefixRefusalId : null]
     .filter((id): id is string => id !== null)
@@ -186,15 +178,15 @@ export function ProjectEditForm({
           ) : null}
         </div>
         {groups !== null ? (
-          <div className="gn-field gn-project-edit__field">
-            <span className="gn-field__label">Group (optional)</span>
-            <GroupPicker groups={groups} value={group} onChange={setGroup} disabled={busy} idPrefix={`${idPrefix}-edit`} />
-            {field === 'group' && refusal !== null ? (
-              <p id={groupRefusalId} role="alert" className="gn-project-edit__hint gn-refusal gn-refusal--server">
-                {refusal.reason}
-              </p>
-            ) : null}
-          </div>
+          <ProjectGroupField
+            groups={groups}
+            value={group}
+            onChange={setGroup}
+            disabled={busy}
+            idPrefix={`${idPrefix}-edit`}
+            refusal={refusal}
+            className="gn-project-edit__field"
+          />
         ) : null}
         <div className="gn-project-edit__actions">
           <Button variant="primary" type="submit" disabled={busy || blank || !prefixOk}>
