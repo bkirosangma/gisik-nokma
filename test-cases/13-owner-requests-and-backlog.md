@@ -1972,7 +1972,7 @@ file rather than shifted by a delta.
   `.gn-list*` selector checked against the attributes the component writes. **Four mutation witnesses:**
   renaming the `[hidden]` selector reddens (a)+(b), changing the spacer width reddens (c), renaming the
   focus rule reddens (a)+(d), and renaming a class in `ticket-list.tsx` reddens (a) — with `ui.css`
-  restored to its pre-mutation SHA-256 after each. **The residual gap is named, not papered over:** this
+  restored to its pre-mutation SHA-256 after each. **AMENDED 2026-10-02 (neo T5):** a LEADING `[data-style="…"]` root scope is not a List attribute (the theme shell writes `data-style` on `<html>`), so arm (e) strips it before collecting `[attr]` (`keyedAttributes`); three CONTROLs in the same `it` keep the strip narrow: `.gn-list__column-box[data-style="neo"]` still yields `data-style`, `[data-style="neo"] .gn-list__columns-tray[hidden]` still yields `hidden`, and `.x [data-style="neo"] .gn-list__y` (a non-leading scope) still yields `data-style`. **The residual gap is named, not papered over:** this
   is declaration-level, so nothing here measures a COMPUTED result for this tab in a browser — there is no
   viewport sweep, no screenshot diff, and a declaration that is present and then overridden is invisible
   to every suite in the repo.
