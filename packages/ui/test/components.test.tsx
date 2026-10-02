@@ -633,7 +633,7 @@ describe('R1(c) at the component layer', () => {
    * (light) / 1.16 (dark), below the 3:1 WCAG 1.4.11 floor a non-text boundary
    * owes. The 2026-10-01 audit found people could not find empty neo fields,
    * and the owner reversed it for TEXT FIELDS: the neo rule now carries a 1px
-   * full ring in `--gn-field-rim` (≥ 3:1) beside the sunken shadow. The
+   * full ring in a dedicated ring colour (≥ 3:1; the role was retired by HK-4, 24.120) beside the sunken shadow. The
    * waiver is retired; cards, wells, notices and rows still carry no border.
    * The owner's words and the measurement above stay as the record.
    *
