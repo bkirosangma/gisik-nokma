@@ -127,7 +127,7 @@ describe('Board card — clicking anywhere on the card opens the ticket', () => 
     const onOpenTicket = vi.fn();
     render(<Board board={errandBoard()} onOpenTicket={onOpenTicket} />);
 
-    const toggle = screen.getByRole('button', { name: 'who · when' });
+    const toggle = screen.getByRole('button', { name: /^Moved to Doing by/ });
     await user.click(toggle);
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');

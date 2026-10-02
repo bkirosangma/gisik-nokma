@@ -137,6 +137,8 @@ describe('21.062 one accessible name at every width; the visible word differs by
   it('21.062 the same name on a phone', async () => {
     stubViewport(true);
     await mount(boardOf({ doing: ['tk_b'] }));
+    // UX T7 (23.120): only the picked column is in the page on a phone, so pick Doing first.
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Doing/ }));
     expect(moveTo('tk_b')).toHaveAccessibleName('Move to another state');
   });
 });

@@ -980,6 +980,23 @@ a.gn-ticket-sheet__crumb--link {
 .gn-sheet__close:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 .gn-dialog__body,
 .gn-sheet__body { padding: 0 1.5rem 1.5rem; overflow-y: auto; }
+/* UX fixes T7 (BRD-09, case 23.124): a dialog's actions in a footer OUTSIDE the scrolling body. The panel is a flex
+   column capped at 90vh and only `__body` scrolls, so the footer stays in view at any height; `sticky` states the
+   same intent for a caller whose panel is not capped. A hint line (why Create is disabled) sits beside the actions. */
+.gn-dialog__footer {
+  position: sticky;
+  bottom: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.75rem 1.5rem 1.5rem;
+  background: var(--gn-surface-raised);
+  border-top: 1px solid var(--gn-border);
+}
+.gn-dialog__footer-hint { flex: 1 1 12rem; margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
 
 /* The ticket sheet's header "Move" shortcut (case 21.071): a phone-only second door to the State row's
    Move…, so it is not painted at all above 40rem. It follows `.gn-button` (same specificity), so this
@@ -1147,6 +1164,10 @@ a.gn-ticket-sheet__crumb--link {
   flex-direction: column;
   gap: 0.5rem;
 }
+/* UX fixes T7 (BRD-01, case 23.120): `display: flex` above outranks the UA sheet's own `hidden`, so a hidden column
+   would stay painted. On a phone `BoardGroupSection` hides every column the picker did not choose (and makes it
+   `inert`); this rule is what makes the attribute mean "takes no room", so the rail is as tall as the shown column. */
+.gn-board__column[hidden] { display: none; }
 /* Spec row "Column title" (17px/22px, 600) is STRUCK, Ruling 14 (coordinator,
    2026-09-16) — no rule was ever added for it. `board.tsx:409` renders the
    column name as `Chip`'s own child text, tone set from `column.blocked`/
@@ -1812,21 +1833,19 @@ a.gn-ticket-sheet__crumb--link {
 .gn-board-card__priority--p1 { color: var(--gn-danger); }
 .gn-board-card__priority--p2 { color: var(--gn-text-muted); }
 .gn-board-card__priority--p3 { color: var(--gn-text-subtle); }
-/* The card's FOOTER: "who · when" left, the arrows (and Close) right, one row.
-   `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the card's 8px gap
-   makes the 16 between groups; the negative sides and bottom let the 44px
-   targets reach 8px into the card's 16px padding, so the card does not grow
-   (the mockup, `Main.dc.html:109`). Wraps when "who · when" unfolds into a
-   long sentence, so the arrows drop to their own line rather than shrink. */
+/* The card's FOOTER: the provenance line left, the arrows (and Close) right, ONE row (D14; UX fixes T7, case 23.122,
+   audit BRD-02). It never wraps: the line truncates with an ellipsis instead (`.gn-board-card__provenance` below),
+   and a pressed line wraps inside its own button. `margin: 0.5rem -0.5rem -0.5rem` — 8 of margin on top of the
+   card's 8px gap makes the 16 between groups; the negative sides and bottom let the 44px targets reach 8px into
+   the card's 16px padding, so the card does not grow (the mockup, `Main.dc.html:109`). */
 .gn-board-card__footer {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin: 0.5rem -0.5rem -0.5rem;
 }
 .gn-board-card__provenance {
-  display: inline-flex;
-  align-items: center;
+  display: block;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 2.75rem;
@@ -1837,6 +1856,11 @@ a.gn-ticket-sheet__crumb--link {
   background: transparent;
   font: inherit;
   font-size: 0.75rem;
+  /* One line the height of the 44px target; the text truncates (UX fixes T7, 23.122). */
+  line-height: 2.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--gn-text-subtle);
   cursor: pointer;
   text-align: left;
@@ -1869,6 +1893,13 @@ a.gn-ticket-sheet__crumb--link {
      24px dense-in-list floor this comment argued for is superseded by the
      owner-approved card (`Main.dc.html:110`), and `DENSE_IN_LIST` keeps its
      entry (a 44px target passes a 24px floor). */
+}
+/* Pressed: the whole sentence, wrapped in place. The footer stays a row; the button grows taller (UX fixes T7, 23.122). */
+.gn-board-card__provenance[aria-expanded="true"] {
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.25rem;
+  padding-block: 0.75rem;
 }
 /* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
    button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
@@ -2084,6 +2115,7 @@ a.gn-ticket-sheet__crumb--link {
     font-size: 0.9375rem;
   }
   .gn-board-phone-picker { max-width: 100%; margin-bottom: 0.5rem; overflow-x: auto; }
+  .gn-board-phone-picker__activation { display: contents; }
   .gn-board-card__move-label--phone { display: inline; }
   .gn-board-card__move-label--wide { display: none; }
 }
@@ -3698,8 +3730,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-reopen__summary { font-weight: 600; margin: 0 0 0.4rem; }
 .gn-reopen__picker { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.7rem 0; }
 .gn-reopen__gap { color: var(--gn-text-muted); margin: 0.7rem 0; }
-.gn-reopen__actions,
-.gn-new-ticket__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
+.gn-reopen__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1rem; }
 .gn-new-ticket__field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.7rem; }
 .gn-create-flow__trouble { color: var(--gn-danger); margin: 0.6rem 0 0; }
 
