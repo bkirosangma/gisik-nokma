@@ -22,6 +22,7 @@ export {
   liveQueryAgeMs,
   recallLiveQuery,
   rememberLiveQuery,
+  staleWorkspaces,
 } from './views/live-query-cache.js';
 export { scheduleReload, subscribeReloads } from './views/reload-scheduler.js';
 // The one authoring class the shell's gateway constructs: `gateway.ts` imports types only, so it carries no canvas.
