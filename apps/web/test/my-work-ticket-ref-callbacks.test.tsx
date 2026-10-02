@@ -159,7 +159,12 @@ describe('18.287 My work supplies queryTickets/resolveTicketHref to the open tic
       </Providers>,
     );
     await screen.findByRole('dialog');
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    // The editor loads on first use (smoothness T10), so each slot mounts a tick after the sheet: wait for BOTH modes, not the first.
+    await waitFor(() => {
+      const modes = capturedSlotProps.map((p) => p['mode']);
+      expect(modes).toContain('description');
+      expect(modes).toContain('comment');
+    });
 
     const description = capturedSlotProps.find((p) => p['mode'] === 'description');
     const comment = capturedSlotProps.find((p) => p['mode'] === 'comment');

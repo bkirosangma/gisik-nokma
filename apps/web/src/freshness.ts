@@ -1,6 +1,6 @@
 'use client';
 import { useEffect } from 'react';
-import { scheduleReload, staleWorkspaces } from '@gisik-nokma/app-core';
+import { scheduleReload, staleWorkspaces } from '@gisik-nokma/app-core/data';
 
 /** A cached answer older than this is read again when the person comes back to the page. */
 export const STALE_AFTER_MS = 30_000;
