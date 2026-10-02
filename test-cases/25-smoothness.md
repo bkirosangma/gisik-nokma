@@ -45,7 +45,7 @@ Amendment S-R1 (2026-10-02, spec "Amendment S-R1"): the skeleton fill is the new
 
 ## 25.05 Route shells, the nav skeleton and link pending hints (T5)
 
-Spec D5, S1, P10; amendment S-R1 (the skeleton is the page's real container plus `Skeleton` parts, the fill role is `surfacePlaceholder`, no skeleton rule names a style attribute or the well); audit SM-02. Tests: `apps/web/test/{route-shells,nav-pending,shell-css}.test.*`; `shell-ux.test.ts` (23.040) follows the project page's new fallback. 25.050 is unused.
+Spec D5, S1, P10; amendment S-R1 (the skeleton is the page's real container plus `Skeleton` parts, the fill role is `surfacePlaceholder`, no skeleton rule names a style attribute or the well); audit SM-02. Tests: `apps/web/test/{route-shells,nav-pending,shell-css}.test.*`; `shell-ux.test.ts` (23.040) follows the project page's new fallback. 25.050 is unused. The three top-level `.gn-nav*` rules it adds re-snapshot `packages/ui/test/fixtures/gn-nav-top-level.json` (21.012's control), as neo T3 and T6 did.
 
 - ✅ **25.051 — every signed-in route segment has a `loading.tsx` (workspaces, a workspace, a project, My work, Members, workspace Settings, Inbox, Notes, a note, Account, Settings); sign-in, privacy, terms and the invite page have none.** Control: both lists are checked. Mutation: delete one `loading.tsx` → red. (`route-shells.test.tsx`)
 - ✅ **25.052 — the project shell is the page's own `main.gn-shell.gn-shell--wide`, busy, with no link, button or input, and draws the remembered tab's shape (list: block rows; board: three real `section.gn-board__column`, nine `.gn-card.gn-board-card`, no `card` stand-in).** Control: the list tab draws no column. (`route-shells.test.tsx`)
