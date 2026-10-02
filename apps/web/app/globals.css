@@ -3276,7 +3276,10 @@ input, textarea, select { font-family: inherit; }
     scroll-snap-type: x proximity;
     overscroll-behavior-x: contain;
   }
-  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; }
+  /* Neo follow-up F-3 (audit PV-04, case 23.345): the five tabs were 425px of 1rem-padded pills in a 342px column (and 382px
+     at 430), so the 24px scroll fade swallowed the ~17px peek of Timeline. 0.625rem a side is 365px: all five fit at 430, and at
+     390 Timeline shows 65px, 41px of it clear of the fade (35/11 at 360; measured, 23.345). The shared control keeps its 1rem. */
+  .gn-project__rail .gn-segmented__item { flex: none; scroll-snap-align: start; white-space: nowrap; padding-inline: 0.625rem; }
 }
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
@@ -5641,6 +5644,17 @@ input, textarea, select { font-family: inherit; }
 .gn-group-picker__notice { margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
 /* The header's title and its Edit sit on one line; the heading keeps its own metrics. */
 .gn-project__title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+/* The title's Edit on a phone (neo follow-up F-2, case 23.331, audit BRD-06): a 44px outlined circle with the pencil glyph in the
+   title's own row. The row stops wrapping so Edit can never drop onto a line of its own (it cost a 44px row), and the title, which
+   already ellipsises at <=40rem (`ui.css`), takes what is left. Above 40rem the word shows and the glyph does not. AFTER the base
+   row rule: source order decides. */
+.gn-project__edit-icon { display: none; }
+@media (max-width: 40rem) {
+  .gn-project__title-row { flex-wrap: nowrap; gap: 0.5rem; }
+  .gn-project__title-row .gn-project__edit { flex: none; width: 2.75rem; padding: 0; justify-content: center; }
+  .gn-project__title-row .gn-project__edit-label { display: none; }
+  .gn-project__title-row .gn-project__edit-icon { display: inline-flex; }
+}
 
 /* THE PROSE MEASURE (UX fixes Task 3, case 23.043, audit SYS-16, ENT-17, NP-11, NP-23, SET-23): the empty-state and
    helper sentences of the reading pages stop at `--gn-measure` (70ch) instead of running the page's full width.

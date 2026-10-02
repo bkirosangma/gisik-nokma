@@ -18,6 +18,9 @@ export const PHONE_QUERY = '(max-width: 40rem)';
  * purpose (FD3): widening this query would also have moved the phone top bar's switcher, the dialogs' bottom sheets
  * (case 21.072) and the byline, none of which are wrong at 700px.
  *
+ * AMENDED 2026-10-02 (neo F-2, 23.330): the project page also reads it, to move the workflow picker and "Only tickets in
+ * progress" into the Filters sheet on a phone (the header keeps them inline above 40rem).
+ *
  * `false` on the server, on the first client render and wherever `matchMedia` does not exist, so the
  * markup the server sent is what hydrates; the real answer arrives in an effect and follows a
  * foldable opening or a window resize through the `change` event.

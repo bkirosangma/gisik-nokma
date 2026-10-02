@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { IngestResult } from '@gisik-nokma/domain';
-import { Button } from '@gisik-nokma/ui';
+import { Button, PencilIcon } from '@gisik-nokma/ui';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
 import { newUlid } from '@gisik-nokma/domain';
 import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from './project-edit-form.js';
@@ -172,10 +172,16 @@ export function ProjectTitle({
             <Button
               ref={trigger}
               type="button"
+              className="gn-project__edit"
               aria-label={`Edit ${projectName}`}
               onClick={() => setEditing(true)}
             >
-              Edit
+              {/* Neo follow-up F-2 (case 23.331): on a phone the word gives way to the glyph so Edit stays on the title's row
+                  (the phone arm in `globals.css` swaps them); the accessible name above is the same at every width. */}
+              <span className="gn-project__edit-icon">
+                <PencilIcon />
+              </span>
+              <span className="gn-project__edit-label">Edit</span>
             </Button>
           ) : null}
         </div>
