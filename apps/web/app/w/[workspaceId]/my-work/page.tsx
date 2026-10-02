@@ -11,7 +11,7 @@ import {
   useMyWork,
   type MyWorkView,
 } from '@gisik-nokma/app-core';
-import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
+import { TicketEditorSlot, uploadAttachmentHttp } from '../../../../src/editor-slot.js';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ListPageShell } from '../../../../src/skeletons/page-shells.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';

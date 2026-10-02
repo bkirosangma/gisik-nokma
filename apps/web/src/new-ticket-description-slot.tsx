@@ -1,4 +1,4 @@
-import { TicketEditorSlot } from '@gisik-nokma/editor';
+import { TicketEditorSlot } from './editor-slot.js';
 import type { EditorSlotComponent } from '@gisik-nokma/app-core';
 
 /**
