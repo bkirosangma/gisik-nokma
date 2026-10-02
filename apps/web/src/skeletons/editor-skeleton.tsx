@@ -1,4 +1,5 @@
 import { useCommentToolbarShown } from '@gisik-nokma/editor/comment-toolbar-pref';
+import { MARKDOWN_HINT } from '@gisik-nokma/editor/markdown-hint';
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 
 export type EditorSkeletonProps = {
@@ -10,6 +11,8 @@ export type EditorSkeletonProps = {
   readOnly?: boolean;
   /** The slot's `submitSlot`: `'none'` (the new-ticket dialog) omits the submit control, so the skeleton omits its pill. */
   submitSlot?: 'footer' | 'none';
+  /** The slot's `footerNote`: a comment composer's whole hint line. The hint wraps to as many lines as the words need at this width. */
+  footerNote?: string;
 };
 
 /**
@@ -60,7 +63,7 @@ function StripSet({ groups, which }: { groups: readonly Group[]; which: 'desktop
  * host (`gn-field__input ticket-editor__content`), then `editor-slot__footer`. The content host takes its height from the stylesheet's
  * per-mode rule (description 8.375rem, comment 5.5rem), so it carries no size here. The parts that DO carry a size are the ones whose
  * real controls set their own: the strip's items (each takes a tool's box, laid out in the real groups so the real toolbar container
- * wraps them into the same rows, per breakpoint, `editor.css`), the Format, Attach and submit pills, and the hint line (the footer's
+ * wraps them into the same rows, per breakpoint, `editor.css`), the Format, Attach and submit pills, and the hint (its own words, set transparent on the placeholder fill, so it wraps to the lines the real hint wraps to; the footer's
  * height is the tallest of them). They are sized to the real controls' boxes, not invented ones; the box heights were measured equal,
  * skeleton against loaded editor, at 390 and 1280 px (case 25.182). The fill is the placeholder surface, never the well.
  *
@@ -68,11 +71,13 @@ function StripSet({ groups, which }: { groups: readonly Group[]; which: 'desktop
  * reader has opted in to it (G-6; the stored per-device choice, read from the light `comment-toolbar-pref` subpath so no editor
  * module is pulled in), otherwise it leads its footer with the Format pill. Decoration only: the region is named once.
  */
-export function EditorSkeleton({ mode = 'description', attach = false, readOnly = false, submitSlot = 'footer' }: EditorSkeletonProps) {
+export function EditorSkeleton({ mode = 'description', attach = false, readOnly = false, submitSlot = 'footer', footerNote }: EditorSkeletonProps) {
   const [commentStripShown] = useCommentToolbarShown();
   const collapsible = mode === 'comment' && !readOnly;
   const strip = !readOnly && (mode !== 'comment' || commentStripShown);
   const submit = mode !== 'note' && submitSlot !== 'none';
+  // The real slot's hint line: note none, comment the host's `footerNote`, description the Markdown sentence (none when read-only).
+  const hint = mode === 'note' ? '' : mode === 'comment' ? (footerNote ?? '') : readOnly ? '' : MARKDOWN_HINT;
   return (
     <SkeletonRegion label="Loading editor" className={`editor-slot editor-slot--${mode}`}>
       <div className="ticket-editor">
@@ -90,11 +95,17 @@ export function EditorSkeleton({ mode = 'description', attach = false, readOnly 
         {collapsible ? <Skeleton shape="block" className="gn-editor-skeleton__format" /> : null}
         {attach ? (
           <span className="editor-slot__attach-wrap">
-            <Skeleton shape="block" width="5.5rem" height="2.5rem" className="gn-editor-skeleton__attach" />
+            <Skeleton shape="block" width="5.7rem" height="2.5rem" className="gn-editor-skeleton__attach" />
           </span>
         ) : null}
-        <p className="editor-slot__hint">{mode === 'note' ? null : <Skeleton shape="line" width="55%" height="1rem" />}</p>
-        {submit ? <Skeleton shape="block" width="6rem" height="2.75rem" className="gn-editor-skeleton__submit" /> : null}
+        <p className="editor-slot__hint">
+          {hint === '' ? null : (
+            <span className="gn-skeleton gn-editor-skeleton__hint-text" aria-hidden="true">
+              {hint}
+            </span>
+          )}
+        </p>
+        {submit ? <Skeleton shape="block" width="4.375rem" height="2.75rem" className="gn-editor-skeleton__submit" /> : null}
       </div>
     </SkeletonRegion>
   );

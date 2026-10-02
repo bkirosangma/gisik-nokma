@@ -44,6 +44,7 @@ export const TicketEditorSlot = (props: TicketEditorSlotProps) => {
         attach={props.uploadAttachment !== undefined}
         readOnly={props.readOnly}
         {...(props.submitSlot === undefined ? {} : { submitSlot: props.submitSlot })}
+        {...(props.footerNote === undefined ? {} : { footerNote: props.footerNote })}
       />
     );
   }

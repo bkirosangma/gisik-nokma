@@ -108,15 +108,8 @@ import { TablePicker } from './TablePicker.js';
  *   link, not just the caret/partial selection (`MarkdownEditor.tsx:755`).
  */
 
-const MARKDOWN_ENTRIES: { key: string; markdown: string }[] = [
-  { key: 'bold', markdown: '**bold**' },
-  { key: 'italic', markdown: '*italic*' },
-  { key: 'code', markdown: '`code`' },
-  { key: 'quote', markdown: '> quote' },
-  { key: 'list', markdown: '- list' },
-  { key: 'link', markdown: '[text](url)' },
-];
-export const MARKDOWN_HINT = `Markdown: ${MARKDOWN_ENTRIES.map((entry) => entry.markdown).join(', ')}`;
+import { MARKDOWN_ENTRIES, MARKDOWN_HINT } from '../markdown-hint.js';
+export { MARKDOWN_HINT };
 
 /**
  * Per-tool markdown triggers beyond MARKDOWN_HINT's own six — kept OUT of

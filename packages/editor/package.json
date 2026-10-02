@@ -22,6 +22,10 @@
       "types": "./dist/comment-toolbar-pref.d.ts",
       "default": "./dist/comment-toolbar-pref.js"
     },
+    "./markdown-hint": {
+      "types": "./dist/markdown-hint.d.ts",
+      "default": "./dist/markdown-hint.js"
+    },
     "./markdown-doc": {
       "types": "./dist/markdown-doc/index.d.ts",
       "default": "./dist/markdown-doc/index.js"

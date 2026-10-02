@@ -210,7 +210,17 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here. The sixth is
     // smoothness G-6's Format button (25.388): the comment composers' footer control, floored at 44px on a phone and
     // placed after its own base rule, which sits below the strip's rules in the file.
-    const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE);
+    // The editor SKELETON's own phone rules (smoothness T10 FIX 2, 25.182) live in the same breakpoint block, after the editor's: they
+    // draw the web app's loading placeholder in the real bar's phone boxes and are the only other rules the arm may hold.
+    const isSkeletonRule = (rule: { selectors: string[] }) => rule.selectors.every((selector) => selector.includes('gn-editor-skeleton__'));
+    const skeletonArm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && isSkeletonRule(rule));
+    expect(skeletonArm.map((rule) => rule.selectors.join(', '))).toEqual([
+      '.gn-editor-skeleton__set--desktop',
+      '.gn-editor-skeleton__set--phone',
+      '.gn-skeleton.gn-editor-skeleton__tool, .gn-skeleton.gn-editor-skeleton__format',
+      '.gn-skeleton.gn-editor-skeleton__select',
+    ]);
+    const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && !isSkeletonRule(rule));
     expect(arm.map((rule) => rule.selectors.join(', '))).toEqual([
       '.ticket-editor__toolbar',
       '.ticket-editor__tool',

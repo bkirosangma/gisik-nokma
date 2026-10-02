@@ -100,7 +100,7 @@ describe('25.177 the editor skeleton is the slot box, per mode', () => {
   });
 });
 
-describe('25.184 the strip skeleton has the real bar\'s items, per breakpoint', () => {
+describe('25.177 (FIX 2) the strip skeleton has the real bar\'s items per breakpoint, and the hint its own words', () => {
   const tools = (root: Element) => root.querySelectorAll('.ticket-editor__tool').length;
   const skeletonSet = (which: 'desktop' | 'phone') => {
     const view = render(<EditorSkeleton mode="description" />);
@@ -134,7 +134,7 @@ describe('25.184 the strip skeleton has the real bar\'s items, per breakpoint', 
     }
   };
 
-  it('25.184 desktop and phone: the same group count, tool count and heading select as the real toolbar', async () => {
+  it('25.177 desktop and phone: the same group count, tool count and heading select as the real toolbar; the same hint words per mode', async () => {
     const desktop = await realBar(false);
     const phone = await realBar(true);
     expect(skeletonSet('desktop')).toEqual(desktop);
@@ -144,5 +144,25 @@ describe('25.184 the strip skeleton has the real bar\'s items, per breakpoint', 
     expect(phone.tools).toBe(9);
     expect(desktop.selects).toBe(1);
     expect(phone.selects).toBe(1);
+    // The hint line is the real sentence (it wraps to the real number of lines, 25.182): description's Markdown hint, a comment's
+    // `footerNote`, nothing for a read-only description. The real text is read from the real slot, not restated here.
+    const hintOf = async (props: Record<string, unknown>, skeleton: boolean) => {
+      const view = skeleton
+        ? render(<EditorSkeleton {...(props as object)} />)
+        : render(<RealTicketEditorSlot {...({ doc: null, workspaceId: "w", ticketId: "t", ...props } as React.ComponentProps<typeof RealTicketEditorSlot>)} />);
+      if (!skeleton) await waitFor(() => expect(view.container.querySelector('.ticket-editor__content .ProseMirror')).not.toBeNull());
+      const text = view.container.querySelector('.editor-slot__hint')?.textContent ?? null;
+      view.unmount();
+      return text;
+    };
+    for (const props of [
+      { mode: 'description', readOnly: false },
+      { mode: 'description', readOnly: true },
+      { mode: 'comment', readOnly: false, footerNote: 'Posting records an event citing you.' },
+      { mode: 'comment', readOnly: false },
+    ]) {
+      expect(await hintOf(props, true), JSON.stringify(props)).toBe(await hintOf(props, false));
+    }
+    expect(await hintOf({ mode: 'description', readOnly: false }, true)).toMatch(/^Markdown: /); // control: not the empty string twice
   });
 });

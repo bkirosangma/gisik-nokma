@@ -1355,3 +1355,12 @@
     height: 2.75rem;
   }
 }
+
+/* The skeleton's hint is the real sentence on the placeholder fill: inline, so each wrapped line gets its own bar, as the text's lines
+   will. `.gn-skeleton` supplies the fill and the pulse; this only makes it inline and hides the glyphs. */
+.gn-skeleton.gn-editor-skeleton__hint-text {
+  display: inline;
+  color: transparent;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}

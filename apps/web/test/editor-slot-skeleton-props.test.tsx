@@ -21,8 +21,8 @@ afterEach(() => {
   window.localStorage.removeItem(KEY);
 });
 
-describe('25.181 the wrapper forwards submitSlot to the skeleton', () => {
-  it('draws no submit pill for submitSlot="none", and one without it', () => {
+describe('25.181 the wrapper forwards submitSlot and footerNote to the skeleton', () => {
+  it('draws no submit pill for submitSlot="none", and one without it; draws the comment footerNote as the hint, and none without it', () => {
     const none = render(<TicketEditorSlot {...base} mode="description" submitSlot="none" />);
     expect(none.container.querySelector('.gn-skeleton-region')).not.toBeNull(); // the skeleton is what is showing
     expect(none.container.querySelectorAll('.editor-slot__footer .gn-editor-skeleton__submit')).toHaveLength(0);
@@ -30,6 +30,13 @@ describe('25.181 the wrapper forwards submitSlot to the skeleton', () => {
     // Control, same it(): the same mount without submitSlot draws one.
     const footer = render(<TicketEditorSlot {...base} mode="description" />);
     expect(footer.container.querySelectorAll('.editor-slot__footer .gn-editor-skeleton__submit')).toHaveLength(1);
+    footer.unmount();
+    // The comment hint is the host's own sentence, laid out in the skeleton so it wraps to the lines the real hint will (25.182).
+    const note = render(<TicketEditorSlot {...base} mode="comment" footerNote="Posting records an event citing you." />);
+    expect(note.container.querySelector('.editor-slot__hint')?.textContent).toBe('Posting records an event citing you.');
+    note.unmount();
+    const bare = render(<TicketEditorSlot {...base} mode="comment" />);
+    expect(bare.container.querySelector('.editor-slot__hint')?.textContent).toBe('');
   });
 });
 
