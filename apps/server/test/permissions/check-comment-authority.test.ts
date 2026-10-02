@@ -87,6 +87,16 @@ describe('26.042–26.046 who may edit or delete a comment', () => {
     expect(await gate('comment.deleted', 'ticket', fx.TE, onTE, 'owner')).toBeNull(); // control: the right parent
   });
 
+  it("26.046 (note arm) a comment on note A named against note B is refused; against note A it passes", async () => {
+    // Two notes the owner can read, so the refusal is the comment rule and not the note read rule.
+    const onA = await comment('note', fx.NOTES.nWorkspace, 'owner');
+    expect(await gate('comment.deleted', 'note', fx.NOTES.nWorkspace, newUlid(), 'owner')).toEqual(refusal(COMMENT_UNKNOWN_REASON));
+    expect(await gate('comment.edited', 'note', fx.NOTES.nProject, onA, 'owner')).toEqual(refusal(COMMENT_UNKNOWN_REASON));
+    expect(await gate('comment.deleted', 'note', fx.NOTES.nProject, onA, 'owner')).toEqual(refusal(COMMENT_UNKNOWN_REASON));
+    expect(await gate('comment.edited', 'note', fx.NOTES.nWorkspace, onA, 'owner')).toBeNull(); // control: the right note
+    expect(await gate('comment.deleted', 'note', fx.NOTES.nWorkspace, onA, 'owner')).toBeNull();
+  });
+
   it('26.052 (note arm) a deleted note refuses an edit; restoring it lets the same edit through', async () => {
     const c = await comment('note', fx.NOTES.nProject, 'author');
     const noteEv = (type: string) =>

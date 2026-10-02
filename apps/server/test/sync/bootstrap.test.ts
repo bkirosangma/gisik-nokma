@@ -434,11 +434,11 @@ describe('GET /v1/sync/bootstrap', () => {
     expect(visible.snapshot.state.stateId).toBe('todo');
     // the comment predates the snapshot but still travels — content is not state
     expect(visible.events.some((e: { type: string }) => e.type === 'comment.added')).toBe(true);
-    // and nothing in the tail predates the snapshot except the five backfill
+    // and nothing in the tail predates the snapshot except the seven backfill
     // types — hardcoded here (not imported from `BOOTSTRAP_BACKFILL_TYPES`) so
     // that shrinking the constant would shrink both sides of the check and
     // leave this green for the wrong reason. This ticket's stream carries only
-    // one of the five, so this loop is a boundary check, not a backfill check:
+    // one of the seven, so this loop is a boundary check, not a backfill check:
     // 12.115 and 12.116 are where each type is made to travel.
     for (const e of visible.events) {
       const isBackfill = [
