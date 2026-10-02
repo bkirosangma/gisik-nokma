@@ -160,6 +160,9 @@ check "13.1765 a stale gate marker is ignored and removed: a dead pid, and a liv
 reset; d=$(dead_pid); hold 1 "$d" "Thu Jan  1 00:00:00 1970"; lp=$(live_pid); hold 2 "$lp" "Mon Jan  1 00:00:00 2001"
 out=$(rt -- true)
 check "13.1766 stale slots are reclaimed: a dead pid and a reused pid (live, other start time) both free their slot at once" 'printf "%s" "$out" | grep -q "^queue wait: 0s"'
+reset; d1=$(dead_pid); d2=$(dead_pid); hold 1 "$d1" ""; hold 2 "$d2" ""
+out=$(rt -- true)
+check "13.1766 a dead pid whose recorded start time is EMPTY (ps had failed at claim time) is still stale: the pid check decides, not only the start-time compare" 'printf "%s" "$out" | grep -q "^queue wait: 0s"'
 reset; mkdir "$CTL_SEM_DIR/slot-1" "$CTL_SEM_DIR/slot-2"; script_line "1005 rmdir \"$CTL_SEM_DIR/slot-1\""
 out=$(rt -- true)
 check "13.1766 a slot dir with no holder file is a claim in progress: NOT reclaimed while fresh (the run waits for it)" 'printf "%s" "$out" | grep -q "waited for: slots"'
@@ -174,9 +177,11 @@ check "13.1767 two real processes racing for ONE slot (one stale slot to reclaim
 reset
 out=$(rt -- sh -c 'exit 5'); rc=$?
 check "13.1768 the slot is released when the command fails (and the run did happen: rc 5)" '[ $rc -eq 5 ] && printf "%s" "$out" | grep -q "exit code: 5" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
-# exec: $rp is then the verb's own pid, so the TERM reaches its trap
-reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30 >/dev/null 2>&1 ) & rp=$! ; i=0; while [ $i -lt 40 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
-held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null; sleep 1
+# exec: $rp is then the verb's own pid, so the TERM reaches its trap. SAMPLE 1 s and generous polls: this arm runs under load in the mutation pass.
+reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sleep 30 >/dev/null 2>&1 ) & rp=$!
+i=0; while [ $i -lt 120 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
+held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null
+i=0; while [ $i -lt 40 ] && [ -n "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
 check "13.1768 the slot is released when the verb is terminated (SIGTERM), and was held while it ran" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
 check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
