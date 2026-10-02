@@ -168,16 +168,18 @@ async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
   desktop.unmount();
 }
 
+// 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.233 the ticket sheet gets the phone bar, and every tool stays reachable', () => {
   it('21.233 at ≤40rem the sheet description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountSheet);
-  });
+  }, 20_000);
 });
 
+// 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.234 the new-ticket dialog gets the phone bar, and every tool stays reachable', () => {
   it('21.234 at ≤40rem the dialog description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountDialog);
-  });
+  }, 20_000);
 });
 
 // ── 21.235: the editor's OWN phone arm ────────────────────────────────────────────────────────────────────────────
@@ -315,12 +317,17 @@ async function twoRowsInHost(mount: Mounter, side: number): Promise<void> {
   expect(SELECT_WIDTH).toBe(97.5);
 }
 
+// 20 s per `it`, as notes-css (flake 18.226, #898): each `it` mounts the real sheet (or dialog) twice and packs four widths,
+// and asserts geometry, never a duration. The 2026-10-02 LOCAL release gate timed 21.236 out at the 5 s default (load average
+// ~74); alone under that load it took 5250 ms, its siblings 21.233 3560 ms, 21.234 1518 ms, 21.237 1401 ms. Reviewer B's LOCAL
+// run at load 164: 21.233 5233 ms (timed out at 5 s), 21.234 2934 ms, 21.236 10486 ms, 21.237 8855 ms. 21.235 is a stylesheet
+// read (705 ms) and keeps the default. The global `testTimeout` is unchanged.
 describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, in the sheet and in the dialog at 360–466', () => {
   it('21.236 the ticket sheet (viewport − 2 × the sheet body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountSheet, hostWidths().sheetSide);
-  });
+  }, 20_000);
   it('21.237 the new-ticket dialog (viewport − 2 × the dialog body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountDialog, hostWidths().dialogSide);
-  });
+  }, 20_000);
 });
 
