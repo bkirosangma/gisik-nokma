@@ -5,6 +5,7 @@ import { projInvites } from './proj-invites.js';
 import { notesProjection } from './notes.js';
 import { noteSearchProjection } from './note-search.js';
 import { membershipsProjection } from './proj-memberships.js';
+import { projGroups } from './proj-groups.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
 import { createProjectionRegistry, type ProjectionRegistry } from './registry.js';
@@ -76,6 +77,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(ticketTypesProjection);
   // §8 position 4.
   registry.register(projProjects);
+  // Prefixes and groups Task 6: the group tree, directly after the projects it files. It reads no
+  // other projection's table and none reads it inside an ingest transaction, so the slot is only
+  // for legibility; `project.updated {groupId}` is written by `projProjects` above.
+  registry.register(projGroups);
   // §8 position 5 (Plan 3 Chain B Task 10). It INSERTS above proj_memberships,
   // which has been registered since Plan 4 and sits at position 7. Two
   // adjacencies are load-bearing and neither is with proj_memberships: it must
