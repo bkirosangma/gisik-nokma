@@ -40,6 +40,8 @@ export type CalendarMarker =
   | {
       kind: 'marker';
       ticketId: string;
+      /** The ticket's key (`CCSO-4`) when it has one — the chip's text is `<key> <title>` (23.140). */
+      key: string | null;
       title: string;
       date: string;
       marker: 'due' | 'start';
@@ -52,6 +54,7 @@ export type CalendarMarker =
   | {
       kind: 'marker';
       ticketId: string;
+      key: string | null;
       title: string;
       date: string;
       /** A claimed custom `date`-kind field (owner sign-off 2026-08-20). */
@@ -217,6 +220,7 @@ function collectItems(
     const due = dateClaimOf(input, 'dueDate');
     const title = titleOf(input.state);
     const ticketId = input.state.id;
+    const key = input.key ?? null;
 
     // Custom date claims are independent of the start/due story — they are
     // collected first and unconditionally, so no `continue` below can drop
@@ -226,6 +230,7 @@ function collectItems(
       customItems.push({
         kind: 'marker',
         ticketId,
+        key,
         title,
         date: claim.date,
         marker: 'custom',
@@ -258,6 +263,7 @@ function collectItems(
       items.push({
         kind: 'marker',
         ticketId,
+        key,
         title,
         date: due.date,
         marker: 'due',
@@ -273,6 +279,7 @@ function collectItems(
       items.push({
         kind: 'marker',
         ticketId,
+        key,
         title,
         date: start.date,
         marker: 'start',
