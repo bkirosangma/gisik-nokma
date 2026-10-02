@@ -485,6 +485,10 @@ describe('18.226 every class the Notes page renders is a class globals.css style
    * each state change, then unions two small supplementary renders for the
    * states that genuinely cannot coexist with the rest.
    */
+  // 20 s, not vitest's default 5 s (flake 18.226, BRIEF-flake-18226-timeout-2026-10-02): this one `it` drives a whole populated page
+  // through every state and asserts a class SET, never a duration. Under machine load (load average 60-72) it took 2203 ms at 5211eee4
+  // and 4139 ms at the release tip against 846 ms when quiet, and timed out in 3 of 5 full web runs and once in a gate (G0, 07:32).
+  // The global `testTimeout` is unchanged and no other test is touched.
   it('the two sets are EQUAL — a rename on either side reddens here', async () => {
     const user = userEvent.setup();
     const seen = new Set<string>();
@@ -704,7 +708,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
 
     // NEITHER LIST IS TYPED HERE — see the inbox scanner's own docblock for why.
     expect(rendered).toEqual(styled);
-  });
+  }, 20_000);
 
   it('the one data-attribute globals.css keys a .gn-notes rule on is really rendered', async () => {
     const services = stubServices({
