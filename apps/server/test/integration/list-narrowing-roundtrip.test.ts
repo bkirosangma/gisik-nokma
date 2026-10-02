@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createOnlineDataSource, type FetchLike } from '@gisik-nokma/app-core/online';
 import { newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
@@ -317,10 +317,33 @@ afterAll(async () => {
   await db.drop();
 });
 
+/**
+ * The online data source's roster burst (`ROSTER_BURST_MS`, smoothness T3 FD7,
+ * case 25.026). Not exported from `@gisik-nokma/app-core/online`, so restated;
+ * the control read in 13.304 fails if the two ever disagree.
+ */
+const ROSTER_BURST_MS = 1000;
+
 describe('13.304 — the List narrows at the real door when the checkbox is ticked', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('13.304 the unfiltered List holds all three, and the narrowed List holds ONLY the active one', async () => {
     const calls: string[] = [];
     const source = sourceFor(me.headers, calls);
+
+    // ─── THE ROSTER BURST (smoothness T3, FD7, case 25.026) ──────────────────
+    // The data source joins the workspace roster ONCE per `ROSTER_BURST_MS` per
+    // workspace, so the roster count of a read depends on how far it is from the
+    // read before it. This case reads three times (the unfiltered List, the
+    // narrowed List, a narrowed List again), so the count must not depend on how
+    // fast the machine ran between them: only `Date` is faked (real sockets and
+    // timers are untouched), and each read is placed on the clock by hand — the
+    // narrowed read ONE ms inside the burst, the control read exactly AT its end.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const t0 = Date.now();
+    vi.setSystemTime(t0);
 
     // ─── THE CONTROL RUNS FIRST ──────────────────────────────────────────────
     // Not after the assertion it protects. The runner stops at the first
@@ -348,6 +371,7 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     // `page.tsx:321-324` builds `{ stateCategories: ['active'] }`, the client
     // mapper singularises it, and the route narrows server-side. This is the
     // read no stub in the repo can stand in for.
+    vi.setSystemTime(t0 + ROSTER_BURST_MS - 1);
     const callsBefore = calls.length;
     const narrowed = await source.query.getTickets(
       projectId,
@@ -361,25 +385,45 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     // answered. Asserted on the URL the client actually formed, so a client that
     // dropped the filter and filtered locally would fail here rather than pass
     // on a coincidentally-equal row set.
-    // Filtered to the PAGE requests: the walk also makes ONE roster request for
-    // display names (the `memberLabel` join, case 13.1290), which carries no
-    // filter and is not what this arm is about. That request is asserted
-    // present, so the exclusion is a partition rather than a narrowing of the
-    // evidence — and the partition CARRIES its total below, because
-    // `pages = 1` and `rosters = 1` are both satisfied by a walk that made a
-    // third request too.
+    // Filtered to the PAGE requests: the walk also reads the roster for display
+    // names (the `memberLabel` join, case 13.1290), which carries no filter and
+    // is not what this arm is about. UNDER FD7 (25.026) a read inside the burst
+    // of the unfiltered read above REUSES that read's roster, so this narrowed
+    // read makes ZERO roster requests — asserted absent here, and asserted
+    // present again by the control below, which reads one burst later. The
+    // exclusion is a partition rather than a narrowing of the evidence, and the
+    // partition CARRIES its total below, because `pages = 1` and `rosters = 0`
+    // are both satisfied by a walk that made a third request too.
     const narrowedCalls = calls.slice(callsBefore);
     const narrowedPages = narrowedCalls.filter((url) => url.includes('/tickets?'));
     const narrowedRosters = narrowedCalls.filter((url) => url.includes('/members'));
     expect(narrowedPages).toHaveLength(1);
     expect(decodeURIComponent(narrowedPages[0] ?? '')).toContain('"stateCategory":"active"');
-    expect(narrowedRosters).toHaveLength(1);
-    // The names-only read (`/actor-names`, cases 7.290–7.297) the roster join
-    // falls back to: once per walk, its own bucket.
+    expect(narrowedRosters).toHaveLength(0);
+    // The names-only read (`/actor-names`, cases 7.290–7.297) is PART OF the
+    // roster join (`workspaceRoster` reads `/members` and `/actor-names` in
+    // parallel, once), so inside the burst it is absent too: the narrowed read is
+    // exactly its one page request.
     const narrowedNames = narrowedCalls.filter((url) => url.includes('/actor-names'));
-    expect(narrowedNames).toHaveLength(1);
-    expect(narrowedCalls).toHaveLength(3);
+    expect(narrowedNames).toHaveLength(0);
+    expect(narrowedCalls).toHaveLength(1);
     expect(narrowedPages.length + narrowedRosters.length + narrowedNames.length).toBe(narrowedCalls.length);
+
+    // ─── THE CONTROL PAST THE BURST (same it()) ───────────────────────────────
+    // The same narrowed read, exactly `ROSTER_BURST_MS` after the unfiltered
+    // read, joins the roster again: ONE roster request, so the zero above is
+    // the burst memo and not a read that never asks for a roster. A burst
+    // constant that moved would fail one of the two reads here.
+    vi.setSystemTime(t0 + ROSTER_BURST_MS);
+    const controlBefore = calls.length;
+    const again = await source.query.getTickets(projectId, { stateCategories: ['active'] }, 'flat');
+    expect(ids(again.rows)).toEqual([activeTicketId]);
+    const controlCalls = calls.slice(controlBefore);
+    expect(controlCalls.filter((url) => url.includes('/tickets?'))).toHaveLength(1);
+    expect(controlCalls.filter((url) => url.includes('/members'))).toHaveLength(1);
+    // One join is both reads: the roster and the names-only read (cases 7.290–7.297).
+    expect(controlCalls.filter((url) => url.includes('/actor-names'))).toHaveLength(1);
+    expect(controlCalls).toHaveLength(3);
 
     // ─── THE BOARD READ IS UNNARROWED — a SUPPORTING fact, NOT the negative arm ─
     // `getBoard(projectId)` takes NO filter (`data-source.ts:142`), so the Board's

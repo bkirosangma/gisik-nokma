@@ -256,6 +256,16 @@ export const primitives = {
    */
   neoWellLight: '#e6dcd2',
   neoWellDark: '#141a33',
+  /**
+   * The neo SKELETON fill (smoothness T2; amendment S-R1, rule 3, 2026-10-02): a FLAT surface step, one notch off `surface`
+   * toward the ink — NEVER the well (`neoWellLight`/`neoWellDark`) and never a field look. Light `#eae1d8` is about
+   * two thirds of the way from `neoPaper` `#f1eae3` to the light well `#e6dcd2` but is not it (a skeleton bar sits on a raised
+   * card, and a recess colour there reads as a field); dark `#2a314b` lifts `neoNavy` `#1b2340` the same notch toward the light ink.
+   * 1.08 (light) and 1.20 (dark) against `surface` (the light well is 1.13): a faint bar, deliberately, decoration only (no text sits on it, so no
+   * `CONTRAST_PAIRS` row). hig and minimal do not use these: their role maps to the `surfaceTrack` primitive.
+   */
+  neoPlaceholderLight: '#eae1d8',
+  neoPlaceholderDark: '#2a314b',
 
   /**
    * The four-step FILL hierarchy R1(c) separates by. Eight-digit hex, not
@@ -756,6 +766,13 @@ export const TOKEN_ROLES = [
   'surfaceSunken',
   'surfaceOverlay',
   /**
+   * The fill of a LOADING PLACEHOLDER bar (smoothness T2; amendment S-R1 rule 3) — `--gn-surface-placeholder`. Decoration only: it
+   * never carries text, so no `CONTRAST_PAIRS` row. `hig` and `minimal` map it to the primitive `surfaceTrack` uses, so their
+   * skeletons look exactly as the track does (24.009 stays green); `neo` maps it to a flat step off `surface`, never the
+   * well (`neoPlaceholderLight`/`neoPlaceholderDark`), because there `surfaceTrack` IS the sunken well (neo refresh N2).
+   */
+  'surfacePlaceholder',
+  /**
    * The recessed TRACK and WELL grounds — styling refresh Plan A Task 1. A
    * track holds raised items on the page ground (board columns); a well is a
    * recessed group inside a raised panel (the sheet's fields). Text on both is
@@ -946,6 +963,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'warmRaised',
     surfaceSunken: 'warmSunken',
     surfaceOverlay: 'overlayWarmHig',
+    surfacePlaceholder: 'trackWarm',
     surfaceTrack: 'trackWarm',
     surfaceWell: 'wellWarm',
     text: 'labelWarmLight',
@@ -990,6 +1008,7 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     surfaceRaised: 'navyRaised',
     surfaceSunken: 'navySunken',
     surfaceOverlay: 'overlayNavyHig',
+    surfacePlaceholder: 'trackNavy',
     surfaceTrack: 'trackNavy',
     surfaceWell: 'wellNavy',
     text: 'labelWarmDark',
@@ -1076,6 +1095,7 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoPaper',
       surfaceSunken: 'neoWellLight', // N2 (2026-10-02): a pressed fill is never lighter than its ground
       surfaceOverlay: 'overlayWarmNeo',
+      surfacePlaceholder: 'neoPlaceholderLight', // S-R1: flat, never the well
       surfaceTrack: 'neoWellLight',
       surfaceWell: 'neoWellLight',
       fillTertiary: 'fillWarmNeo3',
@@ -1092,6 +1112,7 @@ const STYLE_COLOR_OVERRIDES: Partial<Record<StyleName, Record<ThemeName, Partial
       surfaceRaised: 'neoNavy', // N4 = B (2026-10-02): extrusion, not elevation; the 16% highlight carries the lift
       surfaceSunken: 'neoWellDark', // N2
       surfaceOverlay: 'overlayNavyNeo',
+      surfacePlaceholder: 'neoPlaceholderDark', // S-R1: flat, never the well
       surfaceTrack: 'neoWellDark',
       surfaceWell: 'neoWellDark',
       textSubtle: 'neoTextSubtleDark',

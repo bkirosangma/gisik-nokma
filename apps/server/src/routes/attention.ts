@@ -136,12 +136,11 @@ function istDaysBetween(fromDay: string, toDay: string): number {
  *
  * ## What this deliberately costs
  *
- * It assembles a full card for every visible ticket in the workspace — including
- * one `rollupFor` round trip each — in order to fill three buckets. That is the
- * plan's shape and `assembleTicketCards` already names the batching residue in
- * its own docblock ("if the board's card count makes it matter, the batch
- * belongs INSIDE `rollupFor`"). Recorded here rather than fixed, with the same
- * owner.
+ * It assembles a full card for every visible ticket in the workspace — the rollups in
+ * ONE `rollupsFor` call since smoothness T11, where this once cost a `rollupFor` round trip
+ * per card — in order to fill three buckets. The assembly itself (provenance, keys, the
+ * full card) is still done for every visible ticket, which is the plan's shape. Recorded
+ * here rather than fixed, with the same owner.
  *
  * ## RECORDED, NOT DECIDED: the blocked flag is read from the CURRENT definition
  *

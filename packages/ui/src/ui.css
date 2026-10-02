@@ -9235,6 +9235,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   transform: translate(-50%, -50%);
 }
 
+/* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
+   Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
+   The keyframe lives beside its ONE consumer (the header's rule for keyframes).
+   Structural skeletons (S-R1): a screen's skeleton renders the real component's own container and fills it with these
+   PARTS, so no rule here names a container style, and none names a style attribute. The fill is the `surfacePlaceholder`
+   role: the track primitive in hig and minimal (unchanged look), a flat step off `surface` in neo, never the well. */
+.gn-skeleton {
+  display: block;
+  background: var(--gn-surface-placeholder);
+  border-radius: var(--gn-radius-control);
+  width: var(--gn-skeleton-w, 60%);
+  height: var(--gn-skeleton-h, 1em);
+  animation: gnPulse 1600ms var(--gn-motion-ease-out) infinite;
+}
+.gn-skeleton--block { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 4rem); }
+.gn-skeleton--circle { border-radius: 50%; width: var(--gn-skeleton-w, 2rem); height: var(--gn-skeleton-h, 2rem); }
+.gn-skeleton--card { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 5.5rem); }
+.gn-skeleton__rows { display: flex; flex-direction: column; gap: var(--gn-space-2); }
+.gn-skeleton-region { display: block; }
+.gn-pending > * { opacity: var(--gn-disabled-opacity); }
+@keyframes gnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-skeleton { animation: none; opacity: 0.8; }
+
 /* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
    Owner, 2026-10-02: "many examples in both desktop and mobile, where due to containers, the lights and shadows are getting cut off
    in the UI." A scroller paints nothing outside its padding box, so a raised card flush against its edge lost the 14 px halo that
