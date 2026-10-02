@@ -71,16 +71,55 @@ A workspace is your whole business — everybody in it and all the work undernea
 bucket of work inside it: "Residential jobs", "Shop operations". Jobs live inside projects.
 
 **Can I create a project?**
-**Only if you are an owner or an admin.** Those two roles get a **New project** form on the workspace
-page; everybody else gets a sentence saying so instead of a button that fails: *"Only an owner or an
-admin can create a project in this workspace."* For anyone, there is no button on the Workspaces page, in
+**Only if you are an owner or an admin.** Those two roles get a **Create project** button on the
+workspace page; everybody else gets a sentence saying so instead of a button that fails: *"Only an owner
+or admin can create a project."* For anyone, there is no button on the Workspaces page, in
 settings, or in the top bar. A brand-new workspace has stages, job types and you as its owner, and
 nowhere to put a job until an owner or admin adds one. For a member this is still the biggest hole in
 the product, and it sits right at the start of the journey.
 
 **Then how does anybody have projects?**
-An owner or admin creates one, with the **New project** form on the workspace page. Any that were
+An owner or admin creates one, with the **Create project** button on the workspace page. Any that were
 already there when you arrived were put there when the system was set up.
+
+**Where do I create a workspace, a project or a job?**
+Each has a button that says **Create**, with a plus sign, in the same bright colour. **Create workspace**
+is at the top of the Workspaces page. **Create project** is on a workspace's page, in the Projects
+heading row — owners and admins only. **Create ticket** is in a project, near the top by the view tabs,
+and inside an empty stage on the Board. Each opens a window; nothing is made until you press the button
+inside it.
+
+**Can I change a project's prefix, or the workspace's?**
+Yes, if you are an owner or an admin. For a project, press **Edit** on its card or page, change
+**Prefix** and press **Save**. For the workspace, press **Edit prefix** under its name. Either way you
+are asked first, in a window called **Change prefix**, and the cursor starts on the safe answer, **Keep**.
+A prefix is one to three letters.
+
+**What happens to the old job numbers when a prefix changes?**
+Every job's number is rewritten at once: **CCSO-12** becomes **CCSH-12** when the project goes from **SO**
+to **SH**, with the same count. The old number still finds the job — in the picker that links a job into
+a note, and in your assistant's search — and puts it first. A note that mentioned **CCSO-12** keeps saying
+**CCSO-12**, and the mention still opens the job.
+
+**Why can't I use a prefix a project used to have?**
+Because the old numbers still point at that project. Once a project has moved off **SO**, no other project
+in the workspace can take it, so one number never names two jobs. The project that gave it up can take it
+back. A prefix another project uses right now is refused too. The form shows the reason and stays open.
+
+**Can my assistant change a prefix?**
+No. It can read and search by job numbers, but changing a prefix is done in the app by an owner or admin.
+
+**How do I put my projects into groups?**
+An owner or admin presses **Edit** on a project and uses **Group (optional)**: four boxes, **Level 1
+group** to **Level 4 group**, each listing only the groups under the one above. Type a name that does not
+exist yet and **Create “…”** makes it. The whole tree is also built and tidied under **Settings → Groups**:
+add a group, rename it by clicking its name, reorder it by dragging (or **Alt** with the arrow keys), or
+delete it once it holds no project and no sub-group.
+
+**What are Grouped and Plain on the workspace page?**
+**Show projects** switches between them. **Grouped** draws the groups as nested sections with a coloured
+strip naming each level, and the projects that have no group last under **Ungrouped**; **Plain** is the
+flat grid. The page remembers your choice, for you, in each workspace. Guests are not offered it.
 
 **Can I have more than one workspace?**
 Yes. The Workspaces page lists them all, each with its projects underneath as links.
@@ -220,11 +259,11 @@ Worth knowing about — but it is no longer the only way to put a date on a cale
 you set the built-in due date.
 
 **Can I set the dates when I create the job, instead of afterwards?**
-Yes. The New ticket window has its own **Start date** and **Due date** boxes — real date pickers, empty
+Yes. The Create ticket window has its own **Start date** and **Due date** boxes — real date pickers, empty
 by default, not the typing box above. Leave either blank to create the job with no claim on that date.
 
 **Can I choose which stage a new job starts in?**
-Yes, if your workflow allows it. The New ticket window has a **Starting status** picker, defaulting to
+Yes, if your workflow allows it. The Create ticket window has a **Starting status** picker, defaulting to
 the workflow's first stage; it is disabled while **Starts in the backlog?** is on, since a backlog job
 has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered.
 
@@ -299,9 +338,9 @@ nothing.
 If half of it works, it tells you both halves: that the parent really was reopened and that is
 permanent history, and separately why your job was refused. Nothing is quietly undone.
 
-**What's the "who · when" button on a card?**
-Press it and it tells you who moved the job and when: *"marked Doing by Anselma Marak on 19 Aug
-2026"*. Every value in the product carries who claimed it and when — nothing is presented as a fact
+**What's the line at the bottom of a card?**
+It says what happened last, in words: *"Moved to Doing by Anselma Marak on 19 Aug"*. Press it and it adds
+the year; press it again and it folds back. A move from an earlier year always shows its year. Every value in the product carries who claimed it and when — nothing is presented as a fact
 that just floats there.
 
 **Why does the history show two different times for the same change?**
@@ -631,7 +670,7 @@ You are taken back to the Notes list with a message: "That note is no longer sha
 ## Boards, lists and dates
 
 **Can a new job start in a column other than the first?**
-Yes — press **Add a ticket** in the empty column you want, rather than the top-level **New ticket**
+Yes — press **Create ticket** in the empty column you want, rather than the top-level **Create ticket**
 button, and the window opens with that column's stage already chosen and the backlog switch off.
 
 **Why is there no Add button on this column?**
@@ -693,7 +732,7 @@ repeats, no gaps.
 
 **What happens on a really big project?**
 There is a ceiling of **2,000 jobs**. Past it the Backlog, List, Calendar and Timeline all refuse rather than
-showing you part of a project pretending to be the whole one — and **the "New ticket" button
+showing you part of a project pretending to be the whole one — and **the "Create ticket" button
 disappears too**, because it reads from the same place. So a project that grows past the ceiling
 becomes one you cannot add to.
 

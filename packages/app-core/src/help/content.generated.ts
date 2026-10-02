@@ -80,11 +80,11 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "bold",
-                  "text": "New project"
+                  "text": "Create project"
                 },
                 {
                   "kind": "text",
-                  "text": " form on the workspace page; a member or a guest is told why it is not there instead of being shown a button that fails. If you are neither an owner nor an admin and your workspace has no projects, there is nowhere to put work, and one of them will have to add one for you. (§3)"
+                  "text": " button on the workspace page; a member or a guest is told why it is not there instead of being shown a button that fails. If you are neither an owner nor an admin and your workspace has no projects, there is nowhere to put work, and one of them will have to add one for you. (§3)"
                 }
               ],
               [
@@ -712,7 +712,7 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — this workspace's own screens: its ticket types, its workflows, and the workspace itself (§11 and §12)."
+                  "text": " — this workspace's own screens: its ticket types, its workflows, its project groups, and the workspace itself (§11 and §12)."
                 }
               ],
               [
@@ -726,7 +726,15 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": ", linking to its home page, with the project you were last in beside it — that one opens a menu of the workspace's other projects."
+                  "text": ", linking to its home page, with the project you were last in beside it — set apart by a thin divider and labelled "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Last project:"
+                },
+                {
+                  "kind": "text",
+                  "text": ". It opens a menu of the workspace's other projects."
                 }
               ],
               [
@@ -930,19 +938,27 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Below the list of workspaces there is a heading, "
+                      "text": "Press "
                     },
                     {
                       "kind": "bold",
-                      "text": "New workspace"
+                      "text": "Create workspace"
                     },
                     {
                       "kind": "text",
-                      "text": ", with one box labelled "
+                      "text": ", the button at the top of the page. A window opens with a box labelled "
                     },
                     {
                       "kind": "bold",
                       "text": "Name"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and one labelled "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Prefix (optional)"
                     },
                     {
                       "kind": "text",
@@ -952,7 +968,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "Type your business name into it. "
+                      "text": "Type your business name into "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Name"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". "
                     },
                     {
                       "kind": "bold",
@@ -966,6 +990,36 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
+                      "text": "If you like, type a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Prefix"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ": one to three letters, which become the front of every job's number in this workspace (the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CC"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " in "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSO-1183"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "). Leave it empty and the product makes one up from the name. You can change it later (§3, under Change a prefix)."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
                       "text": "Press "
                     },
                     {
@@ -974,7 +1028,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": "."
+                      "text": " in the window. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " closes it and creates nothing."
                     }
                   ],
                   [
@@ -1085,15 +1147,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "New project"
+                    "text": "Create project"
                   },
                   {
                     "kind": "text",
-                    "text": " form inside the workspace, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails: "
+                    "text": " button on the workspace's own page, in the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Projects"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " heading row, and that is the only control that creates one. Everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or admin can create a project.\""
                   },
                   {
                     "kind": "text",
@@ -1339,11 +1409,27 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and "
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
                     "text": "Description"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Group (optional)"
                   },
                   {
                     "kind": "text",
@@ -1372,7 +1458,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The project's short prefix, the letters at the start of every job's number, is chosen when the project is started and cannot be edited. Members who are not owners or admins do not see "
+                    "text": "The prefix and the group have their own sections just below. Members who are not owners or admins do not see "
                   },
                   {
                     "kind": "bold",
@@ -1382,6 +1468,622 @@ export const HELP_CONTENT: HelpContent = [
                     "kind": "text",
                     "text": "."
                   }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-three-create-buttons",
+            "title": "The three Create buttons",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Making something new always starts from a button that says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with a small plus sign on it, in the same bright colour wherever you meet it. Each one opens a window; nothing is made until you press the button inside the window."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Create workspace"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — at the top of the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Workspaces"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " page. The window asks for a name and, if you want one, a prefix."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Create project"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — on a workspace's page, in the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Projects"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " heading row beside the archived switch. Owners and admins only; everybody else is told so (§3, under The project problem). The window asks for a name, an optional description and an optional prefix. A new project starts without a group; file it under one with "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " afterwards."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Create ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — in a project, near the top by the view tabs, and inside an empty stage on the Board (that one says "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " too; its full name for a screen reader adds the stage). The window is described in §5."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the door refuses what you asked for — a prefix someone already uses, say — the reason is written inside the window and the window stays open, so nothing you typed is lost."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "change-a-prefix",
+            "title": "Change a prefix",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A job's number has two halves. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "workspace's prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " comes first and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "project's prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " second, then a dash and a count: in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CCSO-1183"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CC"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is the workspace and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "SO"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is the project. You can change either half after the fact."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "A project's prefix:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " an owner or admin presses "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on the project's card or page, types the new letters into "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Prefix"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (one to three letters; it turns your typing into capitals), and presses "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "The workspace's prefix:"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " an owner or admin presses "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit prefix"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", under the workspace's name on its page, types the new letters into "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Workspace prefix"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and presses "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Save prefix"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the box does not hold one to three letters the form says "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"A prefix is 1 to 3 letters.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " stays switched off."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "You are asked first."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " When the prefix really changes, a window called "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Change prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " tells you what will happen — every job's number is rewritten with the new letters, and the old ones still work. It has two buttons: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Change prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " followed by the old letters. The cursor starts on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", so pressing Enter the moment it opens changes nothing. Typing the same prefix back, or changing only the group, asks nothing."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "What changes and what does not:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Every job's number is rewritten at once"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", everywhere it is shown. A job that was "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSO-12"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " reads "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSH-12"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " after the project moves from "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "SO"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "SH"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". The count does not change."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Old numbers still find the job."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Where you search for a job by its number — the picker that links a job into a note (§15), and your assistant's search (§16) — typing "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSO-12"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " finds it and lists it first, wearing its new number. Search only shows what you are allowed to see, the same as always."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Notes keep the key they were written with."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " A note that mentions "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSO-12"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " goes on saying "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "CCSO-12"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and the mention still opens the job."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "A retired prefix cannot be taken by another project."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Once a project has moved off "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "SO"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", no other project in the workspace can start using it, because the old numbers still point to the first project. If you try, you are told so in words such as "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Its old ticket keys still point there, so it can't be reused.\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": " The project that gave it up may take it back. A prefix another project uses right now is refused too."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "The workspace's prefix works the same way"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", for every project at once. A workspace may take back one of its own old prefixes."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Changing a prefix is for people, not for your assistant: the assistant (§16) can read the numbers and search by them, but it cannot change a prefix."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "group-your-projects",
+            "title": "Group your projects",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A workspace with many projects can file them into "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "groups"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", to read them in one tidy tree. Groups have "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "four levels"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": a level-1 group can hold level-2 groups, which hold level-3 groups, which hold level-4 groups. A project sits directly under one group, or under none."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Filing a project."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Owners and admins open "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on the project (card or page) and use "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Group (optional)"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". It is four boxes, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Level 1 group"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Level 4 group"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". Each box lists only the groups under the one above it, and the next box wakes up once the one above has a value. Pick from the list, or type: an exact name picks the group that already exists, and any other name offers "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create “…”"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to make a new group on the spot. Clearing a box clears the ones below it. If somebody made the same group a moment before you, the form says "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"Using the existing\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": " followed by the group's name, and files the project there. Leave the boxes empty to take a project out of its group."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Seeing them."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " On a workspace's page, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Show projects"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " has two choices, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Grouped"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Plain"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Grouped"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " draws the groups as nested sections, level 1 down to level 4, each with a coloured strip naming its level, with each project under its own group; groups with nothing in them are left out, and projects with no group sit last under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Ungrouped"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Plain"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " is the flat grid you had before. The page remembers your choice, for you, in each workspace. Guests are not offered it. If the groups cannot be read, the page keeps the plain list and tells you so."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "The Groups page."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Owners and admins build and tidy the tree itself under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Settings → Groups"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". See The Groups page in §11."
+                    }
+                  ]
                 ]
               }
             ]
@@ -2011,15 +2713,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "New ticket"
+                      "text": "Create ticket"
                     },
                     {
                       "kind": "text",
-                      "text": " button, near the top by the view tabs — or click "
+                      "text": " button, near the top by the view tabs — or press "
                     },
                     {
                       "kind": "bold",
-                      "text": "Add a ticket"
+                      "text": "Create ticket"
                     },
                     {
                       "kind": "text",
@@ -2127,11 +2829,11 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "Create"
+                      "text": "Create ticket"
                     },
                     {
                       "kind": "text",
-                      "text": "."
+                      "text": ". On a phone the button stays at the bottom of the window while you scroll the form, and under it a short line says what is still missing (for example, that the job needs a title)."
                     }
                   ]
                 ]
@@ -2154,7 +2856,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "If the New ticket button is not there:"
+                    "text": "If the Create ticket button is not there:"
                   },
                   {
                     "kind": "text",
@@ -4290,15 +4992,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " arrows that carry it to the stages it may move to, and a small \"who · when\" button. Press that button and it tells you who moved it and when: "
+                    "text": " arrows that carry it to the stages it may move to, and a one-line note of what happened last: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"marked Doing by Anselma Marak on 19 Aug 2026\""
+                    "text": "\"Moved to Doing by Anselma Marak on 19 Aug\""
                   },
                   {
                     "kind": "text",
-                    "text": "."
+                    "text": ". Press that line and it adds the year; press it again and it folds back. A move from an earlier year always shows its year."
                   }
                 ]
               },
@@ -4349,7 +5051,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "An empty column's own Add button starts the job there."
+                    "text": "An empty column's own Create ticket button starts the job there."
                   },
                   {
                     "kind": "text",
@@ -4357,11 +5059,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "Add a ticket"
+                    "text": "Create ticket"
                   },
                   {
                     "kind": "text",
-                    "text": " in an empty column and the New ticket window opens with that column's status already chosen, the backlog switch off, and a job type from that workflow pre-picked. A column whose stage does not allow a job to start there — your admin can turn this off per stage (§11) — shows no Add button at all, even empty."
+                    "text": " in an empty column and the Create ticket window opens with that column's status already chosen, the backlog switch off, and a job type from that workflow pre-picked. A column whose stage does not allow a job to start there — your admin can turn this off per stage (§11) — shows no Create ticket button at all, even empty."
                   }
                 ]
               },
@@ -5496,7 +6198,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "The \"New ticket\" button disappears too"
+                    "text": "The \"Create ticket\" button disappears too"
                   },
                   {
                     "kind": "text",
@@ -6333,7 +7035,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " link in the top bar; it appears once a workspace is open, and it opens that workspace's settings, where the stage builder and the job-type editor live."
+                    "text": " link in the top bar; it appears once a workspace is open, and it opens that workspace's settings, where the stage builder, the job-type editor and the project-group tree live."
                   }
                 ]
               },
@@ -6611,7 +7313,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — on by default; untick it to stop a job being born straight into that stage (the Starting status picker on the New ticket window will not offer it, §5). Greyed out and stuck on for the stage your start marker points to, with the note "
+                      "text": " — on by default; untick it to stop a job being born straight into that stage (the Starting status picker on the Create ticket window will not offer it, §5). Greyed out and stuck on for the stage your start marker points to, with the note "
                     },
                     {
                       "kind": "italic",
@@ -6762,6 +7464,143 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " The positions you drag the boxes into are for this session only. Come back tomorrow and it will have laid itself out again. Known, deliberate for now — do not spend twenty minutes tidying."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "the-groups-page",
+            "title": "The Groups page",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Settings → Groups"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (the tab sits between "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Workflows"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ") draws the workspace's project groups (§3, under Group your projects) as a tree, left to right: one column per level, with a coloured strip on each box naming its level. On a phone the same tree is an indented list. Everybody who is a member of the workspace can read it; a guest is told "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Groups are shown to workspace members.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; a workspace with no groups says so."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Owners and admins can change it:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Add group"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " adds a top-level group. You type its name into the field that opens and press Enter."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "The "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "+"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on any box below level 4 adds a group inside it. A level-4 group cannot hold another."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Click a name to rename it."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Enter saves; Escape cancels."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Drag a box up or down among its neighbours"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " to reorder them. Without a mouse, put the cursor on the name and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Alt"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " with the up or down arrow. There is no drag on a touch screen."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks you to confirm, and is offered only on a group that holds no project and no sub-group. Move the projects out ("
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Edit"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on each) and delete the sub-groups first."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Each change is saved as soon as you make it, one at a time. If the product refuses — two groups with the same name side by side, or a group still in use — it says why in its own words and the tree stays as it was."
                   }
                 ]
               }
@@ -9295,7 +10134,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. A project's short prefix is fixed when it is started and cannot be changed afterwards."
+                      "text": " See a workspace's projects, start one, change its name or description, archive or restore it, and delete one or bring it back. The assistant can give a new project a short prefix when it starts one, but it cannot change a prefix afterwards; do that yourself (§3)."
                     }
                   ],
                   [
@@ -10274,15 +11113,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "New project"
+                    "text": "Create project"
                   },
                   {
                     "kind": "text",
-                    "text": " form on the workspace page; everybody else gets a sentence saying so instead of a button that fails: "
+                    "text": " button on the workspace page; everybody else gets a sentence saying so instead of a button that fails: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"Only an owner or an admin can create a project in this workspace.\""
+                    "text": "\"Only an owner or admin can create a project.\""
                   },
                   {
                     "kind": "text",
@@ -10305,11 +11144,336 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "New project"
+                    "text": "Create project"
                   },
                   {
                     "kind": "text",
-                    "text": " form on the workspace page. Any that were already there when you arrived were put there when the system was set up."
+                    "text": " button on the workspace page. Any that were already there when you arrived were put there when the system was set up."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "where-do-i-create-a-workspace-a-project-or-a-job",
+            "title": "Where do I create a workspace, a project or a job?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Each has a button that says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with a plus sign, in the same bright colour. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is at the top of the Workspaces page. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is on a workspace's page, in the Projects heading row — owners and admins only. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is in a project, near the top by the view tabs, and inside an empty stage on the Board. Each opens a window; nothing is made until you press the button inside it."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-change-a-project-s-prefix-or-the-workspace-s",
+            "title": "Can I change a project's prefix, or the workspace's?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes, if you are an owner or an admin. For a project, press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on its card or page, change "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Save"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". For the workspace, press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " under its name. Either way you are asked first, in a window called "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Change prefix"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and the cursor starts on the safe answer, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". A prefix is one to three letters."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-happens-to-the-old-job-numbers-when-a-prefix-changes",
+            "title": "What happens to the old job numbers when a prefix changes?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Every job's number is rewritten at once: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CCSO-12"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " becomes "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CCSH-12"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " when the project goes from "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "SO"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "SH"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", with the same count. The old number still finds the job — in the picker that links a job into a note, and in your assistant's search — and puts it first. A note that mentioned "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CCSO-12"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " keeps saying "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "CCSO-12"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and the mention still opens the job."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-can-t-i-use-a-prefix-a-project-used-to-have",
+            "title": "Why can't I use a prefix a project used to have?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Because the old numbers still point at that project. Once a project has moved off "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "SO"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", no other project in the workspace can take it, so one number never names two jobs. The project that gave it up can take it back. A prefix another project uses right now is refused too. The form shows the reason and stays open."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-my-assistant-change-a-prefix",
+            "title": "Can my assistant change a prefix?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "No. It can read and search by job numbers, but changing a prefix is done in the app by an owner or admin."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-put-my-projects-into-groups",
+            "title": "How do I put my projects into groups?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "An owner or admin presses "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on a project and uses "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Group (optional)"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": four boxes, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Level 1 group"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Level 4 group"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", each listing only the groups under the one above. Type a name that does not exist yet and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create “…”"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " makes it. The whole tree is also built and tidied under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings → Groups"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ": add a group, rename it by clicking its name, reorder it by dragging (or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Alt"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with the arrow keys), or delete it once it holds no project and no sub-group."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-are-grouped-and-plain-on-the-workspace-page",
+            "title": "What are Grouped and Plain on the workspace page?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Show projects"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switches between them. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Grouped"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " draws the groups as nested sections with a coloured strip naming each level, and the projects that have no group last under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Ungrouped"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Plain"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is the flat grid. The page remembers your choice, for you, in each workspace. Guests are not offered it."
                   }
                 ]
               }
@@ -10973,7 +12137,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes. The New ticket window has its own "
+                    "text": "Yes. The Create ticket window has its own "
                   },
                   {
                     "kind": "bold",
@@ -11004,7 +12168,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Yes, if your workflow allows it. The New ticket window has a "
+                    "text": "Yes, if your workflow allows it. The Create ticket window has a "
                   },
                   {
                     "kind": "bold",
@@ -11350,23 +12514,23 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "what-s-the-who-when-button-on-a-card",
-            "title": "What's the \"who · when\" button on a card?",
+            "id": "what-s-the-line-at-the-bottom-of-a-card",
+            "title": "What's the line at the bottom of a card?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Press it and it tells you who moved the job and when: "
+                    "text": "It says what happened last, in words: "
                   },
                   {
                     "kind": "italic",
-                    "text": "\"marked Doing by Anselma Marak on 19 Aug 2026\""
+                    "text": "\"Moved to Doing by Anselma Marak on 19 Aug\""
                   },
                   {
                     "kind": "text",
-                    "text": ". Every value in the product carries who claimed it and when — nothing is presented as a fact that just floats there."
+                    "text": ". Press it and it adds the year; press it again and it folds back. A move from an earlier year always shows its year. Every value in the product carries who claimed it and when — nothing is presented as a fact that just floats there."
                   }
                 ]
               }
@@ -12763,7 +13927,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "Add a ticket"
+                    "text": "Create ticket"
                   },
                   {
                     "kind": "text",
@@ -12771,7 +13935,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "New ticket"
+                    "text": "Create ticket"
                   },
                   {
                     "kind": "text",
@@ -13065,7 +14229,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "the \"New ticket\" button disappears too"
+                    "text": "the \"Create ticket\" button disappears too"
                   },
                   {
                     "kind": "text",
