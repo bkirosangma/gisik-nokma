@@ -88,6 +88,24 @@ describe('the read tools', () => {
     expect(paths).toEqual([]);
   });
 
+  it('14.550 search reads /v1/search with kinds and mode; search_tickets keeps its reply and points at search', async () => {
+    const { session, paths } = sessionRecording({ hits: [], notes: [] });
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold', kinds: ['note'], mode: 'meaning' });
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold' }); // control: no kinds, no mode → neither is sent
+    await tool('search', session).handler({ workspaceId: 'w', query: 'cold', kinds: ['ticket', 'note'], filter: { priority: 'P1' } });
+    expect(paths[0]).toBe('/v1/search?workspaceId=w&q=cold&kinds=note&mode=meaning');
+    expect(paths[1]).toBe('/v1/search?workspaceId=w&q=cold');
+    expect(paths[2]).toBe(`/v1/search?workspaceId=w&q=cold&kinds=ticket%2Cnote&filter=${encodeURIComponent('{"priority":"P1"}')}`);
+    // the old name: the SAME request it always made (no kinds), and a description that sends the reader to `search`
+    await tool('search_tickets', session).handler({ workspaceId: 'w', query: 'cold' });
+    expect(paths[3]).toBe('/v1/search?workspaceId=w&q=cold');
+    expect(tool('search_tickets', session).description).toMatch(/^Kept for one release as the old name of `search`/);
+    expect(tool('search', session).description).toContain('no pages');
+    await expect(tool('search', session).handler({ workspaceId: 'w', query: 'x', filter: { text: 'y' } })).rejects.toThrow(/^search takes the search text as `query`/);
+    expect(paths).toHaveLength(4);
+    expect(readTools(session)[0]!.name, '`search` is the first read tool').toBe('search');
+  });
+
   it('14.65 list_tickets JSON-encodes the FilterSpec into one filter parameter', async () => {
     const { session, paths } = sessionRecording({ projectId: 'p1', groupBy: 'flat', groups: [], nextCursor: null });
     await tool('list_tickets', session).handler({
