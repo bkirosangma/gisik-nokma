@@ -13,6 +13,7 @@ import { useSessionStatus } from "./providers.js";
 import { SessionNotice } from "./session-notice.js";
 import { LastProjectNav } from "./last-project-nav.js";
 import { NavHoverMenu } from "./nav-hover-menu.js";
+import { NavPending } from "./nav-pending.js";
 import { isWithin } from "./path-within.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
 import { useWorkspaceLookup } from "./use-workspace-name.js";
@@ -312,7 +313,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             item: the bar does not offer a link that cannot resolve. */}
         {user !== null ? (
           <Link href="/workspaces" aria-current={current("/workspaces")}>
-            Workspaces
+            <NavPending>Workspaces</NavPending>
           </Link>
         ) : null}
         <div className="gn-nav__more">
@@ -363,7 +364,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             href={`/w/${effectiveWorkspaceId}/my-work`}
             aria-current={currentSection(`/w/${effectiveWorkspaceId}/my-work`)}
           >
-            My work
+            <NavPending>My work</NavPending>
           </Link>
         ) : null}
         {!noWorkspace ? (
@@ -371,7 +372,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             href={`/w/${effectiveWorkspaceId}/members`}
             aria-current={currentSection(`/w/${effectiveWorkspaceId}/members`)}
           >
-            Members
+            <NavPending>Members</NavPending>
           </Link>
         ) : null}
         {/* Settings — WORKSPACE-SCOPED again (Round 21, owner: "move back the
@@ -386,7 +387,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             href={`/settings?workspaceId=${effectiveWorkspaceId}`}
             aria-current={currentSection("/settings", `/w/${effectiveWorkspaceId}/settings`)}
           >
-            Settings
+            <NavPending>Settings</NavPending>
           </Link>
         ) : null}
         </div>
@@ -421,7 +422,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
         {signedOut ? (
           <>
             <Link href="/help" aria-current={current("/help")}>
-              Help
+              <NavPending>Help</NavPending>
             </Link>
             {/* E5-31: the arm `legal-nav.tsx:96-99` already had and this bar
                 did not. `/account` is withheld with `Workspaces` above — it is
@@ -434,7 +435,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
               className="gn-nav__signin"
               href={`/sign-in?next=${encodeURIComponent(pathname)}`}
             >
-              Sign in
+              <NavPending>Sign in</NavPending>
             </Link>
           </>
         ) : null}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { useEffect, useState } from 'react';
 import { useAppServices, useSessionStatus } from './providers.js';
 
@@ -90,7 +91,7 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
           : 'Inbox'
       }
     >
-      <InboxIcon />
+      <NavPending><InboxIcon /></NavPending>
       {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
     </Link>
   );
