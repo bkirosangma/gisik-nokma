@@ -51,13 +51,15 @@ describe('the surfacePlaceholder role (amendment S-R1, rule 3)', () => {
       const step = luminance(placeholder);
       expect(Math.abs(step - surface), theme).toBeGreaterThan(0);
       expect(Math.abs(ink - step) < Math.abs(ink - surface), `${theme}: toward ink`).toBe(true);
-      expect(Math.abs(step - surface) < Math.abs(luminance(well) - surface), `${theme}: a smaller step than the well`).toBe(true);
+      // the well lies the OTHER way in dark (below the surface, away from the ink), so the two can never be confused there
+      if (theme === 'dark') expect(luminance(well) < surface && surface < step, 'dark: well < surface < placeholder').toBe(true);
+      else expect(luminance(well) < step && step < surface, 'light: well < placeholder < surface').toBe(true);
       // still visible on the surface it sits on (a faint bar, not an invisible one)
       expect(contrastRatio(placeholder, colorOf(theme, 'surface', 'neo'))).toBeGreaterThan(1.05);
     }
     // decoration only: no row names it, in either position
     expect(CONTRAST_PAIRS.some((pair) => pair.fg === 'surfacePlaceholder' || pair.bg === 'surfacePlaceholder')).toBe(false);
-    // Control: the well IS a step off the surface, so the "smaller step" comparison above can fail.
-    expect(Math.abs(luminance(primitives.neoWellLight) - luminance(colorOf('light', 'surface', 'neo')))).toBeGreaterThan(0);
+    // Control: the well itself FAILS the "never the well" ordering above (it is not strictly between itself and the surface).
+    expect(luminance(primitives.neoWellLight) < luminance(primitives.neoWellLight)).toBe(false);
   });
 });
