@@ -103,3 +103,60 @@ describe('25.201 one card grabbed re-renders one slot, not the board', () => {
     expect(rerendered).toEqual([]);
   });
 });
+
+/**
+ * Case 25.205 — the memo does not break drag-and-drop (watch item R-1, early no-op drags). A skipped slot's `MoveArrows`
+ * keeps the `attemptMove` it registered at its last render, so the drop must still find it, and must still post exactly ONE
+ * event for the grabbed id — also after the page re-rendered (fresh `moves`) between the grab and the drop.
+ */
+describe('25.205 a memoised slot still drops exactly once, and a same-column drop is still a no-op', () => {
+  it('25.205 own-column drop posts nothing; a drop on another column posts one event for the grabbed id, across a page re-render', async () => {
+    const board: BoardView = {
+      projectId: 'prj_1',
+      groups: [
+        {
+          workflowId: 'wf-errand',
+          workflowVersion: 1,
+          workflowName: 'Errand',
+          columns: [
+            {
+              stateId: 'todo',
+              name: 'To do',
+              category: 'open',
+              blocked: false,
+              creatable: true,
+              cards: ['tk_a', 'tk_b', 'tk_c'].map((ticketId) => boardCardSeed({ ticketId, title: `Ticket ${ticketId}` })),
+            },
+            { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
+          ],
+        },
+      ],
+    };
+    const source = createFakeDataSource({ getWorkflowDef: async () => WF_ERRAND });
+    const onMoved = vi.fn();
+    const makeMoves = (): BoardMoveCapability => ({ dataSource: source, workspaceId: WS, currentUserId: 'user_kiro', onMoved });
+    const view = render(pageOf(board, makeMoves));
+    await waitFor(() => expect(document.querySelectorAll('[draggable="true"]').length).toBe(3));
+
+    // Own column: a no-op, and the board re-renders around it.
+    const first = dragData();
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_b'), { dataTransfer: first });
+    view.rerender(pageOf(board, makeMoves));
+    fireEvent.drop(screen.getByTestId('board-column-todo'), { dataTransfer: first });
+    await act(async () => {});
+    expect(source.ingested).toHaveLength(0);
+    expect(onMoved).not.toHaveBeenCalled();
+    fireEvent.dragEnd(screen.getByTestId('ticket-card-tk_b'), { dataTransfer: first });
+
+    // CONTROL — the same card, the same re-render in between, dropped on another column: exactly one move, for that card.
+    const second = dragData();
+    fireEvent.dragStart(screen.getByTestId('ticket-card-tk_b'), { dataTransfer: second });
+    view.rerender(pageOf(board, makeMoves));
+    fireEvent.drop(screen.getByTestId('board-column-doing'), { dataTransfer: second });
+    await waitFor(() => expect(onMoved).toHaveBeenCalledTimes(1));
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]![0]!.payload).toEqual({ to: 'doing' });
+    expect(source.ingested[0]![0]!.entity).toMatchObject({ id: 'tk_b' });
+  });
+});
