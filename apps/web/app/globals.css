@@ -3876,6 +3876,18 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
 }
 
+/* The BAR — the drawer toggle and the page's ONE "Create note" (UX fixes T9, 23.161, audit NP-02). It sits OUTSIDE
+   `.gn-notes__body`, so the two-column grid above is untouched, and OUTSIDE `.gn-notes__tree--drawer`, so the
+   ≤60rem arm that hides the drawer cannot hide the Create button. No rule in that arm sets `display: none` on it.
+   Above 60rem the toggle is `display: none` and the bar is a row of its own holding only Create. */
+.gn-notes__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 /* Confluence-style inner padding (owner, 2026-09-23), generous and
    viewport-proportional so it neither pins to the edge at 1600px nor crowds
    the text at 768px. */
@@ -3974,7 +3986,8 @@ input, textarea, select { font-family: inherit; }
   margin-top: 0.5rem;
 }
 
-/* The tree head — the title filter now, and Task 3's Create button beside it. */
+/* The tree head — the title filter. The Create button is NOT here: it sits in `.gn-notes__bar`, outside the
+   drawer, so it is painted while the drawer is closed (UX fixes T9, 23.161, audit NP-02). */
 .gn-notes__tree-head {
   display: flex;
   align-items: center;
@@ -4200,7 +4213,6 @@ input, textarea, select { font-family: inherit; }
   .gn-notes__tree-toggle {
     display: inline-flex;
     align-items: center;
-    margin-bottom: 0.75rem;
   }
   .gn-notes__tree--drawer {
     display: none;
@@ -4292,19 +4304,23 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
 }
 
-/* A real floor (owner, 2026-09-23: "the height should also be enough to
-   feel like its a note"), so a nearly-empty note still reads as a page
-   rather than collapsing to a few lines. Reuses `--app-nav-offset`
-   (`:root`, `:1862`) with its own `0px` fallback rather than a second magic
-   number for the nav bar's height; `12rem` approximates the page's own
-   chrome above the editor (title, byline, breadcrumb, paddings) — a
-   minimum, not a pixel-exact fit, so it is deliberately not exact.
-   `cursor: text` signals the padded empty area below short text is part of
-   the same click-to-focus surface (`note-document.tsx`), not dead space. */
+/* The note page's height (owner, 2026-09-23: "the height should also be enough to feel like its a note").
+   AMENDED 2026-10-02 (UX fixes T9, 23.162, audit NP-04): the floor used to sit on THIS wrapper, but the drawn
+   field (the inset `.ticket-editor__content`, 134px) never stretched to fill it, so a short note was a small
+   box above an invisible band, with "Saved" and the comments pushed a screen away (520px blank at 768). The
+   wrapper now has no floor; the FIELD carries it, in the rule below. `cursor: text` stays: a click on the
+   wrapper's own padding still focuses the editor (`note-document.tsx`). */
 .gn-notes__editor {
   min-width: 0;
-  min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem);
   cursor: text;
+}
+/* The visible editing field is the floor (23.162): the taller of 40dvh and what is left of the screen under the
+   page's own chrome. Reuses `--app-nav-offset` (`:root`) with its `0px` fallback; `20rem` is the chrome above
+   AND below the field (nav, title, byline, toolbar, hint, "Saved") — a minimum, not a pixel-exact fit. Three
+   classes, so it beats the editor sheet's `.editor-slot .ticket-editor__content` (8.375rem) without leaning on
+   source order. */
+.gn-notes__editor .ticket-editor .ticket-editor__content {
+  min-height: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem));
 }
 
 /* ── The notes screen on a phone (mobile-web plan Task 9, cases 21.130–21.131) ───────────────
