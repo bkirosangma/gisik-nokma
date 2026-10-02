@@ -4,6 +4,7 @@ import { emptyDoc, isDocJson, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { UploadResult } from '../upload.js';
 import { composeEditorSubmission, type EditorSubmission } from '../attachments/compose-editor-submission.js';
+import { useCommentToolbarShown } from '../comment-toolbar-pref.js';
 import { MARKDOWN_HINT } from './EditorToolbar.js';
 import { TicketEditor } from './TicketEditor.js';
 
@@ -283,6 +284,10 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
   // see that prop's own docblock.
   const attachFileRef = useRef<((file: File) => void) | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
+  // G-6: the comment editors' Format button, the strip's id for its `aria-controls`, and the one per-device choice.
+  const formatButtonRef = useRef<HTMLButtonElement | null>(null);
+  const toolbarId = useId();
+  const [toolbarShown, setToolbarShown] = useCommentToolbarShown();
   // TWO flags, on purpose, because they answer different questions at different
   // instants. `submitting` is render state and drives `disabled`; it is useless
   // as a re-entrancy guard, because two clicks in one React batch both read the
@@ -402,6 +407,9 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
   // made with a toolbar button, and would lose it silently: no blur follows a
   // tab close. Raised for Plan 5, which owns the debounce.
   const isNote = props.mode === 'note';
+  // G-6 (owner 2026-10-02): a COMMENT editor keeps its formatting strip behind a small Format button. Only comment
+  // mode: the description and the note body keep the strip drawn. A read-only comment has no strip to show.
+  const collapsibleToolbar = isComment && !props.readOnly;
 
   return (
     // The mode modifier is for the stylesheet, not for the reader: the comment
@@ -516,8 +524,37 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
           it was.
         */
         hintSlot="none"
+        {...(collapsibleToolbar
+          ? {
+              toolbarHidden: !toolbarShown,
+              toolbarId,
+              onToolbarClose: (): void => {
+                setToolbarShown(false);
+                formatButtonRef.current?.focus();
+              },
+            }
+          : {})}
       />
       <div className="editor-slot__footer">
+        {/*
+          G-6: the Format button, bottom-left, ahead of Attach. "Aa" is the glyph, the accessible name says what a
+          press does ("Show formatting" / "Hide formatting"), and `aria-expanded` says which state it is in.
+          `aria-controls` names the strip even while it is unmounted (an absent target is how a collapsed disclosure
+          is allowed to read). The button takes no focus when it opens the strip, so the text keeps its caret.
+        */}
+        {collapsibleToolbar ? (
+          <button
+            ref={formatButtonRef}
+            type="button"
+            className="editor-slot__format"
+            aria-label={toolbarShown ? 'Hide formatting' : 'Show formatting'}
+            aria-expanded={toolbarShown}
+            aria-controls={toolbarId}
+            onClick={() => setToolbarShown(!toolbarShown)}
+          >
+            <span aria-hidden="true">Aa</span>
+          </button>
+        ) : null}
         {/*
           Unit 5 (owner: "I thought we already made the attachment feature
           but i dont see where we can attach files in our build") — the

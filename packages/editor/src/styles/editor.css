@@ -906,6 +906,49 @@
   opacity: 0.7;
 }
 
+/* The Format button (G-6, owner 2026-10-02: "just have a small format button"): the comment editors keep the
+   formatting strip behind it. A QUIET ghost control, the opposite of the raised Attach beside it: transparent,
+   the muted label, no raised shadow; hover is the quiet wash (the ghost depth the button system gives every quiet
+   control, so neo keeps its pair through the tokens). It is the strip's own tool size on a desktop (32px) and the
+   44px floor on a phone (the arm below, with the tools'). */
+.editor-slot__format {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 34px;
+  padding: 0 0.5rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.editor-slot__format:hover {
+  background: var(--gn-fill-quaternary);
+  box-shadow: var(--gn-shadow-quiet-near);
+}
+.editor-slot__format[aria-expanded='true'] {
+  background: var(--gn-fill-secondary);
+  color: var(--gn-text-accent);
+}
+.editor-slot__format:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* The phone floor, BELOW the base rule it overrides (same specificity, so source order decides: the editor's own
+   phone arm at the top of this file comes before the footer rules and could not win here). 44px, as the tools get. */
+@media (max-width: 40rem) {
+  .editor-slot__format {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}
+
 /* The Attach button (Unit 5) — the prototype's own raised/quiet coat
    (`desktop.dc.html:1319`: `background:var(--cardBg);box-shadow:var(
    --cardShadow);color:var(--accent)`), mapped onto the house tokens
