@@ -206,8 +206,10 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'padding-right')).toBe('0.25rem');
     expect(indexOfRule('.ticket-editor__tool-group', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__tool-group', null));
     expect(indexOfRule('.ticket-editor__toolbar', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__toolbar', null));
-    // The arm is EXACTLY these five rules, none scoped under a host (`.gn-notes …` was the Notes-only form that left
-    // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here.
+    // The arm is EXACTLY these six rules, none scoped under a host (`.gn-notes …` was the Notes-only form that left
+    // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here. The sixth is
+    // smoothness G-6's Format button (25.388): the comment composers' footer control, floored at 44px on a phone and
+    // placed after its own base rule, which sits below the strip's rules in the file.
     const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE);
     expect(arm.map((rule) => rule.selectors.join(', '))).toEqual([
       '.ticket-editor__toolbar',
@@ -215,6 +217,7 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
       '.ticket-editor__heading-select',
       '.ticket-editor__tool-divider',
       '.ticket-editor__tool-group',
+      '.editor-slot__format',
     ]);
     expect(arm.map((rule) => [...rule.body.matchAll(/(?:^|;|\{)\s*([a-z-]+)\s*:/g)].map((hit) => hit[1]))).toEqual([
       ['padding-left', 'padding-right'],
@@ -222,6 +225,7 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
       ['min-height'],
       ['display'],
       ['flex-wrap'],
+      ['min-height', 'min-width'],
     ]);
     // …and the GLOBAL sheet no longer carries a Notes-scoped copy of any of them (they would fork the cascade).
     const scoped = parseRules(readGlobalsCss()).filter((rule) => rule.selectors.some((selector) => /\.gn-notes\b.*\.ticket-editor__/.test(selector)));

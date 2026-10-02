@@ -3909,6 +3909,72 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
+                      "text": "A comment box keeps its formatting tools out of the way."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Under every comment box, on a ticket or a note, and in a comment you are editing, a small "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Aa"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button sits at the left of the row, next to "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". Press it (it reads "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Show formatting"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") to open the same formatting tools above the box, and press it again ("
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Hide formatting"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") to put them away; Escape inside the tools closes them too. Your choice is kept on this device for every comment box. Hidden tools are still there to type with: Ctrl or ⌘ with B, I or K, Markdown such as "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "**bold**"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", pasting, "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "@"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " mentions and "
+                    },
+                    {
+                      "kind": "code",
+                      "text": ":ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " links all work. A ticket's description and a note's own body always show their tools."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
                       "text": "You can attach a file to a ticket now."
                     },
                     {
