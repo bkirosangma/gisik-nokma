@@ -398,3 +398,21 @@ describe('22.148 the workspace home header on a phone', () => {
     expect(valueOf(ruleExactly(globals, '.gn-workspace-home__projects-heading'), 'flex-wrap')).toBe('wrap');
   });
 });
+
+describe('25.316 the workspace home page remembers a collapsed group for the signed-in user (G-1 persistence at the real door)', () => {
+  it('25.316 collapsing Stores stores its id under gn-groups-collapsed:<session user>:<workspace>; a remount of the page still has it collapsed, and the sibling Operations stays open', async () => {
+    await showGrouped();
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse Stores' }));
+    expect(JSON.parse(window.localStorage.getItem(`gn-groups-collapsed:${KIRO}:${WORKSPACE}`) ?? 'null')).toEqual(['g-stores']);
+    cleanup();
+    await showGrouped();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Stores' })).toHaveAttribute('aria-expanded', 'false'));
+    // CONTROL (same it): a group nobody collapsed is open, so the page reads the ids, not "everything collapsed".
+    expect(screen.getByRole('button', { name: 'Collapse Operations' })).toHaveAttribute('aria-expanded', 'true');
+    // A different person on the same device does not inherit it.
+    cleanup();
+    session = { data: { user: { id: OTHER, name: 'Other' } }, isPending: false };
+    await showGrouped();
+    expect(screen.getByRole('button', { name: 'Collapse Stores' })).toHaveAttribute('aria-expanded', 'true');
+  });
+});

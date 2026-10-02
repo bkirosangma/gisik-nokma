@@ -725,3 +725,19 @@ describe('22.244 the tree spine runs from the first child\'s centre to the last 
     expect(valueOf(ruleExactly(css, '.gn-groups__children > .gn-groups__node::after', '@media (max-width: 40rem)'), 'display')).toBe('none');
   });
 });
+
+describe('25.317 Settings → Groups remembers a collapsed node for the signed-in user (G-1 persistence at the real door)', () => {
+  it('25.317 collapsing Alpha stores its id under gn-groups-tree-collapsed:<session user>:<workspace>; a remount of the page still has it collapsed, and Delivery stays open', async () => {
+    window.localStorage.clear();
+    renderPage('admin', []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Collapse Alpha' }));
+    expect(JSON.parse(window.localStorage.getItem(`gn-groups-tree-collapsed:${ME}:${WORKSPACE}`) ?? 'null')).toEqual(['g-alpha']);
+    cleanup();
+    renderPage('admin', []);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Expand Alpha' })).toHaveAttribute('aria-expanded', 'false'));
+    // CONTROL (same it): the parent nobody collapsed is open, and the home's key is untouched.
+    expect(screen.getByRole('button', { name: 'Collapse Delivery' })).toHaveAttribute('aria-expanded', 'true');
+    expect(window.localStorage.getItem(`gn-groups-collapsed:${ME}:${WORKSPACE}`)).toBeNull();
+    window.localStorage.clear();
+  });
+});
