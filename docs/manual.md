@@ -970,7 +970,7 @@ need a state built for it.
 
 **If the board is empty** it says **which** emptiness it is. A project with no tickets at all gets
 *"No tickets here yet. Create one."* A project whose only tickets are epics gets *"No tickets in this
-view — epics appear in the List."* — an epic is real work that this view does not draw, so "create one"
+view. Epics appear in the List."* — an epic is real work that this view does not draw, so "create one"
 would name the wrong remedy and the List is where it lives.
 
 Those two are the cases the board can tell apart, and it tells them apart exactly. It still cannot say

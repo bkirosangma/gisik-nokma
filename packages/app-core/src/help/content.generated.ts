@@ -5456,7 +5456,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"No tickets in this view — epics appear in the List.\""
+                    "text": "\"No tickets in this view. Epics appear in the List.\""
                   },
                   {
                     "kind": "text",
