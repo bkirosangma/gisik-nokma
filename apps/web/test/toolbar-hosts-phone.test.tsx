@@ -211,7 +211,12 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here. The sixth is
     // smoothness G-6's Format button (25.388): the comment composers' footer control, floored at 44px on a phone and
     // placed after its own base rule, which sits below the strip's rules in the file.
-    const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE);
+    // AMENDED 2026-10-02 (G-7): the arm's first six rules (file order) are the ones below; everything after them is G-7's own
+    // block at the foot of the file (the unbox, dock, scroll and sheet rules), each selector pinned by `phone-editors.test.tsx`
+    // (25.411–25.416), so the list is no longer the whole arm.
+    const fullArm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE);
+    expect(fullArm.length, 'G-7 appended its block after the six').toBeGreaterThan(6);
+    const arm = fullArm.slice(0, 6);
     expect(arm.map((rule) => rule.selectors.join(', '))).toEqual([
       '.ticket-editor__toolbar',
       '.ticket-editor__tool',

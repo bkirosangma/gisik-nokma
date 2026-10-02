@@ -595,3 +595,27 @@ describe('G-7 1 + 2: unboxed long text and slimmer comment boxes', () => {
     expect(phoneRule('.ticket-editor__scroll')).toContain('overflow-x');
   });
 });
+
+describe('G-7 5 × G-6: the sheet inside a comment editor', () => {
+  it('25.418 Escape inside the More sheet closes ONLY the sheet: the comment Format strip stays open (the sheet is a portal, but React events bubble through it), and the Format button keeps its state', async () => {
+    window.localStorage.clear();
+    stubPhone(true);
+    const view = render(<TicketEditorSlot {...slotProps({ mode: 'comment' })} />);
+    await vi.waitFor(() => expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull());
+    const user = userEvent.setup();
+    const format = view.container.querySelector('.editor-slot__format') as HTMLButtonElement;
+    await user.click(format);
+    expect(format).toHaveAttribute('aria-expanded', 'true');
+    expect(view.container.querySelector('[role="toolbar"]')).not.toBeNull();
+
+    await user.click(tool(view, 'More tools'));
+    expect(sheet()).not.toBeNull();
+    await user.keyboard('{Escape}');
+    expect(sheet(), 'Escape closes the sheet').toBeNull();
+    // CONTROL (same it): the strip is still open, and a second Escape (no sheet now) is what closes it.
+    expect(format).toHaveAttribute('aria-expanded', 'true');
+    expect(view.container.querySelector('[role="toolbar"]')).not.toBeNull();
+    view.unmount();
+    window.localStorage.clear();
+  });
+});

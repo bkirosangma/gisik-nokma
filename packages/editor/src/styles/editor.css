@@ -1318,8 +1318,11 @@
    It is the LAST block of the file on purpose: the unbox and padding rules fight `.editor-slot .ticket-editor__content`
    (above) and ui.css's `[data-style="neo"] .gn-field__input` (a different file, whose load order the web app and the
    mobile webview do not share), so they take THREE classes — (0,3,0), more than either — and never lean on source order
-   against ui.css. The ground and text of the floating pieces carry a system-colour fallback: the mobile webview imports
-   this file alone and defines no `--gn-*` token, and a bar or a sheet with no ground is unreadable.
+   against ui.css. The ground and text of the floating pieces carry a SYSTEM-colour fallback (`Canvas`, `CanvasText`; the
+   mask's opaque stop is `Canvas` too, a mask reads only alpha): the mobile webview imports this file alone and defines no
+   `--gn-*` token, and a bar or a sheet with no ground is unreadable. No hex, no colour function and no named colour
+   is written here, as the header requires; the scrim's dim is `--gn-surface-overlay` with no fallback (the webview
+   keeps the tap target, loses only the dim).
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 40rem) {
   .ticket-editor {
@@ -1361,8 +1364,8 @@
      tools" is pinned outside the scroll area. */
   .ticket-editor__scroll {
     --ticket-editor-fade-size: 1.5rem;
-    --ticket-editor-fade-from: black;
-    --ticket-editor-fade-to: black;
+    --ticket-editor-fade-from: Canvas;
+    --ticket-editor-fade-to: Canvas;
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
@@ -1382,8 +1385,8 @@
   }
   .ticket-editor__scroll[data-at-start='false'],
   .ticket-editor__scroll[data-at-end='false'] {
-    -webkit-mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), black var(--ticket-editor-fade-size), black calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
-    mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), black var(--ticket-editor-fade-size), black calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
+    -webkit-mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), Canvas var(--ticket-editor-fade-size), Canvas calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
+    mask-image: linear-gradient(to right, var(--ticket-editor-fade-from), Canvas var(--ticket-editor-fade-size), Canvas calc(100% - var(--ticket-editor-fade-size)), var(--ticket-editor-fade-to));
   }
   .ticket-editor__scroll > .ticket-editor__tool-group {
     flex: none;
@@ -1438,7 +1441,7 @@
     z-index: 50;
     display: flex;
     align-items: flex-end;
-    background: var(--gn-surface-overlay, rgba(0, 0, 0, 0.4));
+    background: var(--gn-surface-overlay);
   }
   .ticket-editor__sheet {
     position: fixed;

@@ -59,7 +59,8 @@ describe('21.137 at ≤40rem the notes toolbar packs into at most two rows at 36
     // CONTROL (same `it`): the identical model on the desktop bar (all seventeen tools + select, the dividers
     // kept as the pre-fix sheet drew them) gives the FIVE rows T13 measured — so the model can fail.
     const desktop = mountToolbar(false);
-    const old = { ...rules, dividerWidth: 5 + rules.groupGap };
+    // AMENDED (G-7): the phone group no longer wraps, so the pre-fix bar's WRAPPING groups are restated (`groupWraps: true`).
+    const old = { ...rules, groupWraps: true, dividerWidth: 5 + rules.groupGap };
     expect(pack(desktop.toolbar, TOOLBAR_AT_360, old).rows).toBe(5);
     desktop.editor.destroy();
     desktop.view.unmount();

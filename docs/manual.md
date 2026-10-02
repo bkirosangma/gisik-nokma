@@ -1867,6 +1867,13 @@ or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a l
 **Insert note** and **Insert ticket** each drop the `:note`/`:ticket` trigger at the cursor and open the same
 picker typing it would — the same two triggers work from the keyboard too, and `[[` still works for a note.
 
+On a phone the toolbar is a single row that sits just above the on-screen keyboard while you type, and scrolls
+sideways when it does not all fit. It carries Bold, Italic, Bullet list, Task item, the Heading level menu, Link,
+**Insert ticket** and **Insert note**; **More tools** at its right end opens a sheet from the bottom with the rest —
+Undo, Redo, Numbered list, Strikethrough, Code, Quote, Code block, Collapsible, Horizontal rule and **Insert table** —
+as large labelled buttons. Pick one and the sheet closes and you are back in the text where you were; Escape or a tap
+outside the sheet closes it without changing anything.
+
 **Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you
 want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
 row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is
