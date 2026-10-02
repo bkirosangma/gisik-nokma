@@ -21,6 +21,7 @@ import { registerAttentionRoutes } from './routes/attention.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
+import { registerGroupRoutes } from './routes/groups.js';
 import { registerListRoutes } from './routes/list.js';
 import { registerMyWorkRoutes } from './routes/my-work.js';
 import { registerMcpDeviceRoutes } from './routes/mcp-device.js';
@@ -978,6 +979,8 @@ export function buildApp(
   // parameter, same reason as every route above it: each handler reads
   // `request.currentUserId` and resolves its whole tenancy gate from it.
   registerBuilderReadRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // The project-group tree (prefixes and groups Task 6): one flat read, owner/admin/member only.
+  registerGroupRoutes(app, { pool: deps.pool }, requireSession);
   // Workspace-wide full text (Plan 5 Task 10) — the FIRST cross-project read
   // here. Board, list and the builder surface all take their scope from a path
   // parameter the door resolves; this one spans a whole workspace, so

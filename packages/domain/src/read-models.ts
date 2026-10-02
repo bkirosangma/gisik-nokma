@@ -929,3 +929,21 @@ export type DeletedItem = {
   containedCount: number;
 };
 export type DeletedItemsRead = { items: DeletedItem[] };
+
+/**
+ * One project group as `GET /v1/workspaces/:workspaceId/groups` serves it
+ * (prefixes and groups plan Task 6). `level` is 1–4 and `parentId` is null
+ * exactly at level 1. `projectCount` counts the projects filed directly under
+ * the group (trashed ones included — they still point at it); `childCount`
+ * counts the groups directly under it. Siblings sort by `rank`.
+ */
+export type GroupRow = {
+  id: string;
+  parentId: string | null;
+  level: 1 | 2 | 3 | 4;
+  name: string;
+  rank: string;
+  projectCount: number;
+  childCount: number;
+};
+export type GroupListResponse = { workspaceId: string; groups: GroupRow[] };

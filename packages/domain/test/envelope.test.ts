@@ -70,7 +70,7 @@ describe('submittedEventSchema', () => {
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'kind'],
       message:
-        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite' | 'note', received 'shop'",
+        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite' | 'note' | 'group', received 'shop'",
     });
   });
 
@@ -304,7 +304,7 @@ describe("ENTITY_KINDS admits 'invite'", () => {
     expect(submittedEventSchema.safeParse(event).success).toBe(true);
   });
 
-  it('lists exactly the eight kinds', () => {
+  it('lists exactly the nine kinds', () => {
     expect([...ENTITY_KINDS]).toEqual([
       'workspace',
       'project',
@@ -314,6 +314,7 @@ describe("ENTITY_KINDS admits 'invite'", () => {
       'membership',
       'invite',
       'note',
+      'group',
     ]);
   });
 });
