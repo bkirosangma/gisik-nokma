@@ -10,6 +10,7 @@ import { formatDay } from '@gisik-nokma/app-core';
 import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core/online';
 import { istToday } from '../../../src/ist-today.js';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
+import { bumpProjectsVersion } from '../../../src/projects-version.js';
 
 /**
  * `/invite/[token]` — where a link somebody was sent turns into a membership.
@@ -99,7 +100,11 @@ export default function InvitePage() {
 
   const accept = (): void =>
     void invites.acceptInvite(token).then(
-      ({ workspaceId }) => router.push(`/w/${workspaceId}/my-work`),
+      ({ workspaceId }) => {
+        // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
+        bumpProjectsVersion();
+        router.push(`/w/${workspaceId}/my-work`);
+      },
       (cause: unknown) => {
         setRefusal(
           cause instanceof InviteAcceptanceError && cause.serverMessage !== null

@@ -31,9 +31,11 @@ import {
   type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
+import { rememberLastUserId } from './last-user-id.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
 import { clearReadCaches } from './clear-read-caches.js';
+import { useFreshness } from './freshness.js';
 import { signInWithNext, withSignInOnExpiredWrite } from './expired-session.js';
 
 /**
@@ -179,6 +181,7 @@ export function Providers({
     };
   }, [services]);
   const value = services ?? constructed;
+  useFreshness();
   return <AppServicesContext.Provider value={value}>{children}</AppServicesContext.Provider>;
 }
 
@@ -307,6 +310,8 @@ function resolveSession(session: ReturnType<typeof authClient.useSession>): Reso
     // them is not theirs to be served (smoothness T3, case 25.028 door 4). The
     // first resolve (`lastKnownUser === null`) and a re-render are not changes.
     if (lastKnownUser !== null && lastKnownUser.id !== user.id) clearReadCaches();
+    // The id outlives the page so a screen can read ITS remembered tab in the first frame (spec D9).
+    if (lastKnownUser?.id !== user.id && typeof window !== 'undefined') rememberLastUserId(user.id);
     lastKnownUser = {
       id: user.id,
       name: user.name,
@@ -323,6 +328,7 @@ function resolveSession(session: ReturnType<typeof authClient.useSession>): Reso
   // Signed out (another tab, an expired cookie): the person this tab knew is gone.
   if (lastKnownUser !== null) clearReadCaches();
   lastKnownUser = null;
+  if (typeof window !== 'undefined') rememberLastUserId(null);
   return { kind: 'signed-out' };
 }
 

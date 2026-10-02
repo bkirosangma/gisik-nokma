@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { NotesPage } from '../../../src/notes/notes-page.js';
+import { NotesPageShell } from '../../../src/skeletons/page-shells.js';
 
 /**
  * `/notes/<id>` — the SAME page with a note open (spec §9.1).
@@ -21,7 +22,7 @@ import { NotesPage } from '../../../src/notes/notes-page.js';
 export default function NoteRoute() {
   const { noteId } = useParams<{ noteId: string }>();
   return (
-    <Suspense fallback={<main className="gn-shell gn-shell--wide gn-notes-page" />}>
+    <Suspense fallback={<NotesPageShell />}>
       <NotesPage noteId={noteId} />
     </Suspense>
   );

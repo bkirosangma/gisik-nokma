@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { useEffect, useState } from 'react';
 import { useAppServices, useSessionStatus } from './providers.js';
 
@@ -90,7 +91,7 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
           : 'Inbox'
       }
     >
-      <InboxIcon />
+      <NavPending><InboxIcon /></NavPending>
       {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
     </Link>
   );
@@ -144,10 +145,18 @@ export function useInboxUnread(): number {
     }
 
     void refresh();
-    const timer = setInterval(() => void refresh(), REFRESH_MS);
+    // A hidden tab polls nothing (audit SM-15): the badge catches up the moment the tab is shown again.
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'hidden') void refresh();
+    }, REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [notifications, signedIn]);
   return unread;
