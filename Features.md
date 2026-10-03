@@ -3755,6 +3755,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 ### Reference index and "Linked from" (spec B)
 
+- ⚙️ **The reference index, `proj_references`** (KG-B T1; `packages/domain/src/doc-text.ts` `extractDocReferences`, `apps/server/src/projections/references.ts`, migration `apps/server/migrations/1791500000000_proj-references.sql`, `apps/server/src/purge/{table-rules,erasure,survivors,purge-item}.ts`) — every `ticketRef`, `wikiLink` and `mention` in a description, a comment (on a ticket or a note) or a note body, one row each with a ≤ 160-character snippet marking it `[[…]]` (a bracket touching the marker is spaced away from it, so the one pair always splits back to the reference's own text); a body change replaces its source's rows; trash keeps them; a purge erases by source and target and re-derives survivors, taking every survivor's entity lock before it erases anything. Filled automatically on the first boot after the migration (`apps/server/src/projections/backfill-references.ts`, started from `apps/server/src/index.ts` after listen): one entity per transaction under ingest's entity lock, so no live event is lost; restart-safe, marked in `projection_backfills` (`docs/runbook.md`); a purge running at the same time cannot deadlock with it (the purge's lock order, 27.123). Prod size not supplied; floor used (P=100 000, Q=400 000), on a lane M2 Pro: `refs-perf: 100000 body + 400000 other events on Apple M2 Pro; proj_search 40059 ms (+498 MB); proj_references 86401 ms (+9 MB), 193332 rows`; `refs-perf: backfill 15000 entities in 87013 ms (+7 MB), longest entity transaction 40 ms, 193332 rows`; `refs-perf: bar — rebuild 86401 ms = 2.16 x the proj_search baseline 40059 ms (limit 3x)` (bar re-ruled 2026-10-03 13:24, planner ruling A: rebuild ≤ 3 × the `proj_search` baseline of the same run; two loaded runs reached 110 and 159 ms for the longest entity transaction). Cases 27.100–27.123.
 <!-- KG-B bullets -->
 
 ### Knowledge Graph view (spec C)
@@ -3764,6 +3765,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 ### D — MCP graph query and semantic layer
 
+- ⚙️ **Semantic core (D T1, measured first):** kNN (k 10, τ 0.35 chosen by `selectTau` from the measured sweep), seeded Louvain communities, class-based TF-IDF labels, order-free signatures, audience partitions (a suggestion never mixes audiences) and D4's `hiddenItems` (the LIVE items a viewer cannot see, fail-closed on a missing `proj_visibility` row). Measured on the labelled 60 and a synthetic corpus: precision@5 0.847, six suggestions at purity 0.966, 10 000 items in 20.4 s (bar 60 s), `hiddenItems` over 500 items p95 3.1 ms (bar 150 ms). Cases 27.400–27.415. (`apps/server/src/semantic/`, `apps/server/src/read/item-visibility.ts`)
+- ⚙️ **`pnpm --filter @gisik-nokma/server semantic:measure`** prints precision@5, the τ sweep, the embedding rate and the pipeline time per size. (`apps/server/src/tools/measure-semantic.ts`)
 <!-- D T1 -->
 <!-- D T2 -->
 <!-- D T3 -->
