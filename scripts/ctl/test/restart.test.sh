@@ -93,7 +93,12 @@ launch_pinned() { local v="$HERE/verbs/restart.sh"
   mutant "$v" "$T/r12.sh" 'lb="ctlr$$";' "$R12
 lb=\"ctlr\$\$\";" && ! one_launch "$T/r12.sh" || return 1
   mutant "$v" "$T/r12i.sh" 'lb="ctlr$$";' "$R12; lb=\"ctlr\$\$\";" && ! one_launch "$T/r12i.sh" || return 1
-  mutant "$v" "$T/lit.sh" 'paste: $cmd;' 'paste: $launcher --permission-mode bypassPermissions \"\$(cat $pf)\";' && ! one_launch "$T/lit.sh"; }
-check "13.2036 one launch line, pinned by structure (the live paste cannot run in a test): over verbs/restart.sh without comment lines, exactly one cmd= assignment, the dry-run echo prints \`paste: \$cmd;\`, the only load-buffer is \`printf '%s' \"\$cmd\" | tmux load-buffer\`, and no line but cmd= carries --permission-mode; CONTROL in the same check: a copy with a flagless cmd= re-assigned before the paste (own line, and inline) and a copy whose dry-run echo prints the old literal are both rejected" 'launch_pinned'
+  mutant "$v" "$T/r12b.sh" 'lb="ctlr$$";' 'cmd="$launcher \"\$(cat $pf)\""
+lb="ctlr$$";' && ! one_launch "$T/r12b.sh" || return 1
+  mutant "$v" "$T/lit.sh" 'paste: $cmd;' 'paste: $launcher --permission-mode bypassPermissions \"\$(cat $pf)\";' && ! one_launch "$T/lit.sh" || return 1
+  # one copy per remaining clause with no --permission-mode in it, so each clause is the only one that can reject it
+  mutant "$v" "$T/litb.sh" 'paste: $cmd;' 'paste: $launcher \"\$(cat $pf)\";' && ! one_launch "$T/litb.sh" || return 1
+  mutant "$v" "$T/pst.sh" "printf '%s' \"\$cmd\" | tmux" "printf '%s' \"\$launcher \\\"\\\$(cat \$pf)\\\"\" | tmux" && ! one_launch "$T/pst.sh"; }
+check "13.2036 one launch line, pinned by structure (the live paste cannot run in a test): over verbs/restart.sh without comment lines, exactly one cmd= assignment, the dry-run echo prints \`paste: \$cmd;\`, the only load-buffer is \`printf '%s' \"\$cmd\" | tmux load-buffer\`, and no line but cmd= carries --permission-mode; CONTROL in the same check: a copy with a flagless cmd= re-assigned before the paste (own line, inline, and one that never mentions --permission-mode), a copy whose dry-run echo prints the old literal, one whose echo prints a flagless line and one that pastes a string other than \$cmd are all rejected" 'launch_pinned'
 
 [ "$fails" -eq 0 ] && { echo "restart tests: all ok"; exit 0; } || { echo "restart tests: $fails FAILED"; exit 1; }
