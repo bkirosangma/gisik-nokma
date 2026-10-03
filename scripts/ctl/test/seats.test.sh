@@ -100,6 +100,8 @@ d=$(fixture); mkpane "$d/6.pane" "⏺ x" "typed words" 12 sonnet-5-5 ""; grep -v
 check "13.1820 panel: with NO status line in the capture, the ❯ above a ─ rule still beats a later ❯ row" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "typed words" ]'
 d=$(fixture); printf '❯ an earlier message\n⏺ ok\n❯ real box text\n' > "$d/6.pane"; meta "$d" 6 planner 0
 check "13.1820 CONTROL: with no status line and no rule, the LAST ❯ is the box (not an echoed message above)" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "real box text" ]'
+d=$(fixture); mkpane "$d/6.pane" "⏺ x" 'a long wrapped first line\n  and its second line' 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; printf '  \xe2\x97\xaf general-purpose  grep one | two\n' >> "$d/6.pane"; meta "$d" 6 planner 0
+check "13.1820 panel: a box that wraps onto a second line (no rule right under its ❯) with 12 agent rows below, the last holding a \" | \", still reads the box's own line" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "a long wrapped first line" ]'
 d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
 check "13.1820 CONTROL: a panel alone makes an idle seat neither busy nor box-text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"],d[\"box\"]")" = "idle empty" ]'
 
