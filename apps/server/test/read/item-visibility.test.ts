@@ -1,8 +1,10 @@
+import { newUlid } from '@gisik-nokma/domain';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { hiddenItems, type ItemRef } from '../../src/read/item-visibility.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { canSee } from '../../src/visibility/can-see.js';
 import { canReadNoteById } from '../../src/visibility/can-read-note.js';
+import { applyAll, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { NOTES_USERS, seedNotesFixture, type NotesFixture, type NotesUser } from '../helpers/notes-fixture.js';
@@ -18,9 +20,14 @@ import { NOTES_USERS, seedNotesFixture, type NotesFixture, type NotesUser } from
  */
 let db: TestDatabase;
 let fx: NotesFixture;
+// A WORKSPACE-mode ticket: the one ticket mode where a guest and a member differ (no userIds: workspace mode refuses them).
+let TW: string;
 beforeAll(async () => {
   db = await createTestDatabase();
   fx = await seedNotesFixture(db.pool);
+  TW = newUlid();
+  await seedTicket(db.pool, { workspaceId: fx.WS, ticketId: TW, projectId: fx.P, title: 'Workspace-wide' });
+  await applyAll(db.pool, [setVisibilityEnv(fx.WS, TW, 'workspace')]);
 }, 120_000);
 afterAll(async () => {
   await db.drop();
@@ -37,7 +44,7 @@ const n = (id: string): ItemRef => ({ kind: 'note', id });
 
 describe('27.412 hiddenItems agrees with the single-item definitions', () => {
   it('for every user and every item, hidden ⇔ ¬canSee / ¬canReadNoteById; control: the table is not constant', async () => {
-    const items: ItemRef[] = [t(fx.TP), t(fx.TE), ...Object.values(fx.NOTES).map(n)];
+    const items: ItemRef[] = [t(fx.TP), t(fx.TE), t(TW), ...Object.values(fx.NOTES).map(n)];
     let someHidden = false;
     let someClear = false;
     for (const who of NOTES_USERS) {
@@ -57,12 +64,12 @@ describe('27.412 hiddenItems agrees with the single-item definitions', () => {
 
 describe('27.411 hiddenItems: live minus visible, fail-closed, trash ignored', () => {
   it('lists what the viewer cannot see; a missing visibility row hides; a trashed ticket is ignored; control: members and the owner lose nothing', async () => {
-    const mixed = [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(fx.TE), n(fx.NOTES.nExplicit)];
-    // A listed guest: no project, no workspace scope — loses TP, nProject, nWorkspace; keeps TE and nExplicit.
-    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace)]));
+    const mixed = [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(fx.TE), n(fx.NOTES.nExplicit), t(TW)];
+    // A listed guest: no project, no workspace scope — loses TP, nProject, nWorkspace and the workspace-mode ticket TW; keeps TE and nExplicit.
+    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(TW)]));
     // Controls: Rule A readers and the owner lose nothing.
-    expect(await hiddenFor('memberIn', [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace)])).toEqual([]);
-    expect(await hiddenFor('memberOut', [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace)])).toEqual([]);
+    expect(await hiddenFor('memberIn', [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(TW)])).toEqual([]);
+    expect(await hiddenFor('memberOut', [t(fx.TP), n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(TW)])).toEqual([]);
     expect(await hiddenFor('owner', mixed)).toEqual([]);
 
     // FAIL-CLOSED: with TP's visibility row gone, even a reader who saw it a moment ago has it HIDDEN.
@@ -85,7 +92,7 @@ describe('27.411 hiddenItems: live minus visible, fail-closed, trash ignored', (
     await applyCommitted(db.pool, [
       makeCommitted({ workspaceId: fx.WS, entity: { kind: 'ticket', id: fx.TP }, type: 'ticket.deleted', payload: {}, actorId: fx.ids.owner }),
     ]);
-    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace)]));
+    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace), t(TW)]));
     expect(await hiddenFor('owner', mixed)).toEqual([]);
 
     // A deleted NOTE is ignored the same way. nProject is hidden from the guest (above); once its author
@@ -93,7 +100,7 @@ describe('27.411 hiddenItems: live minus visible, fail-closed, trash ignored', (
     await applyCommitted(db.pool, [
       makeCommitted({ workspaceId: fx.WS, actorId: fx.ids.author, entity: { kind: 'note', id: fx.NOTES.nProject }, type: 'note.deleted', payload: {} }),
     ]);
-    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nWorkspace)]));
+    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nWorkspace), t(TW)]));
     expect(await hiddenFor('owner', mixed)).toEqual([]);
   });
 });

@@ -119,6 +119,9 @@ describe('27.405 partitions never mix audiences (§7 case 5)', () => {
     expect(out).toHaveLength(2);
     expect(out.every((s) => new Set(s.itemKeys.map((k) => k.slice(7, 8))).size === 1)).toBe(true);
     expect(() => suggestForPartition(mixed, BASE)).toThrow(/mixed audiences/);
+    // suggestAll walks partitions in key order, whatever the input order, so a run is deterministic.
+    expect(suggestAll(mixed, BASE).map((s) => s.partition)).toEqual(['e:u1', 'w']);
+    expect(suggestAll([...mixed].reverse(), BASE).map((s) => s.partition)).toEqual(['e:u1', 'w']);
     const one = suggestAll(mixed.map((m) => ({ ...m, partition: 'w' })), { ...BASE, maxSize: 12 });
     expect(one).toHaveLength(1); // control
   });

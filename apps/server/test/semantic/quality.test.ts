@@ -76,5 +76,8 @@ describe('27.408–27.410 the quality bars (spec D §4.1)', () => {
     console.table(rows);
     expect(selectTau(rows)).toBe(SUGGESTION_TAU);
     expect(selectTau(rows, { purity: 1.01, minSuggestions: 4 })).toBeNull(); // control
+    // The min-suggestions bar is the control against purity met by suggesting almost nothing (plan:44).
+    expect(selectTau(rows, { purity: 0.99, minSuggestions: 4 })).toBeNull(); // only 0.60 (2) and 0.65 (1) are that pure
+    expect(selectTau(rows, { purity: 0.99, minSuggestions: 1 })).toBe(0.6); // control: the same purity bar with no count bar picks 0.60
   }, 120_000);
 });
