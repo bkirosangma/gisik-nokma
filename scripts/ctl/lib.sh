@@ -109,17 +109,9 @@ ctl_press_enter() {
   tmux send-keys -t "$target" Enter
 }
 
-# Print the REAL (non-dim) text on the last ❯ prompt line of TARGET; empty when the box holds only ghost/hint text.
-ctl_box_text() {
-  tmux capture-pane -e -p -t "$1" 2>/dev/null | python3 -c '
-import re, sys
-lines = sys.stdin.read().split("\n")
-idx = max((i for i, l in enumerate(lines) if "\u276f" in l), default=None)
-if idx is None: sys.exit(0)
-after = lines[idx].split("\u276f", 1)[1]
-after = re.sub(r"\x1b\[2m.*?(?:\x1b\[0m|\x1b\[22m|$)", "", after, flags=re.S)   # dim spans are not input, closed or not
-print(re.sub(r"\x1b\[[0-9;]*m", "", after).strip())'
-}
+# Print the REAL (non-dim) text in the input box of TARGET; empty when the box holds only ghost/hint text. The box is the ❯ line above
+# the status line, never the background-agent panel's selected row below the footer — boxtext.py, shared with `ctl seats` (13.1820).
+ctl_box_text() { tmux capture-pane -e -p -t "$1" 2>/dev/null | python3 "$(dirname "${BASH_SOURCE[0]}")/boxtext.py"; }
 
 # True when the box shows the queued-messages hint (the lane is mid-turn; a submission was queued behind it).
 ctl_box_queued() { tmux capture-pane -e -p -t "$1" 2>/dev/null | grep -q 'Press up to edit queued messages'; }
