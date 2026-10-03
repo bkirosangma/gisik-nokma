@@ -3784,3 +3784,31 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- KG-E bullet T2 -->
 <!-- KG-E bullet T3 -->
 <!-- KG-E bullet T4 -->
+
+## 26. Workflow and Timeline graphs
+
+*Flow graphs, a timeline of planned and actual work, and the model under them. Spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`; mirrored by `test-cases/29-workflow-timeline-graphs.md`.*
+
+### Part 1 — the viewport engine, packing and the continuous Timeline view
+
+<!-- wtg-part1-viewport-timeline-view T1 bullet -->
+<!-- wtg-part1-viewport-timeline-view T2 bullet -->
+<!-- wtg-part1-viewport-timeline-view T3 bullet -->
+<!-- wtg-part1-viewport-timeline-view T4 bullet -->
+<!-- wtg-part1-viewport-timeline-view T5 bullet -->
+<!-- wtg-part1-viewport-timeline-view T6 bullet -->
+<!-- wtg-part1-viewport-timeline-view T7 bullet -->
+<!-- wtg-part1-viewport-timeline-view T8 bullet -->
+<!-- wtg-part1-viewport-timeline-view T9 bullet -->
+<!-- wtg-part1-viewport-timeline-view T10 bullet -->
+<!-- wtg-part1-viewport-timeline-view T11 bullet -->
+<!-- wtg-part1-viewport-timeline-view T12 bullet -->
+<!-- wtg-part1-viewport-timeline-view T13 bullet -->
+
+<!-- wtg-part2-model bullets -->
+
+<!-- wtg-part3-workflow-graph bullets -->
+
+<!-- WTG4 bullets -->
+
+<!-- wtg-part5-mcp bullets -->
