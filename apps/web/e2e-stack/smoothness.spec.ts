@@ -1,11 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { parseBaseline, ratchetFailures, recordRow, sameFixture, serialiseBaseline, SWAP_BUDGET, type Baseline, type Fixture, type Row } from './helpers/smoothness-baseline.js';
 import { openSeededBoard, readWorkspaceId, seededProjectHref } from './helpers/board.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
- * Smoothness T14 (cases 25.231, 25.232; spec §6, §7): the CLS / request-count ratchet, read from the deployed stack.
+ * Smoothness T14 (cases 25.231, 25.232, 25.235, 25.236; spec §6, §7): the CLS / request-count ratchet, read from the deployed stack.
  *
  * ## What 25.231 measures, per `${viewport}|${route}`
  *
@@ -21,40 +22,54 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  *     in a later wave, so "no duplicate" cannot be an absolute bar yet; it can only never get worse;
  *   - **LCP** against the spec §6 desktop/tablet/phone budget (unthrottled here, so a generous bar, not the throttled one).
  *
- * Each route is loaded SAMPLES times, cold (3 to check, 5 to record). A run is judged on the MEDIAN of each number (one load's CLS can jump with where a
- * second wave lands, and a ratchet that fails on one outlier is noise); a recording stores the WORST of its (more) samples, so a later median
- * can exceed the stored number only if the route got worse. The raw samples are printed per key.
+ * Each route is loaded SAMPLES times, cold (3 to check, 5 to record). A run is judged on the BEST load of each number (several numbers on this stack are two-valued or
+ * drift a few percent from load to load: My work 390 is CLS 0 in one load and 0.635 in the next, and a ratchet judged on a median failed its own
+ * unmutated control on a different key in each of three runs), so a regression has to hold in EVERY load to fail; the price is that a
+ * regression which shows in only some loads is not seen. A recording stores the WORST of its (more) samples, so the best load of a later
+ * run can exceed the stored number only if the route got worse. LCP is still the median. The raw samples are printed per key.
  *
  * The ratchet is `smoothness-baseline.json`, keyed `${viewport}|${route with ids as <id>}`, with `{ cls, requests, duplicates,
- * swapShiftCls }`. A run compares each median to its key and fails when CLS exceeds `max(baseline, 0.01)`, when the request count or the
- * duplicate count exceeds the baseline, or when the swap shift exceeds `max(baseline, 0.01)`. A key with no row is recorded, never failed. `SMOOTHNESS_RECORD=1`
- * rewrites the file from this run (the way `tap-target-baseline.json` is recorded): the diff is the ratchet moving, and a reviewer
- * reads it in that direction.
+ * swapShiftCls }`, plus a `_fixture` row. A run compares each best load to its key and fails when CLS exceeds `max(baseline, 0.01)`, when the
+ * request count or the duplicate count exceeds the baseline, or when the swap shift exceeds `max(baseline, 0.01)`.
  *
- * ONE signed-in session, ONE paced process (1.5 s between page loads), a 429 on any response ends the run red: a rate limit is a
- * failure to read, never something to retry in a loop. READ-ONLY, except 25.232, which renames one ticket and puts the title back.
+ * - **A key with no row FAILS** (25.235; the precedent is `viewport.spec.ts`: a missing baseline fails rather than seeding itself).
+ *   Without this a deleted row, or a route whose key stopped matching the `<id>` pattern, asserts nothing and the run is green.
+ * - **Like with like (`_fixture`).** The rows were measured on a data set (`{ notes, deletedNotes, tickets, workflows, members }`,
+ *   counted through `/v1` with the signed-in session), and a page's CLS depends on the rows it renders. When the run's fixture is not
+ *   the json's, the four per-key comparisons are NOT made: the test annotates (`smoothness-fixture-mismatch`, both fixtures, and the
+ *   instruction to re-record) and the data-independent asserts still run (busy seen, busy left, LCP, 429, viewport width, a key with
+ *   no row). A json with no `_fixture` fails. NOTE for CI: the release gate runs this spec on a fresh, seed-only stack, so its fixture
+ *   differs from the dev stack's the ratchet was recorded on; it annotates there, it does not ratchet. A baseline recorded on the seed
+ *   would ratchet there.
+ * - **A recording only lowers (25.236).** `SMOOTHNESS_RECORD=1` stores, per field, `min(stored, this run's worst of five)` and takes the run
+ *   for keys with no row; it refuses a stack whose fixture differs from the stored one. `SMOOTHNESS_RECORD=raise` overwrites every row and
+ *   the fixture: the explicit act for new data or for accepting a worse number, whose diff a reviewer reads in that direction. (This
+ *   is stricter than `tap-target-baseline.json`, which also never overwrites but has no data to drift.) Flake, measured: a key with two values
+ *   (My work 390: CLS 0 or 0.635, about half the loads each) is stored as 0 by a five-sample recording that lands all low (0.5^5 = 3% a key;
+ *   it happened to the second recording on 2026-10-03), and the best of three loads then reads 0.635 only when all three are high (about 12%).
+ *   A recording from two runs (the per-field worst of both, a `raise` by hand) cuts the first number; `raise` or a deleted row repairs a row.
+ *
+ * ONE paced process (1.5 s between page loads). A run makes TWO UI sign-ins (one per test) and `global-setup.ts` sends two magic links of its
+ * own; `helpers/sign-in.ts` does not pace them. A 429 on any response seen by a test's page ends that test red (both tests listen; the
+ * `/v1` fixture reads are checked too): a rate limit is a failure to read, never something to retry in a loop. READ-ONLY, except
+ * 25.232, which renames one ticket and puts the title back.
  *
  * Run: `cd apps/web && pnpm exec playwright test -c playwright.stack.config.ts e2e-stack/smoothness.spec.ts`
  * (`SMOOTHNESS_RECORD=1` in front to record). The stack must be the one built from the tip under test.
  */
 
 const BASELINE = fileURLToPath(new URL('./smoothness-baseline.json', import.meta.url));
-const RECORD = process.env['SMOOTHNESS_RECORD'] === '1';
+// '1' lowers and adds rows only; 'raise' is the explicit act that may overwrite a row (and the only way to re-baseline on new data).
+const RAISE = process.env['SMOOTHNESS_RECORD'] === 'raise';
+const RECORD = process.env['SMOOTHNESS_RECORD'] === '1' || RAISE;
 const PACE_MS = 1500;
-const SWAP_BUDGET = 0.01;
-
-interface Row {
-  cls: number;
-  requests: number;
-  duplicates: number;
-  swapShiftCls: number;
-}
 
 // A recording takes more loads than a check: several numbers on this stack are two-valued from load to load (a route's CLS is 0 in one
 // load and 0.6 in the next, depending on which side of a second wave a swap lands), and the stored ceiling must contain both values.
 const SAMPLES = Number(process.env['SMOOTHNESS_SAMPLES'] ?? (RECORD ? '5' : '3'));
 const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
 const worst = (xs: number[]): number => Math.max(...xs);
+const best = (xs: number[]): number => Math.min(...xs);
 
 const VIEWPORTS = [
   { key: '390', width: 390, height: 844, lcpMs: 2500 },
@@ -125,15 +140,35 @@ async function settleAndRead(page: Page): Promise<Vitals> {
   });
 }
 
-function readBaseline(): Record<string, Row> {
-  return JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, Row>;
+function readBaseline(): Baseline {
+  return parseBaseline(readFileSync(BASELINE, 'utf8'));
 }
 
-test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
-  test('25.231 every route paints a skeleton first, swaps it with no layout shift above 0.01, and asks no duplicate URL', async ({ page }) => {
+/** What the signed-in session can count on this stack right now, read through `/v1` (not through a page, so the request log is untouched). */
+async function readFixture(page: Page, ws: string): Promise<Fixture> {
+  const count = async (path: string, field: string): Promise<number> => {
+    const res = await page.request.get(path);
+    expect(res.status(), `${path}: a 429 is STOP, never a retry loop`).not.toBe(429);
+    expect(res.ok(), `${path} answered ${res.status()}`).toBe(true);
+    const list = ((await res.json()) as Record<string, unknown>)[field];
+    expect(Array.isArray(list), `${path} has no "${field}" array`).toBe(true);
+    return (list as unknown[]).length;
+  };
+  const base = `/v1/workspaces/${ws}`;
+  return {
+    notes: await count(`${base}/notes`, 'notes'),
+    deletedNotes: await count(`${base}/notes?deleted=1`, 'notes'),
+    tickets: await count(`${base}/tickets`, 'tickets'),
+    workflows: await count(`${base}/workflows`, 'workflows'),
+    members: await count(`${base}/members`, 'members'),
+  };
+}
+
+test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25.236)', () => {
+  test('25.231 every route paints a skeleton first and holds its CLS, skeleton-swap shift, /v1 requests and duplicate URLs at or under the recorded baseline', async ({ page }) => {
     test.setTimeout(60_000 + 27 * SAMPLES * 9_000);
     const baseline = readBaseline();
-    const next: Record<string, Row> = { ...baseline };
+    const next: Baseline = { fixture: baseline.fixture, rows: { ...baseline.rows } };
     const requests: string[] = [];
     const limited: string[] = [];
     page.on('request', (r) => {
@@ -148,6 +183,21 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
     await page.goto('/workspaces', { waitUntil: 'networkidle' });
     const ws = await readWorkspaceId(page);
     const board = await seededProjectHref(page, ws);
+    const fixture = await readFixture(page, ws);
+    console.log(`[smoothness] fixture ${JSON.stringify(fixture)}; baseline fixture ${JSON.stringify(baseline.fixture)}`);
+    // A baseline with no fingerprint cannot say what data it was measured on: that FAILS (a recording writes one).
+    if (!RECORD) expect(baseline.fixture, 'smoothness-baseline.json has no _fixture: re-record on this data with SMOOTHNESS_RECORD=raise and commit').toBeDefined();
+    const sameData = sameFixture(baseline.fixture, fixture);
+    // SMOOTHNESS_RECORD=1 compares nothing and only lowers, which is meaningless across data: re-baselining on new data is `raise`.
+    if (RECORD && !RAISE) expect(sameData, `the stored _fixture ${JSON.stringify(baseline.fixture)} is not this stack's ${JSON.stringify(fixture)}: the rows belong to other data, re-baseline with SMOOTHNESS_RECORD=raise`).toBe(true);
+    if (RAISE) next.fixture = fixture;
+    if (!RECORD && !sameData) {
+      test.info().annotations.push({
+        type: 'smoothness-fixture-mismatch',
+        description: `The baseline was recorded on ${JSON.stringify(baseline.fixture)}; this stack holds ${JSON.stringify(fixture)}. The per-key ratchet comparisons (CLS, requests, duplicates, swap shift) were NOT made. Re-record on this data: SMOOTHNESS_RECORD=raise (see .env.example) and commit smoothness-baseline.json.`,
+      });
+      console.log('[smoothness] FIXTURE MISMATCH: per-key comparisons skipped; re-record with SMOOTHNESS_RECORD=raise');
+    }
     const routes = ['/workspaces', `/w/${ws}`, board, `/w/${ws}/my-work`, `/w/${ws}/members`, '/inbox', '/notes', '/account', '/settings'];
 
     for (const vp of VIEWPORTS) {
@@ -172,30 +222,32 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
           duplicates: f(samples.map((x) => x.dupes.length)),
           swapShiftCls: f(samples.map((x) => x.v.swapShiftCls)),
         });
-        const row = pick(median); // what a run is judged on
-        const ceiling = pick(worst); // what a recording stores: the worst of its samples, so a median can only exceed it if the route got worse
+        const row = pick(best); // what a run is judged on: the BEST load, so a regression must hold in every load
+        const ceiling = pick(worst); // what a recording stores: the worst of its samples, so the best load of a later run can only exceed it if the route got worse
         const lcp = median(samples.map((x) => x.v.lcp));
-        const prior = baseline[key];
+        const prior = baseline.rows[key];
         console.log(`[smoothness] ${key} cls=${JSON.stringify(samples.map((x) => x.v.cls))} swap=${JSON.stringify(samples.map((x) => x.v.swapShiftCls))} req=${JSON.stringify(samples.map((x) => x.requests.length))} dup=${JSON.stringify(samples.map((x) => x.dupes.length))} lcp=${JSON.stringify(samples.map((x) => x.v.lcp))} worst=${samples[0]?.v.worst ?? ''}`);
 
         expect.soft(samples.every((x) => x.v.busySeen), `${key}: no [aria-busy] region was painted in some load (a route with no placeholder)`).toBe(true);
         expect.soft(samples.every((x) => x.v.busyLeft === 0), `${key}: a busy region is left after the settle`).toBe(true);
         expect.soft(lcp, `${key} LCP`).toBeLessThan(vp.lcpMs);
-        if (prior !== undefined && !RECORD) {
+        if (!RECORD) {
           const last = samples.at(-1);
-          expect.soft(row.cls, `${key} CLS (baseline ${prior.cls}); worst shifts ${samples[0]?.v.worst ?? ''}`).toBeLessThanOrEqual(Math.max(prior.cls, SWAP_BUDGET));
-          expect.soft(row.requests, `${key} requests (baseline ${prior.requests}): ${JSON.stringify(last?.requests)}`).toBeLessThanOrEqual(prior.requests);
-          expect.soft(row.duplicates, `${key} duplicate reads (baseline ${prior.duplicates}): ${JSON.stringify(last?.dupes)}`).toBeLessThanOrEqual(prior.duplicates);
-          expect.soft(row.swapShiftCls, `${key} skeleton-swap shift (baseline ${prior.swapShiftCls})`).toBeLessThanOrEqual(Math.max(prior.swapShiftCls, SWAP_BUDGET));
+          const ctx = { worstShifts: samples[0]?.v.worst ?? '', lastRequests: JSON.stringify(last?.requests), lastDupes: JSON.stringify(last?.dupes) };
+          expect.soft(ratchetFailures(key, prior, row, ctx, sameData), key).toEqual([]);
         }
-        if (prior === undefined || RECORD) next[key] = ceiling;
+        if (RECORD) next.rows[key] = recordRow(prior, ceiling, RAISE);
       }
     }
-    if (RECORD) writeFileSync(BASELINE, JSON.stringify(Object.fromEntries(Object.entries(next).sort(([a], [b]) => a.localeCompare(b))), null, 2) + '\n');
+    if (RECORD) writeFileSync(BASELINE, serialiseBaseline(next));
   });
 
   test('25.232 a title edit on the sheet shows at once and no frame ever paints the old title back', async ({ page }) => {
     test.setTimeout(120_000);
+    const limited: string[] = [];
+    page.on('response', (r) => {
+      if (r.status() === 429) limited.push(r.url());
+    });
     await signIn(page, OWNER_EMAIL);
     await page.setViewportSize({ width: 1440, height: 900 });
     const { workspaceId, projectId } = await openSeededBoard(page);
@@ -205,6 +257,9 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
     await expect(title).toBeVisible({ timeout: 15_000 });
     const original = await title.inputValue();
     const renamed = `${original.replace(/ \(25\.232\)$/, '')} (25.232)`;
+    // Control: the edit changes the title. A card that already ends " (25.232)" (an earlier run whose `finally` did not finish) would make
+    // `fill` a no-op and every frame equal `renamed`: green with no edit.
+    expect(renamed, 'the rename must change the title: the first card already carries the suffix, restore it by hand').not.toBe(original);
     try {
       await title.fill(renamed);
       // Every animation frame from here to a second after the Enter records the field's value and whether it is disabled.
@@ -224,11 +279,13 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
       const frames = await page.evaluate(() => (window as unknown as { __frames: { v: string; d: boolean }[] }).__frames);
       // Control: the recorder really ran for the whole second (a loop that never started would pass the assertions below).
       expect(frames.length, 'the frame recorder produced no frames').toBeGreaterThan(30);
+      expect(limited, 'a 429 during the edit: STOP, back off, never retry in a loop').toEqual([]);
       const wrong = frames.filter((f) => f.v !== renamed);
       expect(wrong.length, `${wrong.length} of ${frames.length} frames painted a title other than the edit; first: ${JSON.stringify(wrong[0])}`).toBe(0);
       // The write reached the server: a reload reads the new title back.
       await page.goto(`/w/${workspaceId}/p/${projectId}`, { waitUntil: 'networkidle' });
       await page.locator('.gn-board__card-slot', { hasText: renamed }).first().waitFor({ timeout: 15_000 });
+      expect(limited, 'a 429 after the reload: STOP, back off, never retry in a loop').toEqual([]);
     } finally {
       // Put the seeded title back (this spec's one write), whatever happened above.
       await page.goto(`/w/${workspaceId}/p/${projectId}`, { waitUntil: 'networkidle' });
@@ -241,5 +298,34 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
         await page.waitForTimeout(800);
       }
     }
+  });
+
+  test('25.235 a key with no baseline row fails, and the other keys are compared as usual', () => {
+    const row: Row = { cls: 0.2, requests: 10, duplicates: 2, swapShiftCls: 0.2 };
+    const ctx = { worstShifts: '', lastRequests: '[]', lastDupes: '[]' };
+    const rows: Record<string, Row> = { '390|/a': { ...row }, '390|/b': { ...row } };
+    delete rows['390|/b'];
+    const missing = ratchetFailures('390|/b', rows['390|/b'], row, ctx, true);
+    expect(missing.length, 'the deleted row must fail the run').toBe(1);
+    expect(missing[0], 'and name the key').toContain('390|/b');
+    // The same on a run whose data is not the baseline's: the key set is not data.
+    expect(ratchetFailures('390|/b', rows['390|/b'], row, ctx, false).length).toBe(1);
+    // Control: the key that still has its row is compared. At the baseline it is green, over it on each of the four numbers it is red.
+    expect(ratchetFailures('390|/a', rows['390|/a'], row, ctx, true)).toEqual([]);
+    for (const over of [{ cls: 0.3 }, { requests: 11 }, { duplicates: 3 }, { swapShiftCls: 0.3 }]) {
+      expect(ratchetFailures('390|/a', rows['390|/a'], { ...row, ...over }, ctx, true).length, `over: ${JSON.stringify(over)}`).toBe(1);
+    }
+  });
+
+  test('25.236 a recording over an existing row can only lower it; raising is its own act', () => {
+    const stored: Row = { cls: 0.2, requests: 10, duplicates: 2, swapShiftCls: 0.1 };
+    const regressed: Row = { cls: 0.9, requests: 14, duplicates: 6, swapShiftCls: 0.5 };
+    expect(recordRow(stored, regressed, false), 'a recording on a regressed tip must not raise any field').toEqual(stored);
+    const lowered: Row = { cls: 0.05, requests: 8, duplicates: 0, swapShiftCls: 0.01 };
+    expect(recordRow(stored, lowered, false), 'a better run lowers every field').toEqual(lowered);
+    expect(recordRow(stored, { ...stored, cls: 0.3, requests: 9 }, false), 'fields are judged one by one').toEqual({ ...stored, requests: 9 });
+    // Control: an absent key takes the run's worst, and the explicit act overwrites.
+    expect(recordRow(undefined, regressed, false)).toEqual(regressed);
+    expect(recordRow(stored, regressed, true)).toEqual(regressed);
   });
 });
