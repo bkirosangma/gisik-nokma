@@ -44,7 +44,7 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * `comment.added` does (a replica's thread must show the edited text and the
  * deletion), so they travel in full below the cut too (case 26.057).
  *
- * **The pair has moved five times, and BOTH numbers moved together each time**,
+ * **The pair has moved five times, and both numbers moved together every time but one** (18/15 → 20/15 moved only the first: the two comment events are backfilled, not folded),
  * which is why the arithmetic is restated here rather than left to be
  * re-derived: a reader who trusted an old pair would compute the wrong total for
  * the list below and conclude a type was missing. Measured at each commit, not

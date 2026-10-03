@@ -321,7 +321,12 @@
   type Gesture = { id: string; start: Point; last: Point; cancelled: boolean };
 
   /**
-   * Owns the dragged id's position from drag start until `onNodeDragStop` returns (spec §2.1).
+   * Owns the dragged id's position from drag start until `onNodeDragStop` returns (spec §2.1), and nothing else of React Flow's.
+   * `onNodesChange` is an ALLOW-LIST (planner ruling 2026-10-03, F1): `select` and `dimensions` changes always, `position`
+   * changes only for the active, un-cancelled gesture's id. Every other change is dropped, because the draft owns membership
+   * and placement: `remove` (React Flow's Backspace default), `add`, `replace`, and a `position` with no gesture or for another id
+   * (an arrow-key nudge, a box-select move) would otherwise change the canvas and leave the draft behind, a delete or a move
+   * that never happened. T4's nudge commits through the draft store, outside this filter.
    * React Flow keeps emitting position changes for the id until pointer-up, and its last one (`dragging: false`)
    * carries the RAW pointer position (`@xyflow/system` :2330-2331); after a cancel every change for the id is dropped.
    */
@@ -333,7 +338,9 @@
     }, [draftNodes]);
     const onNodesChange = useCallback((changes: NodeChange[]) => {
       const g = gesture.current;
-      const kept = g?.cancelled ? changes.filter((change) => !(change.type === 'position' && change.id === g.id)) : changes;
+      const kept = changes.filter(
+        (change) => change.type === 'select' || change.type === 'dimensions' || (change.type === 'position' && g !== null && !g.cancelled && change.id === g.id),
+      );
       if (g && !g.cancelled) {
         for (const change of kept) if (change.type === 'position' && change.id === g.id && change.position) g.last = change.position; // live, pre-render
       }
@@ -760,6 +767,8 @@
 - [ ] **Step 4: Keyboard nudge**
 
   React Flow moves selected nodes on arrow keys through `updateNodePositions` with `dragging: false`. That arrives in our `onNodesChange` as a position change with `dragging: false` and no active drag.
+
+  The wrapper sits OUTSIDE `useWorkingNodes`: Task 1's hook drops a position change with no active gesture (F1's allow-list), so the nudge must be consumed by the wrapper BEFORE the change reaches the hook; React Flow moves a node on an arrow key only when it is `selected`, so the state must be selected through the draft first (a click, or focus/Enter mapped to `store.actions.select`).
 
   In the wrapped `onNodesChange`, treat a position change with `dragging === false` when `working.draggingId() === null` as a nudge. The guard holds because Task 1's hook keeps the gesture active (cancelled or not) until `onNodeDragStop` calls `endDrag()`, so React Flow's drag-end change never reaches this branch:
   1. compute `step = alt ? 1 : GRID` along the change's direction (its sign versus the current position);

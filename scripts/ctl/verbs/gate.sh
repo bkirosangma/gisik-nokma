@@ -7,6 +7,7 @@
 # gate sits above it as the net: nothing reaches main on a replay.
 set -u
 . "$(cd "$(dirname "$0")/.." && pwd)/lib.sh"
+. "$(cd "$(dirname "$0")/.." && pwd)/sem.sh"
 ctl_parse_common "$@" || exit 1
 sha="${CTL_ARGS[0]:-}"; [ -n "$sha" ] || ctl_fail gate "usage: ctl gate <sha> [--base <branch>]"
 CTL_BASE=main
@@ -38,6 +39,8 @@ log="$(ctl_log gate)"; console="$log.console"
 base="$(basename "$log" .log)"; work="$(dirname "$log")/gate-lock-${base#gate-}"
 if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_MODE=$mode GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
 mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
+# Priority over `ctl run-tests`: while this marker is live no NEW test slot is granted (running ones finish). Removed on every exit path.
+ctl_sem_gate_begin; trap ctl_sem_gate_end EXIT
 GATE_MODE="$mode" GATE_REPO="$CTL_REPO" bash "$work/gate.sh" "$log" > "$console" 2>&1; echo "GATE_WRAPPER_EXIT=$?" >> "$console"
 # The mode that RAN is what gate.sh printed, not what this verb asked for: a copy of gate.sh that ignored GATE_MODE must fail here, not pass under the wrong name.
 ran=$(grep -m1 '^GATE_MODE=' "$console" | sed 's/^GATE_MODE=\([a-z]*\).*/\1/')
@@ -47,7 +50,10 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-echo "$T" | grep -q '34 successful, 34 total' || ctl_fail gate "$summary (log $log)"
+# TEMPORARY "36 or 41": the verb that runs is the PRIMARY checkout's (release/smoothness: 36 tasks), but Knowledge Graph C T1 adds a package, so its gate is 41.
+# Both halves must match one graph — an anchored two-alternative match, so 4136, 360/410 and mixed pairs fail. KG C T1's LAST commit pins 41-ONLY here
+# (and flips 13.1849 to a FAIL control); delete this comment with the 36 arm. Same shape as #954's "34 or 36" (13.1844-13.1849).
+echo "$T" | grep -Eq '^Tasks: +(36 successful, 36|41 successful, 41) total *$' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"

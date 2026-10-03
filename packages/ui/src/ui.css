@@ -4152,6 +4152,20 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* F-5 (N3): the reason line wrapped nowhere and widened To do over the edge to Doing; 13rem (208px) is under a 260px column. */
   max-width: 13rem;
 }
+/* G-9: T1 dragging */
+/* The state under the pointer lifts: above its neighbours, a touch larger, on the board's drag-image shadow (nodes rest flat). */
+.react-flow__node-state, .react-flow__node-anyState { cursor: grab; }
+.react-flow__node.dragging { z-index: 1000 !important; cursor: grabbing; }
+.react-flow__node.dragging .gn-state-node,
+.react-flow__node.dragging .gn-any-state-node { transform: scale(1.02); box-shadow: var(--gn-shadow-lift-drag); }
+
+/* G-9: T3 guides+outline */
+
+/* G-9: T4 tidy+add-transition */
+
+/* G-9: T5 fullscreen */
+
+/* G-9: end */
 .gn-state-node--open { border-left: 6px solid var(--gn-category-open); }
 .gn-state-node--active { border-left: 6px solid var(--gn-category-active); }
 .gn-state-node--terminal { border-left: 6px solid var(--gn-category-terminal); }
@@ -9506,6 +9520,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    mask makes it a stacking context later in the DOM, which a bare `position: relative` ties with and loses to. */
 [data-style="neo"] .gn-board-phone-picker {
   position: relative;
+  z-index: 1;
+}
+/* The same strip reaches back over the workflow heading above the rail: its toggle's foot (the bottom 2 px of the drawn box, and the
+   hit-slop below it) lay under the rail whenever the rail wears the scroll-fade mask (content past an edge), because the mask makes the
+   rail a stacking context later in the DOM than the toggle's `position: relative`, which a bare level ties with and loses to. Measured
+   with `elementFromPoint` on the CI seed's "Errand with waits" group (23 tickets, the rail overflows) at 1440: the toggle's bottom
+   edge answered `div.gn-board__rail.gn-scroll-fade` (25.320/25.327); a rail with no overflow, and so no mask, answered the button. */
+[data-style="neo"] .gn-board__workflow-toggle {
   z-index: 1;
 }
 

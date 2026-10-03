@@ -1,9 +1,10 @@
+import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Select } from '@gisik-nokma/ui';
 import { useBuilderEnv, useBuilderStore } from './builder-context.js';
 import type { StateNodeData } from './flow-graph.js';
 
-export function StateNode(props: NodeProps) {
+export const StateNode = memo(function StateNode(props: NodeProps) {
   const data = props.data as StateNodeData;
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
@@ -86,4 +87,4 @@ export function StateNode(props: NodeProps) {
       <Handle type="source" position={Position.Right} isConnectable={canAuthor} />
     </div>
   );
-}
+});

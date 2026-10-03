@@ -21,16 +21,20 @@ import { describeEvent } from '../../src/views/history-copy.js';
  *
  * ## What this case cannot see, named rather than implied
  *
- * The two exported lists do not cover the whole entity-kind-`ticket` set: the
- * twenty registrations in `vocabulary.ts` read as
- * `TICKET_EVENT_TYPES` (17) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`} —
- * `visibility.set` is registered against a ticket but is in NEITHER list, so it
- * is the one member spelled by hand here. **A NEW event type registered against
+ * The two exported lists do not cover the whole entity-kind-`ticket` set:
+ * `vocabulary.ts` registers 22 non-purge types against a ticket (25 name
+ * `ticket`; the three `purge.*` are the exemption). This census covers 20 of
+ * them: `TICKET_EVENT_TYPES` (17) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`},
+ * and `visibility.set`, in NEITHER list, is the one member spelled by hand here.
+ * The other two, `comment.edited` and `comment.deleted`, are registered against
+ * a ticket and sit in neither list either; they are outside this census and are
+ * narrated and pinned by case 26.117 below. **A NEW event type registered against
  * entity kind `ticket` and added to neither exported list would not be seen by
- * this case.** That is a real blind spot and it is stated rather than papered
- * over; the count assertion below is what makes it loud, because the day the
- * registrations move, this number is wrong and the reader is sent back to
- * `vocabulary.ts`.
+ * this case, and the blind spot is live today with those two members.** It is
+ * stated rather than papered over. The count assertion below does NOT catch it:
+ * the pinned number is the size of the derived union, so a type added to neither
+ * list leaves it unchanged. It catches only a change to the exported lists
+ * themselves, which sends the reader back to `vocabulary.ts`.
  */
 const ENTITY_KIND_TICKET_UNIVERSE = [
   ...TICKET_EVENT_TYPES,
@@ -40,10 +44,11 @@ const ENTITY_KIND_TICKET_UNIVERSE = [
 ] as const;
 
 /**
- * The registrations that read this way on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20). Pinned as a NUMBER so a
+ * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20). Pinned as a NUMBER so a
  * change to the domain's lists fails loudly here rather than quietly shrinking
  * what this census covers: the failure message says to re-read the
- * registrations, which is the actual remedy.
+ * registrations, which is the actual remedy. It is not a count of the
+ * registrations (22), as the docblock above says.
  */
 const REGISTRATIONS_ON_2026_10_03 = 20;
 
