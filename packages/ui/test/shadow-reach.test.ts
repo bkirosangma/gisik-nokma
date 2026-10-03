@@ -138,7 +138,7 @@ describe('25.323 the scrollers hold their raised children with room, and hand th
 });
 
 describe('25.324 the reach strip takes no neighbour\'s click', () => {
-  it('25.324 the toolbar, the notes bar and the phone picker above a padded scroller are positioned, so they paint and take the pointer above its strip', () => {
+  it('25.324 the toolbar, the notes bar, the phone picker and the board workflow toggle above a padded scroller are positioned, so they paint and take the pointer above its strip', () => {
     expect(valueOf(only(globals, '[data-style="neo"] .gn-groups__toolbar'), 'position')).toBe('relative');
     const bar = only(globals, '[data-style="neo"] .gn-notes__bar');
     expect(valueOf(bar, 'position')).toBe('relative');
@@ -148,6 +148,14 @@ describe('25.324 the reach strip takes no neighbour\'s click', () => {
     expect(valueOf(picker, 'position')).toBe('relative');
     // The rail's scroll-fade mask is a stacking context after the picker in the DOM, so the picker needs a level too.
     expect(valueOf(picker, 'z-index')).toBe('1');
+    // The workflow toggle sits in the heading right above a rail whose top strip reaches back over its foot; a rail with content past an
+    // edge wears the scroll-fade mask (a stacking context later in the DOM), which took the toggle's bottom-edge clicks on the CI seed's
+    // "Errand with waits" group. The toggle is already `position: relative` (hit-slop anchor); it needs the level, as the picker does.
+    const toggle = only(ui, '[data-style="neo"] .gn-board__workflow-toggle');
+    expect(valueOf(toggle, 'z-index')).toBe('1');
+    // CONTROL: the toggle's own base rule is positioned (so the level applies) and the rail's mask is what makes the stacking context.
+    expect(valueOf(only(ui, '.gn-board__workflow-toggle'), 'position')).toBe('relative');
+    expect(rulesNaming(ui, ".gn-scroll-fade[data-at-end='false']").some((r) => valueOf(r.body, 'mask-image')?.includes('linear-gradient'))).toBe(true);
     // CONTROL: the tree really is positioned above 60rem, which is why the bar's bare position would tie.
     expect(rulesNaming(globals, '.gn-notes__tree').some((r) => valueOf(r.body, 'position') === 'relative')).toBe(true);
   });

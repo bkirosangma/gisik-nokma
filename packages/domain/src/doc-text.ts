@@ -171,3 +171,149 @@ export function collectDocReferences(doc: unknown): DocReferences {
   walk(doc, 0);
   return { ticketIds, noteIds };
 }
+
+/**
+ * One structured reference in a document (Knowledge Graph spec B §2.1): a
+ * `ticketRef`, a `wikiLink` or a `mention`, in document order. Bare text such
+ * as `GN-142` is NOT a reference. `ordinal` counts every reference, repeats
+ * included, so it is stable for a body however its targets later fare.
+ */
+export type DocReferenceKind = 'ticket' | 'note' | 'person';
+export type DocReference = { targetKind: DocReferenceKind; targetId: string; ordinal: number; snippet: string };
+
+/** Spec B §2.1: a snippet is at most this many characters. */
+export const SNIPPET_MAX_CHARS = 160;
+
+// Private-use sentinels for the marker while the text is assembled; stripped from
+// every piece of the person's own text first, so only these two can exist.
+const MARK_OPEN = '\uE000';
+const MARK_CLOSE = '\uE001';
+const stripSentinels = (value: string): string => value.replace(/[\uE000\uE001]/g, '');
+
+/**
+ * The blocks a snippet may be: the innermost one holding the reference. A
+ * list item and a table cell hold a paragraph, so in the editor's own schema
+ * the paragraph wins; the outer types are listed for documents from other
+ * producers, where a cell may hold text directly.
+ */
+const SNIPPET_BLOCK_TYPES = new Set([
+  'paragraph', 'heading', 'codeBlock', 'code_block', 'detailsSummary', 'blockquote',
+  'listItem', 'list_item', 'taskItem', 'tableCell', 'tableHeader',
+]);
+
+function referenceOf(node: unknown): { kind: DocReferenceKind; id: string } | null {
+  if (node === null || typeof node !== 'object' || Array.isArray(node)) return null;
+  const candidate = node as { type?: unknown; attrs?: unknown };
+  const attrs = (typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}) as Record<string, unknown>;
+  const idOf = (key: string): string | null => {
+    const value = attrs[key];
+    return typeof value === 'string' && value !== '' ? value : null;
+  };
+  const kinds: Record<string, [DocReferenceKind, string]> = {
+    ticketRef: ['ticket', 'ticketId'],
+    wikiLink: ['note', 'noteId'],
+    mention: ['person', 'userId'],
+  };
+  const entry = typeof candidate.type === 'string' ? kinds[candidate.type] : undefined;
+  if (entry === undefined) return null;
+  const id = idOf(entry[1]);
+  return id === null ? null : { kind: entry[0], id };
+}
+
+export function extractDocReferences(doc: unknown, options: DocTextOptions = {}): DocReference[] {
+  const found: Array<{ kind: DocReferenceKind; id: string; block: unknown; indexInBlock: number }> = [];
+  const perBlock = new Map<unknown, number>();
+  const walk = (node: unknown, depth: number, block: unknown): void => {
+    if (depth > MAX_DEPTH) return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth, block);
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+    const ref = referenceOf(node);
+    if (ref !== null) {
+      const indexInBlock = perBlock.get(block) ?? 0;
+      perBlock.set(block, indexInBlock + 1);
+      found.push({ ...ref, block, indexInBlock });
+      return;
+    }
+    const candidate = node as { type?: unknown; content?: unknown };
+    const here = typeof candidate.type === 'string' && SNIPPET_BLOCK_TYPES.has(candidate.type) ? node : block;
+    if (candidate.content !== undefined) walk(candidate.content, depth + 1, here);
+  };
+  walk(doc, 0, doc);
+  return found.map((ref, ordinal) => ({
+    targetKind: ref.kind,
+    targetId: ref.id,
+    ordinal,
+    snippet: snippetFor(ref.block, ref.indexInBlock, options),
+  }));
+}
+
+/** The block's text with its `target`-th own reference wrapped in the sentinels. */
+function renderMarked(
+  node: unknown,
+  depth: number,
+  options: DocTextOptions,
+  target: number,
+  counter: { seen: number },
+  counting: boolean,
+  isRoot: boolean,
+): string {
+  if (depth > MAX_DEPTH) return '';
+  if (node === null || typeof node !== 'object' || Array.isArray(node)) return '';
+  const candidate = node as { type?: unknown; text?: unknown; content?: unknown };
+  if (referenceOf(node) !== null) {
+    const own = stripSentinels(render(node, depth, options));
+    if (!counting) return own;
+    const mine = counter.seen === target;
+    counter.seen += 1;
+    return mine ? `${MARK_OPEN}${own}${MARK_CLOSE}` : own;
+  }
+  if (candidate.type === 'ticketRef' || candidate.type === 'wikiLink' || candidate.type === 'mention') {
+    return stripSentinels(render(node, depth, options)); // a chip with no id: its text, never a marker
+  }
+  if (candidate.type === 'text') return typeof candidate.text === 'string' ? stripSentinels(candidate.text) : '';
+  if (candidate.type === 'hardBreak' || candidate.type === 'hard_break') return ' ';
+  // A reference inside a NESTED snippet block belongs to that block, not to this one.
+  const nested = !isRoot && typeof candidate.type === 'string' && SNIPPET_BLOCK_TYPES.has(candidate.type);
+  const children = Array.isArray(candidate.content)
+    ? candidate.content.map((child) => renderMarked(child, depth + 1, options, target, counter, counting && !nested, false)).join('')
+    : '';
+  return typeof candidate.type === 'string' && BLOCK_NODE_TYPES.has(candidate.type) ? `${children} ` : children;
+}
+
+function snippetFor(block: unknown, indexInBlock: number, options: DocTextOptions): string {
+  const flat = renderMarked(block, 0, options, indexInBlock, { seen: 0 }, true, true)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\[(?=\[)/g, '[ ')
+    .replace(/\](?=\])/g, '] ')
+    // A bracket TOUCHING the marker would join it into "[[[" / "]]]" and move the pair for
+    // Task 2's splitSnippet (the first "[[", then the first "]]" after it): keep a space between.
+    .replace(/\[(?=\uE000)/g, '[ ')
+    .replace(/(?<=\uE000)\[/g, ' [')
+    .replace(/\](?=\uE001)/g, '] ')
+    .replace(/(?<=\uE001)\]/g, ' ]');
+  const open = flat.indexOf(MARK_OPEN);
+  const close = flat.indexOf(MARK_CLOSE);
+  if (open < 0 || close < open) return flat.slice(0, SNIPPET_MAX_CHARS);
+  const marked = `${flat.slice(0, open)}[[${flat.slice(open + 1, close)}]]${flat.slice(close + 1)}`;
+  return windowAround(marked, open, close + 3);
+}
+
+/** At most SNIPPET_MAX_CHARS, centred on [start, end), an ellipsis where text was cut. */
+function windowAround(text: string, start: number, end: number): string {
+  const max = SNIPPET_MAX_CHARS;
+  if (text.length <= max) return text;
+  const markLength = end - start;
+  if (markLength + 2 > max) return `${text.slice(start, start + max - 3)}…]]`;
+  const room = max - markLength;
+  let from = Math.max(0, start - Math.floor(room / 2));
+  const to = Math.min(text.length, from + max);
+  from = Math.max(0, to - max);
+  let out = text.slice(from, to);
+  if (from > 0) out = `…${out.slice(1)}`;
+  if (to < text.length) out = `${out.slice(0, -1)}…`;
+  return out;
+}

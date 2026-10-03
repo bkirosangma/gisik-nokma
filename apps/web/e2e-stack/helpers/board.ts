@@ -149,6 +149,8 @@ export async function seededProjectHref(page: Page, workspaceId: string): Promis
  */
 export async function openSeededBoard(
   page: Page,
+  /** The name the project link carries on THIS page: the seed's, unless the spec rewrote it (sheet-header-compact's long name). */
+  projectName: string = SEEDED_PROJECT_NAME,
 ): Promise<{ workspaceId: string; projectId: string }> {
   await page.goto('/workspaces', { waitUntil: 'networkidle' });
   const workspaceId = await readWorkspaceId(page);
@@ -158,13 +160,13 @@ export async function openSeededBoard(
   await page.locator(`a[href^="/w/${workspaceId}"]`).first().click();
   await page.waitForURL(new RegExp(`/w/${workspaceId}(/|\\?|$)`), { timeout: 15_000 });
 
-  const link = page.getByRole('link', { name: `Open ${SEEDED_PROJECT_NAME}`, exact: true });
+  const link = page.getByRole('link', { name: `Open ${projectName}`, exact: true });
   try {
     await expect(link).toHaveCount(1, { timeout: 15_000 });
   } catch {
     const seen = await projectLinks(page, workspaceId).allTextContents();
     throw new Error(
-      `reached /w/${workspaceId} but found no single project link named "${SEEDED_PROJECT_NAME}". ` +
+      `reached /w/${workspaceId} but found no single project link named "${projectName}". ` +
         `Projects rendered: ${JSON.stringify(seen)}.`,
     );
   }
@@ -175,7 +177,7 @@ export async function openSeededBoard(
   // next line reports the page the click was made FROM — found by running it.
   await page.waitForURL(/\/p\/[^/?]+/, { timeout: 15_000 }).catch(() => {
     throw new Error(
-      `clicking the "${SEEDED_PROJECT_NAME}" link left the browser at ` +
+      `clicking the "${projectName}" link left the browser at ` +
         `${new URL(page.url()).pathname}, not a board. The link's href is ${String(href)}.`,
     );
   });
@@ -184,13 +186,13 @@ export async function openSeededBoard(
   const path = new URL(page.url()).pathname;
   if (href !== null && path !== href) {
     throw new Error(
-      `clicking the "${SEEDED_PROJECT_NAME}" link reached ${path}, but that link points at ${href}. ` +
+      `clicking the "${projectName}" link reached ${path}, but that link points at ${href}. ` +
         `The click landed somewhere else, so every measurement downstream would be of another board.`,
     );
   }
   const projectId = /\/p\/([^/]+)/.exec(path)?.[1] ?? '';
   if (projectId === '') {
-    throw new Error(`clicking the "${SEEDED_PROJECT_NAME}" link left the browser at ${path}, not a board`);
+    throw new Error(`clicking the "${projectName}" link left the browser at ${path}, not a board`);
   }
   return { workspaceId, projectId };
 }

@@ -61,13 +61,16 @@ describe('25.527/25.528 Add state with a near point', () => {
 
   it('25.527 the new state takes the largest measured box, and the gap decides the answer (a state measures taller than the 120 guess; its edge sits off the grid)', () => {
     const store = createDraftStore(newDraft('Measured'));
-    const only = store.actions.addState();
-    store.actions.moveState(only, { x: 0, y: 0 });
-    // 192 = 12 grid steps: with no gap the first free row above is y = -192, with the 8 px gap it is -208; the 120 guess would say -128
-    // a second, smaller state far away: the new box is the LARGEST measured one, not the smallest or the last
+    // a smaller state far away FIRST, the big one in the middle, another smaller one far away LAST: the new box is the LARGEST measured
+    // one, not the smallest, the first or the last (the order of def.states is the order the sizes are read in)
     const small = store.actions.addState();
     store.actions.moveState(small, { x: 5000, y: 5000 });
-    const sizes = { [only]: { width: 200, height: 192 }, [small]: { width: 100, height: 60 } };
+    const only = store.actions.addState();
+    store.actions.moveState(only, { x: 0, y: 0 });
+    const tiny = store.actions.addState();
+    store.actions.moveState(tiny, { x: -5000, y: 5000 });
+    // 192 = 12 grid steps: with no gap the first free row above is y = -192, with the 8 px gap it is -208; the 120 guess would say -128
+    const sizes = { [small]: { width: 100, height: 60 }, [only]: { width: 200, height: 192 }, [tiny]: { width: 80, height: 48 } };
     const id = store.actions.addState({ near: { x: 0, y: -100 }, sizes });
     expect(store.getState().positions[id]).toEqual({ x: 0, y: -208 });
     // the same on x: 200 wide + the gap puts the first free column to the left at -208, where the smallest box (100) would say -112
