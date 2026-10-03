@@ -11,8 +11,10 @@ import { stubServices } from './helpers/stub-services.js';
  * edit or a delete is filed against and WHO may see the controls, not the editor's own behaviour.
  */
 let capturedSlotProps: Array<Record<string, unknown>> = [];
-vi.mock('@gisik-nokma/editor', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@gisik-nokma/editor')>();
+// The seam is the page's own editor slot (`../src/editor-slot.js`, the lazy wrapper, smoothness T10/T9 case 25.163), so a capture
+// is synchronous with the render instead of waiting for the editor chunk's dynamic import.
+vi.mock('../src/editor-slot.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/editor-slot.js')>();
   return {
     ...actual,
     TicketEditorSlot: function CapturingSlot(props: Record<string, unknown>) {
@@ -134,6 +136,8 @@ describe('26.113–26.115 note comments: edit and delete', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: "More actions for Anselma Marak's comment" }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    // The composer is a button until reached for (smoothness T9, 25.153): open it so its slot exists to compare.
+    await user.click(await screen.findByRole('button', { name: /Add a comment/ }));
     const KEYS = ['queryUsers', 'queryNotes', 'queryTickets', 'resolveTicketHref'] as const;
     const composer = capturedSlotProps.filter((p) => p['placeholder'] === 'Add a comment').at(-1)!;
     const edit = capturedSlotProps.filter((p) => p['submitLabel'] === 'Save').at(-1)!;

@@ -18,6 +18,7 @@ import { usePhoneBoard } from '../../views/use-phone-board.js';
 import { connectionToTransition, phoneOpeningView, toFlowGraph } from './flow-graph.js';
 import { StateNode } from './state-node.js';
 import { TransitionEdge } from './transition-edge.js';
+import { useDragEscape, useWorkingNodes } from './use-working-nodes.js';
 
 const NODE_TYPES = { state: StateNode, anyState: AnyStateNode };
 const EDGE_TYPES = { transition: TransitionEdge };
@@ -38,7 +39,10 @@ function CanvasInner() {
   const summaryCtx = useSummaryCtx();
   const { fitView } = useReactFlow();
   const phone = usePhoneBoard();
-  const { nodes, edges } = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
+  const graph = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
+  const working = useWorkingNodes(graph.nodes);
+  // G-9 T1: Escape during a drag puts the state back where it started.
+  const escape = useDragEscape(working.cancelDrag);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -48,13 +52,23 @@ function CanvasInner() {
     [store],
   );
 
-  const onNodeDragStop = useCallback(
+  const onNodeDragStart = useCallback(
     (_mouseEvent: unknown, node: Node) => {
-      const key = node.id === ANY_STATE_NODE_ID ? node.id : node.id.slice('s:'.length);
-      store.actions.moveState(key, node.position);
+      working.beginDrag(node.id);
+      escape.arm();
     },
-    [store],
+    [working.beginDrag, escape.arm],
   );
+
+  // The commit is the working copy's position, never the handler's `node.position`: React Flow's drag-end position is
+  // the raw pointer one, and a cancelled gesture (Escape) commits nothing.
+  const onNodeDragStop = useCallback(() => {
+    escape.disarm();
+    const done = working.endDrag();
+    if (done === null) return;
+    const key = done.id === ANY_STATE_NODE_ID ? done.id : done.id.slice('s:'.length);
+    store.actions.moveState(key, done.position);
+  }, [store, working.endDrag, escape.disarm]);
 
   // F-5 (WF-03): on a phone the whole graph fits only at ~0.28, where a 13px checkbox is drawn at 4px. The canvas opens
   // at a readable zoom on the start state instead and the reader pans; "Fit to screen" still shows everything.
@@ -75,12 +89,15 @@ function CanvasInner() {
   return (
     <div className="gn-workflow-canvas">
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={working.nodes}
+        edges={graph.edges}
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
         onConnect={onConnect}
+        onNodesChange={working.onNodesChange}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
+        nodeDragThreshold={4}
         onPaneClick={() => store.actions.select({ kind: 'none' })}
         nodesConnectable={canAuthor}
         nodesDraggable
