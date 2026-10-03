@@ -10,6 +10,8 @@ import { TicketEditorSlot } from '../src/editor-slot.js';
  */
 
 vi.mock('@gisik-nokma/editor', () => ({
+  // The slot module keeps the serializer from the same chunk (smoothness T9, `exportMarkdown`), so the stub names it.
+  exportMarkdown: () => '',
   TicketEditorSlot: (props: { mode: string }) => <div data-testid="loaded-editor" data-mode={props.mode} />,
 }));
 
