@@ -22,8 +22,11 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 const ENABLED = process.env['REFS_PERF'] === '1';
 const BODY_EVENTS = Number(process.env['REFS_PERF_BODY_EVENTS'] ?? '100000');
 const OTHER_EVENTS = Number(process.env['REFS_PERF_OTHER_EVENTS'] ?? '400000');
-const BAR_MS = 10_000;
+// The bar (planner ruling 2026-10-03 13:24, RULING A: the first 10 000 ms bar was set without measuring the
+// existing projections — proj_search takes ~50 s at this floor). Machine-relative, so it means the same on any box.
+const BAR_RATIO = 3; // rebuild proj_references <= 3 x the proj_search rebuild measured in THIS run
 const BAR_RSS_MB = 512;
+const BAR_ENTITY_MS = 100; // the deploy path: the backfill's longest single-entity transaction
 
 let db: TestDatabase;
 beforeAll(async () => {
@@ -120,7 +123,7 @@ async function measureBackfill(): Promise<{ ms: number; rssMb: number; maxEntity
 
 describe('27.118 the rebuild and the boot backfill at the size floor', () => {
   if (!ENABLED) {
-    console.log('refs-perf: SKIPPED — set REFS_PERF=1 to measure the proj_references rebuild and backfill at the floor (P=100 000, Q=400 000) against the bar (rebuild ≤ 10 000 ms and ≤ +512 MB RSS; backfill ≤ +512 MB RSS).');
+    console.log('refs-perf: SKIPPED — set REFS_PERF=1 to measure the proj_references rebuild and backfill at the floor (P=100 000, Q=400 000) against the bar (rebuild ≤ 3 × the proj_search baseline of the same run and ≤ +512 MB RSS; backfill ≤ +512 MB RSS and longest entity transaction ≤ 100 ms).');
     it.skip('measures the proj_references rebuild (set REFS_PERF=1)', () => undefined);
     return;
   }
@@ -145,8 +148,10 @@ describe('27.118 the rebuild and the boot backfill at the size floor', () => {
         `longest entity transaction ${backfill.maxEntityMs.toFixed(0)} ms, ${after ?? 0} rows`,
     );
     expect(after).toBe(rows[0]?.n); // the backfill reaches the rebuild's rows
-    expect(refs.ms).toBeLessThanOrEqual(BAR_MS);
+    console.log(`refs-perf: bar — rebuild ${refs.ms.toFixed(0)} ms = ${(refs.ms / baseline.ms).toFixed(2)} x the proj_search baseline ${baseline.ms.toFixed(0)} ms (limit ${BAR_RATIO}x)`);
+    expect(refs.ms).toBeLessThanOrEqual(BAR_RATIO * baseline.ms);
     expect(refs.rssMb).toBeLessThanOrEqual(BAR_RSS_MB);
     expect(backfill.rssMb).toBeLessThanOrEqual(BAR_RSS_MB);
+    expect(backfill.maxEntityMs).toBeLessThanOrEqual(BAR_ENTITY_MS);
   }, 3_600_000);
 });

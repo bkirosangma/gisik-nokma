@@ -26,6 +26,14 @@ import type { Projection } from './registry.js';
  * chip reads `Deleted item` inside any other reference's snippet. Ordinals
  * are assigned BEFORE that filter, so the keys agree too.
  *
+ * ## Known cost
+ * Each body event costs three round trips — the `purged_entities` lookup, the
+ * DELETE of the source's rows, the INSERT. At the size floor (100 000 body +
+ * 400 000 other events) `rebuildProjection` takes ~2.5 x `proj_search`'s rebuild
+ * (124 s vs 50 s, 27.118). Left as is on purpose (planner ruling 2026-10-03 13:24 (⚑ LANE 6, KG-B T1 rebuild bar, RULING A):
+ * no optimisation at prod's size, far under the floor); the deploy path is the
+ * boot backfill, whose longest single-entity transaction was 35 ms.
+ *
  * ## Trash and purge
  * A trash event is not a body event: rows stay, reads hide them
  * (`read/linked-from.ts`). Purge deletes by source parent AND by target
