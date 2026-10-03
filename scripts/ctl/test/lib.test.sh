@@ -176,6 +176,24 @@ check "13.1842 task count: CONTROL — a short 36-task run (35 of 36) FAILS" 'ou
 check "13.1842 task count: CONTROL — 34 successful of 36 total FAILS (the pair must agree)" 'out=$(FIXTURE_OK=34 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 36 total"'
 check "13.1842 task count: CONTROL — 36 successful of 34 total FAILS" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 34 total"'
 check "13.1843 task count: CONTROL — a 34-task run (34/34) FAILS the verb on the 36-only tip, naming the Tasks line" 'out=$(FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 34 total"'
+# 13.1844-13.1848 (13.1849 is the pending 41-only flip): Knowledge Graph C T1 adds a package (41 tasks) while the verb that runs is the primary checkout's (36-only), so the verb accepts 36 OR 41 until
+# KG C T1's last commit pins 41-only. The pair must match one graph; 13.1840-13.1843 above still hold (36 passes, 34/35/37 and mixed pairs fail).
+check "13.1844 task count: a cached run of 41/41 passes the verb (KG C T1's graph)" 'FIXTURE_TASKS=41 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +41 successful, 41 total"'
+check "13.1844 task count: a fresh (main-kind) run of 41/41 passes too" 'FIXTURE_TASKS=41 gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · Tasks: +41 successful, 41 total"'
+check "13.1844 task count: CONTROL — 36/36 still passes on the same tip (both graphs, release-kind)" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
+check "13.1844 task count: CONTROL — 36/36 still passes main-kind" 'FIXTURE_TASKS=36 gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · Tasks: +36 successful, 36 total"'
+for n in 35 37 40 42; do
+  check "13.1845 task count: CONTROL — $n/$n FAILS, naming the Tasks line (accepted by value, not by range)" 'out=$(FIXTURE_TASKS='$n' gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *'$n' successful, '$n' total"'
+done
+check "13.1845 task count: CONTROL — 34/34 FAILS (13.1843's control stays valid with the 41 arm)" 'out=$(FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 34 total"'
+check "13.1846 task count: CONTROL — mixed pair 36 successful of 41 total FAILS" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS=41 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 41 total"'
+check "13.1846 task count: CONTROL — mixed pair 41 successful of 36 total FAILS" 'out=$(FIXTURE_OK=41 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *41 successful, 36 total"'
+check "13.1846 task count: CONTROL — a short 41-task run (40 of 41) FAILS" 'out=$(FIXTURE_OK=40 FIXTURE_TASKS=41 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *40 successful, 41 total"'
+check "13.1846 task count: CONTROL — a short 41-task run FAILS main-kind too" 'out=$(FIXTURE_OK=40 FIXTURE_TASKS=41 gbr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *40 successful, 41 total"'
+check "13.1847 task count: CONTROL — anchored on the left: 136 of 36 and 141 of 41 FAIL (an accepted count as the tail of a longer one)" '( for n in 36 41; do out=$(FIXTURE_OK=1$n FIXTURE_TASKS=$n gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *1$n successful, $n total" || exit 1; done )'
+check "13.1847 task count: CONTROL — 36 of 360 and 41 of 410 FAIL (an accepted count as the prefix of the total)" '( for n in 360 410; do out=$(FIXTURE_OK=${n%0} FIXTURE_TASKS=$n gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *${n%0} successful, $n total" || exit 1; done )'
+check "13.1847 task count: CONTROL — anchored on the right: text after 'total' FAILS (36/36 total total)" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS="36 total" gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 36 total total"'
+check "13.1848 task count: the TEMPORARY marker is greppable — gate.sh names the 36-or-41 pair and KG C T1's 41-only pin, so the removal is not forgotten" 'grep -q "TEMPORARY \"36 or 41\"" "$HERE/verbs/gate.sh" && grep -q "KG C T1.s LAST commit pins 41-ONLY" "$HERE/verbs/gate.sh"'
 ( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
