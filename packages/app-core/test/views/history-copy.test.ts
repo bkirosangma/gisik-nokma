@@ -22,9 +22,9 @@ import { describeEvent } from '../../src/views/history-copy.js';
  * ## What this case cannot see, named rather than implied
  *
  * The two exported lists do not cover the whole entity-kind-`ticket` set:
- * `vocabulary.ts` registers 22 non-purge types against a ticket (25 name
- * `ticket`; the three `purge.*` are the exemption). This census covers 20 of
- * them: `TICKET_EVENT_TYPES` (17) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`},
+ * `vocabulary.ts` registers 24 non-purge types against a ticket (27 name
+ * `ticket`; the three `purge.*` are the exemption). This census covers 22 of
+ * them: `TICKET_EVENT_TYPES` (19) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`},
  * and `visibility.set`, in NEITHER list, is the one member spelled by hand here.
  * The other two, `comment.edited` and `comment.deleted`, are registered against
  * a ticket and sit in neither list either; they are outside this census and are
@@ -44,13 +44,13 @@ const ENTITY_KIND_TICKET_UNIVERSE = [
 ] as const;
 
 /**
- * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20). Pinned as a NUMBER so a
+ * The size of the union above on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20; the drafts pair, T1, made it 22). Pinned as a NUMBER so a
  * change to the domain's lists fails loudly here rather than quietly shrinking
  * what this census covers: the failure message says to re-read the
  * registrations, which is the actual remedy. It is not a count of the
- * registrations (22), as the docblock above says.
+ * registrations (24), as the docblock above says.
  */
-const REGISTRATIONS_ON_2026_10_03 = 20;
+const REGISTRATIONS_ON_2026_10_03 = 22;
 
 /**
  * ONE VALID PAYLOAD PER TYPE, and the table is what makes this a census of
@@ -98,6 +98,8 @@ const VALID_PAYLOAD: Record<string, unknown> = {
   'ticket.restored': {},
   'ticket.link_added': { kind: 'blocks', targetId: '01J9GTKB000000000000000000' },
   'ticket.link_removed': { kind: 'relates', targetId: '01J9GTKB000000000000000000' },
+  'ticket.published': { projectId: '01J9GPRJ000000000000000000' },
+  'ticket.discarded': {},
   'comment.added': { body: {} },
   'attachment.added': { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' },
   'claim.contested': { originalEvent: {}, rule: 'r', reason: 'why' },
@@ -129,7 +131,7 @@ describe('3.183 history copy — the census', () => {
     expect(
       TICKET_EVENT_TYPES.length,
       'TICKET_EVENT_TYPES changed shape: re-read packages/domain/src/vocabulary.ts and re-derive the universe',
-    ).toBe(17);
+    ).toBe(19);
     expect(CONTEST_EVENT_TYPES.length).toBe(2);
     expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_10_03);
   });
@@ -302,5 +304,16 @@ describe('27.005 history copy — link sentences', () => {
     expect(describeEvent(linkEvent('ticket.link_added', 'parent', { key: 'GN-1' }))).toBe('ticket.link_added');
     // control: an unknown type still falls back
     expect(describeEvent({ ...eventOf('ticket.closed'), type: 'ticket.never_seen' })).toBe('ticket.never_seen');
+  });
+});
+
+describe('28.006 draft history sentences', () => {
+  it('28.006 drafted, published, discarded; control: a creation without draft reads Created', () => {
+    const typeName = (id: string): string => (id === 'task' ? 'Task' : id);
+    const created = (payload: Record<string, unknown>): TicketHistoryEvent => ({ ...eventOf('ticket.created'), payload });
+    expect(describeEvent(created({ typeId: 'task', draft: true }), { typeName })).toBe('Drafted as Task');
+    expect(describeEvent(created({ typeId: 'task' }), { typeName })).toBe('Created as Task'); // control
+    expect(describeEvent(eventOf('ticket.published'))).toBe('Published');
+    expect(describeEvent(eventOf('ticket.discarded'))).toBe('Discarded');
   });
 });

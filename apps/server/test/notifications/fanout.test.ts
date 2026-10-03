@@ -202,6 +202,18 @@ describe('27.007 link events', () => {
   });
 });
 
+describe('28.005 a discard notifies nobody', () => {
+  it('28.005 ticket.discarded writes no row; control: ticket.assigned to a member who can see it does', async () => {
+    await seedTicket(TICKET, ANSELMA, 'Renew the DLT registration');
+    await fanout().onCommitted(
+      makeEnvelope({ type: 'ticket.discarded', workspaceId: WS, actorId: KIRO, entity: { kind: 'ticket', id: TICKET }, payload: {} }),
+    );
+    expect(await totalNotificationRows()).toBe(0);
+    await fanout().onCommitted(assigned());
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+  });
+});
+
 describe('ticket.assigned', () => {
   it("notifies the assignee with the event's provenance", async () => {
     await seedTicket(TICKET, ANSELMA, 'Renew the DLT registration');
