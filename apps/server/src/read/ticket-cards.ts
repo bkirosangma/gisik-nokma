@@ -320,8 +320,11 @@ export function composeCardKey(
  * one ticket, batched. My Work is the one caller whose rows span workspaces,
  * which is why this groups by `workspace_id` instead of assuming one.
  */
-async function cardKeysFor(db: Queryable, rows: readonly ProjTicketRow[]): Promise<Map<string, string | null>> {
-  const byWorkspace = new Map<string, ProjTicketRow[]>();
+export async function cardKeysFor(
+  db: Queryable,
+  rows: readonly Pick<ProjTicketRow, 'ticket_id' | 'workspace_id' | 'project_id'>[],
+): Promise<Map<string, string | null>> {
+  const byWorkspace = new Map<string, Pick<ProjTicketRow, 'ticket_id' | 'workspace_id' | 'project_id'>[]>();
   for (const row of rows) {
     const bucket = byWorkspace.get(row.workspace_id) ?? [];
     bucket.push(row);
