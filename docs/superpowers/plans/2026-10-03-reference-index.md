@@ -24,7 +24,7 @@
 **Numbers, copied from the spec or fixed here**
 - Snippet: at most **160** characters, the reference wrapped in `[[…]]` (§2.1).
 - "Linked from" page size: **20** (§3.2). Past 20, a `Show all N` control loads the rest from the same endpoint.
-- Rebuild bar (Task 1, set here, see the Task 1 docblock for why): at the size FLOOR **P = 100 000 body events, Q = 400 000 other events** (planner ruling 2026-10-03: prod size not supplied; a floor comfortably above a 10-day-old small-team prod, as plan E does), `rebuildProjection('proj_references')` **≤ 10 000 ms** and **peak RSS growth ≤ 512 MB**, and the boot backfill's peak RSS growth **≤ 512 MB**. Any one exceeded ⇒ STOP and report.
+- Rebuild bar (Task 1, set here, see the Task 1 docblock for why): at the size FLOOR **P = 100 000 body events, Q = 400 000 other events** (planner ruling 2026-10-03: prod size not supplied; a floor comfortably above a 10-day-old small-team prod, as plan E does), `rebuildProjection('proj_references')` **≤ 3 × the `proj_search` rebuild measured in the SAME run** and **peak RSS growth ≤ 512 MB**, and the boot backfill's peak RSS growth **≤ 512 MB** and **longest single-entity transaction ≤ 100 ms**. Any one exceeded ⇒ STOP and report. (Re-ruled by the planner ruling 2026-10-03 13:24 (⚑ LANE 6, KG-B T1 rebuild bar, RULING A): the first bar, 10 000 ms, was set without measuring the existing projections; `proj_search` itself takes ~50 s at the floor. Machine-relative so it means the same on any box.)
 - **No step waits on the owner's word** (planner ruling 2026-10-03: execution is autonomous, the release to main included). No prod query, no manual prod step: the index fills itself on boot (Task 1 Step 10).
 - Migration number: `1791500000000` (the highest on `release/smoothness` is `1791300000000_comment-edit-delete.sql`; `1791400000000` is left for plan A). Re-read `ls apps/server/migrations | tail -3` on `origin/release/knowledge-graph` first; if plan A used a number ≥ `1791500000000`, take the next free one above it. `pnpm check:migrations` decides.
 
@@ -111,7 +111,7 @@ Instead the backfill walks the ticket and note ENTITIES one short transaction ea
 - Inside the lock, the backfill deletes the entity's rows and replays `readEntityEvents` (`event-store.ts:132`) through `referencesProjection.apply`. A concurrent ingest on that entity either committed before the lock was granted (READ COMMITTED: the replay's next statement sees it, the `nextSeq` argument at `event-store.ts:15-19`) or waits and applies live on top of the replayed rows. Since every write is "replace this source", the result equals a rebuild either way.
 - No event is lost and no ingest waits longer than one entity's replay.
 
-The two bars measure the two paths. `rebuildProjection` stays the recovery and verification path (`rebuild:projection`, `verify-projections`): ≤ 10 s, ≤ 512 MB. The backfill runs inside the serving process: ≤ 512 MB, and its time and longest single-entity transaction are reported. Confirm the instance's RAM with `doctl apps tier instance-size get professional-xs` and say it beside the numbers.
+The two bars measure the two paths. `rebuildProjection` stays the recovery and verification path (`rebuild:projection`, `verify-projections`): ≤ 3 × the `proj_search` rebuild of the same run, ≤ 512 MB (planner ruling 2026-10-03 13:24 (⚑ LANE 6, KG-B T1 rebuild bar, RULING A); it was ≤ 10 s). The backfill runs inside the serving process and is the deploy path: ≤ 512 MB, longest single-entity transaction ≤ 100 ms, and its total time is reported. Known cost, recorded not optimised: three round trips per body event. Confirm the instance's RAM with `doctl apps tier instance-size get professional-xs` and say it beside the numbers.
 
 **Files:**
 - Create:
@@ -1373,8 +1373,9 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
   const ENABLED = process.env['REFS_PERF'] === '1';
   const BODY_EVENTS = Number(process.env['REFS_PERF_BODY_EVENTS'] ?? '100000');
   const OTHER_EVENTS = Number(process.env['REFS_PERF_OTHER_EVENTS'] ?? '400000');
-  const BAR_MS = 10_000;
+  const BAR_RATIO = 3; // rebuild <= 3 x proj_search measured in the same run (ruling A)
   const BAR_RSS_MB = 512;
+  const BAR_ENTITY_MS = 100;
 
   let db: TestDatabase;
   beforeAll(async () => {
@@ -1471,7 +1472,7 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
 
   describe('27.118 the rebuild and the boot backfill at the size floor', () => {
     if (!ENABLED) {
-      console.log('refs-perf: SKIPPED — set REFS_PERF=1 to measure the proj_references rebuild and backfill at the floor (P=100 000, Q=400 000) against the bar (rebuild ≤ 10 000 ms and ≤ +512 MB RSS; backfill ≤ +512 MB RSS).');
+      console.log('refs-perf: SKIPPED — set REFS_PERF=1 to measure the proj_references rebuild and backfill at the floor (P=100 000, Q=400 000) against the bar (rebuild ≤ 3 × the proj_search baseline of the same run and ≤ +512 MB RSS; backfill ≤ +512 MB RSS and longest entity transaction ≤ 100 ms).');
       it.skip('measures the proj_references rebuild (set REFS_PERF=1)', () => undefined);
       return;
     }
@@ -1496,9 +1497,10 @@ The two bars measure the two paths. `rebuildProjection` stays the recovery and v
           `longest entity transaction ${backfill.maxEntityMs.toFixed(0)} ms, ${after ?? 0} rows`,
       );
       expect(after).toBe(rows[0]?.n); // the backfill reaches the rebuild's rows
-      expect(refs.ms).toBeLessThanOrEqual(BAR_MS);
+      expect(refs.ms).toBeLessThanOrEqual(BAR_RATIO * baseline.ms);
       expect(refs.rssMb).toBeLessThanOrEqual(BAR_RSS_MB);
       expect(backfill.rssMb).toBeLessThanOrEqual(BAR_RSS_MB);
+      expect(backfill.maxEntityMs).toBeLessThanOrEqual(BAR_ENTITY_MS);
     }, 3_600_000);
   });
   ```

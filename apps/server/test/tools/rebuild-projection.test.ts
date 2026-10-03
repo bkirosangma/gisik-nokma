@@ -50,3 +50,15 @@ describe('13.1227 rebuild:projection puts the birth priority on a stale proj_tic
     expect(after[0]?.fields['priority']?.actorId).toBe(world.owner);
   });
 });
+
+describe('27.117 rebuild:projection can reach a managed database', () => {
+  it('27.117 a DATABASE_CA_CERT turns TLS on; without one the pool has no ssl (control)', async () => {
+    const { toolPool } = await import('../../src/tools/rebuild-projection.js');
+    const pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----';
+    const withCa = toolPool('postgres://u:p@localhost:5432/x', { DATABASE_CA_CERT: pem });
+    const without = toolPool('postgres://u:p@localhost:5432/x', {});
+    expect((withCa as unknown as { options: { ssl?: unknown } }).options.ssl).toBeDefined();
+    expect((without as unknown as { options: { ssl?: unknown } }).options.ssl).toBeUndefined();
+    await Promise.all([withCa.end(), without.end()]);
+  });
+});

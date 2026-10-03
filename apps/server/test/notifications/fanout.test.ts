@@ -179,6 +179,29 @@ function assigned(overrides: Partial<EventEnvelope> = {}): EventEnvelope {
   });
 }
 
+describe('27.007 link events', () => {
+  it('27.007 a committed link event notifies nobody; control: a ticket.assigned to a member who can see it does', async () => {
+    await seedTicket(TICKET, null, 'Renew the DLT registration');
+    const target = '01J9GTKB000000000000000000';
+    for (const type of ['ticket.link_added', 'ticket.link_removed'] as const) {
+      await fanout().onCommitted(
+        makeEnvelope({
+          type,
+          workspaceId: WS,
+          actorId: KIRO,
+          entity: { kind: 'ticket', id: TICKET },
+          payload: { kind: 'blocks', targetId: target },
+        }),
+      );
+    }
+    expect(await totalNotificationRows()).toBe(0);
+    // control, same `it`: the same fan-out and the same visible set DO notify for an assignment
+    await fanout().onCommitted(assigned());
+    expect(await rowsFor(ANSELMA)).toHaveLength(1);
+    expect(await totalNotificationRows()).toBe(1);
+  });
+});
+
 describe('ticket.assigned', () => {
   it("notifies the assignee with the event's provenance", async () => {
     await seedTicket(TICKET, ANSELMA, 'Renew the DLT registration');

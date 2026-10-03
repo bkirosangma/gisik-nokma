@@ -13,6 +13,7 @@ import { rollupsProjection } from './rollups.js';
 import { searchProjection } from './search.js';
 import { ticketCommentsProjection } from './ticket-comments.js';
 import { ticketsProjection } from './tickets.js';
+import { referencesProjection } from './references.js';
 import { ticketTypesProjection } from './ticket-types.js';
 import { workflowsProjection } from './workflows.js';
 import { workspaceSettingsProjection } from './workspace-settings.js';
@@ -28,7 +29,7 @@ import { workspaceSettingsProjection } from './workspace-settings.js';
  *   proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
  *   proj_tickets, proj_rollups, proj_memberships, proj_invites,
  *   proj_visibility, proj_contested, proj_workspace_settings, proj_search,
- *   proj_ticket_comments
+ *   proj_ticket_comments, proj_references
  *
  * `proj_projects` is in that list by the owner decision of 2026-08-26 and was
  * MISSING from this comment until Plan 4 Task 9 registered it — coordination
@@ -196,5 +197,10 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // the moment this position becomes load-bearing and must be justified as an
   // adjacency.
   registry.register(ticketCommentsProjection);
+  // Knowledge Graph spec B. APPENDED: `apply` reads no projection's table (only
+  // its own rows and `purged_entities`, which is not a projection), and no
+  // projection reads proj_references inside an ingest transaction — its one
+  // reader, `read/linked-from.ts`, is a request-path read.
+  registry.register(referencesProjection);
   return registry;
 }

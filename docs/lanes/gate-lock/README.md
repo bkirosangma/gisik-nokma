@@ -138,8 +138,8 @@ silent misattribution.
 ## Gate modes, the turbo cache, and measured timings (`task/gate-speedup`, owner 2026-10-02)
 
 `gate.sh` takes `GATE_MODE=fresh|cached` (unset = `fresh`; anything else refuses, exit 2). `ctl gate` picks it from `--base`
-and states the mode that RAN in its OK line, read from the console (`… EXIT=0 · mode=cached · Tasks: 36 successful, 36 total ·
-Cached: 26 cached, 36 total …`); a `gate.sh` that ran a different mode than asked fails the verb.
+and states the mode that RAN in its OK line, read from the console (`… EXIT=0 · mode=cached · Tasks: 41 successful, 41 total ·
+Cached: 26 cached, 41 total …`); a `gate.sh` that ran a different mode than asked fails the verb.
 
 | kind | command | turbo flags | when |
 |---|---|---|---|
@@ -149,7 +149,7 @@ Cached: 26 cached, 36 total …`); a `gate.sh` that ran a different mode than as
 **The cache is only as sound as `turbo.json`'s `inputs`.** `scripts/ctl/test/gate-cache.test.sh` (a `ctl selftest` step) proves a
 changed cross-package reader changes the task hash (`ui#test` after an `apps/web/src` edit; `mobile#test` after a
 `packages/editor` CSS edit; and one row for every other declared non-dependency input, cases 13.1712–13.1715, each shown red when its
-`turbo.json` entry is removed) and that an unrelated file does not; `ctl gate` itself fails any run that is not 36/36 (13.1716); `--real` shows it through turbo's own cache (warm → HIT → change →
+`turbo.json` entry is removed) and that an unrelated file does not; `ctl gate` itself fails any run that is not 41/41 (13.1716, 13.1840–13.1849); `--real` shows it through turbo's own cache (warm → HIT → change →
 MISS), run 2026-10-02: `warm=miss rerun=hit unrelated-change=hit reader-change=miss` for both. The audit found, and `turbo.json`
 now declares: ui (client source roots + `apps/*/test`, `packages/*/test`, the `package.json` globs), app-core (the help suite walks
 `apps/**` and `packages/**`, minus build output — the `!` negations are mandatory: a glob input walks the DISK and ignores

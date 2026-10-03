@@ -390,7 +390,10 @@ export function quotedSpans(text) {
 
 const PRODUCT_DIRS = ['apps', 'packages'];
 const PRODUCT_EXT = /\.(ts|tsx|js|jsx|mjs|css|json|md)$/;
-const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.turbo']);
+// `test-results` and `playwright-report` are Playwright's gitignored output: a failed run leaves
+// `error-context.md`, a DOM-text snapshot that can hold any product sentence (measured 2026-10-03: a leftover
+// one made a known-absent baseline entry look present). Output, not product, wherever it sits.
+const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.turbo', 'test-results', 'playwright-report']);
 
 /**
  * The haystack, and the ONE FILE THAT MUST NOT BE IN IT.

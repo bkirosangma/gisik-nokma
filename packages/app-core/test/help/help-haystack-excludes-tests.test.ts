@@ -61,6 +61,34 @@ describe('23.290 a quotation found only in a test file is reported as absent fro
   });
 });
 
+describe('23.293 a quotation found only in Playwright output is reported as absent from the product', () => {
+  it('finds it in a real source dir (control, first) and no longer finds it under test-results or playwright-report', () => {
+    // Control: the SAME file name and text in a source dir, and in dirs that merely resemble the output dirs.
+    for (const home of [
+      'apps/x/src/error-context.md',
+      'apps/x/src/test-results-api/error-context.md',
+      'apps/x/src/my-playwright-report/error-context.md',
+    ]) {
+      const root = plantedRoot({ [home]: `- paragraph: ${QUOTE}\n` });
+      expect(productText(root), home).toContain(QUOTE);
+      expect(compareAbsent({ documents: DOC, product: productText(root), baseline: NO_BASELINE }).undeclared, home).toEqual([]);
+    }
+
+    // The gitignored output of a failed run: a DOM-text snapshot, at any depth, in either package directory.
+    for (const home of [
+      'apps/web/test-results/notes-chromium/error-context.md',
+      'apps/web/test-results/a/b/c/error-context.md',
+      'packages/y/test-results/z/error-context.md',
+      'apps/web/playwright-report/data/error-context.md',
+    ]) {
+      const root = plantedRoot({ [home]: `- paragraph: ${QUOTE}\n` });
+      expect(productText(root), home).not.toContain(QUOTE);
+      const { undeclared } = compareAbsent({ documents: DOC, product: productText(root), baseline: NO_BASELINE });
+      expect(undeclared, home).toEqual([{ source: 'doc', span: QUOTE }]);
+    }
+  });
+});
+
 describe('23.291 isTestPath names test files and test directories, and nothing that merely resembles them', () => {
   it('rejects look-alikes (control, first) and accepts test dirs, e2e dirs, .test and .spec files', () => {
     for (const path of [
