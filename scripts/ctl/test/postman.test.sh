@@ -18,6 +18,8 @@ tmux new-session -d -s "$S" -n anchor "sleep 900"
 cleanup() { tmux kill-session -t "$S" 2>/dev/null; for f in "$L"/inbox-watch-*.pid; do [ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null; done; rm -rf "$T"; }
 trap cleanup EXIT
 reset() { rm -rf "$R"/* "$L"/*; : > "$N"; NOW=1790000000; for w in $(tmux list-windows -t "$S" -F '#{window_name}' | grep -v '^anchor$'); do tmux kill-window -t "$S:=$w"; done; }
+# a killed child of this shell stays a zombie until reaped, and `kill -0` still succeeds on a zombie: read the process state instead
+proc_alive() { local st; st="$(ps -o stat= -p "$1" 2>/dev/null)"; [ -n "$st" ] && [ "${st#Z}" = "$st" ]; }
 jget() { python3 -c 'import json,sys; [print(json.loads(l).get(sys.argv[2],"")) for l in open(sys.argv[3]) if json.loads(l)["id"]==int(sys.argv[1])]' "$1" "$2" "$R/LEDGER.jsonl"; }
 ledger_n() { [ -f "$R/LEDGER.jsonl" ] && wc -l < "$R/LEDGER.jsonl" | tr -d ' ' || echo 0; }
 count_kind() { python3 -c 'import json,sys; print(sum(1 for l in open(sys.argv[2]) if json.loads(l)["kind"]==sys.argv[1] and (len(sys.argv)<4 or json.loads(l)["to"]==sys.argv[3])))' "$1" "$R/LEDGER.jsonl" ${2:+"$2"} 2>/dev/null || echo 0; }
@@ -92,10 +94,10 @@ reset; sleep 300 & old=$!; echo $old > "$L/inbox-watch-exec3.pid"
 ( exec -a "ctl inbox --watch --seat exec3" sleep 300 ) & old=$!; echo $old > "$L/inbox-watch-exec3.pid"; sleep 0.3
 CTL_WATCH_ONCE=1 pm inbox --watch --seat exec3 >/dev/null 2>&1
 check "13.1922 watch: starting a second watcher for the seat stops the old one by its exact pid and takes over" \
-  '! kill -0 $old 2>/dev/null; [ "$(cat "$L/inbox-watch-exec3.pid" 2>/dev/null)" != "$old" ] || [ ! -s "$L/inbox-watch-exec3.pid" ]'
+  '! proc_alive $old && { [ "$(cat "$L/inbox-watch-exec3.pid" 2>/dev/null)" != "$old" ] || [ ! -s "$L/inbox-watch-exec3.pid" ]; }; r=$?; kill $old 2>/dev/null; [ $r = 0 ]'
 reset; sleep 300 & unrelated=$!; echo $unrelated > "$L/inbox-watch-exec3.pid"
 CTL_WATCH_ONCE=1 pm inbox --watch --seat exec3 >/dev/null 2>&1
-check "13.1979 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled" 'kill -0 $unrelated 2>/dev/null; r=$?; kill $unrelated 2>/dev/null; [ $r = 0 ]'
+check "13.1979 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled" 'proc_alive $unrelated; r=$?; kill $unrelated 2>/dev/null; [ $r = 0 ]'
 reset; pm post exec3 --kind fix --text "w1" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; watch_once exec3 >/dev/null
 : > "$R/postman/inbox/exec3.jsonl"; pm post exec3 --kind note --text "w2" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1923 watch: a file that shrinks below the cursor restarts at 0 (acked ids skipped, new ones shown)" 'watch_once exec3 | grep -q "#2 "'
@@ -148,7 +150,7 @@ reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev
 check "13.1945 ack stops redelivery: nothing more is pasted after the ack, however late" '[ "$(rec_n exec3)" = 1 ] && ! status_of exec3 | grep -q "head=#1"'
 reset; mkseat exec3 idle; pm post exec3 --kind next --text "first" --from main >/dev/null 2>&1; pm post exec3 --kind fix --text "second" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1946 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked" \
-  '[ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ] && rec_has exec3 "#1 next" && ! rec_has exec3 "#2"; pm ack 1 --seat exec3 >/dev/null 2>&1; sleep 3; NOW=$((NOW+5)); pm postman once >/dev/null 2>&1; [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 2 ] && rec_has exec3 "#2 fix"'
+  '[ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ] && rec_has exec3 "#1 next" && ! rec_has exec3 "#2" && { pm ack 1 --seat exec3 >/dev/null 2>&1; sleep 3; NOW=$((NOW+5)); pm postman once >/dev/null 2>&1; [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 2 ] && rec_has exec3 "#2 fix"; }'
 reset; mkseat exec3 mute; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
 for dt in 200 620 1220; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done
 check "13.1947 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try" \
