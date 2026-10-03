@@ -45,6 +45,14 @@ says `none` on a managed database, the rest of the output is not an answer about
 `deploy/do/README.md` owns the ordering rule the server applies here (an `ssl*` parameter in the URL
 replaces whatever CA a caller passed, which is why the pool rebuilds the string before connecting).
 
+**The Linked-from index fills itself.** The deploy that carries `1791500000000_proj-references.sql`
+(Knowledge Graph B) creates `proj_references` empty. On its first boot the server backfills the
+table from the ledger in the background, one ticket or note at a time, after it is already
+serving. Until that finishes, "Linked from" lists only what it has indexed so far. When it is
+done it logs `backfill proj_references: N entities in M ms` and writes a row to
+`projection_backfills`; later boots see that row and skip it. A crash or a redeploy mid-run
+leaves no row, and the next boot starts again from the beginning, which is safe. Nothing to run by hand.
+
 ## Deploy (first time)
 
 See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving

@@ -162,6 +162,8 @@ describe('proj_entity_heads', () => {
       // projection-order.test.ts, the pin of record, and the red suite told
       // them about this one.
       'proj_ticket_comments',
+      // Knowledge Graph B: appended, as projection-order.test.ts pins.
+      'proj_references',
     ]);
   });
 });

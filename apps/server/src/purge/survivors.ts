@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { readEntityEvents } from '../ledger/event-store.js';
+import { lockEntity, readEntityEvents } from '../ledger/event-store.js';
 import { reindexNote } from '../projections/note-search.js';
 import type { Projection, ProjectionRegistry } from '../projections/registry.js';
 import type { ErasureSet } from './erasure.js';
@@ -59,6 +59,27 @@ function projectionNamed(registry: ProjectionRegistry, name: string): Projection
 }
 
 /**
+ * Called after `collectSurvivors` and BEFORE `eraseRows`: takes the entity lock of every
+ * ticket and note survivor, which `rederiveSurvivors` later relies on.
+ *
+ * The boot backfill (`projections/backfill-references.ts`) replays an entity under this
+ * same lock, and its first act there is to DELETE the entity's rows. Taking the lock only
+ * after `eraseRows` has deleted the rows that point at the purged item makes a cycle:
+ * the purge holds those row locks and waits for the survivor's entity lock, the backfill
+ * holds that entity lock and waits for the rows. Postgres breaks it with 40P01 and aborts
+ * one of the two, whichever began waiting first: the backfill (its first-boot run then
+ * dies half way, with no marker) or the purge itself (a failed purge). Locking here, with
+ * nothing yet deleted, leaves the backfill nothing to wait on while it holds a lock the
+ * purge wants. A purge already holds the workspace lock and the target's
+ * (purge-item.ts:106-107); ingest takes workspace → entity, the same direction, and the
+ * backfill holds one entity lock at a time, so no other cycle exists (27.123).
+ */
+export async function lockSurvivors(db: PoolClient, survivors: Survivors): Promise<void> {
+  for (const id of survivors.ticketIds) await lockEntity(db, 'ticket', id);
+  for (const id of survivors.noteIds) await lockEntity(db, 'note', id);
+}
+
+/**
  * Called after `recordPurged` — every projection replayed here reads
  * `purged_entities` — and before `rederiveWorkspaceLexemes`, which reads the
  * note search rows this rewrites.
@@ -103,5 +124,20 @@ export async function rederiveSurvivors(
         WHERE invite_id = $1`,
       [inviteId, set.projectIds],
     );
+  }
+
+  // Knowledge Graph spec B: a survivor's own rows and its comments' rows are
+  // replayed AFTER recordPurged, so the projection skips the purged targets and
+  // renders their chips as Deleted item, exactly as a rebuild over the
+  // post-purge ledger does.
+  const references = projectionNamed(registry, 'proj_references');
+  for (const [kind, ids] of [['ticket', survivors.ticketIds], ['note', survivors.noteIds]] as const) {
+    for (const id of ids) {
+      // The entity's lock is already held: `lockSurvivors` took it before `eraseRows`.
+      await db.query('DELETE FROM proj_references WHERE source_parent_kind = $1 AND source_parent_id = $2', [kind, id]);
+      for (const event of await readEntityEvents(db, kind, id)) {
+        await references.apply(event, db);
+      }
+    }
   }
 }
