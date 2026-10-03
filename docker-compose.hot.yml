@@ -260,6 +260,7 @@ services:
       - ./packages/rule-engine/src:/repo/packages/rule-engine/src
       - ./packages/sync-client/src:/repo/packages/sync-client/src
       - ./packages/ui/src:/repo/packages/ui/src
+      - ./packages/viewport/src:/repo/packages/viewport/src
       - ./reference:/repo/reference:ro
 
   # ---------------------------------------------------------------------------
@@ -374,3 +375,4 @@ services:
       - ./packages/rule-engine/src:/repo/packages/rule-engine/src
       - ./packages/sync-client/src:/repo/packages/sync-client/src
       - ./packages/ui/src:/repo/packages/ui/src
+      - ./packages/viewport/src:/repo/packages/viewport/src

@@ -327,6 +327,9 @@ importers:
       '@gisik-nokma/ui':
         specifier: workspace:*
         version: link:../ui
+      '@gisik-nokma/viewport':
+        specifier: workspace:*
+        version: link:../viewport
       '@xyflow/react':
         specifier: ^12.8.2
         version: 12.11.6(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
