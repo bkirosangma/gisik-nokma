@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useColorScheme, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import type { EditorToHostMessage, HostToEditorMessage } from '@gisik-nokma/editor/webview-bridge';
 import { loadDocMessage, parseRawEditorMessage, serializeHostMessage } from './editor-bridge.js';
@@ -9,6 +10,10 @@ import {
   EDITOR_READY_TIMEOUT_MS,
   readyTimedOut,
 } from './editor-refusals.js';
+import { EDITOR_FRAME_STYLE, EDITOR_LOADING_OVERLAY_STYLE, EDITOR_MIN_HEIGHT } from './editor-band.js';
+import { SkeletonBlock } from '../components/skeleton.js';
+import { skeletonGround } from '../components/skeleton-model.js';
+import { themeFor } from '../screens/help-theme.js';
 
 type LoadDocMessage = Extract<HostToEditorMessage, { kind: 'loadDoc' }>;
 type ChangeMessage = Extract<EditorToHostMessage, { kind: 'change' }>;
@@ -70,6 +75,7 @@ export function EditorWebView(props: EditorWebViewProps) {
   const ref = useRef<WebView>(null);
   const { initialDoc, editable = true, purgedIds, html, onChange, onSubmit, onRequestUpload, onMentionQuery, onEditorError } = props;
   const source = useMemo(() => ({ html }), [html]);
+  const ground = skeletonGround(themeFor(useColorScheme()));
   const readyReceivedRef = useRef(false);
 
   const send = useCallback((message: HostToEditorMessage): void => {
@@ -153,6 +159,15 @@ export function EditorWebView(props: EditorWebViewProps) {
       ref={ref}
       originWhitelist={['about:*']}
       source={source}
+      style={EDITOR_FRAME_STYLE}
+      // The page is loading: a skeleton of the editor's own height COVERS the WebView (an absolute overlay on the screen's ground, see
+      // `EDITOR_LOADING_OVERLAY_STYLE`), so the ScrollView keeps its band and the slot does not grow while the page loads (spec §3.3).
+      startInLoadingState
+      renderLoading={() => (
+        <View style={[EDITOR_LOADING_OVERLAY_STYLE, { backgroundColor: ground }]}>
+          <SkeletonBlock height={EDITOR_MIN_HEIGHT} />
+        </View>
+      )}
       onMessage={onMessage}
       javaScriptEnabled
       // Door (b): the WebView itself failing to load used to render a blank
