@@ -39,9 +39,12 @@ interface Opened {
   readonly ticketId: string;
 }
 
-async function openSheet(page: Page): Promise<Opened> {
+async function openSheet(page: Page, longName = false): Promise<Opened> {
   await signIn(page, OWNER_EMAIL);
-  const { workspaceId, projectId } = await openSeededBoard(page);
+  // The long name is installed BEFORE the board is opened, and the helper is told the name this spec wrote, so it finds
+  // the project link under the name the page renders rather than under the seed's literal.
+  if (longName) await useLongProjectName(page);
+  const { workspaceId, projectId } = await openSeededBoard(page, longName ? LONG_PROJECT_NAME : undefined);
   const firstCard = page.locator('[data-testid^="ticket-card-"]').first();
   await expect(firstCard).toBeVisible({ timeout: 20_000 });
   const testId = await firstCard.getAttribute('data-testid');
@@ -128,8 +131,7 @@ test.describe('25.431 the phone header compacts without jitter', () => {
   // The seed name, and (FIX 1) a project name that wraps at p = 0: the reserved space is the measured full height either way.
   for (const long of [false, true]) {
   test(`a small-step wheel scroll down and back up: the content moves by exactly the scroll delta, no in-flow height changes, CLS 0 (${long ? 'long' : 'seed'} project name)`, async ({ page }) => {
-    if (long) await useLongProjectName(page);
-    await openSheet(page);
+    await openSheet(page, long);
     await ensureScrollable(page);
     await page.mouse.move(195, 500);
     await page.evaluate(() => {
@@ -237,8 +239,7 @@ test.describe('25.437 a long project name at p = 0 lays out exactly as the un-co
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test('every crumb is shown whole and wrapped, each separator beside its crumb, no empty row; at p = 1 the line folds to a lone "…"', async ({ page }) => {
-    await useLongProjectName(page);
-    await openSheet(page);
+    await openSheet(page, true);
     await ensureScrollable(page);
     const crumbs = async (): Promise<{ text: string; sep: boolean; top: number; bottom: number; scrollW: number; clientW: number; overflow: string; visible: string }[]> =>
       page.evaluate(() =>

@@ -11,6 +11,9 @@ step "hook self-test"        "python3 '$HERE/hooks/ctl-scripts-only.py' --self-t
 step "lib tests"             "bash '$HERE/test/lib.test.sh'"
 # The cached gate is only as sound as turbo.json's inputs: a changed cross-package reader must change the task hash (a MISS).
 step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.test.sh'"
+step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
+step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
+step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so

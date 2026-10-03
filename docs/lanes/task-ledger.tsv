@@ -574,22 +574,53 @@ mcp-everything	11	in-flight	-	-	landed in release/mcp-everything as #929; reache
 mcp-everything	12	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	13	in-flight	-	-	landed in release/mcp-everything as #935; reaches main with that release
 mcp-everything	14	done	937	f27485e	owner step: the real claude.ai check against production at f27485e (the merge of release/mcp-everything, #937) was reported SUCCESSFUL by the owner (2026-10-02 21:3x, relayed by the planner 21:33); case 14.298 is the record
-smoothness	1	in-flight	-	-	ready on task/smoothness-docs (spec, plan, bucket 25, Features §22); its PR into release/smoothness is not open yet; reaches main with that release
-smoothness	2	todo	-	-	not started
-smoothness	3	todo	-	-	not started
-smoothness	4	todo	-	-	not started
-smoothness	5	todo	-	-	not started
-smoothness	6	todo	-	-	not started
-smoothness	7	todo	-	-	not started
-smoothness	8	todo	-	-	not started
-smoothness	9	todo	-	-	not started
-smoothness	10	todo	-	-	not started
-smoothness	11	todo	-	-	not started
-smoothness	12	todo	-	-	not started
-smoothness	13	todo	-	-	not started
+smoothness	1	done	938	7bff22be	T1 catalogue and docs: landed in release/smoothness as #938; reached main in #961 (66c46fdd)
+smoothness	2	done	942	4d418760	T2 loading primitives: landed as #942 (batch 1); reached main in #961
+smoothness	3	done	942	4d418760	T3 read cache: landed as #942 (batch 1); reached main in #961
+smoothness	4	done	946	dfe7afe3	T4 one workspaces read: landed as #946; reached main in #961
+smoothness	5	done	945	25eac7fe	T5 route shells and link pending hints: landed as #945; reached main in #961
+smoothness	6	done	953	df63f256	T6: landed as #953 (batch 6); reached main in #961
+smoothness	7	done	949	153982f9	T7 optimistic writes: landed as #949 (batch 5); reached main in #961
+smoothness	8	done	953	df63f256	T8: landed as #953 (batch 6); reached main in #961
+smoothness	9	done	958	b550492d	T9 notes page onto the lazy editor slot: landed as #958; reached main in #961
+smoothness	10	done	949	153982f9	T10 bundles: landed as #949 (batch 5); reached main in #961
+smoothness	11	done	942	4d418760	T11 server rollups and compression: landed as #942 (batch 1); reached main in #961
+smoothness	12	done	953	df63f256	T12: landed as #953 (batch 6); reached main in #961
+smoothness	13	done	950	eab56e1b	T13 desktop and phone loading states: landed as #950; reached main in #961
 smoothness	14	todo	-	-	not started
-workflow-canvas	1	in-flight	-	-	G-9 T1 on task/g9-t1-live-drag (lane 7); not merged into release/smoothness yet
-workflow-canvas	2	in-flight	-	-	G-9 T2 on task/g9-t2-collision-snap (98e73a78, in review); not merged into release/smoothness yet
+workflow-canvas	1	done	957	de3b699b	G-9 T1 live drag: landed as #957 (union with T2); reached main in #961
+workflow-canvas	2	done	957	de3b699b	G-9 T2 collision and snap: landed as #957 (union with T1); reached main in #961
 workflow-canvas	3	todo	-	-	not started (waits for T1 + T2)
 workflow-canvas	4	todo	-	-	not started (waits for T1)
 workflow-canvas	5	todo	-	-	not started (waits for T3 + T4)
+typed-links	1	todo	-	-	not started (events, every census, opens Features §24 + test-cases/27)
+typed-links	2	todo	-	-	not started (waits for T1)
+typed-links	3	todo	-	-	not started (waits for T2)
+typed-links	4	todo	-	-	not started (waits for T2; MCP refusal case after T3)
+typed-links	5	todo	-	-	not started (waits for T3 + T4)
+reference-index	1	todo	-	-	not started (needs plan A T1 merged into release/knowledge-graph; stops at Step 11 if the floor run misses the bar)
+reference-index	2	todo	-	-	not started (waits for T1)
+reference-index	3	todo	-	-	not started (waits for T2)
+reference-index	4	todo	-	-	not started (waits for T3)
+home	1	todo	-	-	not started (needs plan A T1 + the E seed commit; the brief carries prod counts)
+home	2	todo	-	-	not started (needs plan A T1 + the E seed commit; parallel with T1)
+home	3	todo	-	-	not started (waits for T1 + T2)
+home	4	todo	-	-	not started (waits for T3 and plan C's KnowledgeGraph component)
+knowledge-graph-view	1	todo	-	-	not started (needs Plan A T1 for §24 + file 27; STOP-AND-REPORT x2)
+knowledge-graph-view	2	todo	-	-	not started (waits for T1)
+knowledge-graph-view	3	todo	-	-	not started (waits for T1)
+knowledge-graph-view	4	todo	-	-	not started (waits for T1)
+knowledge-graph-view	5	todo	-	-	not started (waits for T2 + T3 + T4)
+knowledge-graph-view	6	todo	-	-	not started (waits for T1 + Plan A and Plan B table tasks)
+knowledge-graph-view	7	todo	-	-	not started (waits for T5)
+knowledge-graph-view	8	todo	-	-	not started (waits for T7)
+knowledge-graph-view	9	todo	-	-	not started (waits for T6 + T8)
+mcp-graph-semantic-layer	1	todo	-	-	not started (measure first; needs plan A T1 catalogue)
+mcp-graph-semantic-layer	2	todo	-	-	not started (beside T1, T3)
+mcp-graph-semantic-layer	3	todo	-	-	not started (beside T1, T2)
+mcp-graph-semantic-layer	4	todo	-	-	not started (waits for T3)
+mcp-graph-semantic-layer	5	todo	-	-	not started (waits for T1 bars PASSED, T2, T4)
+mcp-graph-semantic-layer	6	todo	-	-	not started (waits for T2, T4, plan C graph-neighbours, plan A links, plan B references)
+mcp-graph-semantic-layer	7	todo	-	-	not started (waits for T4, T5, T6, plan A link_tickets)
+mcp-graph-semantic-layer	8	todo	-	-	not started (waits for T4-T6, plan C T7-T9)
+mcp-graph-semantic-layer	9	todo	-	-	not started (waits for T8)
