@@ -374,6 +374,8 @@ describe('G-3 addendum: the last note opened, per device', () => {
       expect(row.getBoundingClientRect().height).toBe(0);
       await settle();
       expect(nav.scrollTop, 'a hidden row was taken for one already in view, or scrolled to from no box').toBe(0);
+      // The slower workspace answers: the lists show, and the remembered row is centred: 600 - 0 - (200 - 40) / 2 = 520. (The observer's
+      // `hidden` watch is not what re-runs the reveal here: B's rows land and the skeleton leaves the nav in the un-hide's own task; see the catalogue.)
       // The slower workspace answers: the lists show, and the remembered row is centred: 600 - 0 - (200 - 40) / 2 = 520.
       answerB();
       await waitFor(() => expect(row.closest('.gn-notes__sections')).not.toHaveAttribute('hidden'));

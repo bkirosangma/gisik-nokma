@@ -205,6 +205,8 @@ describe('the route fallback is the page\'s own head, scope row and rail (S-R1; 
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const q = (selector: string) => doc.querySelector(selector);
     expect(q('.gn-project > .gn-project__head > .gn-project__identity > .gn-project__breadcrumb')).not.toBeNull();
+    // The fallback's breadcrumb place is the breadcrumb's own line (1.125rem), as the page's pending one is (25.243).
+    expect(heightOf(q('.gn-project__identity > .gn-project__breadcrumb .gn-skeleton'))).toBe(valueOf(ruleExactly(ui, '.gn-project__breadcrumb'), 'line-height'));
     expect(q('.gn-project > .gn-project__head > .gn-project__identity > .gn-project__title-row > .gn-skeleton--title')).not.toBeNull();
     const kids = Array.from(q('.gn-project')?.children ?? []).map((child) => child.className.split(' ')[0]);
     expect(kids).toEqual(['gn-project__head', 'gn-project__scope-row', 'gn-segmented', 'gn-board__rail']);
