@@ -466,6 +466,7 @@ for (const viewport of VIEWPORTS) {
             // A fresh database (the CI stack) has no note, and this spec sorts before notes.spec.ts: create one then.
             const { href, created } = await openNoteFromList(page, () => visit('/notes'));
             // A created note is already open (the dialog navigates there); an existing one is visited.
+            console.log(`[neo-shadow-clip] note: created=${created}`);
             if (created) await page.waitForLoadState('networkidle');
             else await visit(href);
           },
