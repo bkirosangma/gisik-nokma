@@ -211,9 +211,10 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232)', () => {
       await page.evaluate(() => {
         const frames: { v: string; d: boolean }[] = [];
         (window as unknown as { __frames: typeof frames }).__frames = frames;
-        const el = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ticket title"]');
         const loop = (): void => {
-          if (el !== null) frames.push({ v: el.value, d: el.disabled });
+          // Re-queried every frame: a remounted field must be read, not a detached node that keeps its last value.
+          const el = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ticket title"]');
+          frames.push(el === null ? { v: '<no title field>', d: false } : { v: el.value, d: el.disabled });
           requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
