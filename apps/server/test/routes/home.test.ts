@@ -4,6 +4,7 @@ import { HOME_ID_CAP, newUlid, type AttentionResponse, type HomeResponse, type L
 import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { isWorkspaceAdmin } from '../../src/read/membership-roster.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../../src/read/membership.js';
+import { LIVE_TICKET_WHERE } from '../../src/read/visible-where.js';
 import { visibleMemberCount } from '../../src/read/workspace-counts.js';
 import { readMembers } from '../../src/routes/builder-reads.js';
 import { capIds, readHome } from '../../src/routes/home.js';
@@ -66,6 +67,8 @@ function homeTicketId(index: number): string {
 type HomeFixtures = {
   /** due 2026-08-19, open → Past due */
   overdueYesterday: string;
+  /** due 2026-08-18, open, and an id that sorts AFTER `overdueYesterday`'s → Past due, listed BEFORE it (day, then id) */
+  overdueOlder: string;
   /** due 2026-08-20, open → Due soon (today is NOT overdue) */
   dueToday: string;
   /** due 2026-08-23, open → Due soon at N = 3 */
@@ -81,7 +84,11 @@ type HomeFixtures = {
   /** due 2026-08-19, then `ticket.deleted` → nowhere */
   trashed: string;
   liveNote: string;
+  /** Created after `liveNote`, so its `updated_at` is later → listed first (newest first) */
+  liveNote2: string;
   deletedNote: string;
+  /** A note homed in `doomedProject`: counted until the project is deleted (27.606) */
+  doomedNote: string;
   /** In the NEIGHBOUR's workspace, due 2026-08-19 — never in this workspace's answer */
   neighbourDue: string;
   /** A third project, for 27.606 alone, with two open tickets */
@@ -104,8 +111,11 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
   const neighbourDue = homeTicketId(8);
   const doomedTickets: [string, string] = [homeTicketId(9), homeTicketId(10)];
   const doomedProject = newUlid();
+  const overdueOlder = homeTicketId(11);
   const liveNote = newUlid();
+  const liveNote2 = newUlid();
   const deletedNote = newUlid();
+  const doomedNote = newUlid();
 
   const created = (id: string, title: string, inProject = projectId): LedgerEvent =>
     makeCommitted({
@@ -121,17 +131,19 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
       type: 'ticket.field_set',
       payload: { fieldId: 'dueDate', value: date === null ? null : { date } },
     });
-  const note = (id: string, title: string): LedgerEvent =>
+  const note = (id: string, title: string, homeProjectId = projectId): LedgerEvent =>
     makeCommitted({
       ...ws,
       entity: { kind: 'note', id },
       type: 'note.created',
-      payload: { title, homeProjectId: projectId, scope: { mode: 'workspace' } },
+      payload: { title, homeProjectId, scope: { mode: 'workspace' } },
     });
 
   await applyCommitted(db.pool, [
     created(overdueYesterday, 'Overdue yesterday'),
     due(overdueYesterday, '2026-08-19'),
+    created(overdueOlder, 'Overdue the day before'),
+    due(overdueOlder, '2026-08-18'),
     created(dueToday, 'Due today'),
     due(dueToday, '2026-08-20'),
     created(dueAtN, 'Due at N'),
@@ -158,6 +170,7 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     note(liveNote, 'A live note'),
     note(deletedNote, 'A deleted note'),
     makeCommitted({ ...ws, entity: { kind: 'note', id: deletedNote }, type: 'note.deleted', payload: {} }),
+    note(liveNote2, 'A newer live note'),
 
     makeCommitted({
       workspaceId: read.neighbour.workspaceId,
@@ -183,10 +196,12 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     }),
     created(doomedTickets[0], 'Doomed one', doomedProject),
     created(doomedTickets[1], 'Doomed two', doomedProject),
+    note(doomedNote, 'A note in the doomed project', doomedProject),
   ]);
 
   return {
     overdueYesterday,
+    overdueOlder,
     dueToday,
     dueAtN,
     dueAtNPlus1,
@@ -195,7 +210,9 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     clearedDue,
     trashed,
     liveNote,
+    liveNote2,
     deletedNote,
+    doomedNote,
     neighbourDue,
     doomedProject,
     doomedTickets,
@@ -264,6 +281,8 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(owner.ids.tickets).not.toContain(fx.trashed);
     expect(owner.counts.tickets).toBe(owner.ids.tickets.length);
     expect(owner.counts.tickets).toBeLessThan(HOME_ID_CAP);
+    // Newest first: `ticket_id DESC`.
+    expect(owner.ids.tickets).toEqual([...owner.ids.tickets].sort().reverse());
 
     // Control: the row exists — the read drops it, the table does not.
     const { rows } = await db.pool.query('SELECT ticket_id FROM proj_tickets WHERE ticket_id = $1', [fx.trashed]);
@@ -286,6 +305,10 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(now.ids.pastDue).not.toContain(fx.dueToday);
     expect(now.ids.dueSoon).toContain(fx.dueToday);
     expect(now.ids.dueSoon).not.toContain(fx.overdueYesterday);
+    // Past due is listed by due day, then id: the older day first although its id sorts later.
+    expect(fx.overdueOlder > fx.overdueYesterday).toBe(true);
+    expect(now.ids.pastDue.indexOf(fx.overdueOlder)).toBeGreaterThanOrEqual(0);
+    expect(now.ids.pastDue.indexOf(fx.overdueOlder)).toBeLessThan(now.ids.pastDue.indexOf(fx.overdueYesterday));
 
     // The pair (copy of 21.243's): one millisecond apart, two Indian days.
     const before = await homeAt('owner', '2026-08-20T18:29:59.999Z');
@@ -332,6 +355,9 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(owner.ids.notes).toContain(fx.liveNote);
     expect(owner.ids.notes).not.toContain(fx.deletedNote);
     expect(owner.counts.notes).toBe(owner.ids.notes.length);
+    // Newest first: `updated_at DESC`.
+    expect(owner.ids.notes.indexOf(fx.liveNote2)).toBeGreaterThanOrEqual(0);
+    expect(owner.ids.notes.indexOf(fx.liveNote2)).toBeLessThan(owner.ids.notes.indexOf(fx.liveNote));
   });
 
   it('27.608 Members is the roster rule in one expression: count = visibleMemberCount = readMembers length, ids = the roster ids', async () => {
@@ -344,7 +370,7 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
       const body = await home(role);
       expect(body.counts.members, role).toBe(roster.length);
       expect(body.counts.members, role).toBe(await visibleMemberCount(db.pool, eff!, read.world.workspaceId));
-      expect(sorted(body.ids.members), role).toEqual(sorted(roster.map((m) => m.userId)));
+      expect(body.ids.members, role).toEqual(roster.map((m) => m.userId));
       counts[role] = body.counts.members;
     }
     // Control: the owner's count includes the guest, the member's does not.
@@ -374,6 +400,17 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(capped).toEqual(ids.slice(0, HOME_ID_CAP));
     expect(capIds(ids.slice(0, HOME_ID_CAP))).toHaveLength(HOME_ID_CAP);
     expect(capIds([])).toEqual([]);
+  });
+
+  it('27.610 the response count is the rows the SELECT found, not the capped ids: it equals an independent COUNT(*) over the live tickets', async () => {
+    const owner = await home('owner');
+    const { rows } = await db.pool.query<{ n: string }>(
+      `SELECT count(*) AS n FROM proj_tickets t WHERE t.workspace_id = $1 AND ${LIVE_TICKET_WHERE}`,
+      [read.world.workspaceId],
+    );
+    expect(owner.counts.tickets).toBe(Number(rows[0]?.n));
+    // Control: ids are the capped list, so they can only be at most the count.
+    expect(owner.ids.tickets.length).toBeLessThanOrEqual(owner.counts.tickets);
   });
 
   it('27.611 Past due and Due soon equal the attention strip’s overdue and due-soon buckets, for the owner and the member', async () => {
@@ -467,6 +504,7 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
       expect(before.ids.tickets).toContain(id);
       expect(before.ids.open).toContain(id);
     }
+    expect(before.ids.notes).toContain(fx.doomedNote);
 
     await applyCommitted(db.pool, [
       makeCommitted({
@@ -485,5 +523,9 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
       }
     }
     expect(after.counts.tickets).toBe(before.counts.tickets - fx.doomedTickets.length);
+    // The notes' side of the same rule (`NOTE_PROJECT_LIVE_WHERE`): a note homed in the deleted project goes too.
+    expect(after.ids.notes).not.toContain(fx.doomedNote);
+    expect(after.ids.notes).toContain(fx.liveNote);
+    expect(after.counts.notes).toBe(before.counts.notes - 1);
   });
 });
