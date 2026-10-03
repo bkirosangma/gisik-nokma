@@ -169,12 +169,14 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     mockSessionUser = null;
     mockPending = true;
     const services = stubServices({ getMyWorkspaces: async () => [ws1, ws2] }, NOTIFICATIONS);
-    const tree = (
+    // A FRESH element per render: re-rendering the same element object would let React bail out, and the mocked
+    // session (an external store here) would never be read again.
+    const tree = () => (
       <Providers services={services}>
         <HomeScreen />
       </Providers>
     );
-    const { rerender } = render(tree);
+    const { rerender } = render(tree());
     const h1 = screen.getByRole('heading', { level: 1 });
     const seen = new Set<string>([h1.textContent ?? '']);
     const observer = new MutationObserver(() => seen.add(h1.textContent ?? ''));
@@ -190,7 +192,7 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     // The session lands.
     mockSessionUser = KIRO;
     mockPending = false;
-    rerender(tree);
+    rerender(tree());
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Second Workspace'));
     seen.add(screen.getByRole('heading', { level: 1 }).textContent ?? '');
     observer.disconnect();

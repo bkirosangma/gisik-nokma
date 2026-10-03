@@ -335,6 +335,13 @@ input, textarea, select { font-family: inherit; }
   .gn-workspaces__head { grid-template-columns: minmax(0, 1fr); }
   .gn-workspaces__head > .gn-button { grid-column: 1; grid-row: auto; margin-top: 0.5rem; }
 }
+/* Home (Knowledge Graph spec E). The frame copies `.gn-workspaces` (same cap, same top spacing). T3 and T4 add
+   their rules inside the two marked blocks below; nothing is appended at EOF. */
+.gn-home { max-width: 73.75rem; margin: 0 auto; padding-top: 1.625rem; display: grid; gap: 1rem; }
+.gn-home > .gn-page-title { margin: 0; }
+.gn-home__empty, .gn-home__refusal { display: grid; gap: 0.75rem; justify-items: start; }
+/* KG-E T3: numbers */
+/* KG-E T4: graph */
 /* ── Task 15, RESOLVING the inversion Task 14 flagged and declined to fix. ──
 
    Both page-specific radius bumps below (`.gn-workspace-list .gn-card`,
