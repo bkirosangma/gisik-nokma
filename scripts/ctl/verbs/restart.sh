@@ -13,7 +13,7 @@ set -- "${CTL_ARGS[@]:3}"; while [ $# -gt 0 ]; do case "$1" in --override) overr
 launcher="/Users/kiro/my_projects/gisik-nokma-lanes/exec-claude.sh"; [ -x "$launcher" ] || ctl_fail restart "no $launcher"
 # Keep the window's existing NAME: the postman addresses a seat by it (a window named `reviewerB` stays `reviewerB`; the old
 # `exec$win` rename orphaned messages addressed to the seat). CTL_TMUX_SESSION is a seam for this ONE read-only lookup (tests);
-# the kill/new-window below stay on the live session.
+# the kill/new-window below stay on the live session (and refuse the seam, see the guard under the dry-run exit).
 # (list-windows, not display-message: a missing index makes display-message answer with the ACTIVE window's name.)
 name="$(tmux list-windows -t "${CTL_TMUX_SESSION:-gisik}" -F '#{window_index} #{window_name}' 2>/dev/null | awk -v w="$win" '$1==w{sub(/^[0-9]+ /,""); print}')"; [ -n "$name" ] || name="exec$win"
 prompt="$(cat "$brief")"; [ -n "$override" ] && prompt="$prompt
@@ -26,6 +26,9 @@ pm=(bash "$(cd "$(dirname "$0")/.." && pwd)/ctl" postman restarted "$name"); [ "
 if pm_out="$("${pm[@]}" 2>&1)"; then [ "$CTL_DRY_RUN" != 1 ] || printf '%s\n' "$pm_out" | grep '^DRY'
 else echo "WARN restart: postman marker not written for '$name' — its open messages will jam the head of the queue until acked: $(printf '%s' "$pm_out" | tail -1)"; fi
 if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: tmux kill-window -t gisik:$win; tmux new-window -t gisik:$win -n $name -c $wt; sleep 3; paste: $launcher --permission-mode bypassPermissions \"\$(cat $pf)\"; send-keys Enter"; ctl_ok restart "dry-run"; fi
+# CTL_TMUX_SESSION is a TEST seam for the name lookup above; the kill/new-window below hardcode gisik:N, so a live restart refuses it
+# (a dry-run exit that is removed or skipped must still stop here, before the first write).
+[ -z "${CTL_TMUX_SESSION:-}" ] || [ "$CTL_TMUX_SESSION" = gisik ] || ctl_fail restart "CTL_TMUX_SESSION=$CTL_TMUX_SESSION is a test seam: a live restart refuses it"
 old_pid="$(tmux list-panes -t "gisik:$win" -F '#{pane_pid}' 2>/dev/null | head -1)"
 tmux kill-window -t "gisik:$win" 2>/dev/null
 tmux new-window -t "gisik:$win" -n "$name" -c "$wt" || ctl_fail restart "new-window failed"

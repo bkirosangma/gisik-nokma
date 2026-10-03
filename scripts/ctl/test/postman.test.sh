@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1987. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -234,6 +234,30 @@ od_round() { # MODE 0 = FIX 1 message only; 1 = + a FIX 2 message after the verd
 check "13.1983 ctl postman audit (on demand) applies the same window: FIX 1's message does not satisfy a FIX 2 verdict 35 min later (exit 1, names it); a FIX 2 message after it does (exit 0); with a FIX 1 and a FIX 2 verdict and only FIX 2's message, exactly the FIX 1 verdict is named" \
   '{ o="$(od_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*(FIX 2)" && od_round 1 >/dev/null && { o="$(od_round 2)"; [ $? = 1 ]; } && [ "$(printf "%s" "$o" | grep -c "^UNMATCHED")" = 1 ] && printf "%s" "$o" | grep "^UNMATCHED" | grep -q "(FIX 1)"'
 
+od2_round() { # F11: FIX verdicts for task/a (+60 s) then task/b (+600 s); MODE 1 posts task/a's message AFTER the task/b line, 0 posts none
+  reset; QR="$R/QUEUE-review.md"; T0=$NOW; printf 'x\n' > "$T/BRIEF-r.md"
+  vl() { local t; t="$(date -r $((T0+$1)) +%H:%M)"; printf '%s DONE %s FIX %s c28ca5cf (FIX 1) reviewer A\n' "$t" "$t" "$2"; }
+  { vl 60 task/a; vl 600 task/b; } > "$QR"
+  NOW=$((T0+900)); if [ "$1" = 1 ]; then pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/a --from reviewerA >/dev/null 2>&1; fi
+  NOW=$((T0+960)); pm postman audit 2>&1; }
+check "13.1988 ctl postman audit (on demand): a verdict's window ends at the next verdict of the SAME branch, not of any branch — task/a's message posted after task/b's verdict still satisfies task/a; CONTROL in the same check: with no task/a message task/a IS named" \
+  '{ o="$(od2_round 1)"; [ $? = 1 ]; } && ! printf "%s" "$o" | grep -q "UNMATCHED.*task/a" && printf "%s" "$o" | grep -q "UNMATCHED.*task/b" && { o="$(od2_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/a"'
+epoch_of() { python3 -c "import sys,time,datetime; print(int(time.mktime(datetime.datetime(*map(int,sys.argv[1:6])).timetuple())))" "$@"; }
+mid_round() { # F12: a 23:50 FIX verdict and a 00:10 line after it, read at 00:20 the next day; MODE 1 posts task/m's message at 23:55 the day before
+  reset; QR="$R/QUEUE-review.md"; printf 'x\n' > "$T/BRIEF-r.md"
+  printf '23:50 DONE 23:50 FIX task/m c28ca5cf (FIX 1) reviewer A\n00:10 REVIEW task/z c28ca5cf base=x brief=y lane=1 (z) (reviewer B)\n' > "$QR"
+  if [ "$1" = 1 ]; then NOW="$(epoch_of 2026 7 14 23 55)"; pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/m --from reviewerA >/dev/null 2>&1; fi
+  NOW="$(epoch_of 2026 7 15 0 20)"; pm postman audit 2>&1; }
+check "13.1989 ctl postman audit (on demand) across midnight: a 23:50 verdict read at 00:20 is dated YESTERDAY (a line later than the next line by over 12 h belongs to the previous day), so task/m's 23:55 message satisfies it; CONTROL in the same check: with no message task/m IS named" \
+  '{ o="$(mid_round 1)"; [ $? = 0 ]; } && { o="$(mid_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/m"'
+nt_round() { # F13: a needs-tip verdict for task/n; MODE 1 = a mergetip message with that ref, 0 = only a fix message with that ref
+  reset; QR="$R/QUEUE-review.md"; T0=$NOW; printf 'x\n' > "$T/BRIEF-r.md"; t="$(date -r $((T0+60)) +%H:%M)"
+  printf '%s DONE %s needs-tip task/n c28ca5cf reviewer A\n' "$t" "$t" > "$QR"
+  NOW=$((T0+300)); pm post exec3 --kind "$([ "$1" = 1 ] && echo mergetip || echo fix)" --body "$T/BRIEF-r.md" --ref task/n --from reviewerA >/dev/null 2>&1
+  NOW=$((T0+360)); pm postman audit 2>&1; }
+check "13.1990 ctl postman audit (on demand): a needs-tip verdict is satisfied by a mergetip message with that ref; CONTROL in the same check: a fix message with that ref does NOT satisfy it (exit 1, named)" \
+  '{ o="$(nt_round 1)"; [ $? = 0 ]; } && { o="$(nt_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*task/n"'
+
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
 pane_case() { # name mode [pretext]  → runs once at +0 against a fresh seat; prints nothing; sets rec file
@@ -265,15 +289,28 @@ check "13.1968 kind note: delivered to the inbox only, never pasted into a pane,
 ackrace_case() { reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; CTL_TEST_ACK_BEFORE_PASTE=1 pm postman once >/dev/null 2>&1; }
 check "13.1984 ack re-check: a seat that acks between pane_state and the paste is never typed into; CONTROL in the same check: without that ack the pointer is pasted" \
   'ackrace_case; [ ! -s "$T/rec-exec3" ] && [ -e "$R/postman/acks/1" ] && pane_case idle && [ "$(rec_n exec3)" = 1 ] && [ ! -e "$R/postman/acks/1" ]'
-# ctl restart is ONLY ever run with --dry-run here: a non-dry restart behind a session seam is `tmux kill-window -t gisik:N` on a live seat the day a mutant reverts the seam
+# ctl restart is ONLY ever run --dry-run here, behind THREE barriers: a PATH-front tmux SHIM (forwards list-windows only; every other subcommand is
+# logged to $TL and fails), CTL_DRY_RUN=1 exported next to --dry-run, and restart.sh's own guard (a live restart refuses CTL_TMUX_SESSION != gisik).
+# restart.sh's kill-window/new-window/paste-buffer hardcode `gisik:N`; the windows below sit at indices 91–98, which no live session has.
 rs_wt="$T/wt"; mkdir -p "$rs_wt"; /usr/bin/git -C "$rs_wt" init -q; printf 'brief\n' > "$T/BRIEF-rs.md"
-rs_dry() { "$CTL" restart "$1" "$rs_wt" "$T/BRIEF-rs.md" --dry-run 2>&1; }
-reset; IDX=9 mkseat reviewerB idle; IDX=4 mkseat exec4 idle
-check "13.1985 ctl restart --dry-run: the window keeps its NAME and the supersede marker is called for it (window 9 = reviewerB → -n reviewerB, never exec9); CONTROL in the same check: window 4 = exec4 and an absent window falls back to exec<N>; nothing is written" \
-  'o="$(rs_dry 9)" && printf "%s" "$o" | grep -q "^DRY: mark reviewerB restarted" && printf "%s" "$o" | grep -q -- "-n reviewerB " && ! printf "%s" "$o" | grep -q "exec9" && o4="$(rs_dry 4)" && printf "%s" "$o4" | grep -q "^DRY: mark exec4 restarted" && printf "%s" "$o4" | grep -q -- "-n exec4 " && o8="$(rs_dry 8)" && printf "%s" "$o8" | grep -q "^DRY: mark exec8 restarted" && [ ! -e "$R/postman/restarts" ]'
-reset; tmux new-window -d -t "$S:6" -n "Bad Name" "sleep 600"; tmux new-window -d -t "$S:5" -n exec5 "sleep 600"
-check "13.1986 ctl restart: a supersede marker that cannot be written prints a WARN (not silent) and the restart still proceeds; CONTROL in the same check: a valid seat name prints no WARN" \
-  'o="$(rs_dry 6)" && printf "%s" "$o" | grep -q "^WARN restart: postman marker not written" && printf "%s" "$o" | tail -1 | grep -q "^OK restart" && o5="$(rs_dry 5)" && ! printf "%s" "$o5" | grep -q "^WARN" && printf "%s" "$o5" | grep -q "^DRY: mark exec5 restarted"'
+TL="$T/tmux-restart.log"; rs_real_tmux="$(command -v tmux)"; mkdir -p "$T/shim"
+printf '#!/bin/bash\ncase "$1" in list-windows) exec "%s" "$@";; esac\necho "$*" >> "%s"\nexit 1\n' "$rs_real_tmux" "$TL" > "$T/shim/tmux"; chmod +x "$T/shim/tmux"
+rs_dry() { PATH="$T/shim:$PATH" CTL_DRY_RUN=1 "${RS_CTL:-$CTL}" restart "$1" "$rs_wt" "$T/BRIEF-rs.md" --dry-run 2>&1; }
+rs_snap() { tmux list-panes -a -F '#{session_name}:#{window_index} #{window_name} #{pane_pid}' 2>/dev/null | sort; }
+reset; IDX=91 mkseat reviewerB idle; IDX=94 mkseat exec4 idle
+check "13.1985 ctl restart --dry-run: the window keeps its NAME and the supersede marker is called for it (window 91 = reviewerB → -n reviewerB, never exec91); CONTROL in the same check: window 94 = exec4 and an absent window falls back to exec<N>; nothing is written and the tmux shim logged no write" \
+  ': > "$TL" && o="$(rs_dry 91)" && printf "%s" "$o" | grep -q "^DRY: mark reviewerB restarted" && printf "%s" "$o" | grep -q -- "-n reviewerB " && ! printf "%s" "$o" | grep -q "exec91" && o4="$(rs_dry 94)" && printf "%s" "$o4" | grep -q "^DRY: mark exec4 restarted" && printf "%s" "$o4" | grep -q -- "-n exec4 " && o8="$(rs_dry 98)" && printf "%s" "$o8" | grep -q "^DRY: mark exec98 restarted" && [ ! -e "$R/postman/restarts" ] && [ ! -s "$TL" ]'
+reset; tmux new-window -d -t "$S:96" -n "Bad Name" "sleep 600"; tmux new-window -d -t "$S:95" -n exec5 "sleep 600"
+check "13.1986 ctl restart: a supersede marker that cannot be written prints a WARN (not silent) and the restart still proceeds; CONTROL in the same check: a valid seat name prints no WARN; the tmux shim logged no write" \
+  ': > "$TL" && o="$(rs_dry 96)" && printf "%s" "$o" | grep -q "^WARN restart: postman marker not written" && printf "%s" "$o" | tail -1 | grep -q "^OK restart" && o5="$(rs_dry 95)" && ! printf "%s" "$o5" | grep -q "^WARN" && printf "%s" "$o5" | grep -q "^DRY: mark exec5 restarted" && [ ! -s "$TL" ]'
+rs_nodry_case() { # a COPY of the ctl tree whose restart.sh lost its dry-run exit: the guard must stop it before any tmux write
+  rm -rf "$T/ctlcopy"; cp -R "$HERE" "$T/ctlcopy" && sed -i.bak '/^if \[ "\$CTL_DRY_RUN" = 1 \]; then echo "DRY: tmux kill-window/d' "$T/ctlcopy/verbs/restart.sh" || return 1
+  ! grep -q 'DRY: tmux kill-window' "$T/ctlcopy/verbs/restart.sh" || return 1
+  : > "$TL"; before="$(rs_snap)"; o="$(RS_CTL="$T/ctlcopy/ctl" rs_dry 91)"; rc=$?; after="$(rs_snap)"
+  [ "$rc" != 0 ] && printf "%s" "$o" | grep -q "a live restart refuses it" && [ ! -s "$TL" ] && [ -n "$before" ] && [ "$before" = "$after" ]; }
+reset; IDX=91 mkseat reviewerB idle
+check "13.1991 ctl restart whose dry-run exit is REMOVED (a stripped copy) reaches no tmux write: the CTL_TMUX_SESSION guard refuses it (rc≠0), the shim log is empty and no pane in ANY session was created, killed or replaced; CONTROL in the same check: the shim logs a write it is handed (a forward-everything shim is red), still forwards list-windows, and the unmodified restart --dry-run prints DRY: mark … restarted and OK restart" \
+  ': > "$TL" && { PATH="$T/shim:$PATH" tmux kill-window -t "ctlpm-nosuch-$$:99" >/dev/null 2>&1; [ $? = 1 ]; } && grep -q "^kill-window -t ctlpm-nosuch-$$:99" "$TL" && PATH="$T/shim:$PATH" tmux list-windows -t "$S" >/dev/null && o="$(rs_dry 91)" && printf "%s" "$o" | grep -q "^DRY: mark reviewerB restarted" && printf "%s" "$o" | tail -1 | grep -q "^OK restart" && rs_nodry_case'
 check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail" \
   '( unset CTL_POSTMAN_CMD_RE; for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done )'
 
