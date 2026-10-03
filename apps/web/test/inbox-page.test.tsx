@@ -141,7 +141,7 @@ describe('/inbox — who did it is a NAME, not an id (cases 11.240–11.242)', (
 });
 
 describe('/inbox — four states, because the plan’s two collapse the one that lies', () => {
-  it('11.144 says "Loading…" while the first page is in flight, NOT that the inbox is empty', async () => {
+  it('11.144 shows its skeleton while the first page is in flight, NOT that the inbox is empty', async () => {
     const first = deferred<{ notifications: Notification[]; nextCursor: string | null }>();
     render(
       <Providers
@@ -151,7 +151,9 @@ describe('/inbox — four states, because the plan’s two collapse the one that
       </Providers>,
     );
 
-    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    // A skeleton region since smoothness T8 (25.125): the wait is named for assistive tech, never a sentence.
+    expect(await screen.findByText('Loading your inbox')).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     // The pair that makes the line above a test: the empty copy is NOT also on
     // screen. A page holding `useState<Notification[]>([])` would render it here.
     expect(screen.queryByText(EMPTY_INBOX_COPY)).not.toBeInTheDocument();

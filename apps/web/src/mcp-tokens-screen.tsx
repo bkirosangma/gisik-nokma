@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
+import { McpSessionSkeleton, McpTokensRowsSkeleton } from './skeletons/screen-skeletons.js';
 import { createHttpClient, HttpError, refusalText } from '@gisik-nokma/app-core/online';
 import { formatDay } from '@gisik-nokma/app-core';
 import { istToday } from './ist-today.js';
@@ -331,7 +332,7 @@ export function McpTokensScreen({
 
       <Card className={cardClass}>
         {session.kind === 'loading' ? (
-          <p>Checking your session…</p>
+          <McpSessionSkeleton />
         ) : session.kind === 'signed-out' ? (
           <p className="gn-mcp-tokens__signed-out">
             <Link href={`/sign-in?next=${encodeURIComponent(returnTo)}`}>Sign in</Link> to see
@@ -355,7 +356,7 @@ export function McpTokensScreen({
                   'Your connected assistants could not be loaded. Reload to try again. The list is unknown, not empty.'}
               </p>
             ) : tokens === null ? (
-              <p data-testid="mcp-tokens-loading">Loading…</p>
+              <McpTokensRowsSkeleton />
             ) : tokens.length > 0 ? (
               <ul className="gn-mcp-tokens__list" data-testid="mcp-tokens-list">
                 {tokens.map((token) => (

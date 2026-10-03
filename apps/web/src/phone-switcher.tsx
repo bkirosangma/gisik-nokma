@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { Sheet } from '@gisik-nokma/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
-import { useAppServices } from './providers.js';
+import { SwitcherRowsSkeleton } from './skeletons/screen-skeletons.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 import { useWorkspaceProjects } from './use-workspace-projects.js';
 
 /**
@@ -120,27 +121,11 @@ function SwitcherBody({
   projects: ReturnType<typeof useWorkspaceProjects>;
   onNavigate: () => void;
 }) {
-  const { dataSource } = useAppServices();
-  // Read when the sheet OPENS, through the same `getMyWorkspaces` the nav's name and
-  // project hooks share — never a second endpoint.
-  const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | 'failed' | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (!cancelled) setWorkspaces(rows);
-      },
-      () => {
-        if (!cancelled) setWorkspaces('failed');
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource]);
-
+  // Read when the sheet OPENS, through the shared `useMyWorkspaces` the nav's name and project hooks use (smoothness
+  // T8, case 25.120): a remount within its 30 s freshness window makes no second `getMyWorkspaces` call. Never a second endpoint.
+  const { rows: workspaces, error } = useMyWorkspaces();
   const liveProjects = (projects ?? []).filter((project) => !project.archived);
-  const liveWorkspaces = Array.isArray(workspaces) ? workspaces.filter((workspace) => !workspace.archived) : [];
+  const liveWorkspaces = workspaces !== null ? workspaces.filter((workspace) => !workspace.archived) : [];
 
   return (
     <nav className="gn-phone-switcher__sheet" aria-label="Workspaces and projects">
@@ -169,8 +154,8 @@ function SwitcherBody({
       ) : null}
       <section>
         <h3 className="gn-phone-switcher__heading">Workspaces</h3>
-        {workspaces === null ? <p className="gn-phone-switcher__note">Loading your workspaces…</p> : null}
-        {workspaces === 'failed' ? <p className="gn-phone-switcher__note">Your workspaces could not be loaded.</p> : null}
+        {workspaces === null && error === null ? <SwitcherRowsSkeleton /> : null}
+        {workspaces === null && error !== null ? <p className="gn-phone-switcher__note">Your workspaces could not be loaded.</p> : null}
         {liveWorkspaces.length > 0 ? (
           <ul className="gn-phone-switcher__list">
             {liveWorkspaces.map((workspace) => {

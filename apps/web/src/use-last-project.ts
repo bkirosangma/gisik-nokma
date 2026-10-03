@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { readLastUserId } from './last-user-id.js';
 
 /**
  * The last project this person opened, and the tab they last had it on.
@@ -285,6 +286,30 @@ export function readProjectTab(projectId: string, userId: string | null): Projec
   // then have no selected segment and no rendering arm, which is a blank page
   // rather than a wrong one.
   return isProjectTab(value) ? value : null;
+}
+
+const subscribeNever = (): (() => void) => () => {};
+
+/**
+ * The tab remembered for this project, on the FIRST client render (spec D9; audit SM-02) — where `readProjectTab` is a
+ * storage read that a `useState` initialiser could not make safely.
+ *
+ * The route is rendered on the server (`next` marks the page dynamic), where storage does not exist, so an initialiser
+ * reading it would answer one tab there and another on the client and hydration would meet a mismatch on `aria-selected`.
+ * `useSyncExternalStore` is React's door for exactly this: the SERVER snapshot is `null` (the page's default), the client
+ * snapshot is the storage read, and React paints the client value on the first client render of a client-only mount, or
+ * re-renders to it right after hydrating one — never a different first paint than the server's HTML. Nothing subscribes: the
+ * memory changes only through this page's own `setView`, which the page's chosen-tab state outranks (13.880).
+ *
+ * `userId` is the signed-in person's id, `undefined` while the session has not answered (the id of the last person who had
+ * one — `last-user-id.ts` — picks which key to read, and `readProjectTab` refuses anyone else's map), `null` when signed out.
+ */
+export function useRememberedProjectTab(projectId: string, userId: string | null | undefined): ProjectTab | null {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => readProjectTab(projectId, userId === undefined ? readLastUserId() : userId),
+    () => null,
+  );
 }
 
 /**
