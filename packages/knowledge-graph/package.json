@@ -1,0 +1,48 @@
+{
+  "name": "@gisik-nokma/knowledge-graph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./stress": {
+      "types": "./dist/render/sigma/stress-scene.d.ts",
+      "default": "./dist/render/sigma/stress-scene.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.typecheck.json"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@gisik-nokma/domain": "workspace:*",
+    "@gisik-nokma/ui": "workspace:*",
+    "@sigma/node-image": "4.0.0-alpha.3",
+    "graphology": "0.26.0",
+    "sigma": "4.0.0-beta.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "graphology-types": "0.24.8",
+    "jsdom": "^25.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^3.1.0"
+  }
+}
