@@ -9,7 +9,7 @@ import { UNMEASURED_NODE } from '../../src/workflow-builder/ui/flow-graph.js';
 
 /** Three states stacked 16 px apart at the origin, so every grid point near (0, 0) is taken. */
 function crowded() {
-  const store = createDraftStore(newDraft());
+  const store = createDraftStore(newDraft('Placement'));
   const ids = [store.actions.addState(), store.actions.addState(), store.actions.addState()];
   ids.forEach((id, at) => store.actions.moveState(id, { x: at * GRID, y: 0 }));
   return { store, ids };
