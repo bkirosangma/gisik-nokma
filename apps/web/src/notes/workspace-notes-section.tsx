@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Button } from '@gisik-nokma/ui';
+import { Button, useWait } from '@gisik-nokma/ui';
 import type { NoteScopeMode, NoteSummary } from '@gisik-nokma/domain';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
 import { useLiveQuery } from '@gisik-nokma/app-core';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { useNotesSearch } from '../use-notes-search.js';
+import { prefetchEditor } from '../editor-slot.js';
 import { NoteRow } from './note-row.js';
+import { NoteRowSkeleton } from './note-skeletons.js';
 import { SCOPE_LABELS } from './note-scope-options.js';
 
 /**
@@ -71,7 +73,12 @@ function renderSnippet(snippet: string): ReactNode {
   );
 }
 
-export function WorkspaceNotesSection({
+/**
+ * Memoised (smoothness T9, 25.157): the page re-renders for reasons that are not this section's (the headings a keystroke
+ * reports, the drawer toggle, the Create dialog), and every one of them used to rebuild every workspace's tree and re-run
+ * its `useNotesSearch`. The props are primitives and the `workspace` row, which the shared workspaces read keeps stable.
+ */
+export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
   workspace,
   openNoteId,
   titleFilter = '',
@@ -90,12 +97,14 @@ export function WorkspaceNotesSection({
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
 
-  const notes = useLiveQuery(dataSource, workspace.id, 'notes', () =>
-    dataSource.query.getNotes(workspace.id),
-  );
-  const deleted = useLiveQuery(dataSource, workspace.id, 'deleted-notes', () =>
-    dataSource.query.getDeletedNotes(workspace.id),
-  );
+  // `cacheKey`: a note change remounts this page (`tree-scroll.ts`), and the tree is painted from the last answer while the
+  // read runs again, so the list does not blank and refill under the reader (smoothness T9, 25.152).
+  const notes = useLiveQuery(dataSource, workspace.id, 'notes', () => dataSource.query.getNotes(workspace.id), {
+    cacheKey: 'notes',
+  });
+  const deleted = useLiveQuery(dataSource, workspace.id, 'deleted-notes', () => dataSource.query.getDeletedNotes(workspace.id), {
+    cacheKey: 'deleted-notes',
+  });
 
   /**
    * `useNotesSearch` owns its OWN `query`/`setQuery`, uncontrolled — it is
@@ -116,33 +125,39 @@ export function WorkspaceNotesSection({
 
   const needle = titleFilter.trim().toLowerCase();
   const filtering = needle !== '';
-  const matches = (note: NoteSummary): boolean =>
-    !filtering || note.title.toLowerCase().includes(needle);
-
-  const rows = (notes.data ?? []).filter(matches);
-
-  const homeRows = rows.filter((note) => note.homeProjectId === '').sort(byUpdatedDesc);
-
-  const knownIds = new Set(workspace.projects.map((project) => project.id));
-  const unknownHomeIds = [
-    ...new Set(
-      rows
-        .map((note) => note.homeProjectId)
-        .filter((home) => home !== '' && !knownIds.has(home)),
-    ),
-  ].sort();
-  const groups = [
-    ...workspace.projects.map((project) => ({ id: project.id, name: project.name })),
-    ...unknownHomeIds.map((id) => ({ id, name: id })),
-  ];
-  const rowsFor = (homeId: string): NoteSummary[] =>
-    rows.filter((note) => note.homeProjectId === homeId).sort(byUpdatedDesc);
-
   const mayRestoreOthers = workspace.role === 'owner' || workspace.role === 'admin';
-  const deletedRows = (deleted.data ?? [])
-    .filter(matches)
-    .filter((note) => mayRestoreOthers || note.authorId === user?.id)
-    .sort(byUpdatedDesc);
+  const userId = user?.id;
+
+  // The tree's shape, rebuilt only when what it is built from changes (not on every keystroke's re-render of the page above).
+  const { homeRows, groups, rowsByHome, deletedRows } = useMemo(() => {
+    const matches = (note: NoteSummary): boolean => !filtering || note.title.toLowerCase().includes(needle);
+    const rows = (notes.data ?? []).filter(matches);
+    const byHome = new Map<string, NoteSummary[]>();
+    for (const note of [...rows].sort(byUpdatedDesc)) {
+      const bucket = byHome.get(note.homeProjectId);
+      if (bucket === undefined) byHome.set(note.homeProjectId, [note]);
+      else bucket.push(note);
+    }
+    const knownIds = new Set(workspace.projects.map((project) => project.id));
+    const unknownHomeIds = [...new Set(rows.map((note) => note.homeProjectId).filter((home) => home !== '' && !knownIds.has(home)))].sort();
+    return {
+      homeRows: byHome.get('') ?? [],
+      groups: [
+        ...workspace.projects.map((project) => ({ id: project.id, name: project.name })),
+        ...unknownHomeIds.map((id) => ({ id, name: id })),
+      ],
+      rowsByHome: byHome,
+      deletedRows: (deleted.data ?? [])
+        .filter(matches)
+        .filter((note) => mayRestoreOthers || note.authorId === userId)
+        .sort(byUpdatedDesc),
+    };
+  }, [notes.data, deleted.data, needle, filtering, workspace.projects, mayRestoreOthers, userId]);
+  const rowsFor = (homeId: string): NoteSummary[] => rowsByHome.get(homeId) ?? [];
+
+  // A search that has not answered yet is a wait, not "No notes match" (25.158). Held for the standard wait so a search that
+  // answers in a blink never flashes a skeleton, and never drawn over results that already came back.
+  const waiting = useWait(search.searching && search.results.length === 0);
 
   async function restore(noteId: string): Promise<void> {
     if (user === null) return;
@@ -186,7 +201,11 @@ export function WorkspaceNotesSection({
             <p className="gn-notes__corrected">{`Showing results for ${search.corrected.join(' ')}`}</p>
           ) : null}
           {search.results.length === 0 ? (
-            <p className="gn-notes__no-results">No notes match</p>
+            search.searching ? (
+              waiting ? <NoteRowSkeleton label="Searching notes" rows={2} /> : null
+            ) : (
+              <p className="gn-notes__no-results">No notes match</p>
+            )
           ) : (
             <ol className="gn-notes__results">
               {search.results.map((hit) => (
@@ -196,7 +215,13 @@ export function WorkspaceNotesSection({
                   data-testid={`notes-result-${hit.noteId}`}
                   data-source={hit.source}
                 >
-                  <Link href={`/notes/${hit.noteId}`} className="gn-notes__result-title">
+                  <Link
+                    href={`/notes/${hit.noteId}`}
+                    className="gn-notes__result-title"
+                    onPointerEnter={prefetchEditor}
+                    onFocus={prefetchEditor}
+                    onClick={prefetchEditor}
+                  >
                     {hit.title}
                   </Link>
                   <p className="gn-notes__snippet">{renderSnippet(hit.snippet)}</p>
@@ -264,4 +289,4 @@ export function WorkspaceNotesSection({
       )}
     </section>
   );
-}
+});

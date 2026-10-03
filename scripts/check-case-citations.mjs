@@ -154,7 +154,7 @@ export function extractCheckedIds(text) {
 // fixture comment, not only inside the `it(...)` that uses it), any
 // `*.test.ts`/`*.test.tsx` file wherever it lives (five apps/mobile and
 // apps/desktop tests are co-located under `src/`, not under `test/`), and
-// the e2e specs under `apps/web/e2e*/`.
+// the e2e specs under `apps/web/e2e*/`, and the canvas browser suite's `packages/workflow-canvas-browser/tests/` (G-9 T1).
 function isTestPath(relPath) {
   if (relPath.includes('/node_modules/')) return false;
   if (/(^|\/)test\//.test(relPath)) return true;
@@ -166,6 +166,8 @@ function isTestPath(relPath) {
   // narrower *.spec.ts-only rule silently excluded its own helpers
   // (apps/web/e2e-stack/helpers/*.ts, global-setup.ts).
   if (/^apps\/web\/e2e[^/]*\//.test(relPath)) return true;
+  // G-9 T1: the canvas browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
+  if (/^packages\/workflow-canvas-browser\/tests\//.test(relPath)) return true;
   return false;
 }
 
