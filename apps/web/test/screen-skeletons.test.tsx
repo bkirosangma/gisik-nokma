@@ -215,8 +215,9 @@ describe('25.126 My work', () => {
     expect(body.querySelectorAll('.gn-my-work section.gn-my-work__section')).toHaveLength(4);
     expect(body.querySelectorAll('.gn-my-work__item').length).toBeGreaterThanOrEqual(4);
     expect(screen.queryByText('Loading…')).toBeNull();
+    // G1 §3 (25.250): the strip answering alone changes nothing; both regions swap in the body's commit.
     act(() => attention.resolve([]));
-    await waitFor(() => expect(screen.queryByText('Loading what needs your attention')).toBeNull());
+    expect(screen.queryByText('Loading what needs your attention')).not.toBeNull();
     act(() => work.resolve({ assigned: [], inTransit: [], contested: [], shared: [] }));
     await screen.findByText('Nothing assigned to you.');
     expect(busyRegions()).toEqual([]);

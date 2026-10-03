@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   AttentionStrip,
@@ -146,6 +146,19 @@ function MyWorkBoard() {
   // Names the claimant of a contested claim (R3 N4, case 6.256).
   const actorLabelOf = useActorLabels([workspaceId]);
   const myWork = useMyWork(dataSource, workspaceId);
+  /**
+   * THE TWO REGIONS SWAP IN ONE COMMIT (smoothness-2 G1, 25.250-25.253; my-work CLS 0 or 0.6923 at 390, 0.289 at 768, 0.1898 at
+   * 1440). The attention strip and the body are two reads and two swaps; the strip's skeleton is 4rem and the real strip 378px
+   * (938 at 390), so whichever swap committed SECOND, in a frame where the first had already painted, dragged the other down by the
+   * difference. A paint falls between the two commits by chance (2 of 5 loads at 390, always at 768, with the order flipped at 1440).
+   * Both are held behind their skeletons while BOTH were still pending at this page's first render, and shown together once both
+   * have settled (an answer or a refusal): the swap replaces nodes, and a new node is not a shift. A region that was ALREADY
+   * present at first render (an answer served from a cache) is not held: it is there from the first frame, and it must not wait
+   * for the slow read (SM-01).
+   */
+  const settled = (read: { data: unknown; error: string | null }): boolean => read.data !== null || read.error !== null;
+  const heldFromFirstRender = useRef(!settled(attention) && !settled(myWork));
+  const held = heldFromFirstRender.current && !(settled(attention) && settled(myWork));
 
   // A 401 on EITHER read is a session that ended, not a refusal to answer, and
   // this page used to say the opposite: `Features.md` and case 3.86 both claimed
@@ -339,7 +352,9 @@ function MyWorkBoard() {
               </p>
             ) : null}
 
-            {attention.error !== null ? (
+            {held ? (
+              <AttentionBandSkeleton />
+            ) : attention.error !== null ? (
               <ShellRefusal what="What needs your attention" message={attention.error} />
             ) : attention.data !== null ? (
               <AttentionStrip items={attention.data} onOpenTicket={openTicket} />
@@ -347,7 +362,9 @@ function MyWorkBoard() {
               <AttentionBandSkeleton />
             )}
 
-            {myWork.error !== null ? (
+            {held ? (
+              <MyWorkSkeleton />
+            ) : myWork.error !== null ? (
               <ShellRefusal what="My work" message={myWork.error} />
             ) : myWork.data !== null ? (
               <MyWork view={myWork.data} onOpenTicket={openTicket} actorLabelOf={actorLabelOf} />

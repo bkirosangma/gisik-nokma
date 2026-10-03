@@ -43,10 +43,10 @@
     "swapShiftCls": 0.0055
   },
   "1440|/w/<id>/my-work": {
-    "cls": 0.1247,
+    "cls": 0.0055,
     "requests": 9,
     "duplicates": 2,
-    "swapShiftCls": 0.1247
+    "swapShiftCls": 0.0055
   },
   "1440|/w/<id>/p/<id>": {
     "cls": 0.0071,
@@ -97,10 +97,10 @@
     "swapShiftCls": 0.0212
   },
   "390|/w/<id>/my-work": {
-    "cls": 0.635,
+    "cls": 0,
     "requests": 9,
     "duplicates": 2,
-    "swapShiftCls": 0.635
+    "swapShiftCls": 0
   },
   "390|/w/<id>/p/<id>": {
     "cls": 0,
@@ -151,10 +151,10 @@
     "swapShiftCls": 0.0179
   },
   "768|/w/<id>/my-work": {
-    "cls": 0.2896,
+    "cls": 0,
     "requests": 9,
     "duplicates": 2,
-    "swapShiftCls": 0.2896
+    "swapShiftCls": 0
   },
   "768|/w/<id>/p/<id>": {
     "cls": 0.0147,
