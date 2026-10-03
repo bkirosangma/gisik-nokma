@@ -26,6 +26,10 @@
       "types": "./dist/markdown-hint.d.ts",
       "default": "./dist/markdown-hint.js"
     },
+    "./reading": {
+      "types": "./dist/reading/index.d.ts",
+      "default": "./dist/reading/index.js"
+    },
     "./markdown-doc": {
       "types": "./dist/markdown-doc/index.d.ts",
       "default": "./dist/markdown-doc/index.js"

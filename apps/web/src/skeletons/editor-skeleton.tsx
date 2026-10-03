@@ -13,6 +13,8 @@ export type EditorSkeletonProps = {
   submitSlot?: 'footer' | 'none';
   /** The slot's `footerNote`: a comment composer's whole hint line. The hint wraps to as many lines as the words need at this width. */
   footerNote?: string;
+  /** The region's name when the host's wait is not the editor's own (the notes page: "Loading the note"). Default "Loading editor". */
+  label?: string;
 };
 
 /**
@@ -83,7 +85,7 @@ function PhoneSet() {
  * reader has opted in to it (G-6; the stored per-device choice, read from the light `comment-toolbar-pref` subpath so no editor
  * module is pulled in), otherwise it leads its footer with the Format pill. Decoration only: the region is named once.
  */
-export function EditorSkeleton({ mode = 'description', attach = false, readOnly = false, submitSlot = 'footer', footerNote }: EditorSkeletonProps) {
+export function EditorSkeleton({ mode = 'description', attach = false, readOnly = false, submitSlot = 'footer', footerNote, label = 'Loading editor' }: EditorSkeletonProps) {
   const [commentStripShown] = useCommentToolbarShown();
   const collapsible = mode === 'comment' && !readOnly;
   const strip = !readOnly && (mode !== 'comment' || commentStripShown);
@@ -91,7 +93,7 @@ export function EditorSkeleton({ mode = 'description', attach = false, readOnly 
   // The real slot's hint line: note none, comment the host's `footerNote`, description the Markdown sentence (none when read-only).
   const hint = mode === 'note' ? '' : mode === 'comment' ? (footerNote ?? '') : readOnly ? '' : MARKDOWN_HINT;
   return (
-    <SkeletonRegion label="Loading editor" className={`editor-slot editor-slot--${mode}`}>
+    <SkeletonRegion label={label} className={`editor-slot editor-slot--${mode}`}>
       <div className="ticket-editor">
         {strip ? (
           <div className="ticket-editor__toolbar">
