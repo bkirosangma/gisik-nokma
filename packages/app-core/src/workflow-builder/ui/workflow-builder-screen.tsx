@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
 import { Button, Skeleton, SkeletonRegion, useScrollEdges } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
@@ -13,11 +13,14 @@ import {
   type BuilderEnvironment,
   type BuilderSession,
 } from './builder-context.js';
+import { AddTransitionForm } from './add-transition-form.js';
 import { BuilderPanels } from './builder-panels.js';
 import { IssuesPanel } from './issues-panel.js';
 import { PublishControls } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
+import type { CanvasApi } from './use-canvas-api.js';
+import { TidyControl } from './tidy-control.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
 
 /**
@@ -48,7 +51,7 @@ function WorkflowNameField() {
   );
 }
 
-function AddStateButton() {
+function AddStateButton(props: { canvas: RefObject<CanvasApi | null> }) {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   if (!canAuthor) return null;
@@ -58,7 +61,11 @@ function AddStateButton() {
   // border), and `.ticket-type-list__new` is the sibling precedent for a
   // builder action reaching for the component rather than a bespoke rule.
   return (
-    <Button className="workflow-builder-screen__add-state" onClick={() => store.actions.addState()}>
+    <Button
+      className="workflow-builder-screen__add-state"
+      // G-9 T3: the new state lands on the free grid point nearest the middle of what the author is looking at.
+      onClick={() => store.actions.addState({ near: props.canvas.current?.centre(), sizes: props.canvas.current?.sizes() })}
+    >
       Add state
     </Button>
   );
@@ -100,6 +107,10 @@ export function WorkflowBuilderScreen(props: {
   const [panelsOpen, setPanelsOpen] = useState(false);
   // The left panel scrolls down on the desktop split: `.gn-scroll-fade--y` shows a state list that runs past the fold.
   const leftEdgesRef = useScrollEdges<HTMLElement>('y');
+  const canvasApi = useRef<CanvasApi | null>(null);
+  const [onCanvasReady] = useState(() => (api: CanvasApi | null) => {
+    canvasApi.current = api;
+  });
   const panelsButtonRef = useRef<HTMLButtonElement>(null);
   const panelsDoneRef = useRef<HTMLButtonElement>(null);
   const closePanels = () => {
@@ -212,7 +223,9 @@ export function WorkflowBuilderScreen(props: {
           <div className="workflow-builder-screen__title-row">
             <WorkflowNameField />
             <div className="workflow-builder-screen__actions">
-              <AddStateButton />
+              <AddStateButton canvas={canvasApi} />
+              <AddTransitionForm />
+              <TidyControl sizes={() => canvasApi.current?.sizes() ?? {}} />
               <Button
                 ref={panelsButtonRef}
                 className="workflow-builder-screen__panels"
@@ -266,7 +279,7 @@ export function WorkflowBuilderScreen(props: {
               the canvas is a named region inside it, and `aria-label` is what
               keeps it addressable now that it is not a landmark of its own. */}
           <section className="workflow-builder-screen__canvas" aria-label="Canvas">
-            <WorkflowCanvas />
+            <WorkflowCanvas onReady={onCanvasReady} />
           </section>
         </div>
       </div>
