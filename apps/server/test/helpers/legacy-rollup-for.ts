@@ -116,6 +116,9 @@ export async function legacyRollupFor(
       projectId: child.project_id,
       resolvedMode: child.resolved_mode,
       resolvedUserIds: child.resolved_user_ids,
+      // Drafts T3: the field is required. Changed in the same commit as `ResolvedVisibility`, deliberately:
+      // the worlds this frozen copy is compared over hold no draft.
+      draftAuthorId: null,
     });
     if (!visible) {
       notAdmitted += 1;

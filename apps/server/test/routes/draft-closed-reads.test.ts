@@ -190,7 +190,10 @@ describe('28.057 the single-ticket reads', () => {
       for (const [index, url] of real.entries()) {
         const answer = await get(role, url);
         const unknown = await get(role, ghost[index] as string);
-        expect(answer.statusCode, `${role} ${url}`).toBe(404);
+        // The notes-of-a-ticket read answers 200 `{ notes: [] }` for ANY id, an unknown one included (it lists
+        // the viewer's own visible notes attached to that id and has no ticket gate), so for it "not found" is
+        // that answer; every other read is a 404.
+        expect(answer.statusCode, `${role} ${url}`).toBe(url.endsWith('/notes') ? 200 : 404);
         expect(answer.json(), `${role} ${url}: not the unknown-id answer`).toEqual(unknown.json());
       }
       // the bootstrap-style ticket list names no draft either
@@ -198,7 +201,11 @@ describe('28.057 the single-ticket reads', () => {
     }
     // CONTROL, same `it`: opened, the owner reads every one of them
     await withDraftsOpened(db.pool, world.draftIds, async () => {
-      for (const url of urls(world.draftId)) expect((await get('owner', url)).statusCode, url).toBe(200);
+      for (const url of urls(world.draftId)) {
+        const answer = await get('owner', url);
+        expect(answer.statusCode, url).toBe(200);
+        if (url.endsWith(world.draftId)) expect(answer.body, url).toContain(world.draftId); // the detail itself
+      }
       expect(await body('owner', `/v1/workspaces/${WS()}/tickets`)).toContain(world.draftId);
     });
   });
@@ -206,7 +213,16 @@ describe('28.057 the single-ticket reads', () => {
 
 describe('28.060 the builder reads', () => {
   it('the guest\'s actor names omit the author of a guest-visible draft', async () => {
-    await expectClosed([{ role: 'guest', url: `/v1/workspaces/${WS()}/actor-names`, marker: read.userIds.projectLead }]);
+    // A phone sign-in is never labelled (FD3, `labelled`), so the lead gets a real address for this case, the
+    // `builder-reads.test.ts` precedent; otherwise the control could never name them and the case is vacuous.
+    const lead = read.userIds.projectLead;
+    const original = (await db.pool.query<{ email: string }>('SELECT email FROM "user" WHERE id = $1', [lead])).rows[0]!.email;
+    await db.pool.query('UPDATE "user" SET email = $1 WHERE id = $2', ['quokka.lead@example.com', lead]);
+    try {
+      await expectClosed([{ role: 'guest', url: `/v1/workspaces/${WS()}/actor-names`, marker: lead }]);
+    } finally {
+      await db.pool.query('UPDATE "user" SET email = $1 WHERE id = $2', [original, lead]);
+    }
   });
 
   it('state occupancy, the type population and the per-type counts do not count a draft; cleared they exceed by exactly the four drafts', async () => {

@@ -143,6 +143,8 @@ type ChildRow = {
   project_id: string;
   resolved_mode: 'workspace' | 'project' | 'explicit';
   resolved_user_ids: string[];
+  /** Always null here: the query excludes drafts (C2). Selected so the `canSeeResolved` literal states it. */
+  draft_author_id: string | null;
   /** From the LEFT JOIN: `null` when `proj_tickets` has no row for this child. */
   state_category: 'open' | 'active' | 'terminal' | null;
 };
@@ -282,11 +284,15 @@ export async function rollupsFor(
     // which is NULL on the same join-miss row `t.ticket_id IS NULL` answers
     // for, so `NOT EXISTS` against a NULL project id matches no row and is
     // TRUE — it does not fight the join-miss escape, it is simply moot there.
+    //
+    // Drafts T3 (C2): `v.draft_author_id IS NULL`. A draft is no child anyone counts, not even as
+    // "restricted": another person's draft under a visible parent would otherwise read "1 restricted".
     `SELECT v.parent_id, v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
-            t.state_category
+            v.draft_author_id, t.state_category
      FROM proj_visibility v
      LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
      WHERE v.parent_id = ANY($1::text[])
+       AND v.draft_author_id IS NULL
        AND ((t.deleted_at IS NULL
              AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL))
             OR t.ticket_id IS NULL)
@@ -339,12 +345,14 @@ export async function rollupsFor(
       projectId: child.project_id,
       resolvedMode: child.resolved_mode,
       resolvedUserIds: child.resolved_user_ids,
+      draftAuthorId: child.draft_author_id,
     });
     if (!visible) {
       tally.notAdmitted += 1;
       // A viewer with NO workspace role reaches nothing by assignment (case 6.276): such a child
       // stays restricted and is never put to the arm.
-      if (eff.workspaceRole !== null) tally.candidates.push(child.ticket_id);
+      // A draft is never offered to the arm (drafts R17; the query already excludes one).
+      if (eff.workspaceRole !== null && child.draft_author_id === null) tally.candidates.push(child.ticket_id);
     }
   }
   // The per-viewer half follows `canSee`, including the assignee arm (R1, FD1 of the access follow-ups

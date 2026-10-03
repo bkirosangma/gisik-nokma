@@ -594,12 +594,15 @@ export async function readTicketCounts(db: Queryable, workspaceId: string): Prom
     // container half), and it is in the JOIN's ON clause rather than the
     // WHERE, deliberately: this is a LEFT JOIN whose whole job is to report a
     // count of ZERO for a type that has no tickets, and a WHERE on the
-    // right-hand alias would turn a zero into an absent row.
+    // right-hand alias would turn a zero into an absent row. It is the longhand
+    // twin of `LIVE_TICKET_WHERE`, draft half included (drafts T3); in the `ON`,
+    // not the `WHERE`, for the zero-count reason above.
     `SELECT t.type_id, count(k.ticket_id)::int AS count
        FROM proj_ticket_types t
        LEFT JOIN proj_tickets k
          ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
         AND k.deleted_at IS NULL
+        AND k.draft_author_id IS NULL
         AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = k.project_id AND dp.deleted_at IS NOT NULL)
       WHERE t.workspace_id = $1
       GROUP BY t.type_id`,

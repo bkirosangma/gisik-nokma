@@ -131,13 +131,21 @@ export function ticketAudienceWhere(eff: EffectiveRole, userId: string, params: 
  * halves over `na.ticket_id`.
  *
  * The two constant answers return BEFORE any parameter is bound, exactly as the
- * audience function's do (see "No parameter it does not use" above).
+ * audience function's do (see "No parameter it does not use" above). No branch but
+ * the non-member's `FALSE` admits a DRAFT, which nobody reaches through here: the
+ * author's doors are `visibility/can-open.ts` (drafts spec §4.1, R17).
  */
 export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
   if (eff.workspaceRole === null) return 'FALSE';
-  if (eff.workspaceRole === 'owner') return 'TRUE';
-  return `(${ticketAudienceWhere(eff, userId, params)} OR ${assigneeReachWhere(userId, params)})`;
+  // The draft clause is in EVERY non-FALSE branch, the owner's constant one included, and binds no parameter
+  // (the "no parameter it does not use" rule above): a draft is closed for the owner too (drafts spec R17).
+  if (eff.workspaceRole === 'owner') return '(v.draft_author_id IS NULL)';
+  return `((${ticketAudienceWhere(eff, userId, params)} OR ${assigneeReachWhere(userId, params)}) AND v.draft_author_id IS NULL)`;
 }
+
+/** The soft-delete and container halves alone. A DOOR (an author opening their own draft) asks this one. */
+export const LIVE_BASE_WHERE =
+  't.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)';
 
 /**
  * The soft-delete predicate: a ticket whose `ticket.deleted` has not been undone.
@@ -227,9 +235,16 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
  * ticket-level "ancestor deleted" column: one row is the only place the
  * container's own state can change, and a copy on every descendant would need
  * its own fold on every `project.deleted`/`project.undeleted`.
+ *
+ * ## The draft clause (drafts spec A4)
+ *
+ * A draft is excluded here for the same reason a deleted ticket is: it is in no
+ * view. `LIVE_TICKET_WHERE` is `LIVE_BASE_WHERE` (the soft-delete and container
+ * halves) plus `t.draft_author_id IS NULL`. A new VIEW must use this constant,
+ * never the base; only a DOOR that admits an author to their own draft asks the
+ * base (T4's `canOpen`, T9's `ticketIsOpenable`).
  */
-export const LIVE_TICKET_WHERE =
-  't.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)';
+export const LIVE_TICKET_WHERE = `${LIVE_BASE_WHERE} AND t.draft_author_id IS NULL`;
 
 /**
  * The `'explicit'` COLUMN of the table above, on its own: this ticket's resolved
