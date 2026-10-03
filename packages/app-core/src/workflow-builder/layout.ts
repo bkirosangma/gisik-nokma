@@ -5,12 +5,6 @@ export type StatePosition = { x: number; y: number };
 /** The distinguished node from-any ('*') transitions will draw from once Task 5's canvas exists. */
 export const ANY_STATE_NODE_ID = 'any-state';
 
-/**
- * A state's size before React Flow has measured it. The start node always carries the "start state always allows new tickets" reason, so it sits at `.gn-state-node`'s 13rem cap (208px); about 120px tall.
- * Housed here, not in `ui/flow-graph.ts`, so the draft store (free placement) and the canvas (obstacles) read one number without the store importing React Flow.
- */
-export const UNMEASURED_NODE = { width: 208, height: 120 };
-
 export const COLUMN_WIDTH = 260;
 export const ROW_HEIGHT = 140;
 const TOP_MARGIN = 80;

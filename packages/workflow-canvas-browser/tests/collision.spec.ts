@@ -240,3 +240,20 @@ test('25.526 an arrow that would push the state into its neighbour changes nothi
     expect(Math.abs(now.x - box.x) + Math.abs(now.y - box.y)).toBeLessThan(0.6);
   }
 });
+
+test('25.527 the Add state button drops the new state clear of every other state, inside the part of the board the author is looking at', async ({ page }) => {
+  await openHarness(page);
+  const names = ['To do', 'Doing', 'Done'];
+  await page.getByRole('button', { name: 'Add state' }).click();
+  const added = page.locator('.react-flow__node', { has: page.locator('.gn-state-node__name', { hasText: 'New state' }) });
+  await expect(added).toBeVisible();
+  const v = await viewport(page);
+  const b = (await added.boundingBox())!;
+  const box = { x: (b.x - v.tx) / v.zoom, y: (b.y - v.ty) / v.zoom, width: b.width / v.zoom, height: b.height / v.zoom };
+  for (const name of names) expect(gap(box, await flowBox(page, name)), `clear of ${name}`).toBeGreaterThanOrEqual(8 - 0.6);
+  const pane = (await page.locator('.react-flow__pane').boundingBox())!;
+  expect(b.x + b.width / 2).toBeGreaterThan(pane.x);
+  expect(b.x + b.width / 2).toBeLessThan(pane.x + pane.width);
+  expect(b.y + b.height / 2).toBeGreaterThan(pane.y);
+  expect(b.y + b.height / 2).toBeLessThan(pane.y + pane.height);
+});

@@ -13,14 +13,15 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { clampToAvoidOverlap, NODE_GAP, rectsOverlap, type Rect } from '../collision.js';
-import { ANY_STATE_NODE_ID, UNMEASURED_NODE } from '../layout.js';
+import { ANY_STATE_NODE_ID } from '../layout.js';
 import { GRID, snapPosition, type Guide } from '../snap.js';
 import { AnyStateNode } from './any-state-node.js';
 import { CanvasOverlays } from './canvas-overlays.js';
 import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './builder-context.js';
 import { usePhoneBoard } from '../../views/use-phone-board.js';
-import { connectionToTransition, phoneOpeningView, toFlowGraph, type StateNodeData } from './flow-graph.js';
+import { connectionToTransition, phoneOpeningView, toFlowGraph, UNMEASURED_NODE, type StateNodeData } from './flow-graph.js';
 import { StateNode } from './state-node.js';
+import { useCanvasApi, type CanvasApi } from './use-canvas-api.js';
 import { useCanvasKeys } from './use-canvas-keys.js';
 import { TransitionEdge } from './transition-edge.js';
 import { useDragEscape, useWorkingNodes } from './use-working-nodes.js';
@@ -52,7 +53,7 @@ const rectOf = (candidate: Node): Rect => ({ ...candidate.position, ...sizeOf(ca
 const stateKey = (nodeId: string) => (nodeId === ANY_STATE_NODE_ID ? nodeId : nodeId.slice('s:'.length));
 const nameOf = (candidate: Node) => (candidate.type === 'state' ? (candidate.data as StateNodeData).name : 'Any state');
 
-function CanvasInner() {
+function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
   const draft = useDraft();
@@ -68,6 +69,7 @@ function CanvasInner() {
   const { altDown, arrow, selectKey } = useCanvasKeys();
   const live = useRef({ nodes: working.nodes });
   live.current = { nodes: working.nodes };
+  useCanvasApi(props.onReady, live);
 
   const clearOverlays = useCallback(() => {
     setGuides(NO_GUIDES);
@@ -245,10 +247,10 @@ function CanvasInner() {
   );
 }
 
-export function WorkflowCanvas() {
+export function WorkflowCanvas(props: { onReady?: (api: CanvasApi | null) => void }) {
   return (
     <ReactFlowProvider>
-      <CanvasInner />
+      <CanvasInner onReady={props.onReady} />
     </ReactFlowProvider>
   );
 }
