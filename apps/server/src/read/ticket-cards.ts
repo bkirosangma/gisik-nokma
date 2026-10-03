@@ -317,11 +317,16 @@ export function composeCardKey(
  * key like the prototype). Three reads PER WORKSPACE in the batch — the
  * identity for the workspace prefix, the project prefixes, the ticket numbers
  * over exactly these ids — the three the single-ticket route already makes for
- * one ticket, batched. My Work is the one caller whose rows span workspaces,
- * which is why this groups by `workspace_id` instead of assuming one.
+ * one ticket, batched. Two callers' rows span workspaces — My Work, and the
+ * Knowledge Graph ring read (`graph-neighbours.ts` `keysFor`, whose tickets
+ * reach across workspaces through people) — which is why this groups by
+ * `workspace_id` instead of assuming one.
  */
-async function cardKeysFor(db: Queryable, rows: readonly ProjTicketRow[]): Promise<Map<string, string | null>> {
-  const byWorkspace = new Map<string, ProjTicketRow[]>();
+export async function cardKeysFor(
+  db: Queryable,
+  rows: readonly Pick<ProjTicketRow, 'ticket_id' | 'workspace_id' | 'project_id'>[],
+): Promise<Map<string, string | null>> {
+  const byWorkspace = new Map<string, Pick<ProjTicketRow, 'ticket_id' | 'workspace_id' | 'project_id'>[]>();
   for (const row of rows) {
     const bucket = byWorkspace.get(row.workspace_id) ?? [];
     bucket.push(row);

@@ -1,0 +1,7 @@
+[38;5;174m✶[39m [38;5;174mJitterbugging… [38;5;241m(1m 13s · ↓[39m [38;5;241m321 tokens · thought for 1s)[39m
+[38;5;241m  ⎿  Tip: You can control how big a workflow is just by prompting. Ask for a small workflow, cap it with [38;5;105m"use at most 5 agents"[38;5;241m, or set a default with [38;5;105mDynamic workflow size[38;5;241m in [38;5;105m/config[38;5;241m.[39m
+[38;5;245m────────────────────────────────────────
+[38;5;241m❯ [39m
+[38;5;245m────────────────────────────────────────
+[39m  [38;5;241muser@example.com | sonnet-5-5 | advisor: opus | effort: high | Ctx 5% | session 9% (resets 6:00am) | weekly 2% (resets mon 6:30am)[39m
+  [38;5;241m-- INSERT --[39m [38;5;131m⏵⏵ bypass permissions on[38;5;241m (shift+tab to cycle) · ← for agents[39m

@@ -1,0 +1,12 @@
+[38;5;174m✽[39m [38;5;174mTempering… [38;5;241m(6s · [38;5;247mthinking with high effort[38;5;241m)[39m
+[38;5;241m  ⎿  Tip: Use /voice to enable push-to-talk dictation
+
+[38;5;245m─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[38;5;241m❯ [39m
+[38;5;245m─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;241muser@example.com | opus-5-5 | advisor: opus | effort: high | Ctx 32% | [33mcutting it close[38;5;241m | session 15% (resets 11:00am) | weekly 13% (resets mon 6:30am)[39m
+  [38;5;241m-- INSERT --[39m [38;5;131m⏵⏵ bypass permissions on[38;5;241m · [38;5;37m2 monitors[38;5;241m · [38;5;174m⧉[39m [38;5;241m3 · /tasks to see subagents · ← for agents[39m
+
+[1m  ⏺ main[0m
+[38;5;241m❯ ◯ general-purpose[39m  [38;5;241mPorting sigtest.cjs measurements into browser cases[39m                                                                                                                   [38;5;241m37m 1s · ↓ 247.7k tokens[39m
+[38;5;241m  ◯ general-purpose[39m  [38;5;241mWriting Task 2 embedding plan[39m                                                                                                                                        [38;5;241m36m 28s · ↓ 212.3k tokens[39m

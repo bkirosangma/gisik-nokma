@@ -43,6 +43,8 @@ import {
   ticketCreatedPayload,
   ticketDeletedPayload,
   ticketFieldSetPayload,
+  ticketLinkAddedPayload,
+  ticketLinkRemovedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -262,6 +264,25 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: ticketRestoredPayload,
+});
+
+/**
+ * The typed-link pair (Knowledge Graph spec A §2.2): filed against the SOURCE ticket, whoever writes
+ * them. Both FOLD into `TicketState.links` (so they are in `TICKET_EVENT_TYPES`) and carry nothing
+ * beyond the fold, so they are deliberately not backfilled below a snapshot.
+ */
+domainRegistry.register({
+  type: 'ticket.link_added',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketLinkAddedPayload,
+});
+
+domainRegistry.register({
+  type: 'ticket.link_removed',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketLinkRemovedPayload,
 });
 
 /**
