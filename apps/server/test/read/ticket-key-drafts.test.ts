@@ -1,14 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
 import { NUMBERING_ROWS_SQL, ticketIdsAtNumber, ticketNumbers } from '../../src/read/ticket-numbers.js';
-import { resetEntitySeqs } from '../helpers/apply.js';
+import { applyCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { appendTestEvent } from '../helpers/ledger.js';
-import { ev, seedWorkspace, ticketCreated, TYPE_ID, type Base } from '../purge/world.js';
+import { ev, projectCreated, seedWorkspace, ticketCreated, TYPE_ID, type Base } from '../purge/world.js';
 
 /**
  * Drafts T2 (spec §6.1, R25-R27): a ticket's number is its position among its project's NUMBERING ROWS.
- * Cases 28.020 and 28.021 (`test-cases/28-drafts.md` §28.2). Ledger-level, with no projections: the key
+ * Cases 28.020, 28.021 and 28.028 (`test-cases/28-drafts.md` §28.2). Ledger-level, with no projections: the key
  * query reads `events` alone, and T3 is what teaches the projections what a draft is.
  */
 
@@ -109,5 +109,42 @@ describe('28.021 a draft takes no number until it is published', () => {
     await append(ticketCreated(base2, X, P2, 'plain first'), ticketCreated(base2, Y, P2, 'plain second'));
     const control = await ticketNumbers(db.pool, base2.WS, [X, Y]);
     expect([control.get(X), control.get(Y)]).toEqual([1, 2]);
+  });
+});
+
+describe('28.028 the drafts schema', () => {
+  it('28.028 the four columns and two partial indexes exist and are NULL on a pre-draft ledger; control: no other table has one', async () => {
+    // every `draft_*` column in the schema: exactly the four this migration adds, so no untouched table grew one
+    const cols = await db.pool.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND column_name LIKE 'draft\\_%' ORDER BY 1, 2`,
+    );
+    expect(cols.rows.map((r) => `${r.table_name}.${r.column_name}`)).toEqual([
+      'proj_tickets.draft_at',
+      'proj_tickets.draft_author_id',
+      'proj_tickets.draft_discarded',
+      'proj_visibility.draft_author_id',
+    ]);
+    const idx = await db.pool.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+        WHERE indexname IN ('proj_tickets_drafts_idx', 'proj_visibility_drafts_idx') ORDER BY indexname`,
+    );
+    expect(idx.rows.map((r) => r.indexname)).toEqual(['proj_tickets_drafts_idx', 'proj_visibility_drafts_idx']);
+    for (const row of idx.rows) {
+      expect(row.indexdef).toContain('(workspace_id, draft_author_id)');
+      expect(row.indexdef).toContain('WHERE (draft_author_id IS NOT NULL)');
+    }
+    // a pre-draft ledger, PROJECTED: the rows exist, and every draft column on them is NULL
+    const base = await seedWorkspace(db.pool);
+    const P = newUlid();
+    const T = newUlid();
+    await applyCommitted(db.pool, [projectCreated(base, P, 'Schema', 'SC'), ticketCreated(base, T, P, 'plain')]);
+    const tickets = await db.pool.query(
+      'SELECT draft_author_id, draft_at, draft_discarded FROM proj_tickets WHERE ticket_id = $1',
+      [T],
+    );
+    expect(tickets.rows).toEqual([{ draft_author_id: null, draft_at: null, draft_discarded: null }]);
+    const visibility = await db.pool.query('SELECT draft_author_id FROM proj_visibility WHERE ticket_id = $1', [T]);
+    expect(visibility.rows).toEqual([{ draft_author_id: null }]);
   });
 });

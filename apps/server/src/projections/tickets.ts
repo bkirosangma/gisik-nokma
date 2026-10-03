@@ -4,6 +4,7 @@ import {
   applyTicketEvent,
   foldTicketToWorkflowVersion,
   isRedactedTicketCreated,
+  isRedactedTicketPublished,
   workflowDefinedPayloadSchema,
   type LedgerEvent,
   type TicketState,
@@ -562,8 +563,10 @@ export const ticketsProjection: Projection = {
     }
     // Trash series Plan 2 (spec §5.4): a purged ticket's REDACTED creation
     // produces no ticket. Skipped before `current` is read, like the two
-    // content-free types above — folding it would throw by design (D7).
-    if (isRedactedTicketCreated(event)) {
+    // content-free types above — folding it would throw by design (D7). The
+    // same for a purged ticket's redacted PUBLISH (drafts T2: kept as a
+    // numbering row).
+    if (isRedactedTicketCreated(event) || isRedactedTicketPublished(event)) {
       return;
     }
 
