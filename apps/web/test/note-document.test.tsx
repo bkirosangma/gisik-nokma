@@ -233,65 +233,46 @@ describe('18.460 opening a note never draws the lost-access copy while the note 
    */
   const LOST = 'That note is no longer shared with you.';
 
-  function deferredWorld(second: 'hold' | 'null' | 'note', reads: { count: number; release: () => void }) {
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    reads.release = release;
-    return world({
-      getNote: async (_workspaceId: string, id: string) => {
-        if (id !== NOTE) return null;
-        reads.count += 1;
-        if (reads.count === 1) return noteDetail();
-        if (second === 'null') return null;
-        if (second === 'hold') await gate;
-        return noteDetail();
-      },
-    });
-  }
-
-  it('18.460 the found note stays on screen through the second read; CONTROL: an unreadable note and a second-read null still draw the copy', async () => {
+  /**
+   * AMENDED by smoothness T9 (25.151): the search's answer is now the live query's FIRST answer, so the found note is read ONCE
+   * and there is no second read to hold open; the claim (the found note never flashes the lost-access copy) is unchanged, and the
+   * old "second read answers null" control has nothing to answer: a later reload answering null is `onLostAccess`'s (spec §9.7).
+   */
+  it('18.460 the found note is on screen from the search\'s own answer and never flashes the lost-access copy; CONTROL: an unreadable note still draws it', async () => {
     let flashed = false;
     const observer = new MutationObserver(() => {
       if (document.body.textContent?.includes(LOST) === true) flashed = true;
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     try {
-      const reads = { count: 0, release: () => undefined as void };
-      const services = deferredWorld('hold', reads);
+      const reads = { count: 0 };
+      const services = world({
+        getNote: async (_workspaceId: string, id: string) => {
+          if (id !== NOTE) return null;
+          reads.count += 1;
+          return noteDetail();
+        },
+      });
       render(
         <Providers services={services}>
           <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
         </Providers>,
       );
-      // The search read answered and the live query's read is now in flight.
-      await waitFor(() => expect(reads.count).toBeGreaterThanOrEqual(2));
-      // The note is on screen while that read is open, and the copy is not.
       expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
       expect(screen.queryByText(LOST)).not.toBeInTheDocument();
-      reads.release();
-      await waitFor(() => expect(reads.count).toBeGreaterThanOrEqual(2));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      // Once (25.151): the search's read, not a second identical one.
+      expect(reads.count).toBe(1);
       expect(flashed).toBe(false);
     } finally {
       observer.disconnect();
     }
     cleanup();
 
-    // CONTROL 1 — a note nothing holds: the search finds nothing and the copy IS drawn.
+    // CONTROL — a note nothing holds: the search finds nothing and the copy IS drawn.
     render(
       <Providers services={world()}>
         <NoteDocument noteId={OTHER_NOTE} workspaces={[WS_A_REF]} />
-      </Providers>,
-    );
-    expect(await screen.findByText(LOST)).toBeInTheDocument();
-    cleanup();
-
-    // CONTROL 2 — found by the search, but the live read answers null: the seed does not mask it.
-    const reads2 = { count: 0, release: () => undefined as void };
-    render(
-      <Providers services={deferredWorld('null', reads2)}>
-        <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
       </Providers>,
     );
     expect(await screen.findByText(LOST)).toBeInTheDocument();

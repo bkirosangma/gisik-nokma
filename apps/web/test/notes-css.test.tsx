@@ -3,9 +3,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, NoteSummary, SubmittedEvent } from '@gisik-nokma/domain';
+import { clearReadCaches } from '../src/clear-read-caches.js';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -94,6 +95,9 @@ function mediaBlocksTouching(css: string, prefix: string): Array<{ condition: st
   }
   return blocks;
 }
+
+// The shell's per-person reads are module state (smoothness T3/T4/T9): each case starts with none, as a first visit does.
+beforeEach(() => clearReadCaches());
 
 describe('18.226 the scanners are proven against planted input before they are trusted', () => {
   it('reads classes out of selectors, ignores commented-out ones', () => {
@@ -224,7 +228,12 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
   it('13.1486 the visible editor field carries a min-height built from --app-nav-offset (AMENDED: no longer the wrapper)', () => {
     const rule = declarationsFor(CSS, '.gn-notes__editor .ticket-editor .ticket-editor__content');
     expect(rule).not.toBeNull();
-    expect(rule ?? '').toMatch(/min-height:\s*max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    // AMENDED by smoothness T9 (25.156): the field reads `--gn-notes-editor-min`, declared once on `:root`, and the derivation
+    // this case pins now lives in that declaration (the skeleton in the route shell reads the same number).
+    expect(rule ?? '').toMatch(/min-height:\s*var\(--gn-notes-editor-min\)/);
+    expect(CSS.match(/--gn-notes-editor-min:\s*([^;]+);/)?.[1] ?? '').toMatch(
+      /max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/,
+    );
     expect(declarationsFor(CSS, '.gn-notes__editor') ?? '').not.toMatch(/min-height/);
   });
 
@@ -512,6 +521,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       getNote: async (_ws, id) => (id === OPEN_NOTE ? openNote : null),
       getNotes: async () => [{ ...openNote }, groupNote],
       getDeletedNotes: async () => [deletedNote],
+      getNoteComments: async () => [],
       getNoteHistory: async () => [{ eventId: 'ev_1', authorId: 'u_kiro', recordedAt: '2026-09-23T08:00:00.000Z', seq: 2 }],
       getNoteVersion: async () => body([paragraph('An earlier version')]),
       searchNotes: async (_ws, text, options) =>
@@ -558,6 +568,8 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByTestId('note-document');
+    // The composer is a button until reached for (smoothness T9, 25.153): `gn-notes__add-comment` is rendered once the thread has loaded.
+    await screen.findByRole('button', { name: /Add a comment/ });
     snap(container); // header, bar, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
     // group/group-title, deleted/restore button, session-absent, editor,
     // title, byline, author, edited, scope/scope-wrap, badges, reading-time,
@@ -678,13 +690,14 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     snap(emptyRender.container); // empty, dialog, dialog-empty, hint (NO_NOTE_COPY)
     emptyRender.unmount();
 
-    // Loading: the workspaces read never lands.
+    // Loading: the workspaces read never lands (a first visit: the shared read would otherwise carry the previous render's rows).
+    clearReadCaches();
     const loadingRender = render(
       <Providers services={stubServices({ getMyWorkspaces: () => new Promise(() => {}) })}>
         <NotesPage />
       </Providers>,
     );
-    await screen.findByText('Loading…');
+    await screen.findByText('Loading your notes'); // the tree's skeleton region (smoothness T9, 25.159), no longer "Loading…"
     snap(loadingRender.container); // loading
     loadingRender.unmount();
 
