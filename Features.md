@@ -3744,3 +3744,30 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- A T3 bullet -->
 <!-- A T4 bullet -->
 <!-- A T5 bullet -->
+
+### Reference index and "Linked from" (spec B)
+
+<!-- KG-B bullets -->
+
+### Knowledge Graph view (spec C)
+
+<!-- KG-C bullet -->
+
+### D — MCP graph query and semantic layer
+
+<!-- D T1 -->
+<!-- D T2 -->
+<!-- D T3 -->
+<!-- D T4 -->
+<!-- D T5 -->
+<!-- D T6 -->
+<!-- D T7 -->
+<!-- D T8 -->
+<!-- D T9 -->
+
+### Home (spec E)
+
+<!-- KG-E bullet T1 -->
+<!-- KG-E bullet T2 -->
+<!-- KG-E bullet T3 -->
+<!-- KG-E bullet T4 -->
