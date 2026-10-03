@@ -784,3 +784,4 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1977 🧪 audit: a delivered FIX (a fix message with that ref) satisfies it — no note
 - 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none
 - 13.1979 🧪 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled
+- 13.1980 🧪 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min
