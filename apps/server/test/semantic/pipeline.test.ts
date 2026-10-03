@@ -160,9 +160,8 @@ describe('27.407 sizes 3–12, and a community already ≥ 50% in one concept is
   });
 });
 
-// `meanUnit` has no case id of its own in the plan (27.415–27.419 are reserved); it is the item-vector step 1
-// (spec D §4.1), so it is pinned here rather than left untested.
-describe('meanUnit: the mean of unit vectors, re-normalised', () => {
+// `meanUnit` is the item-vector step 1 (spec D §4.1); planner 2026-10-03 12:08 gave it 27.415 (27.416–27.419 stay spare).
+describe('27.415 meanUnit: the mean of unit vectors, re-normalised', () => {
   it('averages then renormalises to unit length; control: opposite vectors (zero norm), no vectors and a wrong width all throw', () => {
     const axis = (index: number): Float32Array => {
       const v = new Float32Array(EMBEDDING_DIM);
