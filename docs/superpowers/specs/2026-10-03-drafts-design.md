@@ -68,7 +68,7 @@ Plans go in the order 1 → 2. Spec 2 builds on the primitives in this spec (§7
 
 **How events reach a device.**
 - The stream: `visibleEventsFor` (`visibility/visible-events-for.ts:442`) asks `canSee` per ticket event (`:493`). Events at or below the reader's cursor are never re-sent; a widening of reach is announced by a `reach-granted` notice that makes the device pull (`visibility/grant-backfill.ts:153` `GRANT_BACKFILL_TRIGGERS = ['visibility.set','ticket.reparented','ticket.assigned']`).
-- Bootstrap: `/v1/sync/bootstrap` lists `listVisibleTickets` (`sync/sync-routes.ts:495`) and pulls each with `bootstrapTicket` (`:199`); `/v1/sync/bootstrap/ticket` gates on `canSee` (`:432`).
+- Bootstrap: `/v1/sync/bootstrap` lists `listVisibleTickets` (`sync/sync-routes.ts:497`) and pulls each with `bootstrapTicket` (`:201`); `/v1/sync/bootstrap/ticket` gates on `canSee` (`:434`).
 - Reconcile: a device names the ids it holds and is told which it may no longer hold, by `canSee` (`sync/reconcile-route.ts:153`).
 
 **How events are committed.** `ingestAll` (`ingest/ingest-service.ts:432`) commits each event in its OWN transaction, in order (`commitOne`, `:166`). The gate order inside one commit is: purge check, permission (`checkPermission`), contest coherence, rule engine, server gates, insert, projections (`:255-330`). There is no batch atomicity.
@@ -218,7 +218,7 @@ This is the list the plan builds from. It is grouped by what the path needs. The
 | Single ticket: detail, events, ancestors, comments | `routes/tickets.ts:372,426,674,725,952` (detail `:372` is door G7; the attachment list `:864` is door G10) |
 | Ticket history (MCP `get_ticket_history`) | `routes/ticket-history.ts:281` |
 | Attachment upload and download gates | `routes/attachments.ts:412,627` — **also doors** (G10) |
-| The ticket list used by bootstrap and `GET /tickets` | `visibility/visible-tickets.ts:56,68` → `routes/tickets.ts:345`, `sync/sync-routes.ts:495`, `visibility/grant-backfill.ts:647` |
+| The ticket list used by bootstrap and `GET /tickets` | `visibility/visible-tickets.ts:56,68` → `routes/tickets.ts:345`, `sync/sync-routes.ts:497`, `visibility/grant-backfill.ts:647` |
 | Single-ticket live read | `read/live-ticket.ts:58` |
 | Notification recipients | `notifications/fanout.ts:85` (every recipient is gated by `canSeeTicket`, so no draft assignment or mention notice leaves the author's hands) |
 | Date-approaching and stale sweeps | `notifications/sweep.ts:125,187,265` |
@@ -257,11 +257,11 @@ This is the list the plan builds from. It is grouped by what the path needs. The
 |---|---|---|
 | G1 | permission for the allowlisted events (§3.3) | `check-permission.ts:1639`: replace `canSee` by a three-way `ticketAccess` (`visible` / `own-draft` / `none`); `own-draft` applies R6-R7 |
 | G2 | the stream | `visible-events-for.ts:493`: `canOpen` |
-| G3 | single-ticket bootstrap | `sync-routes.ts:432`: `canOpen` |
-| G4 | full bootstrap | `sync-routes.ts:495`: append the author's own drafts (`listMyDrafts`) after `listVisibleTickets` |
+| G3 | single-ticket bootstrap | `sync-routes.ts:434`: `canOpen` |
+| G4 | full bootstrap | `sync-routes.ts:497`: append the author's own drafts (`listMyDrafts`) after `listVisibleTickets` |
 | G5 | reconcile | `reconcile-route.ts:153`: `canOpen`. If this stayed `canSee`, a device would be told to purge its owner's own drafts at every catch-up |
 | G6 | contests roster | `contests-route.ts:293`: `canOpen` |
-| G7 | ticket detail | `routes/tickets.ts:372`: `canOpen`; the response carries `draft: true` and `key: null` |
+| G7 | ticket detail | `routes/tickets.ts:372`: `canOpen`; the response carries the folded `ticketState.draft` (`{ authorId, at }`) and `key: null`, and no new top-level wire field |
 | G8 | the Drafts list | new `GET /v1/workspaces/:id/drafts` and `GET /v1/me/drafts` (§12.2, §13) |
 | G9 | spec 2's graph reads | `canOpen` / `listMyDrafts` (spec 2 owns the route; §7.4) |
 | G10 | attachments of a draft | upload `routes/attachments.ts:412`, download `:627`, list `routes/tickets.ts:864`: `canOpen` (R56) |
@@ -379,7 +379,7 @@ R55. **Everything else spec 2 may rely on:** a single `ticket.published` commits
 ### 7.5 Rank on publish (owner ruling 6)
 
 R64. **A publish lands the ticket at the END of its project's Backlog.** Ranked rows draw above unranked rows, and unranked rows draw by ticket id (`packages/domain/src/rank.ts:85` `compareByRank`; `backlog-rank.ts:70`), so one new key on its own lands above every unranked row. The published ticket is therefore ranked the way a drag to the end is today: `planRankMove` (`packages/app-core/src/views/backlog-rank.ts:214`) backfills the unranked rows, in their drawn order, with ascending keys (`rankBetween`, `rank.ts:54`) and then gives the moved ticket the next key. The owner accepted that cost for drags ("one ingest, N+1 events", `backlog-rank.ts:195-199`).
-- The algorithm moves into `packages/domain/src/rank.ts` as `planTailRank(rows)` (pure; `planRankMove` calls it for its end-of-list case, with no change to its behaviour), so the server and the client share it.
+- The algorithm moves into `packages/domain/src/rank.ts` as `planTailRank(rows, tailIds)` (pure; `tailIds` names the tickets to place last; `planRankMove` calls it for its end-of-list case, with no change to its behaviour), so the server and the client share it.
 - Publishing is `ticket.published` followed by `ticket.ranked` (the rank needs the ticket to be in the Backlog, `refusal-rules.ts:40` `rank-requires-backlog`, so the rank cannot precede the publish). The backfill `ticket.ranked` events come first. Through `POST …/drafts/publish` and `publish_draft` the server builds all of them and commits them in the one transaction (R47/R48); through the app's single publish and offline, the client sends the batch and `submitRank`'s partial-application rule applies (`backlog-rank.ts:209-218`).
 - For a set (R48), the backfill runs once per project, then each published ticket takes the next key in the given order.
 R65. **Whose rows.** The backfill ranks the Backlog rows the PUBLISHER can see (`visibleTicketsWhere`), as a drag does. Rows they cannot see stay unranked and so draw below the new ticket for people who can see them (Q15).
@@ -467,7 +467,7 @@ The registry order is unchanged. `tools/verify-projections.ts` must stay clean w
 - Tabs: **Details** and, once spec 2 lands, **Graph**. **Attachments** is shown (R56) and the Notes section works (R66); **History** is hidden while it is a draft (it shows the whole stream after publish), and comments are not offered. Hidden controls for the refused events of R7 are disabled with the reason ("Available after you publish"), not removed, so the layout does not move on publish.
 - **Publish** confirms nothing. It submits `ticket.published` plus the rank events (R64); on commit the pill is replaced by the key the server returns on the next read, and the ticket appears last in the project's Backlog.
 - **Discard** opens a confirmation: "Discard this draft? It is erased and can't be recovered." plus "N sub-drafts will be erased too" when there are any, and "N attachments uploaded to this draft will be permanently deleted" when there are any (R60). Notes linked to the draft are not deleted; the dialog says "Linked notes are kept and unlinked." Button **Discard draft**.
-- The wire view `TicketRead` (`packages/app-core/src/view-types.ts:639`) gains `draft?: true`; `TicketSummary`, `BoardCard` and list rows never carry a draft (the server never returns one there).
+- The wire view `TicketRead` (`packages/app-core/src/view-types.ts:639`) gains `draft?: true`, which the client maps from the detail's `ticketState.draft` (G7 serves no separate `draft` field); `TicketSummary`, `BoardCard` and list rows never carry a draft (the server never returns one there).
 
 ### 12.4 Offline
 
@@ -599,7 +599,7 @@ Q-numbers are stable. Resolved by the owner's review and removed: Q1 (Drafts pag
 - `apps/server/src/routes/tickets.ts`, `builder-reads.ts`, `people.ts`, a new `routes/drafts.ts`
 - `apps/server/src/ingest/ingest-service.ts` (`commitInTx`, `ingestAtomic`), a new `routes/drafts-publish.ts`
 - `apps/server/src/routes/attachments.ts` (G10), `routes/tickets.ts` (attachment list)
-- `packages/domain/src/rank.ts` (`planTailRank`), `packages/app-core/src/views/backlog-rank.ts`
+- `packages/domain/src/rank.ts` (`planTailRank(rows, tailIds)`), `packages/app-core/src/views/backlog-rank.ts`
 - `apps/server/src/purge/purge-item.ts`, `sweep.ts`, a new `discard-draft.ts`; `notifications/fanout.ts`, `sweep.ts`; `auto-close/sweep.ts`
 - `packages/app-core/src/views/new-ticket-dialog.tsx`, `create-ticket-flow.tsx`, `ticket-sheet.tsx`, `history-copy.ts`, a new `drafts-page.tsx`; `view-types.ts`; `replica/replica-data-source.ts`; `precheck.ts`
 - `packages/sync-client/src/outbox/outbox.ts`, `replica/replica.ts`

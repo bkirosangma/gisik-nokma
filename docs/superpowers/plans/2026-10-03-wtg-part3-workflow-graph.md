@@ -1,0 +1,13354 @@
+# The Workflow graph (Workflow and Timeline graphs, Part 3) Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE. UI tasks (T5 to T10, T12) name **`frontend-design`** in the lane prompt and measure real geometry by painting the worktree on a lane port (`next dev -p <port>` against the running API, no compose: rule #23; the recipe is `memory/browser-measurement.md`; kill that server when done).
+
+**Goal:** the Graph tab of the ticket sheet at `min(1240px, 94vw)` with a Knowledge | Workflow | Timeline switch, and in it the Workflow graph: a ticket's whole flow drawn as boxes, diamonds, labelled branches, loops and dotted note blocks, with an inspector, the Decide control with its confirmation, "Not taken" / alternates / pass display, creating draft steps from a "+" handle, and Publish flow.
+
+**Architecture:**
+- **A new package `@gisik-nokma/flow-graph`.** Four pure layers and one DOM class: `layout/` (ELK in a Worker for one strip, then our own fold into bands and our own leaf placement), `scene/` (a `SceneInput` from the app becomes a `Scene`: measured boxes, routed edges, note stacks), `render/` (`FlowStage`: DOM nodes and SVG edges inside ONE transformed layer that Part 1's `CameraAdapter` moves; taps are geometry, because the camera captures the pointer). The package imports no domain, app-core, server or web code and only `layout/elk.ts` names `elkjs`. T1 MEASURES ELK against spec §13 before any scene work and pins what it found.
+- **Server.** `GET /v1/workspaces/:ws/tickets/:id/flow` answers one `FlowRead` for one viewer: Part 2's ring-by-ring walk plus Part 2's `analyzeFlow` / `planFlow`, joined by the pure `buildFlowRead` (alternates, taken passes, IST-day periods, planned intervals, tray reasons) with titles, keys, state names, visible notes and pin counts. `POST …/tickets/:id/decide` (with `dryRun`) is the Decide door.
+- **Client.** `DataSource.query.getFlow` (online; the replica answers with a named gap), app-core's pure `workflow-graph/flow-model.ts` (`FlowRead` to `SceneInput`, the sentences, the diff of two reads, `linkEventFor`, `publishOrder`), and a web panel `apps/web/src/workflow-graph/` loaded through `next/dynamic({ ssr: false })` so ELK, the stage and the camera cost nothing on a route that opens no graph.
+
+**Tech stack:** TypeScript (strict, `noUncheckedIndexedAccess`, NodeNext), `elkjs` 0.12.0 pinned exactly (Worker), React 19, Next 15, Fastify, Postgres (read-only in this plan: no migration), vitest 3 (node and jsdom), Playwright (Part 1's `packages/flow-graph-browser`).
+
+**Spec:** `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md`, **Part 3 (§9–10)**; read Parts 1, 2 and 4 for context. Also `docs/superpowers/specs/2026-10-03-drafts-design.md` §3, §7.4, §10 and §12. Code was read at `origin/release/knowledge-graph` @ `ec72d1f8`; every `file:line` below was read there unless it says "per plan". Part 1, Part 2, the Drafts release and the KG release's own code (Graph tab, `knowledgeGraphSlot`, token recipe) are NOT on that tip: they are cited from their plans in the "Consumed contract" table, and **the landed code governs** (every task's Step 0 re-reads the names it uses).
+
+**New package.** This plan adds `packages/flow-graph` (build, test, typecheck). T1 changes the gate's task count (`scripts/ctl/verbs/gate.sh`: 41-only at `:55` on the KG tip, and whatever Graph Part 1 T1 pinned by the time this plan runs). The verb that runs is the PRIMARY checkout's, so T1 lands in TWO PRs with the same procedure as Graph Part 1 T1 (planner ruling P6): **PR A** (`task/wtg3-gate-widen`, small, lands first and alone) widens the verb to accept `N or M` (N = the count measured on the base, M = the count with `flow-graph`; both MEASURED at execution, never copied); **OWNER ACTION:** the owner pulls the primary checkout; **PR B** (`task/wtg3-measure`, everything else) pins `M` only in its last commit; **OWNER ACTION:** the owner pulls the primary checkout again after PR B lands.
+
+**Owner is away.** Three steps stop and report instead of deciding (each says STOP): T1 Step 8 (an ELK bar misses), T1 Step 9 (the real phone), T5 Step 7 (a pan bar misses). Everything else proceeds autonomously.
+
+| Needs | From | Used by |
+|---|---|---|
+| `@gisik-nokma/viewport`: `CameraAdapter` (`camera()`, `getCamera()`, `toWorld()`, `destroy()`), `packages/flow-graph-browser` (private Playwright package: Vite page, own port, `NEEDS: browser`) | Part 1 | T1 (harness), T5, T7 |
+| Model: `leads_to` + label, the Decision type, `ticket.decided`, estimate / rework estimate / wait-for-all fields, periods, rounds, passes, flow causes, `analyzeFlow`, `planFlow`, `branchOf`, `sameLabel`, `readFlow(db, {workspaceId, seedId, viewerId, cap?})`, `planSettle`, the settle listener | Part 2 (T2, T5, T9, T10, T11, T12, T15, T16) | T3, T7, T8, T11, T12 |
+| `ticket.created {draft:true, start:'backlog'}`, `ticket.link_added` with the additive `from`, `POST /v1/workspaces/:ws/drafts/publish`, `ingestAtomic` and its client door `ingestClientAtomic`, `listMyDrafts`, `draft_author_id` | Drafts plan (spec R1–R3, R42–R44, R47–R49, R55) | T3, T9, T11 |
+| The Graph tab (`knowledgeGraphSlot`, one-option inner switch), `cardKeysFor` exported, the token recipe (`TOKEN_ROLES`, `CONTRAST_PAIRS`), `packages/ui/test/helpers/colour-scan.ts` | KG C (T1, T4, T9) | T1, T4, T6 |
+| `ticket.link_added` / `ticket.link_removed`, the Links section | typed-links (spec A) | T8, T9 |
+| `note.attached`, `visibleNotesWhere`, `NOTE_PROJECT_LIVE_WHERE` | Notes series (on the tip) | T3, T10 |
+
+**Order:** T1 → T2 → T4 → T5 (the package). T3 is the server read and needs Part 2's T12 and Drafts' T1; it runs in parallel with T1 and T2. T6 needs the KG release's Graph tab. T7 needs T3, T4, T5 and T6. T7, T8, T9 and T10 are a chain for the view files: each edits `workflow-view.tsx` (and `workflow-panel.tsx`, `support.tsx`, the view test) as a diff on the one before, so T9 needs T8 merged and T10 needs T9 merged. T11 needs T3, Part 2's T16 and the Drafts task that adds `ingestClientAtomic` (it touches no web file and can start any time after them). T12 needs T8, T9, T10 and T11 (it is a diff on T10's end state). T1, T5, T6, T7 to T10 and T12 need `NEEDS: browser`; T3 and T11 need `NEEDS: db`.
+
+## Global Constraints
+
+**Release and identity**
+- **Release:** a NEW release branch `release/<next>`, cut after the Knowledge Graph release ships (one release branch at a time; the literal `<next>` is filled when the owner cuts it). Every task branch is `task/wtg3-<slug>` cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`.
+- **Land with** `ctl gate <sha> --base release/<next>` then `ctl land <pr> --base release/<next>`, with the same `--repo` for both.
+- **Plan id** (ledger and `check:tasks`): `wtg-part3-workflow-graph` (the file stem after the date, `scripts/check-task-ledger.mjs:263`).
+- **Prerequisites for T1:** Part 1's first task has landed (it creates `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` and the Playwright package `packages/flow-graph-browser`), and the KG release is on the branch.
+
+**Catalogue**
+- Features.md **§26 "Workflow and Timeline graphs"** ↔ `test-cases/29-workflow-timeline-graphs.md`. This plan owns **`29.230`–`29.289`** and tiles them per task: **T1 29.230–29.233 · T2 29.234–29.239 · T3 29.240–29.245 · T4 29.246–29.250 · T5 29.251–29.254 · T6 29.255–29.259 · T7 29.260–29.262 · T8 29.263–29.266 · T9 29.267–29.269 · T10 29.270–29.275 · T11 29.276–29.279 · T12 29.280–29.289**. (Spec §16.1 labels 29.230–29.269 "sheet, Workflow graph, create and publish" and 29.270–29.289 "note blocks, alternates, Not taken and pass display"; the per-task split is this plan's and every id is used once.)
+- Case lines are id LINES: `- ❌ **29.230 — …**` (`test-cases/18-notes.md:23`). Each starts ❌ and flips ✅ in the same commit as its test; 🟡 is for an automated half that is green while a manual half (the real phone) is pending, with the manual half named in the line. Test names or comments carry the id. `pnpm check:citations` needs every ✅ id in a test; `node scripts/check-case-ids.mjs` counts id LINES (suffixed ids are not policed, so never write a range as one line).
+- **Before allocating,** re-grep every live tip: `for b in $(git for-each-ref refs/remotes/origin --format='%(refname:short)'); do git grep -l '29\.2[3-8][0-9]' "${b}" -- Features.md test-cases >/dev/null 2>&1 && echo "$b"; done`. Expect no hit but a line of Part 1's own sub-block table. Part 1 T1 seeds ONE Part 3 anchor in each file (`<!-- wtg-part3-workflow-graph -->` in file 29, `<!-- wtg-part3-workflow-graph bullets -->` in Features §26). T1 Step 0 writes the Part 3 sub-section and one anchor per task directly below them in BOTH files (efficiency rule #21), keeping the Part anchor lines, so parallel tasks never append at one line.
+- **Ledger:** rows at the end of this plan, status `todo`.
+
+**Numbers, copied from the spec (§9.3, §10, §13)**
+- Sizes: ticket **140 x 64**, Decision **176 x 108**, note block **140 x 40**, pills **22** high; a phone ticket block is **156** wide and grows to hold a title of up to **3** lines (a phone note title wraps to 2); orientation is **portrait below 40rem** of the graph container, landscape otherwise; positions are computed per view and **never saved**.
+- Sheet: `width: min(1240px, 94vw)` for EVERY view while the Graph tab is open; every other tab stays `min(40rem, 94vw)`; full screen drops the **53.75rem** body cap on the Graph tab.
+- Notes: at most **3** note blocks per ticket, then one `+N notes` block; **8 px** apart; the dotted line is **1.5 px**, dash `2 4`, round caps, no arrowhead.
+- Edges: `leads_to` solid 2 px with an arrowhead; `blocks` dashed 1.6 px at 60%, labelled `blocks`; a loop label reads `Needs rework ↺ 2` (the count absent at 0); the chosen edge of a settled Decision is full weight, the others 40% with the tooltip `not chosen`.
+- Bars (§13, measured in T1 and T5 BEFORE the scene code is relied on): ELK **150 nodes / 200 edges p95 <= 250 ms** desktop (Worker), **60 nodes <= 700 ms** on the phone, **no main-thread task over 50 ms**; adding one leaf keeps **>= 90%** of the nodes within **1 px**; pan of a **300-node** flow on desktop **>= 60 fps with a worst frame <= 16.7 ms**, of a **100-node** flow on the phone **>= 30 fps with a worst frame <= 50 ms**; `GET …/flow` at 300 tickets **p95 <= 120 ms** (Part 4 T1 measures it); first-load JS on routes that open no graph: no increase. A bar that fails is STOP-AND-REPORT.
+- Contrast: edge, dotted-line and outline pairs **3:1**, text pairs **4.5:1**, light and dark, in `packages/ui/test/tokens.test.ts`. A Not-taken ticket is faded by a **pale fill and a dashed border, never by reduced opacity**.
+
+**Copy rules (exact strings)**
+- **No `" — "` and no `" · "` in anything a person reads.** `packages/app-core/test/copy/ui-copy.test.ts` 23.191 sweeps `apps/web/src`, `apps/web/app`, `packages/app-core/src` and `packages/ui/src` for both (strings, template chunks and JSX text; comments are exempt), 23.370 sweeps `packages/domain/src` and 23.372 `packages/mcp-server/src` for the dash, and 23.190 forbids the words `job` and `stage` in those UI strings (a CSS class such as `gn-wf__stage` does not match `\bstage\b`). The spec's own sentences use both marks (a Not-taken tooltip `Not taken — pass 1, via GN-151 Client decides · Yes`, a Passes row `Pass 1 · Yes · chosen by …`); this plan writes them without: `Not taken, pass 1, via GN-151 Client decides (chose Yes)`, and a Decision's outcome and `Pass 2` are two chips. `packages/flow-graph` is not in those roots, so its tests assert the same property for what it draws (29.251).
+- Tab `Graph`; inner switch `aria-label "Graph views"` with `Knowledge`, `Workflow`, `Timeline` (drawn only with two or more); no `Start` button in the sheet header.
+- Empty: `This ticket isn't in a flow yet. Add what comes next.`
+- Header chips: `N tickets in this flow` (`1 ticket in this flow`), `Leads to N`, `Blocks N`, `Notes N`, switch `Show notes`.
+- Draft banner: `N drafts in this flow. Only you can see them. Publishing makes every draft a Backlog ticket.` (`1 draft in this flow. …`), button `Publish flow`.
+- Form: title `New draft after <KEY>`; fields `Title`, `Type` (`Task`, `Decision`), `Estimate (days)`, optional `Start`, `Due`; helper `Starts when <KEY> is done, unless you give it dates.`; buttons `Cancel`, `Create draft`.
+- Inspector: `Wait for all incoming`; helper `Off: it moves as soon as any ticket that leads here is done. On: it waits for all of them.`; `Comes after`, `Leads to`, `Alternate of`, `Passes`, `Rework estimate`, `Automatic moves in this flow`, `Open ticket`, `Open note`, `Decide`.
+- Chips: `Not taken` (`Not taken (pass 2)` from pass 2), `Pass 2`, `Draft`, `waits for all`, `↺2` after a key.
+- Accessible list heading `This flow, in order`; row `GN-147 Pitch is approved, after GN-144 (Yes)`, with `. Notes: Pitch brief, Client call` appended when it has visible notes (the spec's WG-7 sentence).
+
+**Decisions this plan takes** (each is reported to the planner and is one branch to change)
+- **D-W3-1 One package, one `elkjs` importer.** Spec §9.2 says "only `packages/flow-graph/src/render/` and `layout/elk.ts` import `elkjs`". `render/` never needs ELK (it draws a finished `Scene`), so the seam check (T1, case 29.230) allows `src/layout/elk.ts` alone, plus the test-side `test/engine/inprocess.ts`. The check reads the RESOLVED imports of the TypeScript program, not a regex, so a side-effect or dynamic import is caught (the KG's lesson).
+- **D-W3-2 A plain strip, then our own fold; our own leaf placement.** MEASURED in T1 (Node, `test/layout/findings.test.ts`): ELK's `MULTI_EDGE` wrapping dropped route sections, drew diagonal segments and threw (`Cannot read properties of undefined`) on random flows, with zero defects without it; and raw ELK moves more than 10% of the nodes for at least one source leaf of the mockup flow (spec §13 wants at most 10%). So `layoutFlow` asks ELK for one strip and `foldBands` (landscape, more than 8 nodes) cuts it into bands; `placeLeaves` puts a lone new leaf beside its source without asking ELK at all (existing nodes keep their pixels: stable share 1.0). Any other change is a full re-layout and a 240 ms glide of the nodes that moved (`diffLayouts`).
+- **D-W3-3 Taps are geometry.** `CameraAdapter` captures the pointer, so no `click` reaches a node. `FlowStage` records down/up and resolves the tap with `pickAt` on the scene. The "+" handle link-drag stops the camera's pointerdown with `stopImmediatePropagation` (the stage registers its listeners first on the same element), and is off where `onLink` is unset (the phone uses the sheet's Links section, spec WG-4).
+- **D-W3-4 This plan owns `GET …/tickets/:id/flow` and its read.** Part 2's contract describes the route as a small `FlowReadWire {rootId, tickets, links, truncated, reached}` (CONTRACT T12); Part 4 and Part 5 want the richer `FlowRead` (alternates, taken passes, periods, planned, tray, pin, notes, autoMoves). T3 returns the rich one from the same path and names the server function `readFlowView` (Part 2's `readFlow` stays the internal walk). Part 4's case 29.292 ("Part 3's `readFlow` on a 300-ticket flow is p95 <= 120 ms") measures `readFlowView`. Reported.
+- **D-W3-5 Dates on the wire are IST days.** `periods`, `planned` and `actual` are `YYYY-MM-DD` (Part 4's consumed-contract row says the same); Part 2 stores instants, so `buildFlowRead` converts with `istDayOf` (`packages/domain/src/ist-day.ts:43`). `pin` carries counts `{notes, attachments}` (spec :714 and TG-11), not the boolean at spec :174 (Part 5's review notes ask for the same fix).
+- **D-W3-6 Alternates are "exactly one branch".** PS-7 gives an alternate line to "a ticket that is on exactly one branch of a Decision". `buildFlowRead` computes it with Part 2's `branchOf`: a ticket on none (the Decision itself, a ticket before it, a loop target reached by a back edge only) or on several (the shared tail of a diamond) gets nothing from that Decision.
+- **D-W3-7 The Decide control asks the server for its plan.** PS-6 says the control "computes `planSettle` locally". The browser holds only the visible subgraph, and a hidden ticket between two visible ones changes the plan, so a local plan could be wrong. `POST …/decide` with `dryRun: true` runs Part 2's `planSettle` over the whole flow (`viewerId: null` walk) on the server, then NAMES only tickets the viewer can see and answers `hiddenMoves: true` for the rest ("Some steps you can't see will also move", no count).
+- **D-W3-8 `FlowRead` over the replica.** `getFlow`, `previewDecide`, `decide` and `publishFlow` are online-only: an offline device cannot walk a flow it does not hold (the roster, attachments counts and other people's notes are not local), and a partial flow would be a wrong one. The replica rejects each with a `ReplicaGapError` (the `ATTENTION_ABSENCES` pattern, `replica-data-source.ts:448`, `:1337`); the "+ New step" and Publish buttons say "Needs a connection".
+- **D-W3-9 Creating a step is two events with a cleanup.** The draft's `ticket.created` and its `leads_to` link (filed on the DRAFT's stream with `from = source`, Drafts R42–R43) go through `dataSource.ingest` in order; if the link is refused the form files `ticket.discarded` for the orphan and shows the refusal. A private orphan draft would be harmless (it sits on the Drafts page) but a form that leaves one behind on a refusal is a form that lies.
+- **D-W3-10 The new draft's place in the hierarchy.** It takes the SOURCE's project and parent (Drafts R5: the deepest rank needs a parent at creation). A source with no parent gives a parentless draft, which the engine accepts for any rank above the deepest; a refusal is shown in the form.
+- **D-W3-11 Publish order.** Flow order (FL-3) with every parent before its child: `publishOrder(read)` takes the drafts in `read.order` and moves a draft that precedes its own unpublished parent to just after that parent (Drafts R51: the route does not sort). The ticket-sheet button is disabled with a reason while offline or when a draft's parent or type is no longer valid; the refusal body names the draft (`409 draft.publish-refused {ticketId, cause}`).
+- **D-W3-12 Remembered choices.** The Graph tab's inner switch (`gn.graph.view`) and the Show notes switch (`gn.flow.notes`) live in `localStorage`, every access in try/catch; with storage blocked the defaults hold (the view shown on opening is the last remembered one, else the first one drawn: Knowledge, then Workflow, then Timeline).
+- **D-W3-13 Colours are seven new token roles** (T4): `flowEdge`, `flowEdgeMuted`, `flowNoteLine`, `flowNoteFill`, `flowNotTakenFill`, `flowNotTakenLine`, `flowCanvas`. Ticket text, dots and status use the existing roles; the status dots reuse `categoryOpen / categoryActive / categoryTerminal`. The candidate values were contrast-checked against the six surfaces; T4's test loop measures them and the lane steps a value by `0x080808` if a pair fails.
+- **D-W3-14 The Decide door files two events atomically as the session user.** `ticket.decided` and, when the Decision is not terminal yet, the person's finishing `ticket.transitioned` (DC-5), through `ingestClientAtomic` (Drafts' client door for `ingestAtomic`). Origin is `request.authKind === 'mcp-token' ? 'mcp' : 'web'` (`routes/workspaces.ts:68`). Everything the choice causes is Part 2's settle listener's work (`cascade: 'pending'`), so the response says what was filed, not what the cascade will do.
+- **D-W3-15 Node ordering inside a lane.** `FlowRead.nodes` are in flow order (FL-3); the scene, the accessible list and the Publish order read that order and nothing re-sorts.
+
+- **Decisions D-W3-16 to D-W3-52 are written in the task that takes them,** so the lane that changes a decision reads it beside the code: T6 takes 16 to 18, T7 19 to 24, T8 25 to 31, T9 32 to 35, T10 36 to 40, T11 41 to 45, T12 46 to 52. Every one is reported to the planner and is one branch to change.
+
+**What must not change**
+- Part 2's flow read (`readFlow`) and `planFlow` / `planSettle` signatures; this plan calls them.
+- `GET …/tickets/:id`, the List and Board reads, `ticket.created` for a published ticket.
+- Every other tab of the ticket sheet keeps `min(40rem, 94vw)` and its present layout; `16.81` keeps counting the tabs (T6 amends it for the sheet WITH slots).
+- Visibility: a hidden ticket is a hole in a flow (the walk does not pass through it) and absent from nodes, counts and the accessible list; a hidden note is absent and uncounted (D5).
+
+**Tests and tooling**
+- **Node 22** for `pnpm install` in a worktree.
+- Every test run goes through the slot runner: `SR=/Users/kiro/my_projects/gisik-nokma-lanes/slot-run.sh; "$SR" <label> -- <cmd> > /tmp/<label>.log 2>&1; tail -30 /tmp/<label>.log`. Labels below are per task (`wtg3-t1` …). Commands below are written without the wrapper for brevity; wrap every one.
+- **Never pipe a test or build run into `head`.** Use `| tail -N` or `> /tmp/x.log 2>&1`. vitest `--maxWorkers=2`. No `pkill` / `killall`.
+- **Build before suites.** Web reads app-core's `dist`, app-core reads the flow-graph `dist` only through the web panel; the server reads domain, rule-engine and app-core `dist`: `pnpm turbo run build --filter=@gisik-nokma/web...`.
+- **App-core online/sync changes** (T3, T11) ⇒ also run the server integration files (`apps/server/test/integration/*.test.ts`) WHOLE. An editor/domain change ⇒ regenerate the mobile editor bundle (this plan adds no event, notification kind or registry entry; T3 greps and says so).
+- **`ui.css` changes** (T4–T12) ⇒ run the ui, app-core and web suites WHOLE.
+- **Every run quoted in a report is named LOCAL.** CI runs only on the release→main PR.
+- **Controls live in the same `it()`** as the case they guard (a refusal test also proves the same call with one input changed is accepted).
+- **A new event type, notification kind or cause** ⇒ update EVERY vocabulary census in the same task (`apps/server/test/census/ticket-vocabulary-census.test.ts`). This plan adds none; if a lane finds it needs one, it STOPs and reports.
+- **Features.md and `test-cases/`** change in the same commit as the code.
+- **Prose is a claim.** A docblock, Features line or case that says the sheet has three tabs, or that the Graph tab is Knowledge only, is rewritten in the commit that makes it false (T6 lists its sites).
+- Gate task count and every pinned member/registry count are MEASURED on the tip at execution and pinned in the same task that changes them; never copy a number from this plan.
+
+## Consumed contract
+
+Names this plan calls but does not write. "Per plan X" means that plan's text; **the landed code governs**, and each task's Step 0 re-reads the row it uses and changes only its call sites.
+
+| Name | Per plan | Shape this plan assumes |
+|---|---|---|
+| `CameraAdapter` from `@gisik-nokma/viewport` | Part 1 (`src/dom/camera-adapter.ts`) | `new CameraAdapter(options)` binding its listeners to `options.el`; `camera(target: Partial<{x,y,zoom}>, {instant?, maxMs?})`, `getCamera()`, `toWorld(px)`, `destroy()` |
+| `packages/flow-graph-browser` | Part 1 | private Playwright package with a Vite page, its own port, a `tests/` directory; T1 and T5 add pages and specs to it |
+| `FlowNode`, `FlowEdge {sourceId, targetId, label}`, `edgeKey`, `FlowAnalysis {starts, ends, backEdges, order}`, `analyzeFlow`, `FlowPlan`, `NodePlan {intervals, unscheduled, onTimeline}`, `planFlow`, `branchOf`, `sameLabel`, `PassRecord`, `WorkPeriod`, `NotTakenResolution`, `SYSTEM_ACTOR_FLOW`, `DECISION_TYPE_ID`, `ticketDecidedPayload` | Part 2 (T5, T8–T11) | as `wtg2/CONTRACT.md` pins them (`packages/domain/src/flow/*`, exported from `@gisik-nokma/domain`) |
+| `readFlow(db, {workspaceId, seedId, viewerId, cap?}) → {nodes: FlowNode[], edges: FlowEdge[], truncated, reached}` | Part 2 T12 (`apps/server/src/flow/read-flow.ts`) | `viewerId: null` ignores visibility; a viewer gets their own drafts only |
+| `planSettle({nodes, edges, decisionId, closeStarted?}) → {steps, blocked, started, touchesOthers}` and `SettleStep.kind` in `reopen`, `to-initial`, `to-backlog`, `not-taken-transition`, `not-taken-close` | Part 2 T15 | pure, `packages/domain/src/flow/settle.ts` |
+| settle listener, gates `decision.cascade-blocked`, `decision.bad-close-started` | Part 2 T16 | the cascade after a committed `ticket.decided`; gates run on the person's events |
+| `ingestClientAtomic(rawEvents, sessionUserId) → AtomicOutcome` on `ClientIngest`, `AtomicOutcome = {status: 'committed', results: IngestResult[]} \| {status: 'rolled-back', index, result: IngestResult}` | Drafts plan (spec R47, T5b) | the gated client door over `ingestAtomic` (all or none); if the Drafts plan named it or shaped its answer differently, T11 Step 0 changes the one call and the one `if` that reads it |
+| `listMyDrafts(db, userId, workspaceId)` | Drafts plan (R55) | newest first |
+| `POST /v1/workspaces/:ws/drafts/publish {ticketIds}` | Drafts plan (R48, R49) | `200 {results: [{ticketId, key}]}`, `409 {rule:'draft.publish-refused', ticketId, cause:{rule, reason}}` |
+| `knowledgeGraphSlot`, the Graph tab, `GraphPanel` / `graph-panel.tsx` | KG C T9 | `TicketSheetProps.knowledgeGraphSlot?: (props: { workspaceId; ticketId; onOpenTicket?; onShowLinks }) => ReactElement \| null`; the tab value is `'graph'` |
+| `cardKeysFor(db, rows) → Map<ticketId, key \| null>` | KG C T1 (exported) | already `export async function cardKeysFor` at `apps/server/src/read/ticket-cards.ts:325` on `origin/release/knowledge-graph` (7834d3c6); nobody exports it again |
+| `TOKEN_ROLES`, `themes.light/dark`, `CONTRAST_PAIRS`, `colorOf`, `contrastRatio`, `cssVariableName`, `themeStylesheet` | KG C T4 (recipe) | in `packages/ui/src/tokens.ts` and `packages/ui/test/tokens.test.ts` |
+
+## Review Focus
+
+1. **A hidden ticket inside a flow.** A ticket the viewer cannot see between two they can is a hole: the flow neither passes through it nor counts it, no edge names it, the Publish and Decide plans do not name it, and a Decide dry run says "Some steps you can't see will also move" without a number. Pinned by 29.243 (T3) and 29.276 (T11).
+2. **A flow of one, and a flow with a loop only.** A ticket in no flow draws itself with Start and End and the sentence "This ticket isn't in a flow yet. Add what comes next."; a Decision whose only forward edge loops back has no alternates and no Not-taken ticket. Pinned by 29.262 (T7) and 29.240 (T3).
+3. **Publish with a draft whose parent is also a draft, listed after it.** The route does not sort; a child before its unpublished parent rolls the whole batch back. `publishOrder` must put the parent first, and a refusal names the draft. Pinned by 29.269 (T9).
+4. **A revision to the other branch with a started ticket on the branch being left.** The confirmation lists each started ticket with two options of equal weight and neither pre-selected, Confirm stays disabled until each has a choice, and a plan the engine would refuse writes nothing. Pinned by 29.287 and 29.288 (T12), 29.278 (T11).
+5. **A phone-width flow with long titles and many notes.** Measured block sizes (never 64 px) keep wrapped titles from overlapping, note stacks stay in the layout, the "+N notes" block opens the ticket's Notes, and the greyscale rendering still names every status. Pinned by 29.234 and 29.239 (T2), 29.271, 29.272 and 29.274 (T10), 29.289 (T12).
+
+---
+
+## File structure
+
+| File | Responsibility | Task |
+|---|---|---|
+| `packages/flow-graph/{package.json,tsconfig.json,tsconfig.typecheck.json,vitest.config.ts,test/setup.ts}` (new) | the package; `elkjs` 0.12.0 pinned; `exports` `.` and `./testing` | 1 |
+| `packages/flow-graph/src/types.ts` | `Orientation`, `LayoutNode`, `LayoutEdge`, `LayoutInput`, `FlowLayout`, `NOTE_GAP`, `boxSize` (T2) | 1, 2 |
+| `packages/flow-graph/src/layout/{elk,graph-input,from-elk,layout}.ts` | the only `elkjs` importer; the ELK graph with ports and measured sizes; ELK's answer to routed boxes; one full layout | 1, 2 |
+| `packages/flow-graph/src/layout/{measure,orientation,fold,incremental,diff}.ts` | measured blocks and wrapped titles; portrait below 40rem; the band fold; lone-leaf placement; the move diff | 2 |
+| `packages/flow-graph/src/testing/fixtures.ts` | the mockup flow, synthetic flows, `withLeaf` (subpath `./testing`) | 1 |
+| `packages/flow-graph/src/scene/{types,geometry,build-scene}.ts`, `src/scene/notes.ts` | `SceneInput` to `Scene`; rounded orthogonal paths; the note stack and dotted tree (T10) | 4, 10 |
+| `packages/flow-graph/src/render/{fit,pick,stage}.ts` | camera maths, geometry picking, `FlowStage` | 5 |
+| `packages/flow-graph/test/**` | seam, layout, scene, stage tests | 1, 2, 4, 5, 10 |
+| `packages/flow-graph-browser/{harness,tests}/elk-bars.*`, `flow-pan.*` (new files in Part 1's package) | the Worker ELK bars; the 300-node and 100-node pan bars | 1, 5 |
+| `packages/domain/src/read-models-flow.ts` (new), `packages/domain/src/flow/flow-read.ts` (new), `packages/domain/src/index.ts`, Part 2's `flow/index.ts` | `FlowRead` and friends; the pure `buildFlowRead` | 3 |
+| `apps/server/src/flow/{flow-view,flow-facts,auto-moves}.ts` (new), `apps/server/src/routes/flow.ts` (Part 2 T12's file, its route replaced), `apps/server/src/app.ts` | the read for one viewer and its route | 3 |
+| `apps/server/src/read/notes.ts`, `apps/server/src/read/ticket-cards.ts` | `listNotesForTickets`; `titleOf` exported (`cardKeysFor` is already exported on the KG tip) | 3 |
+| `apps/server/src/flow/decide-preview.ts` (new), `apps/server/src/routes/flow.ts` (the second route), `apps/server/src/http/http-origin.ts`, `apps/server/src/app.ts` | the Decide door: the pure refusals and plan naming, the dry run and the atomic write | 11 |
+| `packages/app-core/src/data-source.ts`, `online/{online-data-source,mappers,decide-door}.ts`, `replica/replica-data-source.ts`, `index.ts` | `getFlow`, `previewDecide`, `decide`, `publishFlow`; mappers; replica gaps | 3, 9, 11 |
+| `packages/app-core/src/workflow-graph/{flow-model,flow-sentences,flow-diff,inspector-model,inspector-events,link-events,step-events,notes-model,decide-model,testing,index}.ts` (new), `packages/app-core/package.json` (`./workflow-graph` and `./workflow-graph/testing` exports) | pure: `FlowRead` to `SceneInput`; sentences; read diff; the inspector, link, step, note and Decide models; publish order; the test fixtures | 7–12 |
+| `packages/app-core/src/views/ticket-sheet.tsx`, `packages/ui/src/components/sheet.tsx`, `packages/ui/src/ui.css` | the `workflowGraphSlot`, the inner switch, the wide sheet | 6 |
+| `packages/ui/src/tokens.ts`, `packages/ui/test/tokens.test.ts`, `packages/ui/src/ui.css` (`/* WTG3 Tn */` blocks) | seven token roles; `.gn-flow*` rules | 4–12 |
+| `apps/web/src/workflow-graph/{workflow-panel,workflow-canvas,flow-inspector,new-step-form,publish-banner,decide-control,decide-dialog,flow-list,flow-header}.tsx` (new), `apps/web/src/workflow-graph/use-*.ts` | the panel and its parts | 6–12 |
+| the three `<TicketSheet>` hosts (`my-work/page.tsx`, `p/[projectId]/page.tsx`, `notes/note-document.tsx`) | `workflowGraphSlot={TicketWorkflowTab}` | 6 |
+| `scripts/ctl/verbs/gate.sh`, `scripts/ctl/lib.test.sh`, `scripts/ctl/README.md`, `docs/lanes/gate-lock/*`, `scripts/check-case-citations.mjs`, `.github/workflows/ci.yml`, `turbo.json`, `packages/ui/test/helpers/colour-scan.ts` | the gate count and the package's registrations | 1 |
+| `Features.md` §26, `test-cases/29-workflow-timeline-graphs.md`, `test-cases/13-*.md` (13.1702, 13.1716 prose), `docs/manual.md` | catalogue and help | each task its own lines |
+
+**Parallelism:** T3 ∥ T1/T2. T11 ∥ T7 to T10 (server and app-core only). T7 → T8 → T9 → T10 → T12 are sequential, because each is a diff on the shared view files. Shared files: `Features.md`, file 29, `ui.css` and `tokens.ts` (each task writes under its own anchor / its own `/* WTG3 Tn */` block / its own token lines), and `packages/app-core/src/data-source.ts` (T3, T9 and T11 each add their own method; rebase, never merge by hand).
+
+---
+
+### Task 1: Measure first: the package, the seam, ELK's graph, the findings, the Worker bars (cases 29.230–29.233)
+
+**Branches:** `task/wtg3-gate-widen` (PR A, the gate widening: lands FIRST and alone) and `task/wtg3-measure` (PR B, everything else), both cut from `origin/release/<next>`, both `--base release/<next>`; PR B is cut AFTER PR A is merged so its last commit applies on top of it. **NEEDS:** the owner's pull of the primary checkout after PR A (the gate verb that runs is the primary's). **Files:**
+- Create:
+  - `packages/flow-graph/package.json`, `tsconfig.json`, `tsconfig.typecheck.json`, `vitest.config.ts`, `test/setup.ts`
+  - `packages/flow-graph/src/index.ts`, `src/types.ts`
+  - `packages/flow-graph/src/layout/{elk,graph-input,from-elk,layout}.ts`
+  - `packages/flow-graph/src/testing/fixtures.ts`
+  - `packages/flow-graph/test/seam.test.ts`, `test/layout/{graph-input,findings}.test.ts`, `test/engine/inprocess.ts`
+  - `packages/flow-graph-browser/harness/elk-bars.html`, `harness/elk-bars.ts`, `tests/elk-bars.spec.ts` (new files in Part 1's package)
+- Modify:
+  - `pnpm-lock.yaml` (by `pnpm install`), the four Dockerfiles' package lists (`apps/{server,web}/Dockerfile` and `Dockerfile.dev`)
+  - PR A, then pinned in PR B: `scripts/ctl/verbs/gate.sh`, `scripts/ctl/lib.test.sh`, `scripts/ctl/README.md`, `docs/lanes/gate-lock/*`, `test-cases/13-deploy-and-ops.md` (13.1702, 13.1716 prose and the PR A fixture cases)
+  - PR B only: `scripts/check-case-citations.mjs`, `.github/workflows/ci.yml`, `turbo.json`, `packages/ui/test/helpers/colour-scan.ts`
+  - `Features.md` §26, `test-cases/29-workflow-timeline-graphs.md` (Step 0)
+
+**Interfaces:**
+- **Consumes:** nothing from earlier plans except Part 1's `packages/flow-graph-browser` (Vite page and Playwright config).
+- **Produces** (from `@gisik-nokma/flow-graph`): `layoutFlow(engine, input, options): Promise<FlowLayout>`; `createElkEngine(workerFactory): LayoutEngine`; `engineFromInstance(instance): LayoutEngine`; `type LayoutEngine = { layout(graph: ElkGraph): Promise<ElkGraph>; terminate(): void }`; `type WorkerFactory = (url?: string) => Worker`; the layout types of `src/types.ts`. From `@gisik-nokma/flow-graph/testing`: `mockupFlow(orientation?)`, `syntheticFlow(n, m, seed, orientation?)`, `withLeaf(flow, from, leafId?)`. T2 changes `layoutFlow` (adds the fold), `src/types.ts` (note stacks) and `graph-input.ts` / `from-elk.ts` (note ports); every signature above is stable.
+
+Siblings copied: `packages/ui/{package.json,tsconfig.json,tsconfig.typecheck.json,vitest.config.ts}` for the package files (`packages/ui/package.json` read at `ec72d1f8`: scripts `build` / `test` / `typecheck`, `type: module`, `dist` exports); KG C T1 Step 3 and Step 13 (`docs/superpowers/plans/2026-10-03-knowledge-graph-view.md:405-470`, `:1436-1475`) for the package registration and the gate count; the KG's seam check for the RESOLVED-imports walker (the lesson: a regex walker misses side-effect imports).
+
+**Why a plain strip and our own placement (the measured findings, pinned by 29.233).** The spec leaves ELK's behaviour to a measurement (§9.2 "Measured first", §13). Run in Node over `elkjs` 0.12.0 with the ports of this task's `graph-input.ts` and the mockup's 13-node flow:
+- **Wrapping.** `elk.layered.wrapping.strategy = MULTI_EDGE` (the option that would fold a long strip into bands) dropped the route sections of some edges, drew diagonal segments, and on some random flows threw (`Cannot read properties of undefined`). Over 30 random 40-node / 55-edge flows the plain strip had zero defects and the wrapped one had many. So this package never asks ELK to wrap; T2 folds the finished strip itself.
+- **Stability.** Adding one leaf after some node of the mockup flow moved more than 10% of the other nodes for at least one source (the stable share dipped below 0.9). Spec §13 wants at least 90% within 1 px, so T2 places a lone new leaf itself and leaves every existing pixel alone.
+- **Time.** 150 nodes / 200 edges lay out in about 170 ms in Node on the lane's machine, 300 nodes in about 1.1 s, 60 nodes in about 45 ms (single run each, in process). The §13 bars are about the browser Worker, which Steps 7 to 9 measure.
+- **Ports.** `FIXED_SIDE` ports on a Decision keep its branches on distinct sides; `FIXED_POS` ports (T2) put an edge exactly at the given y.
+
+- [ ] **Step 0: Pre-flight, the landed names, and the catalogue anchors**
+
+  1. **Step 0a (PR A) runs FIRST and merges before this.** Then `git fetch origin`; cut `task/wtg3-measure` (PR B) from `origin/release/<next>`, which now holds PR A; `pnpm install` under Node 22.
+  2. **Re-read what this task relies on** and write the landed facts into the first lines of `HANDOFF-wtg3-measure.md`:
+     - `ls packages/flow-graph-browser && sed -n 1,80p packages/flow-graph-browser/playwright.config.ts` (Part 1's package: its Vite root, `webServer` command and port, where harness pages live; put this task's three files where its own harness pages and specs are, and keep the URL below `/harness/elk-bars.html` in step with that layout);
+     - `grep -n "isTestPath" -A12 scripts/check-case-citations.mjs` (the KG C T1 line for `knowledge-graph-browser` and Part 1's line for `flow-graph-browser` are both there);
+     - `grep -n "CLIENT_SOURCE_ROOTS" -A14 packages/ui/test/helpers/colour-scan.ts`;
+     - `grep -n "Tasks:" scripts/ctl/verbs/gate.sh` (the gate count line, whatever number it holds: 41-only on the KG tip, the count Part 1 T1 pinned on this branch); on PR B's branch it must already read PR A's `N or M` (Step 0a);
+     - `ls packages` (no `flow-graph` yet; `viewport` and `flow-graph-browser` from Part 1, `knowledge-graph` and `knowledge-graph-browser` from KG C).
+     If `packages/flow-graph-browser` or the Graph tab is missing, STOP: a prerequisite plan has not landed.
+  3. **License and weight of `elkjs`** (spec §9.2 "believed EPL-2.0, the first task confirms"): `pnpm view elkjs@0.12.0 license dist.unpackedSize` and, after Step 2's install, `ls -l packages/flow-graph/node_modules/elkjs/lib/elk-worker.min.js packages/flow-graph/node_modules/elkjs/lib/elk-api.js`. Write both lines into the handoff. Expected license `EPL-2.0`: it permits use as a dependency; add a line to `docs/manual.md`'s third-party notices section if one exists (`grep -n -i "third-party\|licen" docs/manual.md`). If it is anything else, STOP and ask.
+  4. **Catalogue.** Re-grep every live tip (command in Global Constraints). Guard: `grep -n '^<!-- wtg-part3-workflow-graph -->$' test-cases/29-workflow-timeline-graphs.md && grep -n '^<!-- wtg-part3-workflow-graph bullets -->$' Features.md`; if either is missing, Part 1 T1 has not landed: STOP. In `test-cases/29-workflow-timeline-graphs.md`, directly below Part 1's `<!-- wtg-part3-workflow-graph -->` (keep that line), add:
+     ```markdown
+     ## 29.3 Part 3 — The Workflow graph (29.230–29.289)
+
+     Plan `docs/superpowers/plans/2026-10-03-wtg-part3-workflow-graph.md`; spec `docs/superpowers/specs/2026-10-03-workflow-timeline-graphs-design.md` §9–10. Ids tile 29.230–29.289: T1 230–233 · T2 234–239 · T3 240–245 · T4 246–250 · T5 251–254 · T6 255–259 · T7 260–262 · T8 263–266 · T9 267–269 · T10 270–275 · T11 276–279 · T12 280–289.
+
+     <!-- wtg-part3-workflow-graph T1 -->
+
+     <!-- wtg-part3-workflow-graph T2 -->
+
+     <!-- wtg-part3-workflow-graph T3 -->
+
+     <!-- wtg-part3-workflow-graph T4 -->
+
+     <!-- wtg-part3-workflow-graph T5 -->
+
+     <!-- wtg-part3-workflow-graph T6 -->
+
+     <!-- wtg-part3-workflow-graph T7 -->
+
+     <!-- wtg-part3-workflow-graph T8 -->
+
+     <!-- wtg-part3-workflow-graph T9 -->
+
+     <!-- wtg-part3-workflow-graph T10 -->
+
+     <!-- wtg-part3-workflow-graph T11 -->
+
+     <!-- wtg-part3-workflow-graph T12 -->
+
+     <!-- wtg-part3-workflow-graph end -->
+     ```
+     In `Features.md` §26, directly below Part 1's `<!-- wtg-part3-workflow-graph bullets -->` (keep that line), add a sub-heading `### Workflow graph (Part 3)` and twelve anchor lines `<!-- wtg-part3-workflow-graph T1 bullet -->` … `<!-- wtg-part3-workflow-graph T12 bullet -->`.
+  5. Run: `node scripts/check-case-ids.mjs && pnpm check:citations`. Expected: both pass.
+
+  Commit: `wtg3 T1: open the Part 3 sub-section and per-task anchors under Part 1's Part 3 anchors in Features §26 and test-cases/29`.
+
+- [ ] **Step 0a: PR A, widen the gate to `N or M` (its own PR, small, runs BEFORE Step 0 and lands first; planner ruling P6)**
+
+  The verb that runs is the primary checkout's, which accepts N only; PR B's gate would fail there. Graph Part 1 T1 (its PR A, Steps 1-4) and KG C T1 (`36 or 41`) solved this the same way; mirror Part 1 T1's PR A step for step, with this task's numbers:
+  1. **Measure both counts** on `task/wtg3-gate-widen` (cut from `origin/release/<next>`): N is the `pnpm turbo run build test typecheck --dry=json` task count on the base; M is the same count with a `packages/flow-graph` that carries Step 2's `package.json` (its `build`, `test` and `typecheck` scripts), measured in a scratch copy and NOT committed (expected M = N + 3). Never copy a number from this plan or from Part 1's.
+  2. **Fixtures first (RED):** in `scripts/ctl/lib.test.sh`, add the block Part 1 T1's PR A added for its `41 or 46`, with `N or M`: both counts accepted, `M-1 of M` and `N+1` refused, the anchors kept (`^` and ` *$`). Case lines: the next free run of 13.xxxx ids after re-grepping every live tip (the Global Constraints command), the transitional arm written ❌ and its M-only pin written PENDING for PR B.
+  3. **The verb:** the anchored `Tasks:` line in `scripts/ctl/verbs/gate.sh` accepts `N` or `M`, the SAME count on both sides of `successful, … total`; `scripts/ctl/README.md` and `docs/lanes/gate-lock/README.md` say "transitional, until WTG3 T1 PR B pins M".
+  4. **Verify (LOCAL):** `pnpm check:ctl` and `pnpm check:citations`. Mutation: make the alternation M-only → the N arms go RED; drop `^` or ` *$` → the anchor arms go RED. Record both in the HANDOFF.
+  5. `ctl pr open --repo <worktree> --base release/<next> --title "gate: accept N or M (WTG Part 3 T1, transitional)" --body <ABSOLUTE path>`; `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  6. **Report to the controller: `NEEDS: owner pulls the primary checkout`**, with the merge sha. Do not wait: PR B's work needs no gate until Step 11.
+  7. **OWNER ACTION:** the owner pulls the primary checkout (on the release branch it stands on) after PR A merges, so the verb that runs accepts `N or M`. PR B's gate waits for it.
+
+  Step 0 and every step after it are PR B, on `task/wtg3-measure` cut AFTER PR A merged.
+
+- [ ] **Step 1: The four case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T1 -->`:
+  - `- ❌ **29.230 — Only `src/layout/elk.ts` (and the test-side in-process engine) imports `elkjs`, judged on the RESOLVED imports of the whole TypeScript program:** a side-effect import and a dynamic `import()` elsewhere are both caught; control: the same detector over the allowed files reports `elkjs`, and a relative import is not reported. Mutation: `import 'elkjs'` in `src/types.ts` → reds.`
+  - `- ❌ **29.231 — The package draws any labelled graph:** nothing in it imports `@gisik-nokma/domain`, `app-core`, `server` or `web`; control: the detector matches those names. Mutation: `import '@gisik-nokma/domain'` in any source file → reds.`
+  - `- ❌ **29.232 — The ELK graph is built from the caller's order:** a Decision's forward branches then its loops take distinct sides (landscape `EAST, NORTH, SOUTH`; portrait `SOUTH, WEST, EAST`), a plain ticket carries no ports, children keep the flow order, the seed is fixed, labels carry the measured size, and ELK is never asked to wrap; control: landscape is `RIGHT`, portrait `DOWN`. Mutation: swap two Decision sides → reds.`
+  - `- ❌ **29.233 — What ELK does, measured:** raw ELK moves more than 10% of the nodes for at least one leaf of the mockup flow; ELK's `MULTI_EDGE` wrapping drops or bends routes or throws on random flows while the plain strip never does; 150 nodes / 200 edges lay out well inside a second in process; and the Worker lays out 150 / 200 at p95 <= 250 ms on the desktop with no main-thread task over 50 ms and 60 nodes <= 700 ms on the real phone (🟡 until the phone number is recorded). Control: the same flow without a leaf is byte-identical. Mutation: flip `<` to `>` in the raw-ELK assertion → reds.`
+
+- [ ] **Step 2: The package skeleton**
+
+  `packages/flow-graph/package.json`:
+  ```json
+  {
+    "name": "@gisik-nokma/flow-graph",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "./testing": { "types": "./dist/testing/fixtures.d.ts", "default": "./dist/testing/fixtures.js" }
+    },
+    "scripts": {
+      "build": "tsc -p tsconfig.json",
+      "test": "vitest run",
+      "typecheck": "tsc -p tsconfig.typecheck.json"
+    },
+    "dependencies": {
+      "elkjs": "0.12.0"
+    },
+    "devDependencies": {
+      "@testing-library/jest-dom": "^6.6.3",
+      "@types/node": "^22.10.0",
+      "jsdom": "^25.0.1",
+      "typescript": "^5.6.3",
+      "vitest": "^3.1.0"
+    }
+  }
+  ```
+  - `elkjs` has NO caret (spec §9.2: "the version is pinned exactly, the version the first task measures"). Every other range is `packages/ui/package.json`'s.
+  - The package has no React dependency: the stage is plain DOM and the host mounts it.
+
+  `tsconfig.json` and `tsconfig.typecheck.json` are `packages/ui`'s two files verbatim (`outDir: dist`, `rootDir: src`, `jsx: react-jsx`, `lib: ES2023 + DOM + DOM.Iterable`; typecheck is `noEmit` and includes `src` and `test`). `vitest.config.ts` is `packages/ui/vitest.config.ts` verbatim (`environment: 'jsdom'`, `setupFiles: ['test/setup.ts']`; the pure files below say `// @vitest-environment node` themselves). `test/setup.ts` is `import '@testing-library/jest-dom/vitest';`.
+
+  Run: `pnpm install` (Node 22), then `git diff --stat pnpm-lock.yaml`. Expected: only `packages/flow-graph` and `elkjs 0.12.0` (and its tree) are added. Then Step 0.3's `ls` lines.
+
+- [ ] **Step 3: RED, three test files first**
+
+  The seam test (29.230, 29.231). It reads the TypeScript PROGRAM named by `tsconfig.typecheck.json`, so what `tsc` compiles is what is checked.
+
+  `packages/flow-graph/test/seam.test.ts`:
+  ```ts
+// @vitest-environment node
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+import { describe, expect, it } from 'vitest';
+
+const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ELK = /^elkjs(\/|$)/;
+const APP = /^@gisik-nokma\/(domain|app-core|server|web)(\/|$)/;
+/** The ONE production file that may name elkjs (spec §9.2), and the test-side engine that runs it in process. */
+const ELK_ALLOWED = [join(PKG, 'src', 'layout', 'elk.ts'), join(PKG, 'test', 'engine', 'inprocess.ts')];
+
+/** The PROGRAM's files (from tsconfig.typecheck.json), not a directory walk: what tsc compiles is what is checked. */
+function programFiles(): { files: string[]; options: ts.CompilerOptions } {
+  const config = ts.readConfigFile(join(PKG, 'tsconfig.typecheck.json'), ts.sys.readFile);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, PKG);
+  return { files: parsed.fileNames, options: parsed.options };
+}
+
+/**
+ * Every import the TypeScript pre-processor sees (static, `export … from`, side-effect `import 'x'`, dynamic `import('x')`,
+ * `require`), RESOLVED with the program's options. A regex walker misses side-effect imports (the Knowledge Graph's lesson).
+ */
+export function importsMatching(files: readonly string[], options: ts.CompilerOptions, pattern: RegExp): string[] {
+  const host = ts.createCompilerHost(options);
+  const hits: string[] = [];
+  for (const file of files) {
+    const info = ts.preProcessFile(readFileSync(file, 'utf8'), true, true);
+    for (const imported of info.importedFiles) {
+      const resolved = ts.resolveModuleName(imported.fileName, file, options, host).resolvedModule;
+      const name = resolved?.packageId?.name ?? imported.fileName;
+      if (pattern.test(name) || pattern.test(imported.fileName)) hits.push(`${relative(PKG, file)} → ${imported.fileName}`);
+    }
+  }
+  return hits;
+}
+
+describe('the package seams', () => {
+  it('29.230 no file but src/layout/elk.ts (and the test-side engine) imports elkjs; control: the detector sees elk.ts\'s import', () => {
+    const { files, options } = programFiles();
+    const outside = files.filter((file) => !ELK_ALLOWED.includes(file));
+    expect(importsMatching(outside, options, ELK)).toEqual([]);
+    // control: the same detector over the allowed files reports elkjs, so an empty answer above is evidence
+    expect(importsMatching(files.filter((file) => ELK_ALLOWED.includes(file)), options, ELK).join('\n')).toContain('→ elkjs');
+  });
+
+  it('29.230 a side-effect import and a dynamic import are caught; control: a relative import is not', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fg-seam-'));
+    writeFileSync(join(dir, 'bad.ts'), "import 'elkjs/lib/elk.bundled.js';\nexport const later = () => import('elkjs');\n");
+    writeFileSync(join(dir, 'ok.ts'), "import './bad.js';\nexport {};\n");
+    const { options } = programFiles();
+    expect(importsMatching([join(dir, 'bad.ts')], options, ELK)).toHaveLength(2);
+    expect(importsMatching([join(dir, 'ok.ts')], options, ELK)).toEqual([]);
+  });
+
+  it('29.231 the package draws any labelled graph: nothing in it imports the domain, app-core, the server or the web app; control: the detector matches those names', () => {
+    const { files, options } = programFiles();
+    expect(importsMatching(files, options, APP)).toEqual([]);
+    const dir = mkdtempSync(join(tmpdir(), 'fg-seam-'));
+    writeFileSync(join(dir, 'bad.ts'), "import '@gisik-nokma/domain';\nexport {};\n");
+    expect(importsMatching([join(dir, 'bad.ts')], options, APP)).toHaveLength(1);
+  });
+});
+  ```
+
+  `packages/flow-graph/test/engine/inprocess.ts` (the one test-side file that names `elkjs`, so layout tests run without a Worker):
+  ```ts
+// The one test-side file that names `elkjs`: the in-process engine, so layout tests run without a Worker.
+import ELK from 'elkjs/lib/elk.bundled.js';
+import { engineFromInstance, type LayoutEngine } from '../../src/layout/elk.js';
+
+type Ctor = new () => { layout(graph: never): Promise<unknown> };
+const Elk = ((ELK as unknown as { default?: Ctor }).default ?? ELK) as unknown as Ctor;
+
+export function inProcessEngine(): LayoutEngine {
+  return engineFromInstance(new Elk());
+}
+
+/** A fixed-width label measure for tests: 7 px a character plus a 16 px pill, 20 px high (the mockup's pill). */
+export const labelSize = (text: string): { width: number; height: number } => ({ width: text.length * 7 + 16, height: 20 });
+  ```
+
+  `packages/flow-graph/test/layout/graph-input.test.ts` (29.232):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { mockupFlow, syntheticFlow } from '../../src/testing/fixtures.js';
+import { toElkGraph } from '../../src/layout/graph-input.js';
+import { labelSize } from '../engine/inprocess.js';
+
+const sidesOf = (graph: ReturnType<typeof toElkGraph>, nodeId: string): string[] =>
+  (graph.children.find((c) => c.id === nodeId)?.ports ?? []).map((p) => `${p.id.split('#')[1]}:${p.layoutOptions['elk.port.side']}`);
+
+describe('29.232 the ELK graph is built from the caller\'s order, with a Decision\'s branches on distinct sides', () => {
+  it('29.232 landscape: in on WEST, forward branches then loops on EAST, NORTH, SOUTH; a plain ticket has no ports', () => {
+    const graph = toElkGraph(mockupFlow('landscape'), { labelSize });
+    // 151 has one forward edge (Yes -> dEnd) and two loops (No -> 141, Need more info -> dA): forward first, then loops.
+    expect(sidesOf(graph, '151')).toEqual(['in:WEST', 'out0:EAST', 'out1:NORTH', 'out2:SOUTH']);
+    const out = (id: string) => graph.edges.find((e) => e.id === id)!.sources[0];
+    expect(out('151>dEnd')).toBe('151#out0');
+    expect(out('151>141')).toBe('151#out1');
+    expect(out('151>dA')).toBe('151#out2');
+    expect(graph.edges.find((e) => e.id === '150>151')!.targets[0]).toBe('151#in');
+    // control: a ticket carries no ports and edges name it directly
+    expect(graph.children.find((c) => c.id === '141')!.ports).toBeUndefined();
+    expect(graph.edges.find((e) => e.id === '140>141')!.sources[0]).toBe('140');
+  });
+
+  it('29.232 portrait turns the sides a quarter: in on NORTH, outs SOUTH, WEST, EAST; direction DOWN', () => {
+    const graph = toElkGraph(mockupFlow('portrait'), { labelSize });
+    expect(sidesOf(graph, '151')).toEqual(['in:NORTH', 'out0:SOUTH', 'out1:WEST', 'out2:EAST']);
+    expect(graph.layoutOptions['elk.direction']).toBe('DOWN');
+    // control: landscape is RIGHT
+    expect(toElkGraph(mockupFlow('landscape'), { labelSize }).layoutOptions['elk.direction']).toBe('RIGHT');
+  });
+
+  it('29.232 children keep the flow order (ELK\'s model order), the seed is fixed, labels carry the measured size', () => {
+    const flow = mockupFlow();
+    const graph = toElkGraph(flow, { labelSize });
+    expect(graph.children.map((c) => c.id)).toEqual(flow.nodes.map((n) => n.id));
+    expect(graph.layoutOptions['elk.randomSeed']).toBe('7');
+    expect(graph.edges.find((e) => e.id === '144>147')!.labels).toEqual([{ text: 'Yes', width: 37, height: 20 }]);
+    expect(graph.edges.find((e) => e.id === '140>141')!.labels).toBeUndefined();
+  });
+
+  it('29.232 ELK is never asked to wrap (it dropped or diagonalised routes; the fold is ours); control: the options it IS given are present', () => {
+    for (const flow of [syntheticFlow(8, 9, 1), syntheticFlow(40, 55, 1), mockupFlow('portrait')]) {
+      const options = toElkGraph(flow, { labelSize }).layoutOptions;
+      expect(Object.keys(options).filter((k) => k.includes('wrapping') || k.includes('aspectRatio'))).toEqual([]);
+      expect(options['elk.layered.cycleBreaking.strategy']).toBe('MODEL_ORDER');
+    }
+  });
+});
+  ```
+
+  `packages/flow-graph/test/layout/findings.test.ts` (29.233). These PIN what T1 measured; if an ELK upgrade changes one, the test fails and the design choice it justifies is reopened, not patched:
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { mockupFlow, syntheticFlow, withLeaf } from '../../src/testing/fixtures.js';
+import { toElkGraph } from '../../src/layout/graph-input.js';
+import { layoutFlow } from '../../src/layout/layout.js';
+import type { FlowLayout, LayoutInput } from '../../src/types.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+
+const options = { labelSize };
+
+/** Share of the nodes that did not move by more than a pixel (spec §13's bar is 0.9 for adding one leaf). */
+function stableShare(before: FlowLayout, after: FlowLayout): number {
+  const next = new Map(after.nodes.map((n) => [n.id, n]));
+  const kept = before.nodes.filter((n) => {
+    const m = next.get(n.id);
+    return m !== undefined && Math.abs(m.x - n.x) <= 1 && Math.abs(m.y - n.y) <= 1;
+  });
+  return kept.length / before.nodes.length;
+}
+
+/** Defects in a laid-out graph: a route ELK did not give, a route with a diagonal segment. */
+function defects(graph: { edges: { id: string; sections?: { startPoint: { x: number; y: number }; endPoint: { x: number; y: number }; bendPoints?: { x: number; y: number }[] }[] }[] }): number {
+  let n = 0;
+  for (const edge of graph.edges) {
+    const section = edge.sections?.[0];
+    if (section === undefined) {
+      n += 1;
+      continue;
+    }
+    const pts = [section.startPoint, ...(section.bendPoints ?? []), section.endPoint];
+    for (let i = 0; i + 1 < pts.length; i += 1) if (Math.abs(pts[i]!.x - pts[i + 1]!.x) > 0.01 && Math.abs(pts[i]!.y - pts[i + 1]!.y) > 0.01) n += 1;
+  }
+  return n;
+}
+
+/**
+ * These pin what T1 MEASURED (spec §13 and §9.3 left the answer to a measurement). If an ELK upgrade changes one, the test fails
+ * loudly and the design choice it justifies (a plain strip plus our own fold; our own leaf placement) is reopened, not patched.
+ */
+describe('29.233 what ELK does, measured, and so what the layout does', () => {
+  it('29.233 raw ELK moves more than 10% of the nodes for at least one leaf of the mockup flow; control: the same flow without a leaf is byte-identical', async () => {
+    const base = mockupFlow();
+    const before = await layoutFlow(inProcessEngine(), base, options);
+    const again = await layoutFlow(inProcessEngine(), base, options);
+    expect(JSON.stringify(again)).toBe(JSON.stringify(before));
+    let worst = 1;
+    for (const node of base.nodes) worst = Math.min(worst, stableShare(before, await layoutFlow(inProcessEngine(), withLeaf(base, node.id), options)));
+    expect(worst).toBeLessThan(0.9);
+  });
+
+  it('29.233 ELK wrapping (MULTI_EDGE) drops or bends routes or throws on random flows; the plain strip never does', async () => {
+    let wrapped = 0;
+    let plain = 0;
+    const engine = inProcessEngine();
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const flow: LayoutInput = syntheticFlow(40, 55, seed);
+      const graph = toElkGraph(flow, options);
+      plain += defects(await engine.layout(graph));
+      try {
+        const out = await engine.layout({ ...graph, layoutOptions: { ...graph.layoutOptions, 'elk.layered.wrapping.strategy': 'MULTI_EDGE', 'elk.layered.wrapping.additionalEdgeSpacing': '10' } });
+        wrapped += defects(out);
+      } catch {
+        wrapped += 1;
+      }
+    }
+    expect(plain).toBe(0);
+    expect(wrapped).toBeGreaterThan(0);
+  });
+
+  it('29.233 150 nodes and 200 edges lay out in process well inside a second (the browser bar, 250 ms at p95, is measured by the Worker harness)', async () => {
+    const engine = inProcessEngine();
+    const flow = syntheticFlow(150, 200, 3);
+    const started = performance.now();
+    const layout = await layoutFlow(engine, flow, options);
+    const ms = performance.now() - started;
+    console.info(`flow-graph: 150 nodes / 200 edges laid out in ${ms.toFixed(0)} ms in process`);
+    expect(layout.nodes).toHaveLength(150);
+    expect(ms).toBeLessThan(2000);
+  });
+});
+  ```
+
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 > /tmp/wtg3-t1.log 2>&1; tail -30 /tmp/wtg3-t1.log`. Expected: FAIL (the sources do not exist: `Failed to load url ../../src/…`). Commit the RED tests (`wtg3 T1: RED seam, ELK graph and findings tests`).
+
+- [ ] **Step 4: GREEN, the types, the engine, the graph builder**
+
+  `src/types.ts`. Nothing here knows a ticket: the app maps a `FlowRead` to these, so the package never imports `@gisik-nokma/domain`:
+  ```ts
+/**
+ * The layout's vocabulary (spec §9.3). Nothing here knows a ticket: the app maps a `FlowRead` to these, so this package
+ * never imports `@gisik-nokma/domain` and the renderer can draw any labelled graph.
+ */
+export type Orientation = 'landscape' | 'portrait';
+export type NodeShape = 'ticket' | 'decision';
+
+export type Point = { x: number; y: number };
+export type Rect = { x: number; y: number; width: number; height: number };
+
+/** One box the layout places. The size is MEASURED (`measure.ts`), never a constant, so a wrapped phone title cannot overlap its neighbour. */
+export type LayoutNode = {
+  id: string;
+  shape: NodeShape;
+  /** The DRAWN shape's size. */
+  width: number;
+  height: number;
+};
+
+/** `loop` is FL-3's back edge, supplied by the caller: the layout never decides it. */
+export type LayoutEdge = { id: string; source: string; target: string; label: string | null; loop: boolean };
+
+/** `nodes` arrive in FLOW ORDER (FL-3). That order is ELK's model order, which is what makes a layout reproducible. */
+export type LayoutInput = {
+  nodes: readonly LayoutNode[];
+  edges: readonly LayoutEdge[];
+  orientation: Orientation;
+};
+
+export type PlacedNode = Rect & { id: string };
+export type RoutedEdge = { id: string; points: Point[]; label: Rect | null };
+export type FlowLayout = { width: number; height: number; orientation: Orientation; nodes: PlacedNode[]; edges: RoutedEdge[] };
+
+export type LayoutOptions = {
+  /** Measured size of an edge-label pill for this text. */
+  labelSize: (text: string) => { width: number; height: number };
+};
+  ```
+
+  `src/layout/elk.ts` is the ONLY file that names `elkjs`. `elkjs` is CommonJS whose `module.exports` is the constructor and also carries `.default`, so under native ESM the default import is the constructor while its `.d.ts` types it as the module; the cast accepts both, which is what a bundler's interop may hand over. The Worker comes from the HOST (only the host's bundler can emit the 1.6 MB `elk-worker.min.js` as an asset), and the engine is created at the first layout, so a page that never opens a graph never loads the worker:
+  ```ts
+import ElkModule from 'elkjs/lib/elk-api.js';
+import type { ELK as ElkInstance, ELKConstructorArguments } from 'elkjs/lib/elk-api.js';
+import type { ElkGraph } from './graph-input.js';
+
+/**
+ * The only file in this package that names `elkjs` (spec §9.2; `test/seam.test.ts` checks the RESOLVED imports of the whole
+ * TypeScript program, so a side-effect or dynamic import elsewhere is caught too).
+ *
+ * `elkjs` is CommonJS whose `module.exports` is the constructor AND carries `.default` (the file's last two lines), so a native
+ * ESM default import yields the constructor at run time while its `.d.ts` types the default import as the module. The cast below
+ * accepts both shapes, which is what a bundler's interop may hand over.
+ */
+type ElkConstructor = new (args?: ELKConstructorArguments) => ElkInstance;
+const Elk = ((ElkModule as unknown as { default?: ElkConstructor }).default ?? ElkModule) as unknown as ElkConstructor;
+
+export type WorkerFactory = (url?: string) => Worker;
+
+/** What the layout needs of ELK, so tests can hand it the in-process engine and the app hands it a worker. */
+export interface LayoutEngine {
+  layout(graph: ElkGraph): Promise<ElkGraph>;
+  terminate(): void;
+}
+
+/**
+ * ELK in a Web Worker. `workerFactory` is the HOST's, because only the host's bundler knows how to emit the 1.6 MB
+ * `elkjs/lib/elk-worker.min.js` as an asset: the app passes
+ * `() => new Worker(new URL('elkjs/lib/elk-worker.min.js', import.meta.url))`. The engine is created on the first layout and
+ * not before, so a page that never opens a graph never loads the worker.
+ */
+export function createElkEngine(workerFactory: WorkerFactory): LayoutEngine {
+  let elk: ElkInstance | null = null;
+  return {
+    layout: async (graph) => {
+      elk ??= new Elk({ workerFactory });
+      return (await elk.layout(graph as never)) as unknown as ElkGraph;
+    },
+    terminate: () => {
+      elk?.terminateWorker();
+      elk = null;
+    },
+  };
+}
+
+/** For tests and node scripts: the same API, run in-process (`elkjs/lib/elk.bundled.js` is passed in by the caller, never imported here). */
+export function engineFromInstance(instance: { layout(graph: never): Promise<unknown> }): LayoutEngine {
+  return { layout: async (graph) => (await instance.layout(graph as never)) as ElkGraph, terminate: () => undefined };
+}
+  ```
+
+  `src/layout/graph-input.ts` turns the caller's nodes and edges into ELK's JSON. The node ORDER is ELK's model order (FL-3) and cycles are broken at the edges that point backwards in it, so a reopened flow lays out the way its author reads it:
+  ```ts
+import type { LayoutEdge, LayoutInput, LayoutOptions, Orientation } from '../types.js';
+
+/** The slice of ELK's JSON this package reads and writes. Declared here, not imported, so only `elk.ts` ever names `elkjs`. */
+export type ElkLabel = { text: string; width: number; height: number; x?: number; y?: number };
+export type ElkPort = { id: string; width: number; height: number; layoutOptions: Record<string, string>; x?: number; y?: number };
+export type ElkChild = {
+  id: string;
+  width: number;
+  height: number;
+  layoutOptions?: Record<string, string>;
+  ports?: ElkPort[];
+  x?: number;
+  y?: number;
+};
+export type ElkSection = { id: string; startPoint: { x: number; y: number }; endPoint: { x: number; y: number }; bendPoints?: { x: number; y: number }[] };
+export type ElkEdge = { id: string; sources: string[]; targets: string[]; labels?: ElkLabel[]; sections?: ElkSection[] };
+export type ElkGraph = { id: string; layoutOptions: Record<string, string>; children: ElkChild[]; edges: ElkEdge[]; width?: number; height?: number };
+
+/** A fixed seed, so a flow lays out the same way every time it is opened (spec §9.3). */
+export const ELK_SEED = 7;
+export const GAP = { node: 40, layer: 72, edgeNode: 24, padding: 32 } as const;
+
+/** A Decision's ports: one in, and outs on distinct sides (spec §9.3: top, right, bottom). More than three share sides in turn. */
+const PORT_SIDES: Record<Orientation, { in: string; out: readonly string[] }> = {
+  landscape: { in: 'WEST', out: ['EAST', 'NORTH', 'SOUTH'] },
+  portrait: { in: 'NORTH', out: ['SOUTH', 'WEST', 'EAST'] },
+};
+
+const inPortId = (nodeId: string): string => `${nodeId}#in`;
+const outPortId = (nodeId: string, slot: number): string => `${nodeId}#out${slot}`;
+
+/**
+ * Outgoing edges of one Decision get slots: forward edges first, in the order they were given (flow order of the caller),
+ * then loops, so a loop takes the side no forward branch needed.
+ */
+export function decisionSlots(edges: readonly LayoutEdge[], nodeId: string): Map<string, number> {
+  const mine = edges.filter((e) => e.source === nodeId);
+  const ordered = [...mine.filter((e) => !e.loop), ...mine.filter((e) => e.loop)];
+  return new Map(ordered.map((e, i) => [e.id, i]));
+}
+
+export function toElkGraph(input: LayoutInput, options: LayoutOptions): ElkGraph {
+  const direction = input.orientation === 'landscape' ? 'RIGHT' : 'DOWN';
+  const slotsOf = new Map<string, Map<string, number>>();
+  const children: ElkChild[] = input.nodes.map((node) => {
+    if (node.shape !== 'decision') return { id: node.id, width: node.width, height: node.height };
+    const slots = decisionSlots(input.edges, node.id);
+    slotsOf.set(node.id, slots);
+    const sides = PORT_SIDES[input.orientation];
+    const port = (id: string, side: string): ElkPort => ({ id, width: 0, height: 0, layoutOptions: { 'elk.port.side': side } });
+    const ports: ElkPort[] = [port(inPortId(node.id), sides.in)];
+    for (let slot = 0; slot < Math.max(1, slots.size); slot += 1) ports.push(port(outPortId(node.id, slot), sides.out[slot % sides.out.length] ?? sides.out[0]!));
+    return { id: node.id, width: node.width, height: node.height, layoutOptions: { 'elk.portConstraints': 'FIXED_SIDE' }, ports };
+  });
+  const edges: ElkEdge[] = input.edges.map((e) => {
+    const source = slotsOf.has(e.source) ? outPortId(e.source, slotsOf.get(e.source)?.get(e.id) ?? 0) : e.source;
+    const target = slotsOf.has(e.target) ? inPortId(e.target) : e.target;
+    const labels = e.label === null ? undefined : [{ text: e.label, ...options.labelSize(e.label) }];
+    return { id: e.id, sources: [source], targets: [target], ...(labels === undefined ? {} : { labels }) };
+  });
+  const layoutOptions: Record<string, string> = {
+    'elk.algorithm': 'layered',
+    'elk.direction': direction,
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.randomSeed': String(ELK_SEED),
+    // The caller's node order IS the flow order (FL-3); ELK keeps it, and breaks cycles at the edges that point backwards in it.
+    'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+    'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
+    'elk.spacing.nodeNode': String(GAP.node),
+    'elk.layered.spacing.nodeNodeBetweenLayers': String(GAP.layer),
+    'elk.layered.spacing.edgeNodeBetweenLayers': String(GAP.edgeNode),
+    'elk.padding': `[top=${GAP.padding},left=${GAP.padding},bottom=${GAP.padding},right=${GAP.padding}]`,
+  };
+  return { id: 'root', layoutOptions, children, edges };
+}
+  ```
+
+  `src/layout/from-elk.ts` turns ELK's answer into boxes and orthogonal routes. `tidy` removes ELK's floating-point noise (267.33333333333314 against 267.33333333333303 for one horizontal run was a fake diagonal), `simplify` drops repeated and collinear points, and `snapLabel` puts the label pill ON its route as the mockup draws it (ELK places it beside):
+  ```ts
+import type { FlowLayout, LayoutInput, Point, Rect, RoutedEdge } from '../types.js';
+import type { ElkGraph } from './graph-input.js';
+
+/** ELK computes in floating point (267.33333333333314 against 267.33333333333303 for one horizontal run); a hundredth of a pixel is below anything drawn. */
+const tidy = (v: number): number => Math.round(v * 100) / 100;
+const tidyPoint = (p: Point): Point => ({ x: tidy(p.x), y: tidy(p.y) });
+
+const same = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
+
+/** Drops repeated points and the middle of three collinear ones, so a route is the fewest segments that draw it. */
+export function simplify(points: readonly Point[]): Point[] {
+  const out: Point[] = [];
+  for (const p of points) {
+    const last = out[out.length - 1];
+    if (last !== undefined && same(last, p)) continue;
+    out.push(p);
+    while (out.length >= 3) {
+      const [a, b, c] = out.slice(-3) as [Point, Point, Point];
+      const flat = (a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y);
+      if (!flat) break;
+      out.splice(out.length - 2, 1);
+    }
+  }
+  return out;
+}
+
+/**
+ * ELK places a label BESIDE its edge. The pills in the mockup sit ON the line, so the label is centred on the segment nearest to
+ * where ELK put it, clamped to that segment so it never hangs off a corner.
+ */
+export function snapLabel(label: Rect, points: readonly Point[]): Rect {
+  const cx = label.x + label.width / 2;
+  const cy = label.y + label.height / 2;
+  let best: { distance: number; a: Point; b: Point } | null = null;
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const px = Math.min(Math.max(cx, Math.min(a.x, b.x)), Math.max(a.x, b.x));
+    const py = Math.min(Math.max(cy, Math.min(a.y, b.y)), Math.max(a.y, b.y));
+    const distance = Math.hypot(cx - px, cy - py);
+    if (best === null || distance < best.distance) best = { distance, a, b };
+  }
+  if (best === null) return label;
+  const { a, b } = best;
+  let x: number;
+  let y: number;
+  if (a.y === b.y) {
+    y = a.y;
+    x = Math.min(Math.max(cx, Math.min(a.x, b.x) + label.width / 2), Math.max(a.x, b.x) - label.width / 2);
+    if (Math.abs(a.x - b.x) < label.width) x = (a.x + b.x) / 2;
+  } else if (a.x === b.x) {
+    x = a.x;
+    y = Math.min(Math.max(cy, Math.min(a.y, b.y) + label.height / 2), Math.max(a.y, b.y) - label.height / 2);
+    if (Math.abs(a.y - b.y) < label.height) y = (a.y + b.y) / 2;
+  } else {
+    x = (a.x + b.x) / 2;
+    y = (a.y + b.y) / 2;
+  }
+  return { x: x - label.width / 2, y: y - label.height / 2, width: label.width, height: label.height };
+}
+
+export function fromElkGraph(result: ElkGraph, input: LayoutInput): FlowLayout {
+  const placed = new Map(result.children.map((c) => [c.id, c]));
+  const nodes = input.nodes.map((n) => {
+    const c = placed.get(n.id);
+    return { id: n.id, x: tidy(c?.x ?? 0), y: tidy(c?.y ?? 0), width: n.width, height: n.height };
+  });
+  const edges: RoutedEdge[] = result.edges.map((e) => {
+    const section = e.sections?.[0];
+    const points = section === undefined ? [] : simplify([section.startPoint, ...(section.bendPoints ?? []), section.endPoint].map(tidyPoint));
+    const raw = e.labels?.[0];
+    const label =
+      raw === undefined || raw.x === undefined || raw.y === undefined || points.length < 2
+        ? null
+        : snapLabel({ x: raw.x, y: raw.y, width: raw.width, height: raw.height }, points);
+    return { id: e.id, points, label };
+  });
+  return { width: tidy(result.width ?? 0), height: tidy(result.height ?? 0), orientation: input.orientation, nodes, edges };
+}
+  ```
+
+  `src/layout/layout.ts` (T2 adds the fold):
+  ```ts
+import type { FlowLayout, LayoutInput, LayoutOptions } from '../types.js';
+import type { LayoutEngine } from './elk.js';
+import { fromElkGraph } from './from-elk.js';
+import { toElkGraph } from './graph-input.js';
+
+/** One full layout, pure of the DOM (the engine is injected): ELK lays the flow out as one strip. T2 adds the fold. */
+export async function layoutFlow(engine: LayoutEngine, input: LayoutInput, options: LayoutOptions): Promise<FlowLayout> {
+  return fromElkGraph(await engine.layout(toElkGraph(input, options)), input);
+}
+  ```
+
+  `src/testing/fixtures.ts`: the approved mockup's flow (`Main.dc.html`: 13 nodes, 17 edges, two Decisions and three loops), a seeded random flow for scaling, and a leaf adder:
+  ```ts
+import type { LayoutEdge, LayoutInput, LayoutNode } from '../types.js';
+
+const ticket = (id: string): LayoutNode => ({ id, shape: 'ticket', width: 140, height: 64 });
+const decision = (id: string): LayoutNode => ({ id, shape: 'decision', width: 176, height: 108 });
+const edge = (source: string, target: string, label: string | null = null, loop = false): LayoutEdge => ({
+  id: `${source}>${target}`,
+  source,
+  target,
+  label,
+  loop,
+});
+
+/**
+ * The approved mockup's flow (`Main.dc.html`): thirteen nodes, seventeen edges, two Decisions that branch and three loops
+ * ('No' back to 141, 'Need more info' back to the draft, and 146 back to 143). Nodes are in FLOW ORDER and each `loop: true`
+ * edge points to an earlier index, which is exactly FL-3's definition of a back edge over that order.
+ */
+export function mockupFlow(orientation: LayoutInput['orientation'] = 'landscape'): LayoutInput {
+  return {
+    orientation,
+    nodes: [
+      ticket('140'), ticket('141'), ticket('142'), ticket('143'), decision('144'), ticket('145'), ticket('147'),
+      decision('d1'), ticket('146'), ticket('dA'), ticket('150'), decision('151'), ticket('dEnd'),
+    ],
+    edges: [
+      edge('140', '141'), edge('141', '142'), edge('141', '143'), edge('142', '144'), edge('143', '144'),
+      edge('144', '147', 'Yes'), edge('144', '145', 'No'), edge('147', 'd1'), edge('d1', '146', 'No'), edge('145', '146'),
+      edge('d1', 'dA', 'Yes'), edge('dA', '150'), edge('150', '151'), edge('151', 'dEnd', 'Yes'),
+      edge('151', '141', 'No', true), edge('151', 'dA', 'Need more info', true), edge('146', '143', null, true),
+    ],
+  };
+}
+
+/** A deterministic pseudo-random connected flow of `n` tickets and `m` edges (m >= n - 1), all forward in index order. */
+export function syntheticFlow(n: number, m: number, seed: number, orientation: LayoutInput['orientation'] = 'landscape'): LayoutInput {
+  let s = seed >>> 0;
+  const next = (): number => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const nodes = Array.from({ length: n }, (_, i) => ticket(`n${i}`));
+  const seen = new Set<string>();
+  const edges: LayoutEdge[] = [];
+  for (let i = 1; i < n; i += 1) {
+    const from = Math.max(0, i - 1 - Math.floor(next() * 4));
+    seen.add(`${from}>${i}`);
+    edges.push(edge(`n${from}`, `n${i}`));
+  }
+  let guard = 0;
+  while (edges.length < m && guard < m * 50) {
+    guard += 1;
+    const a = Math.floor(next() * n);
+    const b = Math.floor(next() * n);
+    if (a >= b || seen.has(`${a}>${b}`)) continue;
+    seen.add(`${a}>${b}`);
+    edges.push(edge(`n${a}`, `n${b}`));
+  }
+  return { orientation, nodes, edges };
+}
+
+/** `flow` plus one new ticket that `from` leads to. The new node is LAST in flow order, as a leaf added to the flow's tail would be. */
+export function withLeaf(flow: LayoutInput, from: string, leafId = 'leaf'): LayoutInput {
+  return { ...flow, nodes: [...flow.nodes, ticket(leafId)], edges: [...flow.edges, edge(from, leafId)] };
+}
+  ```
+
+  `src/index.ts`:
+  ```ts
+export type * from './types.js';
+export { layoutFlow } from './layout/layout.js';
+export { createElkEngine, engineFromInstance, type LayoutEngine, type WorkerFactory } from './layout/elk.js';
+  ```
+
+  Run: the Step 3 command, then `pnpm --filter @gisik-nokma/flow-graph typecheck` and `pnpm --filter @gisik-nokma/flow-graph build`. Expected: PASS (10 tests in 3 files), typecheck clean, `dist/index.js`, `dist/testing/fixtures.js` and `dist/layout/elk.js` exist. Print the 150 / 200 timing line the findings test logs and keep it for the handoff. Commit.
+
+- [ ] **Step 5: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.230 | `import 'elkjs/lib/elk.bundled.js';` as a first line of `src/types.ts` | the first `it` of 29.230 names `src/types.ts → elkjs/lib/elk.bundled.js` |
+  | 29.230 | make the detector a regex over the file text (`/from 'elkjs/.test(text)`) | the second `it` (side-effect and dynamic imports) reds: only one of two is found |
+  | 29.231 | `import '@gisik-nokma/domain';` in `src/layout/layout.ts` | 29.231 |
+  | 29.232 | swap `'NORTH'` and `'SOUTH'` in `PORT_SIDES.landscape.out` | the sides assertion |
+  | 29.232 | add `'elk.layered.wrapping.strategy': 'MULTI_EDGE'` to `layoutOptions` | the no-wrapping `it` |
+  | 29.233 | in `findings.test.ts` flip `expect(worst).toBeLessThan(0.9)` to `toBeGreaterThan(0.9)` | the raw-ELK finding reds (the finding is the test's content, so a flipped bar must be caught) |
+  | 29.233 | make `toElkGraph` drop `considerModelOrder` AND `cycleBreaking` | the mockup layout changes, so the determinism control (`again` vs `before`) still passes but `graph-input.test.ts` 29.232's option assertion (`MODEL_ORDER`) reds |
+
+  Revert each. (A mutation that survives is a finding about the test: say so in the handoff.)
+
+- [ ] **Step 6: The Worker harness page (spec §13: measured on the Worker, not in process)**
+
+  Put these three files beside Part 1's harness pages (Step 0.2). The page lays out the mockup flow and synthetic flows of 60, 150 / 200 and 300 / 400 nodes through the REAL Worker (`createElkEngine` with the host's factory), 30 runs each after one warm-up, and records the main-thread long tasks while it does so. `?phone=1` runs only the 13- and 60-node rows (the phone bar) and prints a plain `<pre id="out">` so a person can read the numbers off the device.
+
+  `packages/flow-graph-browser/harness/elk-bars.html`:
+  ```html
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>ELK bars</title>
+    </head>
+    <body>
+      <pre id="out">running…</pre>
+      <script type="module" src="./elk-bars.ts"></script>
+    </body>
+  </html>
+  ```
+
+  `packages/flow-graph-browser/harness/elk-bars.ts`:
+  ```ts
+  import { createElkEngine, layoutFlow } from '@gisik-nokma/flow-graph';
+  import { mockupFlow, syntheticFlow } from '@gisik-nokma/flow-graph/testing';
+  import type { LayoutInput } from '@gisik-nokma/flow-graph';
+
+  const labelSize = (text: string): { width: number; height: number } => ({ width: text.length * 7 + 16, height: 20 });
+  const RUNS = 30;
+
+  type Row = { name: string; nodes: number; edges: number; cold: number | null; p50: number; p95: number; max: number };
+  const percentile = (sorted: number[], p: number): number => sorted[Math.min(sorted.length - 1, Math.ceil(p * sorted.length) - 1)]!;
+
+  async function row(name: string, flow: LayoutInput, cold: boolean): Promise<Row> {
+    // ONE engine per row: the Worker is created on its first layout, so the first call includes the worker load (the cold figure).
+    const engine = createElkEngine(() => new Worker(new URL('elkjs/lib/elk-worker.min.js', import.meta.url)));
+    const started = performance.now();
+    await layoutFlow(engine, flow, { labelSize });
+    const first = performance.now() - started;
+    const times: number[] = [];
+    for (let i = 0; i < RUNS; i += 1) {
+      const t = performance.now();
+      await layoutFlow(engine, flow, { labelSize });
+      times.push(performance.now() - t);
+    }
+    engine.terminate();
+    times.sort((a, b) => a - b);
+    return { name, nodes: flow.nodes.length, edges: flow.edges.length, cold: cold ? Math.round(first) : null, p50: Math.round(percentile(times, 0.5)), p95: Math.round(percentile(times, 0.95)), max: Math.round(times[times.length - 1]!) };
+  }
+
+  async function main(): Promise<void> {
+    const phone = new URLSearchParams(location.search).has('phone');
+    const longTasks: number[] = [];
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) longTasks.push(Math.round(entry.duration));
+    });
+    try {
+      observer.observe({ type: 'longtask', buffered: true });
+    } catch {
+      // longtask is Chromium-only; on another engine the list stays empty and the result says so
+    }
+    const rows: Row[] = [];
+    rows.push(await row('13/17 mockup', mockupFlow('landscape'), true));
+    rows.push(await row('60/80', syntheticFlow(60, 80, 5), false));
+    if (!phone) {
+      rows.push(await row('150/200', syntheticFlow(150, 200, 3), false));
+      rows.push(await row('300/400', syntheticFlow(300, 400, 4), false));
+    }
+    const result = { done: true, phone, rows, longTasks, userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency };
+    (window as unknown as { __elkBars: unknown }).__elkBars = result;
+    document.getElementById('out')!.textContent = JSON.stringify(result, null, 2);
+  }
+
+  void main();
+  ```
+
+  `packages/flow-graph-browser/tests/elk-bars.spec.ts` (copy the import and `test.use` lines from Part 1's first spec):
+  ```ts
+  import { expect, test } from '@playwright/test';
+
+  type Bars = { done: boolean; rows: Array<{ name: string; p95: number; max: number; nodes: number; edges: number; cold: number | null }>; longTasks: number[]; userAgent: string };
+
+  test('29.233 ELK in a Worker meets the §13 layout bars on this machine (desktop)', async ({ page }) => {
+    await page.goto('/harness/elk-bars.html');
+    await page.waitForFunction(() => (window as unknown as { __elkBars?: { done: boolean } }).__elkBars?.done === true, undefined, { timeout: 180_000 });
+    const bars = (await page.evaluate(() => (window as unknown as { __elkBars: Bars }).__elkBars)) as Bars;
+    // Printed so the number reaches the report; the report names it LOCAL and names the machine.
+    console.info(`elk-bars (LOCAL desktop) ${JSON.stringify(bars.rows)} longTasks>50ms=${JSON.stringify(bars.longTasks.filter((d) => d > 50))} ${bars.userAgent}`);
+    const row = (name: string) => bars.rows.find((r) => r.name === name)!;
+    expect(row('150/200').p95).toBeLessThanOrEqual(250);
+    // the main thread stays free: ELK runs in the Worker; only the mapping of the answer runs here
+    expect(bars.longTasks.filter((d) => d > 50)).toEqual([]);
+    // control: the harness measured the sizes it claims
+    expect(row('150/200')).toMatchObject({ nodes: 150, edges: 200 });
+    expect(row('13/17 mockup').cold).not.toBeNull();
+  });
+  ```
+
+  Run: `pnpm turbo run build --filter=@gisik-nokma/flow-graph... > /tmp/wtg3-build.log 2>&1; tail -5 /tmp/wtg3-build.log`, then `pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/elk-bars.spec.ts > /tmp/wtg3-t1-pw.log 2>&1; tail -30 /tmp/wtg3-t1-pw.log`. (Headless Chromium renders in software; this spec measures CPU work in a Worker and does not need a GPU.) Expected: PASS and one `elk-bars (LOCAL desktop)` line.
+
+  Commit.
+
+- [ ] **Step 7: Record the desktop numbers**
+
+  Write the `elk-bars (LOCAL desktop)` line, the machine (`uname -m`, `sysctl -n machdep.cpu.brand_string`) and the in-process timing line of Step 4 into `HANDOFF-wtg3-measure.md`. Note which of 13, 60, 150 and 300 nodes are over the phone bar of 700 ms at 60 nodes (the desktop is faster than the phone, so a desktop 60-node p95 over 175 ms is already a warning).
+
+- [ ] **Step 8: STOP AND REPORT, if the desktop bar misses**
+
+  **If the 150 / 200 p95 is over 250 ms or any main-thread task is over 50 ms,** STOP. Do not tune. Send the owner the numbers and the three remedies in this order, and wait for the word:
+  1. The named fallback (spec §9.2) for the Workflow graph only: the pure analysis plus a hand-written layered layout like `workflow-builder/layout.ts`. Everything after T2 is layout-agnostic (it consumes `FlowLayout`), so this swaps `layout/graph-input.ts` and `from-elk.ts` and nothing else.
+  2. Fewer ELK options (turn off `considerModelOrder` and measure; the flow order is then restored by our fold).
+  3. A smaller cap than 300 tickets per flow for the Workflow view (the spec's cap is Part 2's `readFlow` default).
+
+- [ ] **Step 9: STOP AND REPORT: the real phone**
+
+  The phone bar (60 nodes <= 700 ms, spec §13) is measured on a real mid-range phone, not an emulator. A lane has no phone, so:
+  1. `pnpm --filter @gisik-nokma/flow-graph-browser exec vite --host` (the command Part 1's `package.json` `dev` script runs; read it), and note the LAN URL.
+  2. Send the owner: *"Open `http://<LAN IP>:<port>/harness/elk-bars.html?phone=1` on the phone, wait for the JSON, and paste the `p95` of the `60/80` row and the `userAgent`."*
+  3. Record the answer in the handoff. **If the 60-node p95 is over 700 ms,** STOP and propose, in order: lay out with `elk.layered.nodePlacement.strategy = BRANDES_KOEPF` only (cheaper than the default network simplex placement; measure it first on the desktop), then the same for the crossing minimisation, then the Step 8 fallback for phones only.
+  4. Until the number is recorded, 29.233 stays 🟡 with the sentence "phone number pending".
+
+- [ ] **Step 10: The gate count and the package's registrations**
+
+  1. **COUNT first:** `pnpm turbo run build test typecheck --dry=json > /tmp/wtg3-dry.json 2>/dev/null; python3 -c "import json;print(len(json.load(open('/tmp/wtg3-dry.json'))['tasks']))"`. Expected: the old count + 3 (`flow-graph#build`, `#test`, `#typecheck`; Part 1's `flow-graph-browser` is already counted). Pin THAT number and quote it in DONE.
+  2. **Every place the KG's T1 touched for the count** (`git diff origin/release/smoothness...origin/task/kg-c-t1-measure -- scripts/ctl docs/lanes/gate-lock test-cases/13-deploy-and-ops.md Features.md`): read that diff and change the same lines from the current count to the new one:
+     - `scripts/ctl/verbs/gate.sh`: the PIN, PR B's LAST commit, made only AFTER the owner pulled the primary checkout following PR A: PR A's transitional `N or M` line becomes `M`-only (the count measured in item 1 must equal PR A's M; if it differs, STOP and report: the widening was measured wrong). PR A's transitional fixture case becomes a 🚫 line with its reason, and the M-only pin case flips, in the same commit;
+     - every fixture `Tasks:` / `Cached:` line in `scripts/ctl/lib.test.sh`;
+     - the 13.1702 grep, and the 13.1716 failure arms (`<n-1> of <n>`) and its control;
+     - the README's two gate-lock lines in `scripts/ctl/README.md`;
+     - the 13.1702 and 13.1716 case prose, with a note "(… until WTG3 T1 put `flow-graph`'s build/test/typecheck on the gate)";
+     - the Features gate bullet's count.
+  3. **`scripts/check-case-citations.mjs` `isTestPath`:** add `if (/^packages\/flow-graph\/test\//.test(relPath)) return true;` beside Part 1's and the KG's lines, with a one-line comment (Part 1's `flow-graph-browser/tests/` line already covers the spec).
+  4. **`.github/workflows/ci.yml`:** the chromium install line for `flow-graph-browser` is Part 1's and covers this spec; add nothing, and confirm with `grep -n "flow-graph-browser" .github/workflows/ci.yml`. Run `apps/server/test/ci/ci-trigger.test.ts` to confirm the triggers are unaffected.
+  5. **`packages/ui/test/helpers/colour-scan.ts` `CLIENT_SOURCE_ROOTS`:** add `'packages/flow-graph/src'`.
+  6. **`turbo.json`, `@gisik-nokma/ui#test` inputs:** add `"$TURBO_ROOT$/packages/flow-graph/src/**"` beside the KG's line.
+  6a. **The four Dockerfiles list every workspace package by hand** (`apps/server/Dockerfile:47`, `apps/server/Dockerfile.dev:50`, `apps/web/Dockerfile:33`, `apps/web/Dockerfile.dev:50` on the tip, each seven `COPY packages/<name>/package.json packages/<name>/` lines in alphabetical order, with the comment "a NEW workspace package needs a line here: `pnpm fetch` below is the step whose cache key this list sets, and a package absent from it surfaces as an offline-store miss at the install"). Add `COPY packages/flow-graph/package.json packages/flow-graph/` after the `editor` line in all four, and `COPY packages/viewport/package.json packages/viewport/` too if Part 1 did not (`grep -n "packages/viewport" apps/web/Dockerfile`; the same for `knowledge-graph` after KG C T1: if either is missing, add it and say so in the handoff, because the web image's `pnpm install --offline --frozen-lockfile` fails without it). Run `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/deploy/dockerfile-cache-shape.test.ts > /tmp/wtg3-docker.log 2>&1; tail -n 12 /tmp/wtg3-docker.log` (13.1426; expected PASS: the test pins the order manifests, fetch, source, install, so an added line must sit in the manifest block).
+  7. **Run:** `pnpm --filter @gisik-nokma/ui exec vitest run --maxWorkers=2 > /tmp/wtg3-ui.log 2>&1; tail -8 /tmp/wtg3-ui.log`. Expected: PASS (the new root holds no colour literal). **Mutation:** put `color: '#ff0000'` in a `packages/flow-graph/src` file; the colour scan is RED and names the file. Revert.
+  8. **Run:** `pnpm check:ctl > /tmp/wtg3-ctl.log 2>&1; tail -5 /tmp/wtg3-ctl.log`. Expected: PASS.
+  8a. **The pin and the primary.** The M-only pin of item 2 is PR B's LAST commit, made after the OWNER ACTION of Step 0a (the owner pulled the primary after PR A). Before `ctl gate`, read the PRIMARY checkout's verb (`grep -n "Tasks:" <primary>/scripts/ctl/verbs/gate.sh`): it must accept M (PR A's `N or M`). If it still accepts N only, the owner has not pulled yet: report `NEEDS: owner pulls the primary checkout` and wait; never change the verb here to get past it.
+  9. **Say in DONE:** *"The gate now expects <n> tasks. The primary checkout must be pulled (the owner does it) before the next gate, or it counts against <n−3>."*
+  9a. **OWNER ACTION:** after PR B lands, the owner pulls the primary checkout again, so the verb that runs is the pinned M-only one (until then it is the transitional `N or M`, which still passes later gates but is not the pin).
+
+  Commit.
+
+- [ ] **Step 11: Catalogue, Features, sweeps, DONE**
+
+  Under `<!-- wtg-part3-workflow-graph T1 -->`: flip ✅ 29.230, 29.231 and 29.232; 29.233 is 🟡 with *"the browser Worker bar on the desktop is green (numbers in the handoff); the real phone is pending"* until Step 9 records the number, then ✅. Under `<!-- wtg-part3-workflow-graph T1 bullet -->` add one ⚙️ bullet:
+  > *Flow-graph package (⚙️): `packages/flow-graph` holds the Workflow graph's layout and renderer. Only `src/layout/elk.ts` imports `elkjs` (pinned 0.12.0, run in a Web Worker the host supplies), the package imports no app code, and `test/layout/findings.test.ts` pins what was measured about ELK (no wrapping; raw ELK is not leaf-stable). `packages/flow-graph/`, `packages/flow-graph-browser/harness/elk-bars.ts`.*
+
+  Edit the Features gate bullet's count in the same commit. **Sweeps:** `flow-graph` (whole), `ui` (whole, for the colour scan), `pnpm check:citations`, `node scripts/check-case-ids.mjs`, `pnpm check:tasks`, `pnpm check:ctl`.
+
+  Push, then `DONE task/wtg3-measure <sha40>` (with PR A's merge sha) and one REVIEW line (`NEEDS: browser, a phone`; PR B's gate runs on the pulled primary, Step 10 item 8a).
+
+---
+
+
+---
+
+### Task 2: Layout: measured blocks, the band fold, lone-leaf placement, the move diff, orientation, note-stack ports (cases 29.234–29.239)
+
+**Branch** `task/wtg3-layout` (from `origin/release/<next>` after T1 is merged). **Files:**
+- Create:
+  - `packages/flow-graph/src/layout/{measure,orientation,fold,incremental,diff}.ts`
+  - `packages/flow-graph/test/layout/{helpers.ts,measure.test.ts,fold.test.ts,layout.test.ts}`
+- Modify:
+  - `packages/flow-graph/src/types.ts` (`NOTE_GAP`, `NoteStack`, `LayoutNode.notes`, `boxSize`)
+  - `packages/flow-graph/src/layout/{graph-input,from-elk,layout}.ts` (note-stack ports, box sizes, the fold)
+  - `packages/flow-graph/src/index.ts` (four more exports)
+  - `Features.md` §26 (T2 bullet anchor), `test-cases/29-workflow-timeline-graphs.md` (T2 anchor)
+
+**Interfaces:**
+- **Consumes** (T1): `layoutFlow`, `createElkEngine`, `LayoutInput`, `FlowLayout`, `mockupFlow`, `syntheticFlow`, `withLeaf`, `test/engine/inprocess.ts`.
+- **Produces:** `layoutFlow(engine, input, options)` now returns a FOLDED layout for a landscape flow of more than 8 nodes; `LayoutNode.notes?: NoteStack` and `boxSize(node, orientation)`; `placeLeaves(prev, input, options): FlowLayout | null`; `diffLayouts(a, b, tolerance?): LayoutDiff`; `orientationFor(containerWidthPx, remPx?): Orientation` with `PORTRAIT_BELOW_REM = 40`; `BLOCK`, `ticketBlock`, `decisionBlock`, `layoutNode`, `wrapLines`, `TextMeasure` (the measured block sizes the app feeds into `LayoutInput`). T4's scene builder, T5's stage and T10's notes all stand on these names.
+
+Siblings copied: none in the repo (this is new pure code); the checks are the geometry helpers of `test/layout/helpers.ts` (an integer-step walk of every route against every box).
+
+**Why these five pieces** (all measured in T1, `findings.test.ts`): ELK is asked for ONE strip (wrapping is defective); a strip of more than 8 nodes is too wide for a sheet of `min(1240px, 94vw)`, so `foldBands` cuts it at the gaps between layers and stacks the pieces like lines of text, running every edge that crosses bands down its own lane in the gap and a "highway" at the left margin (axis-aligned, never through a box, checked on 30 random flows of 9 to 150 nodes); a lone new leaf is PLACED beside its source (`placeLeaves`) because raw ELK moves more than 10% of the nodes; anything else is a full re-layout whose moves glide (`diffLayouts` says which nodes moved).
+
+- [ ] **Step 0: Pre-flight**
+
+  1. `git fetch origin`; cut `task/wtg3-layout`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/flow-graph`.
+  2. `git grep -n "export" packages/flow-graph/src/index.ts` and `git grep -n "layoutFlow" packages/flow-graph/src` (T1's names are as the Interfaces block says; if T1 landed under other names, change this task's call sites, not T1's).
+  3. Run T1's suite once: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 > /tmp/wtg3-t2-pre.log 2>&1; tail -n 12 /tmp/wtg3-t2-pre.log`. Expected PASS (10 tests).
+
+- [ ] **Step 1: The six case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T2 -->` in `test-cases/29-workflow-timeline-graphs.md`:
+  - `- ❌ **29.234 — Blocks are MEASURED, never a fixed 64 px:** a desktop ticket is 140 x 64 with two title lines and an ellipsis, a phone ticket is 156 wide with up to three lines and its height follows them, every wrapped line fits its width, a word wider than a line is cut, a Decision grows to three question lines and never below 176 x 108; control: a short title is one line on both. Mutation: phone width 156 → 140 → reds.`
+  - `- ❌ **29.235 — A long flow folds into bands:** more than 8 nodes fold into bands near a 1.7 aspect with no overlap, no diagonal route and no route through a node, on the mockup and on thirty random flows of 9 to 150 nodes; control: a strip of 8 is left alone. Mutation: fold at 8 nodes instead of more than 8 → reds.`
+  - `- ❌ **29.236 — A layout is a drawing:** the mockup's 13 nodes have no overlap, every route is axis-aligned and every label sits on its route, the same input lays out byte-identically twice, a Decision's three routes leave from three distinct sides, portrait flows top to bottom; control: a deliberately overlapping layout is reported by the same checker. Mutation: skip the label snap → reds.`
+  - `- ❌ **29.237 — Adding one leaf moves nothing else:** raw ELK moves more than 10% of the nodes for some source, placing the leaf moves none for EVERY source (stable share 1.0, spec §13 wants 0.9), and anything that is not a lone leaf returns null so the caller re-lays out and glides; control: the same flow plus a leaf is accepted and overlaps nothing. Mutation: `placeLeaves` returns null always → reds.`
+  - `- ❌ **29.238 — Orientation follows the CONTAINER and a move is a diff:** under 40rem is portrait, 40rem and over is landscape, a rem other than 16 moves the line, the device is never read; \`diffLayouts\` reports moved, added, removed and the stable share; control: identical layouts are stable at 1. Mutation: 40 → 41 → reds.`
+  - `- ❌ **29.239 — A note stack reserves room without moving the edges:** a ticket and a Decision with a note stack keep their routes on the SHAPE (never the note column) in both orientations, nothing overlaps, no route runs through a box; control: without the stack the box is the shape. Mutation: anchor ports on the box → reds.`
+
+- [ ] **Step 2: RED, the tests first**
+
+  `packages/flow-graph/test/layout/helpers.ts` (shared by the layout tests; the walk checks each route every 2 px against every box that is not its own end):
+  ```ts
+import type { FlowLayout, Point, Rect } from '../../src/types.js';
+
+const inside = (p: Point, r: Rect): boolean => p.x > r.x && p.x < r.x + r.width && p.y > r.y && p.y < r.y + r.height;
+
+/** Every integer-step point along a segment, because routes are axis-aligned and boxes are pixel-aligned. */
+export function crossings(layout: FlowLayout): string[] {
+  const out: string[] = [];
+  for (const edge of layout.edges) {
+    const [source, target] = edge.id.split('>');
+    for (let i = 0; i + 1 < edge.points.length; i += 1) {
+      const a = edge.points[i]!;
+      const b = edge.points[i + 1]!;
+      if (a.x !== b.x && a.y !== b.y) out.push(`${edge.id} diagonal at ${i}`);
+      const steps = Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+      for (let s = 0; s <= steps; s += 2) {
+        const p = { x: a.x + ((b.x - a.x) * s) / Math.max(1, steps), y: a.y + ((b.y - a.y) * s) / Math.max(1, steps) };
+        for (const n of layout.nodes) if (n.id !== source && n.id !== target && inside(p, n)) out.push(`${edge.id} through ${n.id}`);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+  ```
+
+  `packages/flow-graph/test/layout/measure.test.ts` (29.234, 29.238). The measure function is a fixed 7 px per character so the test needs no canvas:
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { BLOCK, decisionBlock, ticketBlock, wrapLines } from '../../src/layout/measure.js';
+import { orientationFor } from '../../src/layout/orientation.js';
+import { diffLayouts } from '../../src/layout/diff.js';
+import type { FlowLayout } from '../../src/types.js';
+
+/** 6 px a character: a fixed-width stand-in for the browser's `measureText`. */
+const six = (text: string): number => text.length * 6;
+
+describe('measured blocks (spec WG-9)', () => {
+  it('29.234 a desktop ticket is 140 x 64 with two title lines and an ellipsis; a phone ticket is 156 wide, takes up to three lines and its height follows them; control: a short title is one line on both', () => {
+    const long = 'Prepare the quarterly planning deck for the leadership review next week';
+    const desktop = ticketBlock(long, false, six);
+    expect(desktop.width).toBe(140);
+    expect(desktop.height).toBe(64);
+    expect(desktop.lines).toHaveLength(2);
+    expect(desktop.truncated).toBe(true);
+    expect(desktop.lines[1]!.endsWith('…')).toBe(true);
+    const phone = ticketBlock(long, true, six);
+    expect(phone.width).toBe(156);
+    expect(phone.lines).toHaveLength(3);
+    expect(phone.height).toBe(Math.max(64, BLOCK.padding + BLOCK.headRow + 3 * BLOCK.lineHeight));
+    expect(phone.height).toBeGreaterThan(desktop.height - 1);
+    // control
+    expect(ticketBlock('Pitch', false, six).lines).toEqual(['Pitch']);
+    expect(ticketBlock('Pitch', true, six).lines).toEqual(['Pitch']);
+    expect(ticketBlock('Pitch', true, six).height).toBe(64);
+  });
+
+  it('29.234 every wrapped line fits its width, a single word wider than the line is cut, and an empty title is one blank line; control: nothing is truncated when it fits', () => {
+    const width = 100;
+    const { lines } = wrapLines('Supercalifragilisticexpialidocious and more words here', width, six, 3);
+    for (const line of lines) expect(six(line)).toBeLessThanOrEqual(width);
+    expect(lines.length).toBeLessThanOrEqual(3);
+    expect(wrapLines('', width, six, 2).lines).toEqual([]);
+    expect(ticketBlock('', false, six).height).toBe(64);
+    expect(wrapLines('a b c', width, six, 2)).toEqual({ lines: ['a b c'], truncated: false });
+  });
+
+  it('29.234 a Decision grows to hold three question lines and never shrinks below 176 x 108', () => {
+    const one = decisionBlock('Go?', six);
+    expect(one.width).toBe(176);
+    expect(one.height).toBe(108);
+    const three = decisionBlock('Does the client approve the revised scope and the new budget for this quarter at all', six);
+    expect(three.lines).toHaveLength(3);
+    expect(three.height).toBeGreaterThanOrEqual(108);
+  });
+});
+
+describe('orientation and diff', () => {
+  it('29.238 the CONTAINER decides: under 40rem is portrait, 40rem and over is landscape; a remPx other than 16 moves the line; control: the device is never read', () => {
+    expect(orientationFor(639)).toBe('portrait');
+    expect(orientationFor(640)).toBe('landscape');
+    expect(orientationFor(700, 18)).toBe('portrait'); // 40rem is 720 px at an 18 px root
+    expect(orientationFor(720, 18)).toBe('landscape');
+  });
+
+  it('29.238 diffLayouts reports moved, added and removed, and the share that stayed within the tolerance; control: identical layouts are stable at 1 and a disjoint pair is 1 by convention', () => {
+    const at = (nodes: [string, number, number][]): FlowLayout => ({ width: 0, height: 0, orientation: 'landscape', edges: [], nodes: nodes.map(([id, x, y]) => ({ id, x, y, width: 1, height: 1 })) });
+    const a = at([['a', 0, 0], ['b', 10, 0], ['c', 20, 0], ['d', 30, 0]]);
+    const b = at([['a', 0, 0], ['b', 10.5, 0], ['c', 20, 3], ['e', 0, 9]]);
+    const diff = diffLayouts(a, b);
+    expect(diff.moved.map((m) => m.id)).toEqual(['c']);
+    expect(diff.added).toEqual(['e']);
+    expect(diff.removed).toEqual(['d']);
+    expect(diff.stable).toBeCloseTo(2 / 3);
+    expect(diffLayouts(a, a).stable).toBe(1);
+    expect(diffLayouts(a, at([['z', 0, 0]])).stable).toBe(1);
+  });
+});
+  ```
+
+  `packages/flow-graph/test/layout/fold.test.ts` (29.235). The random-flows case runs ELK 30 times on flows of up to 150 nodes, so it carries its own budget (`120_000` ms): the package default of 20 s is for single layouts:
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { mockupFlow, syntheticFlow } from '../../src/testing/fixtures.js';
+import { FOLD_ASPECT, foldBands } from '../../src/layout/fold.js';
+import { layoutFlow } from '../../src/layout/layout.js';
+import type { FlowLayout, LayoutInput } from '../../src/types.js';
+import { crossings } from './helpers.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+
+const options = { labelSize };
+const bandsOf = (layout: FlowLayout): number => new Set(layout.nodes.map((n) => Math.round(n.y / 1))).size;
+
+describe('folding a strip into bands', () => {
+  it('29.235 the mockup folds into bands near the target aspect; no route is diagonal, none runs through a node; control: a strip of eight is left alone', async () => {
+    const flow = mockupFlow();
+    const folded = await layoutFlow(inProcessEngine(), flow, options);
+    expect(crossings(folded)).toEqual([]);
+    expect(folded.width / folded.height).toBeGreaterThan(FOLD_ASPECT / 1.5);
+    expect(folded.width / folded.height).toBeLessThan(FOLD_ASPECT * 1.5);
+    expect(folded.edges.every((e) => e.points.length >= 2)).toBe(true);
+    const small: LayoutInput = { ...syntheticFlow(8, 9, 3), orientation: 'landscape' };
+    const strip = await layoutFlow(inProcessEngine(), small, options);
+    expect(foldBands(strip, small.nodes.map((n) => n.id))).toBe(strip);
+    expect(bandsOf(folded)).toBeGreaterThan(bandsOf(strip) / 2);
+  });
+
+  it('29.235 thirty random flows of 9 to 150 nodes: no overlap, no diagonal, no route through a node', async () => {
+    const bad: string[] = [];
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const n = [9, 14, 20, 40, 80, 150][seed % 6]!;
+      const base = syntheticFlow(n, Math.round(n * 1.3), seed);
+      // every fifth ticket carries a stack of note blocks, so the fold meets boxes taller than their shapes
+      const flow = { ...base, nodes: base.nodes.map((node, i) => (i % 5 === 0 ? { ...node, notes: { width: 140, height: 88 } } : node)) };
+      const layout = await layoutFlow(inProcessEngine(), flow, options);
+      for (const c of crossings(layout)) bad.push(`seed ${seed} n ${n}: ${c}`);
+      for (let i = 0; i < layout.nodes.length; i += 1)
+        for (let j = i + 1; j < layout.nodes.length; j += 1) {
+          const a = layout.nodes[i]!;
+          const b = layout.nodes[j]!;
+          if (a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height) bad.push(`seed ${seed}: ${a.id} overlaps ${b.id}`);
+        }
+    }
+    expect(bad).toEqual([]);
+    // thirty ELK runs of up to 150 nodes: slow on a loaded machine, so the case carries its own budget (the package default is 20 s)
+  }, 120_000);
+});
+  ```
+
+  `packages/flow-graph/test/layout/layout.test.ts` (29.236, 29.237, 29.239):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { mockupFlow, withLeaf } from '../../src/testing/fixtures.js';
+import { diffLayouts } from '../../src/layout/diff.js';
+import { layoutFlow } from '../../src/layout/layout.js';
+import { placeLeaves } from '../../src/layout/incremental.js';
+import { boxSize, type FlowLayout, type Rect } from '../../src/types.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { crossings } from './helpers.js';
+
+const options = { labelSize };
+const hit = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+function overlapping(layout: FlowLayout): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < layout.nodes.length; i += 1)
+    for (let j = i + 1; j < layout.nodes.length; j += 1)
+      if (hit(layout.nodes[i]!, layout.nodes[j]!)) out.push(`${layout.nodes[i]!.id}/${layout.nodes[j]!.id}`);
+  return out;
+}
+
+describe('the mockup flow through ELK (in process)', () => {
+  it('29.236 thirteen nodes lay out with no overlap, every route is axis-aligned and every label sits on its route; control: a deliberately overlapping layout is reported', async () => {
+    const layout = await layoutFlow(inProcessEngine(), mockupFlow(), options);
+    expect(layout.nodes).toHaveLength(13);
+    expect(overlapping(layout)).toEqual([]);
+    for (const edge of layout.edges) {
+      expect(edge.points.length, edge.id).toBeGreaterThanOrEqual(2);
+      for (let i = 0; i + 1 < edge.points.length; i += 1) {
+        const a = edge.points[i]!;
+        const b = edge.points[i + 1]!;
+        expect(a.x === b.x || a.y === b.y, `${edge.id} segment ${i}`).toBe(true);
+      }
+    }
+    const labelled = layout.edges.filter((e) => e.label !== null);
+    expect(labelled.map((e) => e.id).sort()).toEqual(['144>145', '144>147', '151>141', '151>dA', '151>dEnd', 'd1>146', 'd1>dA'].sort());
+    for (const edge of labelled) {
+      const l = edge.label!;
+      const c = { x: l.x + l.width / 2, y: l.y + l.height / 2 };
+      const onSegment = edge.points.some((p, i) => {
+        const q = edge.points[i + 1];
+        if (q === undefined) return false;
+        return p.y === q.y ? c.y === p.y && c.x >= Math.min(p.x, q.x) && c.x <= Math.max(p.x, q.x) : c.x === p.x && c.y >= Math.min(p.y, q.y) && c.y <= Math.max(p.y, q.y);
+      });
+      expect(onSegment, `label of ${edge.id} on its route`).toBe(true);
+    }
+    // control: the detector does see an overlap
+    expect(overlapping({ ...layout, nodes: [layout.nodes[0]!, { ...layout.nodes[0]!, id: 'twin' }] })).toEqual(['140/twin']);
+  });
+
+  it('29.236 the same input lays out byte-identically twice; control: a different flow differs', async () => {
+    const a = await layoutFlow(inProcessEngine(), mockupFlow(), options);
+    const b = await layoutFlow(inProcessEngine(), mockupFlow(), options);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    const c = await layoutFlow(inProcessEngine(), withLeaf(mockupFlow(), '142'), options);
+    expect(JSON.stringify(c)).not.toBe(JSON.stringify(a));
+  });
+
+  it('29.236 a Decision\'s three outgoing routes leave from three distinct sides of the diamond', async () => {
+    const layout = await layoutFlow(inProcessEngine(), mockupFlow(), options);
+    const box = layout.nodes.find((n) => n.id === '151')!;
+    const side = (p: { x: number; y: number }): string => (p.x >= box.x + box.width ? 'E' : p.x <= box.x ? 'W' : p.y <= box.y ? 'N' : 'S');
+    const sides = ['151>dEnd', '151>141', '151>dA'].map((id) => side(layout.edges.find((e) => e.id === id)!.points[0]!));
+    expect(new Set(sides).size).toBe(3);
+  });
+
+  it('29.236 portrait lays out too, flowing top to bottom for the first edge; control: landscape flows left to right', async () => {
+    const portrait = await layoutFlow(inProcessEngine(), mockupFlow('portrait'), options);
+    expect(overlapping(portrait)).toEqual([]);
+    const p140 = portrait.nodes.find((n) => n.id === '140')!;
+    const p141 = portrait.nodes.find((n) => n.id === '141')!;
+    expect(p141.y).toBeGreaterThan(p140.y);
+    const landscape = await layoutFlow(inProcessEngine(), mockupFlow('landscape'), options);
+    const l140 = landscape.nodes.find((n) => n.id === '140')!;
+    const l141 = landscape.nodes.find((n) => n.id === '141')!;
+    expect(l141.x).toBeGreaterThan(l140.x);
+  });
+});
+
+describe('adding one leaf (spec §13: at least 90% of nodes within 1 px)', () => {
+  it('29.237 raw ELK moves more than 10% of the nodes for some source; placing the leaf moves none, for EVERY source; control: the placement overlaps nothing', async () => {
+    const base = mockupFlow();
+    const before = await layoutFlow(inProcessEngine(), base, options);
+    let worstRaw = 1;
+    for (const node of base.nodes) {
+      const grown = withLeaf(base, node.id);
+      const raw = await layoutFlow(inProcessEngine(), grown, options);
+      worstRaw = Math.min(worstRaw, diffLayouts(before, raw).stable);
+      const placed = placeLeaves(before, grown, options);
+      expect(placed, `leaf after ${node.id}`).not.toBeNull();
+      expect(diffLayouts(before, placed!).stable, `leaf after ${node.id}`).toBe(1);
+      expect(overlapping(placed!), `leaf after ${node.id}`).toEqual([]);
+      expect(placed!.edges.find((e) => e.id === `${node.id}>leaf`)!.points.length).toBeGreaterThanOrEqual(2);
+    }
+    // This is why `placeLeaves` exists: measured, raw ELK re-lays out a large part of the flow for at least one leaf.
+    expect(worstRaw).toBeLessThan(0.9);
+  });
+
+  it('29.237 a change that is not a lone leaf returns null and the caller re-lays out and glides; control: the same flow plus a leaf is accepted', async () => {
+    const base = mockupFlow();
+    const before = await layoutFlow(inProcessEngine(), base, options);
+    const extraEdge = { ...base, edges: [...base.edges, { id: '140>142', source: '140', target: '142', label: null, loop: false }] };
+    expect(placeLeaves(before, extraEdge, options)).toBeNull();
+    expect(placeLeaves(before, { ...base, nodes: base.nodes.slice(1), edges: base.edges.filter((e) => e.source !== '140') }, options)).toBeNull();
+    expect(placeLeaves(before, { ...withLeaf(base, '142'), orientation: 'portrait' }, options)).toBeNull();
+    expect(placeLeaves(before, withLeaf(base, '142'), options)).not.toBeNull();
+    const moved = diffLayouts(before, await layoutFlow(inProcessEngine(), extraEdge, options));
+    expect(moved.moved.length).toBeGreaterThan(0);
+  });
+});
+
+describe('reserved note space (spec WG-7)', () => {
+  const noted = (flow: ReturnType<typeof mockupFlow>, stacks: Record<string, { width: number; height: number }>) => ({
+    ...flow,
+    nodes: flow.nodes.map((n) => (stacks[n.id] === undefined ? n : { ...n, notes: stacks[n.id]! })),
+  });
+  it('29.239 a ticket and a Decision with a note stack keep their edges on the SHAPE, nothing overlaps, no route runs through a box; control: without the stack the box is the shape', async () => {
+    for (const orientation of ['landscape', 'portrait'] as const) {
+      const flow = noted(mockupFlow(orientation), { '141': { width: 140, height: 136 }, '144': { width: 140, height: 88 }, '151': { width: 140, height: 40 }, d1: { width: 140, height: 136 } });
+      const layout = await layoutFlow(inProcessEngine(), flow, options);
+      expect(overlapping(layout), orientation).toEqual([]);
+      expect(crossings(layout), orientation).toEqual([]);
+      const landscape = orientation === 'landscape';
+      for (const id of ['141', '144', '151', 'd1']) {
+        const box = layout.nodes.find((n) => n.id === id)!;
+        const spec = flow.nodes.find((n) => n.id === id)!;
+        expect(box, `${id} box`).toMatchObject(boxSize(spec, orientation));
+        for (const edge of layout.edges.filter((e) => e.id.startsWith(`${id}>`))) {
+          const p = edge.points[0]!;
+          // the route leaves the SHAPE, never the note column
+          expect(landscape ? p.y <= box.y + spec.height : p.x <= box.x + spec.width, `${edge.id} leaves the shape`).toBe(true);
+        }
+      }
+      const plain = await layoutFlow(inProcessEngine(), mockupFlow(orientation), options);
+      expect(plain.nodes.find((n) => n.id === '141')).toMatchObject({ width: 140, height: 64 });
+    }
+  });
+});
+  ```
+
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 test/layout > /tmp/wtg3-t2.log 2>&1; tail -n 30 /tmp/wtg3-t2.log`. Expected: FAIL to load (`../../src/layout/measure.js` and the others do not exist). Commit the RED tests (`wtg3 T2: RED layout tests`).
+
+- [ ] **Step 3: GREEN, types, measure, orientation, diff**
+
+  `src/types.ts` replaces T1's: adds `NOTE_GAP`, `NoteStack`, `LayoutNode.notes` and `boxSize`. `PlacedNode` is now the BOX (the shape sits at its top-left); a node without notes has box = shape:
+  ```ts
+/**
+ * The layout's vocabulary (spec §9.3). Nothing here knows a ticket: the app maps a `FlowRead` to these, so this package
+ * never imports `@gisik-nokma/domain` and the renderer can draw any labelled graph.
+ */
+export type Orientation = 'landscape' | 'portrait';
+export type NodeShape = 'ticket' | 'decision';
+
+export type Point = { x: number; y: number };
+export type Rect = { x: number; y: number; width: number; height: number };
+
+/** One box the layout places. The size is MEASURED (`measure.ts`), never a constant, so a wrapped phone title cannot overlap its neighbour. */
+/** Px between a shape and its note stack, and between two note blocks. */
+export const NOTE_GAP = 8;
+export type NoteStack = { width: number; height: number };
+
+export type LayoutNode = {
+  id: string;
+  shape: NodeShape;
+  /** The DRAWN shape's size. */
+  width: number;
+  height: number;
+  /**
+   * The size of the stack of note blocks that sits beside the shape (WG-7): below it in landscape, to its right in portrait. The
+   * placed box grows to hold it (`boxSize`), and the node's edges still meet the SHAPE (fixed ports), never the note column.
+   */
+  notes?: NoteStack;
+};
+
+/** `loop` is FL-3's back edge, supplied by the caller: the layout never decides it. */
+export type LayoutEdge = { id: string; source: string; target: string; label: string | null; loop: boolean };
+
+/** `nodes` arrive in FLOW ORDER (FL-3). That order is ELK's model order, which is what makes a layout reproducible. */
+export type LayoutInput = {
+  nodes: readonly LayoutNode[];
+  edges: readonly LayoutEdge[];
+  orientation: Orientation;
+};
+
+/** `width`/`height` are the PLACED BOX: the shape plus any reserved note space. The shape sits at the box's top-left. */
+export type PlacedNode = Rect & { id: string };
+export type RoutedEdge = { id: string; points: Point[]; label: Rect | null };
+export type FlowLayout = { width: number; height: number; orientation: Orientation; nodes: PlacedNode[]; edges: RoutedEdge[] };
+
+export type LayoutOptions = {
+  /** Measured size of an edge-label pill for this text. */
+  labelSize: (text: string) => { width: number; height: number };
+};
+
+/**
+ * The box a node occupies in the layout: its shape, plus the note stack beside it. The shape sits at the box's top-left.
+ * Landscape stacks the notes under the shape (the box is as wide as the wider of the two); portrait puts them to its right.
+ */
+export function boxSize(node: LayoutNode, orientation: Orientation): { width: number; height: number } {
+  if (node.notes === undefined) return { width: node.width, height: node.height };
+  return orientation === 'landscape'
+    ? { width: Math.max(node.width, node.notes.width), height: node.height + NOTE_GAP + node.notes.height }
+    : { width: node.width + NOTE_GAP + node.notes.width, height: Math.max(node.height, node.notes.height) };
+}
+  ```
+
+  `src/layout/measure.ts`: the one place a block's size is decided. The app passes a canvas `measureText` as `TextMeasure`; wrapping is greedy by words, a word wider than a line is cut by characters, the last line ends in an ellipsis when text was left over:
+  ```ts
+import type { LayoutNode } from '../types.js';
+
+/** Width in px of one line of text at the block's title font. The browser passes a canvas `measureText`; tests pass a fixed width. */
+export type TextMeasure = (text: string) => number;
+
+export const BLOCK = {
+  /** Spec §9.3 / the mockup: a ticket is 140 × 64 on a desktop; a phone block is 156 wide and grows (WG-9). */
+  desktopWidth: 140,
+  phoneWidth: 156,
+  minHeight: 64,
+  decisionWidth: 176,
+  decisionMinHeight: 108,
+  noteWidth: 140,
+  noteHeight: 40,
+  /** top and bottom padding, the key row, one title line. */
+  padding: 14,
+  headRow: 18,
+  lineHeight: 16,
+  /** A card's side padding, both sides. */
+  sidePadding: 20,
+} as const;
+
+/**
+ * Greedy word wrap to at most `maxLines` lines of `maxWidth` px. A word wider than a line is cut by characters. The last line
+ * ends in an ellipsis when text was left over; `full` says whether any was.
+ */
+export function wrapLines(text: string, maxWidth: number, measure: TextMeasure, maxLines: number): { lines: string[]; truncated: boolean } {
+  const words = text.trim().split(/\s+/).filter((w) => w !== '');
+  const lines: string[] = [];
+  let current = '';
+  let index = 0;
+  const pushWord = (word: string): string => {
+    if (measure(word) <= maxWidth) return word;
+    let cut = word;
+    while (cut.length > 1 && measure(cut) > maxWidth) cut = cut.slice(0, -1);
+    return cut;
+  };
+  while (index < words.length && lines.length < maxLines) {
+    const word = words[index]!;
+    const candidate = current === '' ? word : `${current} ${word}`;
+    if (measure(candidate) <= maxWidth) {
+      current = candidate;
+      index += 1;
+      continue;
+    }
+    if (current === '') {
+      const cut = pushWord(word);
+      lines.push(cut);
+      words[index] = word.slice(cut.length);
+      if (words[index] === '') index += 1;
+      continue;
+    }
+    lines.push(current);
+    current = '';
+  }
+  if (current !== '' && lines.length < maxLines) lines.push(current);
+  const truncated = index < words.length;
+  if (truncated && lines.length > 0) {
+    let last = lines[lines.length - 1]!;
+    while (last.length > 0 && measure(`${last}…`) > maxWidth) last = last.slice(0, -1).trimEnd();
+    lines[lines.length - 1] = `${last}…`;
+  }
+  return { lines, truncated };
+}
+
+export type TicketBlock = { width: number; height: number; lines: string[]; truncated: boolean };
+
+/** A ticket block. Desktop: 140 wide, 64 high, two title lines. Phone: 156 wide, up to three lines, and the height follows the content. */
+export function ticketBlock(title: string, phone: boolean, measure: TextMeasure): TicketBlock {
+  const width = phone ? BLOCK.phoneWidth : BLOCK.desktopWidth;
+  const maxLines = phone ? 3 : 2;
+  const { lines, truncated } = wrapLines(title, width - BLOCK.sidePadding, measure, maxLines);
+  const height = Math.max(BLOCK.minHeight, BLOCK.padding + BLOCK.headRow + Math.max(1, lines.length) * BLOCK.lineHeight);
+  return { width, height, lines, truncated };
+}
+
+/** A Decision diamond. Its question wraps in the inner 62% of the width, in at most three lines, and the diamond grows to hold them. */
+export function decisionBlock(question: string, measure: TextMeasure): TicketBlock {
+  const width = BLOCK.decisionWidth;
+  const { lines, truncated } = wrapLines(question, Math.floor(width * 0.62), measure, 3);
+  const height = Math.max(BLOCK.decisionMinHeight, BLOCK.headRow + BLOCK.lineHeight + Math.max(1, lines.length) * BLOCK.lineHeight + 24);
+  return { width, height, lines, truncated };
+}
+
+export function layoutNode(id: string, shape: LayoutNode['shape'], block: Pick<TicketBlock, 'width' | 'height'>): LayoutNode {
+  return { id, shape, width: block.width, height: block.height };
+}
+  ```
+
+  `src/layout/orientation.ts` (the CONTAINER's width, not the device's: the same sheet is narrow on a laptop with a split screen):
+  ```ts
+import type { Orientation } from '../types.js';
+
+/** Spec §9.3: narrower than 40rem is portrait (`ui.css:1059`), else landscape. The CONTAINER decides, not the device. */
+export const PORTRAIT_BELOW_REM = 40;
+
+export function orientationFor(containerWidthPx: number, remPx = 16): Orientation {
+  return containerWidthPx < PORTRAIT_BELOW_REM * remPx ? 'portrait' : 'landscape';
+}
+  ```
+
+  `src/layout/diff.ts` (what moved between two layouts, so the stage glides only those):
+  ```ts
+import type { FlowLayout } from '../types.js';
+
+export type LayoutDiff = {
+  /** Nodes present in both whose position changed by more than `tolerance` px. They glide (240 ms, spec §9.3); the rest stay. */
+  moved: { id: string; from: { x: number; y: number }; to: { x: number; y: number } }[];
+  added: string[];
+  removed: string[];
+  /** Share of the nodes present in BOTH layouts that did not move: the §13 stability figure. 1 when none are shared. */
+  stable: number;
+};
+
+export function diffLayouts(prev: FlowLayout, next: FlowLayout, tolerance = 1): LayoutDiff {
+  const before = new Map(prev.nodes.map((n) => [n.id, n]));
+  const after = new Map(next.nodes.map((n) => [n.id, n]));
+  const moved: LayoutDiff['moved'] = [];
+  let shared = 0;
+  for (const [id, to] of after) {
+    const from = before.get(id);
+    if (from === undefined) continue;
+    shared += 1;
+    if (Math.abs(from.x - to.x) > tolerance || Math.abs(from.y - to.y) > tolerance) moved.push({ id, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } });
+  }
+  return {
+    moved,
+    added: [...after.keys()].filter((id) => !before.has(id)),
+    removed: [...before.keys()].filter((id) => !after.has(id)),
+    stable: shared === 0 ? 1 : (shared - moved.length) / shared,
+  };
+}
+  ```
+
+- [ ] **Step 4: GREEN, the graph builder, ELK's answer, the fold, the leaf, the layout**
+
+  `src/layout/graph-input.ts` replaces T1's: placed sizes come from `boxSize`; a node with a note stack gets `FIXED_POS` ports on the SHAPE's own edge (a plain ticket one shared out port, a Decision one per outgoing edge on the two sides its notes do not use), so ELK keeps edges off the note column:
+  ```ts
+import { boxSize, type LayoutEdge, type LayoutInput, type LayoutOptions, type Orientation } from '../types.js';
+
+/** The slice of ELK's JSON this package reads and writes. Declared here, not imported, so only `elk.ts` ever names `elkjs`. */
+export type ElkLabel = { text: string; width: number; height: number; x?: number; y?: number };
+export type ElkPort = { id: string; width: number; height: number; layoutOptions: Record<string, string>; x?: number; y?: number };
+export type ElkChild = {
+  id: string;
+  width: number;
+  height: number;
+  layoutOptions?: Record<string, string>;
+  ports?: ElkPort[];
+  x?: number;
+  y?: number;
+};
+export type ElkSection = { id: string; startPoint: { x: number; y: number }; endPoint: { x: number; y: number }; bendPoints?: { x: number; y: number }[] };
+export type ElkEdge = { id: string; sources: string[]; targets: string[]; labels?: ElkLabel[]; sections?: ElkSection[] };
+export type ElkGraph = { id: string; layoutOptions: Record<string, string>; children: ElkChild[]; edges: ElkEdge[]; width?: number; height?: number };
+
+/** A fixed seed, so a flow lays out the same way every time it is opened (spec §9.3). */
+export const ELK_SEED = 7;
+export const GAP = { node: 40, layer: 72, edgeNode: 24, padding: 32 } as const;
+
+/** A Decision's ports: one in, and outs on distinct sides (spec §9.3: top, right, bottom). More than three share sides in turn. */
+const PORT_SIDES: Record<Orientation, { in: string; out: readonly string[] }> = {
+  landscape: { in: 'WEST', out: ['EAST', 'NORTH', 'SOUTH'] },
+  portrait: { in: 'NORTH', out: ['SOUTH', 'WEST', 'EAST'] },
+};
+
+const inPortId = (nodeId: string): string => `${nodeId}#in`;
+const outPortId = (nodeId: string, slot: number): string => `${nodeId}#out${slot}`;
+
+/**
+ * Outgoing edges of one Decision get slots: forward edges first, in the order they were given (flow order of the caller),
+ * then loops, so a loop takes the side no forward branch needed.
+ */
+export function decisionSlots(edges: readonly LayoutEdge[], nodeId: string): Map<string, number> {
+  const mine = edges.filter((e) => e.source === nodeId);
+  const ordered = [...mine.filter((e) => !e.loop), ...mine.filter((e) => e.loop)];
+  return new Map(ordered.map((e, i) => [e.id, i]));
+}
+
+/** A node with reserved note space gives up the side its notes sit on (spec WG-7): a Decision's branches then use two sides, not three. */
+const NOTE_SIDES: Record<Orientation, { in: string; out: readonly string[] }> = {
+  landscape: { in: 'WEST', out: ['EAST', 'NORTH'] },
+  portrait: { in: 'NORTH', out: ['SOUTH', 'WEST'] },
+};
+
+/** Where a port sits on the SHAPE (relative to the box's top-left), `index` of `count` on a side that holds several. */
+function portPosition(side: string, index: number, count: number, shape: { width: number; height: number }): { x: number; y: number } {
+  const t = (index + 1) / (count + 1);
+  switch (side) {
+    case 'WEST': return { x: 0, y: shape.height * t };
+    case 'EAST': return { x: shape.width, y: shape.height * t };
+    case 'NORTH': return { x: shape.width * t, y: 0 };
+    default: return { x: shape.width * t, y: shape.height };
+  }
+}
+
+export function toElkGraph(input: LayoutInput, options: LayoutOptions): ElkGraph {
+  const direction = input.orientation === 'landscape' ? 'RIGHT' : 'DOWN';
+  const slotsOf = new Map<string, Map<string, number>>();
+  const children: ElkChild[] = input.nodes.map((node) => {
+    const noted = node.notes !== undefined;
+    const box = boxSize(node, input.orientation);
+    if (node.shape !== 'decision' && !noted) return { id: node.id, ...box };
+    // A plain ticket with notes has one out port that every outgoing edge shares; a Decision gets one per outgoing edge.
+    const slots = node.shape === 'decision' ? decisionSlots(input.edges, node.id) : new Map(input.edges.filter((e) => e.source === node.id).map((e) => [e.id, 0] as const));
+    slotsOf.set(node.id, slots);
+    const sides = noted ? NOTE_SIDES[input.orientation] : PORT_SIDES[input.orientation];
+    const outs = node.shape === 'decision' ? Math.max(1, slots.size) : 1;
+    const outSide = (slot: number): string => sides.out[slot % sides.out.length] ?? sides.out[0]!;
+    const perSide = new Map<string, number>();
+    for (let slot = 0; slot < outs; slot += 1) perSide.set(outSide(slot), (perSide.get(outSide(slot)) ?? 0) + 1);
+    const seen = new Map<string, number>();
+    const make = (id: string, side: string, index: number, count: number): ElkPort => ({
+      id,
+      width: 0,
+      height: 0,
+      layoutOptions: { 'elk.port.side': side },
+      ...(noted ? { ...portPosition(side, index, count, node) } : {}),
+    });
+    const ports: ElkPort[] = [make(inPortId(node.id), sides.in, 0, 1)];
+    for (let slot = 0; slot < outs; slot += 1) {
+      const side = outSide(slot);
+      const index = seen.get(side) ?? 0;
+      seen.set(side, index + 1);
+      ports.push(make(outPortId(node.id, slot), side, index, perSide.get(side) ?? 1));
+    }
+    return { id: node.id, ...box, layoutOptions: { 'elk.portConstraints': noted ? 'FIXED_POS' : 'FIXED_SIDE' }, ports };
+  });
+  const edges: ElkEdge[] = input.edges.map((e) => {
+    const source = slotsOf.has(e.source) ? outPortId(e.source, slotsOf.get(e.source)?.get(e.id) ?? 0) : e.source;
+    const target = slotsOf.has(e.target) ? inPortId(e.target) : e.target;
+    const labels = e.label === null ? undefined : [{ text: e.label, ...options.labelSize(e.label) }];
+    return { id: e.id, sources: [source], targets: [target], ...(labels === undefined ? {} : { labels }) };
+  });
+  const layoutOptions: Record<string, string> = {
+    'elk.algorithm': 'layered',
+    'elk.direction': direction,
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.randomSeed': String(ELK_SEED),
+    // The caller's node order IS the flow order (FL-3); ELK keeps it, and breaks cycles at the edges that point backwards in it.
+    'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+    'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
+    'elk.spacing.nodeNode': String(GAP.node),
+    'elk.layered.spacing.nodeNodeBetweenLayers': String(GAP.layer),
+    'elk.layered.spacing.edgeNodeBetweenLayers': String(GAP.edgeNode),
+    'elk.padding': `[top=${GAP.padding},left=${GAP.padding},bottom=${GAP.padding},right=${GAP.padding}]`,
+  };
+  return { id: 'root', layoutOptions, children, edges };
+}
+  ```
+
+  `src/layout/from-elk.ts` replaces T1's (the same simplify and label snap, now reading the box size for a noted node):
+  ```ts
+import { boxSize, type FlowLayout, type LayoutInput, type Point, type Rect, type RoutedEdge } from '../types.js';
+import type { ElkGraph } from './graph-input.js';
+
+/** ELK computes in floating point (267.33333333333314 against 267.33333333333303 for one horizontal run); a hundredth of a pixel is below anything drawn. */
+const tidy = (v: number): number => Math.round(v * 100) / 100;
+const tidyPoint = (p: Point): Point => ({ x: tidy(p.x), y: tidy(p.y) });
+
+const same = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
+
+/** Drops repeated points and the middle of three collinear ones, so a route is the fewest segments that draw it. */
+export function simplify(points: readonly Point[]): Point[] {
+  const out: Point[] = [];
+  for (const p of points) {
+    const last = out[out.length - 1];
+    if (last !== undefined && same(last, p)) continue;
+    out.push(p);
+    while (out.length >= 3) {
+      const [a, b, c] = out.slice(-3) as [Point, Point, Point];
+      const flat = (a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y);
+      if (!flat) break;
+      out.splice(out.length - 2, 1);
+    }
+  }
+  return out;
+}
+
+/**
+ * ELK places a label BESIDE its edge. The pills in the mockup sit ON the line, so the label is centred on the segment nearest to
+ * where ELK put it, clamped to that segment so it never hangs off a corner.
+ */
+export function snapLabel(label: Rect, points: readonly Point[]): Rect {
+  const cx = label.x + label.width / 2;
+  const cy = label.y + label.height / 2;
+  let best: { distance: number; a: Point; b: Point } | null = null;
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const px = Math.min(Math.max(cx, Math.min(a.x, b.x)), Math.max(a.x, b.x));
+    const py = Math.min(Math.max(cy, Math.min(a.y, b.y)), Math.max(a.y, b.y));
+    const distance = Math.hypot(cx - px, cy - py);
+    if (best === null || distance < best.distance) best = { distance, a, b };
+  }
+  if (best === null) return label;
+  const { a, b } = best;
+  let x: number;
+  let y: number;
+  if (a.y === b.y) {
+    y = a.y;
+    x = Math.min(Math.max(cx, Math.min(a.x, b.x) + label.width / 2), Math.max(a.x, b.x) - label.width / 2);
+    if (Math.abs(a.x - b.x) < label.width) x = (a.x + b.x) / 2;
+  } else if (a.x === b.x) {
+    x = a.x;
+    y = Math.min(Math.max(cy, Math.min(a.y, b.y) + label.height / 2), Math.max(a.y, b.y) - label.height / 2);
+    if (Math.abs(a.y - b.y) < label.height) y = (a.y + b.y) / 2;
+  } else {
+    x = (a.x + b.x) / 2;
+    y = (a.y + b.y) / 2;
+  }
+  return { x: x - label.width / 2, y: y - label.height / 2, width: label.width, height: label.height };
+}
+
+export function fromElkGraph(result: ElkGraph, input: LayoutInput): FlowLayout {
+  const placed = new Map(result.children.map((c) => [c.id, c]));
+  const nodes = input.nodes.map((n) => {
+    const c = placed.get(n.id);
+    return { id: n.id, x: tidy(c?.x ?? 0), y: tidy(c?.y ?? 0), ...boxSize(n, input.orientation) };
+  });
+  const edges: RoutedEdge[] = result.edges.map((e) => {
+    const section = e.sections?.[0];
+    const points = section === undefined ? [] : simplify([section.startPoint, ...(section.bendPoints ?? []), section.endPoint].map(tidyPoint));
+    const raw = e.labels?.[0];
+    const label =
+      raw === undefined || raw.x === undefined || raw.y === undefined || points.length < 2
+        ? null
+        : snapLabel({ x: raw.x, y: raw.y, width: raw.width, height: raw.height }, points);
+    return { id: e.id, points, label };
+  });
+  return { width: tidy(result.width ?? 0), height: tidy(result.height ?? 0), orientation: input.orientation, nodes, edges };
+}
+  ```
+
+  `src/layout/fold.ts`:
+  ```ts
+import type { FlowLayout, PlacedNode, Point, Rect, RoutedEdge } from '../types.js';
+import { snapLabel } from './from-elk.js';
+import { GAP } from './graph-input.js';
+
+/** Only a flow of more than this many nodes is folded; a short one is a single strip (spec §9.3). */
+export const FOLD_MIN_NODES = 8;
+/** The folded sheet's width over its height. The mockup's two bands at 13 nodes measure about 1.7. */
+export const FOLD_ASPECT = 1.7;
+/** The empty strip between two bands; the lanes that edges cross bands by run in it, 8 px apart. */
+export const BAND_GAP = 96;
+export const LANE_STEP = 8;
+const HIGHWAY_X = 8;
+const HIGHWAY_STEP = 4;
+
+type Band = { index: number; nodes: PlacedNode[]; dx: number; dy: number; top: number; bottom: number; left: number; right: number };
+
+/** Free x-ranges of the strip: the gaps between layers, where a cut can fall without splitting a node. */
+function cutCandidates(layout: FlowLayout): number[] {
+  const spans = layout.nodes.map((n) => [n.x, n.x + n.width] as const).sort((a, b) => a[0] - b[0]);
+  const cuts: number[] = [];
+  let reach = spans[0]?.[1] ?? 0;
+  for (const [from, to] of spans) {
+    if (from - reach >= GAP.layer / 2) cuts.push((reach + from) / 2);
+    reach = Math.max(reach, to);
+  }
+  return cuts;
+}
+
+const aspectOf = (width: number, height: number): number => width / Math.max(1, height);
+
+/**
+ * Folds a left-to-right strip into bands stacked top to bottom, like a line of text wrapped. ELK's own MULTI_EDGE wrapping
+ * would do this but drew a diagonal or no route for most edges that cross between bands (measured, 15 random flows per size: no
+ * wrapped layout of 20 or more nodes had every route axis-aligned; plan T1), so the strip is laid out plain and folded here.
+ *
+ * An edge inside one band keeps ELK's route, shifted. An edge between bands leaves its source into the free column right of it,
+ * drops to a lane in the gap between bands, runs to the left margin ("highway", x under the padding, so no node is ever there),
+ * travels to the lane above the target's band and enters the target from its left. Lanes are 8 px apart per crossing edge.
+ */
+export function foldBands(layout: FlowLayout, idsInOrder: readonly string[]): FlowLayout {
+  if (layout.orientation !== 'landscape' || layout.nodes.length <= FOLD_MIN_NODES) return layout;
+  const candidates = cutCandidates(layout);
+  const stripTop = Math.min(...layout.nodes.map((n) => n.y));
+  const stripBottom = Math.max(...layout.nodes.map((n) => n.y + n.height));
+  const stripLeft = Math.min(...layout.nodes.map((n) => n.x));
+  const stripRight = Math.max(...layout.nodes.map((n) => n.x + n.width));
+  const bandHeight = stripBottom - stripTop;
+  const strip = stripRight - stripLeft;
+  let bestK = 1;
+  let bestScore = Infinity;
+  for (let k = 1; k <= candidates.length + 1; k += 1) {
+    const width = strip / k + 2 * GAP.padding;
+    const height = k * bandHeight + (k - 1) * BAND_GAP + 2 * GAP.padding;
+    const score = Math.abs(Math.log(aspectOf(width, height) / FOLD_ASPECT));
+    if (score < bestScore - 1e-9) {
+      bestScore = score;
+      bestK = k;
+    }
+  }
+  if (bestK === 1) return layout;
+
+  const cuts: number[] = [];
+  for (let j = 1; j < bestK; j += 1) {
+    const wanted = stripLeft + (strip * j) / bestK;
+    const taken = candidates.filter((c) => !cuts.includes(c));
+    const nearest = taken.reduce((a, b) => (Math.abs(b - wanted) < Math.abs(a - wanted) ? b : a), taken[0]!);
+    cuts.push(nearest);
+  }
+  cuts.sort((a, b) => a - b);
+  const bandOf = (x: number): number => cuts.filter((c) => c <= x).length;
+
+  const nodeBand = new Map(layout.nodes.map((n) => [n.id, bandOf(n.x + n.width / 2)]));
+  const sameBand = (e: RoutedEdge, source: string, target: string): boolean => nodeBand.get(source) === nodeBand.get(target) && e.points.every((p) => bandOf(p.x) === nodeBand.get(source));
+  const ends = (e: RoutedEdge): [string, string] => {
+    const [source, target] = e.id.split('>') as [string, string];
+    return [source, target];
+  };
+
+  // Band extents: nodes plus the routes that stay inside the band.
+  const bands: Band[] = Array.from({ length: bestK }, (_, index) => ({ index, nodes: [], dx: 0, dy: 0, top: Infinity, bottom: -Infinity, left: Infinity, right: -Infinity }));
+  const grow = (band: Band, r: Rect): void => {
+    band.top = Math.min(band.top, r.y);
+    band.bottom = Math.max(band.bottom, r.y + r.height);
+    band.left = Math.min(band.left, r.x);
+    band.right = Math.max(band.right, r.x + r.width);
+  };
+  for (const n of layout.nodes) {
+    const band = bands[nodeBand.get(n.id)!]!;
+    band.nodes.push(n);
+    grow(band, n);
+  }
+  for (const e of layout.edges) {
+    const [s, t] = ends(e);
+    if (!sameBand(e, s, t)) continue;
+    const band = bands[nodeBand.get(s)!]!;
+    for (const p of e.points) grow(band, { x: p.x, y: p.y, width: 0, height: 0 });
+    if (e.label !== null) grow(band, e.label);
+  }
+  let cursor = GAP.padding;
+  for (const band of bands) {
+    if (band.nodes.length === 0) {
+      band.top = band.bottom = band.left = band.right = 0;
+    }
+    band.dx = GAP.padding - Math.min(band.left, ...band.nodes.map((n) => n.x));
+    band.dy = cursor - band.top;
+    cursor += band.bottom - band.top + BAND_GAP;
+  }
+  const shiftPoint = (p: Point, band: Band): Point => ({ x: p.x + band.dx, y: p.y + band.dy });
+  const nodes: PlacedNode[] = layout.nodes.map((n) => {
+    const band = bands[nodeBand.get(n.id)!]!;
+    return { ...n, x: n.x + band.dx, y: n.y + band.dy };
+  });
+  const placed = new Map(nodes.map((n) => [n.id, n]));
+
+  // Crossing edges, in the caller's flow order, so lanes are assigned the same way every time.
+  const order = new Map(idsInOrder.map((id, i) => [id, i]));
+  const crossing = layout.edges
+    .filter((e) => !sameBand(e, ends(e)[0], ends(e)[1]))
+    .sort((a, b) => (order.get(ends(a)[0]) ?? 0) - (order.get(ends(b)[0]) ?? 0) || (order.get(ends(a)[1]) ?? 0) - (order.get(ends(b)[1]) ?? 0));
+  const gapTop = (b: number): number => (bands[b]!.bottom + bands[b]!.dy) + 16; // lane origin in the gap BELOW band b
+  const routed = new Map<string, RoutedEdge>();
+  const lanes = new Map<number, number>();
+  const lane = (gap: number): number => {
+    const n = lanes.get(gap) ?? 0;
+    lanes.set(gap, n + 1);
+    return gapTop(gap) + (n % 8) * LANE_STEP;
+  };
+  let highway = 0;
+  for (const e of crossing) {
+    const [s, t] = ends(e);
+    const from = placed.get(s)!;
+    const to = placed.get(t)!;
+    const sb = nodeBand.get(s)!;
+    const tb = nodeBand.get(t)!;
+    const first = shiftPoint(e.points[0]!, bands[sb]!);
+    const last = shiftPoint(e.points[e.points.length - 1]!, bands[tb]!);
+    const down = tb > sb;
+    const dropX = from.x + from.width + 24;
+    const enterX = to.x - 24;
+    const outLane = down ? lane(sb) : lane(sb - 1);
+    const inLane = down ? lane(tb - 1) : lane(tb);
+    const wayX = HIGHWAY_X + (highway % 5) * HIGHWAY_STEP;
+    highway += 1;
+    const raw: Point[] = [first, { x: dropX, y: first.y }, { x: dropX, y: outLane }, { x: wayX, y: outLane }, { x: wayX, y: inLane }, { x: enterX, y: inLane }, { x: enterX, y: last.y }, last];
+    const points = raw.filter((p, i) => i === 0 || p.x !== raw[i - 1]!.x || p.y !== raw[i - 1]!.y);
+    let label: Rect | null = null;
+    if (e.label !== null) {
+      // Centre the pill on the longest horizontal run, where it reads best.
+      let best = 0;
+      for (let i = 0; i + 1 < points.length; i += 1) if (Math.abs(points[i]!.x - points[i + 1]!.x) > Math.abs(points[best]!.x - points[best + 1]!.x)) best = i;
+      const a = points[best]!;
+      const b = points[best + 1]!;
+      label = snapLabel({ x: (a.x + b.x) / 2 - e.label.width / 2, y: (a.y + b.y) / 2 - e.label.height / 2, width: e.label.width, height: e.label.height }, points);
+    }
+    routed.set(e.id, { id: e.id, points, label });
+  }
+  const edges: RoutedEdge[] = layout.edges.map((e) => {
+    const done = routed.get(e.id);
+    if (done !== undefined) return done;
+    const band = bands[nodeBand.get(ends(e)[0])!]!;
+    return { id: e.id, points: e.points.map((p) => shiftPoint(p, band)), label: e.label === null ? null : { ...e.label, x: e.label.x + band.dx, y: e.label.y + band.dy } };
+  });
+  const width = Math.max(...nodes.map((n) => n.x + n.width), ...edges.flatMap((e) => e.points.map((p) => p.x))) + GAP.padding;
+  const height = Math.max(...nodes.map((n) => n.y + n.height), ...edges.flatMap((e) => e.points.map((p) => p.y))) + GAP.padding;
+  return { ...layout, width, height, nodes, edges };
+}
+  ```
+
+  `src/layout/incremental.ts`:
+  ```ts
+import type { FlowLayout, LayoutInput, LayoutNode, LayoutOptions, PlacedNode, Point, Rect, RoutedEdge } from '../types.js';
+import { GAP } from './graph-input.js';
+import { snapLabel } from './from-elk.js';
+
+/** Which side of its box a routed edge leaves from. */
+type Side = 'E' | 'N' | 'S' | 'W';
+const LANDSCAPE_OUT: readonly Side[] = ['E', 'N', 'S'];
+const PORTRAIT_OUT: readonly Side[] = ['S', 'W', 'E'];
+
+const overlaps = (a: Rect, b: Rect, gap: number): boolean =>
+  a.x < b.x + b.width + gap && b.x < a.x + a.width + gap && a.y < b.y + b.height + gap && b.y < a.y + a.height + gap;
+
+function sideOf(node: Rect, start: Point): Side {
+  if (start.x >= node.x + node.width) return 'E';
+  if (start.x <= node.x) return 'W';
+  return start.y <= node.y ? 'N' : 'S';
+}
+
+function anchor(node: Rect, side: Side): Point {
+  switch (side) {
+    case 'E': return { x: node.x + node.width, y: node.y + node.height / 2 };
+    case 'W': return { x: node.x, y: node.y + node.height / 2 };
+    case 'N': return { x: node.x + node.width / 2, y: node.y };
+    case 'S': return { x: node.x + node.width / 2, y: node.y + node.height };
+  }
+}
+
+/**
+ * Adding ONE leaf must not move the rest of the flow (spec §9.3, §13: at least 90% of nodes within 1 px). ELK alone cannot
+ * promise that: measured on the mockup's thirteen nodes, a new leaf after `142` re-laid out every node (`T1`, case 29.232).
+ * So when the only change since `prev` is new tickets that something existing leads to, and nothing else changed, they are PLACED
+ * beside their source and every other node keeps its pixels. Anything else returns `null` and the caller runs ELK and glides.
+ *
+ * The next full layout (a reopened view) recomputes everything, since positions are never saved (spec §9.3).
+ */
+export function placeLeaves(prev: FlowLayout, input: LayoutInput, options: LayoutOptions): FlowLayout | null {
+  if (prev.orientation !== input.orientation) return null;
+  const known = new Map(prev.nodes.map((n) => [n.id, n]));
+  const added = input.nodes.filter((n) => !known.has(n.id));
+  if (added.length === 0 || input.nodes.length - added.length !== prev.nodes.length) return null;
+  const prevEdges = new Map(prev.edges.map((e) => [e.id, e]));
+  const addedEdges = input.edges.filter((e) => !prevEdges.has(e.id));
+  if (input.edges.length - addedEdges.length !== prev.edges.length) return null;
+  const addedIds = new Set(added.map((n) => n.id));
+  // Each new ticket has exactly one incoming new edge, from a node that was already there, and leads nowhere yet.
+  for (const node of added) {
+    const incoming = addedEdges.filter((e) => e.target === node.id);
+    if (incoming.length !== 1 || !known.has(incoming[0]!.source)) return null;
+  }
+  if (addedEdges.some((e) => addedIds.has(e.source) || !addedIds.has(e.target))) return null;
+
+  const landscape = input.orientation === 'landscape';
+  const placed: PlacedNode[] = [...prev.nodes];
+  const routes: RoutedEdge[] = [...prev.edges];
+  const used = new Map<string, Set<Side>>();
+  const sizeOf = new Map(input.nodes.map((n) => [n.id, n]));
+  /** The drawn shape: a placed box may be taller or wider than it by its reserved note space. */
+  const shapeOf = (box: PlacedNode): PlacedNode => {
+    const spec = sizeOf.get(box.id);
+    return spec === undefined ? box : { ...box, width: spec.width, height: spec.height };
+  };
+  const sidesUsed = (id: string): Set<Side> => {
+    let set = used.get(id);
+    if (set === undefined) {
+      const node = shapeOf(known.get(id)!);
+      set = new Set(prev.edges.filter((e) => e.id.startsWith(`${id}>`) && e.points[0] !== undefined).map((e) => sideOf(node, e.points[0]!)));
+      used.set(id, set);
+    }
+    return set;
+  };
+
+  for (const edge of addedEdges) {
+    const leaf = added.find((n) => n.id === edge.target)!;
+    const box = placed.find((n) => n.id === edge.source)!;
+    const source = shapeOf(box);
+    const order = landscape ? LANDSCAPE_OUT : PORTRAIT_OUT;
+    const taken = sidesUsed(source.id);
+    const sourceNode = input.nodes.find((n) => n.id === source.id)!;
+    // Only a Decision has several sides to leave from; any other node leaves by the flow's own direction.
+    const side: Side = sourceNode.shape === 'decision' ? (order.find((s) => !taken.has(s)) ?? order[0]!) : order[0]!;
+    taken.add(side);
+    const spot = positionLeaf(source, side, leaf, placed, landscape);
+    placed.push(spot);
+    routes.push(routeLeaf(source, side, spot, edge.id, edge.label, landscape, options));
+  }
+  return { ...prev, width: Math.max(prev.width, ...placed.map((n) => n.x + n.width + GAP.padding)), height: Math.max(prev.height, ...placed.map((n) => n.y + n.height + GAP.padding)), nodes: placed, edges: routes };
+}
+
+function positionLeaf(source: PlacedNode, side: Side, leaf: LayoutNode, placed: readonly PlacedNode[], landscape: boolean): PlacedNode {
+  let x: number;
+  let y: number;
+  if (landscape) {
+    x = source.x + source.width + GAP.layer;
+    y = side === 'N' ? source.y - GAP.node - leaf.height : side === 'S' ? source.y + source.height + GAP.node : source.y + (source.height - leaf.height) / 2;
+  } else {
+    y = source.y + source.height + GAP.layer;
+    x = side === 'W' ? source.x - GAP.node - leaf.width : side === 'E' ? source.x + source.width + GAP.node : source.x + (source.width - leaf.width) / 2;
+  }
+  // Slide along the cross axis, away from the source, until the box touches nothing.
+  const step = landscape ? (side === 'N' ? -1 : 1) : side === 'W' ? -1 : 1;
+  for (let guard = 0; guard < 200; guard += 1) {
+    const box: Rect = { x, y, width: leaf.width, height: leaf.height };
+    const hit = placed.find((n) => overlaps(box, n, GAP.node / 2));
+    if (hit === undefined) break;
+    if (landscape) y = step < 0 ? hit.y - GAP.node - leaf.height : hit.y + hit.height + GAP.node;
+    else x = step < 0 ? hit.x - GAP.node - leaf.width : hit.x + hit.width + GAP.node;
+  }
+  return { id: leaf.id, x, y, width: leaf.width, height: leaf.height };
+}
+
+function routeLeaf(source: Rect, side: Side, leaf: Rect, id: string, label: string | null, landscape: boolean, options: LayoutOptions): RoutedEdge {
+  const start = anchor(source, side);
+  const end = landscape ? { x: leaf.x, y: leaf.y + leaf.height / 2 } : { x: leaf.x + leaf.width / 2, y: leaf.y };
+  // Leaving along the flow (east in landscape, south in portrait) bends twice; leaving by a side bends once.
+  const along = landscape ? side === 'E' : side === 'S';
+  let points: Point[];
+  if (along) {
+    points = landscape
+      ? [start, { x: (start.x + end.x) / 2, y: start.y }, { x: (start.x + end.x) / 2, y: end.y }, end]
+      : [start, { x: start.x, y: (start.y + end.y) / 2 }, { x: end.x, y: (start.y + end.y) / 2 }, end];
+  } else {
+    points = landscape ? [start, { x: start.x, y: end.y }, end] : [start, { x: end.x, y: start.y }, end];
+  }
+  const clean = points.filter((p, i) => i === 0 || p.x !== points[i - 1]!.x || p.y !== points[i - 1]!.y);
+  const size = label === null ? null : options.labelSize(label);
+  const mid = clean[Math.floor(clean.length / 2)] ?? start;
+  const raw: Rect | null = size === null ? null : { x: mid.x - size.width / 2, y: mid.y - size.height / 2, ...size };
+  return { id, points: clean, label: raw === null ? null : snapLabel(raw, clean) };
+}
+  ```
+
+  `src/layout/layout.ts` replaces T1's strip-only version (strip, then fold):
+  ```ts
+import type { FlowLayout, LayoutInput, LayoutOptions } from '../types.js';
+import type { LayoutEngine } from './elk.js';
+import { foldBands } from './fold.js';
+import { fromElkGraph } from './from-elk.js';
+import { toElkGraph } from './graph-input.js';
+
+/**
+ * One full layout. Pure of the DOM: the engine is injected. ELK lays the flow out as one strip; a landscape strip of more than
+ * eight nodes is then folded into bands (`fold.ts`). ELK's own wrapping is NOT used: it dropped or diagonalised routes (T1).
+ */
+export async function layoutFlow(engine: LayoutEngine, input: LayoutInput, options: LayoutOptions): Promise<FlowLayout> {
+  const strip = fromElkGraph(await engine.layout(toElkGraph(input, options)), input);
+  return foldBands(strip, input.nodes.map((n) => n.id));
+}
+  ```
+
+  `src/index.ts` replaces T1's (four more exports):
+  ```ts
+export type * from './types.js';
+export { layoutFlow } from './layout/layout.js';
+export { createElkEngine, engineFromInstance, type LayoutEngine, type WorkerFactory } from './layout/elk.js';
+export { placeLeaves } from './layout/incremental.js';
+export { diffLayouts, type LayoutDiff } from './layout/diff.js';
+export { orientationFor, PORTRAIT_BELOW_REM } from './layout/orientation.js';
+export { BLOCK, decisionBlock, layoutNode, ticketBlock, wrapLines, type TextMeasure, type TicketBlock } from './layout/measure.js';
+  ```
+
+  Run: the Step 2 command, then the WHOLE package suite, `typecheck` and `build`. Expected: PASS (21 tests in 5 files with T1's seam test; the fold file takes about 20 s), typecheck clean. Commit.
+
+- [ ] **Step 5: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.234 | `phoneWidth: 156` → `140` in `BLOCK` | the phone assertion |
+  | 29.234 | `wrapLines(..., 3)` → `2` for a phone ticket in `ticketBlock` | the three-line assertion |
+  | 29.235 | `layout.nodes.length <= FOLD_MIN_NODES` → `< FOLD_MIN_NODES` | the "strip of eight is left alone" control, in the same `it` |
+  | 29.235 | `const enterX = to.x - 24` → `to.x` | a route passes through (or touches) a node in the random flows |
+  | 29.236 | return `raw` instead of `snapLabel(raw, clean)` in `routeLeaf` AND in `from-elk.ts`'s label step | the "every label sits on its route" check |
+  | 29.237 | `placeLeaves` starts with `return null;` | the "moves none, for EVERY source" check |
+  | 29.237 | change `incoming.length !== 1` to `incoming.length > 1` | the not-a-lone-leaf control (a leaf with no incoming edge must give null) |
+  | 29.238 | `PORTRAIT_BELOW_REM = 40` → `41` | the boundary assertion at 40rem |
+  | 29.239 | in `graph-input.ts`, place the port on the BOX edge (`box`) instead of the shape's edge (`node`) | the "leaves the shape" assertion |
+
+  Revert each. A survivor is a finding about the test: say so in the handoff.
+
+- [ ] **Step 6: Features and catalogue**
+
+  1. Flip 29.234 to 29.239 from ❌ to ✅ under the T2 anchor (the test file names carry the ids).
+  2. `Features.md`, under `<!-- wtg-part3-workflow-graph T2 bullet -->`: `- ⚙️ **Flow layout** — \`@gisik-nokma/flow-graph\` lays a flow out with ELK (one strip), folds a long strip into bands, places a lone new leaf without moving anything else, measures blocks (desktop 140 x 64, phone 156 wide, titles up to three lines) and reserves room for a note stack. \`packages/flow-graph/src/layout/\``
+  3. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`, then `pnpm turbo run build test typecheck --filter=@gisik-nokma/flow-graph`.
+  4. Run the package suite three times in a row. Expected: green each time (the 30-flow case is seeded, so a flake is a finding).
+
+  Commit `wtg3 T2: measured blocks, the band fold, leaf placement and note ports`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-layout.md` written.
+
+
+---
+
+### Task 3: The flow read: `buildFlowRead`, `readFlowView`, the route, `getFlow`, the replica gap (cases 29.240–29.245)
+
+**Branch** `task/wtg3-flow-read` (needs Part 2's T12 `readFlow` and T10/T11 `analyzeFlow`/`planFlow`, and Drafts' T1; it does not need T1/T2 of this plan). **NEEDS: db.** **Files:**
+- Create:
+  - `packages/domain/src/read-models-flow.ts`, `packages/domain/src/flow-read.ts`, `packages/domain/test/flow-read.test.ts`
+  - `apps/server/src/flow/{flow-facts,auto-moves,flow-view}.ts`
+  - `apps/server/test/flow/flow-view.test.ts`, `apps/server/test/routes/flow.test.ts`
+  - `packages/app-core/test/online/get-flow.test.ts`
+- Modify:
+  - `packages/domain/src/index.ts` (two exports)
+  - `apps/server/src/routes/flow.ts` (Part 2 T12's file: its `registerFlowRoute` already serves `GET …/tickets/:ticketId/flow` with the small `FlowReadWire`; this task REPLACES it, one route and one owner, see Step 5), `apps/server/test/flow/read-flow.test.ts` (Part 2's route halves of 29.187 and 29.189, re-pointed at `FlowRead`)
+  - `apps/server/src/read/ticket-cards.ts` (export `titleOf`, still private at `:221` on the KG tip; `cardKeysFor` is already exported at `:325`), `apps/server/src/read/notes.ts` (add `listNotesForTickets`), `apps/server/src/app.ts` (register the route beside `registerTicketRoutes`, `:930` on the tip)
+  - `packages/app-core/src/data-source.ts` (`getFlow`), `packages/app-core/src/online/{online-data-source,mappers}.ts`, `packages/app-core/src/replica/replica-data-source.ts` (`FLOW_ABSENCES`, `REPLICA_GAPS`, the rejecting method), `packages/app-core/test/replica/replica-data-source.test.ts` (12.185), `packages/app-core/src/index.ts`
+  - `Features.md` §26 (T3 anchor), `test-cases/29-workflow-timeline-graphs.md` (T3 anchor), `test-cases/12-offline-sync-apps.md` (the 12.185 line, see Step 7)
+
+**Interfaces:**
+- **Consumes** (Part 2, per plan): `readFlow(db, {workspaceId, seedId, viewerId, cap?}) → {nodes: FlowNode[], edges: FlowEdge[], truncated, reached}`, `analyzeFlow(nodes, edges) → FlowAnalysis`, `planFlow({nodes, edges, analysis?}) → FlowPlan`, `branchOf`, `sameLabel`, `edgeKey`, `SYSTEM_ACTOR_FLOW`, `DECISION_TYPE_ID`, `ticketDecidedPayload`. Drafts: a draft is a `proj_tickets` row whose `readFlow` walk includes the viewer's own drafts only. Typed-links: `proj_ticket_links (workspace_id, source_id, target_id, kind, …)` with `kind = 'blocks'`.
+- **Produces:**
+  - `@gisik-nokma/domain`: `FlowRead`, `FlowNodeRead`, `FlowEdgeRead`, `FlowAlternateRead`, `FlowNoteRead`, `FlowAutoMoveRead`, `FlowStateRead`; `buildFlowRead(input: FlowReadInput): FlowRead`; `FlowCardFacts`.
+  - server: `readFlowView(db: Queryable, args: {workspaceId; seedId; viewerId; eff: EffectiveRole}): Promise<FlowRead>`; `registerFlowRoutes(app, deps: {pool}, requireSession)`; `GET /v1/workspaces/:workspaceId/tickets/:ticketId/flow` answering `FlowRead`.
+  - app-core: `DataSourceQuery.getFlow(workspaceId: string, ticketId: string): Promise<FlowRead>`; `mapFlow(raw: unknown): FlowRead`.
+  - T4, T7, T8, T9 and T12 read these types; Part 4 (timeline) and Part 5 (home) read the same route.
+
+Siblings copied: `routes/tickets.ts` `GET …/attachments` (`:855` on the tip: the 404-before-403 guard order `loadTicketRow`, `canSee`, `ticketIsLive`, one `NOT_FOUND_BODY`); `read/notes.ts` `listNotesForTicket` (`:247`) for the batch note read; `routes/builder-reads.ts` `readActorNames` (`:319`) for assignee names; `read/list-cards.ts` for the state-name lookup (`foldedWorkflowDefs` + `statesWithBacklog`, read at `:63-110`); `online-data-source.ts` `getTicketAttachments` (`:403`) and `getAttention` (`:570`) for the door + mapper; the `ATTENTION_ABSENCES` pattern (`replica-data-source.ts`, entry in `REPLICA_GAPS` at `:661`) for the gap.
+
+**Why the read is pure in the middle.** `buildFlowRead` takes Part 2's already-computed pieces (nodes, edges, analysis, plan) and the facts the server loaded (titles, keys, state names, names, notes, counts) and returns bytes; it reads no clock and no database. That is what lets T4, T7 and the tests feed it by hand, and what lets Part 4 re-run it for the timeline. Everything that needs a database is in three small files under `apps/server/src/flow/`, each a fixed number of queries, so `GET …/flow` does not grow with the flow (Part 4 measures p95 <= 120 ms at 300 tickets against `readFlowView`).
+
+- [ ] **Step 0: Pre-flight**
+
+  1. `git fetch origin`; cut `task/wtg3-flow-read`; `pnpm install` (Node 22).
+  2. **Re-read Part 2's landed names** and write them into `HANDOFF-wtg3-flow-read.md`: `git grep -n "export" packages/domain/src/flow/index.ts`; `git grep -n "export async function readFlow" apps/server/src/flow`; `git grep -n "export function planFlow\|export function analyzeFlow" packages/domain/src/flow`; `git grep -n "StateCategory" packages/domain/src/flow/index.ts packages/domain/src/workflow.ts` (if `StateCategory` is not exported by `flow/index.ts`, import it from the file that exports it in `read-models-flow.ts`). If `readFlow` or `planFlow` is missing, STOP: Part 2 has not landed.
+  3. `git grep -n "proj_ticket_links" apps/server/migrations` (the table and its `kind` CHECK; the Part 2 migration adds `leads_to` and `label`). `git grep -n "draft_author_id" apps/server/migrations` (Drafts).
+  4. `git grep -n "async function cardKeysFor\|function titleOf" apps/server/src/read/ticket-cards.ts` (on the KG tip `cardKeysFor` is already exported at `:325` and `titleOf` is private at `:221`; export `titleOf` in this task if still private, and never re-export `cardKeysFor`).
+  5. Run `pnpm turbo run build --filter=@gisik-nokma/server...` once so the baseline is green.
+
+- [ ] **Step 1: The six case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T3 -->`:
+  - `- ❌ **29.240 — A Decision's other branches are named, and a flow's shape is stable:** a ticket on exactly one branch of a Decision names the other branches (outcome and first ticket); the Decision, the ticket before it, a loop target reached over a back edge only and the shared tail of a diamond get none; nodes arrive in flow order with starts, ends, a stable \`flowId\` (the smallest ticket id), \`blocks\` edges only between members, and a draft has no key; control: a Decision with one forward label has no alternates, and a ticket with no card facts is a loud error, never a blank. Mutation: count a ticket on two branches as on one → reds.`
+  - `- ❌ **29.241 — A Decision's edges say which way it went:** a loop edge counts the passes whose FINAL outcome is its label (a revision replaces it), the chosen edge is full weight and the others are not, a source that is not a settled Decision has \`chosen: null\`; control: a pending Decision chooses none but keeps its history. Mutation: count the first outcome of a revised pass → reds.`
+  - `- ❌ **29.242 — The read carries the dates and the reasons:** periods and the actual span are IST days with an open period ending null and the 18:29:59Z / 18:30:00Z pair falling on different days; planned intervals keep pass, basis and \`pruned\`; the tray carries its reason; a Not-taken ticket keeps its resolution; notes and the pin counts pass through; control: a ticket the plan does not know has none of these. Mutation: slice the instant's date instead of \`istDayOf\` → reds.`
+  - `- ❌ **29.243 — A hidden ticket is a hole:** for a member who cannot see one ticket in the middle of a flow, the read has no node, no edge, no key and no count for it, and nothing behind it that is only reachable through it; the owner's read of the same seed has all of them; titles, keys, state names, assignee names, visible notes and pin counts match the rows; a note the viewer cannot read is absent and uncounted; a block link with one hidden end is absent; control: the number of queries is the same for a 6-ticket flow and a 40-ticket flow. Mutation: read nodes with \`viewerId: null\` → reds.`
+  - `- ❌ **29.244 — The route:** \`GET /v1/workspaces/:ws/tickets/:id/flow\` answers 401 with no session, a byte-identical 404 for a stranger, a neighbour workspace's owner, an unknown id, a deleted ticket and a ticket the viewer cannot see, and 200 \`FlowRead\` for a member; control: the owner's 200 on the same URL. Mutation: skip \`canSee\` → reds.`
+  - `- ❌ **29.245 — \`getFlow\` is online only:** the online source returns the route's body through \`mapFlow\` (a body missing \`nodes\`, \`edges\`, \`order\` or \`flowId\` throws); the replica rejects with \`ReplicaGapError('getFlow', …)\` and \`getFlow\` is a key of \`REPLICA_GAPS\`; control: a replica method that answers still resolves. Mutation: remove the key from \`REPLICA_GAPS\` → 12.185 reds.`
+
+- [ ] **Step 2: RED, the pure builder first**
+
+  `packages/domain/test/flow-read.test.ts` (29.240 to 29.242; the diamond fixture is the mockup's shape: `A → D`, `D -Yes→ B`, `D -No→ C`, `D -Need rework→ A` as a loop, both branches rejoining at `E`, with pass 1 "Need rework" and pass 2 revised to "Yes"):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { buildFlowRead, type FlowCardFacts, type FlowReadInput } from '../src/flow-read.js';
+import type { FlowAnalysis, FlowEdge, FlowNode, FlowPlan } from '../src/flow/index.js';
+
+const node = (id: string, over: Partial<FlowNode> = {}): FlowNode => ({
+  id, typeId: 'task', stateId: 'todo', category: 'open', closed: false, trashed: false, draft: false, parentId: null, isDecision: false, outcome: null, passes: [],
+  notTaken: null, waitForAll: false, started: false, rounds: 1, periods: [], explicitStart: null, explicitDue: null, estimate: null, reworkEstimate: null,
+  initialStateId: 'todo', firstTerminalStateId: 'done', ...over,
+});
+const facts = (id: string, over: Partial<FlowCardFacts> = {}): FlowCardFacts => ({
+  key: `GN-${id}`, title: `Title ${id}`, projectId: 'p1', stateName: 'To do', initialStateName: 'To do', assigneeId: null, assigneeName: null, notes: [], pinNotes: 0, pinAttachments: 0, ...over,
+});
+const edge = (s: string, t: string, label: string | null = null): FlowEdge => ({ sourceId: s, targetId: t, label });
+
+/** A -> D; D -Yes-> B -> E; D -No-> C -> E; D -Need rework-> A (a back edge). D chose "Need rework" in pass 1 and "Yes" in pass 2. */
+function diamond(over: Partial<FlowReadInput> = {}): FlowReadInput {
+  const nodes = [
+    node('A', { periods: [{ start: '2026-10-02T19:00:00Z', end: '2026-10-02T21:00:00Z', pass: 1 }, { start: '2026-10-03T04:00:00Z', end: null, pass: 2 }], rounds: 2, started: true }),
+    node('D', {
+      isDecision: true, category: 'terminal', closed: true, outcome: 'Yes',
+      passes: [
+        { pass: 1, outcome: 'Need rework', by: 'u1', at: '2026-10-02T21:00:00Z', revisions: [] },
+        { pass: 2, outcome: 'Yes', by: 'u1', at: '2026-10-03T05:00:00Z', revisions: [{ from: 'No', to: 'Yes', by: 'u1', at: '2026-10-03T05:00:00Z' }] },
+      ],
+    }),
+    node('B'),
+    node('C', { category: 'terminal', closed: true, notTaken: { kind: 'not-taken', decisionTicketId: 'D', outcome: 'Yes', pass: 2 } }),
+    node('E'),
+  ];
+  const edges = [edge('A', 'D'), edge('D', 'B', 'Yes'), edge('D', 'C', 'No'), edge('D', 'A', 'Need rework'), edge('B', 'E'), edge('C', 'E')];
+  const analysis: FlowAnalysis = { starts: ['A'], ends: ['E'], backEdges: new Set(['D>A']), order: ['A', 'D', 'B', 'C', 'E'] };
+  const plan: FlowPlan = new Map([
+    ['A', { intervals: [{ pass: 1, start: '2026-10-02', end: '2026-10-03', basis: 'explicit' }], unscheduled: null, onTimeline: true }],
+    ['C', { intervals: [{ pass: 2, start: '2026-10-04', end: '2026-10-05', basis: 'chained', pruned: true }], unscheduled: null, onTimeline: false }],
+    ['E', { intervals: [], unscheduled: 'no-estimate', onTimeline: false }],
+  ]);
+  return {
+    rootId: 'B', truncated: false, reached: 5, nodes, edges, blocks: [{ sourceId: 'B', targetId: 'C' }, { sourceId: 'B', targetId: 'GHOST' }], analysis, plan,
+    facts: new Map(nodes.map((n) => [n.id, facts(n.id)])), autoMoves: [], draftCount: 0, ...over,
+  };
+}
+
+describe('buildFlowRead (Part 3 T3)', () => {
+  it('29.240 alternates: a ticket on exactly one branch names the other branches\' first tickets; the Decision, the ticket before it and the shared tail get none', () => {
+    const read = buildFlowRead(diamond());
+    const of = (id: string) => read.nodes.find((n) => n.id === id)!.alternates;
+    expect(of('B')).toEqual([{ viaDecisionId: 'D', outcome: 'No', firstTicketId: 'C' }]);
+    expect(of('C')).toEqual([{ viaDecisionId: 'D', outcome: 'Yes', firstTicketId: 'B' }]);
+    expect(of('E')).toEqual([]); // on both branches
+    expect(of('D')).toEqual([]);
+    expect(of('A')).toEqual([]); // the loop target is reached over a back edge only
+    // control: a Decision with ONE forward label has no alternates to name
+    const single = buildFlowRead(diamond({ edges: [edge('A', 'D'), edge('D', 'B', 'Yes'), edge('B', 'E'), edge('D', 'A', 'Need rework')] }));
+    expect(single.nodes.find((n) => n.id === 'B')!.alternates).toEqual([]);
+  });
+
+  it('29.241 a loop edge counts the passes whose final outcome is its label; the chosen edge is full weight and the others are not; control: a pending Decision chooses none', () => {
+    const read = buildFlowRead(diamond());
+    const edgeOf = (id: string) => read.edges.find((e) => e.id === id)!;
+    expect(edgeOf('D>A')).toMatchObject({ loop: true, taken: 1, takenPasses: [1], chosen: false });
+    expect(edgeOf('D>B')).toMatchObject({ loop: false, taken: 1, takenPasses: [2], chosen: true });
+    expect(edgeOf('D>C')).toMatchObject({ taken: 0, takenPasses: [], chosen: false });
+    expect(edgeOf('A>D')).toMatchObject({ taken: 0, takenPasses: [], chosen: null });
+    const pending = diamond();
+    pending.nodes = pending.nodes.map((n) => (n.id === 'D' ? { ...n, outcome: null } : n));
+    const after = buildFlowRead(pending);
+    expect(after.edges.filter((e) => e.from === 'D').map((e) => e.chosen)).toEqual([null, null, null]);
+    expect(after.edges.find((e) => e.id === 'D>A')!.taken).toBe(1); // history stays
+  });
+
+  it('29.242 periods and the actual span are IST days, an open period has a null end, the boundary minute falls on the right side; control: no work, no actual', () => {
+    const read = buildFlowRead(diamond());
+    const a = read.nodes.find((n) => n.id === 'A')!;
+    expect(a.periods).toEqual([{ start: '2026-10-03', end: '2026-10-03', pass: 1 }, { start: '2026-10-03', end: null, pass: 2 }]);
+    expect(a.actual).toEqual({ start: '2026-10-03', end: null });
+    const edgeCase = diamond();
+    edgeCase.nodes = edgeCase.nodes.map((n) => (n.id === 'B' ? { ...n, periods: [{ start: '2026-10-02T18:29:59Z', end: '2026-10-02T18:30:00Z', pass: 1 }] } : n));
+    expect(buildFlowRead(edgeCase).nodes.find((n) => n.id === 'B')!.periods).toEqual([{ start: '2026-10-02', end: '2026-10-03', pass: 1 }]);
+    expect(read.nodes.find((n) => n.id === 'E')!.actual).toBeNull();
+  });
+
+  it('29.242 planned intervals keep their pass, basis and pruned flag, the tray carries the reason, and a Not-taken ticket keeps its resolution; control: a ticket the plan does not know has none of these', () => {
+    const read = buildFlowRead(diamond());
+    const c = read.nodes.find((n) => n.id === 'C')!;
+    expect(c.planned).toEqual([{ pass: 2, start: '2026-10-04', end: '2026-10-05', basis: 'chained', pruned: true }]);
+    expect(c.resolution).toEqual({ kind: 'not-taken', decisionTicketId: 'D', outcome: 'Yes', pass: 2 });
+    expect(read.nodes.find((n) => n.id === 'E')!.tray).toBe('no-estimate');
+    const b = read.nodes.find((n) => n.id === 'B')!;
+    expect(b.planned).toEqual([]);
+    expect(b.tray).toBeNull();
+    expect(b.resolution).toBeNull();
+  });
+
+  it('29.240 the shape: flow order, starts and ends, blocks only between members, stable flowId, a draft has no key; control: a missing card fact is a loud error, not a blank', () => {
+    const input = diamond();
+    input.nodes = input.nodes.map((n) => (n.id === 'B' ? { ...n, draft: true } : n));
+    const read = buildFlowRead(input);
+    expect(read.nodes.map((n) => n.id)).toEqual(['A', 'D', 'B', 'C', 'E']);
+    expect([read.start, read.end, read.flowId, read.rootId]).toEqual([['A'], ['E'], 'A', 'B']);
+    expect(read.nodes.find((n) => n.id === 'B')).toMatchObject({ key: null, draft: true, kind: 'ticket' });
+    expect(read.nodes.find((n) => n.id === 'D')).toMatchObject({ kind: 'decision', round: 1, outcome: 'Yes' });
+    expect(read.nodes.find((n) => n.id === 'A')).toMatchObject({ round: 2, key: 'GN-A' });
+    expect(read.edges.filter((e) => e.kind === 'blocks').map((e) => e.id)).toEqual(['B~C']);
+    expect(read.edges.filter((e) => e.kind === 'leads_to')).toHaveLength(6);
+    expect(() => buildFlowRead({ ...diamond(), facts: new Map() })).toThrow(/no facts for ticket A/);
+  });
+
+  it('29.242 notes and the pin pass through unchanged; the auto moves and the draft count are the caller\'s', () => {
+    const input = diamond();
+    (input.facts as Map<string, FlowCardFacts>).set('B', facts('B', { notes: [{ id: 'n1', title: 'Brief' }], pinNotes: 1, pinAttachments: 2, assigneeId: 'u1', assigneeName: 'Ama', initialStateName: 'Ready' }));
+    const move = { ticketId: 'B', at: '2026-10-03T05:00:00Z', kind: 'led-to' as const, becauseTicketId: 'A', pass: null, outcome: null };
+    const read = buildFlowRead({ ...input, autoMoves: [move], draftCount: 3 });
+    expect(read.nodes.find((n) => n.id === 'B')).toMatchObject({ notes: [{ id: 'n1', title: 'Brief' }], pin: { notes: 1, attachments: 2 }, assigneeName: 'Ama', initialStateName: 'Ready' });
+    expect(read.autoMoves).toEqual([move]);
+    expect(read.draftCount).toBe(3);
+  });
+});
+  ```
+
+  Run: `pnpm --filter @gisik-nokma/domain exec vitest run --maxWorkers=2 test/flow-read.test.ts > /tmp/wtg3-t3.log 2>&1; tail -n 30 /tmp/wtg3-t3.log`. Expected: FAIL (`../src/flow-read.js` does not exist). Commit.
+
+- [ ] **Step 3: GREEN, the types and the builder**
+
+  `packages/domain/src/read-models-flow.ts`: the wire. Dates are IST days; `pin` is counts (spec :714), not the boolean at :174:
+  ```ts
+import type { PassRecord, StateCategory, UnscheduledReason } from './flow/index.js';
+
+/**
+ * What `GET /v1/workspaces/:ws/tickets/:id/flow` answers and `DataSource.query.getFlow` returns (Workflow and Timeline graphs,
+ * Part 3). One flow, read for ONE viewer: a ticket they cannot see is a hole in it, with no count. Dates are IST days
+ * (`YYYY-MM-DD`), never instants, so the graph and the timeline agree on which day a thing happened.
+ */
+export type FlowStateRead = { id: string; name: string; category: StateCategory };
+
+/** PS-7: one of the Decision's OTHER forward labelled edges, for a ticket that sits on exactly one branch of it. */
+export type FlowAlternateRead = { viaDecisionId: string; outcome: string; firstTicketId: string };
+
+export type FlowNoteRead = { id: string; title: string };
+
+export type FlowNodeRead = {
+  id: string;
+  /** `null` for a draft. */
+  key: string | null;
+  draft: boolean;
+  title: string;
+  kind: 'ticket' | 'decision';
+  typeId: string;
+  parentId: string | null;
+  projectId: string;
+  state: FlowStateRead;
+  /** The name of the first state of the ticket's workflow: where a Backlog ticket goes when its predecessors close. */
+  initialStateName: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  dueDate: string | null;
+  waitForAll: boolean;
+  estimate: number | null;
+  reworkEstimate: number | null;
+  /** 1 for a first run; 2 and up after a loop reopened it (PS-2). */
+  round: number;
+  /** A Decision's current outcome; `null` while pending or after a clear. */
+  outcome: string | null;
+  passes: PassRecord[];
+  /** PS-8: set when the ticket was closed "Not taken". */
+  resolution: { kind: 'not-taken'; decisionTicketId: string; outcome: string; pass: number } | null;
+  alternates: FlowAlternateRead[];
+  periods: Array<{ start: string; end: string | null; pass: number }>;
+  planned: Array<{ pass: number; start: string; end: string; basis: 'explicit' | 'chained'; pruned: boolean }>;
+  actual: { start: string; end: string | null } | null;
+  tray: UnscheduledReason | null;
+  notes: FlowNoteRead[];
+  pin: { notes: number; attachments: number };
+};
+
+export type FlowEdgeRead = {
+  /** `source>target` for `leads_to`, `source~target` for `blocks`. */
+  id: string;
+  kind: 'leads_to' | 'blocks';
+  from: string;
+  to: string;
+  label: string | null;
+  /** FL-3's back edge. */
+  loop: boolean;
+  /** How many passes of the source Decision took this label (0 for any other edge). */
+  taken: number;
+  takenPasses: number[];
+  /** `true` full weight, `false` drawn at 40% ("not chosen"), `null` when the source is not a settled Decision. */
+  chosen: boolean | null;
+};
+
+export type FlowAutoMoveKind = 'led-to' | 'reopened-by-flow' | 'branch-not-taken';
+
+/** One transition the flow actor filed (WG-3's "Automatic moves in this flow"). */
+export type FlowAutoMoveRead = {
+  ticketId: string;
+  /** An instant: the inspector formats it. */
+  at: string;
+  kind: FlowAutoMoveKind;
+  /** The ticket whose finishing or choice caused it. */
+  becauseTicketId: string | null;
+  pass: number | null;
+  outcome: string | null;
+};
+
+export type FlowRead = {
+  /** The smallest ticket id in the flow: stable while the flow keeps its members. */
+  flowId: string;
+  /** The ticket the sheet was opened from. */
+  rootId: string;
+  truncated: boolean;
+  reached: number;
+  start: string[];
+  end: string[];
+  /** FL-3 flow order. */
+  order: string[];
+  nodes: FlowNodeRead[];
+  edges: FlowEdgeRead[];
+  autoMoves: FlowAutoMoveRead[];
+  /** The viewer's own drafts in this flow (CR-3). */
+  draftCount: number;
+};
+  ```
+
+  `packages/domain/src/flow-read.ts`. `alternatesFor` is PS-7 with D-W3-6's "exactly one branch" rule; `edgeRead` counts a pass as having taken an edge when its FINAL outcome (a revision replaces it) is the edge's label:
+  ```ts
+import { istDayOf } from './ist-day.js';
+import type { FlowAlternateRead, FlowAutoMoveRead, FlowEdgeRead, FlowNodeRead, FlowRead } from './read-models-flow.js';
+import { branchOf, edgeKey, sameLabel, type FlowAnalysis, type FlowEdge, type FlowNode, type FlowPlan } from './flow/index.js';
+
+/** What the server knows about a ticket that Part 2's `FlowNode` (a planning input) does not carry. */
+export type FlowCardFacts = {
+  key: string | null;
+  title: string;
+  projectId: string;
+  stateName: string;
+  /** The NAME of the workflow's first state (where Backlog's Start edge leads), for the sentence "Moves to To do when GN-150 closes". */
+  initialStateName: string;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  /** The notes the VIEWER can see, newest first. */
+  notes: Array<{ id: string; title: string }>;
+  /** Counts for the pin (TG-11): visible notes, and attachments the viewer may know of. */
+  pinNotes: number;
+  pinAttachments: number;
+};
+
+export type FlowReadInput = {
+  rootId: string;
+  truncated: boolean;
+  reached: number;
+  nodes: readonly FlowNode[];
+  edges: readonly FlowEdge[];
+  /** `blocks` links with BOTH ends in the flow. */
+  blocks: ReadonlyArray<{ sourceId: string; targetId: string }>;
+  analysis: FlowAnalysis;
+  plan: FlowPlan;
+  facts: ReadonlyMap<string, FlowCardFacts>;
+  autoMoves: readonly FlowAutoMoveRead[];
+  draftCount: number;
+};
+
+/**
+ * PS-7: for each Decision with two or more forward labelled edges, a ticket on EXACTLY ONE of its branches gets the other
+ * branches as alternates, each naming that branch's first ticket. A ticket on none (the Decision itself, a ticket before it) or on
+ * several (the shared tail of a diamond) gets nothing from that Decision.
+ */
+function alternatesFor(nodes: readonly FlowNode[], edges: readonly FlowEdge[], analysis: FlowAnalysis): Map<string, FlowAlternateRead[]> {
+  const out = new Map<string, FlowAlternateRead[]>();
+  const rank = new Map(analysis.order.map((id, i) => [id, i] as const));
+  const decisions = nodes.filter((n) => n.isDecision).sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  for (const d of decisions) {
+    const forward = edges.filter((e) => e.sourceId === d.id && e.label !== null && !analysis.backEdges.has(edgeKey(e)));
+    if (forward.length < 2) continue;
+    const branches = forward.map((e) => ({ edge: e, members: branchOf(d.id, e.label!, edges, analysis) }));
+    for (const node of nodes) {
+      const on = branches.filter((b) => b.members.has(node.id));
+      if (on.length !== 1) continue;
+      const list = out.get(node.id) ?? [];
+      for (const other of branches) {
+        if (other === on[0]) continue;
+        list.push({ viaDecisionId: d.id, outcome: other.edge.label!, firstTicketId: other.edge.targetId });
+      }
+      out.set(node.id, list);
+    }
+  }
+  return out;
+}
+
+function edgeRead(edge: FlowEdge, byId: ReadonlyMap<string, FlowNode>, analysis: FlowAnalysis): FlowEdgeRead {
+  const source = byId.get(edge.sourceId);
+  const base = { id: edgeKey(edge), kind: 'leads_to' as const, from: edge.sourceId, to: edge.targetId, label: edge.label, loop: analysis.backEdges.has(edgeKey(edge)) };
+  if (source === undefined || !source.isDecision || edge.label === null) return { ...base, taken: 0, takenPasses: [], chosen: null };
+  // A pass took this edge when its FINAL outcome (a revision replaces it) is the edge's label.
+  const takenPasses = source.passes.filter((p) => sameLabel(p.outcome, edge.label)).map((p) => p.pass);
+  const chosen = source.outcome === null ? null : sameLabel(source.outcome, edge.label);
+  return { ...base, taken: takenPasses.length, takenPasses, chosen };
+}
+
+/**
+ * The Workflow graph's whole answer, from Part 2's pure pieces and the facts the server read. Pure: no clock, no database, so the
+ * same input is the same bytes (the route is a thin shell around it, and the replica could call it too).
+ */
+export function buildFlowRead(input: FlowReadInput): FlowRead {
+  const byId = new Map(input.nodes.map((n) => [n.id, n] as const));
+  const alternates = alternatesFor(input.nodes, input.edges, input.analysis);
+  const rank = new Map(input.analysis.order.map((id, i) => [id, i] as const));
+  const ordered = [...input.nodes].sort((a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+  const nodes: FlowNodeRead[] = ordered.map((n) => {
+    const facts = input.facts.get(n.id);
+    if (facts === undefined) throw new Error(`buildFlowRead: no facts for ticket ${n.id}: the read must load every node it passes in`);
+    const plan = input.plan.get(n.id);
+    const first = n.periods[0];
+    const last = n.periods[n.periods.length - 1];
+    return {
+      id: n.id,
+      key: n.draft ? null : facts.key,
+      draft: n.draft,
+      title: facts.title,
+      kind: n.isDecision ? 'decision' : 'ticket',
+      typeId: n.typeId,
+      parentId: n.parentId,
+      projectId: facts.projectId,
+      state: { id: n.stateId, name: facts.stateName, category: n.category },
+      initialStateName: facts.initialStateName,
+      assigneeId: facts.assigneeId,
+      assigneeName: facts.assigneeName,
+      dueDate: n.explicitDue,
+      waitForAll: n.waitForAll,
+      estimate: n.estimate,
+      reworkEstimate: n.reworkEstimate,
+      round: n.rounds,
+      outcome: n.outcome,
+      passes: n.passes,
+      resolution: n.notTaken,
+      alternates: alternates.get(n.id) ?? [],
+      periods: n.periods.map((p) => ({ start: istDayOf(p.start), end: p.end === null ? null : istDayOf(p.end), pass: p.pass })),
+      planned: (plan?.intervals ?? []).map((i) => ({ pass: i.pass, start: i.start, end: i.end, basis: i.basis, pruned: i.pruned === true })),
+      actual: first === undefined || last === undefined ? null : { start: istDayOf(first.start), end: last.end === null ? null : istDayOf(last.end) },
+      tray: plan?.unscheduled ?? null,
+      notes: facts.notes,
+      pin: { notes: facts.pinNotes, attachments: facts.pinAttachments },
+    };
+  });
+  const flowEdges = input.edges.map((e) => edgeRead(e, byId, input.analysis));
+  const blockEdges: FlowEdgeRead[] = input.blocks
+    .filter((b) => byId.has(b.sourceId) && byId.has(b.targetId))
+    .map((b) => ({ id: `${b.sourceId}~${b.targetId}`, kind: 'blocks', from: b.sourceId, to: b.targetId, label: null, loop: false, taken: 0, takenPasses: [], chosen: null }));
+  return {
+    flowId: [...byId.keys()].sort()[0] ?? input.rootId,
+    rootId: input.rootId,
+    truncated: input.truncated,
+    reached: input.reached,
+    start: [...input.analysis.starts],
+    end: [...input.analysis.ends],
+    order: [...input.analysis.order],
+    nodes,
+    edges: [...flowEdges, ...blockEdges],
+    autoMoves: [...input.autoMoves],
+    draftCount: input.draftCount,
+  };
+}
+  ```
+
+  `packages/domain/src/index.ts`, next to `export * from './read-models.js';` (`:44` on the tip):
+  ```ts
+  export * from './read-models-flow.js';
+  export * from './flow-read.js';
+  ```
+
+  Run the Step 2 command, then `pnpm --filter @gisik-nokma/domain typecheck && pnpm --filter @gisik-nokma/domain build`. Expected: PASS (6 tests), typecheck clean. Commit.
+
+- [ ] **Step 4: RED, the server read and the route**
+
+  `apps/server/test/flow/flow-view.test.ts` (29.243). The seed is the diamond again, with `X` a ticket the member may not see, linked `A → X → E`, plus a `blocks` link from `B` to `X` and one from `B` to `C`. Events are Part 2's: `ticket.link_added {kind: 'leads_to', targetId, label?}`, `ticket.decided {outcome}`. If the landed payloads differ, change the seed, not the assertions:
+  ```ts
+  // @vitest-environment node
+  import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+  import { DECISION_TYPE_ID, newUlid, type FlowRead, type LedgerEvent } from '@gisik-nokma/domain';
+  import type { Queryable } from '../../src/db/queryable.js';
+  import { readFlowView } from '../../src/flow/flow-view.js';
+  import { requireMember } from '../../src/read/membership.js';
+  import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+  import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+  import { buildReadTestApp, type ReadWorld } from '../helpers/read-app.js';
+
+  let db: TestDatabase;
+  let read: ReadWorld;
+  const id = { a: newUlid(), d: newUlid(), b: newUlid(), c: newUlid(), e: newUlid(), x: newUlid() };
+  const noteId = newUlid();
+  const hiddenNoteId = newUlid();
+
+  const link = (from: string, to: string, label?: string): LedgerEvent =>
+    makeCommitted({
+      workspaceId: read.world.workspaceId,
+      actorId: read.world.owner,
+      entity: { kind: 'ticket', id: from },
+      type: 'ticket.link_added',
+      payload: { kind: 'leads_to', targetId: to, ...(label === undefined ? {} : { label }) },
+    });
+
+  beforeAll(async () => {
+    db = await createTestDatabase();
+    read = await buildReadTestApp(db);
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    const create = (ticket: string, title: string, typeId = 'task'): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: ticket }, type: 'ticket.created', payload: { typeId, projectId: read.world.projectId, parentId: null, title } });
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: DECISION_TYPE_ID }, type: 'ticket-type.defined', payload: { id: DECISION_TYPE_ID, name: 'Decision', icon: 'help', rank: 3, workflowId: read.world.workflowId, fields: [] } }),
+      create(id.a, 'Draft the pitch'),
+      create(id.d, 'Is the pitch approved', DECISION_TYPE_ID),
+      create(id.b, 'Send to the client'),
+      create(id.c, 'Shelve the pitch'),
+      create(id.e, 'Close the file'),
+      create(id.x, 'Salary review for the pitch team'),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: id.x }, type: 'visibility.set', payload: { ticketId: id.x, mode: 'explicit', userIds: [read.world.owner] } }),
+      link(id.a, id.d), link(id.d, id.b, 'Yes'), link(id.d, id.c, 'No'), link(id.b, id.e), link(id.c, id.e), link(id.a, id.x), link(id.x, id.e),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: id.b }, type: 'ticket.link_added', payload: { kind: 'blocks', targetId: id.c } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: id.b }, type: 'ticket.link_added', payload: { kind: 'blocks', targetId: id.x } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: id.d }, type: 'ticket.decided', payload: { outcome: 'Yes' } }),
+    ]);
+    await db.pool.query(`INSERT INTO attachments (id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key) VALUES ($1,$2,$3,$4,'brief.pdf','application/pdf',10,$5)`, [newUlid(), ws.workspaceId, id.b, ws.actorId, `k-${newUlid()}`]);
+    // a workspace-visible note on B, and a private note of the owner's on B that the member cannot read
+    const note = (noteEntity: string, title: string, scope: unknown): LedgerEvent =>
+      makeCommitted({ ...ws, entity: { kind: 'note', id: noteEntity }, type: 'note.created', payload: { title, homeProjectId: read.world.projectId, scope, attachTicketId: id.b } });
+    await applyCommitted(db.pool, [note(noteId, 'Pitch brief', { mode: 'workspace' }), note(hiddenNoteId, 'Owner only', { mode: 'private' })]);
+  }, 60_000);
+  afterAll(async () => {
+    await read.app.close();
+    await db.drop();
+  });
+
+  async function viewAs(userId: string, seed = id.b): Promise<FlowRead> {
+    const eff = (await requireMember(db.pool, userId, read.world.workspaceId))!;
+    return readFlowView(db.pool, { workspaceId: read.world.workspaceId, seedId: seed, viewerId: userId, eff });
+  }
+
+  describe('29.243 the flow read for one viewer', () => {
+    it('29.243 a ticket the member cannot see is a hole: no node, no edge, no count; the owner sees it; control: both reads are of the same seed', async () => {
+      const member = await viewAs(read.world.member);
+      const owner = await viewAs(read.world.owner);
+      expect(owner.nodes.map((n) => n.id).sort()).toEqual([id.a, id.b, id.c, id.d, id.e, id.x].sort());
+      expect(member.nodes.map((n) => n.id).sort()).toEqual([id.a, id.b, id.c, id.d, id.e].sort());
+      expect(JSON.stringify(member)).not.toContain(id.x);
+      expect(JSON.stringify(member)).not.toContain('Salary review');
+      expect(member.reached).toBe(5);
+      expect(member.edges.filter((e) => e.kind === 'blocks').map((e) => e.id)).toEqual([`${id.b}~${id.c}`]);
+      expect(owner.edges.filter((e) => e.kind === 'blocks').map((e) => e.id).sort()).toEqual([`${id.b}~${id.c}`, `${id.b}~${id.x}`].sort());
+    });
+
+    it('29.243 titles, keys, state names, notes and pins match the rows; a note the viewer cannot read is absent and uncounted; the Decision is a decision with its outcome', async () => {
+      const member = await viewAs(read.world.member);
+      const b = member.nodes.find((n) => n.id === id.b)!;
+      expect(b).toMatchObject({ title: 'Send to the client', kind: 'ticket', draft: false });
+      expect(b.key).toMatch(/^[A-Z]+-\d+$/);
+      expect(b.state.name).not.toBe('');
+      expect(b.initialStateName).not.toBe('');
+      expect(b.pin.attachments).toBe(1);
+      expect(b.notes.map((n) => n.id)).toEqual([noteId]);
+      expect(b.pin.notes).toBe(1);
+      expect(member.nodes.find((n) => n.id === id.d)).toMatchObject({ kind: 'decision', outcome: 'Yes' });
+      const owner = await viewAs(read.world.owner);
+      expect(owner.nodes.find((n) => n.id === id.b)!.notes.map((n) => n.id).sort()).toEqual([hiddenNoteId, noteId].sort());
+    });
+
+    it('29.243 the query count does not grow with the flow', async () => {
+      const counter = (): { db: Queryable; count: () => number } => {
+        let n = 0;
+        return { db: { query: ((...args: unknown[]) => { n += 1; return (db.pool.query as (...a: unknown[]) => unknown)(...args); }) as Queryable['query'] }, count: () => n };
+      };
+      const eff = (await requireMember(db.pool, read.world.owner, read.world.workspaceId))!;
+      const small = counter();
+      await readFlowView(small.db, { workspaceId: read.world.workspaceId, seedId: id.b, viewerId: read.world.owner, eff });
+      // 34 more tickets in a chain behind E
+      const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+      const chain = Array.from({ length: 34 }, () => newUlid());
+      const events: LedgerEvent[] = [];
+      chain.forEach((t, i) => {
+        events.push(makeCommitted({ ...ws, entity: { kind: 'ticket', id: t }, type: 'ticket.created', payload: { typeId: 'task', projectId: read.world.projectId, parentId: null, title: `Step ${i}` } }));
+        events.push(link(i === 0 ? id.e : chain[i - 1]!, t));
+      });
+      await applyCommitted(db.pool, events);
+      const big = counter();
+      const wide = await readFlowView(big.db, { workspaceId: read.world.workspaceId, seedId: id.b, viewerId: read.world.owner, eff });
+      expect(wide.nodes.length).toBe(6 + 34);
+      expect(big.count()).toBe(small.count());
+    });
+  });
+  ```
+  (`note.created` with `attachTicketId` is the one-event seed the soft-delete surface test uses, `test/integration/soft-delete-client-surface.test.ts:417-428`; the `private` scope is `NoteScope` in `packages/domain/src/note-state.ts:41`.)
+
+  `apps/server/test/routes/flow.test.ts` (29.244), after `board.test.ts`'s shape (`buildReadTestApp`, `read.authOf(role)`, `app.inject`):
+  ```ts
+  // @vitest-environment node
+  import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+  import { newUlid } from '@gisik-nokma/domain';
+  import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
+  import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+  import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+
+  let db: TestDatabase;
+  let read: ReadWorld;
+  beforeAll(async () => {
+    db = await createTestDatabase();
+    read = await buildReadTestApp(db);
+  }, 60_000);
+  afterAll(async () => {
+    await read.app.close();
+    await db.drop();
+  });
+
+  const get = (role: ReadRole | null, workspaceId: string, ticketId: string) =>
+    read.app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/tickets/${ticketId}/flow`, headers: role === null ? {} : read.authOf(role) });
+
+  describe('29.244 GET /v1/workspaces/:ws/tickets/:id/flow', () => {
+    it('29.244 401 with no session; 200 FlowRead for the owner and a member; control: the same URL answers both', async () => {
+      const { workspaceId, taskInEpicId } = read.world;
+      const none = await get(null, workspaceId, taskInEpicId);
+      expect(none.statusCode).toBe(401);
+      expect(none.json()).toEqual(UNAUTHENTICATED_BODY);
+      for (const role of ['owner', 'member'] as const) {
+        const ok = await get(role, workspaceId, taskInEpicId);
+        expect(ok.statusCode, role).toBe(200);
+        const body = ok.json();
+        expect(body).toMatchObject({ rootId: taskInEpicId, truncated: false, draftCount: 0 });
+        expect(body.nodes).toHaveLength(1); // a ticket in no flow is a flow of one
+        expect(body.edges).toEqual([]);
+      }
+    });
+
+    it('29.244 a stranger, a neighbour, an unknown id and a ticket the viewer cannot see all answer the SAME 404', async () => {
+      const { workspaceId, taskInEpicId, hiddenTaskId } = read.world;
+      expect((await get('owner', workspaceId, hiddenTaskId)).statusCode).toBe(200); // control: it exists, and the owner may read it
+      const probes = [
+        await get('stranger', workspaceId, taskInEpicId),
+        await get('neighbour', workspaceId, taskInEpicId),
+        await get('owner', workspaceId, newUlid()),
+        await get('outsider', workspaceId, hiddenTaskId),
+        await get('guest', workspaceId, hiddenTaskId),
+      ];
+      const first = probes[0]!;
+      expect(first.statusCode).toBe(404);
+      for (const probe of probes) {
+        expect(probe.statusCode).toBe(404);
+        expect(probe.body).toBe(first.body);
+        const { date: _a, ...mine } = probe.headers;
+        const { date: _b, ...theirs } = first.headers;
+        expect(mine).toEqual(theirs);
+      }
+    });
+  });
+  ```
+  (`outsider` and `guest` cannot see `hiddenTaskId` — explicit audience, owner only — per `read-scenario.ts`. A deleted ticket's 404 is `ticketIsLive`: add one more probe after deleting `sharedTaskId` with the repo's `ticket.deleted` seed event if one exists in `read-app.ts`/`seed.ts`; if none does, name the missing control in the handoff.)
+
+  App-core, `packages/app-core/test/online/get-flow.test.ts` (29.245). Copy the transport fixture of the nearest online test (`grep -ln "getTicketAttachments" packages/app-core/test/online`) for the fake `http`:
+  ```ts
+  // @vitest-environment node
+  import { describe, expect, it } from 'vitest';
+  import { mapFlow } from '../../src/online/mappers.js';
+
+  const empty = { flowId: 't1', rootId: 't1', truncated: false, reached: 1, start: ['t1'], end: ['t1'], order: ['t1'], nodes: [], edges: [], autoMoves: [], draftCount: 0 };
+
+  describe('29.245 mapFlow', () => {
+    it('29.245 a complete body passes through unchanged; control: a body missing nodes, edges, order, flowId or autoMoves throws, naming the key', () => {
+      expect(mapFlow(empty)).toEqual(empty);
+      for (const key of ['nodes', 'edges', 'order', 'flowId', 'autoMoves'] as const) {
+        const { [key]: _gone, ...rest } = empty;
+        expect(() => mapFlow(rest), key).toThrow(new RegExp(key));
+      }
+      expect(() => mapFlow(null)).toThrow(/flow/);
+    });
+  });
+  ```
+  And in `packages/app-core/test/replica/replica-data-source.test.ts`, inside the `12.185` list, directly under `['getAttention', …]`, add `['getFlow', () => ds.query.getFlow(WS, newUlid())],`; extend the owner regex with `|Workflow graph plan` (Step 6 explains).
+
+  Run each new file; expected FAIL (the modules do not exist). Commit.
+
+- [ ] **Step 5: GREEN, the server**
+
+  `apps/server/src/read/ticket-cards.ts`: add `export` to `function titleOf` (`:221`). `cardKeysFor` is already exported on the KG tip (`:325`). No other change.
+
+  `apps/server/src/read/notes.ts`, after `listNotesForTicket` (`:247`): the batch twin. Same predicates as the single read (workspace, not deleted, `visibleNotesWhere`, `NOTE_PROJECT_LIVE_WHERE`), no `summariesOf` (it reads attached tickets per note, which this read does not need):
+  ```ts
+  /**
+   * The notes attached to ANY of `ticketIds` that this viewer may read, newest first, grouped by ticket (the Workflow graph's
+   * note blocks). A note the viewer cannot read is absent (D5): no placeholder, no count. One query for the whole flow.
+   */
+  export async function listNotesForTickets(
+    db: Queryable,
+    eff: EffectiveRole,
+    userId: string,
+    workspaceId: string,
+    ticketIds: readonly string[],
+  ): Promise<Map<string, Array<{ noteId: string; title: string }>>> {
+    const out = new Map<string, Array<{ noteId: string; title: string }>>();
+    if (ticketIds.length === 0) return out;
+    const params = new SqlParams();
+    const clauses = [
+      `n.workspace_id = ${params.add(workspaceId)}`,
+      `na.ticket_id = ANY(${params.add([...ticketIds])}::text[])`,
+      'n.deleted = FALSE',
+      visibleNotesWhere(eff, userId, params),
+      NOTE_PROJECT_LIVE_WHERE,
+    ];
+    const { rows } = await db.query<{ note_id: string; title: string; ticket_id: string }>(
+      `SELECT n.note_id, n.title, na.ticket_id
+         FROM proj_notes n
+         JOIN proj_note_attachments na ON na.note_id = n.note_id
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY n.updated_at DESC, n.note_id`,
+      params.toArray(),
+    );
+    for (const row of rows) {
+      const list = out.get(row.ticket_id) ?? [];
+      list.push({ noteId: row.note_id, title: row.title });
+      out.set(row.ticket_id, list);
+    }
+    return out;
+  }
+  ```
+
+  `apps/server/src/flow/flow-facts.ts`: everything the builder needs that Part 2's `FlowNode` does not carry. Fixed query count: rows, keys (3 per workspace, one workspace here), workflow definitions (one per distinct pair), roster, notes, attachment counts:
+  ```ts
+  import { statesWithBacklog, type FlowCardFacts } from '@gisik-nokma/domain';
+  import type { Queryable } from '../db/queryable.js';
+  import type { EffectiveRole } from '../permissions/effective-role.js';
+  import { readActorNames } from '../routes/builder-reads.js';
+  import { listNotesForTickets } from '../read/notes.js';
+  import { cardKeysFor, PROJ_TICKET_COLUMNS, titleOf, type ProjTicketRow } from '../read/ticket-cards.js';
+  import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
+
+  /**
+   * Titles, keys, state names, assignee names, the notes the viewer may read and the pin counts for `ids`, which are ALREADY the
+   * viewer's flow (Part 2's `readFlow` did the visibility walk): this function adds names to tickets the walk admitted and never
+   * widens the set. The workspace clause is bound beside the id list because `fetchTicketRows` applies none.
+   */
+  export async function loadFlowFacts(
+    db: Queryable,
+    args: { eff: EffectiveRole; viewerId: string; workspaceId: string; ids: readonly string[] },
+  ): Promise<Map<string, FlowCardFacts>> {
+    const { eff, viewerId, workspaceId, ids } = args;
+    const facts = new Map<string, FlowCardFacts>();
+    if (ids.length === 0) return facts;
+    const { rows } = await db.query<ProjTicketRow>(
+      `SELECT ${PROJ_TICKET_COLUMNS} FROM proj_tickets t WHERE t.workspace_id = $1 AND t.ticket_id = ANY($2::text[]) ORDER BY t.ticket_id`,
+      [workspaceId, [...ids]],
+    );
+    const [keys, defs, roster, notes, attachments] = await Promise.all([
+      cardKeysFor(db, rows),
+      foldedWorkflowDefs(db, workspaceId, rows.map((r) => ({ workflowId: r.workflow_id, version: r.workflow_version }))),
+      readActorNames(db, workspaceId),
+      listNotesForTickets(db, eff, viewerId, workspaceId, ids),
+      db.query<{ ticket_id: string; n: number }>(
+        `SELECT ticket_id, COUNT(*)::int AS n FROM attachments WHERE workspace_id = $1 AND ticket_id = ANY($2::text[]) GROUP BY ticket_id`,
+        [workspaceId, [...ids]],
+      ),
+    ]);
+    const names = new Map(roster.map((r) => [r.userId, r.displayName] as const));
+    const attached = new Map(attachments.rows.map((r) => [r.ticket_id, r.n] as const));
+    for (const row of rows) {
+      const def = defs.get(foldedDefKey(row.workflow_id, row.workflow_version));
+      if (def === undefined) {
+        throw new Error(`loadFlowFacts: no published definition of workflow ${row.workflow_id} at version ${row.workflow_version}, which ticket ${row.ticket_id} is folded to`);
+      }
+      const state = statesWithBacklog(def).find((s) => s.id === row.state_id);
+      if (state === undefined) {
+        throw new Error(`loadFlowFacts: workflow ${row.workflow_id}@${row.workflow_version} has no state ${row.state_id}, which ticket ${row.ticket_id} is in`);
+      }
+      const mine = notes.get(row.ticket_id) ?? [];
+      facts.set(row.ticket_id, {
+        key: keys.get(row.ticket_id) ?? null,
+        title: titleOf(row),
+        projectId: row.project_id,
+        stateName: state.name,
+        initialStateName: def.states.find((s) => s.id === def.initialStateId)?.name ?? state.name,
+        assigneeId: row.assignee_id,
+        assigneeName: row.assignee_id === null ? null : (names.get(row.assignee_id) ?? null),
+        notes: mine.map((n) => ({ id: n.noteId, title: n.title })),
+        pinNotes: mine.length,
+        pinAttachments: attached.get(row.ticket_id) ?? 0,
+      });
+    }
+    return facts;
+  }
+  ```
+
+  `apps/server/src/flow/auto-moves.ts`: what the flow actor did, newest first. The two event types are the ones Part 2's causes ride on (`ticket.transitioned` for a promotion or a reopen, `ticket.closed` for a Not-taken close); a cause is read off the payload, and `becauseTicketId` is blanked when that ticket is not in the viewer's flow:
+  ```ts
+  import { SYSTEM_ACTOR_FLOW, type FlowAutoMoveRead } from '@gisik-nokma/domain';
+  import type { Queryable } from '../db/queryable.js';
+
+  /** Newest first. The inspector shows one ticket's own latest five; the read carries the flow's latest fifty. */
+  export const AUTO_MOVE_LIMIT = 50;
+
+  type CauseRow = { entity_id: string; server_time: Date; payload: { cause?: { kind?: string; sourceTicketId?: string; decisionTicketId?: string; outcome?: string; pass?: number } } };
+
+  export async function loadAutoMoves(db: Queryable, workspaceId: string, ids: readonly string[]): Promise<FlowAutoMoveRead[]> {
+    if (ids.length === 0) return [];
+    const { rows } = await db.query<CauseRow>(
+      `SELECT e.entity_id, e.server_time, e.payload
+         FROM events e
+        WHERE e.workspace_id = $1 AND e.actor_id = $2 AND e.type IN ('ticket.transitioned', 'ticket.closed')
+          AND e.entity_id = ANY($3::text[]) AND e.payload->'cause'->>'kind' IN ('led-to', 'reopened-by-flow', 'branch-not-taken')
+        ORDER BY e.server_time DESC, e.id DESC
+        LIMIT ${AUTO_MOVE_LIMIT}`,
+      [workspaceId, SYSTEM_ACTOR_FLOW, [...ids]],
+    );
+    const inFlow = new Set(ids);
+    return rows.map((row) => {
+      const cause = row.payload.cause ?? {};
+      const kind = cause.kind as FlowAutoMoveRead['kind'];
+      const because = kind === 'led-to' ? cause.sourceTicketId : cause.decisionTicketId;
+      return {
+        ticketId: row.entity_id,
+        at: row.server_time.toISOString(),
+        kind,
+        becauseTicketId: because !== undefined && inFlow.has(because) ? because : null,
+        pass: typeof cause.pass === 'number' ? cause.pass : null,
+        outcome: typeof cause.outcome === 'string' ? cause.outcome : null,
+      };
+    });
+  }
+  ```
+
+  `apps/server/src/flow/flow-view.ts`:
+  ```ts
+  import { buildFlowRead, type FlowRead } from '@gisik-nokma/domain';
+  import { analyzeFlow, planFlow } from '@gisik-nokma/domain';
+  import type { Queryable } from '../db/queryable.js';
+  import type { EffectiveRole } from '../permissions/effective-role.js';
+  import { loadAutoMoves } from './auto-moves.js';
+  import { loadFlowFacts } from './flow-facts.js';
+  import { readFlow } from './read-flow.js';
+
+  /**
+   * The Workflow graph's answer for ONE viewer: Part 2's ring-by-ring walk (a hidden ticket is a hole), Part 2's analysis and plan,
+   * and the facts of the tickets the walk admitted. `blocks` links are kept only when BOTH ends are in the flow.
+   */
+  export async function readFlowView(
+    db: Queryable,
+    args: { workspaceId: string; seedId: string; viewerId: string; eff: EffectiveRole },
+  ): Promise<FlowRead> {
+    const { workspaceId, seedId, viewerId, eff } = args;
+    const walk = await readFlow(db, { workspaceId, seedId, viewerId });
+    const ids = walk.nodes.map((n) => n.id);
+    const analysis = analyzeFlow(walk.nodes, walk.edges);
+    const plan = planFlow({ nodes: walk.nodes, edges: walk.edges, analysis });
+    const [facts, autoMoves, blocks] = await Promise.all([
+      loadFlowFacts(db, { eff, viewerId, workspaceId, ids }),
+      loadAutoMoves(db, workspaceId, ids),
+      loadBlocks(db, workspaceId, ids),
+    ]);
+    return buildFlowRead({
+      rootId: seedId,
+      truncated: walk.truncated,
+      reached: walk.reached,
+      nodes: walk.nodes,
+      edges: walk.edges,
+      blocks,
+      analysis,
+      plan,
+      facts,
+      autoMoves,
+      draftCount: walk.nodes.filter((n) => n.draft).length,
+    });
+  }
+
+  async function loadBlocks(db: Queryable, workspaceId: string, ids: readonly string[]): Promise<Array<{ sourceId: string; targetId: string }>> {
+    if (ids.length === 0) return [];
+    const { rows } = await db.query<{ source_id: string; target_id: string }>(
+      `SELECT source_id, target_id FROM proj_ticket_links
+        WHERE workspace_id = $1 AND kind = 'blocks' AND source_id = ANY($2::text[]) AND target_id = ANY($2::text[])
+        ORDER BY source_id, target_id`,
+      [workspaceId, [...ids]],
+    );
+    return rows.map((r) => ({ sourceId: r.source_id, targetId: r.target_id }));
+  }
+  ```
+  `walk.nodes` already exclude what the viewer cannot see, so the `blocks` query's two `ANY` lists cannot name a hidden ticket. The draft count is the viewer's own drafts (Part 2's walk admits no one else's).
+
+  `apps/server/src/routes/flow.ts`, after the attachments route's guard order. **Part 2 T12 created this file** with `registerFlowRoute`, `FlowReadWire` and `flowWire` on the SAME path; two registrations of one path make Fastify throw at start-up, so this task replaces the file's contents with the code below (delete `FlowReadWire` and `flowWire`; keep `walkFlow` in `flow/read-flow.ts` only if something else still imports it). In Part 2's `apps/server/test/flow/read-flow.test.ts`, re-point the route halves at the rich read: 29.187's hidden-seed 404 is unchanged; 29.189's wire assertions (titles, state names, `leads_to` with its label, `blocks` between members, no key for a draft) read `FlowRead`'s field names and keep their meaning. Fix Part 2 T12's Features bullet in the same commit (it names the small wire):
+  ```ts
+  import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+  import type { Pool } from 'pg';
+  import { readFlowView } from '../flow/flow-view.js';
+  import { ticketIsLive } from '../read/live-ticket.js';
+  import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
+  import { canSee } from '../visibility/can-see.js';
+
+  /** `GET /v1/workspaces/:ws/tickets/:id/flow`: one `FlowRead` for the signed-in viewer. Every refusal is the one shared 404. */
+  export function registerFlowRoutes(app: FastifyInstance, deps: { pool: Pool }, requireSession: preHandlerHookHandler): void {
+    app.get<{ Params: { workspaceId: string; ticketId: string } }>(
+      '/v1/workspaces/:workspaceId/tickets/:ticketId/flow',
+      { preHandler: requireSession },
+      async (request, reply) => {
+        const { workspaceId, ticketId } = request.params;
+        const eff = await requireMember(deps.pool, request.currentUserId, workspaceId);
+        if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
+        if (!(await ticketIsLive(deps.pool, workspaceId, ticketId))) return reply.code(404).send(READ_NOT_FOUND_BODY);
+        if (!(await canSee(deps.pool, request.currentUserId, ticketId))) return reply.code(404).send(READ_NOT_FOUND_BODY);
+        return readFlowView(deps.pool, { workspaceId, seedId: ticketId, viewerId: request.currentUserId, eff });
+      },
+    );
+  }
+  ```
+  `apps/server/src/app.ts`: replace Part 2 T12's `import { registerFlowRoute } from './routes/flow.js';` with `import { registerFlowRoutes } from './routes/flow.js';`, delete its `registerFlowRoute(app, { pool: deps.pool }, requireSession);` (after `registerTicketHistoryRoute`), and, directly under `registerTicketRoutes(app, { pool: deps.pool }, requireSession);` (`:930`), add `registerFlowRoutes(app, { pool: deps.pool }, requireSession);`. `git grep -n "registerFlowRoute\b\|FlowReadWire" apps packages` must print nothing afterwards.
+
+  Run: `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/flow test/routes/flow.test.ts > /tmp/wtg3-t3s.log 2>&1; tail -n 30 /tmp/wtg3-t3s.log` (`test/flow` includes Part 2's `read-flow.test.ts`). Expected: PASS. Fix by changing the seed to the landed payloads (Step 0), never the assertions.
+
+- [ ] **Step 6: GREEN, the client**
+
+  `packages/app-core/src/data-source.ts`, in `DataSourceQuery` beside `getAttention` (`:419` on the tip):
+  ```ts
+    /**
+     * One ticket's whole flow, read for the signed-in viewer (Workflow graph). Online: `GET /v1/workspaces/:ws/tickets/:id/flow`.
+     * Replica: rejects with `ReplicaGapError`: a flow is a walk over tickets this device may not hold, over a roster, attachment
+     * counts and other people's notes it does not hold either, and a partial flow would be drawn as if it were whole.
+     */
+    getFlow(workspaceId: string, ticketId: string): Promise<FlowRead>;
+  ```
+  with `FlowRead` imported from `@gisik-nokma/domain`.
+
+  `packages/app-core/src/online/mappers.ts`: a guard, not a reshape (the wire IS the view type; `FlowRead` carries nothing the client renames):
+  ```ts
+  /** `FlowRead` as the route sends it. A body without its spine is an error here, not an empty graph. */
+  export function mapFlow(raw: unknown): FlowRead {
+    if (typeof raw !== 'object' || raw === null) throw new Error('mapFlow: the flow body is not an object');
+    const body = raw as Record<string, unknown>;
+    for (const key of ['flowId', 'rootId'] as const) {
+      if (typeof body[key] !== 'string') throw new Error(`mapFlow: ${key} is missing or not a string`);
+    }
+    for (const key of ['nodes', 'edges', 'order', 'start', 'end', 'autoMoves'] as const) {
+      if (!Array.isArray(body[key])) throw new Error(`mapFlow: ${key} is missing or not an array`);
+    }
+    return body as unknown as FlowRead;
+  }
+  ```
+
+  `packages/app-core/src/online/online-data-source.ts`, in `query` beside `getAttention` (`:570`):
+  ```ts
+    getFlow: async (workspaceId, ticketId) => mapFlow(await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/flow`)),
+  ```
+
+  `packages/app-core/src/replica/replica-data-source.ts`: before `REPLICA_GAPS` define
+  ```ts
+  /** Workflow graph, Part 3. The whole method: see `DataSourceQuery.getFlow`. */
+  const FLOW_ABSENCES: readonly ReplicaAbsence[] = [
+    {
+      field: 'FlowRead (the flow around a ticket, read for one viewer)',
+      because:
+        'a flow is every ticket reachable by leads_to links in both directions, with titles, keys, assignee names, other people\'s notes and attachment counts; this device holds what was already visible to it, no roster, no attachment counts and no notes of others, so a walk here would draw a partial flow as if it were whole',
+      owner: 'Workflow graph plan: a local flow fold in the replica (packages/sync-client), not a /v1 route',
+    },
+  ];
+  ```
+  add `getFlow: FLOW_ABSENCES,` to `REPLICA_GAPS` directly under `getAttention: ATTENTION_ABSENCES,` (`:677`; the key order is tested), and `getFlow: () => Promise.reject(new ReplicaGapError('getFlow', FLOW_ABSENCES)),` under `getAttention:` in the method table (`:1344`). Export `mapFlow` from `packages/app-core/src/online/index.ts` only if the other mappers are.
+
+  `packages/app-core/test/replica/replica-data-source.test.ts`: the owner regex becomes `/^(Plan 10|Plan 2 of the notes series|Trash series Plan 3|Prefixes and groups plan|Workflow graph plan): /`.
+
+  Run: the app-core suite WHOLE (`pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 > /tmp/wtg3-t3c.log 2>&1; tail -n 30 /tmp/wtg3-t3c.log`), then the doubles that spell every `DataSourceQuery` member (a new member breaks their typecheck; the list on the tip, from `grep -rn "getAttention:" apps packages --include=*.ts --include=*.tsx`): `apps/web/test/helpers/stub-services.ts:206` (add `getFlow: unstubbed('getFlow'),` beside `getAttention`: that helper's rule is that an unstubbed read rejects BY NAME, never answers an invented blank), `apps/web/test/data-source-gateway.test.ts:66` (the same line), `packages/app-core/test/helpers/fake-data-source.ts:92` (`getFlow: async () => { throw new Error('fake-data-source: getFlow is not stubbed'); },`). A page test that never reads a flow needs nothing else. **And the soft-delete census**, which is total over the query union: `apps/server/test/integration/soft-delete-client-surface.test.ts` has a verdict table (`getAttention: { verdict: 'excluded', carries: true }` at `:645`) and a callers table (`getAttention: () => ds.getAttention(workspaceId),` at `:754`). Add `getFlow: { verdict: 'excluded', carries: true, why: 'the flow read walks live tickets only and the route refuses a trashed seed with the shared third guard (ticketIsLive); a trashed ticket is a hole in a flow, never a node' },` and, beside `getAttention` in the callers, `getFlow: () => ds.getFlow(workspaceId, childId),` (`childId` is the fixture's deleted ticket: before the delete the answer carries its title as the one node of its flow; after it the route refuses, which that walk records as `refused`). **Bump the member count** the same file asserts (`expect(MEMBERS).toHaveLength(28)` at `:848` on the tip, with a comment above it naming who bumped it before): read the number on the release branch and add one, and add a line to that comment (`29 until the Workflow graph's getFlow`). Then `pnpm turbo run typecheck --filter=@gisik-nokma/web...`. Expected PASS.
+
+- [ ] **Step 7: The 12.185 prose, mutations, census, catalogue**
+
+  1. **Prose is a claim.** `grep -rn "12.185" test-cases Features.md packages/app-core/test packages/app-core/src` and the `ELEVEN` in the test title (the list already has more than eleven entries on the tip, so the word is stale): rewrite the title and the case line to say the methods are enumerated by id and not counted, and add `getFlow` where the line lists them.
+  2. **App-core online change ⇒ server integration files WHOLE:** `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/integration > /tmp/wtg3-t3i.log 2>&1; tail -n 30 /tmp/wtg3-t3i.log`. Add a `getFlow` agreement case beside the `getAttention` one in `test/integration/client-contract.test.ts` (copy it: real route body through `mapFlow` is `toEqual` to the body).
+  3. **No new event, notification kind or cause** in this task: `git diff --stat origin/release/<next> -- packages/domain/src/events apps/server/src/projections apps/server/test/census` is empty (say so in the handoff).
+  4. **Mutations (the reviewer re-runs these):**
+
+     | Case | Mutation | Expected red |
+     |---|---|---|
+     | 29.240 | in `alternatesFor` replace `on.length !== 1` with `on.length === 0` | the shared-tail (`E`) assertion |
+     | 29.241 | in `edgeRead` compare `p.revisions[0]?.from ?? p.outcome` | the revised-pass count |
+     | 29.242 | replace `istDayOf(p.start)` with `p.start.slice(0, 10)` | the 18:29:59Z / 18:30:00Z pair |
+     | 29.243 | `readFlow(db, {…, viewerId: null})` in `readFlowView` | the hole assertions (member sees `X`) |
+     | 29.243 | in `loadBlocks` use `source_id = ANY($2) OR target_id = ANY($2)` | the member's `blocks` list contains `B~X`'s hidden end |
+     | 29.243 | replace `listNotesForTickets` with a per-ticket loop over `listNotesForTicket` | the query-count control |
+     | 29.244 | delete the `canSee` line in the route | the `hiddenTaskId` probes |
+     | 29.245 | remove `getFlow` from `REPLICA_GAPS` | 12.185 |
+
+  5. Flip 29.240 to 29.245 to ✅. `Features.md`, under `<!-- wtg-part3-workflow-graph T3 bullet -->`: `- ⚙️ **Flow read** — \`GET /v1/workspaces/:ws/tickets/:id/flow\` returns one \`FlowRead\` for the viewer: nodes in flow order with title, key, state, alternates, passes, IST-day periods, planned intervals, tray reason, visible notes and pin counts; edges with taken passes and the chosen branch; the flow actor's latest automatic moves. \`apps/server/src/flow/\`, \`packages/domain/src/flow-read.ts\`; online only (\`getFlow\`), the replica refuses with a named gap.`
+  6. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build test typecheck --filter=@gisik-nokma/domain --filter=@gisik-nokma/server --filter=@gisik-nokma/app-core` (LOCAL).
+
+  Commit `wtg3 T3: the flow read, its route and getFlow`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-flow-read.md` written.
+
+
+---
+
+### Task 4: The scene and the flow colours: `SceneInput` to `Scene`, rounded paths, seven token roles with their contrast guarantees (cases 29.246–29.250)
+
+**Branch** `task/wtg3-scene` (after T2; independent of T3). **Files:**
+- Create:
+  - `packages/flow-graph/src/scene/{types,geometry,build-scene}.ts`
+  - `packages/flow-graph/test/scene/{fixture.ts,scene.test.ts}`
+- Modify:
+  - `packages/flow-graph/src/index.ts` (scene exports)
+  - `packages/ui/src/tokens.ts` (fourteen primitives, seven roles, two theme mappings, the declared pairs), `packages/ui/test/tokens.test.ts` (the 29.250 cases)
+  - `Features.md` §26 (T4 anchor), `test-cases/29-workflow-timeline-graphs.md` (T4 anchor)
+
+**Interfaces:**
+- **Consumes** (T2): `layoutFlow`, `LayoutInput`, `FlowLayout`, `ticketBlock`, `decisionBlock`, `TextMeasure`, `GAP`, `mockupFlow`; (KG C T4) the token recipe: `TOKEN_ROLES`, `themes.light`/`themes.dark`, `CONTRAST_PAIRS`, `colorOf`, `contrastRatio`, `cssVariableName`, `themeStylesheet`, `STYLE_NAMES`, `THEME_NAMES`.
+- **Produces:** `buildScene(input: SceneInput, layout: FlowLayout, ctx: SceneContext): Scene`; `layoutInputOf(input, ctx): LayoutInput`; `edgeLabelText(edge): string | null`; `roundedPath(points, radius?)`; the types `SceneInput`, `SceneNode`, `SceneEdge`, `Scene`, `DrawnNode`, `DrawnEdge`, `DrawnPill`, `DrawnNote`, `NoteConnector`; seven roles `flowEdge`, `flowEdgeMuted`, `flowNoteLine`, `flowNoteFill`, `flowNotTakenFill`, `flowNotTakenLine`, `flowCanvas` emitted as `--gn-flow-edge` ... `--gn-flow-canvas`. T5's stage draws a `Scene`; T7's `flow-model.ts` produces a `SceneInput`; T10 replaces `build-scene.ts` with the version that also places note blocks.
+
+Siblings copied: KG C T4 (`docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`, "Task 4: Graph colour tokens", read in full: its primitive/role/mapping/pair recipe and its measured-pair loop are followed step for step).
+
+**Why this split.** The scene is the one place that knows what a flow LOOKS like: sizes come from the measured block (never 64 px), the layout is given only `leads_to` edges (a `blocks` link is drawn after, as a dashed route between the finished shapes, so it never bends the layout), a Not-taken ticket mutes its edges, and every wrapped title is the same text the layout measured. The package holds no colour (`CLIENT_SOURCE_ROOTS` includes it since T1); every colour is a `var(--gn-flow-…)` the stage writes.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-scene`; `pnpm install` (Node 22); build the package: `pnpm turbo run build --filter=@gisik-nokma/flow-graph`.
+  2. Re-read the token recipe as landed: `grep -n "export const TOKEN_ROLES\|export const CONTRAST_PAIRS\|export function colorOf\|export function contrastRatio\|export const STYLE_NAMES\|export const THEME_NAMES" packages/ui/src/tokens.ts` and `sed -n 90,125p packages/ui/test/tokens.test.ts` (the loop over `CONTRAST_PAIRS` in every style and theme). If KG C T4 is not on the branch, STOP: this task cannot copy its recipe.
+  3. Catalogue anchors exist (T1 Step 0): `grep -n "wtg-part3-workflow-graph T4" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The five case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T4 -->`:
+  - `- ❌ **29.246 — The layout is given measured sizes and the \`leads_to\` edges only:** every node's size is the measured block (a Decision at least 176 x 108), a loop's label reads \`Needs rework ↺ 2\` from 1 pass and has no count at 0, and a \`blocks\` link is never laid out; control: the same input without the \`blocks\` link lays out identically. Mutation: include \`blocks\` in the layout edges → reds.`
+  - `- ❌ **29.247 — Everything is drawn where the layout put it:** every node at its placed position and size, the Start and End pills on the nodes FL-3 names, a \`blocks\` link dashed and labelled \`blocks\`, no box overlapping a pill, no route through a box; control: a node without \`start\` or \`end\` has no pill. Mutation: draw a pill for every node → reds.`
+  - `- ❌ **29.248 — A Not-taken ticket mutes its edges and nothing else's:** an edge that touches it is muted; control: its neighbours' other edges are not. Mutation: mute by source only → reds.`
+  - `- ❌ **29.249 — The rounded path keeps its end points:** it starts and ends exactly on the first and last point and rounds only the corners; control: a straight line has no curve command. Mutation: drop the last point → reds.`
+  - `- ❌ **29.250 — Seven flow colours, each measured:** the roles exist and emit \`--gn-flow-*\`; edge, dotted-line and outline pairs clear 3:1 and text on the note and Not-taken fills clears 4.5:1, in every style and theme, on the canvas and on \`surfaceRaised\`; a Not-taken ticket is told by a pale fill and a dashed border, so its fill differs from the canvas; control: a value known to fail (the mockup's note grey on the canvas) is below 3. Mutation: \`flowNotTakenLine\` light → \`#a8a49a\` → reds.`
+
+- [ ] **Step 2: RED, the scene tests and the token tests**
+
+  `packages/flow-graph/test/scene/fixture.ts` (the approved mockup's flow as scene input: a status word on every node, three loops, one `blocks` link):
+  ```ts
+import { mockupFlow } from '../../src/fixtures.js';
+import type { SceneEdge, SceneInput, SceneNode } from '../../src/scene/types.js';
+import type { Orientation } from '../../src/types.js';
+
+const TITLES: Record<string, string> = {
+  '140': 'Kick-off call', '141': 'Draft the pitch', '142': 'Team builds the deck', '143': 'Collect the references', '144': 'Client approves scope?',
+  '145': 'Revise the scope', '147': 'Pitch is approved', d1: 'Budget fits?', '146': 'Cut features', dA: 'Alternate plan', '150': 'Final review', '151': 'Client decides', dEnd: 'Launch',
+};
+
+/** The approved mockup's flow as scene input: a status word on every node, three loops, one Blocks link. */
+export function mockupScene(orientation: Orientation = 'landscape', overrides: Record<string, Partial<SceneNode>> = {}): SceneInput {
+  const flow = mockupFlow(orientation);
+  const hasIn = new Set(flow.edges.map((e) => e.target));
+  const hasOut = new Set(flow.edges.map((e) => e.source));
+  const nodes: SceneNode[] = flow.nodes.map((n, i) => ({
+    id: n.id,
+    shape: n.shape,
+    key: `GN-${n.id.replace(/\D/g, '') || 900 + i}`,
+    title: TITLES[n.id] ?? n.id,
+    draft: false,
+    statusWord: i < 3 ? 'Done' : i < 5 ? 'In progress' : 'Backlog',
+    category: i < 3 ? 'terminal' : i < 5 ? 'active' : 'open',
+    assigneeInitials: i % 2 === 0 ? 'AR' : null,
+    round: 1,
+    waitForAll: false,
+    start: !hasIn.has(n.id),
+    end: !hasOut.has(n.id),
+    notTaken: null,
+    outcome: null,
+    passCount: 0,
+    notes: [],
+    ...overrides[n.id],
+  }));
+  const edges: SceneEdge[] = flow.edges.map((e) => ({ id: e.id, kind: 'leads_to', source: e.source, target: e.target, label: e.label, loop: e.loop, taken: 0, chosen: null, tooltip: null }));
+  edges.push({ id: '150~144', kind: 'blocks', source: '150', target: '144', label: null, loop: false, taken: 0, chosen: null, tooltip: null });
+  return { nodes, edges, orientation, phone: false };
+}
+  ```
+
+  `packages/flow-graph/test/scene/scene.test.ts` (29.246 to 29.249). `ctx` measures 7 px per character, so no canvas is needed:
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { layoutFlow } from '../../src/layout/layout.js';
+import { edgeLabelText, layoutInputOf, buildScene } from '../../src/scene/build-scene.js';
+import { roundedPath } from '../../src/scene/geometry.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { crossings } from '../layout/helpers.js';
+import { mockupScene } from './fixture.js';
+
+const ctx = { measure: (text: string) => text.length * 6, labelSize };
+const build = async (input = mockupScene()) => buildScene(input, await layoutFlow(inProcessEngine(), layoutInputOf(input, ctx), ctx), ctx);
+
+describe('the scene from layout (spec WG-1, WG-2)', () => {
+  it('29.246 the layout input carries measured sizes and only the leads_to edges, with a loop count in its label; control: a blocks link is not laid out', () => {
+    const input = mockupScene('landscape');
+    const loop = input.edges.find((e) => e.id === '151>141')!;
+    const counted = { ...input, edges: input.edges.map((e) => (e.id === '151>141' ? { ...e, taken: 2 } : e)) };
+    const layoutInput = layoutInputOf(counted, ctx);
+    expect(layoutInput.edges.map((e) => e.id)).not.toContain('150~144');
+    expect(layoutInput.edges).toHaveLength(17);
+    expect(layoutInput.edges.find((e) => e.id === '151>141')!.label).toBe('No ↺ 2');
+    expect(layoutInput.edges.find((e) => e.id === '151>dA')!.label).toBe('Need more info');
+    expect(layoutInput.nodes.find((n) => n.id === '144')).toMatchObject({ shape: 'decision', width: 176 });
+    expect(layoutInput.nodes.find((n) => n.id === '141')).toMatchObject({ shape: 'ticket', width: 140, height: 64 });
+    // control: the count is absent at 0 and never on a forward edge
+    expect(edgeLabelText({ ...loop, taken: 0 })).toBe('No');
+    expect(edgeLabelText({ ...loop, loop: false, taken: 3 })).toBe('No');
+    expect(edgeLabelText({ ...loop, label: null, taken: 3 })).toBeNull();
+  });
+
+  it('29.247 every node is drawn at its placed position, the Start and End pills sit on the nodes FL-3 names, blocks is drawn dashed and labelled, nothing overlaps or crosses', async () => {
+    const scene = await build();
+    expect(scene.nodes).toHaveLength(13);
+    expect(scene.pills.filter((p) => p.kind === 'start').map((p) => p.nodeId)).toEqual(['140']);
+    expect(scene.pills.filter((p) => p.kind === 'end').map((p) => p.nodeId)).toEqual(['dEnd']);
+    const blocks = scene.edges.find((e) => e.edge.kind === 'blocks')!;
+    expect(blocks.label?.text).toBe('blocks');
+    expect(blocks.points.length).toBeGreaterThanOrEqual(2);
+    for (let i = 0; i + 1 < blocks.points.length; i += 1) expect(blocks.points[i]!.x === blocks.points[i + 1]!.x || blocks.points[i]!.y === blocks.points[i + 1]!.y).toBe(true);
+    const flowEdges = scene.edges.filter((e) => e.edge.kind === 'leads_to');
+    expect(flowEdges).toHaveLength(17);
+    expect(crossings({ width: 0, height: 0, orientation: 'landscape', nodes: scene.nodes.map((n) => ({ id: n.node.id, ...n.box })), edges: flowEdges.map((e) => ({ id: e.edge.id, points: e.points, label: null })) })).toEqual([]);
+    expect(flowEdges.find((e) => e.edge.id === '144>147')!.label?.text).toBe('Yes');
+    expect(flowEdges.find((e) => e.edge.id === '140>141')!.label).toBeNull();
+    expect(scene.width).toBeGreaterThan(0);
+    expect(scene.height).toBeGreaterThan(0);
+  });
+
+  it('29.248 a Not-taken ticket mutes its edges; control: its neighbours\' other edges are not muted', async () => {
+    const scene = await build(mockupScene('landscape', { '145': { notTaken: { chip: 'Not taken', tooltip: 'Not taken, pass 1, via GN-144 Client approves scope? · Yes' } } }));
+    const muted = scene.edges.filter((e) => e.muted).map((e) => e.edge.id).sort();
+    expect(muted).toEqual(['144>145', '145>146']);
+    expect(scene.edges.find((e) => e.edge.id === '144>147')!.muted).toBe(false);
+  });
+
+  it('29.249 the rounded path keeps its end points and rounds only the corners; control: a straight line has no curve', () => {
+    expect(roundedPath([{ x: 0, y: 0 }, { x: 100, y: 0 }])).toBe('M0 0 L100 0');
+    const d = roundedPath([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 50 }], 6);
+    expect(d).toBe('M0 0 L94 0 Q100 0 100 6 L100 50');
+    expect(roundedPath([{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 50 }], 6)).toContain('Q4 0 4 2'); // clamped to half of the short segment
+  });
+});
+  ```
+
+  `packages/ui/test/tokens.test.ts`: append (29.250). Pairs are declared for what the graph draws: lines on the canvas and on `surfaceRaised` (the sheet), text on the two fills:
+  ```ts
+  /** 29.250: the Workflow graph's colours (spec Part 3 §10, WG-10). Values: plan T4's table; a pair that fails is stepped by 0x080808, never waived. */
+  describe('the Workflow graph colours', () => {
+    const FLOW_ROLES = ['flowEdge', 'flowEdgeMuted', 'flowNoteLine', 'flowNoteFill', 'flowNotTakenFill', 'flowNotTakenLine', 'flowCanvas'] as const;
+    const LINES = ['flowEdge', 'flowEdgeMuted', 'flowNoteLine', 'flowNotTakenLine'] as const;
+
+    it('29.250 seven roles exist and emit --gn-flow-* variables; control: no other role claims the prefix', () => {
+      for (const role of FLOW_ROLES) expect(TOKEN_ROLES).toContain(role);
+      expect(cssVariableName('flowNotTakenFill')).toBe('--gn-flow-not-taken-fill');
+      expect(cssVariableName('flowCanvas')).toBe('--gn-flow-canvas');
+      expect(themeStylesheet()).toContain('--gn-flow-edge: #4a5371;');
+      expect(TOKEN_ROLES.filter((r) => r.startsWith('flow'))).toEqual([...FLOW_ROLES]);
+    });
+
+    it('29.250 every line clears 3:1 on the canvas and on surfaceRaised, text clears 4.5:1 on the two fills, in every style and theme', () => {
+      for (const style of STYLE_NAMES) for (const theme of THEME_NAMES) {
+        for (const role of LINES) for (const bg of ['flowCanvas', 'surfaceRaised'] as const) {
+          expect(contrastRatio(colorOf(theme, role, style), colorOf(theme, bg, style)), `${style}/${theme} ${role} on ${bg}`).toBeGreaterThanOrEqual(3);
+        }
+        expect(contrastRatio(colorOf(theme, 'flowNoteLine', style), colorOf(theme, 'flowNoteFill', style)), `${style}/${theme} note line on its fill`).toBeGreaterThanOrEqual(3);
+        expect(contrastRatio(colorOf(theme, 'flowNotTakenLine', style), colorOf(theme, 'flowNotTakenFill', style)), `${style}/${theme} not-taken line on its fill`).toBeGreaterThanOrEqual(3);
+        for (const fg of ['text', 'textMuted'] as const) for (const bg of ['flowNoteFill', 'flowNotTakenFill'] as const) {
+          expect(contrastRatio(colorOf(theme, fg, style), colorOf(theme, bg, style)), `${style}/${theme} ${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      // control: a value the mockup used and that fails is below the bar, so the loop above can fail
+      expect(contrastRatio('#a8a49a', colorOf('light', 'flowCanvas'))).toBeLessThan(3);
+    });
+
+    it('29.250 the declared pairs are in CONTRAST_PAIRS (the loop that measures them is the existing one); a Not-taken fill differs from the canvas, so the ticket is not told by opacity alone', () => {
+      const has = (fg: string, bg: string, min: number) => CONTRAST_PAIRS.some((p) => p.fg === fg && p.bg === bg && p.minimum === min);
+      for (const role of LINES) for (const bg of ['flowCanvas', 'surfaceRaised']) expect(has(role, bg, 3), `${role} on ${bg}`).toBe(true);
+      for (const fg of ['text', 'textMuted']) for (const bg of ['flowNoteFill', 'flowNotTakenFill']) expect(has(fg, bg, 4.5), `${fg} on ${bg}`).toBe(true);
+      expect(has('flowCanvas', 'surface', 3)).toBe(false);
+      for (const theme of THEME_NAMES) expect(colorOf(theme, 'flowNotTakenFill')).not.toBe(colorOf(theme, 'flowCanvas'));
+    });
+  });
+  ```
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 test/scene > /tmp/wtg3-t4.log 2>&1; tail -n 20 /tmp/wtg3-t4.log` (FAIL: no `src/scene`) and `pnpm --filter @gisik-nokma/ui exec vitest run --maxWorkers=2 test/tokens.test.ts > /tmp/wtg3-t4u.log 2>&1; tail -n 20 /tmp/wtg3-t4u.log` (FAIL: no roles). Commit the RED tests.
+
+- [ ] **Step 3: GREEN, the scene**
+
+  `src/scene/types.ts`. Nothing here is a domain type: the app maps a `FlowRead` to `SceneInput`. `notes` and `connectors` stay in the types so T10 adds notes without changing a signature; this task's scene returns them empty:
+  ```ts
+import type { FlowLayout, Orientation, Point, Rect } from '../types.js';
+
+/**
+ * What the app hands the scene. Nothing here is a domain type: `apps/web` (or app-core's `flow-model.ts`) maps a `FlowRead` to
+ * these, so the package draws any flow and never imports `@gisik-nokma/domain`.
+ */
+export type SceneCategory = 'open' | 'active' | 'terminal';
+
+export type SceneNode = {
+  id: string;
+  shape: 'ticket' | 'decision';
+  /** `null` for a draft: it has no key until it is published. */
+  key: string | null;
+  /** A ticket's title, or a Decision's question. */
+  title: string;
+  draft: boolean;
+  /** The state's NAME, drawn next to the dot so status is never colour alone (WG-10). */
+  statusWord: string;
+  category: SceneCategory;
+  assigneeInitials: string | null;
+  /** 1 for a first run; "↺2" after the key from 2 on (WG-1). */
+  round: number;
+  waitForAll: boolean;
+  /** FL-3: gets an automatic Start / End pill. */
+  start: boolean;
+  end: boolean;
+  /** PS-8: set when the ticket was closed "Not taken". `chip` is the word, `tooltip` the sentence. */
+  notTaken: { chip: string; tooltip: string } | null;
+  /** A Decision's current outcome, and how many passes it has recorded (WG-8). */
+  outcome: string | null;
+  passCount: number;
+  notes: SceneNoteIn[];
+};
+
+export type SceneNoteIn = { id: string; title: string };
+
+export type SceneEdge = {
+  /** `leads_to`: `source>target`. `blocks`: `source~target`. */
+  id: string;
+  kind: 'leads_to' | 'blocks';
+  source: string;
+  target: string;
+  label: string | null;
+  /** FL-3's back edge, supplied by the caller. */
+  loop: boolean;
+  /** How many passes took this edge (Decision label = the pass's final outcome). 0 for any other edge. */
+  taken: number;
+  /** `true` full weight, `false` drawn at 40% ("not chosen"), `null` not a Decision's choice. */
+  chosen: boolean | null;
+  tooltip: string | null;
+};
+
+export type SceneInput = { nodes: readonly SceneNode[]; edges: readonly SceneEdge[]; orientation: Orientation; phone: boolean };
+
+export type DrawnNode = {
+  node: SceneNode;
+  /** The drawn shape. */
+  rect: Rect;
+  /** Wrapped title lines, with the ellipsis already applied. */
+  lines: string[];
+  /** The placed box: the shape plus its note stack. */
+  box: Rect;
+};
+
+export type DrawnPill = { kind: 'start' | 'end'; nodeId: string; rect: Rect };
+
+export type DrawnEdge = {
+  edge: SceneEdge;
+  points: Point[];
+  /** An SVG path with rounded corners. */
+  path: string;
+  /** Muted: it touches a Not-taken ticket. */
+  muted: boolean;
+  label: { text: string; rect: Rect } | null;
+};
+
+export type DrawnNote = {
+  id: string;
+  ticketId: string;
+  rect: Rect;
+  lines: string[];
+  /** `n` for the "+N notes" block that opens the ticket's Notes, else `null`. */
+  more: number | null;
+};
+
+export type NoteConnector = { ticketId: string; points: Point[] };
+
+export type Scene = {
+  width: number;
+  height: number;
+  orientation: Orientation;
+  nodes: DrawnNode[];
+  pills: DrawnPill[];
+  edges: DrawnEdge[];
+  notes: DrawnNote[];
+  /** Dotted, no arrowhead (WG-7). */
+  connectors: NoteConnector[];
+};
+
+export type { FlowLayout };
+  ```
+
+  `src/scene/geometry.ts`: the rounded orthogonal path (radius 6, clamped to half the shorter neighbour segment), the route a `blocks` link takes between two finished shapes, and a bounding rectangle:
+  ```ts
+import type { Point, Rect } from '../types.js';
+
+/** A polyline as an SVG path with each corner rounded by at most `radius` px (never more than half of either neighbouring segment). */
+export function roundedPath(points: readonly Point[], radius = 6): string {
+  if (points.length === 0) return '';
+  const first = points[0]!;
+  let d = `M${first.x} ${first.y}`;
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = points[i - 1]!;
+    const here = points[i]!;
+    const next = points[i + 1];
+    if (next === undefined) {
+      d += ` L${here.x} ${here.y}`;
+      break;
+    }
+    const inLen = Math.hypot(here.x - prev.x, here.y - prev.y);
+    const outLen = Math.hypot(next.x - here.x, next.y - here.y);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    if (r <= 0) {
+      d += ` L${here.x} ${here.y}`;
+      continue;
+    }
+    const a = { x: here.x - ((here.x - prev.x) / inLen) * r, y: here.y - ((here.y - prev.y) / inLen) * r };
+    const b = { x: here.x + ((next.x - here.x) / outLen) * r, y: here.y + ((next.y - here.y) / outLen) * r };
+    d += ` L${a.x} ${a.y} Q${here.x} ${here.y} ${b.x} ${b.y}`;
+  }
+  return d;
+}
+
+type Side = 'N' | 'E' | 'S' | 'W';
+
+function anchor(r: Rect, side: Side): Point {
+  switch (side) {
+    case 'N': return { x: r.x + r.width / 2, y: r.y };
+    case 'S': return { x: r.x + r.width / 2, y: r.y + r.height };
+    case 'E': return { x: r.x + r.width, y: r.y + r.height / 2 };
+    case 'W': return { x: r.x, y: r.y + r.height / 2 };
+  }
+}
+
+/**
+ * A `blocks` link is drawn after the layout, not laid out (it never extends a flow, FL-1): an orthogonal elbow from the facing sides
+ * of the two shapes. It may cross a third box; it is the faint dashed line, and a crossing there is the lesser evil against a
+ * layout that a second kind of edge would re-rank.
+ */
+export function routeBetween(from: Rect, to: Rect): Point[] {
+  const dx = to.x + to.width / 2 - (from.x + from.width / 2);
+  const dy = to.y + to.height / 2 - (from.y + from.height / 2);
+  const horizontal = Math.abs(dx) * from.height >= Math.abs(dy) * from.width;
+  const a = anchor(from, horizontal ? (dx >= 0 ? 'E' : 'W') : dy >= 0 ? 'S' : 'N');
+  const b = anchor(to, horizontal ? (dx >= 0 ? 'W' : 'E') : dy >= 0 ? 'N' : 'S');
+  const raw: Point[] = horizontal
+    ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
+    : [a, { x: a.x, y: (a.y + b.y) / 2 }, { x: b.x, y: (a.y + b.y) / 2 }, b];
+  return raw.filter((p, i) => i === 0 || p.x !== raw[i - 1]!.x || p.y !== raw[i - 1]!.y);
+}
+
+export const unionRect = (rects: readonly Rect[]): Rect => {
+  const x = Math.min(...rects.map((r) => r.x));
+  const y = Math.min(...rects.map((r) => r.y));
+  return { x, y, width: Math.max(...rects.map((r) => r.x + r.width)) - x, height: Math.max(...rects.map((r) => r.y + r.height)) - y };
+};
+  ```
+
+  `src/scene/build-scene.ts` (the no-notes version; T10 replaces it):
+  ```ts
+import { decisionBlock, ticketBlock, type TextMeasure, type TicketBlock } from '../layout/measure.js';
+import { GAP } from '../layout/graph-input.js';
+import type { FlowLayout, LayoutEdge, LayoutInput, LayoutNode, LayoutOptions, Rect } from '../types.js';
+import { roundedPath, routeBetween } from './geometry.js';
+import type { DrawnEdge, DrawnNode, DrawnPill, Scene, SceneEdge, SceneInput, SceneNode } from './types.js';
+
+export type SceneContext = { measure: TextMeasure; labelSize: LayoutOptions['labelSize'] };
+
+export const PILL = { width: 40, height: 22 } as const;
+
+/** What the edge's pill says: its label, then the passes that took a loop ("Needs rework ↺ 2"; the count is absent at 0, WG-8). */
+export function edgeLabelText(edge: SceneEdge): string | null {
+  if (edge.label === null) return null;
+  return edge.loop && edge.taken > 0 ? `${edge.label} ↺ ${edge.taken}` : edge.label;
+}
+
+function blockOf(node: SceneNode, phone: boolean, measure: TextMeasure): TicketBlock {
+  return node.shape === 'decision' ? decisionBlock(node.title, measure) : ticketBlock(node.title, phone, measure);
+}
+
+/** The layout's input: measured sizes (never a constant, WG-9) and ONLY the `leads_to` edges. Note stacks are reserved from T9 on. */
+export function layoutInputOf(input: SceneInput, ctx: SceneContext): LayoutInput {
+  const nodes: LayoutNode[] = input.nodes.map((node) => {
+    const block = blockOf(node, input.phone, ctx.measure);
+    return { id: node.id, shape: node.shape, width: block.width, height: block.height };
+  });
+  const edges: LayoutEdge[] = input.edges
+    .filter((e) => e.kind === 'leads_to')
+    .map((e) => ({ id: e.id, source: e.source, target: e.target, label: edgeLabelText(e), loop: e.loop }));
+  return { nodes, edges, orientation: input.orientation };
+}
+
+function pillRects(rect: Rect): { start: Rect; end: Rect } {
+  return {
+    start: { x: rect.x - 6, y: rect.y - PILL.height / 2, ...PILL },
+    end: { x: rect.x + rect.width - PILL.width + 6, y: rect.y - PILL.height / 2, ...PILL },
+  };
+}
+
+export function buildScene(input: SceneInput, layout: FlowLayout, ctx: SceneContext): Scene {
+  const placed = new Map(layout.nodes.map((n) => [n.id, n]));
+  const nodes: DrawnNode[] = [];
+  const pills: DrawnPill[] = [];
+
+  for (const node of input.nodes) {
+    const box = placed.get(node.id);
+    if (box === undefined) continue;
+    const block = blockOf(node, input.phone, ctx.measure);
+    const rect: Rect = { x: box.x, y: box.y, width: block.width, height: block.height };
+    nodes.push({ node, rect, lines: block.lines, box });
+    const { start, end } = pillRects(rect);
+    if (node.start) pills.push({ kind: 'start', nodeId: node.id, rect: start });
+    if (node.end) pills.push({ kind: 'end', nodeId: node.id, rect: end });
+  }
+
+  const shapes = new Map(nodes.map((n) => [n.node.id, n.rect]));
+  const taken = new Set(input.nodes.filter((n) => n.notTaken !== null).map((n) => n.id));
+  const routed = new Map(layout.edges.map((e) => [e.id, e]));
+  const edges: DrawnEdge[] = [];
+  for (const edge of input.edges) {
+    const muted = taken.has(edge.source) || taken.has(edge.target);
+    const text = edgeLabelText(edge);
+    if (edge.kind === 'leads_to') {
+      const route = routed.get(edge.id);
+      if (route === undefined || route.points.length < 2) continue;
+      edges.push({ edge, points: route.points, path: roundedPath(route.points), muted, label: text === null || route.label === null ? null : { text, rect: route.label } });
+    } else {
+      const a = shapes.get(edge.source);
+      const b = shapes.get(edge.target);
+      if (a === undefined || b === undefined) continue;
+      const points = routeBetween(a, b);
+      const mid = points[Math.floor(points.length / 2)] ?? points[0]!;
+      const size = ctx.labelSize('blocks');
+      edges.push({ edge, points, path: roundedPath(points), muted, label: { text: 'blocks', rect: { x: mid.x - size.width / 2, y: mid.y - size.height / 2, ...size } } });
+    }
+  }
+
+  const all: Rect[] = [...nodes.map((n) => n.box), ...pills.map((p) => p.rect)];
+  const width = Math.max(layout.width, ...all.map((r) => r.x + r.width + GAP.padding), ...edges.flatMap((e) => e.points.map((p) => p.x + GAP.padding)));
+  const height = Math.max(layout.height, ...all.map((r) => r.y + r.height + GAP.padding), ...edges.flatMap((e) => e.points.map((p) => p.y + GAP.padding)));
+  return { width, height, orientation: input.orientation, nodes, pills, edges, notes: [], connectors: [] };
+}
+  ```
+
+  `src/index.ts`, append:
+  ```ts
+  export type * from './scene/types.js';
+  export { buildScene, layoutInputOf, edgeLabelText, PILL, type SceneContext } from './scene/build-scene.js';
+  export { roundedPath } from './scene/geometry.js';
+  ```
+
+  Run the Step 2 flow-graph command, then the WHOLE package suite, `typecheck` and `build`. Expected: PASS (4 scene tests), typecheck clean. Commit.
+
+- [ ] **Step 4: GREEN, the colours**
+
+  1. **Primitives**, in `primitives` (`tokens.ts`, beside the neutral family; a one-line docblock each citing spec Part 3 §10 and this plan's T4):
+
+     | Primitive | Value | Primitive | Value |
+     |---|---|---|---|
+     | `flowEdgeLight` | `'#4a5371'` | `flowEdgeDark` | `'#b4bcd8'` |
+     | `flowEdgeMutedLight` | `'#6c6c70'` | `flowEdgeMutedDark` | `'#98989d'` |
+     | `flowNoteLineLight` | `'#7a7468'` | `flowNoteLineDark` | `'#9a96a8'` |
+     | `flowNoteFillLight` | `'#fffdfa'` | `flowNoteFillDark` | `'#2b3764'` |
+     | `flowNotTakenFillLight` | `'#ebe3da'` | `flowNotTakenFillDark` | `'#2a2f45'` |
+     | `flowNotTakenLineLight` | `'#7c7167'` | `flowNotTakenLineDark` | `'#8c93ad'` |
+     | `flowCanvasLight` | `'#f3ece5'` | `flowCanvasDark` | `'#181f38'` |
+
+     (`flowEdgeMutedLight` equals the existing `grayAccessible` and `flowEdgeMutedDark` equals `grayAccessibleDark`; map to those two primitives instead of adding duplicates.) Measured while planning, light/dark, worst of the surfaces `surface`, `surfaceRaised`, `surfaceSunken` and neo's: `flowEdge` 5.4 / 6.3, `flowEdgeMuted` 3.7 / 4.1, `flowNoteLine` 3.3 / 4.1, `flowNotTakenLine` 3.4 / 3.9, note line on its fill 4.6 / 4.0, Not-taken line on its fill 3.7 / 4.3, `text` on the note fill 17.0 / 10.5 and on the Not-taken fill 13.6 / 12.1. `flowNotTakenLine` light started at `#8a7f74`, which measured 2.79 on `surfaceSunken` and 3.08 on its own fill, so it was darkened to `#7c7167`.
+  2. **Roles**: add the seven to `TOKEN_ROLES`, after the last graph role (after `level4`, or after KG C's `graphCardLine` when it has landed). Docblock: where each is drawn (lines on `flowCanvas` in the Graph tab, `surfaceRaised` in a sheet; the two fills behind note blocks and Not-taken tickets), and that **a Not-taken ticket is faded by a pale fill and a dashed border, never by reduced opacity** (WG-10: opacity would lower the text below its pair).
+  3. **Mappings**, `themes.light` and `themes.dark`: each role to its `…Light` / `…Dark` primitive (`flowEdgeMuted` to `grayAccessible` / `grayAccessibleDark`). `neo` has no override: `colorOf` falls back to these.
+  4. **Pairs**, in `CONTRAST_PAIRS` under one comment naming 29.250: the four line roles on `flowCanvas` and on `surfaceRaised` at `3`; `flowNoteLine` on `flowNoteFill` and `flowNotTakenLine` on `flowNotTakenFill` at `3`; `text` and `textMuted` on `flowNoteFill` and on `flowNotTakenFill` at `4.5`.
+
+  Run: the Step 2 ui command, then the `ui` suite WHOLE: `pnpm --filter @gisik-nokma/ui exec vitest run --maxWorkers=2 > /tmp/wtg3-t4ui.log 2>&1; tail -n 12 /tmp/wtg3-t4ui.log`. Expected PASS. If a pair fails in some style, step that one primitive by 0x080808 toward more contrast, record both numbers in its docblock and in DONE; never lower a minimum.
+  Print the measured ratios once (`pnpm --filter @gisik-nokma/ui build`, then a `node -e` over `colorOf` and `contrastRatio` from `dist`) into the primitives' docblocks and the handoff.
+
+- [ ] **Step 5: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.246 | remove `.filter((e) => e.kind === 'leads_to')` in `layoutInputOf` | the `blocks` control |
+  | 29.246 | `decisionBlock` minimum height 108 → 100 (in `measure.ts`) | the Decision size assertion |
+  | 29.247 | `if (node.start)` → `if (true)` | the pill count |
+  | 29.248 | `taken.has(edge.source) \|\| taken.has(edge.target)` → `taken.has(edge.source)` | the incoming-edge assertion |
+  | 29.249 | drop the last point in `roundedPath` | the end-point assertion |
+  | 29.250 | `flowNotTakenLineLight: '#7c7167'` → `'#a8a49a'` | the line pair loop, naming `flowNotTakenLine` |
+  | 29.250 | add `{ fg: 'flowCanvas', bg: 'surface', minimum: 3 }` | the "not declared" assertion |
+
+  Revert each.
+
+- [ ] **Step 6: Sweeps, catalogue, Features**
+
+  1. Flip 29.246 to 29.250 to ✅.
+  2. `Features.md`, under `<!-- wtg-part3-workflow-graph T4 bullet -->`: `- ⚙️ **Flow scene and colours** — \`buildScene\` turns a \`SceneInput\` and a layout into drawn boxes, pills, rounded routes and dashed \`blocks\` links (a Not-taken ticket mutes its edges); seven \`--gn-flow-*\` colour roles with measured contrast, a Not-taken ticket told by pale fill and dashed border, never by opacity. \`packages/flow-graph/src/scene/\`, \`packages/ui/src/tokens.ts\``
+  3. A new role can change a stylesheet a snapshot reads: `grep -rn "themeStylesheet" apps/web/test packages/app-core/test` and run those files; then `pnpm turbo run build --filter=@gisik-nokma/web...` and the web and app-core suites WHOLE.
+  4. `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`.
+
+  Commit `wtg3 T4: the scene and the seven flow colours`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-scene.md` written.
+
+
+---
+
+### Task 5: The stage: `FlowStage`, geometry picks, the "+" link drag, fit and centre, the stage CSS, the pan bars (cases 29.251–29.254)
+
+**Branch** `task/wtg3-stage` (after T4). **NEEDS: browser** (the pan bars). **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-canvas/project/Main.dc.html` and `wtg-preview/*.png` (node cards, diamonds, pills, labels, selection ring); measure real geometry in a browser (the harness page; a lane port once the stage is in the web app). **Files:**
+- Create:
+  - `packages/flow-graph/src/render/{fit,pick,stage}.ts`
+  - `packages/flow-graph/test/render/stage.test.ts`
+  - `packages/flow-graph-browser/harness/flow-pan.html`, `harness/flow-pan.ts`, `tests/flow-pan.spec.ts`
+- Modify:
+  - `packages/flow-graph/src/index.ts` (render exports)
+  - `packages/ui/src/ui.css` (one `/* WTG3 T5 */` block: `.gn-flow*` rules)
+  - `Features.md` §26 (T5 anchor), `test-cases/29-workflow-timeline-graphs.md` (T5 anchor)
+
+**Interfaces:**
+- **Consumes** (T4): `Scene`, `DrawnNode`, `DrawnEdge`, `DrawnNote`, `DrawnPill`, `buildScene`, `layoutInputOf`; (Part 1) `CameraAdapter` from `@gisik-nokma/viewport`.
+- **Produces:**
+  - `class FlowStage` (constructor `(host: HTMLElement, options?: StageOptions)`; `viewport`, `layer`; `setLabel(text)`, `on(events)`, `attachCamera(camera)`, `setScene(scene, mode: 'first' | 'glide')`, `setSelected(id | null)`, `highlight(ids)`, `fit(instant?)`, `focusNode(id, instant?)`, `zoomBy(factor)`, `destroy()`, getter `current`);
+  - `interface FlowCamera { toWorld(px): Point; getCamera(): Camera; camera(target: Partial<Camera>, options?): void }` (`CameraAdapter` satisfies it structurally);
+  - `type StageEvents = { onPick; onOpen; onAdd; onHover; onLink? }`;
+  - `fitCamera`, `centreCamera`, `isVisible`, `ZOOM`, `pickAt`, `nodeAt`, `handleRect`, `type Pick`, `GLIDE_MS = 240`.
+  T7's canvas mounts one stage per panel; T8 wires `onPick`; T9 wires `onAdd` and `onLink`; T10 passes note picks.
+
+Siblings copied: none for the stage (new). The camera contract is Part 1's `CameraAdapter`; the pan harness copies T1's `elk-bars` page (same package, same Vite root).
+
+**The design this task pins (D-W3-3).**
+- **DOM nodes, SVG edges, ONE transformed layer.** Part 1's `CameraAdapter` moves `stage.layer` with a CSS transform; nothing is re-laid out while panning, so a pan costs the compositor and nothing else.
+- **Taps are geometry.** The camera captures the pointer while it pans, so no `click` ever reaches a node element. `FlowStage` records `pointerdown` and `pointerup`, and a still, short press (under 6 px, under 600 ms) is resolved with `pickAt(scene, camera.toWorld(point), handleFor)`: the "+" handle beats a note beats a node.
+- **No listener, no handle.** The "+" handle is drawn, and is a tap target, only while the host has set `onAdd`: a control that does nothing when pressed is not drawn (a host whose create form is not built yet shows none).
+- **The link drag.** On a phone `onLink` is unset and the handle only taps. Where it is set, a press on the handle calls `stopImmediatePropagation()` (the stage registered its listeners on the viewport BEFORE the camera did, so the camera never sees that `pointerdown`), draws a rubber path and, on release over another node (`nodeAt`), calls `onLink(from, to)`; a release on empty space, `Escape` or `pointercancel` links nothing.
+- **Elements are keyed by id and reused.** A live event touches only what changed; `setScene(scene, 'glide')` makes moved nodes slide for 240 ms and new things fade in; reduced motion draws at once and adds no flash.
+- **Status is never colour alone** (WG-10): every node carries its state NAME beside its dot, a draft says `Draft` in place of a key, a Not-taken ticket says `Not taken`.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-stage`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/flow-graph --filter=@gisik-nokma/viewport`.
+  2. **Re-read Part 1's camera as landed:** `grep -n "export class CameraAdapter" -B3 -A40 packages/viewport/src/dom/camera-adapter.ts` and `sed -n 1,60p packages/flow-graph-browser/playwright.config.ts`. Write into the handoff: the constructor's option names (the harness below passes `el` and `layer`; change those two names to the landed ones), whether the adapter binds its listeners at construction (the stage MUST be constructed first, so its listeners run first), and the Playwright projects and ports.
+  3. Run the existing suites once for a baseline: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 > /tmp/wtg3-t5-pre.log 2>&1; tail -n 12 /tmp/wtg3-t5-pre.log`.
+
+- [ ] **Step 1: The four case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T5 -->`:
+  - `- ❌ **29.251 — The stage draws a scene:** one box per node with the state word, the key and the wrapped title; one path per flow edge with an arrowhead and a dashed one for \`blocks\`; the Start and End pills; the edge labels; the viewport is a labelled image; a Decision is a diamond with its question, its outcome and (from two passes) \`Pass n\` as two chips, never one string with a middle dot; control: a draft shows \`Draft\` in place of a key. Mutation: drop the status word → reds.`
+  - `- ❌ **29.252 — A second scene reuses what it has:** elements are keyed by id and reused, what is gone is removed and what is new is added; the layer's glide class clears after 240 ms and is never set on the first scene or under reduced motion; selection sets \`aria-current\` on that node only; a flash is added and then removed and is absent under reduced motion; control: a ticket removed from the input leaves no element behind. Mutation: key elements by index → reds.`
+  - `- ❌ **29.253 — Taps are geometry:** a short still tap on a node picks it, a second within 350 ms opens it, the "+" handle adds, Enter opens and N adds the selected node, and the handle beats a note beats a node; a drag from the handle onto another node links them and the camera never sees that \`pointerdown\`; control: a drag of 20 px and a slow press pick nothing, with no \`onAdd\` there is no handle and its spot picks nothing, a drop on empty space links nothing, a drag from a plain node is the camera's, Ctrl+N is left alone. Mutation: remove \`stopImmediatePropagation\` → reds.`
+  - `- ❌ **29.254 — Fit, centre and pan:** fit shows the whole flow centred and never magnifies past 1:1 or shrinks below the floor, centring puts the rect's middle at the viewport's middle, with no camera \`fit()\` and \`focusNode()\` do nothing; and in the browser a pan of a 300-node flow on the desktop sustains at least 59 fps with no frame over 17.5 ms (the 60 fps / 16.7 ms bar, read with one display tick of timer slack) and a 100-node flow under 4x CPU throttling at least 30 fps with no frame over 50 ms (🟡 until the real phone is read). Control: a 13-node flow on the same page is no slower. Mutation: re-render the scene on every camera move → reds.`
+
+- [ ] **Step 2: RED, the stage tests**
+
+  `packages/flow-graph/test/render/stage.test.ts` (jsdom). It uses the mockup scene through the real layout and scene builders; `fakeCamera` is the identity camera; jsdom has no `PointerEvent`, so events are `MouseEvent`s carrying `clientX`, `clientY` and a stamped `timeStamp`, which is all the stage reads:
+  ```ts
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { layoutFlow } from '../../src/layout/layout.js';
+import { fitCamera, centreCamera, ZOOM } from '../../src/render/fit.js';
+import { handleRect, pickAt } from '../../src/render/pick.js';
+import { FlowStage, type FlowCamera } from '../../src/render/stage.js';
+import { buildScene, layoutInputOf } from '../../src/scene/build-scene.js';
+import type { Scene } from '../../src/scene/types.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { mockupScene } from '../scene/fixture.js';
+
+const ctx = { measure: (text: string) => text.length * 6, labelSize };
+async function sceneOf(overrides: Parameters<typeof mockupScene>[1] = {}): Promise<Scene> {
+  const input = mockupScene('landscape', overrides);
+  return buildScene(input, await layoutFlow(inProcessEngine(), layoutInputOf(input, ctx), ctx), ctx);
+}
+
+/** A camera at the identity: screen px = world px. */
+function fakeCamera(): FlowCamera & { calls: unknown[] } {
+  const calls: unknown[] = [];
+  return { calls, toWorld: (p) => p, getCamera: () => ({ x: 0, y: 0, zoom: 1 }), camera: (t, o) => void calls.push([t, o]) };
+}
+
+const hosts: HTMLElement[] = [];
+afterEach(() => {
+  for (const h of hosts.splice(0)) h.remove();
+});
+function mount(options: ConstructorParameters<typeof FlowStage>[1] = { reducedMotion: () => false, schedule: () => undefined }) {
+  const host = document.createElement('div');
+  document.body.append(host);
+  hosts.push(host);
+  return { host, stage: new FlowStage(host, options) };
+}
+/** jsdom has no PointerEvent; the stage reads only clientX, clientY, buttons and timeStamp, which a MouseEvent carries. */
+const stamp = (type: string, x: number, y: number, t: number) =>
+  Object.defineProperty(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }), 'timeStamp', { value: t });
+
+describe('the stage draws a scene', () => {
+  it('29.251 one box per node with the status word, key and wrapped title; one path per flow edge; pills; labels; the viewport is a labelled image; control: a draft shows "Draft" in place of a key', async () => {
+    const scene = await sceneOf({ '142': { draft: true, key: null } });
+    const { stage, host } = mount();
+    stage.setLabel('Flow of 13 tickets');
+    stage.setScene(scene);
+    expect(host.querySelector('.gn-flow')!.getAttribute('role')).toBe('img');
+    expect(host.querySelector('.gn-flow')!.getAttribute('aria-label')).toBe('Flow of 13 tickets');
+    expect(host.querySelectorAll('.gn-flow-node')).toHaveLength(13);
+    const card = host.querySelector('[data-node-id="141"]')!;
+    expect(card.querySelector('.gn-flow-node__status')!.textContent).toBe('Done');
+    expect(card.querySelector('.gn-flow-node__key')!.textContent).toBe('GN-141');
+    expect(card.querySelector('.gn-flow-node__title')!.textContent).toBe('Draft the pitch');
+    expect(host.querySelector('[data-node-id="142"] .gn-flow-node__key')!.textContent).toBe('Draft');
+    expect(host.querySelector('[data-node-id="142"]')!.getAttribute('data-draft')).toBe('true');
+    expect(host.querySelectorAll('path.gn-flow-edge--flow')).toHaveLength(17);
+    expect(host.querySelectorAll('path.gn-flow-edge--blocks')).toHaveLength(1);
+    expect(host.querySelectorAll('path.gn-flow-edge--loop')).toHaveLength(3);
+    expect([...host.querySelectorAll('.gn-flow-pill--start, .gn-flow-pill--end')].map((p) => p.textContent).sort()).toEqual(['End', 'Start']);
+    expect(host.querySelector('.gn-flow-edge-label[data-edge-id="144>147"]')!.textContent).toBe('Yes');
+    expect(host.querySelector('[data-node-id="144"] svg.gn-flow-node__diamond polygon')).not.toBeNull();
+    expect(host.querySelector('[data-node-id="141"] svg')).toBeNull();
+  });
+
+  it('29.251 a Decision shows its outcome and, from two passes, "Pass n", as two chips and never one string with a middle dot; control: a ticket and a pending Decision show none', async () => {
+    const scene = await sceneOf({ '144': { outcome: 'Yes', passCount: 2 }, '151': { outcome: 'No', passCount: 1 } });
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    const chips = (id: string) => [...host.querySelectorAll(`[data-node-id="${id}"] .gn-flow-node__outcome`)].map((c) => c.textContent);
+    expect(chips('144')).toEqual(['Yes', 'Pass 2']);
+    expect(chips('151')).toEqual(['No']);
+    expect(chips('141')).toEqual([]);
+    expect(host.textContent).not.toContain(' · ');
+    const pending = await sceneOf({ '144': { outcome: null, passCount: 1 } });
+    stage.setScene(pending);
+    expect(chips('144')).toEqual([]);
+    expect(host.querySelector('[data-node-id="144"] .gn-flow-node__chips')).toBeNull();
+  });
+
+  it('29.252 a second scene REUSES the elements it still has, removes what is gone and adds what is new; control: a ticket removed from the input leaves no element behind', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    const kept = host.querySelector('[data-node-id="140"]');
+    const smaller: Scene = { ...scene, nodes: scene.nodes.filter((n) => n.node.id !== '147'), edges: scene.edges.filter((e) => !e.edge.id.includes('147')) };
+    stage.setScene(smaller, 'glide');
+    expect(host.querySelector('[data-node-id="140"]')).toBe(kept);
+    expect(host.querySelector('[data-node-id="147"]')).toBeNull();
+    expect(host.querySelector('[data-edge-id="144>147"]')).toBeNull();
+    expect(host.querySelector('.gn-flow-edge-label[data-edge-id="144>147"]')).toBeNull();
+    expect(host.querySelectorAll('.gn-flow-node')).toHaveLength(12);
+    stage.setScene(scene, 'glide');
+    expect(host.querySelectorAll('.gn-flow-node')).toHaveLength(13);
+    expect(host.querySelector('[data-node-id="147"]')!.classList.contains('gn-flow__enter')).toBe(true);
+    expect(host.querySelector('[data-node-id="140"]')!.classList.contains('gn-flow__enter')).toBe(false);
+  });
+
+  it('29.252 glide is a class on the layer that clears after 240 ms; reduced motion never sets it; control: the first scene never glides', async () => {
+    const scene = await sceneOf();
+    const timers: Array<[() => void, number]> = [];
+    const { stage, host } = mount({ reducedMotion: () => false, schedule: (cb, ms) => void timers.push([cb, ms]) });
+    stage.setScene(scene, 'first');
+    expect(host.querySelector('.gn-flow__layer--glide')).toBeNull();
+    stage.setScene(scene, 'glide');
+    expect(host.querySelector('.gn-flow__layer--glide')).not.toBeNull();
+    expect(timers.at(-1)![1]).toBeGreaterThanOrEqual(240);
+    timers.at(-1)![0]();
+    expect(host.querySelector('.gn-flow__layer--glide')).toBeNull();
+    const reduced = mount({ reducedMotion: () => true, schedule: () => undefined });
+    reduced.stage.setScene(scene, 'glide');
+    expect(reduced.host.querySelector('.gn-flow__layer--glide')).toBeNull();
+    expect(reduced.host.querySelector('.gn-flow__enter')).toBeNull();
+  });
+
+  it('29.252 selection sets aria-current on that node only; a flash is added and then removed; reduced motion adds none', async () => {
+    const scene = await sceneOf();
+    const timers: Array<() => void> = [];
+    const { stage, host } = mount({ reducedMotion: () => false, schedule: (cb) => void timers.push(cb) });
+    stage.setScene(scene);
+    stage.setSelected('144');
+    expect(host.querySelectorAll('[aria-current="true"]')).toHaveLength(1);
+    expect(host.querySelector('[data-node-id="144"]')!.getAttribute('aria-current')).toBe('true');
+    stage.setSelected('141');
+    expect(host.querySelector('[data-node-id="144"]')!.hasAttribute('aria-current')).toBe(false);
+    stage.highlight(['145']);
+    expect(host.querySelector('[data-node-id="145"]')!.classList.contains('gn-flow-node--flash')).toBe(true);
+    timers.forEach((t) => t());
+    expect(host.querySelector('[data-node-id="145"]')!.classList.contains('gn-flow-node--flash')).toBe(false);
+    const calm = mount({ reducedMotion: () => true, schedule: () => undefined });
+    calm.stage.setScene(scene);
+    calm.stage.highlight(['145']);
+    expect(calm.host.querySelector('.gn-flow-node--flash')).toBeNull();
+  });
+});
+
+describe('taps are geometry (the camera holds the pointer, so no click reaches a node)', () => {
+  it('29.253 a short still tap on a node picks it, a second within 350 ms opens it, the "+" handle adds; control: a drag of 20 px and a slow press pick nothing', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    stage.attachCamera(fakeCamera());
+    const picks: unknown[] = [];
+    const opened: string[] = [];
+    const added: string[] = [];
+    stage.on({ onPick: (p) => picks.push(p), onOpen: (id) => opened.push(id), onAdd: (id) => added.push(id) });
+    const vp = host.querySelector('.gn-flow')!;
+    vp.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON: () => ({}) });
+    const node = scene.nodes.find((n) => n.node.id === '141')!.rect;
+    const cx = node.x + 10;
+    const cy = node.y + 10;
+    const tap = (t: number) => {
+      vp.dispatchEvent(stamp('pointerdown', cx, cy, t));
+      vp.dispatchEvent(stamp('pointerup', cx, cy, t + 50));
+    };
+    tap(1000);
+    expect(picks.at(-1)).toEqual({ kind: 'node', id: '141' });
+    expect(opened).toEqual([]);
+    tap(1200);
+    expect(opened).toEqual(['141']);
+    // the handle follows the selected node
+    stage.setSelected('141');
+    const h = handleRect(node, 'landscape');
+    vp.dispatchEvent(stamp('pointerdown', h.x + 5, h.y + 5, 3000));
+    vp.dispatchEvent(stamp('pointerup', h.x + 5, h.y + 5, 3040));
+    expect(added).toEqual(['141']);
+    // control: a drag and a long press
+    const before = picks.length;
+    vp.dispatchEvent(stamp('pointerdown', cx, cy, 4000));
+    vp.dispatchEvent(stamp('pointerup', cx + 20, cy, 4050));
+    vp.dispatchEvent(stamp('pointerdown', cx, cy, 5000));
+    vp.dispatchEvent(stamp('pointerup', cx, cy, 5900));
+    expect(picks.length).toBe(before);
+  });
+
+  it('29.253 Enter opens and N adds the selected node; nothing happens with no selection; control: Ctrl+N is left alone', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    const opened: string[] = [];
+    const added: string[] = [];
+    stage.on({ onOpen: (id) => opened.push(id), onAdd: (id) => added.push(id) });
+    const vp = host.querySelector('.gn-flow')!;
+    vp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(opened).toEqual([]);
+    stage.setSelected('150');
+    vp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    vp.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true }));
+    vp.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true }));
+    expect(opened).toEqual(['150']);
+    expect(added).toEqual(['150']);
+  });
+
+  it('29.253 pickAt: the handle beats the node, a note beats nothing, outside is null; control: the handle exists only for the node it follows', async () => {
+    const scene = await sceneOf();
+    const node = scene.nodes.find((n) => n.node.id === '141')!.rect;
+    const h = handleRect(node, 'landscape');
+    const mid = { x: h.x + h.width / 2, y: h.y + h.height / 2 };
+    expect(pickAt(scene, mid, '141')).toEqual({ kind: 'add', id: '141' });
+    expect(pickAt(scene, mid, '140')).toBeNull();
+    expect(pickAt(scene, { x: node.x + 5, y: node.y + 5 }, null)).toEqual({ kind: 'node', id: '141' });
+    expect(pickAt(scene, { x: -50, y: -50 }, null)).toBeNull();
+    // a note is picked before the node under it would be, and carries its ticket and whether it is the "+N notes" block
+    const note = { id: 'n1', ticketId: '141', rect: { x: node.x + 24, y: node.y + node.height + 8, width: 140, height: 40 }, lines: ['Brief'], more: null };
+    const withNote = { ...scene, notes: [note, { ...note, id: 'more', rect: { ...note.rect, y: note.rect.y + 48 }, more: 2 }] };
+    expect(pickAt(withNote, { x: note.rect.x + 5, y: note.rect.y + 5 }, null)).toEqual({ kind: 'note', id: 'n1', ticketId: '141', more: null });
+    expect(pickAt(withNote, { x: note.rect.x + 5, y: note.rect.y + 53 }, null)).toEqual({ kind: 'note', id: 'more', ticketId: '141', more: 2 });
+  });
+
+  it('29.253 the "+" handle is drawn only while someone listens for it: with no onAdd the selected node has no handle and the spot is not a tap target; control: with onAdd it appears', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.attachCamera(fakeCamera());
+    stage.setScene(scene);
+    stage.setSelected('141');
+    expect(host.querySelector('.gn-flow__add')).toBeNull();
+    const node = scene.nodes.find((n) => n.node.id === '141')!.rect;
+    const h = handleRect(node, 'landscape');
+    const picks: unknown[] = [];
+    stage.on({ onPick: (p) => picks.push(p) });
+    host.querySelector('.gn-flow')!.dispatchEvent(stamp('pointerdown', h.x + 11, h.y + 11, 0));
+    host.querySelector('.gn-flow')!.dispatchEvent(stamp('pointerup', h.x + 11, h.y + 11, 50));
+    expect(picks).toEqual([null]);
+    const added: string[] = [];
+    stage.on({ onPick: (p) => picks.push(p), onAdd: (id) => added.push(id) });
+    expect(host.querySelector('.gn-flow__add')).not.toBeNull();
+    expect((host.querySelector('.gn-flow__add') as HTMLElement).hidden).toBe(false);
+    host.querySelector('.gn-flow')!.dispatchEvent(stamp('pointerdown', h.x + 11, h.y + 11, 100));
+    host.querySelector('.gn-flow')!.dispatchEvent(stamp('pointerup', h.x + 11, h.y + 11, 150));
+    expect(added).toEqual(['141']);
+  });
+
+  it('29.253 dragging from the "+" handle onto another node links them and the camera never sees that pointerdown; control: a drop on empty space links nothing, a drag from a plain node is the camera\'s, and with no onLink (the phone) the handle only taps', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    stage.attachCamera(fakeCamera());
+    const linked: Array<[string, string]> = [];
+    const added: string[] = [];
+    stage.on({ onLink: (a, b) => linked.push([a, b]), onAdd: (id) => added.push(id) });
+    const vp = host.querySelector('.gn-flow')!;
+    vp.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON: () => ({}) });
+    // a stand-in for the camera: a listener added AFTER the stage's, on the same element
+    let cameraSaw = 0;
+    vp.addEventListener('pointerdown', () => (cameraSaw += 1));
+    const from = scene.nodes.find((n) => n.node.id === '141')!.rect;
+    const to = scene.nodes.find((n) => n.node.id === '150')!.rect;
+    const h = handleRect(from, 'landscape');
+    const handle = { x: h.x + 5, y: h.y + 5 };
+    stage.setSelected('141');
+    vp.dispatchEvent(stamp('pointerdown', handle.x, handle.y, 1000));
+    expect(cameraSaw).toBe(0);
+    vp.dispatchEvent(stamp('pointermove', handle.x + 40, handle.y + 40, 1100));
+    expect(host.querySelector<SVGPathElement>('.gn-flow-rubber')!.style.display).toBe('');
+    vp.dispatchEvent(stamp('pointermove', to.x + 10, to.y + 10, 1200));
+    expect(host.querySelector('[data-node-id="150"]')!.getAttribute('data-link-target')).toBe('true');
+    vp.dispatchEvent(stamp('pointerup', to.x + 10, to.y + 10, 1300));
+    expect(linked).toEqual([['141', '150']]);
+    expect(added).toEqual([]);
+    expect(host.querySelector<SVGPathElement>('.gn-flow-rubber')!.style.display).toBe('none');
+    expect(host.querySelector('[data-link-target]')).toBeNull();
+    // control 1: dropped on empty space
+    vp.dispatchEvent(stamp('pointerdown', handle.x, handle.y, 2000));
+    vp.dispatchEvent(stamp('pointermove', 5, 5, 2100));
+    vp.dispatchEvent(stamp('pointerup', 5, 5, 2200));
+    expect(linked).toHaveLength(1);
+    // control 2: a press on a plain node is passed on to the camera
+    vp.dispatchEvent(stamp('pointerdown', to.x + 10, to.y + 10, 3000));
+    expect(cameraSaw).toBe(1);
+    vp.dispatchEvent(stamp('pointerup', to.x + 10, to.y + 10, 3050));
+    // control 3: a still press on the handle is a tap, not a link
+    stage.setSelected('141');
+    vp.dispatchEvent(stamp('pointerdown', handle.x, handle.y, 4000));
+    vp.dispatchEvent(stamp('pointerup', handle.x, handle.y, 4040));
+    expect(added).toEqual(['141']);
+    expect(linked).toHaveLength(1);
+    // control 4: Escape abandons a drag
+    vp.dispatchEvent(stamp('pointerdown', handle.x, handle.y, 5000));
+    vp.dispatchEvent(stamp('pointermove', to.x + 10, to.y + 10, 5100));
+    vp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    vp.dispatchEvent(stamp('pointerup', to.x + 10, to.y + 10, 5200));
+    expect(linked).toHaveLength(1);
+    // control 5: with no onLink the same press reaches the camera
+    stage.on({ onAdd: (id) => added.push(id) });
+    const before = cameraSaw;
+    vp.dispatchEvent(stamp('pointerdown', handle.x, handle.y, 6000));
+    expect(cameraSaw).toBe(before + 1);
+  });
+});
+
+describe('fit and centre', () => {
+  it('29.254 fit shows the whole flow centred and never magnifies past 1:1 or shrinks below the floor; control: centring puts the rect\'s middle at the viewport\'s middle', () => {
+    const vp = { width: 1000, height: 600 };
+    const small = fitCamera({ width: 200, height: 100 }, vp);
+    expect(small.zoom).toBe(1);
+    expect(small.x).toBe((200 - 1000) / 2);
+    const big = fitCamera({ width: 2000, height: 700 }, vp);
+    expect(big.zoom).toBeCloseTo((1000 - 48) / 2000);
+    expect(fitCamera({ width: 90000, height: 90000 }, vp).zoom).toBe(ZOOM.min);
+    const c = centreCamera({ x: 100, y: 100, width: 140, height: 64 }, vp, 1);
+    expect(c.x + 500).toBe(170);
+    expect(c.y + 300).toBe(132);
+    expect(centreCamera({ x: 0, y: 0, width: 1, height: 1 }, vp, 99).zoom).toBe(ZOOM.max);
+  });
+
+  it('29.254 fit() and focusNode() ask the camera; with no camera they do nothing', async () => {
+    const scene = await sceneOf();
+    const { stage, host } = mount();
+    stage.setScene(scene);
+    stage.fit();
+    const cam = fakeCamera();
+    stage.attachCamera(cam);
+    const vp = host.querySelector('.gn-flow') as HTMLElement;
+    Object.defineProperty(vp, 'clientWidth', { value: 1000 });
+    Object.defineProperty(vp, 'clientHeight', { value: 600 });
+    stage.fit(true);
+    expect(cam.calls).toHaveLength(1);
+    stage.focusNode('144');
+    expect(cam.calls).toHaveLength(2);
+    stage.focusNode('nope');
+    expect(cam.calls).toHaveLength(2);
+    vi.useRealTimers();
+  });
+});
+  ```
+
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 test/render > /tmp/wtg3-t5.log 2>&1; tail -n 25 /tmp/wtg3-t5.log`. Expected: FAIL (`src/render/*` do not exist). Commit.
+
+- [ ] **Step 3: GREEN, camera maths, picking, the stage**
+
+  `src/render/fit.ts`: fit a scene into a viewport (never magnify past 1:1, never below `ZOOM.min`) and centre a rect:
+  ```ts
+import type { Point, Rect } from '../types.js';
+
+export type Camera = { x: number; y: number; zoom: number };
+export const ZOOM = { min: 0.2, max: 2.5 } as const;
+
+/**
+ * The camera that shows `bounds` whole inside a viewport, centred, never larger than 1:1 (a three-node flow is not blown up) and
+ * never below the minimum zoom (a 300-node flow is legible when zoomed, not a speck). `padding` is in screen px.
+ */
+export function fitCamera(bounds: { width: number; height: number }, viewport: { width: number; height: number }, padding = 24): Camera {
+  const availableW = Math.max(1, viewport.width - 2 * padding);
+  const availableH = Math.max(1, viewport.height - 2 * padding);
+  const zoom = Math.min(ZOOM.max, 1, Math.max(ZOOM.min, Math.min(availableW / Math.max(1, bounds.width), availableH / Math.max(1, bounds.height))));
+  return { zoom, x: (bounds.width - viewport.width / zoom) / 2, y: (bounds.height - viewport.height / zoom) / 2 };
+}
+
+/** The camera that centres `rect` at `zoom` (a node the person selected from the list, or a Back that returns to it). */
+export function centreCamera(rect: Rect, viewport: { width: number; height: number }, zoom: number): Camera {
+  const z = Math.min(ZOOM.max, Math.max(ZOOM.min, zoom));
+  return { zoom: z, x: rect.x + rect.width / 2 - viewport.width / z / 2, y: rect.y + rect.height / 2 - viewport.height / z / 2 };
+}
+
+/** True when `rect` is entirely inside the camera's view. */
+export function isVisible(rect: Rect, camera: Camera, viewport: { width: number; height: number }): boolean {
+  const right = camera.x + viewport.width / camera.zoom;
+  const bottom = camera.y + viewport.height / camera.zoom;
+  return rect.x >= camera.x && rect.y >= camera.y && rect.x + rect.width <= right && rect.y + rect.height <= bottom;
+}
+
+export const centreOf = (r: Rect): Point => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+  ```
+
+  `src/render/pick.ts`:
+  ```ts
+import type { Orientation, Point, Rect } from '../types.js';
+import type { Scene } from '../scene/types.js';
+
+export type Pick =
+  | { kind: 'node'; id: string }
+  | { kind: 'note'; id: string; ticketId: string; more: number | null }
+  | { kind: 'add'; id: string };
+
+const HANDLE = 22;
+const inside = (p: Point, r: Rect, slack = 0): boolean => p.x >= r.x - slack && p.x <= r.x + r.width + slack && p.y >= r.y - slack && p.y <= r.y + r.height + slack;
+
+/** The "+" handle that follows a node (WG-4): after it on the flow's axis, 6 px off the shape. */
+export function handleRect(shape: Rect, orientation: Orientation): Rect {
+  return orientation === 'landscape'
+    ? { x: shape.x + shape.width + 6, y: shape.y + shape.height / 2 - HANDLE / 2, width: HANDLE, height: HANDLE }
+    : { x: shape.x + shape.width / 2 - HANDLE / 2, y: shape.y + shape.height + 6, width: HANDLE, height: HANDLE };
+}
+
+/**
+ * What is under a WORLD point. The camera holds the pointer captured while it pans, so a `click` never reaches a node element;
+ * picking is geometry on the scene instead, which is also what makes it testable without a browser. The handle wins over the
+ * node it follows, a note over nothing under it, a node last.
+ */
+export function pickAt(scene: Scene, world: Point, handleFor: string | null): Pick | null {
+  if (handleFor !== null) {
+    const drawn = scene.nodes.find((n) => n.node.id === handleFor);
+    if (drawn !== undefined && inside(world, handleRect(drawn.rect, scene.orientation))) return { kind: 'add', id: handleFor };
+  }
+  for (const note of scene.notes) if (inside(world, note.rect)) return { kind: 'note', id: note.id, ticketId: note.ticketId, more: note.more };
+  for (const drawn of scene.nodes) if (inside(world, drawn.rect)) return { kind: 'node', id: drawn.node.id };
+  return null;
+}
+
+/** The node whose drawn shape is under a WORLD point, other than `except`: where a link dragged from the "+" handle would land. */
+export function nodeAt(scene: Scene, world: Point, except: string | null): string | null {
+  for (const drawn of scene.nodes) if (drawn.node.id !== except && inside(world, drawn.rect)) return drawn.node.id;
+  return null;
+}
+  ```
+
+  `src/render/stage.ts`:
+  ```ts
+import type { DrawnEdge, DrawnNode, DrawnNote, DrawnPill, Scene } from '../scene/types.js';
+import type { Point } from '../types.js';
+import { centreCamera, centreOf, fitCamera, type Camera, ZOOM } from './fit.js';
+import { handleRect, nodeAt, pickAt, type Pick } from './pick.js';
+
+const SVG = 'http://www.w3.org/2000/svg';
+/** A node that moves glides this long (spec §9.3); a new node or edge fades in over the same time. */
+export const GLIDE_MS = 240;
+const FLASH_MS = 1200;
+const TAP_PX = 6;
+const TAP_MS = 600;
+const DOUBLE_MS = 350;
+
+/** What the stage needs of a camera. `CameraAdapter` (`@gisik-nokma/viewport`) satisfies it; a test passes a fake. */
+export interface FlowCamera {
+  toWorld(px: Point): Point;
+  getCamera(): Camera;
+  camera(target: Partial<Camera>, options?: { instant?: boolean; maxMs?: number }): void;
+}
+
+export type StageEvents = {
+  onPick?: (pick: Pick | null) => void;
+  onOpen?: (id: string) => void;
+  onAdd?: (id: string) => void;
+  onHover?: (pick: Pick | null) => void;
+  /** A link dragged from a node's "+" handle onto another node (WG-4). Leave it unset where dragging is off (the phone): the handle then only taps. */
+  onLink?: (fromId: string, toId: string) => void;
+};
+
+export type StageOptions = {
+  reducedMotion?: () => boolean;
+  /** Replaced in tests so a flash can be waited out without a clock. */
+  schedule?: (callback: () => void, ms: number) => void;
+};
+
+let stageCount = 0;
+
+function el<K extends keyof HTMLElementTagNameMap>(doc: Document, tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+  const node = doc.createElement(tag);
+  node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function place(node: HTMLElement, rect: { x: number; y: number; width: number; height: number }): void {
+  node.style.transform = `translate(${rect.x}px, ${rect.y}px)`;
+  node.style.width = `${rect.width}px`;
+  node.style.height = `${rect.height}px`;
+}
+
+/**
+ * The Workflow graph's renderer (spec §9.2, option B): SVG paths for the edges and the dotted note lines, DOM boxes for nodes,
+ * notes, pills and edge labels, all inside ONE transformed layer that the shared camera moves. Colours are CSS classes over
+ * token variables (`ui.css`), so a theme change repaints without this class being told; `refreshTheme` is therefore not needed.
+ *
+ * The camera captures the pointer while it pans, so no `click` ever reaches a node: taps are recognised here from the
+ * down/up pair and resolved by geometry (`pickAt`).
+ */
+export class FlowStage {
+  readonly viewport: HTMLElement;
+  readonly layer: HTMLElement;
+  private readonly doc: Document;
+  private readonly svg: SVGSVGElement;
+  private readonly overlay: HTMLElement;
+  private readonly markerId: string;
+  private scene: Scene | null = null;
+  private selected: string | null = null;
+  private hovered: string | null = null;
+  private camera: FlowCamera | null = null;
+  private events: StageEvents = {};
+  private down: { x: number; y: number; t: number } | null = null;
+  private lastTap: { id: string; t: number } | null = null;
+  private linking: { from: string; moved: boolean } | null = null;
+  private readonly rubber: SVGPathElement;
+  private readonly nodes = new Map<string, HTMLElement>();
+  private readonly notes = new Map<string, HTMLElement>();
+  private readonly pills = new Map<string, HTMLElement>();
+  private readonly labels = new Map<string, HTMLElement>();
+  private readonly paths = new Map<string, SVGPathElement>();
+  private readonly lines = new Map<string, SVGPolylineElement>();
+  private handle: HTMLElement;
+  private readonly removers: Array<() => void> = [];
+  private readonly reduced: () => boolean;
+  private readonly schedule: (callback: () => void, ms: number) => void;
+
+  constructor(host: HTMLElement, options: StageOptions = {}) {
+    this.doc = host.ownerDocument;
+    this.reduced = options.reducedMotion ?? ((): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    this.schedule = options.schedule ?? ((callback, ms): void => void setTimeout(callback, ms));
+    stageCount += 1;
+    this.markerId = `gn-flow-arrow-${stageCount}`;
+    this.viewport = el(this.doc, 'div', 'gn-flow');
+    this.viewport.tabIndex = 0;
+    this.viewport.setAttribute('role', 'img');
+    this.layer = el(this.doc, 'div', 'gn-flow__layer');
+    this.svg = this.doc.createElementNS(SVG, 'svg');
+    this.svg.setAttribute('class', 'gn-flow__edges');
+    this.svg.setAttribute('aria-hidden', 'true');
+    this.svg.innerHTML = [
+      '<defs>',
+      `<marker id="${this.markerId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="gn-flow__arrow" d="M0 0 L10 5 L0 10 z"/></marker>`,
+      '</defs>',
+    ].join('');
+    this.rubber = this.doc.createElementNS(SVG, 'path');
+    this.rubber.setAttribute('class', 'gn-flow-rubber');
+    this.rubber.style.display = 'none';
+    this.svg.append(this.rubber);
+    this.overlay = el(this.doc, 'div', 'gn-flow__nodes');
+    this.handle = el(this.doc, 'div', 'gn-flow__add', '+');
+    this.handle.hidden = true;
+    this.layer.append(this.svg, this.overlay);
+    this.viewport.append(this.layer);
+    host.append(this.viewport);
+    this.listen('pointerdown', (e) => this.onDown(e as PointerEvent));
+    this.listen('pointerup', (e) => this.onUp(e as PointerEvent));
+    this.listen('pointermove', (e) => this.onMove(e as PointerEvent));
+    this.listen('pointercancel', () => this.endLink());
+    this.listen('keydown', (e) => this.onKey(e as KeyboardEvent));
+  }
+
+  setLabel(text: string): void {
+    this.viewport.setAttribute('aria-label', text);
+  }
+  on(events: StageEvents): void {
+    this.events = events;
+    this.moveHandle();
+  }
+  attachCamera(camera: FlowCamera | null): void {
+    this.camera = camera;
+  }
+  get current(): Scene | null {
+    return this.scene;
+  }
+
+  /**
+   * Draws a scene. Elements are keyed by id and reused, so a live event touches only what changed. `glide` makes nodes that moved
+   * slide to their new place and new things fade in; `first` and reduced motion draw at once.
+   */
+  setScene(scene: Scene, mode: 'first' | 'glide' = 'first'): void {
+    const animate = mode === 'glide' && !this.reduced();
+    this.layer.classList.toggle('gn-flow__layer--glide', animate);
+    this.scene = scene;
+    this.svg.setAttribute('width', String(scene.width));
+    this.svg.setAttribute('height', String(scene.height));
+    this.layer.dataset['orientation'] = scene.orientation;
+    this.sync(this.nodes, scene.nodes.map((n) => [n.node.id, n] as const), (d, existing) => this.drawNode(d, existing), animate, this.overlay);
+    this.sync(this.notes, scene.notes.map((n) => [`${n.ticketId}:${n.id}`, n] as const), (d, existing) => this.drawNote(d, existing), animate, this.overlay);
+    this.sync(this.pills, scene.pills.map((p) => [`${p.nodeId}:${p.kind}`, p] as const), (d, existing) => this.drawPill(d, existing), animate, this.overlay);
+    this.syncEdges(scene.edges, animate);
+    this.syncLines(scene);
+    this.moveHandle();
+    if (animate) this.schedule(() => this.layer.classList.remove('gn-flow__layer--glide'), GLIDE_MS + 20);
+  }
+
+  setSelected(id: string | null): void {
+    this.selected = id;
+    for (const [nodeId, node] of this.nodes) {
+      if (nodeId === id) node.setAttribute('aria-current', 'true');
+      else node.removeAttribute('aria-current');
+    }
+    this.moveHandle();
+  }
+
+  /** A brief ring on the nodes that just changed by a live event (WG-5). Instant under reduced motion: no ring. */
+  highlight(ids: readonly string[]): void {
+    if (this.reduced()) return;
+    for (const id of ids) {
+      const node = this.nodes.get(id);
+      if (node === undefined) continue;
+      node.classList.add('gn-flow-node--flash');
+      this.schedule(() => node.classList.remove('gn-flow-node--flash'), FLASH_MS);
+    }
+  }
+
+  fit(instant = false): void {
+    if (this.scene === null || this.camera === null) return;
+    const target = fitCamera(this.scene, { width: this.viewport.clientWidth, height: this.viewport.clientHeight });
+    this.camera.camera(target, { instant, maxMs: 450 });
+  }
+  focusNode(id: string, instant = false): void {
+    const drawn = this.scene?.nodes.find((n) => n.node.id === id);
+    if (drawn === undefined || this.camera === null) return;
+    const zoom = Math.max(this.camera.getCamera().zoom, 0.8);
+    this.camera.camera(centreCamera(drawn.rect, { width: this.viewport.clientWidth, height: this.viewport.clientHeight }, zoom), { instant });
+  }
+  zoomBy(factor: number): void {
+    if (this.camera === null) return;
+    const cam = this.camera.getCamera();
+    this.camera.camera({ zoom: Math.min(ZOOM.max, Math.max(ZOOM.min, cam.zoom * factor)) });
+  }
+
+  destroy(): void {
+    for (const remove of this.removers.splice(0)) remove();
+    this.viewport.remove();
+    this.nodes.clear();
+    this.notes.clear();
+    this.pills.clear();
+    this.labels.clear();
+    this.paths.clear();
+    this.lines.clear();
+    this.scene = null;
+    this.camera = null;
+  }
+
+  // ---- drawing ----
+  private sync<T>(cache: Map<string, HTMLElement>, entries: ReadonlyArray<readonly [string, T]>, draw: (item: T, existing: HTMLElement | null) => HTMLElement, animate: boolean, parent: HTMLElement): void {
+    const keep = new Set<string>();
+    for (const [key, item] of entries) {
+      keep.add(key);
+      const existing = cache.get(key) ?? null;
+      const node = draw(item, existing);
+      if (existing === null) {
+        cache.set(key, node);
+        parent.append(node);
+        if (animate) node.classList.add('gn-flow__enter');
+      }
+    }
+    for (const [key, node] of cache) {
+      if (keep.has(key)) continue;
+      node.remove();
+      cache.delete(key);
+    }
+  }
+
+  private drawNode(d: DrawnNode, existing: HTMLElement | null): HTMLElement {
+    const node = existing ?? el(this.doc, 'div', 'gn-flow-node');
+    const { node: n } = d;
+    node.dataset['nodeId'] = n.id;
+    node.dataset['shape'] = n.shape;
+    node.dataset['category'] = n.category;
+    if (n.draft) node.dataset['draft'] = 'true';
+    else delete node.dataset['draft'];
+    if (n.notTaken !== null) node.dataset['notTaken'] = 'true';
+    else delete node.dataset['notTaken'];
+    place(node, d.rect);
+    node.replaceChildren();
+    if (n.shape === 'decision') {
+      const diamond = this.doc.createElementNS(SVG, 'svg');
+      diamond.setAttribute('class', 'gn-flow-node__diamond');
+      diamond.setAttribute('viewBox', `0 0 ${d.rect.width} ${d.rect.height}`);
+      diamond.setAttribute('preserveAspectRatio', 'none');
+      const w = d.rect.width;
+      const h = d.rect.height;
+      diamond.innerHTML = `<polygon points="${w / 2},1 ${w - 1},${h / 2} ${w / 2},${h - 1} 1,${h / 2}"/>`;
+      node.append(diamond);
+    }
+    const head = el(this.doc, 'div', 'gn-flow-node__head');
+    head.append(el(this.doc, 'span', 'gn-flow-node__dot'));
+    head.append(el(this.doc, 'span', 'gn-flow-node__status', n.notTaken !== null ? n.notTaken.chip : n.statusWord));
+    const key = n.draft ? 'Draft' : `${n.key ?? ''}${n.round >= 2 ? ` ↺${n.round}` : ''}`;
+    head.append(el(this.doc, 'span', 'gn-flow-node__key', key));
+    if (n.waitForAll) {
+      const glyph = el(this.doc, 'span', 'gn-flow-node__wait', '⋂');
+      glyph.title = 'Waits for all incoming';
+      head.append(glyph);
+    }
+    if (n.assigneeInitials !== null) head.append(el(this.doc, 'span', 'gn-flow-node__who', n.assigneeInitials));
+    node.append(head);
+    const title = el(this.doc, 'div', 'gn-flow-node__title');
+    for (const line of d.lines) title.append(el(this.doc, 'span', 'gn-flow-node__line', line));
+    node.append(title);
+    if (n.shape === 'decision' && (n.outcome !== null || n.passCount >= 2)) {
+      // Two chips, never one string joined with a middle dot: the product has no " · " in anything a person reads.
+      const chips = el(this.doc, 'div', 'gn-flow-node__chips');
+      if (n.outcome !== null) chips.append(el(this.doc, 'span', 'gn-flow-node__outcome', n.outcome));
+      if (n.passCount >= 2) chips.append(el(this.doc, 'span', 'gn-flow-node__outcome gn-flow-node__outcome--pass', `Pass ${n.passCount}`));
+      node.append(chips);
+    }
+    node.title = n.notTaken?.tooltip ?? '';
+    if (n.id === this.selected) node.setAttribute('aria-current', 'true');
+    return node;
+  }
+
+  private drawNote(d: DrawnNote, existing: HTMLElement | null): HTMLElement {
+    const node = existing ?? el(this.doc, 'div', 'gn-flow-note');
+    node.dataset['noteId'] = d.id;
+    node.dataset['ticketId'] = d.ticketId;
+    node.dataset['more'] = d.more === null ? 'false' : 'true';
+    place(node, d.rect);
+    node.replaceChildren(el(this.doc, 'span', 'gn-flow-note__glyph'), el(this.doc, 'span', 'gn-flow-note__title', d.lines.join(' ')));
+    return node;
+  }
+
+  private drawPill(d: DrawnPill, existing: HTMLElement | null): HTMLElement {
+    const node = existing ?? el(this.doc, 'div', `gn-flow-pill gn-flow-pill--${d.kind}`, d.kind === 'start' ? 'Start' : 'End');
+    place(node, d.rect);
+    return node;
+  }
+
+  private syncEdges(edges: readonly DrawnEdge[], animate: boolean): void {
+    const keep = new Set<string>();
+    const redrawn: SVGPathElement[] = [];
+    for (const drawn of edges) {
+      const id = drawn.edge.id;
+      keep.add(id);
+      let path = this.paths.get(id);
+      if (path === undefined) {
+        path = this.doc.createElementNS(SVG, 'path');
+        this.paths.set(id, path);
+        this.svg.append(path);
+        if (animate) redrawn.push(path);
+      } else if (animate && path.getAttribute('d') !== drawn.path) redrawn.push(path);
+      path.setAttribute('d', drawn.path);
+      path.setAttribute('class', this.edgeClass(drawn));
+      if (drawn.edge.kind === 'leads_to') path.setAttribute('marker-end', `url(#${this.markerId})`);
+      else path.removeAttribute('marker-end');
+      path.dataset['edgeId'] = id;
+      path.replaceChildren();
+      if (drawn.edge.tooltip !== null) {
+        const title = this.doc.createElementNS(SVG, 'title');
+        title.textContent = drawn.edge.tooltip;
+        path.append(title);
+      }
+      const label = this.labels.get(id);
+      if (drawn.label === null) {
+        label?.remove();
+        this.labels.delete(id);
+      } else {
+        const pill = label ?? el(this.doc, 'div', 'gn-flow-edge-label');
+        pill.textContent = drawn.label.text;
+        pill.dataset['edgeId'] = id;
+        pill.dataset['kind'] = drawn.edge.kind;
+        if (drawn.muted) pill.dataset['muted'] = 'true';
+        else delete pill.dataset['muted'];
+        pill.title = drawn.edge.tooltip ?? '';
+        place(pill, drawn.label.rect);
+        if (label === undefined) {
+          this.labels.set(id, pill);
+          this.overlay.append(pill);
+        }
+      }
+    }
+    for (const [id, path] of this.paths) {
+      if (keep.has(id)) continue;
+      path.remove();
+      this.paths.delete(id);
+      this.labels.get(id)?.remove();
+      this.labels.delete(id);
+    }
+    // An edge whose route changed fades in again (a path cannot glide in every browser); one reflow restarts all the animations.
+    for (const path of redrawn) path.classList.remove('gn-flow__enter');
+    if (redrawn.length > 0) void this.layer.getBoundingClientRect();
+    for (const path of redrawn) path.classList.add('gn-flow__enter');
+  }
+
+  private edgeClass(drawn: DrawnEdge): string {
+    const parts = ['gn-flow-edge', `gn-flow-edge--${drawn.edge.kind === 'blocks' ? 'blocks' : 'flow'}`];
+    if (drawn.edge.loop) parts.push('gn-flow-edge--loop');
+    if (drawn.muted) parts.push('gn-flow-edge--muted');
+    if (drawn.edge.chosen === false) parts.push('gn-flow-edge--unchosen');
+    return parts.join(' ');
+  }
+
+  /** The dotted note lines: one polyline each, dash `2 4`, round caps, no arrowhead (WG-7). */
+  private syncLines(scene: Scene): void {
+    const keep = new Set<string>();
+    for (const c of scene.connectors) {
+      keep.add(c.ticketId);
+      let line = this.lines.get(c.ticketId);
+      if (line === undefined) {
+        line = this.doc.createElementNS(SVG, 'polyline');
+        line.setAttribute('class', 'gn-flow-note-line');
+        this.lines.set(c.ticketId, line);
+        this.svg.append(line);
+      }
+      line.setAttribute('points', c.points.map((p) => `${p.x},${p.y}`).join(' '));
+    }
+    for (const [id, line] of this.lines) {
+      if (keep.has(id)) continue;
+      line.remove();
+      this.lines.delete(id);
+    }
+  }
+
+  private moveHandle(): void {
+    const id = this.hovered ?? this.selected;
+    const drawn = id === null ? undefined : this.scene?.nodes.find((n) => n.node.id === id);
+    // No `onAdd`, no handle: a control that does nothing when pressed is not drawn.
+    if (drawn === undefined || this.scene === null || this.events.onAdd === undefined) {
+      this.handle.hidden = true;
+      this.handle.remove();
+      return;
+    }
+    place(this.handle, handleRect(drawn.rect, this.scene.orientation));
+    this.handle.hidden = false;
+    if (this.handle.parentElement === null) this.overlay.append(this.handle);
+  }
+
+  // ---- input ----
+  private listen(type: string, handler: (e: Event) => void): void {
+    this.viewport.addEventListener(type, handler);
+    this.removers.push(() => this.viewport.removeEventListener(type, handler));
+  }
+
+  private local(e: { clientX: number; clientY: number }): Point {
+    const rect = this.viewport.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  private pickAtEvent(e: { clientX: number; clientY: number }): Pick | null {
+    if (this.scene === null || this.camera === null) return null;
+    return pickAt(this.scene, this.camera.toWorld(this.local(e)), this.events.onAdd === undefined ? null : (this.hovered ?? this.selected));
+  }
+
+  private onDown(e: PointerEvent): void {
+    this.down = { ...this.local(e), t: e.timeStamp };
+    const pick = this.events.onLink === undefined ? null : this.pickAtEvent(e);
+    if (pick?.kind !== 'add') return;
+    // The "+" handle starts a link. The camera listens on this same element and was attached after the stage, so stopping the
+    // event here is what keeps it from starting a pan (stopImmediatePropagation skips the listeners added later).
+    e.stopImmediatePropagation();
+    this.linking = { from: pick.id, moved: false };
+    this.viewport.setPointerCapture?.(e.pointerId);
+  }
+
+  private dragLink(e: PointerEvent): void {
+    const link = this.linking;
+    const scene = this.scene;
+    if (link === null || scene === null || this.camera === null) return;
+    const here = this.local(e);
+    if (!link.moved && this.down !== null && Math.hypot(here.x - this.down.x, here.y - this.down.y) <= TAP_PX) return;
+    link.moved = true;
+    const world = this.camera.toWorld(here);
+    const from = scene.nodes.find((n) => n.node.id === link.from);
+    if (from === undefined) return;
+    const start = centreOf(handleRect(from.rect, scene.orientation));
+    this.rubber.setAttribute('d', `M${start.x} ${start.y} L${world.x} ${world.y}`);
+    this.rubber.style.display = '';
+    this.markLinkTarget(nodeAt(scene, world, link.from));
+  }
+
+  private markLinkTarget(id: string | null): void {
+    for (const [nodeId, node] of this.nodes) {
+      if (nodeId === id) node.dataset['linkTarget'] = 'true';
+      else delete node.dataset['linkTarget'];
+    }
+  }
+
+  private endLink(): void {
+    this.linking = null;
+    this.rubber.style.display = 'none';
+    this.markLinkTarget(null);
+  }
+
+  private onUp(e: PointerEvent): void {
+    const link = this.linking;
+    if (link !== null) {
+      const dropped = link.moved && this.scene !== null && this.camera !== null ? nodeAt(this.scene, this.camera.toWorld(this.local(e)), link.from) : null;
+      this.endLink();
+      if (link.moved) {
+        this.down = null;
+        if (dropped !== null) this.events.onLink?.(link.from, dropped);
+        return;
+      }
+    }
+    const down = this.down;
+    this.down = null;
+    if (down === null) return;
+    const up = this.local(e);
+    if (Math.hypot(up.x - down.x, up.y - down.y) > TAP_PX || e.timeStamp - down.t > TAP_MS) return;
+    const pick = this.pickAtEvent(e);
+    if (pick?.kind === 'add') {
+      this.events.onAdd?.(pick.id);
+      return;
+    }
+    this.events.onPick?.(pick);
+    if (pick?.kind === 'node') {
+      const again = this.lastTap?.id === pick.id && e.timeStamp - this.lastTap.t < DOUBLE_MS;
+      this.lastTap = again ? null : { id: pick.id, t: e.timeStamp };
+      if (again) this.events.onOpen?.(pick.id);
+    } else this.lastTap = null;
+  }
+
+  private onMove(e: PointerEvent): void {
+    if (this.linking !== null) {
+      this.dragLink(e);
+      return;
+    }
+    if (e.buttons !== 0) return;
+    const pick = this.pickAtEvent(e);
+    const id = pick?.kind === 'node' ? pick.id : pick?.kind === 'add' ? pick.id : null;
+    this.viewport.style.cursor = pick === null ? '' : 'pointer';
+    if (id === this.hovered) return;
+    // The handle belongs to the node it follows: leaving the node for the handle must not drop it.
+    this.hovered = id;
+    this.moveHandle();
+    this.events.onHover?.(pick);
+  }
+
+  private onKey(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && this.linking !== null) {
+      this.endLink();
+      return;
+    }
+    if (this.selected === null || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.events.onOpen?.(this.selected);
+    } else if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      this.events.onAdd?.(this.selected);
+    }
+  }
+}
+  ```
+
+  `src/index.ts`, append:
+  ```ts
+  export { FlowStage, GLIDE_MS, type FlowCamera, type StageEvents, type StageOptions } from './render/stage.js';
+  export { fitCamera, centreCamera, isVisible, ZOOM, type Camera } from './render/fit.js';
+  export { pickAt, nodeAt, handleRect, type Pick } from './render/pick.js';
+  ```
+
+  Run the Step 2 command, then the package suite WHOLE, `typecheck` and `build`. Expected: PASS (12 tests in the stage file), typecheck clean. Commit.
+
+- [ ] **Step 4: The stage CSS**
+
+  Append to `packages/ui/src/ui.css` one block headed `/* WTG3 T5: the Workflow graph's stage (packages/flow-graph, FlowStage). */`. Every colour is a `--gn-*` role; geometry is px because the layout computes px; a card has a fill and the lift shadow, no border (the repo's border ruling), except that a Not-taken or draft ticket is told by a DASHED border, which is the one place a border is the signal. No opacity on a ticket (WG-10); the 40% and 60% of edges are opacity on an SVG path with no text:
+  ```css
+  /* WTG3 T5: the Workflow graph's stage (packages/flow-graph, FlowStage). */
+  .gn-flow {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 20rem;
+    overflow: hidden;
+    background: var(--gn-flow-canvas);
+    border-radius: var(--gn-radius-card);
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+    outline: none;
+  }
+  .gn-flow:active { cursor: grabbing; }
+  .gn-flow:focus-visible { box-shadow: inset 0 0 0 2px var(--gn-focus-ring); }
+  .gn-flow__layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+  .gn-flow__edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .gn-flow__nodes { position: absolute; left: 0; top: 0; }
+
+  .gn-flow-node,
+  .gn-flow-note,
+  .gn-flow-pill,
+  .gn-flow-edge-label,
+  .gn-flow__add { position: absolute; left: 0; top: 0; box-sizing: border-box; }
+  .gn-flow__layer--glide .gn-flow-node,
+  .gn-flow__layer--glide .gn-flow-note,
+  .gn-flow__layer--glide .gn-flow-pill,
+  .gn-flow__layer--glide .gn-flow-edge-label { transition: transform 240ms var(--gn-motion-ease-out); }
+  .gn-flow__enter { animation: gn-flow-enter 240ms var(--gn-motion-ease-out) both; }
+  @keyframes gn-flow-enter { from { opacity: 0; } to { opacity: 1; } }
+
+  .gn-flow-node {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    overflow: hidden;
+    cursor: pointer;
+    color: var(--gn-text);
+    background: var(--gn-surface-raised);
+    border-radius: var(--gn-radius-card);
+    box-shadow: var(--gn-shadow-lift);
+  }
+  .gn-flow-node[aria-current='true'] { box-shadow: 0 0 0 2px var(--gn-focus-ring), var(--gn-shadow-lift); }
+  .gn-flow-node[data-link-target='true'] { box-shadow: 0 0 0 2px var(--gn-accent), var(--gn-shadow-lift); }
+  .gn-flow-node--flash { animation: gn-flow-flash 1200ms var(--gn-motion-ease-out) both; }
+  @keyframes gn-flow-flash { from { box-shadow: 0 0 0 5px var(--gn-focus-ring), var(--gn-shadow-lift); } to { box-shadow: 0 0 0 0 transparent, var(--gn-shadow-lift); } }
+  .gn-flow-node[data-draft='true'] { padding: 6.5px 8.5px; border: 1.5px dashed var(--gn-flow-note-line); }
+  .gn-flow-node[data-not-taken='true'] {
+    padding: 6.5px 8.5px;
+    background: var(--gn-flow-not-taken-fill);
+    border: 1.5px dashed var(--gn-flow-not-taken-line);
+    box-shadow: none;
+  }
+  .gn-flow-node[data-shape='decision'] { align-items: center; justify-content: center; padding: 0 30px; text-align: center; background: transparent; box-shadow: none; border: 0; }
+  .gn-flow-node[data-shape='decision'][aria-current='true'] { box-shadow: none; }
+  .gn-flow-node__diamond { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .gn-flow-node__diamond polygon { fill: var(--gn-surface-raised); stroke: var(--gn-flow-edge-muted); stroke-width: 1.5; stroke-linejoin: round; }
+  .gn-flow-node[data-shape='decision'][aria-current='true'] .gn-flow-node__diamond polygon { stroke: var(--gn-focus-ring); stroke-width: 2.5; }
+  .gn-flow-node[data-shape='decision'][data-not-taken='true'] .gn-flow-node__diamond polygon { fill: var(--gn-flow-not-taken-fill); stroke: var(--gn-flow-not-taken-line); stroke-dasharray: 5 4; }
+  .gn-flow-node__head,
+  .gn-flow-node__title,
+  .gn-flow-node__outcome { position: relative; }
+  .gn-flow-node__head { display: flex; align-items: center; gap: 6px; width: 100%; font-size: 11px; line-height: 14px; color: var(--gn-text-muted); }
+  .gn-flow-node[data-shape='decision'] .gn-flow-node__head { justify-content: center; }
+  .gn-flow-node__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gn-category-open); }
+  .gn-flow-node[data-category='active'] .gn-flow-node__dot { background: var(--gn-category-active); }
+  .gn-flow-node[data-category='terminal'] .gn-flow-node__dot { background: var(--gn-category-terminal); }
+  .gn-flow-node__status { white-space: nowrap; }
+  .gn-flow-node__key { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gn-flow-node[data-shape='decision'] .gn-flow-node__key { margin-left: 0; }
+  .gn-flow-node__wait { color: var(--gn-text-muted); }
+  .gn-flow-node__who { flex: none; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 9px; background: var(--gn-fill-secondary); color: var(--gn-text); font-size: 10px; line-height: 18px; text-align: center; }
+  .gn-flow-node__title { display: flex; flex-direction: column; font-size: 13px; line-height: 16px; font-weight: 600; }
+  .gn-flow-node__line { display: block; white-space: nowrap; }
+  .gn-flow-node__chips { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .gn-flow-node__outcome { padding: 1px 8px; border-radius: 9px; background: var(--gn-fill-secondary); font-size: 11px; line-height: 16px; color: var(--gn-text); white-space: nowrap; }
+
+  .gn-flow-edge { fill: none; stroke: var(--gn-flow-edge); stroke-width: 2; stroke-linejoin: round; }
+  .gn-flow-edge--blocks { stroke-width: 1.6; stroke-dasharray: 6 5; opacity: 0.6; }
+  .gn-flow-edge--muted { stroke: var(--gn-flow-edge-muted); }
+  .gn-flow-edge--unchosen { opacity: 0.4; }
+  .gn-flow__arrow { fill: var(--gn-flow-edge); }
+  .gn-flow-edge-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 11px;
+    background: var(--gn-surface-raised);
+    box-shadow: var(--gn-shadow-lift);
+    color: var(--gn-text);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .gn-flow-edge-label[data-muted='true'] { color: var(--gn-text-muted); }
+  .gn-flow-edge-label[data-kind='blocks'] { color: var(--gn-text-muted); font-weight: 500; }
+  .gn-flow-pill { display: flex; align-items: center; justify-content: center; border-radius: 11px; background: var(--gn-fill-secondary); color: var(--gn-text-muted); font-size: 11px; font-weight: 700; }
+
+  .gn-flow-note { display: flex; align-items: center; gap: 6px; padding: 0 10px; overflow: hidden; cursor: pointer; background: var(--gn-flow-note-fill); border-radius: 8px; box-shadow: var(--gn-shadow-lift); color: var(--gn-text); font-size: 12px; line-height: 15px; }
+  .gn-flow-note__glyph { flex: none; width: 9px; height: 12px; border: 1.5px solid var(--gn-flow-note-line); border-radius: 2px; }
+  .gn-flow-note__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gn-flow-note[data-more='true'] { color: var(--gn-text-muted); }
+  .gn-flow-note-line { fill: none; stroke: var(--gn-flow-note-line); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round; }
+
+  .gn-flow__add { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--gn-accent); color: var(--gn-accent-text); font-weight: 700; line-height: 1; cursor: crosshair; }
+  .gn-flow__add[hidden] { display: none; }
+  .gn-flow-rubber { fill: none; stroke: var(--gn-accent); stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; }
+  @media (prefers-reduced-motion: reduce) {
+    .gn-flow__layer--glide .gn-flow-node,
+    .gn-flow__layer--glide .gn-flow-note,
+    .gn-flow__layer--glide .gn-flow-pill,
+    .gn-flow__layer--glide .gn-flow-edge-label { transition: none; }
+    .gn-flow__enter,
+    .gn-flow-node--flash { animation: none; }
+  }
+  ```
+  Then **measure against the mockup**. The stage is not in the web app until T6 and T7, so this task measures on the harness page (no lane runs a Docker stack of its own, rule #23; T7 repeats the measurement inside the sheet on a lane port): open `packages/flow-graph-browser`'s `flow-pan.html?n=13` (the mockup flow) next to `wtg-preview/Main.png` and compare, in one screenshot pair per theme, the card size (140 x 64), the dot-status-key row, the diamond (176 x 108), the pills (22 high), the label pills and the selection ring. Record the differences that are not intentional in the handoff and fix those that are CSS. Add the screenshot paths to DONE.
+  `ui.css` change ⇒ run the ui, app-core and web suites WHOLE (`> /tmp/wtg3-t5-css.log 2>&1; tail`).
+
+- [ ] **Step 5: The pan bars (spec §13), measured in the browser**
+
+  `packages/flow-graph-browser/harness/flow-pan.html`:
+  ```html
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Flow pan</title>
+      <style>
+        html, body { margin: 0; height: 100%; }
+        #host { position: fixed; inset: 0; }
+      </style>
+    </head>
+    <body>
+      <div id="host"></div>
+      <pre id="out" style="position:fixed;left:8px;bottom:8px;margin:0;font:12px monospace">running…</pre>
+      <script type="module" src="./flow-pan.ts"></script>
+    </body>
+  </html>
+  ```
+
+  `packages/flow-graph-browser/harness/flow-pan.ts`. It lays a synthetic flow of `n` nodes out (`?n=300` desktop, `?n=100` phone, `?n=13` the mockup), draws it with the real `FlowStage` under the real `CameraAdapter`, then pans for three seconds by moving the camera each animation frame, recording the interval between frames. The measured thing is the cost of moving the transformed layer, which is what a pan is. (`el` and `layer` are the adapter's option names as read in Step 0; change them to the landed names.)
+  ```ts
+  import { CameraAdapter } from '@gisik-nokma/viewport';
+  import { FlowStage, buildScene, createElkEngine, layoutFlow, layoutInputOf, type LayoutInput, type SceneInput, type SceneNode } from '@gisik-nokma/flow-graph';
+  import { mockupFlow, syntheticFlow } from '@gisik-nokma/flow-graph/testing';
+
+  const canvas = document.createElement('canvas').getContext('2d')!;
+  canvas.font = '600 13px system-ui, sans-serif';
+  const measure = (text: string): number => canvas.measureText(text).width;
+  const labelSize = (text: string): { width: number; height: number } => ({ width: Math.ceil(measure(text)) + 16, height: 22 });
+
+  function sceneInputOf(flow: LayoutInput): SceneInput {
+    const hasIn = new Set(flow.edges.map((e) => e.target));
+    const hasOut = new Set(flow.edges.map((e) => e.source));
+    const nodes: SceneNode[] = flow.nodes.map((n, i) => ({
+      id: n.id, shape: n.shape, key: `GN-${i + 100}`, title: `Step ${i} of the synthetic flow`, draft: false,
+      statusWord: i % 3 === 0 ? 'Done' : i % 3 === 1 ? 'In progress' : 'Backlog', category: i % 3 === 0 ? 'terminal' : i % 3 === 1 ? 'active' : 'open',
+      assigneeInitials: i % 2 === 0 ? 'AR' : null, round: 1, waitForAll: false, start: !hasIn.has(n.id), end: !hasOut.has(n.id), notTaken: null, outcome: null, passCount: 0, notes: [],
+    }));
+    return {
+      nodes,
+      edges: flow.edges.map((e) => ({ id: e.id, kind: 'leads_to', source: e.source, target: e.target, label: e.label, loop: e.loop, taken: 0, chosen: null, tooltip: null })),
+      orientation: flow.orientation,
+      phone: false,
+    };
+  }
+
+  type PanResult = { n: number; frames: number; fps: number; worstMs: number; p99Ms: number };
+
+  async function pan(adapter: CameraAdapter, seconds: number, n: number): Promise<PanResult> {
+    const intervals: number[] = [];
+    let last = performance.now();
+    const end = last + seconds * 1000;
+    let x = 0;
+    let dir = -1;
+    await new Promise<void>((done) => {
+      const tick = (t: number): void => {
+        intervals.push(t - last);
+        last = t;
+        x += dir * 14;
+        if (x < -2400 || x > 0) dir = -dir;
+        adapter.camera({ x, y: -120 + (x % 40) }, { instant: true });
+        if (t < end) requestAnimationFrame(tick);
+        else done();
+      };
+      requestAnimationFrame(tick);
+    });
+    intervals.shift(); // the first interval spans the page's own setup
+    const total = intervals.reduce((a, b) => a + b, 0);
+    const sorted = [...intervals].sort((a, b) => a - b);
+    return { n, frames: intervals.length, fps: intervals.length / (total / 1000), worstMs: sorted[sorted.length - 1]!, p99Ms: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.99))]! };
+  }
+
+  async function main(): Promise<void> {
+    const n = Number(new URLSearchParams(location.search).get('n') ?? '300');
+    const flow = n === 13 ? mockupFlow('landscape') : syntheticFlow(n, Math.round(n * 1.33), 4);
+    const input = sceneInputOf(flow);
+    const ctx = { measure, labelSize };
+    const engine = createElkEngine(() => new Worker(new URL('elkjs/lib/elk-worker.min.js', import.meta.url)));
+    const layout = await layoutFlow(engine, layoutInputOf(input, ctx), ctx);
+    engine.terminate();
+    const scene = buildScene(input, layout, ctx);
+    const host = document.getElementById('host')!;
+    const stage = new FlowStage(host); // first: its listeners must run before the camera's
+    const adapter = new CameraAdapter({ el: stage.viewport, layer: stage.layer });
+    stage.attachCamera(adapter);
+    stage.setScene(scene, 'first');
+    stage.fit(true);
+    await new Promise((r) => requestAnimationFrame(() => r(null))); // settle
+    const result = await pan(adapter, 3, scene.nodes.length);
+    (window as unknown as { __flowPan: unknown }).__flowPan = { done: true, ...result, nodes: scene.nodes.length, edges: scene.edges.length, userAgent: navigator.userAgent };
+    document.getElementById('out')!.textContent = `${result.n} nodes: ${result.fps.toFixed(1)} fps, worst ${result.worstMs.toFixed(1)} ms, p99 ${result.p99Ms.toFixed(1)} ms`;
+  }
+  void main();
+  ```
+
+  `packages/flow-graph-browser/tests/flow-pan.spec.ts` (29.254). The desktop bar is read as the 60 fps / 16.7 ms bar with one display tick of slack (at least 59 fps, no frame over 17.5 ms), because a vsync-locked `requestAnimationFrame` cannot deliver 16.700 ms every frame; the phone bar is run under 4x CPU throttling (a mid phone is roughly that much slower than the lane's laptop) and is 🟡 until the real device is read (Step 6):
+  ```ts
+  import { expect, test } from '@playwright/test';
+
+  type Pan = { done: true; n: number; frames: number; fps: number; worstMs: number; p99Ms: number; nodes: number; edges: number };
+  const URL = '/harness/flow-pan.html'; // keep in step with Step 0.2's Vite layout
+
+  async function run(page: import('@playwright/test').Page, n: number, throttle: number): Promise<Pan> {
+    if (throttle > 1) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
+    }
+    await page.goto(`${URL}?n=${n}`);
+    await page.waitForFunction(() => (window as unknown as { __flowPan?: { done: boolean } }).__flowPan?.done === true, undefined, { timeout: 60_000 });
+    return (await page.evaluate(() => (window as unknown as { __flowPan: unknown }).__flowPan)) as Pan;
+  }
+
+  test.describe('29.254 pan bars (spec §13)', () => {
+    test('29.254 desktop: a 300-node flow pans at >= 59 fps with no frame over 17.5 ms; control: 13 nodes on the same page is no slower', async ({ page }) => {
+      await page.setViewportSize({ width: 1240, height: 800 });
+      const big = await run(page, 300, 1);
+      console.log(`[wtg3 T5] desktop 300 nodes / ${big.edges} edges: ${big.fps.toFixed(1)} fps, worst ${big.worstMs.toFixed(1)} ms, p99 ${big.p99Ms.toFixed(1)} ms`);
+      expect(big.nodes).toBe(300);
+      expect(big.fps).toBeGreaterThanOrEqual(59);
+      expect(big.worstMs).toBeLessThanOrEqual(17.5);
+      const small = await run(page, 13, 1);
+      expect(small.fps).toBeGreaterThanOrEqual(59);
+      expect(big.worstMs - small.worstMs).toBeLessThan(5);
+    });
+
+    test('29.254 phone width under 4x CPU throttling: a 100-node flow pans at >= 30 fps with no frame over 50 ms', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 780 });
+      const result = await run(page, 100, 4);
+      console.log(`[wtg3 T5] phone-emulated 100 nodes / ${result.edges} edges: ${result.fps.toFixed(1)} fps, worst ${result.worstMs.toFixed(1)} ms`);
+      expect(result.nodes).toBe(100);
+      expect(result.fps).toBeGreaterThanOrEqual(30);
+      expect(result.worstMs).toBeLessThanOrEqual(50);
+    });
+  });
+  ```
+  Run: `pnpm --filter @gisik-nokma/flow-graph-browser exec playwright test tests/flow-pan.spec.ts > /tmp/wtg3-t5-pan.log 2>&1; tail -n 30 /tmp/wtg3-t5-pan.log` (through `slot-run.sh`, `NEEDS: browser`). Expected PASS; write both `[wtg3 T5]` lines into the handoff and into the case line.
+
+- [ ] **Step 6: STOP gates**
+
+  1. **STOP and report** if the desktop bar misses (fps below 59 or a frame over 17.5 ms, three runs in a row): paste the numbers and the three most expensive steps of a Chrome trace of the pan (`page.tracing`), and do not weaken the bar. The spec's levers, in order: `will-change: transform` on the layer is already set; then `content-visibility: auto` on nodes outside the viewport (`isVisible` is exported for exactly this); then fewer SVG paths (merge unchosen edges). Do not try them unasked: the owner rules on a miss.
+  2. **STOP** on the real phone. Run `pnpm --filter @gisik-nokma/flow-graph-browser exec vite --host`, open `http://<laptop-ip>:<port>/harness/flow-pan.html?n=100` on the owner's phone (the owner does this; the lane prints the URL and waits), and record the on-screen line. The case line stays 🟡 until it is recorded; a miss is a STOP.
+
+- [ ] **Step 7: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.251 | remove the `gn-flow-node__status` span | the status-word assertion |
+  | 29.251 | join the two chips with `' · '` into one | the two-chips / no-middle-dot assertion |
+  | 29.252 | key `this.nodes` by `String(index)` in `setScene` | the reuse assertion (same element after a second scene) |
+  | 29.253 | `const TAP_PX = 6` → `60` | the 20 px drag picks nothing control |
+  | 29.253 | delete the `e.stopImmediatePropagation()` in the handle branch of `onDown` | the camera-never-sees-it assertion |
+  | 29.253 | drop the Escape cancel in `onKey` | the cancelled-link control |
+  | 29.253 | `this.events.onAdd === undefined` → `false` in `moveHandle` | the no-onAdd-no-handle assertion |
+  | 29.254 | `Math.min(1, …)` removed in `fitCamera` | the never-magnifies assertion |
+  | 29.254 (browser) | call `stage.setScene(scene, 'first')` inside the pan tick | the fps assertion |
+
+  Revert each.
+
+- [ ] **Step 8: Features and catalogue**
+
+  1. Flip 29.251 to 29.253 to ✅; 29.254 to 🟡 with the line `(real phone pending)` until Step 6.2.
+  2. `Features.md`, under `<!-- wtg-part3-workflow-graph T5 bullet -->`: `- ⚙️ **Flow stage** — \`FlowStage\` draws a scene as DOM boxes and SVG edges in one transformed layer that the shared camera moves; elements are reused across scenes, moved nodes glide for 240 ms, taps are resolved by geometry, a "+" handle drag links two tickets, and a 300-node flow pans at 60 fps on a desktop. \`packages/flow-graph/src/render/\`, \`packages/ui/src/ui.css\` (\`.gn-flow*\`)`
+  3. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build test typecheck --filter=@gisik-nokma/flow-graph --filter=@gisik-nokma/ui` (LOCAL).
+
+  Commit `wtg3 T5: the stage, picks, the link drag, fit and the pan bars`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-stage.md` written.
+
+
+---
+
+### Task 6: The Graph tab: the wide sheet, the inner switch, the slots, the hosts, the first-load bar (cases 29.255–29.259)
+
+**Branch** `task/wtg3-graph-tab` (needs the KG release's Graph tab; independent of T1 to T5 and T3). **NEEDS: browser** (the geometry and the first-load bar). **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-canvas/project/Main.dc.html` (the sheet at 1240 px with the switch) and `Phone-workflow.dc.html`; measure real geometry by painting the worktree on a lane port (`next dev -p <port>` against the running API; `memory/browser-measurement.md`). **Files:**
+- Create:
+  - `packages/app-core/src/views/graph-slots.ts`, `packages/app-core/src/views/graph-tab.tsx`
+  - `packages/app-core/test/views/graph-slots.test.ts`
+  - `packages/ui/test/sheet-wide.test.tsx`, `packages/ui/test/sheet-wide-css.test.ts`
+  - `apps/web/src/workflow-graph/ticket-workflow-tab.tsx`, `apps/web/src/workflow-graph/workflow-panel.tsx` (a loading shell; T7 gives it its body)
+  - `apps/web/test/workflow-graph/hosts.test.ts`
+- Modify:
+  - `packages/ui/src/components/sheet.tsx` (`wide`), `packages/ui/src/ui.css` (one `/* WTG3 T6 */` block, in three places named below)
+  - `packages/app-core/src/views/ticket-sheet.tsx` (props, the tab label, the branch, `wide`), `packages/app-core/test/views/ticket-sheet.test.tsx` (16.81 amended, a new `describe`), `packages/app-core/src/index.ts`
+  - `apps/web/test/import-graph.test.ts` (a new `it`, the alias map and the npm-record regex)
+  - the three `<TicketSheet>` hosts: `apps/web/app/w/[workspaceId]/my-work/page.tsx`, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/src/notes/note-document.tsx`
+  - `test-cases/16-*.md` (16.81's prose) and `test-cases/27-knowledge-graph.md` (27.341's prose, if it names the tab), `Features.md` §26 and §24 (the tab's wording)
+
+**Interfaces:**
+- **Consumes** (KG C T9, per plan; Step 0 reads the landed form): `TicketSheetProps.knowledgeGraphSlot?: KnowledgeGraphSlotComponent`; the sheet's fourth tab (`value: 'graph'`, label `Knowledge Graph` in that plan); the `tab` state union with `'graph'`; `SegmentedControl` (`options`, `value`, `onChange`, `aria-label`).
+- **Produces:**
+  - `type GraphViewId = 'knowledge' | 'workflow' | 'timeline'`; `type GraphSlotProps = { workspaceId; ticketId; selected: string | null; onSelect: (id: string | null) => void; onOpenTicket?: (id: string) => void; onShowLinks: () => void }`; `type GraphSlotComponent = (props: GraphSlotProps) => ReactElement | null`; `availableGraphViews(slots)`, `chooseGraphView(available, remembered)`, `readGraphView()`, `writeGraphView(view)`, `GRAPH_VIEW_STORAGE_KEY = 'gn.graph.view'`;
+  - `TicketSheetProps.workflowGraphSlot?: GraphSlotComponent` (Part 4 adds `timelineGraphSlot` of the same type: one line in `graphSlots`, see Step 4);
+  - `<Sheet wide>`: class `gn-sheet--wide` (width `min(1240px, 94vw)`) and `gn-sheet__body--wide`;
+  - the Graph tab: label `Graph`, inner switch `aria-label "Graph views"` (drawn from two views), shared `selected` state held by the SHEET and passed to every view, so Workflow and Timeline select the same node (Part 4's contract);
+  - web: `TicketWorkflowTab: GraphSlotComponent` (a `next/dynamic({ ssr: false })` boundary around `WorkflowPanel`).
+
+Siblings copied: KG C T9 (`docs/superpowers/plans/2026-10-03-knowledge-graph-view.md:4457-4560`: the slot, the tab, the branch, the host lines, the 27.344 "every host passes the prop" test); `apps/web/test/import-graph.test.ts` (25.171: `staticGraph`, the alias map, the control by a temp-dir module); `packages/ui/test/styling-sheet.test.ts` (`ruleExactly`, `valueOf`).
+
+**Decisions, reported:**
+- **D-W3-16 The sheet owns the shared selection.** Part 4's consumed-contract row says the Workflow and Timeline views are "components taking `{ workspaceId, ticketId, selected, onSelect }`", and its case 29.313 says the selected node is shared. The view switch unmounts the old view, so the state has to live above both: the sheet holds `graphSelected` and gives it to every slot. Part 4's own text types `timelineGraphSlot` as `ReactNode` (its T5, `ticket-sheet.tsx` edit); that contradicts its own consumed row, and this plan's type (`GraphSlotComponent`) is the one to use. Reported.
+- **D-W3-17 The tab is `Graph`.** KG C T9 labels it `Knowledge Graph` (`value: 'graph'`), which is right while Knowledge is the only view; spec SH-1 says the tab is `Graph` with a one-option switch not drawn. This task renames the label (and 16.81's and 27.341's prose) in the same commit that makes `Workflow` a second view.
+- **D-W3-18 Order.** `Knowledge`, `Workflow`, `Timeline` (spec SH-4); Part 4's code comment says "Workflow, Timeline, Knowledge". The spec wins; the opening view is the last one remembered, else the first drawn.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-graph-tab`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. **Read what KG C T9 landed** and write it into the handoff: `grep -n "knowledgeGraphSlot\|'graph'\|Knowledge Graph" packages/app-core/src/views/ticket-sheet.tsx`; `grep -n "KnowledgeGraphSlotComponent" -r packages/app-core/src`; `grep -n "knowledgeGraphSlot" -r apps/web/app apps/web/src`; `grep -n "16.81" -r packages/app-core/test test-cases`. If the Graph tab is not there, STOP: KG C has not landed.
+  3. **Baseline the first-load JS before touching anything:** `pnpm --filter @gisik-nokma/web build > /tmp/wtg3-t6-before.log 2>&1; grep -E "First Load JS|my-work|projectId|/notes" /tmp/wtg3-t6-before.log` (no `head`). Save the route table lines in the handoff.
+  4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T6" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The five case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T6 -->`:
+  - `- ❌ **29.255 — The Graph tab's sheet is wide, the others are not:** \`<Sheet wide>\` is \`min(1240px, 94vw)\` (class \`gn-sheet--wide\`), declared after the base sheet rule and before the full-screen and tablet rules so full screen and the whole-screen tablet band still win; full screen on the Graph tab drops the 53.75rem body cap; the ticket sheet passes \`wide\` only while the Graph tab is open; control: the base sheet is still \`min(40rem, 94vw)\` and the body cap is still 53.75rem without \`wide\`. Mutation: move the wide rule after the 64rem arm → reds. Manual half (🟡 until recorded): on the primary stack at 1440 px the Graph tab measures 1240 px and Details 640 px.`
+  - `- ❌ **29.256 — A tab named Graph appears exactly when a graph view is mounted:** with only \`workflowGraphSlot\` the tabs read Details, History, Attachments, Graph; with no slot there are three and the tab state cannot reach \`graph\`; clicking Graph renders the slot with the workspace and ticket ids and the slot's \`onShowLinks\` returns the sheet to Details. Control: the same sheet without the slot. Mutation: always push the tab → reds (16.81 amended, same \`it\`).`
+  - `- ❌ **29.257 — The inner switch learns its options from the mounted slots:** \`Graph views\` lists Knowledge, Workflow, Timeline in that order, only for the slots mounted, is drawn from two views, opens on the last remembered view (else the first), remembers a choice in \`localStorage\` (every access in try/catch; blocked storage falls back to the first), and the selected node is the SAME across views; control: one view draws no switch. Mutation: drop the try/catch around \`getItem\` → reds (storage that throws).`
+  - `- ❌ **29.258 — The Workflow graph costs nothing on a route that opens no graph:** no static import path from any of the three hosts, the root layout or the sign-in route reaches \`@gisik-nokma/flow-graph\` or \`elkjs\`; only the \`next/dynamic\` boundary does; control: the detector reports a module that DOES import the package statically. The route table's First Load JS for \`/my-work\`, the project page and the note page is unchanged from the baseline (numbers in the handoff). Mutation: a static \`import '@gisik-nokma/flow-graph'\` in \`ticket-workflow-tab.tsx\` → reds.`
+  - `- ❌ **29.259 — All three hosts mount the Workflow view:** my-work, the project page and the note document each pass \`workflowGraphSlot={TicketWorkflowTab}\` to \`<TicketSheet>\`; control: the assertion reads each \`<TicketSheet\` element and finds the prop in it. Mutation: remove it from one host → reds.`
+
+- [ ] **Step 2: RED, the tests**
+
+  `packages/ui/test/sheet-wide.test.tsx`:
+  ```tsx
+  // @vitest-environment jsdom
+  import { render, screen } from '@testing-library/react';
+  import { describe, expect, it } from 'vitest';
+  import { Sheet } from '../src/index.js';
+
+  describe('29.255 the Sheet wide prop', () => {
+    it('29.255 wide adds gn-sheet--wide and gn-sheet__body--wide; full adds its own; control: neither is set by default', () => {
+      const { unmount } = render(<Sheet open title="Plain" onClose={() => undefined}>body</Sheet>);
+      const plain = screen.getByRole('dialog', { name: 'Plain' });
+      expect(plain.className).toBe('gn-sheet');
+      expect(plain.querySelector('.gn-sheet__body')?.className).toBe('gn-sheet__body');
+      unmount();
+      const { unmount: again } = render(<Sheet open title="Wide" wide onClose={() => undefined}>body</Sheet>);
+      const wide = screen.getByRole('dialog', { name: 'Wide' });
+      expect(wide.className).toBe('gn-sheet gn-sheet--wide');
+      expect(wide.querySelector('.gn-sheet__body')?.className).toBe('gn-sheet__body gn-sheet__body--wide');
+      again();
+      render(<Sheet open title="Both" wide full onClose={() => undefined}>body</Sheet>);
+      const both = screen.getByRole('dialog', { name: 'Both' });
+      expect(both.className).toBe('gn-sheet gn-sheet--full gn-sheet--wide');
+      expect(both.querySelector('.gn-sheet__body')?.className).toBe('gn-sheet__body gn-sheet__body--full gn-sheet__body--wide');
+    });
+  });
+  ```
+
+  `packages/ui/test/sheet-wide-css.test.ts` (source order is the contract: equal specificity, so the later rule wins):
+  ```ts
+  import { describe, expect, it } from 'vitest';
+  import { parseRules, readUiCss, ruleExactly, valueOf } from './helpers/css-rules.js';
+
+  const CSS = readUiCss();
+  const order = (selector: string, atRule: string | null = null): number =>
+    parseRules(CSS).findIndex((r) => r.atRule === atRule && r.selectors.length === 1 && r.selectors[0] === selector);
+
+  describe('29.255 the wide sheet CSS', () => {
+    it('29.255 .gn-sheet--wide is min(1240px, 94vw), after .gn-sheet and before .gn-sheet--full and the 64rem arm; control: the base sheet is unchanged', () => {
+      expect(valueOf(ruleExactly(CSS, '.gn-sheet--wide'), 'width')).toBe('min(1240px, 94vw)');
+      expect(valueOf(ruleExactly(CSS, '.gn-sheet'), 'width')).toBe('min(40rem, 94vw)');
+      const wide = order('.gn-sheet--wide');
+      expect(wide).toBeGreaterThan(order('.gn-sheet'));
+      expect(wide).toBeLessThan(order('.gn-sheet--full'));
+      const tablet = parseRules(CSS).findIndex((r) => r.atRule === '@media (max-width: 64rem)' && r.selectors[0] === '.gn-sheet');
+      expect(tablet).toBeGreaterThan(wide);
+    });
+
+    it('29.255 full screen on the Graph tab drops the 53.75rem cap; control: without wide the cap stays', () => {
+      expect(valueOf(ruleExactly(CSS, '.gn-sheet__body--full'), 'max-width')).toBe('53.75rem');
+      expect(valueOf(ruleExactly(CSS, '.gn-sheet__body--wide.gn-sheet__body--full'), 'max-width')).toBe('none');
+      expect(order('.gn-sheet__body--wide.gn-sheet__body--full')).toBeGreaterThan(order('.gn-sheet__body--full'));
+    });
+  });
+  ```
+
+  `packages/app-core/test/views/graph-slots.test.ts` (29.257, the pure half):
+  ```ts
+  // @vitest-environment node
+  import { describe, expect, it } from 'vitest';
+  import { availableGraphViews, chooseGraphView, GRAPH_VIEW_STORAGE_KEY, readGraphView, writeGraphView, type GraphSlots } from '../../src/views/graph-slots.js';
+
+  const slot = (() => null) as GraphSlots['workflow'];
+
+  describe('29.257 the Graph tab\'s views', () => {
+    it('29.257 views are listed in the spec order whatever order the slots were given in, and only those mounted; control: none mounted is none', () => {
+      expect(availableGraphViews({ timeline: slot, knowledge: slot, workflow: slot })).toEqual(['knowledge', 'workflow', 'timeline']);
+      expect(availableGraphViews({ workflow: slot })).toEqual(['workflow']);
+      expect(availableGraphViews({})).toEqual([]);
+    });
+
+    it('29.257 the remembered view wins when it is still available, otherwise the first; an unknown or null memory falls back; control: nothing available chooses nothing', () => {
+      expect(chooseGraphView(['knowledge', 'workflow'], 'workflow')).toBe('workflow');
+      expect(chooseGraphView(['knowledge', 'workflow'], 'timeline')).toBe('knowledge');
+      expect(chooseGraphView(['knowledge', 'workflow'], 'nonsense')).toBe('knowledge');
+      expect(chooseGraphView(['workflow'], null)).toBe('workflow');
+      expect(chooseGraphView([], 'workflow')).toBeNull();
+    });
+
+    it('29.257 storage that throws is survived on both read and write; control: storage that works round-trips', () => {
+      const blocked = {
+        getItem: () => {
+          throw new Error('blocked');
+        },
+        setItem: () => {
+          throw new Error('blocked');
+        },
+      };
+      expect(readGraphView(blocked)).toBeNull();
+      expect(() => writeGraphView('workflow', blocked)).not.toThrow();
+      const memory = new Map<string, string>();
+      const ok = { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => void memory.set(k, v) };
+      writeGraphView('workflow', ok);
+      expect(memory.get(GRAPH_VIEW_STORAGE_KEY)).toBe('workflow');
+      expect(readGraphView(ok)).toBe('workflow');
+    });
+  });
+  ```
+
+  `packages/app-core/test/views/ticket-sheet.test.tsx`. **Amend 16.81** (`:2895-2911` on the tip; re-read the landed lines first): keep the existing three-tab assertions as they are, and in the SAME `it`, after them, add a second mount (import `cleanup` from `@testing-library/react`):
+  ```tsx
+    // 29.256: the same sheet WITH a graph view mounted has a fourth tab named Graph (16.81 counts both mounts)
+    cleanup();
+    renderSheet(read, sheetSource(read, [], []), { workflowGraphSlot: () => <p>flow here</p> });
+    await settled();
+    const withGraph = within(screen.getByRole('tablist', { name: 'Ticket sections' })).getAllByRole('tab');
+    expect(withGraph.map((t) => t.textContent)).toEqual(['Details', 'History', 'Attachments', 'Graph']);
+  ```
+  Rename the `it` to start `16.81 / 29.256`. Then append a new `describe` (it uses the file's own `renderSheet`, `settled`, `sheetSource`, `ticketRead`):
+  ```tsx
+  describe('the Graph tab (Workflow and Timeline graphs, Part 3 SH-1 to SH-5)', () => {
+    const seen: unknown[] = [];
+    const Workflow = (props: GraphSlotProps) => {
+      seen.push(props);
+      return (
+        <div>
+          <p>workflow view</p>
+          <button type="button" onClick={() => props.onSelect('t-9')}>pick node</button>
+          <button type="button" onClick={props.onShowLinks}>show links</button>
+          <span data-testid="wf-selected">{props.selected ?? 'none'}</span>
+        </div>
+      );
+    };
+    const Knowledge = (props: GraphSlotProps) => <p data-testid="kg-selected">{`knowledge view ${props.selected ?? 'none'}`}</p>;
+
+    it('29.256 with only the Workflow view the tab is Graph, there is no inner switch, the slot gets the ids, and onShowLinks returns to Details; control: no slot, no tab', async () => {
+      const read = ticketRead();
+      renderSheet(read, sheetSource(read), { workflowGraphSlot: Workflow });
+      await settled();
+      expect(screen.queryByRole('tablist', { name: 'Graph views' })).toBeNull();
+      await userEvent.click(screen.getByRole('tab', { name: 'Graph' }));
+      expect(screen.getByText('workflow view')).toBeInTheDocument();
+      expect(seen[seen.length - 1]).toMatchObject({ workspaceId: WS, ticketId: TICKET, selected: null });
+      expect(screen.queryByRole('tablist', { name: 'Graph views' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'show links' }));
+      expect(screen.queryByText('workflow view')).toBeNull();
+      expect(screen.getByRole('tab', { name: 'Details', selected: true })).toBeInTheDocument();
+    });
+
+    it('29.257 two views draw the switch in spec order; it opens on the first, remembers the choice, and the selected node survives the switch; control: a blocked storage still opens on the first', async () => {
+      window.localStorage.removeItem('gn.graph.view');
+      const read = ticketRead();
+      renderSheet(read, sheetSource(read), { workflowGraphSlot: Workflow, knowledgeGraphSlot: Knowledge });
+      await settled();
+      await userEvent.click(screen.getByRole('tab', { name: 'Graph' }));
+      const views = screen.getByRole('tablist', { name: 'Graph views' });
+      expect(within(views).getAllByRole('tab').map((r) => r.textContent)).toEqual(['Knowledge', 'Workflow']);
+      expect(screen.getByTestId('kg-selected')).toHaveTextContent('knowledge view none');
+      await userEvent.click(within(views).getByRole('tab', { name: 'Workflow' }));
+      await userEvent.click(screen.getByRole('button', { name: 'pick node' }));
+      expect(screen.getByTestId('wf-selected')).toHaveTextContent('t-9');
+      expect(window.localStorage.getItem('gn.graph.view')).toBe('workflow');
+      await userEvent.click(within(views).getByRole('tab', { name: 'Knowledge' }));
+      expect(screen.getByTestId('kg-selected')).toHaveTextContent('knowledge view t-9');
+      cleanup();
+      // remembered: a fresh sheet opens on the last choice
+      window.localStorage.setItem('gn.graph.view', 'workflow');
+      renderSheet(read, sheetSource(read), { workflowGraphSlot: Workflow, knowledgeGraphSlot: Knowledge });
+      await settled();
+      await userEvent.click(screen.getByRole('tab', { name: 'Graph' }));
+      expect(screen.getByText('workflow view')).toBeInTheDocument();
+      cleanup();
+      // control: storage that throws
+      const blocked = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      renderSheet(read, sheetSource(read), { workflowGraphSlot: Workflow, knowledgeGraphSlot: Knowledge });
+      await settled();
+      await userEvent.click(screen.getByRole('tab', { name: 'Graph' }));
+      expect(screen.getByTestId('kg-selected')).toBeInTheDocument();
+      blocked.mockRestore();
+    });
+  });
+  ```
+  (`GraphSlotProps` is imported from `../../src/views/graph-slots.js`; `userEvent`, `cleanup` and `vi` from the file's existing imports or added. The shared `SegmentedControl` renders `role="tablist"` with `role="tab"` buttons, as 16.81 reads the sheet's own sections; both tablists coexist and are told apart by their names, `Ticket sections` and `Graph views`.)
+
+  `apps/web/test/workflow-graph/hosts.test.ts` (29.259), after KG C's 27.344:
+  ```ts
+  import { readFileSync } from 'node:fs';
+  import { join, resolve } from 'node:path';
+  import { describe, expect, it } from 'vitest';
+
+  const WEB = resolve(__dirname, '../..');
+  const HOSTS = ['app/w/[workspaceId]/my-work/page.tsx', 'app/w/[workspaceId]/p/[projectId]/page.tsx', 'src/notes/note-document.tsx'];
+
+  /** The text of every `<TicketSheet ... />` element in a file (the first `/>` at depth zero after the tag). */
+  function ticketSheetElements(text: string): string[] {
+    const out: string[] = [];
+    let from = 0;
+    for (;;) {
+      const start = text.indexOf('<TicketSheet', from);
+      if (start === -1) return out;
+      let depth = 0;
+      let i = start;
+      for (; i < text.length; i += 1) {
+        if (text[i] === '{') depth += 1;
+        else if (text[i] === '}') depth -= 1;
+        else if (depth === 0 && text.startsWith('/>', i)) break;
+      }
+      out.push(text.slice(start, i + 2));
+      from = i + 2;
+    }
+  }
+
+  describe('29.259 every TicketSheet host mounts the Workflow view', () => {
+    it('29.259 each host passes workflowGraphSlot={TicketWorkflowTab} in every <TicketSheet> it renders; control: the reader finds at least one element per host', () => {
+      for (const host of HOSTS) {
+        const elements = ticketSheetElements(readFileSync(join(WEB, host), 'utf8'));
+        expect(elements.length, host).toBeGreaterThan(0);
+        for (const element of elements) expect(element, host).toContain('workflowGraphSlot={TicketWorkflowTab}');
+      }
+    });
+  });
+  ```
+
+  `apps/web/test/import-graph.test.ts` (29.258). Extend `ALIASES` with the two packages and the npm-record regex with `elkjs`, then add:
+  ```ts
+  // ALIASES, beside the others:
+  //   '@gisik-nokma/flow-graph': join(PKGS, 'flow-graph/src/index.ts'),
+  //   '@gisik-nokma/viewport': join(PKGS, 'viewport/src/index.ts'),
+  // and in staticGraph's last matchAll: (?:@tiptap|@xyflow|prosemirror|elkjs)
+  const reachesFlowGraph = (graph: string[]) => graph.filter((f) => f.includes('/packages/flow-graph/src/') || f.startsWith('npm:elkjs'));
+
+  it('29.258 no route that opens no graph reaches the flow-graph package or elkjs; the Workflow tab reaches it only through next/dynamic; control: a module that imports it statically IS reported', () => {
+    const entries = [
+      join(WEB, 'app/layout.tsx'),
+      join(WEB, 'app/sign-in/page.tsx'),
+      join(WEB, 'app/w/[workspaceId]/my-work/page.tsx'),
+      join(WEB, 'app/w/[workspaceId]/p/[projectId]/page.tsx'),
+      join(WEB, 'src/notes/note-document.tsx'),
+      join(WEB, 'src/workflow-graph/ticket-workflow-tab.tsx'),
+    ];
+    for (const entry of entries) expect(reachesFlowGraph([...staticGraph(entry)]), entry).toEqual([]);
+    const dir = mkdtempSync(join(tmpdir(), 'wtg3-'));
+    try {
+      const bad = join(dir, 'bad.ts');
+      writeFileSync(bad, `import '${join(PKGS, 'flow-graph/src/index.ts').replace(/\\.ts$/, '.js')}';\n`);
+      expect(reachesFlowGraph([...staticGraph(bad)]).length).toBeGreaterThan(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  ```
+  (The temp module imports the index by absolute path so the walker's `.js` to `.ts` convention resolves it; if the walker only follows relative specifiers and aliases, write the specifier as `@gisik-nokma/flow-graph` and rely on the alias entry instead.)
+
+  Run each new file; expected FAIL (`wide` is not a prop, the modules do not exist). Commit the RED tests.
+
+- [ ] **Step 3: GREEN, the Sheet and the CSS**
+
+  `packages/ui/src/components/sheet.tsx`: add the prop and the two class lists. Props (docblock beside `full`):
+  ```ts
+    /**
+     * The wide panel of the Graph tab (Workflow and Timeline graphs, Part 3 SH-2): `min(1240px, 94vw)` instead of
+     * `min(40rem, 94vw)`, because a flow with branches and note blocks does not fit 640 px. Independent of `full`, which still
+     * fills the viewport (and, with `wide`, drops the body's 53.75rem cap). Optional so every other caller is unchanged.
+     */
+    wide?: boolean;
+  ```
+  In the component, `wide = false` in the destructuring; then
+  ```tsx
+        className={['gn-sheet', full ? 'gn-sheet--full' : '', wide ? 'gn-sheet--wide' : ''].filter((c) => c !== '').join(' ')}
+        ...
+        <div className={['gn-sheet__body', full ? 'gn-sheet__body--full' : '', wide ? 'gn-sheet__body--wide' : ''].filter((c) => c !== '').join(' ')}>{children}</div>
+  ```
+  (the two class lists reproduce today's `gn-sheet`, `gn-sheet gn-sheet--full`, `gn-sheet__body`, `gn-sheet__body gn-sheet__body--full` byte for byte when `wide` is unset, so no existing assertion moves).
+
+  `packages/ui/src/ui.css`, three insertions, each headed `/* WTG3 T6 ... */`:
+  1. Directly after the `@media (prefers-reduced-motion: reduce) { .gn-sheet { animation: none; } }` block that follows the base `.gn-sheet` rule (`:480-490` on the tip), and BEFORE `.gn-sheet--full`:
+     ```css
+     /* WTG3 T6 (29.255): the Graph tab's sheet, min(1240px, 94vw). After the base `.gn-sheet` and before `.gn-sheet--full` and the 64rem arm (equal specificity: source order decides), so full screen and the whole-screen tablet band still win. */
+     .gn-sheet--wide { width: min(1240px, 94vw); }
+     ```
+  2. Directly after `.gn-sheet__body--full { max-width: 53.75rem; … }` (`:580`):
+     ```css
+     /* WTG3 T6 (29.255): full screen on the Graph tab fills the width the graph needs; every other tab keeps the 53.75rem column. */
+     .gn-sheet__body--wide.gn-sheet__body--full { max-width: none; }
+     ```
+  3. At the end of the file:
+     ```css
+     /* WTG3 T6: the Graph tab's body and its view switch. */
+     .gn-ticket-sheet__graph { display: flex; flex-direction: column; gap: 0.75rem; min-height: 26rem; }
+     .gn-ticket-sheet__graph > [role='tablist'] { align-self: flex-start; }
+     ```
+  Run the three ui files, then the ui suite WHOLE (`ui.css` change ⇒ ui, app-core and web suites whole). Commit.
+
+- [ ] **Step 4: GREEN, the slots, the tab, the sheet**
+
+  `packages/app-core/src/views/graph-slots.ts`:
+  ```ts
+  import type { ReactElement } from 'react';
+
+  /** The Graph tab's views, in the order the switch draws them (spec SH-4). */
+  export type GraphViewId = 'knowledge' | 'workflow' | 'timeline';
+  export const GRAPH_VIEW_ORDER: readonly GraphViewId[] = ['knowledge', 'workflow', 'timeline'];
+  export const GRAPH_VIEW_LABEL: Readonly<Record<GraphViewId, string>> = { knowledge: 'Knowledge', workflow: 'Workflow', timeline: 'Timeline' };
+  export const GRAPH_VIEW_STORAGE_KEY = 'gn.graph.view';
+
+  /**
+   * What the sheet hands a graph view. `selected` / `onSelect` are the SHEET's, so the Workflow and Timeline views select the
+   * same node (Part 4 29.313) and the choice survives a switch of view.
+   */
+  export type GraphSlotProps = {
+    workspaceId: string;
+    ticketId: string;
+    selected: string | null;
+    onSelect: (id: string | null) => void;
+    onOpenTicket?: (id: string) => void;
+    /** Return the sheet to Details, where the Links section is (the phone's way to add a next step). */
+    onShowLinks: () => void;
+  };
+  export type GraphSlotComponent = (props: GraphSlotProps) => ReactElement | null;
+  export type GraphSlots = Partial<Record<GraphViewId, GraphSlotComponent>>;
+
+  export function availableGraphViews(slots: GraphSlots): GraphViewId[] {
+    return GRAPH_VIEW_ORDER.filter((id) => slots[id] !== undefined);
+  }
+
+  /** The remembered view if it is still available, else the first drawn, else none. */
+  export function chooseGraphView(available: readonly GraphViewId[], remembered: string | null): GraphViewId | null {
+    if (available.length === 0) return null;
+    return available.find((id) => id === remembered) ?? available[0] ?? null;
+  }
+
+  type ReadStorage = Pick<Storage, 'getItem'>;
+  type WriteStorage = Pick<Storage, 'setItem'>;
+
+  /** Every access in try/catch: storage can be absent (a private window), blocked, or throw. */
+  export function readGraphView(storage?: ReadStorage): string | null {
+    try {
+      return (storage ?? window.localStorage).getItem(GRAPH_VIEW_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+  export function writeGraphView(view: GraphViewId, storage?: WriteStorage): void {
+    try {
+      (storage ?? window.localStorage).setItem(GRAPH_VIEW_STORAGE_KEY, view);
+    } catch {
+      // a blocked store only costs the memory of the choice
+    }
+  }
+  ```
+
+  `packages/app-core/src/views/graph-tab.tsx`:
+  ```tsx
+  import { createElement, useState, type ReactElement } from 'react';
+  import { SegmentedControl } from '@gisik-nokma/ui';
+  import { availableGraphViews, chooseGraphView, GRAPH_VIEW_LABEL, readGraphView, writeGraphView, type GraphSlotProps, type GraphSlots, type GraphViewId } from './graph-slots.js';
+
+  export type GraphTabProps = GraphSlotProps & { slots: GraphSlots };
+
+  /** The Graph tab's body: the inner switch (two or more views) and the chosen view. */
+  export function GraphTab({ slots, ...slotProps }: GraphTabProps): ReactElement | null {
+    const available = availableGraphViews(slots);
+    const [chosen, setChosen] = useState<string | null>(() => readGraphView());
+    const view = chooseGraphView(available, chosen);
+    if (view === null) return null;
+    const slot = slots[view];
+    if (slot === undefined) return null;
+    return (
+      <div className="gn-ticket-sheet__graph">
+        {available.length >= 2 ? (
+          <SegmentedControl
+            options={available.map((id) => ({ value: id, label: GRAPH_VIEW_LABEL[id] }))}
+            value={view}
+            onChange={(next: GraphViewId) => {
+              setChosen(next);
+              writeGraphView(next);
+            }}
+            aria-label="Graph views"
+          />
+        ) : null}
+        {createElement(slot, { key: view, ...slotProps })}
+      </div>
+    );
+  }
+  ```
+  `packages/app-core/src/index.ts`, beside the editor-slot exports (`:110` on the tip): `export { GraphTab } from './views/graph-tab.js'; export { availableGraphViews, chooseGraphView, GRAPH_VIEW_LABEL, GRAPH_VIEW_ORDER, GRAPH_VIEW_STORAGE_KEY, readGraphView, writeGraphView, type GraphSlotComponent, type GraphSlotProps, type GraphSlots, type GraphViewId } from './views/graph-slots.js';`
+
+  `packages/app-core/src/views/ticket-sheet.tsx`. Four edits, on the form KG C T9 landed (Step 0.2):
+  1. **Props**, beside `knowledgeGraphSlot`:
+     ```ts
+       /** The Workflow view of the Graph tab (Workflow and Timeline graphs, Part 3). A slot like `editorSlot`: app-core never imports the renderer. */
+       workflowGraphSlot?: GraphSlotComponent;
+     ```
+  2. **One list of views**, built once in the component body (Part 4 adds `timeline: timelineGraphSlot` to this object and nothing else here):
+     ```ts
+       const graphSlots: GraphSlots = {
+         ...(knowledgeGraphSlot === undefined ? {} : { knowledge: knowledgeGraphSlot }),
+         ...(workflowGraphSlot === undefined ? {} : { workflow: workflowGraphSlot }),
+       };
+       const hasGraph = availableGraphViews(graphSlots).length > 0;
+       const [graphSelected, setGraphSelected] = useState<string | null>(null);
+     ```
+  3. **The tab**: in the `SegmentedControl` options, replace KG C's `knowledgeGraphSlot !== undefined ? [{ value: 'graph' as const, label: 'Knowledge Graph' }]` with `hasGraph ? [{ value: 'graph' as const, label: 'Graph' }]`, and extend the comment above it: "a fourth tab named Graph when any graph view is mounted (SH-1); 16.81 counts both mounts".
+  4. **The branch** (KG C's `tab === 'graph' && knowledgeGraphSlot !== undefined` arm) becomes
+     ```tsx
+       ) : tab === 'graph' && hasGraph ? (
+         <GraphTab
+           slots={graphSlots}
+           workspaceId={workspaceId}
+           ticketId={ticketId}
+           selected={graphSelected}
+           onSelect={setGraphSelected}
+           onOpenTicket={onOpenTicket}
+           onShowLinks={() => setTab('details')}
+         />
+     ```
+     and the `<Sheet` gets `wide={tab === 'graph'}` beside `full={sheetFull}` (`:3323` on the tip).
+
+  Run: the new app-core files and `ticket-sheet.test.tsx` (build ui first: `pnpm turbo run build --filter=@gisik-nokma/ui`), then `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 > /tmp/wtg3-t6c.log 2>&1; tail -n 12 /tmp/wtg3-t6c.log`. Expected PASS. Commit.
+
+- [ ] **Step 5: GREEN, the web boundary and the hosts**
+
+  `apps/web/src/workflow-graph/workflow-panel.tsx` (a shell on purpose: T7 gives it the stage; the release is not cut between T6 and T7):
+  ```tsx
+  'use client';
+  import type { GraphSlotProps } from '@gisik-nokma/app-core';
+
+  /** The Workflow view's panel. T7 fills it; until then it only holds the place and the accessible name. */
+  export function WorkflowPanel(_props: GraphSlotProps) {
+    return (
+      <section className="gn-wf" aria-label="Workflow" aria-busy="true">
+        <p className="gn-wf__note">Loading the flow…</p>
+      </section>
+    );
+  }
+  ```
+  `apps/web/src/workflow-graph/ticket-workflow-tab.tsx`: the ONLY file that names the panel, through `next/dynamic`, so the renderer, ELK and the camera are a separate chunk that loads when the Workflow view is first shown:
+  ```tsx
+  'use client';
+  import dynamic from 'next/dynamic';
+  import type { GraphSlotComponent } from '@gisik-nokma/app-core';
+
+  /** Client-only: the panel mounts a camera, a Worker and DOM measurement (spec §9.2). A route that opens no graph pays nothing. */
+  const WorkflowPanel = dynamic(() => import('./workflow-panel.js').then((m) => m.WorkflowPanel), {
+    ssr: false,
+    loading: () => <div className="gn-wf" aria-busy="true" />,
+  });
+
+  export const TicketWorkflowTab: GraphSlotComponent = (props) => <WorkflowPanel {...props} />;
+  ```
+  At each of the three hosts, beside the `knowledgeGraphSlot={TicketGraphTab}` line (KG C T9: `my-work/page.tsx` after `:394`, `p/[projectId]/page.tsx` at the `<TicketSheet` at `:3703`, `note-document.tsx` after `:843`), add `workflowGraphSlot={TicketWorkflowTab}` with the comment `{/* Workflow graph, Part 3: the Graph tab's Workflow view */}` (or the JSX-attribute comment form the file already uses) and `import { TicketWorkflowTab } from '<relative>/workflow-graph/ticket-workflow-tab.js';` (the same relative style the file uses for `TicketGraphTab`).
+
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph test/import-graph.test.ts > /tmp/wtg3-t6w.log 2>&1; tail -n 20 /tmp/wtg3-t6w.log`, then the web suite WHOLE. Expected PASS. Commit.
+
+- [ ] **Step 6: Weight, geometry, mutations**
+
+  1. **First-load JS:** `pnpm --filter @gisik-nokma/web build > /tmp/wtg3-t6-after.log 2>&1; grep -E "First Load JS|my-work|projectId|/notes" /tmp/wtg3-t6-after.log`. The three routes' First Load JS equal the baseline of Step 0.3 (the shell adds a few hundred bytes of `next/dynamic` and `GraphTab`; state the delta and that it is under 1 kB; the budget is "no increase from the graph", and T7's panel body is where the weight goes, behind the boundary).
+  2. **Geometry** (the 🟡 manual half of 29.255): the sheet's width needs only a tab to open, so it is measured in this task if the Graph tab shows, on a lane port; otherwise T7 records it. The CSS-side proof is the 29.255 CSS tests.
+  3. **Mutations (the reviewer re-runs these):**
+
+     | Case | Mutation | Expected red |
+     |---|---|---|
+     | 29.255 | move `.gn-sheet--wide` below the `@media (max-width: 64rem)` block | the source-order assertion |
+     | 29.255 | `wide ? 'gn-sheet--wide' : ''` → `'gn-sheet--wide'` | the plain-sheet class assertion |
+     | 29.256 | `hasGraph ? […] : []` → always `[…]` | 16.81's first arm (three tabs without a slot) |
+     | 29.257 | remove the `try`/`catch` in `readGraphView` | the throwing-storage assertion |
+     | 29.257 | `chooseGraphView` returns `available[0]` always | the remembered-view assertion |
+     | 29.257 | give each view its own `useState` selection instead of the sheet's | the "SAME across views" assertion |
+     | 29.258 | `import '@gisik-nokma/flow-graph';` as the first line of `ticket-workflow-tab.tsx` | the import-graph `it` |
+     | 29.259 | delete the prop from `note-document.tsx` | the hosts test |
+
+     Revert each.
+
+- [ ] **Step 7: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** `grep -n "16.81" -r test-cases` and edit that line to say: three tabs; a fourth, **Graph**, when the host mounts a graph view. `grep -n "Knowledge Graph" test-cases/27-knowledge-graph.md Features.md` and fix every sentence that calls the TAB "Knowledge Graph" (the note byline's `Knowledge Graph` sheet is a different surface and keeps its name); fix the docblocks in `ticket-sheet.tsx` and `graph-panel.tsx` that say so (`grep -n "Knowledge Graph" packages/app-core/src/views/ticket-sheet.tsx apps/web/src/knowledge-graph`).
+  2. Flip 29.255 (automated half; the 🟡 manual half stays until T7 measures it), 29.256, 29.257, 29.258, 29.259.
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T6 bullet -->`: `- ✅ **Graph tab** — the ticket sheet's fourth tab is **Graph**: it opens a wide panel (\`min(1240px, 94vw)\`) holding a Knowledge | Workflow | Timeline switch for the views mounted, remembered per browser; the Workflow view loads as its own chunk. \`packages/app-core/src/views/graph-tab.tsx\`, \`graph-slots.ts\`, \`packages/ui/src/components/sheet.tsx\` (\`wide\`), \`apps/web/src/workflow-graph/\``
+  4. Sweeps: `ui`, `app-core` and `web` suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL).
+
+  Commit `wtg3 T6: the Graph tab, the wide sheet and the Workflow slot`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-graph-tab.md` written (route table before and after, the landed KG C T9 form, the three contradictions D-W3-16 to D-W3-18).
+
+---
+
+### Task 7: The Workflow view: a read becomes a drawn flow, the header, the legend, the list, the empty state, live updates (cases 29.260–29.262)
+
+**Branch** `task/wtg3-workflow-view` (needs T3 for `getFlow` and `FlowRead`, T4 for the scene, T5 for the stage, T6 for the Graph tab and the dynamic boundary). **NEEDS: browser** for Step 8 (a lane port). **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Main.png` (header chips, legend, count, canvas, zoom controls) and `wtg-preview/Phone-workflow.png`; measure real geometry by painting the worktree on a lane port (`next dev -p <port>` against the running API; `memory/browser-measurement.md`). **Files:**
+- Create:
+  - `packages/flow-graph/src/scene/pipeline.ts`, `packages/flow-graph/test/scene/pipeline.test.ts`
+  - `packages/app-core/src/workflow-graph/{flow-sentences,flow-model,flow-diff,testing,index}.ts`, `packages/app-core/test/workflow-graph/model.test.ts`
+  - `apps/web/src/workflow-graph/{panel-deps,measure,runtime,use-container-orientation,use-scene,use-flow}.ts`, `apps/web/src/workflow-graph/{flow-canvas,flow-header,flow-list,workflow-view}.tsx`
+  - `apps/web/test/workflow-graph/{support.tsx,workflow-view.test.tsx,workflow-panel.test.tsx}`
+- Modify:
+  - `packages/flow-graph/src/index.ts` (the pipeline's exports)
+  - `packages/app-core/package.json` (two `exports`, one dependency), `apps/web/package.json` (three dependencies), `pnpm-lock.yaml`
+  - `apps/web/src/workflow-graph/workflow-panel.tsx` (T6's shell becomes the panel)
+  - `packages/ui/src/ui.css` (one `/* WTG3 T7 */` block)
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T7 anchors); 29.255's 🟡 note once its manual half is measured
+
+**Interfaces:**
+- **Consumes:** T3 `FlowRead`, `FlowNodeRead`, `FlowEdgeRead` (from `@gisik-nokma/domain`), `DataSourceQuery.getFlow(workspaceId, ticketId)`; T4 `SceneInput`, `Scene`, `SceneContext`, `layoutInputOf`, `buildScene`; T2 `layoutFlow`, `placeLeaves`, `diffLayouts`, `orientationFor`, `LayoutEngine`; T5 `FlowStage`, `FlowCamera`, `Pick`; T6 `GraphSlotProps`, `GraphSlotComponent`, the `next/dynamic` boundary in `ticket-workflow-tab.tsx`; Part 1 `CameraAdapter`; app-core `useLiveQuery`, web `useAppServices`.
+- **Produces:**
+  - flow-graph: `nextScene(engine, ctx, input: SceneInput, previous: SceneMemory | null): Promise<SceneStep>`, `layoutKey(layoutInput): string`, `type SceneMode = 'first' | 'same' | 'placed' | 'relayout'`, `type SceneMemory = { layout: FlowLayout; layoutInput: LayoutInput }`, `type SceneStep = SceneMemory & { scene: Scene; mode: SceneMode; diff: LayoutDiff | null }`;
+  - app-core, `@gisik-nokma/app-core/workflow-graph`: `sceneInputOf(read, { phone, orientation, showNotes }): SceneInput`, `flowSummary(read)`, `legendOf(read, showNotes)`, `initialsOf(name)`, `listRows(read)`, `afterClause(read, node)`, `nodeLabel(node)`, `edgeTooltip`, `notTakenChip`, `notTakenTooltip`, `ticketsInFlowLabel`, `draftBanner`, `diffReads(prev, next)`, `highlightIds(change)`, `FLOW_EMPTY_COPY`, `FLOW_LIST_HEADING`; and, from `@gisik-nokma/app-core/workflow-graph/testing`, the builders every later test uses: `readNode(id, over)`, `readEdge(from, to, label?, over?)`, `blocksEdge(from, to)`, `readOf(nodes, edges, over?)`, `decisionRead()`;
+  - web: `WorkflowView` (props `GraphSlotProps & { read, error, onRetry, deps }`), `WorkflowPanel` (the live glue), `PanelDeps`, `FlowCanvas` (with `FlowCanvasHandle { focusNode, fit }`), `FlowHeader`, `FlowList`, `useScene`, `useFlow`, and in `test/workflow-graph/support.tsx` `fakeDeps(width?)`, `mountView(read, over?, deps?)`, `centreOfCard`, `press`.
+
+Siblings copied: `apps/web/src/notes/note-comments.tsx` (`useAppServices`, `useLiveQuery(dataSource, workspaceId, key, load, { cacheKey })`); `apps/web/test/backlog-tab.test.tsx:1-30` (`Providers`, `stubServices`, the `auth-client` mock); `packages/ui/src/components/button.tsx` (`Button`). `Switch` and `Chip` are NOT used here (T8 and T10 use `Switch`).
+
+**Decisions, reported:**
+- **D-W3-19 The sheet's own ticket is the default selection.** SH-5 asks for the ticket the sheet is open on to be highlighted by "the mockup's 2.5 px ring". `selected` is the sheet's shared selection (D-W3-16) and starts `null`; the view treats `null`, and a selection that is not a node of this flow, as the read's `rootId`. A tap on the empty canvas calls `onSelect(null)`, which returns the ring to the sheet's ticket.
+- **D-W3-20 Phone means portrait.** Spec §9.3 says orientation follows the graph's container (portrait below 40rem) and WG-9 says a phone is "the sheet below 40rem". They are one measurement: `phone = orientation === 'portrait'`, from the container, not the device. A narrow desktop window gets the phone layout, a tablet in landscape does not.
+- **D-W3-21 The layout pipeline lives in the drawing package.** Spec §9.3 wants the previous layout kept until the new one is ready, no ELK run for a status change, a lone leaf placed, anything else a glide. That decision tree is `nextScene` in `packages/flow-graph`, tested with ELK in-process, so the web panel is glue and the rule is not re-implemented per surface (the Timeline graph, Part 4, can ask the same question of its own layout).
+- **D-W3-22 App-core depends on the drawing package, for types only.** `sceneInputOf` returns the package's `SceneInput`, so `packages/app-core/package.json` gains `"@gisik-nokma/flow-graph": "workspace:*"` and the module uses `import type` only (no runtime edge; `verbatimModuleSyntax` makes breaking that a compile error). The model lives in app-core, behind a subpath export, so no route that does not open a Workflow view loads it (29.258 keeps counting).
+- **D-W3-23 The replica cannot draw a flow, and the view says so.** `getFlow` is online only (D-W3-8). Offline, `useFlow` surfaces the rejection as `error`, and the view shows `The flow could not be loaded. <the gap's own sentence>` with `Try again`. No cached flow is shown: a partial flow would be a wrong one.
+- **D-W3-24 Notes are not drawn in this task.** The scene builder is still the no-notes version (T4) until T10. The view passes `showNotes: false`, draws no Notes chip, no switch and no Note legend entry; the accessible list already names a ticket's visible notes (it is a text path, and true). T10 owns the switch, the chip, the legend entry and the blocks.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-workflow-view` from `origin/release/<next>`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. **Read what landed** and write it into the handoff: `grep -n "export" packages/flow-graph/src/index.ts` (T2/T4/T5 names as in Interfaces; if one landed under another name, change THIS task's call sites, not theirs); `grep -n "getFlow" packages/app-core/src/data-source.ts`; `grep -n "export class CameraAdapter" -A30 packages/viewport/src/dom/camera-adapter.ts` (the constructor's option names: T5's harness passes `{ el, layer }`; use the landed names in `runtime.ts`); `sed -n 1,60p apps/web/src/workflow-graph/ticket-workflow-tab.tsx`.
+  3. **Baselines before touching anything:** `pnpm --filter @gisik-nokma/web build > /tmp/wtg3-t7-before.log 2>&1` and save the `/my-work`, `/w/[workspaceId]/p/[projectId]` and `/notes` First Load JS lines to the handoff (the bar: unchanged after this task).
+  4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T7" Features.md test-cases/29-workflow-timeline-graphs.md`.
+  5. `ls apps/web/node_modules | grep -c elkjs` is `0` now (the web app does not depend on `elkjs` yet; Step 6 adds it).
+
+- [ ] **Step 1: The three case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T7 -->`:
+  - `- ❌ **29.260 — A FlowRead becomes the drawing package's input, and the words around it:** the nodes keep the read's flow order; Start and End come from the read's FL-3 lists (a flow of one has both); a card's status word, assignee initials, round, wait-for-all flag, Decision outcome and pass count map over; a Not-taken ticket carries the chip (\`Not taken\`, \`Not taken (pass 2)\` from pass 2) and the tooltip \`Not taken, pass 2, via GN-162 Title (chose No)\` (a Decision the viewer cannot see is not named); an edge to a ticket that is not in the read is dropped and not counted; tooltips say \`not chosen\`, \`pass 1\`, and for a loop where it goes; the header counts distinct links and the legend names THIS flow's states, specials first; the accessible list is in flow order, \`GN-163 Title, after GN-162 (Yes)\`, with \`. Notes: …\` and \`Draft\` for a draft, and a loop's back edge is not "after"; two reads of one flow differ by the cards a person would see change. Control: the same read twice is no change; a flow of one has no legend entry but its state. Mutation: sort the nodes by id → reds.`
+  - `- ❌ **29.261 — The scene pipeline reuses, places or lays out:** the first draw lays out and has no diff; the same shape with a changed status reuses the layout object and ELK does not run; a lone new leaf is placed beside its source, ELK does not run and no existing node moves; a changed edge label, a removed node or a different orientation is a full layout with a diff of what moved. Control: a leaf with two incomers is a full layout. Mutation: make \`layoutKey\` constant → reds.`
+  - `- ❌ **29.262 — The Workflow view draws the flow and says it in words:** the header (\`Leads to N\`, \`Blocks N\` only above 0, \`N tickets in this flow\`), the legend, the canvas as a labelled image whose name points to the list, the list \`This flow, in order\`; every card names its status in words; the ticket the sheet is open on wears the ring until something else is selected; a tap selects, a quick second tap opens, a tap on nothing returns to the sheet's ticket, a long press does nothing; the list selects on the first press and opens on the second or a double click; a ticket in no flow draws itself with Start and End and the sentence \`This ticket isn't in a flow yet. Add what comes next.\`; loading, a failed read with \`Try again\`, and a truncated flow with \`Open this ticket's neighbours only\`; narrower than 40rem is portrait with 156 px blocks; a new read of the same flow places a new leaf without moving anything, rings a changed card, and does not refit the camera, while another flow is drawn fresh; a layout that finishes after a newer read is dropped; no "+" handle is drawn (nothing creates steps yet); the panel asks \`getFlow\` for this workspace and ticket, shows a refusal with a retry, and ends the Worker on unmount. Control: each of these absent on a good read. Mutation: drop the stale-result guard → reds. Manual half (🟡 until recorded): on a lane port the view next to \`wtg-preview/Main.png\` and \`Phone-workflow.png\` (header, legend, count, canvas, zoom), and the Graph tab measured at 1240 px (29.255's manual half).`
+
+- [ ] **Step 2: RED, the app-core tests and their builders**
+
+  `packages/app-core/src/workflow-graph/testing.ts` is a test helper (nothing shipped reads it), created first because every test here and in T8 to T12 builds its `FlowRead` with it. `decisionRead()` is the fixture: eight steps with every feature in them (a Decision decided twice, its "Yes" ticket closed Not taken in pass 2, a loop, a draft, a wait-for-all ticket in round 2, two notes, one real `blocks` link and one whose source is a hidden ticket):
+  ```ts
+import type { FlowEdgeRead, FlowNodeRead, FlowRead } from '@gisik-nokma/domain';
+
+/**
+ * Builders for tests of the Workflow graph (subpath `@gisik-nokma/app-core/workflow-graph/testing`, so app-core's own tests and
+ * the web panel's tests build a `FlowRead` the same way). Nothing here is read by shipped code.
+ */
+export function readNode(id: string, over: Partial<FlowNodeRead> = {}): FlowNodeRead {
+  return {
+    id,
+    key: over.draft === true ? null : `GN-${id}`,
+    draft: false,
+    title: `Title ${id}`,
+    kind: 'ticket',
+    typeId: 'task',
+    parentId: null,
+    projectId: 'p1',
+    state: { id: 'todo', name: 'To do', category: 'open' },
+    initialStateName: 'To do',
+    assigneeId: null,
+    assigneeName: null,
+    dueDate: null,
+    waitForAll: false,
+    estimate: null,
+    reworkEstimate: null,
+    round: 1,
+    outcome: null,
+    passes: [],
+    resolution: null,
+    alternates: [],
+    periods: [],
+    planned: [],
+    actual: null,
+    tray: null,
+    notes: [],
+    pin: { notes: 0, attachments: 0 },
+    ...over,
+  };
+}
+
+export function readEdge(from: string, to: string, label: string | null = null, over: Partial<FlowEdgeRead> = {}): FlowEdgeRead {
+  return { id: `${from}>${to}`, kind: 'leads_to', from, to, label, loop: false, taken: 0, takenPasses: [], chosen: null, ...over };
+}
+
+export function blocksEdge(from: string, to: string): FlowEdgeRead {
+  return { id: `${from}~${to}`, kind: 'blocks', from, to, label: null, loop: false, taken: 0, takenPasses: [], chosen: null };
+}
+
+/** A read from nodes (given in flow order) and edges; FL-3's start and end are derived from the `leads_to` edges. */
+export function readOf(nodes: FlowNodeRead[], edges: FlowEdgeRead[], over: Partial<FlowRead> = {}): FlowRead {
+  const flow = edges.filter((e) => e.kind === 'leads_to');
+  return {
+    flowId: [...nodes.map((n) => n.id)].sort()[0] ?? '',
+    rootId: nodes[0]?.id ?? '',
+    truncated: false,
+    reached: nodes.length,
+    start: nodes.filter((n) => !flow.some((e) => e.to === n.id)).map((n) => n.id),
+    end: nodes.filter((n) => !flow.some((e) => e.from === n.id)).map((n) => n.id),
+    order: nodes.map((n) => n.id),
+    nodes,
+    edges,
+    autoMoves: [],
+    draftCount: nodes.filter((n) => n.draft).length,
+    ...over,
+  };
+}
+
+const DONE = { id: 'done', name: 'Done', category: 'terminal' } as const;
+const DOING = { id: 'doing', name: 'In progress', category: 'active' } as const;
+
+/**
+ * Eight steps with every feature in them: a Decision that has been decided twice (pass 1 Yes, then pass 2 No), the "Yes" ticket
+ * closed Not taken in pass 2, a loop, a draft, a ticket that waits for all, and two notes. `C` is the ticket the sheet is open on.
+ *
+ *   S > A > D "Build in-house?" (Yes > B, No > C)   B > E   C > E   E > F   F > G (a draft, the End)   D > A "Needs rework" (a loop)
+ *   C blocks F.  N blocks C, but N is not in the flow (a hidden ticket): that edge is a hole.
+ */
+export function decisionRead(): FlowRead {
+  const nodes = [
+    readNode('S', { key: 'GN-160', title: 'Write homepage copy', state: DONE, assigneeName: 'Tengsim Marak' }),
+    readNode('A', { key: 'GN-161', title: 'Design homepage', state: DONE, assigneeName: 'Tengsim Marak', notes: [{ id: 'n1', title: 'Pitch brief' }, { id: 'n2', title: 'Client call' }] }),
+    readNode('D', {
+      key: 'GN-162',
+      title: 'Build the page in-house?',
+      kind: 'decision',
+      typeId: 'decision',
+      state: DONE,
+      assigneeName: 'Ama Rangsa',
+      outcome: 'No',
+      passes: [
+        { pass: 1, outcome: 'Yes', by: 'u1', at: '2026-09-25T06:10:00Z', revisions: [] },
+        { pass: 2, outcome: 'No', by: 'u1', at: '2026-10-02T10:35:00Z', revisions: [] },
+      ],
+    }),
+    readNode('B', { key: 'GN-163', title: 'Build the page in-house', state: DONE, resolution: { kind: 'not-taken', decisionTicketId: 'D', outcome: 'No', pass: 2 } }),
+    readNode('C', { key: 'GN-165', title: 'Brief the agency', state: DOING, assigneeName: 'Ama Rangsa' }),
+    readNode('E', { key: 'GN-166', title: 'Review the agency build', waitForAll: true, round: 2 }),
+    readNode('F', { key: 'GN-168', title: 'Launch the new homepage' }),
+    readNode('G', { draft: true, title: 'Announce the launch' }),
+  ];
+  const edges = [
+    readEdge('S', 'A'),
+    readEdge('A', 'D'),
+    readEdge('D', 'B', 'Yes', { chosen: false, taken: 1, takenPasses: [1] }),
+    readEdge('D', 'C', 'No', { chosen: true, taken: 1, takenPasses: [2] }),
+    readEdge('B', 'E'),
+    readEdge('C', 'E'),
+    readEdge('E', 'F'),
+    readEdge('F', 'G'),
+    readEdge('D', 'A', 'Needs rework', { loop: true, chosen: false, taken: 0, takenPasses: [] }),
+    blocksEdge('C', 'F'),
+    blocksEdge('N', 'C'),
+  ];
+  // `N` is not in the flow: its blocks edge must be dropped and not counted (a hole is never a dangling arrow).
+  return readOf(nodes, edges, { rootId: 'C' });
+}
+  ```
+
+  `packages/app-core/test/workflow-graph/model.test.ts`:
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { diffReads, highlightIds } from '../../src/workflow-graph/flow-diff.js';
+import { flowSummary, initialsOf, legendOf, sceneInputOf } from '../../src/workflow-graph/flow-model.js';
+import { afterClause, edgeTooltip, listRows, nodeLabel, notTakenChip, draftBanner, ticketsInFlowLabel } from '../../src/workflow-graph/flow-sentences.js';
+import { decisionRead, readEdge, readNode, readOf } from '../../src/workflow-graph/testing.js';
+
+const OPTIONS = { phone: false, orientation: 'landscape' as const, showNotes: true };
+
+describe('29.260 a FlowRead as the drawing package\'s input', () => {
+  it('29.260 the nodes keep the read\'s order; Start and End come from the read; status words, initials, Not-taken chips and a Decision\'s passes map over; a hole drops its edge', () => {
+    const read = decisionRead();
+    const input = sceneInputOf(read, OPTIONS);
+    expect(input.nodes.map((n) => n.id)).toEqual(['S', 'A', 'D', 'B', 'C', 'E', 'F', 'G']);
+    expect(input.nodes.filter((n) => n.start).map((n) => n.id)).toEqual(['S']);
+    expect(input.nodes.filter((n) => n.end).map((n) => n.id)).toEqual(['G']);
+    const a = input.nodes[1]!;
+    expect(a).toMatchObject({ key: 'GN-161', statusWord: 'Done', category: 'terminal', assigneeInitials: 'TM', shape: 'ticket', notes: [{ id: 'n1', title: 'Pitch brief' }, { id: 'n2', title: 'Client call' }] });
+    const d = input.nodes[2]!;
+    expect(d).toMatchObject({ shape: 'decision', outcome: 'No', passCount: 2, assigneeInitials: 'AR' });
+    expect(input.nodes[3]!.notTaken).toEqual({ chip: 'Not taken (pass 2)', tooltip: 'Not taken, pass 2, via GN-162 Build the page in-house? (chose No)' });
+    expect(input.nodes[5]).toMatchObject({ round: 2, waitForAll: true, outcome: null });
+    expect(input.nodes[7]).toMatchObject({ draft: true, key: null });
+    expect(input.edges.map((e) => e.id)).toEqual(['S>A', 'A>D', 'D>B', 'D>C', 'B>E', 'C>E', 'E>F', 'F>G', 'D>A', 'C~F']);
+    expect(input.edges.find((e) => e.id === 'N~C')).toBeUndefined();
+    expect(input).toMatchObject({ orientation: 'landscape', phone: false });
+    // controls: the switch empties the notes, and a phone passes through
+    expect(sceneInputOf(read, { ...OPTIONS, showNotes: false }).nodes[0]!.notes).toEqual([]);
+    expect(sceneInputOf(read, { phone: true, orientation: 'portrait', showNotes: true })).toMatchObject({ phone: true, orientation: 'portrait' });
+  });
+
+  it('29.260 edge tooltips: a loop says where it goes, an unchosen branch says so, an earlier pass is named; control: a plain edge has none', () => {
+    const read = decisionRead();
+    const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+    const edge = (id: string) => read.edges.find((e) => e.id === id)!;
+    expect(edgeTooltip(edge('D>A'), byId)).toBe('Loops back to GN-161. Choosing it reopens GN-161 and puts the steps after it back in Backlog. (not chosen)');
+    expect(edgeTooltip(edge('D>B'), byId)).toBe('not chosen, pass 1');
+    expect(edgeTooltip(edge('D>C'), byId)).toBe('pass 2');
+    expect(edgeTooltip({ ...edge('D>C'), takenPasses: [1, 2] }, byId)).toBe('passes 1, 2');
+    expect(edgeTooltip(edge('A>D'), byId)).toBeNull();
+    expect(notTakenChip(1)).toBe('Not taken');
+    expect(notTakenChip(3)).toBe('Not taken (pass 3)');
+    // a Decision the viewer cannot see is not named
+    const hidden = new Map([...byId].filter(([id]) => id !== 'D'));
+    expect(sceneInputOf({ ...read, nodes: read.nodes.filter((n) => n.id !== 'D'), edges: read.edges.filter((e) => e.from !== 'D' && e.to !== 'D') }, OPTIONS).nodes.find((n) => n.id === 'B')!.notTaken!.tooltip).toBe('Not taken, pass 2 (chose No)');
+    expect(hidden.has('D')).toBe(false);
+  });
+
+  it('29.260 initials are the first and last words\' first letters, from code points; nobody is null', () => {
+    expect(initialsOf('Ama Rangsa')).toBe('AR');
+    expect(initialsOf('  Jangjang  Sangma Marak ')).toBe('JM');
+    expect(initialsOf('Ama')).toBe('AM');
+    expect(initialsOf('A')).toBe('A');
+    expect(initialsOf('𝒜da Lovelace')).toBe('𝒜L');
+    expect(initialsOf('')).toBeNull();
+    expect(initialsOf(null)).toBeNull();
+  });
+
+  it('29.260 the header counts distinct notes and the legend names this flow\'s states, specials first; control: a flow of one has neither', () => {
+    const read = decisionRead();
+    expect(flowSummary(read)).toEqual({ tickets: 8, leadsTo: 9, blocks: 1, notes: 2, drafts: 1, waitsForAll: true });
+    // the fixture also carries a blocks edge whose source is a hidden ticket: it is a hole, drawn and counted by nobody
+    expect(read.edges.filter((e) => e.kind === 'blocks')).toHaveLength(2);
+    expect(legendOf(read, true).map((i) => i.label)).toEqual(['Waits for all incoming', 'Draft', 'Note', 'Not taken', 'Loop, times taken', 'Done', 'In progress', 'To do']);
+    expect(legendOf(read, false).map((i) => i.label)).not.toContain('Note');
+    const shared = readOf([readNode('X', { notes: [{ id: 'n9', title: 'Shared' }] }), readNode('Y', { notes: [{ id: 'n9', title: 'Shared' }] })], [readEdge('X', 'Y')]);
+    expect(flowSummary(shared).notes).toBe(1);
+    const one = readOf([readNode('Z')], []);
+    expect(flowSummary(one)).toEqual({ tickets: 1, leadsTo: 0, blocks: 0, notes: 0, drafts: 0, waitsForAll: false });
+    expect(legendOf(one, true)).toEqual([{ kind: 'status', label: 'To do', category: 'open' }]);
+    expect(sceneInputOf(one, OPTIONS).nodes[0]).toMatchObject({ start: true, end: true });
+    expect(ticketsInFlowLabel(1)).toBe('1 ticket in this flow');
+    expect(ticketsInFlowLabel(13)).toBe('13 tickets in this flow');
+    expect(draftBanner(3)).toEqual({ lead: '3 drafts in this flow.', rest: 'Only you can see them. Publishing makes every draft a Backlog ticket.' });
+    expect(draftBanner(1).lead).toBe('1 draft in this flow.');
+  });
+
+  it('29.260 the accessible list is in flow order with "after" clauses and notes; a loop is not "after"; control: a root has no clause', () => {
+    const read = decisionRead();
+    const rows = listRows(read);
+    expect(rows.map((r) => r.id)).toEqual(['S', 'A', 'D', 'B', 'C', 'E', 'F', 'G']);
+    expect(rows[0]!.text).toBe('GN-160 Write homepage copy');
+    expect(rows[1]!.text).toBe('GN-161 Design homepage, after GN-160. Notes: Pitch brief, Client call');
+    expect(rows[2]!.text).toBe('GN-162 Build the page in-house?, after GN-161');
+    expect(rows[3]!.text).toBe('GN-163 Build the page in-house, after GN-162 (Yes)');
+    expect(rows[5]!.text).toBe('GN-166 Review the agency build, after GN-163 and GN-165');
+    expect(rows[7]!.text).toBe('Draft Announce the launch, after GN-168');
+    expect(afterClause(read, read.nodes[0]!)).toBe('');
+    const three = readOf([readNode('P'), readNode('Q'), readNode('R'), readNode('S')], [readEdge('P', 'S'), readEdge('Q', 'S', 'Yes'), readEdge('R', 'S')]);
+    expect(afterClause(three, three.nodes[3]!)).toBe('after GN-P, GN-Q (Yes) and GN-R');
+    expect(nodeLabel({ key: null, draft: false })).toBe('Draft');
+  });
+
+  it('29.260 two reads of one flow differ by what a person would see change; another flow is a new picture; control: the same read is no change', () => {
+    const before = decisionRead();
+    const after = { ...before, nodes: before.nodes.map((n) => (n.id === 'C' ? { ...n, state: { id: 'done', name: 'Done', category: 'terminal' as const } } : n)).concat([readNode('H', { title: 'New' })]).filter((n) => n.id !== 'G') };
+    const change = diffReads(before, after);
+    expect(change).toEqual({ added: ['H'], removed: ['G'], changed: ['C'] });
+    expect(highlightIds(change)).toEqual(['H', 'C']);
+    expect(diffReads(before, before)).toEqual({ added: [], removed: [], changed: [] });
+    expect(diffReads(null, before)).toEqual({ added: [], removed: [], changed: [] });
+    expect(diffReads(before, { ...after, flowId: 'other' }).added).toHaveLength(after.nodes.length);
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t7a.log 2>&1; tail -n 20 /tmp/wtg3-t7a.log` (FAIL: the modules do not exist).
+
+- [ ] **Step 3: GREEN, the model**
+
+  `packages/app-core/src/workflow-graph/flow-sentences.ts`: every sentence the graph says, as pure functions, so the canvas, the list and the tests read the same words (and so the copy sweep 23.191 finds neither a `" — "` nor a `" · "`):
+  ```ts
+import type { FlowEdgeRead, FlowNodeRead, FlowRead } from '@gisik-nokma/domain';
+
+/**
+ * Every sentence the Workflow graph says about a flow, as pure functions of a `FlowRead`, so the canvas, the accessible list and
+ * the tests read the same words. No " — " and no " · " in any string here (23.191 sweeps app-core's source for both).
+ */
+export const FLOW_EMPTY_COPY = "This ticket isn't in a flow yet. Add what comes next.";
+export const FLOW_LIST_HEADING = 'This flow, in order';
+
+/** What a node is called in a sentence: its key, or "Draft" while it has none. */
+export function nodeLabel(node: Pick<FlowNodeRead, 'key' | 'draft'>): string {
+  return node.draft || node.key === null ? 'Draft' : node.key;
+}
+
+export function ticketsInFlowLabel(count: number): string {
+  return `${count} ${count === 1 ? 'ticket' : 'tickets'} in this flow`;
+}
+
+/** The Publish banner's two halves: the mockup sets `lead` in bold. */
+export function draftBanner(count: number): { lead: string; rest: string } {
+  return { lead: `${count} ${count === 1 ? 'draft' : 'drafts'} in this flow.`, rest: 'Only you can see them. Publishing makes every draft a Backlog ticket.' };
+}
+
+/** The chip on a Not-taken ticket: plain for pass 1, "(pass n)" from pass 2 (PS-5). */
+export function notTakenChip(pass: number): string {
+  return pass >= 2 ? `Not taken (pass ${pass})` : 'Not taken';
+}
+
+/** "Not taken, pass 1, via GN-151 Client decides (chose Yes)". A Decision the viewer cannot see is not named. */
+export function notTakenTooltip(node: FlowNodeRead, byId: ReadonlyMap<string, FlowNodeRead>): string {
+  const resolution = node.resolution;
+  if (resolution === null) return '';
+  const decision = byId.get(resolution.decisionTicketId);
+  const via = decision === undefined ? '' : `, via ${nodeLabel(decision)} ${decision.title}`;
+  return `Not taken, pass ${resolution.pass}${via} (chose ${resolution.outcome})`;
+}
+
+/**
+ * An edge's tooltip (WG-8): a loop says where it goes and what choosing it does; an edge a Decision did not choose says
+ * `not chosen`; an edge earlier passes took says which. `null` when there is nothing to say.
+ */
+export function edgeTooltip(edge: FlowEdgeRead, byId: ReadonlyMap<string, FlowNodeRead>): string | null {
+  const facts: string[] = [];
+  if (edge.chosen === false) facts.push('not chosen');
+  if (edge.takenPasses.length === 1) facts.push(`pass ${edge.takenPasses[0]}`);
+  else if (edge.takenPasses.length > 1) facts.push(`passes ${edge.takenPasses.join(', ')}`);
+  let base = '';
+  if (edge.loop) {
+    const target = byId.get(edge.to);
+    const name = target === undefined ? 'an earlier step' : nodeLabel(target);
+    base = `Loops back to ${name}. Choosing it reopens ${name} and puts the steps after it back in Backlog.`;
+  }
+  if (base === '') return facts.length === 0 ? null : facts.join(', ');
+  return facts.length === 0 ? base : `${base} (${facts.join(', ')})`;
+}
+
+function joinAnd(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+/** "after GN-144 (Yes)": the tickets that lead here by a forward edge, in flow order. A loop's back edge is not "after". */
+export function afterClause(read: FlowRead, node: FlowNodeRead): string {
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  const rank = new Map(read.order.map((id, i) => [id, i] as const));
+  const sources = read.edges
+    .filter((e) => e.kind === 'leads_to' && e.to === node.id && !e.loop && byId.has(e.from))
+    .sort((a, b) => (rank.get(a.from) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.from) ?? Number.MAX_SAFE_INTEGER));
+  if (sources.length === 0) return '';
+  return `after ${joinAnd(sources.map((e) => `${nodeLabel(byId.get(e.from)!)}${e.label === null ? '' : ` (${e.label})`}`))}`;
+}
+
+export type ListRow = { id: string; text: string };
+
+/**
+ * The accessible list (WG-4, WG-7): one row per ticket in flow order, "GN-147 Pitch is approved, after GN-144 (Yes)", with
+ * ". Notes: Pitch brief, Client call" when the viewer can see notes on it. It is the keyboard and screen-reader path, so it lists
+ * the notes whether or not the canvas shows them.
+ */
+export function listRows(read: FlowRead): ListRow[] {
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  const ordered = read.order.map((id) => byId.get(id)).filter((n): n is FlowNodeRead => n !== undefined);
+  const missing = read.nodes.filter((n) => !read.order.includes(n.id));
+  return [...ordered, ...missing].map((node) => {
+    const after = afterClause(read, node);
+    const notes = node.notes.length === 0 ? '' : `. Notes: ${node.notes.map((n) => n.title).join(', ')}`;
+    return { id: node.id, text: `${nodeLabel(node)} ${node.title}${after === '' ? '' : `, ${after}`}${notes}` };
+  });
+}
+  ```
+
+  `flow-model.ts`: the mapping to the drawing package's input, the header's numbers and the legend:
+  ```ts
+import type { FlowRead, FlowNodeRead } from '@gisik-nokma/domain';
+import type { Orientation, SceneEdge, SceneInput, SceneNode } from '@gisik-nokma/flow-graph';
+import { edgeTooltip, notTakenChip, notTakenTooltip } from './flow-sentences.js';
+
+export type SceneOptions = { phone: boolean; orientation: Orientation; showNotes: boolean };
+
+/** "Ama Rangsa" is "AR", "Ama" is "AM"; nobody is `null`. Code points, not UTF-16 units, so a name in any script is not cut in half. */
+export function initialsOf(name: string | null): string | null {
+  const words = (name ?? '').trim().split(/\s+/).filter((w) => w !== '');
+  if (words.length === 0) return null;
+  const letters = (word: string): string[] => [...word];
+  const first = letters(words[0]!)[0]!;
+  const second = words.length > 1 ? letters(words[words.length - 1]!)[0]! : (letters(words[0]!)[1] ?? '');
+  return `${first}${second}`.toLocaleUpperCase('en');
+}
+
+/**
+ * A `FlowRead` as the drawing package's input (D-W3-15: the nodes keep the read's flow order and nothing here re-sorts them).
+ * Start and End pills come from the read's FL-3 lists; the Show notes switch empties each ticket's notes; an edge whose end is
+ * not in the read is dropped (a hole, never a dangling arrow).
+ */
+export function sceneInputOf(read: FlowRead, options: SceneOptions): SceneInput {
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  const starts = new Set(read.start);
+  const ends = new Set(read.end);
+  const nodes = read.nodes.map(
+    (n: FlowNodeRead): SceneNode => ({
+      id: n.id,
+      shape: n.kind,
+      key: n.draft ? null : n.key,
+      title: n.title,
+      draft: n.draft,
+      statusWord: n.state.name,
+      category: n.state.category,
+      assigneeInitials: initialsOf(n.assigneeName),
+      round: n.round,
+      waitForAll: n.waitForAll,
+      start: starts.has(n.id),
+      end: ends.has(n.id),
+      notTaken: n.resolution === null ? null : { chip: notTakenChip(n.resolution.pass), tooltip: notTakenTooltip(n, byId) },
+      outcome: n.kind === 'decision' ? n.outcome : null,
+      passCount: n.passes.length,
+      notes: options.showNotes ? n.notes.map((note) => ({ id: note.id, title: note.title })) : [],
+    }),
+  );
+  const edges = read.edges
+    .filter((e) => byId.has(e.from) && byId.has(e.to))
+    .map(
+      (e): SceneEdge => ({ id: e.id, kind: e.kind, source: e.from, target: e.to, label: e.label, loop: e.loop, taken: e.taken, chosen: e.chosen, tooltip: edgeTooltip(e, byId) }),
+    );
+  return { nodes, edges, orientation: options.orientation, phone: options.phone };
+}
+
+export type FlowSummary = { tickets: number; leadsTo: number; blocks: number; notes: number; drafts: number; waitsForAll: boolean };
+
+/** FL-4 and WG-6: the header's numbers. `notes` counts DISTINCT notes: one note attached to two tickets is one note. */
+export function flowSummary(read: FlowRead): FlowSummary {
+  const notes = new Set<string>();
+  for (const node of read.nodes) for (const note of node.notes) notes.add(note.id);
+  const ids = new Set(read.nodes.map((n) => n.id));
+  const drawn = read.edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+  return {
+    tickets: read.nodes.length,
+    leadsTo: drawn.filter((e) => e.kind === 'leads_to').length,
+    blocks: drawn.filter((e) => e.kind === 'blocks').length,
+    notes: notes.size,
+    drafts: read.draftCount,
+    waitsForAll: read.nodes.some((n) => n.waitForAll),
+  };
+}
+
+export type LegendItem =
+  | { kind: 'waits' | 'draft' | 'note' | 'not-taken' | 'loop'; label: string }
+  | { kind: 'status'; label: string; category: 'open' | 'active' | 'terminal' };
+
+/**
+ * The legend (FL-4, WG-1): the specials that appear in THIS flow, then each state name that appears, with its category dot, so a
+ * colour is never the only way to read a status (WG-10). Order is stable: specials first, then states in flow order.
+ */
+export function legendOf(read: FlowRead, showNotes: boolean): LegendItem[] {
+  const summary = flowSummary(read);
+  const items: LegendItem[] = [];
+  if (summary.waitsForAll) items.push({ kind: 'waits', label: 'Waits for all incoming' });
+  if (read.nodes.some((n) => n.draft)) items.push({ kind: 'draft', label: 'Draft' });
+  if (showNotes && summary.notes > 0) items.push({ kind: 'note', label: 'Note' });
+  if (read.nodes.some((n) => n.resolution !== null)) items.push({ kind: 'not-taken', label: 'Not taken' });
+  if (read.edges.some((e) => e.loop)) items.push({ kind: 'loop', label: 'Loop, times taken' });
+  const seen = new Set<string>();
+  for (const node of read.nodes) {
+    if (seen.has(node.state.name)) continue;
+    seen.add(node.state.name);
+    items.push({ kind: 'status', label: node.state.name, category: node.state.category });
+  }
+  return items;
+}
+  ```
+
+  `flow-diff.ts`: what a person watching would call a change between two reads (WG-5):
+  ```ts
+import type { FlowNodeRead, FlowRead } from '@gisik-nokma/domain';
+
+export type ReadChange = { added: string[]; removed: string[]; changed: string[] };
+
+/** What a person watching would call "this ticket changed": the fields the card shows, and a Decision's outcome and passes. */
+function cardOf(n: FlowNodeRead): string {
+  return JSON.stringify([n.state.id, n.title, n.key, n.draft, n.assigneeId, n.waitForAll, n.round, n.outcome, n.passes.length, n.resolution]);
+}
+
+/**
+ * WG-5: between two reads of the same flow, which tickets are new, gone, or changed. The panel highlights `added` and `changed`
+ * for a moment and lets the layout pipeline decide how the scene moves. A different flow (another `flowId`) is not a change but a
+ * new picture: every id is `added`, nothing is `changed`, and `null` before it is the first draw (nothing to highlight).
+ */
+export function diffReads(prev: FlowRead | null, next: FlowRead): ReadChange {
+  if (prev === null || prev.flowId !== next.flowId) return { added: prev === null ? [] : next.nodes.map((n) => n.id), removed: [], changed: [] };
+  const before = new Map(prev.nodes.map((n) => [n.id, cardOf(n)] as const));
+  const after = new Map(next.nodes.map((n) => [n.id, cardOf(n)] as const));
+  return {
+    added: [...after.keys()].filter((id) => !before.has(id)),
+    removed: [...before.keys()].filter((id) => !after.has(id)),
+    changed: [...after].filter(([id, card]) => before.has(id) && before.get(id) !== card).map(([id]) => id),
+  };
+}
+
+/** The ids to ring after a live update. */
+export const highlightIds = (change: ReadChange): string[] => [...change.added, ...change.changed];
+  ```
+
+  `index.ts`:
+  ```ts
+export { diffReads, highlightIds, type ReadChange } from './flow-diff.js';
+export { flowSummary, initialsOf, legendOf, sceneInputOf, type FlowSummary, type LegendItem, type SceneOptions } from './flow-model.js';
+export {
+  FLOW_EMPTY_COPY,
+  FLOW_LIST_HEADING,
+  afterClause,
+  draftBanner,
+  edgeTooltip,
+  listRows,
+  nodeLabel,
+  notTakenChip,
+  notTakenTooltip,
+  ticketsInFlowLabel,
+  type ListRow,
+} from './flow-sentences.js';
+  ```
+
+  `packages/app-core/package.json`: beside `"./workflow-builder"`, add the two subpaths, and add the type-only dependency:
+  ```json
+  "./workflow-graph": {
+    "types": "./dist/workflow-graph/index.d.ts",
+    "default": "./dist/workflow-graph/index.js"
+  },
+  "./workflow-graph/testing": {
+    "types": "./dist/workflow-graph/testing.d.ts",
+    "default": "./dist/workflow-graph/testing.js"
+  }
+  ```
+  and under `dependencies`: `"@gisik-nokma/flow-graph": "workspace:*"`. Run `pnpm install` (Node 22) and commit the lockfile. The module imports `@gisik-nokma/flow-graph` with `import type` only. It is NOT re-exported from `packages/app-core/src/index.ts`: the subpath keeps it out of every bundle that does not open a Workflow view.
+
+  Run: `pnpm turbo run build --filter=@gisik-nokma/flow-graph...` then the Step 2 command. Expected PASS. Then `pnpm --filter @gisik-nokma/app-core exec tsc -p tsconfig.typecheck.json` clean. Commit.
+
+- [ ] **Step 4: RED then GREEN, the scene pipeline**
+
+  `packages/flow-graph/test/scene/pipeline.test.ts` (ELK in-process through T1's `test/engine/inprocess.ts`, a counting wrapper to say "ELK did not run", T4's `mockupScene`):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { LayoutEngine } from '../../src/layout/elk.js';
+import { layoutKey, nextScene } from '../../src/scene/pipeline.js';
+import type { SceneEdge, SceneInput, SceneNode } from '../../src/scene/types.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { mockupScene } from './fixture.js';
+
+const ctx = { measure: (text: string) => text.length * 6, labelSize };
+
+/** The in-process engine with a call counter, so a test can say "ELK did not run". */
+function counting(): { engine: LayoutEngine; calls: () => number } {
+  const inner = inProcessEngine();
+  let n = 0;
+  return { engine: { layout: (g) => (n += 1, inner.layout(g)), terminate: () => inner.terminate() }, calls: () => n };
+}
+
+const leafAfter = (input: SceneInput, after: string, id: string): SceneInput => {
+  const base = input.nodes.find((n) => n.id === after)!;
+  const leaf: SceneNode = { ...base, id, key: null, draft: true, title: 'New step', statusWord: 'Backlog', category: 'open', assigneeInitials: null, start: false, end: true, notes: [] };
+  const edge: SceneEdge = { id: `${after}>${id}`, kind: 'leads_to', source: after, target: id, label: null, loop: false, taken: 0, chosen: null, tooltip: null };
+  return { ...input, nodes: [...input.nodes.map((n) => (n.id === after ? { ...n, end: false } : n)), leaf], edges: [...input.edges, edge] };
+};
+
+describe('the scene pipeline: reuse, place or lay out (spec §9.3, WG-5)', () => {
+  it('29.261 the first draw lays out; the same shape again reuses the layout and ELK does not run; a status change moves nothing', async () => {
+    const { engine, calls } = counting();
+    const input = mockupScene('landscape');
+    const first = await nextScene(engine, ctx, input, null);
+    expect(first.mode).toBe('first');
+    expect(first.diff).toBeNull();
+    expect(first.scene.nodes).toHaveLength(13);
+    expect(calls()).toBe(1);
+
+    const changed = mockupScene('landscape', { '147': { statusWord: 'Done', category: 'terminal' } });
+    const again = await nextScene(engine, ctx, changed, first);
+    expect(again.mode).toBe('same');
+    expect(calls()).toBe(1);
+    expect(again.layout).toBe(first.layout);
+    expect(again.diff?.moved).toEqual([]);
+    expect(again.scene.nodes.find((n) => n.node.id === '147')?.node.statusWord).toBe('Done');
+    // control: a loop that one more pass took has a longer label ("No ↺ 2"), the key differs and the layout is not reused
+    const counted: SceneInput = { ...input, edges: input.edges.map((e) => (e.id === '151>141' ? { ...e, taken: 2 } : e)) };
+    const relaid = await nextScene(engine, ctx, counted, first);
+    expect(relaid.mode).toBe('relayout');
+    expect(layoutKey(relaid.layoutInput)).not.toBe(layoutKey(first.layoutInput));
+  });
+
+  it('29.261 a lone new leaf is placed beside its source, ELK does not run, and no existing node moves; control: a leaf with two incomers is a full layout', async () => {
+    const { engine, calls } = counting();
+    const input = mockupScene('landscape');
+    const first = await nextScene(engine, ctx, input, null);
+    const withLeaf = leafAfter(input, '147', 'new1');
+    const placed = await nextScene(engine, ctx, withLeaf, first);
+    expect(placed.mode).toBe('placed');
+    expect(calls()).toBe(1);
+    expect(placed.diff?.added).toEqual(['new1']);
+    expect(placed.diff?.moved).toEqual([]);
+    expect(placed.diff?.stable).toBe(1);
+    expect(placed.scene.nodes.some((n) => n.node.id === 'new1')).toBe(true);
+    expect(placed.scene.edges.some((e) => e.edge.id === '147>new1')).toBe(true);
+
+    const twoIn: SceneInput = { ...withLeaf, edges: [...withLeaf.edges, { ...withLeaf.edges.find((e) => e.id === '147>new1')!, id: '142>new1', source: '142' }] };
+    const relaid = await nextScene(engine, ctx, twoIn, first);
+    expect(relaid.mode).toBe('relayout');
+    expect(calls()).toBe(2);
+  });
+
+  it('29.261 removing a node, or turning the flow sideways, is a full layout with a diff of what moved; control: both land on a layout with every remaining node', async () => {
+    const { engine, calls } = counting();
+    const input = leafAfter(mockupScene('landscape'), '147', 'new1');
+    const first = await nextScene(engine, ctx, input, null);
+    const smaller: SceneInput = { ...input, nodes: input.nodes.filter((n) => n.id !== 'new1'), edges: input.edges.filter((e) => e.target !== 'new1') };
+    const removed = await nextScene(engine, ctx, smaller, first);
+    expect(removed.mode).toBe('relayout');
+    expect(removed.diff?.removed).toEqual(['new1']);
+    expect(removed.scene.nodes).toHaveLength(13);
+
+    const sideways = await nextScene(engine, ctx, mockupScene('portrait'), removed);
+    expect(sideways.mode).toBe('relayout');
+    expect(sideways.scene.orientation).toBe('portrait');
+    expect(calls()).toBe(3);
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 test/scene/pipeline.test.ts > /tmp/wtg3-t7p.log 2>&1; tail -n 20 /tmp/wtg3-t7p.log` (FAIL: no `pipeline`).
+
+  `packages/flow-graph/src/scene/pipeline.ts`:
+  ```ts
+import { diffLayouts, type LayoutDiff } from '../layout/diff.js';
+import type { LayoutEngine } from '../layout/elk.js';
+import { placeLeaves } from '../layout/incremental.js';
+import { layoutFlow } from '../layout/layout.js';
+import type { FlowLayout, LayoutInput } from '../types.js';
+import { buildScene, layoutInputOf, type SceneContext } from './build-scene.js';
+import type { Scene, SceneInput } from './types.js';
+
+/**
+ * How a scene came to be, which is what the caller needs to animate it (WG-5, spec §9.3):
+ * - `first`: nothing was drawn before; draw at once.
+ * - `same`: nothing the layout depends on changed (a state, an outcome, an assignee, a chip): the previous layout was reused, ELK
+ *   did not run, nothing moves.
+ * - `placed`: only new leaves that something existing leads to; they were placed beside their source, every other node kept its
+ *   pixels, ELK did not run.
+ * - `relayout`: anything else; ELK ran and the nodes that moved glide.
+ */
+export type SceneMode = 'first' | 'same' | 'placed' | 'relayout';
+
+/** What the next call needs of this one. */
+export type SceneMemory = { layout: FlowLayout; layoutInput: LayoutInput };
+
+export type SceneStep = SceneMemory & {
+  scene: Scene;
+  mode: SceneMode;
+  /** Against the previous layout; `null` for `first`. */
+  diff: LayoutDiff | null;
+};
+
+/** Everything the layout depends on, as one string: equal keys mean the previous layout is still right. */
+export function layoutKey(input: LayoutInput): string {
+  return JSON.stringify(input);
+}
+
+/**
+ * The whole path from the app's `SceneInput` to a drawable `Scene`: measure, then reuse, place or lay out, then route. Pure of the
+ * DOM; the engine is injected (a Worker in the app, ELK in-process in tests). The previous layout stays valid until this resolves,
+ * so the caller keeps drawing it meanwhile (spec §9.3), and discards a result whose input is no longer the latest.
+ */
+export async function nextScene(engine: LayoutEngine, ctx: SceneContext, input: SceneInput, previous: SceneMemory | null): Promise<SceneStep> {
+  const layoutInput = layoutInputOf(input, ctx);
+  if (previous === null) {
+    const layout = await layoutFlow(engine, layoutInput, ctx);
+    return { scene: buildScene(input, layout, ctx), layout, layoutInput, mode: 'first', diff: null };
+  }
+  if (layoutKey(previous.layoutInput) === layoutKey(layoutInput)) {
+    return { scene: buildScene(input, previous.layout, ctx), layout: previous.layout, layoutInput, mode: 'same', diff: diffLayouts(previous.layout, previous.layout) };
+  }
+  const placed = placeLeaves(previous.layout, layoutInput, ctx);
+  if (placed !== null) {
+    return { scene: buildScene(input, placed, ctx), layout: placed, layoutInput, mode: 'placed', diff: diffLayouts(previous.layout, placed) };
+  }
+  const layout = await layoutFlow(engine, layoutInput, ctx);
+  return { scene: buildScene(input, layout, ctx), layout, layoutInput, mode: 'relayout', diff: diffLayouts(previous.layout, layout) };
+}
+  ```
+  `src/index.ts`, append:
+  ```ts
+  export { nextScene, layoutKey, type SceneMode, type SceneMemory, type SceneStep } from './scene/pipeline.js';
+  ```
+  Run the pipeline test, then the package suite WHOLE, `typecheck` and `build`. Expected PASS. Commit.
+
+- [ ] **Step 5: RED, the web tests**
+
+  `apps/web/test/workflow-graph/support.tsx` (not a test file; the helpers the view tests and every later web test share: ELK in-process, a camera at the identity that records, a container width, a tap by a card's own coordinates):
+  ```tsx
+import ELK from 'elkjs/lib/elk.bundled.js';
+import { render } from '@testing-library/react';
+import { vi } from 'vitest';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { engineFromInstance } from '@gisik-nokma/flow-graph';
+import type { PanelDeps } from '../../src/workflow-graph/panel-deps.js';
+import { WorkflowView, type WorkflowViewProps } from '../../src/workflow-graph/workflow-view.js';
+
+type Ctor = new () => { layout(graph: never): Promise<unknown> };
+const Elk = ((ELK as unknown as { default?: Ctor }).default ?? ELK) as unknown as Ctor;
+
+/** A camera at the identity that records what it was asked: screen px = world px, so a test can tap by a card's own coordinates. */
+export function fakeCamera() {
+  return { toWorld: (p: { x: number; y: number }) => p, getCamera: () => ({ x: 0, y: 0, zoom: 1 }), camera: vi.fn(), destroy: vi.fn() };
+}
+
+/** ELK in-process, a fixed-width measure, a camera that records, and a container `width` px wide. Build ONE per test: `deps` is a dependency of the view's effects. */
+export type FakeDeps = PanelDeps & { cam: ReturnType<typeof fakeCamera> };
+export function fakeDeps(width = 1000): FakeDeps {
+  const cam = fakeCamera();
+  return {
+    engine: engineFromInstance(new Elk()),
+    context: { measure: (text) => text.length * 6, labelSize: (text) => ({ width: text.length * 7 + 16, height: 22 }) },
+    createCamera: () => cam,
+    fontsReady: async () => undefined,
+    measureWidth: () => width,
+    reducedMotion: () => false,
+    cam,
+  };
+}
+
+export function mountView(read: FlowRead | null, over: Partial<WorkflowViewProps> = {}, deps: FakeDeps = fakeDeps()) {
+  const props: WorkflowViewProps = {
+    workspaceId: 'w1',
+    ticketId: read?.rootId ?? 'x',
+    selected: null,
+    onSelect: vi.fn(),
+    onShowLinks: vi.fn(),
+    read,
+    error: null,
+    onRetry: vi.fn(),
+    deps,
+    ...over,
+  };
+  const utils = render(<WorkflowView {...props} />);
+  return { ...utils, props, deps, update: (next: Partial<WorkflowViewProps>) => utils.rerender(<WorkflowView {...props} {...next} />) };
+}
+
+/** The centre of a drawn card in the camera's (identity) coordinates, read from the element the stage placed. */
+export function centreOfCard(container: HTMLElement, id: string): { x: number; y: number } {
+  const card = container.querySelector<HTMLElement>(`[data-node-id="${id}"]`);
+  if (card === null) throw new Error(`no card for ${id}`);
+  const at = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(card.style.transform);
+  if (at === null) throw new Error(`card ${id} has no transform`);
+  return { x: Number(at[1]) + Number.parseFloat(card.style.width) / 2, y: Number(at[2]) + Number.parseFloat(card.style.height) / 2 };
+}
+
+/** jsdom has no PointerEvent; the stage reads clientX, clientY and timeStamp, which a MouseEvent carries. */
+export const press = (type: string, at: { x: number; y: number }, t: number): Event =>
+  Object.defineProperty(new MouseEvent(type, { clientX: at.x, clientY: at.y, bubbles: true }), 'timeStamp', { value: t });
+  ```
+
+  `apps/web/test/workflow-graph/workflow-view.test.tsx`:
+  ```tsx
+// @vitest-environment jsdom
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { blocksEdge, decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { centreOfCard, fakeDeps, mountView, press } from './support.js';
+
+const cards = (c: HTMLElement) => c.querySelectorAll('.gn-flow-node');
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(cards(c)).toHaveLength(n));
+
+describe('29.262 the Workflow view draws a flow and says it in words', () => {
+  it('29.262 header counts, the legend of THIS flow, the ticket count, the canvas as a labelled image and the list in flow order', async () => {
+    const { container } = mountView(decisionRead());
+    await drawn(container, 8);
+    const summary = screen.getByLabelText('Flow summary');
+    expect(within(summary).getByText('Leads to').closest('li')).toHaveTextContent('Leads to 9');
+    expect(within(summary).getByText('Blocks').closest('li')).toHaveTextContent('Blocks 1');
+    expect(screen.getByText('8 tickets in this flow')).toBeInTheDocument();
+    const legend = within(screen.getByLabelText('Legend'));
+    for (const word of ['Waits for all incoming', 'Draft', 'Not taken', 'Loop, times taken', 'Done', 'In progress', 'To do']) expect(legend.getByText(word)).toBeInTheDocument();
+    expect(legend.queryByText('Note')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Flow of 8 tickets with 9 links. The list below gives the same flow in order.' })).toBeInTheDocument();
+    const list = screen.getByRole('region', { name: 'This flow, in order' });
+    const rows = within(list).getAllByRole('button').map((b) => b.textContent);
+    expect(rows).toHaveLength(8);
+    expect(rows[3]).toBe('GN-163 Build the page in-house, after GN-162 (Yes)');
+    expect(rows[7]).toBe('Draft Announce the launch, after GN-168');
+    // the blocks edge to a hidden ticket is neither drawn nor counted, the real one is drawn
+    expect(container.querySelectorAll('path.gn-flow-edge--blocks')).toHaveLength(1);
+    // control: a read with no blocks link has no Blocks chip
+    const plain = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]));
+    await drawn(plain.container, 2);
+    expect(within(plain.container).queryByText('Blocks')).toBeNull();
+  });
+
+  it('29.262 every card names its status in words and a Not-taken ticket wears the chip in its place; a draft says Draft; the ticket the sheet is open on wears the ring', async () => {
+    const { container } = mountView(decisionRead());
+    await drawn(container, 8);
+    const word = (id: string) => container.querySelector(`[data-node-id="${id}"] .gn-flow-node__status`)?.textContent;
+    expect(word('A')).toBe('Done');
+    expect(word('C')).toBe('In progress');
+    expect(word('E')).toBe('To do');
+    expect(word('B')).toBe('Not taken (pass 2)');
+    expect(container.querySelector('[data-node-id="G"] .gn-flow-node__key')?.textContent).toBe('Draft');
+    expect(container.querySelector('[data-node-id="E"] .gn-flow-node__key')?.textContent).toBe('GN-166 ↺2');
+    expect([...cards(container)].filter((c) => c.getAttribute('aria-current') === 'true').map((c) => c.getAttribute('data-node-id'))).toEqual(['C']);
+  });
+
+  it('29.262 a tap on a card selects it, a quick second tap opens it, a tap on the empty canvas goes back to the sheet\'s own ticket; control: a long press selects nothing', async () => {
+    const onSelect = vi.fn();
+    const onOpenTicket = vi.fn();
+    const { container } = mountView(decisionRead(), { onSelect, onOpenTicket });
+    await drawn(container, 8);
+    const host = container.querySelector('.gn-flow')!;
+    const at = centreOfCard(container, 'A');
+    host.dispatchEvent(press('pointerdown', at, 0));
+    host.dispatchEvent(press('pointerup', at, 700));
+    expect(onSelect).not.toHaveBeenCalled();
+    host.dispatchEvent(press('pointerdown', at, 1000));
+    host.dispatchEvent(press('pointerup', at, 1050));
+    expect(onSelect).toHaveBeenLastCalledWith('A');
+    host.dispatchEvent(press('pointerdown', at, 1100));
+    host.dispatchEvent(press('pointerup', at, 1150));
+    expect(onOpenTicket).toHaveBeenCalledWith('A');
+    host.dispatchEvent(press('pointerdown', { x: -80, y: -80 }, 2000));
+    host.dispatchEvent(press('pointerup', { x: -80, y: -80 }, 2040));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('29.262 the list selects on the first press and the canvas centres it, opens on a second press or a double click; the selection the sheet holds is shown in the list and on the canvas; control: a selection that is not in this flow shows the sheet\'s own ticket', async () => {
+    const onSelect = vi.fn();
+    const onOpenTicket = vi.fn();
+    const { container, deps, update } = mountView(decisionRead(), { onSelect, onOpenTicket });
+    await drawn(container, 8);
+    const list = within(screen.getByRole('region', { name: 'This flow, in order' }));
+    await userEvent.click(list.getByRole('button', { name: /^GN-162/ }));
+    expect(onSelect).toHaveBeenCalledWith('D');
+    expect(deps.cam.camera).toHaveBeenCalled();
+    update({ selected: 'D' });
+    expect(list.getByRole('button', { name: /^GN-162/ })).toHaveAttribute('aria-current', 'true');
+    expect(container.querySelector('[data-node-id="D"]')).toHaveAttribute('aria-current', 'true');
+    expect(container.querySelector('[data-node-id="C"]')).not.toHaveAttribute('aria-current');
+    await userEvent.click(list.getByRole('button', { name: /^GN-162/ }));
+    expect(onOpenTicket).toHaveBeenCalledWith('D');
+    await userEvent.dblClick(list.getByRole('button', { name: /^GN-160/ }));
+    expect(onOpenTicket).toHaveBeenCalledWith('S');
+    update({ selected: 'not-in-this-flow' });
+    expect(container.querySelector('[data-node-id="C"]')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('29.262 a ticket in no flow draws itself with Start and End and says so; control: a flow of two does not', async () => {
+    const { container } = mountView(readOf([readNode('Z', { title: 'Lonely' })], []));
+    await drawn(container, 1);
+    expect(screen.getByText("This ticket isn't in a flow yet. Add what comes next.")).toBeInTheDocument();
+    expect([...container.querySelectorAll('.gn-flow-pill')].map((p) => p.textContent).sort()).toEqual(['End', 'Start']);
+    expect(screen.getByText('1 ticket in this flow')).toBeInTheDocument();
+    expect(container.querySelector('.gn-flow__add')).toBeNull();
+    const two = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]));
+    await drawn(two.container, 2);
+    expect(within(two.container).queryByText("This ticket isn't in a flow yet. Add what comes next.")).toBeNull();
+  });
+
+  it('29.262 loading, a failed read with a retry, and a truncated flow with its way out; control: none of them shows on a good read', async () => {
+    const onRetry = vi.fn();
+    const first = mountView(null, { onRetry });
+    expect(screen.getByText('Loading the flow…')).toHaveAttribute('aria-busy', 'true');
+    first.unmount();
+    const failed = mountView(null, { error: 'needs a connection', onRetry });
+    expect(screen.getByRole('alert')).toHaveTextContent('The flow could not be loaded. needs a connection');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    failed.unmount();
+    const onShowLinks = vi.fn();
+    const big = { ...decisionRead(), truncated: true, reached: 412 };
+    const cut = mountView(big, { onShowLinks });
+    await drawn(cut.container, 8);
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 8 of the first 412 reached.');
+    await userEvent.click(screen.getByRole('button', { name: "Open this ticket's neighbours only" }));
+    expect(onShowLinks).toHaveBeenCalled();
+    cut.unmount();
+    const good = mountView(decisionRead());
+    await drawn(good.container, 8);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByText('Loading the flow…')).toBeNull();
+  });
+
+  it('29.262 narrower than 40rem the graph is portrait with phone-width blocks and no link drag; 40rem and over is landscape; control: the same read in a wide container has 140 px cards', async () => {
+    const narrow = mountView(decisionRead(), {}, fakeDeps(500));
+    await drawn(narrow.container, 8);
+    expect(narrow.container.querySelector('.gn-wf')).toHaveAttribute('data-orientation', 'portrait');
+    expect(narrow.container.querySelector<HTMLElement>('[data-node-id="A"]')!.style.width).toBe('156px');
+    narrow.unmount();
+    const wide = mountView(decisionRead(), {}, fakeDeps(1000));
+    await drawn(wide.container, 8);
+    expect(wide.container.querySelector('.gn-wf')).toHaveAttribute('data-orientation', 'landscape');
+    expect(wide.container.querySelector<HTMLElement>('[data-node-id="A"]')!.style.width).toBe('140px');
+  });
+
+  it('29.262 a new read of the same flow: a new leaf appears without moving anything, a changed card is ringed for a moment and shows its new word; a read of ANOTHER flow is drawn fresh', async () => {
+    const before = decisionRead();
+    const { container, update, deps } = mountView(before);
+    await drawn(container, 8);
+    const home = (id: string) => container.querySelector<HTMLElement>(`[data-node-id="${id}"]`)!.style.transform;
+    const placed = Object.fromEntries(before.nodes.map((n) => [n.id, home(n.id)]));
+    const fits = deps.cam.camera.mock.calls.length;
+    const leaf = readNode('H', { title: 'Follow up' });
+    const next = {
+      ...before,
+      nodes: [...before.nodes.map((n) => (n.id === 'C' ? { ...n, state: { id: 'done', name: 'Done', category: 'terminal' as const } } : n)), leaf],
+      edges: [...before.edges, readEdge('G', 'H')],
+      order: [...before.order, 'H'],
+      end: ['H'],
+    };
+    update({ read: next });
+    await drawn(container, 9);
+    for (const [id, transform] of Object.entries(placed)) expect(home(id), id).toBe(transform);
+    expect(container.querySelector('[data-node-id="C"] .gn-flow-node__status')?.textContent).toBe('Done');
+    expect(container.querySelector('[data-node-id="C"]')).toHaveClass('gn-flow-node--flash');
+    expect(container.querySelector('[data-node-id="H"]')).toHaveClass('gn-flow__enter');
+    expect(deps.cam.camera.mock.calls.length).toBe(fits); // the camera was not refitted under the reader
+    // another flow: drawn fresh and fitted
+    const other = readOf([readNode('X1'), readNode('X2')], [readEdge('X1', 'X2')]);
+    update({ read: other });
+    await drawn(container, 2);
+    expect(deps.cam.camera.mock.calls.length).toBeGreaterThan(fits);
+  });
+
+  it('29.262 a layout that finishes AFTER a newer read was asked for is dropped: the screen ends on the newest read; control: released in order, the same two reads end the same way', async () => {
+    const pending: Array<() => void> = [];
+    const deps = fakeDeps();
+    const inner = deps.engine;
+    deps.engine = { layout: (graph) => new Promise((resolve) => pending.push(() => void inner.layout(graph).then(resolve))), terminate: () => undefined };
+    const older = readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]);
+    const newer = readOf([readNode('P'), readNode('Q'), readNode('R')], [readEdge('P', 'Q'), readEdge('Q', 'R')]);
+    const { container, update } = mountView(older, {}, deps);
+    await waitFor(() => expect(pending).toHaveLength(1));
+    update({ read: newer });
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[1]!();
+    await drawn(container, 3);
+    pending[0]!();
+    await act(async () => new Promise((done) => setTimeout(done, 60)));
+    expect(cards(container)).toHaveLength(3);
+    // control: released in order
+    const queue: Array<() => void> = [];
+    const second = fakeDeps();
+    const real = second.engine;
+    second.engine = { layout: (graph) => new Promise((resolve) => queue.push(() => void real.layout(graph).then(resolve))), terminate: () => undefined };
+    const again = mountView(older, {}, second);
+    await waitFor(() => expect(queue).toHaveLength(1));
+    again.update({ read: newer });
+    await waitFor(() => expect(queue).toHaveLength(2));
+    queue[0]!();
+    queue[1]!();
+    await waitFor(() => expect(again.container.querySelectorAll('.gn-flow-node')).toHaveLength(3));
+  });
+
+  it('29.262 the "+" handle is not drawn: nothing creates steps yet, and an untouched card shows none; control: the blocks edge to a hidden ticket draws nothing', async () => {
+    const { container } = mountView(decisionRead());
+    await drawn(container, 8);
+    expect(container.querySelector('.gn-flow__add')).toBeNull();
+    expect(container.querySelectorAll('path[data-edge-id="N~C"]')).toHaveLength(0);
+    expect(blocksEdge('C', 'F').kind).toBe('blocks');
+    await act(async () => undefined);
+    fireEvent.pointerMove(container.querySelector('.gn-flow')!);
+    expect(container.querySelector('.gn-flow__add')).toBeNull();
+  });
+});
+  ```
+
+  `apps/web/test/workflow-graph/workflow-panel.test.tsx` (the glue: `Providers`, `stubServices`, the runtime replaced; mocks copied from `backlog-tab.test.tsx:17-30`):
+  ```tsx
+// @vitest-environment jsdom
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { Providers } from '../../src/providers.js';
+import { WorkflowPanel } from '../../src/workflow-graph/workflow-panel.js';
+import { stubServices } from '../helpers/stub-services.js';
+
+const dispose = vi.fn();
+
+vi.mock('../../src/auth-client.js', () => ({
+  authClient: {
+    useSession: () => ({ data: { user: { id: 'user_kiro', name: 'Kiro' } }, isPending: false }),
+    signOut: async () => ({ data: {}, error: null }),
+  },
+}));
+
+// The browser runtime (a Worker, the shared camera, fonts) is replaced by the in-process set the view tests use.
+vi.mock('../../src/workflow-graph/runtime.js', async () => {
+  const { fakeDeps } = await import('./support.js');
+  return { createRuntime: () => ({ ...fakeDeps(), dispose }) };
+});
+
+const props = { workspaceId: 'w1', ticketId: 'C', selected: null, onSelect: vi.fn(), onShowLinks: vi.fn() };
+
+describe('29.262 the panel reads the ticket\'s flow and hands it to the view', () => {
+  it('29.262 it asks getFlow for THIS workspace and ticket, draws what comes back, and ends the Worker when it unmounts', async () => {
+    const getFlow = vi.fn(async () => decisionRead());
+    const { container, unmount } = render(
+      <Providers services={stubServices({ getFlow })}>
+        <WorkflowPanel {...props} />
+      </Providers>,
+    );
+    await waitFor(() => expect(container.querySelectorAll('.gn-flow-node')).toHaveLength(8));
+    expect(getFlow).toHaveBeenCalledWith('w1', 'C');
+    expect(dispose).not.toHaveBeenCalled();
+    unmount();
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('29.262 a refused read (offline: getFlow rejects by name) says so and Try again asks again; control: the second answer draws', async () => {
+    const getFlow = vi.fn().mockRejectedValueOnce(new Error('getFlow needs a connection')).mockResolvedValue(decisionRead());
+    const { container } = render(
+      <Providers services={stubServices({ getFlow })}>
+        <WorkflowPanel {...props} />
+      </Providers>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('The flow could not be loaded. getFlow needs a connection');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(container.querySelectorAll('.gn-flow-node')).toHaveLength(8));
+    expect(getFlow).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t7w.log 2>&1; tail -n 20 /tmp/wtg3-t7w.log` (FAIL: the modules do not exist).
+
+- [ ] **Step 6: GREEN, the web view**
+
+  `apps/web/package.json`, `dependencies`: `"@gisik-nokma/flow-graph": "workspace:*"`, `"@gisik-nokma/viewport": "workspace:*"` and `"elkjs": "0.12.0"` (pinned exactly as T1 pinned it: the web app needs it to name `elkjs/lib/elk-worker.min.js` as an asset URL, and its tests run ELK in-process). `pnpm install`, commit the lockfile. Check that every `apps/web` Dockerfile `COPY` list names the new workspace packages' `package.json` (T1 Step 10.6a did for `flow-graph`; `viewport` was Part 1's): run the Dockerfile cache-shape check the repo carries (`ls scripts | grep -i docker`).
+
+  `panel-deps.ts`: everything the view needs from the browser, passed in, so the view is a function of its props:
+  ```ts
+import type { FlowCamera, FlowStage, LayoutEngine, SceneContext } from '@gisik-nokma/flow-graph';
+
+/** What the shared camera must do for the stage, and be able to let go of. `CameraAdapter` satisfies it. */
+export type PanelCamera = FlowCamera & { destroy(): void };
+
+/**
+ * Everything the Workflow view needs from the browser, passed in, so the view is a function of its props: the app builds the real
+ * set once (`runtime.ts`); a test passes ELK in-process and a camera that records.
+ */
+export type PanelDeps = {
+  engine: LayoutEngine;
+  context: SceneContext;
+  createCamera: (stage: FlowStage) => PanelCamera;
+  /** Resolves when the web fonts the blocks are measured in are ready: measuring before them lays out with the wrong widths. */
+  fontsReady: () => Promise<void>;
+  /** The graph container's width in px. The CONTAINER decides portrait, not the device (spec §9.3). */
+  measureWidth: (el: HTMLElement) => number;
+  reducedMotion?: () => boolean;
+};
+  ```
+  `measure.ts` (text measured in the page's own font, because the layout is given the measured sizes, never constants):
+  ```ts
+import type { SceneContext } from '@gisik-nokma/flow-graph';
+
+/** Wide enough that a missed measurement over-wraps rather than overlaps. */
+const FALLBACK_PX_PER_CHAR = 6.4;
+
+/**
+ * Text measurement for the blocks, from a canvas in the page's own font. The widths feed the layout (spec §9.3: ELK is given the
+ * measured sizes), so they must match what the CSS draws: 13 px / 600 for a title, 11 px / 600 for an edge label (`ui.css`,
+ * `.gn-flow-node__title`, `.gn-flow-edge-label`). Without a 2D context (no canvas) a fixed width per character is used.
+ */
+export function browserContext(doc: Document = document): SceneContext {
+  const family = doc.defaultView?.getComputedStyle(doc.body).fontFamily || 'system-ui, sans-serif';
+  const context = doc.createElement('canvas').getContext('2d');
+  const widthIn =
+    (font: string) =>
+    (text: string): number => {
+      if (context === null) return text.length * FALLBACK_PX_PER_CHAR;
+      context.font = font;
+      return context.measureText(text).width;
+    };
+  const title = widthIn(`600 13px ${family}`);
+  const label = widthIn(`600 11px ${family}`);
+  return { measure: title, labelSize: (text) => ({ width: Math.ceil(label(text)) + 16, height: 22 }) };
+}
+  ```
+  `runtime.ts` (the only file that names `CameraAdapter`, `createElkEngine` and the Worker URL; loaded only through the panel):
+  ```ts
+import { createElkEngine } from '@gisik-nokma/flow-graph';
+import { CameraAdapter } from '@gisik-nokma/viewport';
+import { browserContext } from './measure.js';
+import type { PanelDeps } from './panel-deps.js';
+
+/**
+ * The real browser set for the Workflow view: ELK in a Worker (created on the first layout, not before), the shared camera, the
+ * page's fonts. `new Worker(new URL(...))` is the form the bundler turns into an asset; `elkjs` is a dependency of this app for
+ * that reason. This file is only ever imported by `workflow-panel.tsx`, which `next/dynamic` loads when a Workflow view is shown.
+ */
+export function createRuntime(): PanelDeps & { dispose(): void } {
+  const engine = createElkEngine(() => new Worker(new URL('elkjs/lib/elk-worker.min.js', import.meta.url)));
+  return {
+    engine,
+    context: browserContext(),
+    createCamera: (stage) => new CameraAdapter({ el: stage.viewport, layer: stage.layer }),
+    fontsReady: async () => {
+      await document.fonts?.ready;
+    },
+    measureWidth: (el) => el.clientWidth,
+    dispose: () => engine.terminate(),
+  };
+}
+  ```
+  `use-container-orientation.ts`:
+  ```ts
+import { useLayoutEffect, useState, type RefObject } from 'react';
+import { orientationFor, type Orientation } from '@gisik-nokma/flow-graph';
+
+const remPx = (): number => Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+/**
+ * Portrait below 40rem of the graph's own container, else landscape (spec §9.3), following the container as the sheet is resized
+ * or goes full screen. `null` until the first measurement, which happens before paint, so the first layout is never wasted on a
+ * guess.
+ */
+export function useContainerOrientation(ref: RefObject<HTMLElement | null>, measure: (el: HTMLElement) => number): Orientation | null {
+  const [orientation, setOrientation] = useState<Orientation | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    const apply = (): void => setOrientation(orientationFor(measure(el), remPx()));
+    apply();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref, measure]);
+  return orientation;
+}
+  ```
+  `use-scene.ts` (a read in, a drawable frame out; a result whose read is no longer the latest is dropped):
+  ```ts
+import { useEffect, useRef, useState } from 'react';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { diffReads, highlightIds, sceneInputOf, type SceneOptions } from '@gisik-nokma/app-core/workflow-graph';
+import { nextScene, type SceneMemory, type SceneStep } from '@gisik-nokma/flow-graph';
+import type { PanelDeps } from './panel-deps.js';
+
+export type CanvasFrame = { step: SceneStep; flowId: string; highlight: readonly string[] };
+
+type Memory = SceneMemory & { flowId: string };
+
+/**
+ * A read in, a drawable frame out. The scene for a read is computed off the main thread's critical path (ELK runs in its Worker),
+ * so the previous frame stays on screen until the new one is ready (spec §9.3), and a result whose read is no longer the latest
+ * is dropped. Layout is reused or placed when only a leaf or a status changed (`nextScene`); `highlight` is what a person
+ * watching would call changed between the read now shown and the one before it (WG-5).
+ */
+export function useScene(read: FlowRead | null, options: SceneOptions | null, deps: Pick<PanelDeps, 'engine' | 'context' | 'fontsReady'>): { frame: CanvasFrame | null; error: string | null } {
+  const [frame, setFrame] = useState<CanvasFrame | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const memory = useRef<Memory | null>(null);
+  const shown = useRef<FlowRead | null>(null);
+  const issued = useRef(0);
+  const phone = options?.phone;
+  const orientation = options?.orientation;
+  const showNotes = options?.showNotes;
+
+  useEffect(() => {
+    if (read === null || phone === undefined || orientation === undefined || showNotes === undefined) return;
+    const mine = (issued.current += 1);
+    const input = sceneInputOf(read, { phone, orientation, showNotes });
+    const previous = memory.current !== null && memory.current.flowId === read.flowId ? memory.current : null;
+    void (async () => {
+      try {
+        if (previous === null) await deps.fontsReady();
+        const step = await nextScene(deps.engine, deps.context, input, previous);
+        if (mine !== issued.current) return;
+        memory.current = { flowId: read.flowId, layout: step.layout, layoutInput: step.layoutInput };
+        const change = diffReads(shown.current, read);
+        shown.current = read;
+        setError(null);
+        setFrame({ step, flowId: read.flowId, highlight: highlightIds(change) });
+      } catch (cause) {
+        if (mine === issued.current) setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    })();
+  }, [read, phone, orientation, showNotes, deps]);
+
+  return { frame, error };
+}
+  ```
+  `use-flow.ts`:
+  ```ts
+import { useLiveQuery } from '@gisik-nokma/app-core';
+import type { DataSource } from '@gisik-nokma/app-core';
+import type { FlowRead } from '@gisik-nokma/domain';
+
+/**
+ * The ticket's flow, live: re-read (debounced) whenever the workspace stream says something changed, which is how a promotion, a
+ * settle or a new link reaches the open graph (WG-5). Online only (D-W3-8): offline, `getFlow` rejects by name and the view shows
+ * that as an error with a retry.
+ */
+export function useFlow(dataSource: DataSource, workspaceId: string, ticketId: string): { read: FlowRead | null; error: string | null; reload: () => void } {
+  const live = useLiveQuery(dataSource, workspaceId, `flow:${ticketId}`, () => dataSource.query.getFlow(workspaceId, ticketId), { cacheKey: `flow:${ticketId}` });
+  return { read: live.data, error: live.error, reload: live.reload };
+}
+  ```
+  `flow-canvas.tsx` (the stage in a React shell: React owns only the zoom buttons):
+  ```tsx
+'use client';
+
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { FlowStage, type Pick as StagePick } from '@gisik-nokma/flow-graph';
+import type { CanvasFrame } from './use-scene.js';
+import type { PanelDeps } from './panel-deps.js';
+
+export type FlowCanvasHandle = { focusNode(id: string): void; fit(): void };
+
+export type FlowCanvasProps = {
+  frame: CanvasFrame | null;
+  /** The canvas is `role="img"`; this is its name (WG-4). The accessible list under it is the real reading order. */
+  label: string;
+  selectedId: string | null;
+  deps: Pick<PanelDeps, 'createCamera' | 'reducedMotion'>;
+  onPick: (pick: StagePick | null) => void;
+  onOpen: (id: string) => void;
+  /** Leave unset and the "+" handle is not drawn. */
+  onAdd?: (id: string) => void;
+  /** Leave unset where dragging a link is off (the phone: the sheet's Links section does it, WG-4). */
+  onLink?: (fromId: string, toId: string) => void;
+};
+
+/**
+ * The stage in a React shell. The stage owns the DOM inside `.gn-wf-canvas__host`; React owns only the zoom buttons. A scene
+ * for a flow not shown before is drawn at once and fitted; a scene for the flow already shown glides what moved (`step.mode`).
+ */
+export const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCanvas(props, ref) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<FlowStage | null>(null);
+  const shownFlow = useRef<string | null>(null);
+  const { deps } = props;
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) return;
+    const stage = new FlowStage(host, deps.reducedMotion === undefined ? {} : { reducedMotion: deps.reducedMotion });
+    const camera = deps.createCamera(stage);
+    stage.attachCamera(camera);
+    stageRef.current = stage;
+    return () => {
+      camera.destroy();
+      stage.destroy();
+      stageRef.current = null;
+      shownFlow.current = null;
+    };
+  }, [deps]);
+
+  // Every render: the callbacks are the latest ones, and `onAdd` / `onLink` being present or not decides the handle.
+  useEffect(() => {
+    stageRef.current?.on({
+      onPick: props.onPick,
+      onOpen: props.onOpen,
+      ...(props.onAdd === undefined ? {} : { onAdd: props.onAdd }),
+      ...(props.onLink === undefined ? {} : { onLink: props.onLink }),
+    });
+  });
+
+  useEffect(() => {
+    stageRef.current?.setLabel(props.label);
+  }, [props.label, deps]);
+
+  useEffect(() => {
+    stageRef.current?.setSelected(props.selectedId);
+  }, [props.selectedId, props.frame, deps]);
+
+  const { frame } = props;
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (stage === null || frame === null) return;
+    const fresh = shownFlow.current !== frame.flowId || frame.step.mode === 'first';
+    stage.setScene(frame.step.scene, fresh || frame.step.mode === 'same' ? 'first' : 'glide');
+    if (fresh) stage.fit(true);
+    shownFlow.current = frame.flowId;
+    if (frame.highlight.length > 0) stage.highlight(frame.highlight);
+  }, [frame, deps]);
+
+  useImperativeHandle(ref, () => ({ focusNode: (id) => stageRef.current?.focusNode(id), fit: () => stageRef.current?.fit() }), []);
+
+  return (
+    <div className="gn-wf-canvas">
+      <div ref={hostRef} className="gn-wf-canvas__host" />
+      <div className="gn-wf-zoom" role="group" aria-label="Zoom">
+        <button type="button" className="gn-wf-zoom__button" aria-label="Zoom in" onClick={() => stageRef.current?.zoomBy(1.25)}>
+          +
+        </button>
+        <button type="button" className="gn-wf-zoom__button" aria-label="Zoom out" onClick={() => stageRef.current?.zoomBy(0.8)}>
+          −
+        </button>
+        <button type="button" className="gn-wf-zoom__button" aria-label="Fit to screen" onClick={() => stageRef.current?.fit()}>
+          ⛶
+        </button>
+      </div>
+    </div>
+  );
+});
+  ```
+  `flow-header.tsx`:
+  ```tsx
+'use client';
+
+import { flowSummary, legendOf, ticketsInFlowLabel, type LegendItem } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+
+const GLYPH: Record<Exclude<LegendItem['kind'], 'status'>, string> = { waits: '⋂', draft: '', note: '', 'not-taken': '', loop: '↺' };
+
+/**
+ * The strip above the canvas (FL-4, WG-6): the two link counts, the legend of THIS flow, and the ticket count. A status in the
+ * legend carries its NAME next to its dot, as on the cards, so a colour is never the only way to read it (WG-10).
+ */
+export function FlowHeader({ read, showNotes, onShowNeighbours }: { read: FlowRead; showNotes: boolean; onShowNeighbours: () => void }) {
+  const summary = flowSummary(read);
+  const legend = legendOf(read, showNotes);
+  return (
+    <>
+      <div className="gn-wf-bar">
+        <ul className="gn-wf-chips" aria-label="Flow summary">
+          <li className="gn-wf-chip">
+            Leads to <strong>{summary.leadsTo}</strong>
+          </li>
+          {summary.blocks > 0 ? (
+            <li className="gn-wf-chip gn-wf-chip--blocks">
+              Blocks <strong>{summary.blocks}</strong>
+            </li>
+          ) : null}
+        </ul>
+        <ul className="gn-wf-legend" aria-label="Legend">
+          {legend.map((item) => (
+            <li key={`${item.kind}:${item.label}`} className="gn-wf-legend__item" data-kind={item.kind}>
+              {item.kind === 'status' ? (
+                <span className="gn-wf-legend__dot" data-category={item.category} aria-hidden="true" />
+              ) : (
+                <span className={`gn-wf-legend__mark gn-wf-legend__mark--${item.kind}`} aria-hidden="true">
+                  {GLYPH[item.kind]}
+                </span>
+              )}
+              {item.label}
+            </li>
+          ))}
+        </ul>
+        <p className="gn-wf-count">{ticketsInFlowLabel(summary.tickets)}</p>
+      </div>
+      {read.truncated ? (
+        <p className="gn-wf-truncated" role="status">
+          Showing {read.nodes.length} of the first {read.reached} reached.{' '}
+          <button type="button" className="gn-wf-link" onClick={onShowNeighbours}>
+            Open this ticket&apos;s neighbours only
+          </button>
+        </p>
+      ) : null}
+    </>
+  );
+}
+  ```
+  `flow-list.tsx`:
+  ```tsx
+'use client';
+
+import { useId } from 'react';
+import { FLOW_LIST_HEADING, listRows } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+
+/**
+ * The keyboard and screen-reader path (WG-4): the flow in order, one row per ticket. The first press on a row selects it (and
+ * the canvas centres it); a press on the row that is already selected, or a double click, opens the ticket.
+ */
+export function FlowList({ read, selectedId, onSelect, onOpen }: { read: FlowRead; selectedId: string | null; onSelect: (id: string) => void; onOpen: (id: string) => void }) {
+  const headingId = useId();
+  return (
+    <section className="gn-wf-list" aria-labelledby={headingId}>
+      <h3 id={headingId} className="gn-wf-list__heading">
+        {FLOW_LIST_HEADING}
+      </h3>
+      <ol className="gn-wf-list__rows">
+        {listRows(read).map((row) => (
+          <li key={row.id}>
+            <button
+              type="button"
+              className="gn-wf-list__row"
+              aria-current={row.id === selectedId ? 'true' : undefined}
+              onClick={() => (row.id === selectedId ? onOpen(row.id) : onSelect(row.id))}
+              onDoubleClick={() => onOpen(row.id)}
+            >
+              {row.text}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+  ```
+  `workflow-view.tsx`:
+  ```tsx
+'use client';
+
+import { useCallback, useMemo, useRef } from 'react';
+import type { GraphSlotProps } from '@gisik-nokma/app-core';
+import { FLOW_EMPTY_COPY, flowSummary } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+import type { Pick as StagePick } from '@gisik-nokma/flow-graph';
+import { Button } from '@gisik-nokma/ui';
+import { FlowCanvas, type FlowCanvasHandle } from './flow-canvas.js';
+import { FlowHeader } from './flow-header.js';
+import { FlowList } from './flow-list.js';
+import type { PanelDeps } from './panel-deps.js';
+import { useContainerOrientation } from './use-container-orientation.js';
+import { useScene } from './use-scene.js';
+
+export type WorkflowViewProps = GraphSlotProps & {
+  /** `null` while loading or after a failure. */
+  read: FlowRead | null;
+  error: string | null;
+  onRetry: () => void;
+  deps: PanelDeps;
+};
+
+/**
+ * The Workflow view, as a function of its props (the panel feeds it a live read; a test feeds it a fixed one).
+ * The shared selection is the SHEET's (`selected`); with nothing selected, or a selection that is not in this flow, the ticket
+ * the sheet is open on is the selected one (SH-5), so it wears the ring.
+ */
+export function WorkflowView(props: WorkflowViewProps) {
+  const { read, error, onRetry, deps, selected, onSelect, onOpenTicket, onShowLinks } = props;
+  const rootRef = useRef<HTMLElement>(null);
+  const canvasRef = useRef<FlowCanvasHandle>(null);
+  const orientation = useContainerOrientation(rootRef, deps.measureWidth);
+  const phone = orientation === 'portrait';
+  const options = useMemo(() => (orientation === null ? null : { phone, orientation, showNotes: false }), [orientation, phone]);
+  const scene = useScene(read, options, deps);
+
+  const shown = read === null ? null : selected !== null && read.nodes.some((n) => n.id === selected) ? selected : read.rootId;
+  const open = useCallback((id: string) => onOpenTicket?.(id), [onOpenTicket]);
+  const pick = useCallback(
+    (hit: StagePick | null) => {
+      if (hit === null) onSelect(null);
+      else if (hit.kind === 'node') onSelect(hit.id);
+    },
+    [onSelect],
+  );
+  const fromList = useCallback(
+    (id: string) => {
+      onSelect(id);
+      canvasRef.current?.focusNode(id);
+    },
+    [onSelect],
+  );
+
+  const summary = read === null ? null : flowSummary(read);
+  const label = summary === null ? 'Workflow graph' : `Flow of ${summary.tickets} ${summary.tickets === 1 ? 'ticket' : 'tickets'} with ${summary.leadsTo} ${summary.leadsTo === 1 ? 'link' : 'links'}. The list below gives the same flow in order.`;
+
+  return (
+    <section ref={rootRef} className="gn-wf" aria-label="Workflow" data-orientation={orientation ?? undefined}>
+      {read === null && error === null ? (
+        <p className="gn-wf__note" aria-busy="true">
+          Loading the flow…
+        </p>
+      ) : null}
+      {error !== null || scene.error !== null ? (
+        <div className="gn-wf__error" role="alert">
+          <p>The flow could not be loaded. {error ?? scene.error}</p>
+          <Button onClick={onRetry}>Try again</Button>
+        </div>
+      ) : null}
+      {read !== null ? (
+        <>
+          <FlowHeader read={read} showNotes={false} onShowNeighbours={onShowLinks} />
+          {summary !== null && summary.tickets === 1 && read.edges.length === 0 ? <p className="gn-wf__empty">{FLOW_EMPTY_COPY}</p> : null}
+          <div className="gn-wf__body">
+            <div className="gn-wf__stage">
+              <FlowCanvas
+                ref={canvasRef}
+                frame={scene.frame !== null && scene.frame.flowId === read.flowId ? scene.frame : null}
+                label={label}
+                selectedId={shown}
+                deps={deps}
+                onPick={pick}
+                onOpen={open}
+              />
+            </div>
+          </div>
+          <FlowList read={read} selectedId={shown} onSelect={fromList} onOpen={open} />
+        </>
+      ) : null}
+    </section>
+  );
+}
+  ```
+  `workflow-panel.tsx` replaces T6's loading shell (the `next/dynamic` boundary in `ticket-workflow-tab.tsx` is unchanged):
+  ```tsx
+'use client';
+
+import { useEffect, useMemo } from 'react';
+import type { GraphSlotProps } from '@gisik-nokma/app-core';
+import { useAppServices } from '../providers.js';
+import { createRuntime } from './runtime.js';
+import { useFlow } from './use-flow.js';
+import { WorkflowView } from './workflow-view.js';
+
+/**
+ * The Graph tab's Workflow view: the live read, the browser runtime (ELK Worker, camera, fonts), and the view. The runtime is
+ * built once per mount and its Worker is ended with it.
+ */
+export function WorkflowPanel(props: GraphSlotProps) {
+  const { dataSource } = useAppServices();
+  const { read, error, reload } = useFlow(dataSource, props.workspaceId, props.ticketId);
+  const runtime = useMemo(() => createRuntime(), []);
+  useEffect(() => () => runtime.dispose(), [runtime]);
+  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} />;
+}
+  ```
+
+  Run: `pnpm turbo run build --filter=@gisik-nokma/app-core...` (the web reads app-core's `dist`), then the Step 5 command. Expected PASS. Then `pnpm --filter @gisik-nokma/web exec tsc -p tsconfig.json --noEmit` clean. Commit.
+
+- [ ] **Step 7: The panel's CSS**
+
+  Append to `packages/ui/src/ui.css` one block headed `/* WTG3 T7: the Workflow view's panel (apps/web/src/workflow-graph). */`, after T5's block. Roles only (`--gn-*`); the header is the mockup's strip (chips left, legend, the count at the right), the canvas is a fixed-clamp height because a sheet body has no definite height to fill, the list is a quiet table of buttons:
+  ```css
+  /* WTG3 T7: the Workflow view's panel (apps/web/src/workflow-graph). */
+  .gn-wf { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .gn-wf__note,
+  .gn-wf__empty { margin: 0; font-size: 0.8125rem; color: var(--gn-text-muted); }
+  .gn-wf__empty { padding: 8px 12px; border-radius: var(--gn-radius-control); background: var(--gn-fill-quaternary); color: var(--gn-text); }
+  .gn-wf__error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: var(--gn-radius-card); background: var(--gn-fill-quaternary); color: var(--gn-danger); }
+  .gn-wf__error p { margin: 0; }
+  .gn-wf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 0.8125rem; color: var(--gn-text-muted); }
+  .gn-wf-chips,
+  .gn-wf-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0; padding: 0; list-style: none; }
+  .gn-wf-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: var(--gn-fill-secondary); color: var(--gn-text); font-size: 0.8125rem; }
+  .gn-wf-chip strong { font-variant-numeric: tabular-nums; }
+  .gn-wf-legend__item { display: inline-flex; align-items: center; gap: 6px; }
+  .gn-wf-legend__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gn-category-open); }
+  .gn-wf-legend__dot[data-category='active'] { background: var(--gn-category-active); }
+  .gn-wf-legend__dot[data-category='terminal'] { background: var(--gn-category-terminal); }
+  .gn-wf-legend__mark { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 14px; height: 14px; font-size: 12px; line-height: 1; color: var(--gn-text-muted); }
+  .gn-wf-legend__mark--draft { border: 1.5px dashed var(--gn-flow-note-line); border-radius: 3px; }
+  .gn-wf-legend__mark--note { width: 9px; height: 12px; border: 1.5px solid var(--gn-flow-note-line); border-radius: 2px; }
+  .gn-wf-legend__mark--not-taken { border: 1.5px dashed var(--gn-flow-not-taken-line); border-radius: 3px; background: var(--gn-flow-not-taken-fill); }
+  .gn-wf-count { margin: 0 0 0 auto; }
+  .gn-wf-truncated { margin: 0; padding: 6px 12px; border-radius: var(--gn-radius-control); background: var(--gn-fill-quaternary); font-size: 0.8125rem; color: var(--gn-text); }
+  .gn-wf-link { padding: 0; border: 0; background: none; color: var(--gn-text-accent); font: inherit; text-decoration: underline; cursor: pointer; }
+  .gn-wf-link:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; border-radius: 2px; }
+  .gn-wf__body { display: flex; gap: 16px; height: clamp(20rem, 62vh, 48rem); min-height: 0; }
+  .gn-wf__stage { flex: 1 1 0; min-width: 0; min-height: 0; }
+  .gn-wf-canvas { position: relative; width: 100%; height: 100%; }
+  .gn-wf-canvas__host { width: 100%; height: 100%; }
+  .gn-wf-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--gn-radius-control); background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); }
+  .gn-wf-zoom__button { width: 36px; height: 36px; border: 0; background: transparent; color: var(--gn-text); font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; }
+  .gn-wf-zoom__button:hover { background: var(--gn-fill-quaternary); }
+  .gn-wf-zoom__button:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+  .gn-wf-list__heading { margin: 0 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-muted); }
+  .gn-wf-list__rows { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .gn-wf-list__row { width: 100%; padding: 6px 10px; border: 0; border-radius: var(--gn-radius-control); background: transparent; color: var(--gn-text); font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+  .gn-wf-list__row:hover { background: var(--gn-fill-quaternary); }
+  .gn-wf-list__row[aria-current='true'] { background: var(--gn-fill-secondary); font-weight: 600; }
+  .gn-wf-list__row:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+  @media (max-width: 40rem) {
+    .gn-wf__body { height: clamp(18rem, 58vh, 40rem); }
+    .gn-wf-count { margin-left: 0; width: 100%; }
+  }
+  ```
+  `ui.css` change ⇒ run the ui, app-core and web suites WHOLE (`> /tmp/wtg3-t7-css.log 2>&1; tail -n 12 /tmp/wtg3-t7-css.log`), `ui-copy.test.ts` among them: 23.191 finds neither mark in this task's strings, 23.190 finds neither `job` nor `stage` (a CSS class is not a word).
+
+- [ ] **Step 8: Weight, the Worker, the bars and the painted comparison**
+
+  1. **First-load JS is unchanged.** `pnpm --filter @gisik-nokma/web build > /tmp/wtg3-t7-after.log 2>&1` and compare the three route lines with Step 0.3. The panel, ELK, the stage and the camera sit behind T6's `next/dynamic` boundary; a route that opens no graph loads none of them. A number that grew is a static edge: find it with 29.258's import-graph test, do not shave it.
+  2. **The Worker is emitted.** `grep -rl "elk-worker\|ELK" apps/web/.next/static > /tmp/wtg3-t7-w.txt; cat /tmp/wtg3-t7-w.txt`. If webpack did not emit it as an asset (it cannot resolve a bare package path in `new URL`), use the named fallback: add `apps/web/scripts/copy-elk-worker.mjs` (`import { copyFileSync, mkdirSync } from 'node:fs'; import { createRequire } from 'node:module'; mkdirSync('public', { recursive: true }); copyFileSync(createRequire(import.meta.url).resolve('elkjs/lib/elk-worker.min.js'), 'public/elk-worker.min.js');`), run it from `apps/web/package.json`'s `predev` and `prebuild` scripts, add `apps/web/public/elk-worker.min.js` to `.gitignore`, and change `runtime.ts` to `new Worker('/elk-worker.min.js')`. Say which form shipped in the handoff.
+  3. **Paint it.** Follow `memory/browser-measurement.md`: build `domain`, `rule-engine`, `sync-client`, `ui`, `editor`, `app-core`, `flow-graph`, `viewport` in the worktree, `cd apps/web && SERVER_ORIGIN=http://localhost:3000 ./node_modules/.bin/next dev -p <lane port>`, sign in on `:3001` as the e2e seed owner and open a ticket that has links (create a three-ticket flow through the existing Links section if the seed has none: this task has no create form yet). On the Graph tab, Workflow: (a) the sheet is `min(1240px, 94vw)` wide (29.255's manual half: record 1240 at a 1440 px window and 640 on Details), (b) side by side with `wtg-preview/Main.png`: card 140 x 64, the diamond 176 x 108, the pills 22 high, the label pills, the ring, the header chips and legend, the count, the zoom group; (c) at a 390 px window (`emulate`): 156 px blocks, wrapped titles, the list under the canvas; (d) a Done to Backlog change made in a second tab arrives within about a second with a ring on the card and nothing else moved. Take one screenshot per theme for (b) and (c) and put the paths in the handoff. **A difference that is not intentional and is CSS gets fixed here; one that needs the stage code goes back to T5's owner as a finding.** Kill the lane-port server when done (`lsof -a -p <pid> -d cwd`).
+  4. **No bar of its own fails here:** the camera's pan bars are T5's and the ELK bars are T1's; this task adds no timing bar. If the painted flow janks on the owner's machine, that is a finding for T5, not a reason to change this task.
+
+- [ ] **Step 9: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.260 | in `sceneInputOf`, `read.nodes.map` → `[...read.nodes].sort((a, b) => a.id.localeCompare(b.id)).map` | the order assertion |
+  | 29.260 | delete the `.filter((e) => byId.has(e.from) && byId.has(e.to))` | the dropped-edge assertion |
+  | 29.260 | in `flowSummary`, count `read.edges` instead of `drawn` | the hole is counted |
+  | 29.260 | in `afterClause`, drop `!e.loop` | the loop is "after" |
+  | 29.260 | in `legendOf`, push a status for every node (no `seen`) | the legend list |
+  | 29.260 | in `notTakenChip`, `pass >= 2` → `pass >= 1` | the pass-1 chip |
+  | 29.261 | `layoutKey` returns `''` | the changed-label control relays out nothing |
+  | 29.261 | `nextScene` skips `placeLeaves` | the "ELK did not run" assertion |
+  | 29.262 | remove `if (mine !== issued.current) return;` in `useScene` | the late-layout test |
+  | 29.262 | `if (fresh) stage.fit(true)` → `stage.fit(true)` in `FlowCanvas` | the camera-not-refitted assertion |
+  | 29.262 | `: read.rootId` → `: selected` in `WorkflowView` | the ring assertion |
+  | 29.262 | the empty-state condition → `false` | the empty-state assertion |
+  | 29.262 | `useContainerOrientation` ignores the width (always landscape) | the 156 px assertion |
+
+  Revert each. (Where a mutation's text does not match the landed code character for character, make the same change in spirit and say so in the handoff.)
+
+- [ ] **Step 10: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** T6 left `workflow-panel.tsx` as a shell and its Features line says "the Workflow view loads as its own chunk": still true. `grep -rn "Loading the flow" apps/web test-cases Features.md` and fix any case that names the shell's text.
+  2. Flip 29.260, 29.261 (✅) and 29.262 and 29.255 (🟡 until Step 8.3's recorded numbers exist; flip to ✅ in this commit if they do, with the screenshot paths in the line).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T7 bullet -->`: `- ✅ **Workflow view** — the Graph tab's Workflow view draws the ticket's whole flow (boxes, diamonds, labelled branches, loops, Start and End), with a header of link counts, a legend of this flow's states, the list "This flow, in order", an empty state, a retry on a failed read, and live updates (a new step is placed without moving the rest; a changed card is ringed). Online only. \`apps/web/src/workflow-graph/\`, \`packages/app-core/src/workflow-graph/\`, \`packages/flow-graph/src/scene/pipeline.ts\`` and `- ⚙️ **Scene pipeline** — \`nextScene\` reuses the previous layout when only a status changed, places a lone new leaf beside its source, and otherwise lays out and glides what moved. \`packages/flow-graph/src/scene/pipeline.ts\``.
+  4. Sweeps: flow-graph, app-core, ui and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). App-core's `online/` is untouched, so no server integration run is owed.
+
+  Commit `wtg3 T7: the Workflow view`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-workflow-view.md` written (the route table before and after, the Worker form that shipped, the screenshot paths, the landed names Step 0 found, D-W3-19 to D-W3-24).
+
+---
+
+### Task 8: The inspector: what the selected ticket is, what leads to and from it, and the edits that are safe to make there (cases 29.263–29.266)
+
+**Branch** `task/wtg3-inspector` (needs T7). **NEEDS: browser** for Step 7. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is the right-hand column of `wtg-preview/Workflow-create.png` (key and type, title, state / assignee / due chips, the sentence panel, the switch and its helper, Comes after, Leads to with label pills, Automatic moves, Open ticket) and `Phone-workflow.png` for the card. **Files:**
+- Create:
+  - `packages/app-core/src/workflow-graph/{inspector-model,link-events,inspector-events}.ts`
+  - `packages/app-core/test/workflow-graph/{inspector,inspector-events}.test.ts`
+  - `apps/web/src/workflow-graph/{inspector-actions,use-flow-actions}.ts`, `apps/web/src/workflow-graph/flow-inspector.tsx`
+  - `apps/web/test/workflow-graph/{flow-inspector.test.tsx,inspector-actions.test.ts}`
+- Modify:
+  - `packages/app-core/src/workflow-graph/index.ts` (the exports below)
+  - `apps/web/src/workflow-graph/workflow-view.tsx` (the `actions` prop and the inspector in `.gn-wf__body`), `apps/web/src/workflow-graph/workflow-panel.tsx` (`useFlowActions`), `apps/web/test/workflow-graph/support.tsx` (`fakeActions`, a default `actions` in `mountView`)
+  - `packages/ui/src/ui.css` (one `/* WTG3 T8 */` block)
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T8 anchors)
+
+**Interfaces:**
+- **Consumes:** T7's `WorkflowView`, `FlowRead` helpers (`nodeLabel`, `decisionRead` and the other builders from `@gisik-nokma/app-core/workflow-graph/testing`), `fromList` (select and centre); app-core `makeSubmittedFactory` (`packages/app-core/src/submit.ts:25`, exported at `index.ts:11`); web `useAppServices()`, `useCurrentUser()` (`apps/web/src/providers.tsx:233`); `dataSource.ingest(events): Promise<IngestResult[]>` (`data-source.ts:456-457` on the tip); the kit's `Switch` (`checked`, `onChange(next)`, children = label), `Toast` (`open`, `message`, `undo`, `onDismiss`), `Button`.
+- **Produces:**
+  - app-core, from `@gisik-nokma/app-core/workflow-graph`: `inspectorOf(read, id): InspectorModel | null`, `stateSentence`, `loopBodyIds(read)`, `autoMoveRows(read)`, `formatMoveTime(iso)`, `formatDay(day)`, `AUTO_MOVES_SHOWN`; `linkEventFor(make, workspaceId, { source, target }, 'added' | 'removed', label?)`, `labelProblem(label, others, decision)`, `LABEL_PROBLEM_COPY`, `LABEL_MAX`; `waitForAllEvent`, `reworkEstimateEvent`, `relabelEvents`, `removeLinkEvents`, `restoreLinkEvents`, `parseEstimate`, `ESTIMATE_MIN`, `ESTIMATE_MAX`;
+  - web: `InspectorActions { setWaitForAll, setReworkEstimate, relabel, removeLink }` with `ActionResult = { ok: true; undo?: () => Promise<ActionResult> } | { ok: false; message: string }`, `makeInspectorActions({ dataSource, make, workspaceId, read })`, `send(dataSource, events)`, `refusalOf(results, sent)`; `useFlowActions(read, workspaceId): InspectorActions` (the ONE place the panel builds its writes: T9, T11 and T12 widen the object it returns); `FlowInspector`; in `support.tsx` `fakeActions(over?)`.
+
+Siblings copied: `ticket-sheet.tsx:2047-2072` (`make({ ... type: 'ticket.field_set' ... })` then `dataSource.ingest([event])`, the result's `status !== 'committed'` reading, the transport failure as a separate sentence); the kit's `Toast` with `undo` for a removal (`packages/ui/src/components/toast.tsx`, the 15 s default is the owner's ruling); `ticket-notes-section.tsx:103` for the note links T10 adds.
+
+**Decisions, reported:**
+- **D-W3-25 The inspector shows what the read has and writes only what a person may safely change there.** The writes are: the Wait-for-all switch (`ticket.field_set waitForAll`, ES-2), the Rework estimate (`ticket.field_set reworkEstimate`, ES-5), relabelling and removing a `leads_to` link (LK-4). Adding a link and creating a step are T9; Decide is T12. Every write goes through `dataSource.ingest`, so the offline replica and the server judge it with the same rules, and a refusal comes back as `IngestResult.reason`.
+- **D-W3-26 The switch is drawn only when something leads here.** WG-3 lists "Wait for all incoming" without a condition; on a Start ticket it would be a control that changes nothing (there is nothing to wait for). It is drawn when at least one forward `leads_to` edge reaches the ticket, a draft included.
+- **D-W3-27 The header shows a type chip only for a Decision.** `FlowNodeRead` carries `typeId`, not the type's name, and the mockup shows the chip on the Decision alone. An ordinary ticket shows none. (A type name on the node is a one-field addition to `FlowNodeRead` if the owner wants it for custom types.)
+- **D-W3-28 "Automatic moves in this flow" is the flow's last five, not the ticket's.** The spec's three examples name three different tickets, so the list is flow-wide and newest first. The same list shows for every selection.
+- **D-W3-29 A loop is "Leads to" and never "Comes after".** A back edge `D to T` appears in `D`'s Leads to (last, labelled `Needs rework (loop)`), and not in `T`'s Comes after. The ticket's wait-for-all, the sentence and the promotion rule all ignore back edges (FL-3, AP-3), and the inspector says the same.
+- **D-W3-30 Relabel is one call, and a half-done relabel is undone.** LK-4 says remove then add as one batch; `dataSource.ingest` is a sequence, not a transaction. If the remove commits and the add is refused (say, a duplicate name the client could not see), `relabel` files the old link again before it answers, so a refused rename never deletes a branch.
+- **D-W3-31 A draft is edited like any ticket.** `ticket.field_set` on a draft is the author's (Drafts R6); the link events pick their stream by `linkEventFor` (a published source to a draft target goes on the DRAFT's stream with `from`, R42).
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-inspector` from `origin/release/<next>` (T7 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. Read what landed and write the names into the handoff: `grep -n "export" packages/app-core/src/workflow-graph/index.ts` (T7's names); `grep -n "waitForAll\|reworkEstimate" packages/domain/src/ticket-types.ts packages/domain/src/events/ticket-events.ts` (Part 2's field ids: if the landed ids differ from `waitForAll` and `reworkEstimate`, change `inspector-events.ts` and its test, nothing else); `grep -n "link_added\|from" packages/domain/src/events/ticket-events.ts` (the `from` member of R42 and the `label` of LK-2: if the Drafts plan named the draft-side member differently, change `link-events.ts` only); `sed -n 1,40p packages/ui/src/components/toast.tsx`.
+  3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T8" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The four case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T8 -->`:
+  - `- ❌ **29.263 — The inspector model says what the ticket is and what leads to and from it:** a Backlog ticket with sources reads \`Moves to To do when GN-150 closes. Nobody has to move it.\` (a Decision's branch reads \`GN-151 chooses Yes\`; several sources are joined with "or", with "and" when it waits for all); any other ticket reads \`Currently In progress.\`, a draft reads \`A draft. Only you can see it until the flow is published.\`; Comes after lists the forward sources in flow order and Leads to the outgoing links, loops last, so a loop edge is never "comes after"; the switch is offered only when something leads here; the Rework estimate is offered for the loop body of a back edge (the ticket, the Decision and every ticket on a forward path between them, and no ticket that only passes through) and for a ticket in round 2 or more; Automatic moves are the flow's latest five, newest first, in India Standard Time, in the spec's three sentences, and a cause the viewer cannot see is "a step you can't see". Control: the ticket after the Decision has no Rework estimate. Mutation: drop the reach-the-Decision intersection in \`loopBodyIds\` → reds.`
+  - `- ❌ **29.264 — A link or a field is written on the stream the spec names:** a published source to a draft target is filed on the DRAFT's stream with \`from\`; every other link on the source's; a removal carries no label; relabel is \`ticket.link_removed\` then \`ticket.link_added\` with the new label, restore adds the old one; \`waitForAll\` writes \`true\` or \`null\` (never \`false\`); the rework estimate writes whole days 1 to 365 or \`null\`; a Decision's branch name is required, 60 characters at most, and unique after trim and case folding, an ordinary ticket's is optional. Control: the same pair with both ends published is plain. Mutation: \`value: on\` in \`waitForAllEvent\` → reds.`
+  - `- ❌ **29.265 — The inspector shows the selected ticket:** it opens on the ticket the sheet is open on, with its key, title, state, assignee, due day, sentence, the switch with its helper, Comes after, Leads to with label pills, Automatic moves and Open ticket; a Decision names its type; a link row selects that ticket; it sits at the right on a wide sheet and under the canvas as a card on a phone; a selection that left the flow falls back to the sheet's own ticket. Control: no switch on a Start ticket, no Rework estimate on an ordinary one. Mutation: \`placement="side"\` always → reds. Manual half (🟡 until recorded): on a lane port the column beside \`wtg-preview/Workflow-create.png\` and the card beside \`Phone-workflow.png\`.`
+  - `- ❌ **29.266 — The inspector writes, and says why when it cannot:** the switch shows the next value at once and returns to the read's value with the reason when refused; a rename sends nothing for a blank or repeated Decision branch name and relabels otherwise; removing a link shows the Toast with Undo and Undo restores it; a refused removal shows its reason and no Undo; the rework estimate saves on Enter or blur, refuses 0, 366 and fractions with a sentence and writes nothing when unchanged; \`relabel\` puts the old link back when the add is refused after the remove committed; a link to a draft is removed and restored on the draft's stream; an edge that left the flow answers a sentence and sends nothing; a transport failure and a short answer are sentences, never a thrown error. Controls: an accepted write keeps its value; both events committed sends nothing more. Mutation: delete the restore in \`relabel\` → reds.`
+
+- [ ] **Step 2: RED, the app-core tests**
+
+  `packages/app-core/test/workflow-graph/inspector.test.ts` (29.263; the builders are T7's `testing.ts`):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { autoMoveRows, formatDay, formatMoveTime, inspectorOf, loopBodyIds, stateSentence } from '../../src/workflow-graph/inspector-model.js';
+import { decisionRead, readEdge, readNode, readOf } from '../../src/workflow-graph/testing.js';
+
+const BACKLOG = { id: 'backlog', name: 'Backlog', category: 'open' } as const;
+
+/** A > M > D (Yes > B, No > C), B > E, C > E, D > A loop: the body of the loop is A, M and D; B, C and E come after the Decision. */
+function loopRead(): FlowRead {
+  return readOf(
+    [readNode('A'), readNode('M'), readNode('D', { kind: 'decision', typeId: 'decision' }), readNode('B'), readNode('C'), readNode('E', { state: BACKLOG, round: 1 })],
+    [readEdge('A', 'M'), readEdge('M', 'D'), readEdge('D', 'B', 'Yes'), readEdge('D', 'C', 'No'), readEdge('B', 'E'), readEdge('C', 'E'), readEdge('D', 'A', 'Needs rework', { loop: true })],
+    { rootId: 'A' },
+  );
+}
+
+describe('the inspector model (spec WG-3, ES-5)', () => {
+  it('29.263 a Backlog ticket says where it will move by itself; a started one says its state; control: the same ticket in To do says its state', () => {
+    const read = readOf(
+      [readNode('1', { key: 'GN-150' }), readNode('2', { key: 'GN-151', kind: 'decision', typeId: 'decision' }), readNode('3', { key: 'GN-152', state: BACKLOG, initialStateName: 'To do' })],
+      [readEdge('1', '3'), readEdge('2', '3', 'Yes')],
+    );
+    const three = read.nodes[2]!;
+    expect(stateSentence(read, three)).toBe('Moves to To do when GN-150 closes or GN-151 chooses Yes. Nobody has to move it.');
+    expect(stateSentence(read, { ...three, waitForAll: true })).toBe('Moves to To do when GN-150 closes and GN-151 chooses Yes. Nobody has to move it.');
+    expect(stateSentence(read, { ...three, state: { id: 'todo', name: 'To do', category: 'open' } })).toBe('Currently To do.');
+    expect(stateSentence(readOf([readNode('1', { state: BACKLOG })], []), readNode('1', { state: BACKLOG }))).toBe('In Backlog.');
+    expect(stateSentence(read, readNode('9', { draft: true }))).toBe('A draft. Only you can see it until the flow is published.');
+    // the sentence in the one-source case is the spec's own
+    const one = readOf([readNode('1', { key: 'GN-150' }), readNode('3', { state: BACKLOG })], [readEdge('1', '3')]);
+    expect(stateSentence(one, one.nodes[1]!)).toBe('Moves to To do when GN-150 closes. Nobody has to move it.');
+  });
+
+  it('29.263 the header, the switch, Comes after and Leads to come from the read in flow order; a loop edge is "leads to" (last) and never "comes after"', () => {
+    const read = decisionRead();
+    const d = inspectorOf(read, 'D')!;
+    expect(d).toMatchObject({ ref: 'GN-162', typeLabel: 'Decision', title: 'Build the page in-house?', isDecision: true, assignee: 'Ama Rangsa' });
+    expect(inspectorOf(read, 'D')!.due).toBeNull();
+    expect(inspectorOf({ ...read, nodes: read.nodes.map((n) => (n.id === 'D' ? { ...n, dueDate: '2026-10-02' } : n)) }, 'D')!.due).toBe('2 Oct');
+    expect(formatDay('2026-01-09')).toBe('9 Jan');
+    expect(d.comesAfter.map((r) => r.other.label)).toEqual(['GN-161']);
+    expect(d.leadsTo.map((r) => `${r.other.label}:${r.label}:${r.loop}`)).toEqual(['GN-163:Yes:false', 'GN-165:No:false', 'GN-161:Needs rework:true']);
+    const a = inspectorOf(read, 'A')!;
+    // the loop edge D to A does not make D "come after" for A's incoming list
+    expect(a.comesAfter.map((r) => r.other.label)).toEqual(['GN-160']);
+    expect(a.leadsTo.map((r) => r.other.label)).toEqual(['GN-162']);
+    // a start ticket has nothing leading here: no switch; the end-of-flow ticket with sources has one
+    expect(inspectorOf(read, 'S')!.waitForAll.shown).toBe(false);
+    expect(inspectorOf(read, 'E')!.waitForAll).toEqual({ shown: true, on: true });
+    expect(inspectorOf(read, 'C')!.typeLabel).toBeNull();
+    expect(inspectorOf(read, 'nope')).toBeNull();
+  });
+
+  it('29.263 the Rework estimate shows for the body of a loop and for round 2 or more only; control: the ticket after the Decision has none', () => {
+    const read = loopRead();
+    expect([...loopBodyIds(read)].sort()).toEqual(['A', 'D', 'M']);
+    for (const id of ['A', 'M', 'D']) expect(inspectorOf(read, id)!.reworkEstimate.shown, id).toBe(true);
+    for (const id of ['B', 'C', 'E']) expect(inspectorOf(read, id)!.reworkEstimate.shown, id).toBe(false);
+    const rounds = readOf([readNode('x', { round: 2, reworkEstimate: 3 })], []);
+    expect(inspectorOf(rounds, 'x')!.reworkEstimate).toEqual({ shown: true, value: 3 });
+    // a ticket on a path that passes through without reaching D is not in the body
+    const side = readOf(
+      [readNode('A'), readNode('D', { kind: 'decision' }), readNode('Z')],
+      [readEdge('A', 'D'), readEdge('A', 'Z'), readEdge('D', 'A', 'again', { loop: true })],
+    );
+    expect(loopBodyIds(side).has('Z')).toBe(false);
+  });
+
+  it('29.263 the flow\'s automatic moves are the last five, newest first, in IST, in the spec\'s words; a cause the viewer cannot see is not named', () => {
+    const read = decisionRead();
+    const moves = (extra: Array<Partial<FlowRead['autoMoves'][number]> & { ticketId: string; at: string }>): FlowRead => ({
+      ...read,
+      autoMoves: extra.map((m) => ({ kind: 'led-to', becauseTicketId: null, pass: null, outcome: null, ...m })),
+    });
+    const rows = autoMoveRows(
+      moves([
+        { ticketId: 'E', at: '2026-10-02T12:34:00Z', kind: 'led-to', becauseTicketId: 'C' },
+        { ticketId: 'A', at: '2026-10-03T04:30:00Z', kind: 'reopened-by-flow', becauseTicketId: 'D', outcome: 'Needs rework', pass: 2 },
+        { ticketId: 'B', at: '2026-10-02T10:00:00Z', kind: 'branch-not-taken', becauseTicketId: 'D', outcome: 'No', pass: 2 },
+        { ticketId: 'F', at: '2026-10-01T10:00:00Z', kind: 'led-to', becauseTicketId: 'hidden' },
+        { ticketId: 'S', at: '2026-09-30T10:00:00Z', kind: 'led-to', becauseTicketId: 'A' },
+        { ticketId: 'C', at: '2026-09-29T10:00:00Z', kind: 'led-to', becauseTicketId: 'A' },
+        { ticketId: 'ghost', at: '2026-10-04T10:00:00Z', kind: 'led-to', becauseTicketId: 'A' },
+      ]),
+    );
+    expect(rows.map((r) => r.text)).toEqual([
+      'GN-161 Reopened by the flow, because GN-162 chose Needs rework (pass 2), 3 Oct 10:00',
+      'GN-166 Moved to To do automatically, because GN-165 was closed, 2 Oct 18:04',
+      'GN-163 Closed as not taken, because GN-162 chose No (pass 2), 2 Oct 15:30',
+      "GN-168 Moved to To do automatically, because a step you can't see was closed, 1 Oct 15:30",
+      'GN-160 Moved to To do automatically, because GN-161 was closed, 30 Sep 15:30',
+    ]);
+    // a Decision that led to it is named by what it chose
+    const viaDecision = autoMoveRows(moves([{ ticketId: 'C', at: '2026-10-02T10:00:00Z', becauseTicketId: 'D', outcome: 'No' }]));
+    expect(viaDecision[0]!.text).toBe('GN-165 Moved to To do automatically, because GN-162 chose No, 2 Oct 15:30');
+    expect(formatMoveTime('2026-10-02T18:29:59Z')).toBe('2 Oct 23:59');
+    expect(formatMoveTime('2026-10-02T18:30:00Z')).toBe('3 Oct 00:00');
+    expect(autoMoveRows({ ...read, autoMoves: [] })).toEqual([]);
+  });
+});
+  ```
+  `packages/app-core/test/workflow-graph/inspector-events.test.ts` (29.264; `make` is a hand-rolled `MakeSubmitted`, because the real factory only adds an id, an actor and a clock):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { SubmittedEvent } from '@gisik-nokma/domain';
+import type { MakeSubmitted } from '../../src/submit.js';
+import { parseEstimate, relabelEvents, removeLinkEvents, restoreLinkEvents, reworkEstimateEvent, waitForAllEvent } from '../../src/workflow-graph/inspector-events.js';
+import { labelProblem, linkEventFor } from '../../src/workflow-graph/link-events.js';
+
+let n = 0;
+const make: MakeSubmitted = (seed): SubmittedEvent => ({ id: `e${(n += 1)}`, version: 1, actorId: 'me', origin: 'web', clientTime: '2026-10-03T00:00:00.000Z', ...seed });
+const WS = 'ws1';
+const pub = (id: string) => ({ id, draft: false });
+const draft = (id: string) => ({ id, draft: true });
+
+describe('link and field events written from the inspector (spec LK-2, LK-4, R42, ES-2, ES-5)', () => {
+  it('29.264 a link lives on the stream the Drafts spec names: the source\'s, except a published source to a draft target, which goes on the DRAFT with `from`; control: the same pair with both published is plain', () => {
+    expect(linkEventFor(make, WS, { source: pub('S'), target: pub('T') }, 'added', 'Yes')).toMatchObject({
+      entity: { kind: 'ticket', id: 'S' },
+      type: 'ticket.link_added',
+      payload: { kind: 'leads_to', targetId: 'T', label: 'Yes' },
+    });
+    const intoDraft = linkEventFor(make, WS, { source: pub('S'), target: draft('D') }, 'added', ' Need more info ');
+    expect(intoDraft).toMatchObject({ entity: { kind: 'ticket', id: 'D' }, payload: { kind: 'leads_to', targetId: 'D', from: 'S', label: 'Need more info' } });
+    const out = linkEventFor(make, WS, { source: draft('D'), target: pub('T') }, 'added');
+    expect(out.entity.id).toBe('D');
+    expect(out.payload).toEqual({ kind: 'leads_to', targetId: 'T' });
+    expect(linkEventFor(make, WS, { source: draft('D'), target: draft('E') }, 'added').entity.id).toBe('D');
+    // removal never carries a label, and carries `from` on the draft side
+    const gone = linkEventFor(make, WS, { source: pub('S'), target: draft('D') }, 'removed', 'ignored');
+    expect(gone).toMatchObject({ type: 'ticket.link_removed', entity: { id: 'D' }, payload: { kind: 'leads_to', targetId: 'D', from: 'S' } });
+    expect(gone.payload).not.toHaveProperty('label');
+    // no label at all: the key is absent, never null
+    expect(linkEventFor(make, WS, { source: pub('S'), target: pub('T') }, 'added').payload).toEqual({ kind: 'leads_to', targetId: 'T' });
+  });
+
+  it('29.264 relabel is remove then add in one batch; remove is one event; restore adds the old label back', () => {
+    const link = { source: pub('S'), target: pub('T'), label: 'Yes' };
+    const batch = relabelEvents(make, WS, link, 'Approved');
+    expect(batch.map((e) => e.type)).toEqual(['ticket.link_removed', 'ticket.link_added']);
+    expect(batch[1]!.payload).toEqual({ kind: 'leads_to', targetId: 'T', label: 'Approved' });
+    expect(removeLinkEvents(make, WS, link).map((e) => e.type)).toEqual(['ticket.link_removed']);
+    expect(restoreLinkEvents(make, WS, link)[0]!.payload).toEqual({ kind: 'leads_to', targetId: 'T', label: 'Yes' });
+    expect(relabelEvents(make, WS, link, null)[1]!.payload).toEqual({ kind: 'leads_to', targetId: 'T' });
+  });
+
+  it('29.264 the switch writes true or null, never false; the rework estimate writes whole days or null', () => {
+    expect(waitForAllEvent(make, WS, 'T', true).payload).toEqual({ fieldId: 'waitForAll', value: true });
+    expect(waitForAllEvent(make, WS, 'T', false).payload).toEqual({ fieldId: 'waitForAll', value: null });
+    expect(reworkEstimateEvent(make, WS, 'T', 3).payload).toEqual({ fieldId: 'reworkEstimate', value: 3 });
+    expect(reworkEstimateEvent(make, WS, 'T', null).payload).toEqual({ fieldId: 'reworkEstimate', value: null });
+    expect(parseEstimate('')).toEqual({ ok: true, value: null });
+    expect(parseEstimate(' 12 ')).toEqual({ ok: true, value: 12 });
+    expect(parseEstimate('365')).toEqual({ ok: true, value: 365 });
+    for (const bad of ['0', '366', '2.5', '-1', 'two', '1e2']) expect(parseEstimate(bad).ok, bad).toBe(false);
+  });
+
+  it('29.264 a Decision\'s branch needs a name that is unique after trim and case folding; an ordinary ticket\'s label is optional; 60 characters at most', () => {
+    expect(labelProblem(null, [], true)).toBe('blank');
+    expect(labelProblem('   ', [], true)).toBe('blank');
+    expect(labelProblem('Yes', ['yes '], true)).toBe('duplicate');
+    expect(labelProblem('Yes', ['No', null], true)).toBeNull();
+    expect(labelProblem('x'.repeat(61), [], true)).toBe('too-long');
+    expect(labelProblem('x'.repeat(60), [], true)).toBeNull();
+    expect(labelProblem(null, [], false)).toBeNull();
+    expect(labelProblem('Yes', ['Yes'], false)).toBeNull();
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t8a.log 2>&1; tail -n 20 /tmp/wtg3-t8a.log` (FAIL: the modules do not exist).
+
+- [ ] **Step 3: GREEN, the model and the events**
+
+  `packages/app-core/src/workflow-graph/inspector-model.ts` (pure; no " — " and no " · " in any string, 23.191):
+  ```ts
+import type { FlowAutoMoveRead, FlowEdgeRead, FlowNodeRead, FlowRead } from '@gisik-nokma/domain';
+import { nodeLabel } from './flow-sentences.js';
+
+/** A ticket named in a sentence or a row: its key (or "Draft") and its title. */
+export type InspectorRef = { id: string; label: string; title: string };
+
+export type LinkRow = {
+  /** The edge's id (`source>target`), the key for relabel and remove. */
+  edgeId: string;
+  other: InspectorRef;
+  label: string | null;
+  loop: boolean;
+};
+
+export type AutoMoveRow = { ticketId: string; at: string; text: string };
+
+export type InspectorModel = {
+  id: string;
+  ref: string;
+  /** "Decision" for a Decision; an ordinary ticket shows no type chip. */
+  typeLabel: 'Decision' | null;
+  title: string;
+  draft: boolean;
+  state: { name: string; category: 'open' | 'active' | 'terminal' };
+  assignee: string | null;
+  /** "2 Oct": the IST day. */
+  due: string | null;
+  /** WG-3's plain sentence: where the ticket will move by itself, or the state it is in. */
+  sentence: string;
+  /** The switch is drawn only when something leads here (otherwise there is nothing to wait for). */
+  waitForAll: { shown: boolean; on: boolean };
+  comesAfter: LinkRow[];
+  leadsTo: LinkRow[];
+  /** ES-5: for a ticket in a loop body, or in round 2 or more. */
+  reworkEstimate: { shown: boolean; value: number | null };
+  /** `null` unless the ticket is a Decision (the Decide control is T12's). */
+  isDecision: boolean;
+  /** The flow's last five automatic moves, newest first (the same list for every selection). */
+  autoMoves: AutoMoveRow[];
+};
+
+const refOf = (node: FlowNodeRead): InspectorRef => ({ id: node.id, label: nodeLabel(node), title: node.title });
+
+function forwardAdjacency(read: FlowRead): { out: Map<string, string[]>; into: Map<string, string[]> } {
+  const out = new Map<string, string[]>();
+  const into = new Map<string, string[]>();
+  const ids = new Set(read.nodes.map((n) => n.id));
+  for (const e of read.edges) {
+    if (e.kind !== 'leads_to' || e.loop || !ids.has(e.from) || !ids.has(e.to)) continue;
+    out.set(e.from, [...(out.get(e.from) ?? []), e.to]);
+    into.set(e.to, [...(into.get(e.to) ?? []), e.from]);
+  }
+  return { out, into };
+}
+
+function reach(from: string, adjacency: Map<string, string[]>): Set<string> {
+  const seen = new Set<string>();
+  const queue = [from];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    for (const next of adjacency.get(id) ?? []) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return seen;
+}
+
+/**
+ * PS-1: the loop body of every back edge `D to T`: `T`, `D`, and every ticket on a forward path from `T` to `D` (reachable from `T`
+ * AND reaching `D`, over forward edges). A ticket that merely passes through without reaching `D` is not in it.
+ */
+export function loopBodyIds(read: FlowRead): Set<string> {
+  const { out, into } = forwardAdjacency(read);
+  const ids = new Set(read.nodes.map((n) => n.id));
+  const body = new Set<string>();
+  for (const e of read.edges) {
+    if (e.kind !== 'leads_to' || !e.loop || !ids.has(e.from) || !ids.has(e.to)) continue;
+    const fromTarget = reach(e.to, out);
+    const toDecision = reach(e.from, into);
+    body.add(e.to);
+    body.add(e.from);
+    for (const id of fromTarget) if (toDecision.has(id)) body.add(id);
+  }
+  return body;
+}
+
+function joinWith(parts: readonly string[], word: 'and' | 'or'): string {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} ${word} ${parts[parts.length - 1]}`;
+}
+
+/**
+ * WG-3: "Moves to To do when GN-150 closes. Nobody has to move it." for a Backlog ticket with something leading here; otherwise
+ * the state it is in. A Decision's branch says what it waits for ("GN-151 chooses Yes"). With the switch on the parts are joined
+ * with "and" (it waits for all of them), off with "or" (any one moves it).
+ */
+export function stateSentence(read: FlowRead, node: FlowNodeRead): string {
+  if (node.draft) return 'A draft. Only you can see it until the flow is published.';
+  if (node.state.id !== 'backlog') return `Currently ${node.state.name}.`;
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  const incoming = read.edges.filter((e) => e.kind === 'leads_to' && !e.loop && e.to === node.id && byId.has(e.from));
+  if (incoming.length === 0) return 'In Backlog.';
+  const parts = incoming.map((e) => {
+    const source = byId.get(e.from)!;
+    return source.kind === 'decision' && e.label !== null ? `${nodeLabel(source)} chooses ${e.label}` : `${nodeLabel(source)} closes`;
+  });
+  return `Moves to ${node.initialStateName} when ${joinWith(parts, node.waitForAll ? 'and' : 'or')}. Nobody has to move it.`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "2 Oct 18:04", in India Standard Time (ES-4: a day is never the device's). `iso` is an instant. */
+export function formatMoveTime(iso: string): string {
+  const shifted = new Date(new Date(iso).getTime() + 5.5 * 3_600_000);
+  const hh = String(shifted.getUTCHours()).padStart(2, '0');
+  const mm = String(shifted.getUTCMinutes()).padStart(2, '0');
+  return `${shifted.getUTCDate()} ${MONTHS[shifted.getUTCMonth()]} ${hh}:${mm}`;
+}
+
+/** "2 Oct" for an IST day `2026-10-02`. */
+export function formatDay(day: string): string {
+  const [, month, date] = /^\d{4}-(\d{2})-(\d{2})$/.exec(day) ?? [];
+  if (month === undefined || date === undefined) return day;
+  return `${Number(date)} ${MONTHS[Number(month) - 1] ?? month}`;
+}
+
+export const AUTO_MOVES_SHOWN = 5;
+
+function because(move: FlowAutoMoveRead, byId: ReadonlyMap<string, FlowNodeRead>): string {
+  const cause = move.becauseTicketId === null ? undefined : byId.get(move.becauseTicketId);
+  if (cause === undefined) return move.kind === 'led-to' ? "a step you can't see was closed" : "a decision you can't see";
+  const pass = move.pass === null || move.pass < 1 ? '' : ` (pass ${move.pass})`;
+  if (move.kind === 'led-to') {
+    return cause.kind === 'decision' && move.outcome !== null ? `${nodeLabel(cause)} chose ${move.outcome}` : `${nodeLabel(cause)} was closed`;
+  }
+  return `${nodeLabel(cause)} chose ${move.outcome ?? 'an outcome'}${pass}`;
+}
+
+/** WG-3's "Automatic moves in this flow": one sentence per move, newest first, at most five. Moves of tickets outside the read are skipped. */
+export function autoMoveRows(read: FlowRead): AutoMoveRow[] {
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  return [...read.autoMoves]
+    .filter((m) => byId.has(m.ticketId))
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+    .slice(0, AUTO_MOVES_SHOWN)
+    .map((move) => {
+      const node = byId.get(move.ticketId)!;
+      const lead = nodeLabel(node);
+      const verb =
+        move.kind === 'led-to' ? `Moved to ${node.initialStateName} automatically` : move.kind === 'reopened-by-flow' ? 'Reopened by the flow' : 'Closed as not taken';
+      const when = formatMoveTime(move.at);
+      return { ticketId: move.ticketId, at: move.at, text: `${lead} ${verb}, because ${because(move, byId)}, ${when}` };
+    });
+}
+
+function rowsOf(read: FlowRead, edges: readonly FlowEdgeRead[], side: 'from' | 'to'): LinkRow[] {
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  const rank = new Map(read.order.map((id, i) => [id, i] as const));
+  const otherSide = side === 'from' ? 'to' : 'from';
+  return edges
+    .filter((e) => byId.has(e[otherSide]))
+    .map((e): LinkRow => ({ edgeId: e.id, other: refOf(byId.get(e[otherSide])!), label: e.label, loop: e.loop }))
+    .sort(
+      (a, b) =>
+        Number(a.loop) - Number(b.loop) || (rank.get(a.other.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.other.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+}
+
+/** Everything the inspector shows for one selected ticket (WG-3, without the Decision's Decide control and passes: T12). `null` if it is not in the read. */
+export function inspectorOf(read: FlowRead, id: string): InspectorModel | null {
+  const node = read.nodes.find((n) => n.id === id);
+  if (node === undefined) return null;
+  const flow = read.edges.filter((e) => e.kind === 'leads_to');
+  const comesAfter = rowsOf(read, flow.filter((e) => e.to === id && !e.loop), 'to');
+  const leadsTo = rowsOf(read, flow.filter((e) => e.from === id), 'from');
+  const inLoop = loopBodyIds(read).has(id);
+  return {
+    id,
+    ref: nodeLabel(node),
+    typeLabel: node.kind === 'decision' ? 'Decision' : null,
+    title: node.title,
+    draft: node.draft,
+    state: { name: node.state.name, category: node.state.category },
+    assignee: node.assigneeName,
+    due: node.dueDate === null ? null : formatDay(node.dueDate),
+    sentence: stateSentence(read, node),
+    waitForAll: { shown: comesAfter.length > 0, on: node.waitForAll },
+    comesAfter,
+    leadsTo,
+    reworkEstimate: { shown: inLoop || node.round >= 2, value: node.reworkEstimate },
+    isDecision: node.kind === 'decision',
+    autoMoves: autoMoveRows(read),
+  };
+}
+  ```
+  `link-events.ts` (the stream rule and the branch-name rule; `LABEL_PROBLEM_COPY` is the only text):
+  ```ts
+import type { SubmittedEvent } from '@gisik-nokma/domain';
+import type { MakeSubmitted } from '../submit.js';
+
+export type LinkEnd = { id: string; draft: boolean };
+export const LABEL_MAX = 60;
+
+/**
+ * The event that adds or removes ONE `leads_to` link, on the stream the Drafts spec says it lives on (R42):
+ * - a link whose TARGET is a draft and whose source is a published ticket S is filed on the DRAFT's stream, `targetId` the draft
+ *   and `from` S ("S leads to the draft"); a plain event on S's stream naming a draft is refused `draft.link-form`;
+ * - every other link (published to published, or a draft as the source) is filed as spec A defines it, on the SOURCE's stream.
+ * The label rides only on an add (`ticket.link_removed` is `{kind, targetId}`, LK-2); `from` rides on both.
+ */
+export function linkEventFor(
+  make: MakeSubmitted,
+  workspaceId: string,
+  ends: { source: LinkEnd; target: LinkEnd },
+  action: 'added' | 'removed',
+  label: string | null = null,
+): SubmittedEvent {
+  const { source, target } = ends;
+  const draftSide = target.draft && !source.draft;
+  const payload: Record<string, unknown> = { kind: 'leads_to', targetId: target.id };
+  if (draftSide) payload['from'] = source.id;
+  if (action === 'added' && label !== null) payload['label'] = label.trim();
+  return make({
+    workspaceId,
+    entity: { kind: 'ticket', id: draftSide ? target.id : source.id },
+    type: action === 'added' ? 'ticket.link_added' : 'ticket.link_removed',
+    payload,
+  });
+}
+
+export type LabelProblem = 'blank' | 'too-long' | 'duplicate';
+
+export const LABEL_PROBLEM_COPY: Record<LabelProblem, string> = {
+  blank: 'Give this branch a name, such as Yes or No.',
+  'too-long': `Use ${LABEL_MAX} characters or fewer.`,
+  duplicate: 'Another branch of this decision already has that name.',
+};
+
+const fold = (text: string): string => text.trim().toLocaleLowerCase('en');
+
+/**
+ * LK-3.3, checked before the event is sent (the server's `link.label-required` and `link.label-duplicate` still decide): a Decision's
+ * outgoing label is required, 1 to 60 characters once trimmed, and unique among its other outgoing labels after trim and case
+ * folding. `others` are the labels of the Decision's OTHER outgoing links. An ordinary ticket's label is optional: `null` is fine.
+ */
+export function labelProblem(label: string | null, others: readonly (string | null)[], decision: boolean): LabelProblem | null {
+  const text = label === null ? '' : label.trim();
+  if (text === '') return decision ? 'blank' : null;
+  if ([...text].length > LABEL_MAX) return 'too-long';
+  if (decision && others.some((other) => other !== null && fold(other) === fold(text))) return 'duplicate';
+  return null;
+}
+  ```
+  `inspector-events.ts`:
+  ```ts
+import type { SubmittedEvent } from '@gisik-nokma/domain';
+import type { MakeSubmitted } from '../submit.js';
+import { linkEventFor, type LinkEnd } from './link-events.js';
+
+export const ESTIMATE_MIN = 1;
+export const ESTIMATE_MAX = 365;
+
+/** ES-2: `waitForAll` is `true`, or `null` to clear (absent means off); a field claim, so History and attribution come free. */
+export function waitForAllEvent(make: MakeSubmitted, workspaceId: string, ticketId: string, on: boolean): SubmittedEvent {
+  return make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.field_set', payload: { fieldId: 'waitForAll', value: on ? true : null } });
+}
+
+/** ES-5: whole days 1 to 365, or `null` to clear. */
+export function reworkEstimateEvent(make: MakeSubmitted, workspaceId: string, ticketId: string, days: number | null): SubmittedEvent {
+  return make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.field_set', payload: { fieldId: 'reworkEstimate', value: days } });
+}
+
+export type EstimateParse = { ok: true; value: number | null } | { ok: false; message: string };
+
+/** What a person typed in an estimate field: blank clears, otherwise a whole number of days from 1 to 365 (ES-1). */
+export function parseEstimate(text: string): EstimateParse {
+  const trimmed = text.trim();
+  if (trimmed === '') return { ok: true, value: null };
+  if (!/^\d+$/.test(trimmed)) return { ok: false, message: 'Use a whole number of days.' };
+  const value = Number(trimmed);
+  if (value < ESTIMATE_MIN || value > ESTIMATE_MAX) return { ok: false, message: `Use a number of days from ${ESTIMATE_MIN} to ${ESTIMATE_MAX}.` };
+  return { ok: true, value };
+}
+
+export type LinkRef = { source: LinkEnd; target: LinkEnd; label: string | null };
+
+/** LK-4: relabel is ONE batch, `ticket.link_removed` then `ticket.link_added` with the new label. No new event type. */
+export function relabelEvents(make: MakeSubmitted, workspaceId: string, link: LinkRef, next: string | null): SubmittedEvent[] {
+  return [linkEventFor(make, workspaceId, link, 'removed'), linkEventFor(make, workspaceId, link, 'added', next)];
+}
+
+export function removeLinkEvents(make: MakeSubmitted, workspaceId: string, link: LinkRef): SubmittedEvent[] {
+  return [linkEventFor(make, workspaceId, link, 'removed')];
+}
+
+/** Undo of a remove: the same link added again with its old label. */
+export function restoreLinkEvents(make: MakeSubmitted, workspaceId: string, link: LinkRef): SubmittedEvent[] {
+  return [linkEventFor(make, workspaceId, link, 'added', link.label)];
+}
+  ```
+  `index.ts`, append:
+  ```ts
+export {
+  AUTO_MOVES_SHOWN,
+  autoMoveRows,
+  formatDay,
+  formatMoveTime,
+  inspectorOf,
+  loopBodyIds,
+  stateSentence,
+  type AutoMoveRow,
+  type InspectorModel,
+  type InspectorRef,
+  type LinkRow,
+} from './inspector-model.js';
+export { LABEL_MAX, LABEL_PROBLEM_COPY, labelProblem, linkEventFor, type LabelProblem, type LinkEnd } from './link-events.js';
+export {
+  ESTIMATE_MAX,
+  ESTIMATE_MIN,
+  parseEstimate,
+  relabelEvents,
+  removeLinkEvents,
+  reworkEstimateEvent,
+  restoreLinkEvents,
+  waitForAllEvent,
+  type EstimateParse,
+  type LinkRef,
+} from './inspector-events.js';
+  ```
+  Run the Step 2 command (PASS: 8 tests in two files, 14 with T7's) then `pnpm --filter @gisik-nokma/app-core exec tsc -p tsconfig.typecheck.json` clean. Commit.
+
+- [ ] **Step 4: RED, the web tests**
+
+  `apps/web/test/workflow-graph/inspector-actions.test.ts` (29.266, the writes as events and sentences; `DataSource` is a stub with only `ingest`):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it, vi } from 'vitest';
+import { readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { makeSubmittedFactory } from '@gisik-nokma/app-core';
+import type { DataSource } from '@gisik-nokma/app-core';
+import type { IngestResult } from '@gisik-nokma/domain';
+import { makeInspectorActions } from '../../src/workflow-graph/inspector-actions.js';
+
+const committed = (n: number): IngestResult => ({ status: 'committed', eventId: `e${n}`, seq: n, serverTime: '2026-10-03T00:00:00.000Z' });
+const refused = (reason: string): IngestResult => ({ status: 'refused', eventId: 'x', rule: 'link.label-duplicate', reason });
+const read = readOf([readNode('S', { kind: 'decision' }), readNode('T'), readNode('U', { draft: true })], [readEdge('S', 'T', 'Yes'), readEdge('S', 'U', 'No')]);
+
+function actionsWith(answers: IngestResult[][]) {
+  const ingest = vi.fn(async (_events: unknown[]) => answers.shift() ?? []);
+  const dataSource = { ingest, query: {}, subscribe: () => () => undefined } as unknown as DataSource;
+  const make = makeSubmittedFactory({ actorId: 'me', origin: 'web' });
+  return { ingest, actions: makeInspectorActions({ dataSource, make, workspaceId: 'w1', read: () => read }) };
+}
+
+describe('29.266 the inspector\'s writes become events and say what went wrong', () => {
+  it('29.266 relabel sends remove then add in ONE call; if the add is refused after the remove committed, the old link is put back and the reason is returned; control: both committed sends nothing more', async () => {
+    const good = actionsWith([[committed(1), committed(2)]]);
+    expect(await good.actions.relabel('S>T', 'Approved')).toEqual({ ok: true });
+    expect(good.ingest).toHaveBeenCalledTimes(1);
+    const sent = good.ingest.mock.calls[0]![0] as Array<{ type: string; payload: Record<string, unknown> }>;
+    expect(sent.map((e) => e.type)).toEqual(['ticket.link_removed', 'ticket.link_added']);
+    expect(sent[1]!.payload).toMatchObject({ label: 'Approved' });
+
+    const bad = actionsWith([[committed(1), refused('Another branch of this decision already has that name.')], [committed(3)]]);
+    expect(await bad.actions.relabel('S>T', 'No')).toEqual({ ok: false, message: 'Another branch of this decision already has that name.' });
+    expect(bad.ingest).toHaveBeenCalledTimes(2);
+    const restore = bad.ingest.mock.calls[1]![0] as Array<{ type: string; payload: Record<string, unknown> }>;
+    expect(restore).toHaveLength(1);
+    expect(restore[0]).toMatchObject({ type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: 'T', label: 'Yes' } });
+
+    // the remove itself refused: nothing to put back
+    const first = actionsWith([[refused('You cannot edit this ticket.')]]);
+    await first.actions.relabel('S>T', 'x');
+    expect(first.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('29.266 a link to a draft is removed and restored on the draft\'s own stream with `from`; an edge that left the flow answers a sentence and sends nothing', async () => {
+    const run = actionsWith([[committed(1)], [committed(2)]]);
+    const removed = await run.actions.removeLink('S>U');
+    expect(removed.ok).toBe(true);
+    const first = run.ingest.mock.calls[0]![0] as Array<{ entity: { id: string }; payload: unknown }>;
+    expect(first[0]).toMatchObject({ entity: { id: 'U' }, payload: { kind: 'leads_to', targetId: 'U', from: 'S' } });
+    if (removed.ok && removed.undo !== undefined) await removed.undo();
+    const second = run.ingest.mock.calls[1]![0] as Array<{ type: string; entity: { id: string }; payload: unknown }>;
+    expect(second[0]).toMatchObject({ type: 'ticket.link_added', entity: { id: 'U' }, payload: { from: 'S', label: 'No' } });
+    const none = actionsWith([]);
+    expect(await none.actions.removeLink('S>nothing')).toEqual({ ok: false, message: 'That link is no longer in this flow.' });
+    expect(none.ingest).not.toHaveBeenCalled();
+  });
+
+  it('29.266 a transport failure and a short answer both come back as sentences, never as a thrown error', async () => {
+    const dataSource = { ingest: vi.fn(async (_events: unknown[]): Promise<IngestResult[]> => { throw new Error('offline'); }), query: {}, subscribe: () => () => undefined } as unknown as DataSource;
+    const actions = makeInspectorActions({ dataSource, make: makeSubmittedFactory({ actorId: 'me', origin: 'web' }), workspaceId: 'w1', read: () => read });
+    expect(await actions.setWaitForAll('T', true)).toEqual({ ok: false, message: 'offline' });
+    const silent = actionsWith([[]]);
+    expect(await silent.actions.setWaitForAll('T', true)).toEqual({ ok: false, message: 'The server did not answer this change.' });
+  });
+});
+  ```
+  `apps/web/test/workflow-graph/flow-inspector.test.tsx` (29.265 and 29.266, the panel; the view is mounted with T7's `mountView` and a recording `fakeActions`):
+  ```tsx
+// @vitest-environment jsdom
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { fakeActions, fakeDeps, mountView } from './support.js';
+
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(c.querySelectorAll('.gn-flow-node')).toHaveLength(n));
+const panel = () => within(screen.getByRole('complementary', { name: 'Selected ticket' }));
+
+describe('29.265 the inspector shows the selected ticket and what leads to and from it', () => {
+  it('29.265 it opens on the ticket the sheet is open on: key, title, state, assignee, the sentence, the switch with its helper, Comes after, Leads to with label pills, Automatic moves, Open ticket', async () => {
+    const onOpenTicket = vi.fn();
+    const read = decisionRead();
+    read.autoMoves = [{ ticketId: 'E', at: '2026-10-02T12:34:00Z', kind: 'led-to', becauseTicketId: 'C', pass: null, outcome: null }];
+    const { container } = mountView(read, { onOpenTicket });
+    await drawn(container, 8);
+    const p = panel();
+    expect(p.getByText('GN-165')).toBeInTheDocument();
+    expect(p.getByRole('heading', { name: 'Brief the agency' })).toBeInTheDocument();
+    expect(within(p.getByLabelText('Facts')).getByText('In progress')).toBeInTheDocument();
+    expect(within(p.getByLabelText('Facts')).getByText('Ama Rangsa')).toBeInTheDocument();
+    expect(p.getByText('Currently In progress.')).toBeInTheDocument();
+    // C has one source (D, "No") so the switch is drawn, off, with the spec's helper
+    expect(p.getByRole('checkbox', { name: 'Wait for all incoming' })).not.toBeChecked();
+    expect(p.getByText('Off: it moves as soon as any ticket that leads here is done. On: it waits for all of them.')).toBeInTheDocument();
+    expect(within(p.getByLabelText('Comes after')).getByText('GN-162')).toBeInTheDocument();
+    expect(within(p.getByLabelText('Leads to')).getByText('GN-166')).toBeInTheDocument();
+    expect(within(p.getByLabelText('Automatic moves in this flow')).getByText('GN-166 Moved to To do automatically, because GN-165 was closed, 2 Oct 18:04')).toBeInTheDocument();
+    await userEvent.click(p.getByRole('button', { name: 'Open ticket' }));
+    expect(onOpenTicket).toHaveBeenCalledWith('C');
+  });
+
+  it('29.265 selecting another ticket (from the sheet, the list or a link row) changes the panel; a Decision names its type and its labelled branches, loop last; control: no Rework estimate on the ordinary ticket, one on a loop member', async () => {
+    const onSelect = vi.fn();
+    const { container, update } = mountView(decisionRead(), { onSelect });
+    await drawn(container, 8);
+    expect(panel().queryByLabelText('Rework estimate')).toBeNull();
+    update({ selected: 'D' });
+    const p = panel();
+    expect(p.getByText('Decision')).toBeInTheDocument();
+    const rows = within(p.getByLabelText('Leads to')).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows[0]).toMatch(/^YesGN-163 Build the page in-house/);
+    expect(rows[1]).toMatch(/^NoGN-165 Brief the agency/);
+    expect(rows[2]).toMatch(/^Needs rework \(loop\)GN-161 Design homepage/);
+    expect(p.getByLabelText('Rework estimate')).toBeInTheDocument();
+    await userEvent.click(within(p.getByLabelText('Leads to')).getByRole('button', { name: /GN-165 Brief the agency/ }));
+    expect(onSelect).toHaveBeenCalledWith('C');
+    // a start ticket has nothing leading to it: no switch; the ticket in round 2 has the Rework estimate
+    update({ selected: 'S' });
+    expect(panel().queryByRole('checkbox', { name: 'Wait for all incoming' })).toBeNull();
+    update({ selected: 'E' });
+    expect(panel().getByRole('checkbox', { name: 'Wait for all incoming' })).toBeChecked();
+    expect(panel().getByLabelText('Rework estimate (days)')).toBeInTheDocument();
+  });
+
+  it('29.265 it sits at the right on a wide sheet and under the canvas as a card on a phone; a selection that left the flow falls back to the sheet\'s own ticket', async () => {
+    const wide = mountView(decisionRead(), {}, fakeDeps(1000));
+    await drawn(wide.container, 8);
+    expect(panel().getByText('GN-165')).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Selected ticket' })).toHaveAttribute('data-placement', 'side');
+    wide.update({ selected: 'gone' });
+    expect(panel().getByText('GN-165')).toBeInTheDocument();
+    wide.unmount();
+    const narrow = mountView(decisionRead(), {}, fakeDeps(500));
+    await drawn(narrow.container, 8);
+    expect(screen.getByRole('complementary', { name: 'Selected ticket' })).toHaveAttribute('data-placement', 'card');
+  });
+});
+
+describe('29.266 the inspector writes, and says why when a write is refused', () => {
+  it('29.266 the switch writes the next value at once and puts it back with the reason when refused; control: an accepted write keeps it', async () => {
+    const refuse = vi.fn(async () => ({ ok: false as const, message: 'You can only change tickets you can edit.' }));
+    const { container, props } = mountView(decisionRead(), { selected: 'E', actions: fakeActions({ setWaitForAll: refuse }) });
+    await drawn(container, 8);
+    const box = panel().getByRole('checkbox', { name: 'Wait for all incoming' });
+    expect(box).toBeChecked();
+    await userEvent.click(box);
+    expect(refuse).toHaveBeenCalledWith('E', false);
+    expect(await panel().findByRole('alert')).toHaveTextContent('You can only change tickets you can edit.');
+    expect(panel().getByRole('checkbox', { name: 'Wait for all incoming' })).toBeChecked();
+    // accepted: the control shows the new value without waiting for the read
+    const ok = fakeActions();
+    const second = mountView(decisionRead(), { selected: 'E', actions: ok });
+    await drawn(second.container, 8);
+    const boxes = screen.getAllByRole('checkbox', { name: 'Wait for all incoming' });
+    await userEvent.click(boxes[boxes.length - 1]!);
+    expect(ok.setWaitForAll).toHaveBeenCalledWith('E', false);
+    expect(boxes[boxes.length - 1]).not.toBeChecked();
+    expect(props.actions.setWaitForAll).toBeDefined();
+  });
+
+  it('29.266 renaming a branch: a valid name relabels, a blank or repeated name on a Decision is refused before anything is sent; control: a non-Decision link may have no label', async () => {
+    const actions = fakeActions();
+    const { container } = mountView(decisionRead(), { selected: 'D', actions });
+    await drawn(container, 8);
+    const leads = () => within(panel().getByLabelText('Leads to'));
+    await userEvent.click(leads().getByRole('button', { name: 'Rename the link to GN-163' }));
+    const field = leads().getByLabelText('Branch name');
+    await userEvent.clear(field);
+    await userEvent.click(leads().getByRole('button', { name: 'Save' }));
+    expect(leads().getByRole('alert')).toHaveTextContent('Give this branch a name, such as Yes or No.');
+    await userEvent.type(field, ' no ');
+    await userEvent.click(leads().getByRole('button', { name: 'Save' }));
+    expect(leads().getByRole('alert')).toHaveTextContent('Another branch of this decision already has that name.');
+    expect(actions.relabel).not.toHaveBeenCalled();
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Approved');
+    await userEvent.click(leads().getByRole('button', { name: 'Save' }));
+    expect(actions.relabel).toHaveBeenCalledWith('D>B', 'Approved');
+    await waitFor(() => expect(leads().queryByLabelText('Branch name')).toBeNull());
+    // an ordinary ticket's link may be unlabelled: blank saves as null
+    const plain = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q', 'later')]), { selected: 'P', actions });
+    await drawn(plain.container, 2);
+    const box = within(within(plain.container).getByLabelText('Leads to'));
+    await userEvent.click(box.getByRole('button', { name: /^Rename the link to/ }));
+    await userEvent.clear(box.getByLabelText('Branch name'));
+    await userEvent.click(box.getByRole('button', { name: 'Save' }));
+    expect(actions.relabel).toHaveBeenLastCalledWith('P>Q', null);
+  });
+
+  it('29.266 removing a link shows a message with Undo that puts it back; a refusal shows its reason and no Undo', async () => {
+    const undo = vi.fn(async () => ({ ok: true as const }));
+    const removeLink = vi.fn(async () => ({ ok: true as const, undo }));
+    const { container } = mountView(decisionRead(), { selected: 'D', actions: fakeActions({ removeLink }) });
+    await drawn(container, 8);
+    await userEvent.click(within(panel().getByLabelText('Leads to')).getByRole('button', { name: 'Remove the link to GN-163' }));
+    expect(removeLink).toHaveBeenCalledWith('D>B');
+    const toast = await screen.findByRole('status');
+    expect(toast).toHaveTextContent('Removed the link to GN-163.');
+    await userEvent.click(within(toast).getByRole('button', { name: 'Undo' }));
+    expect(undo).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    // refused
+    const refused = fakeActions({ removeLink: vi.fn(async () => ({ ok: false as const, message: 'That link is no longer in this flow.' })) });
+    const second = mountView(decisionRead(), { selected: 'D', actions: refused });
+    await drawn(second.container, 8);
+    const rows = within(second.container.querySelector('.gn-wf-inspector')! as HTMLElement);
+    await userEvent.click(rows.getByRole('button', { name: 'Remove the link to GN-165' }));
+    expect(await rows.findByRole('alert')).toHaveTextContent('That link is no longer in this flow.');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('29.266 the rework estimate saves whole days 1 to 365 on Enter or blur, refuses 0, 366 and fractions with a sentence; control: an unchanged value writes nothing', async () => {
+    const actions = fakeActions();
+    const read = decisionRead();
+    read.nodes = read.nodes.map((n) => (n.id === 'E' ? { ...n, reworkEstimate: 2 } : n));
+    const { container } = mountView(read, { selected: 'E', actions });
+    await drawn(container, 8);
+    const field = panel().getByLabelText('Rework estimate (days)');
+    expect(field).toHaveValue('2');
+    await userEvent.clear(field);
+    await userEvent.type(field, '400{Enter}');
+    expect(panel().getByText('Use a number of days from 1 to 365.')).toBeInTheDocument();
+    expect(actions.setReworkEstimate).not.toHaveBeenCalled();
+    await userEvent.clear(field);
+    await userEvent.type(field, '2.5{Enter}');
+    expect(panel().getByText('Use a whole number of days.')).toBeInTheDocument();
+    await userEvent.clear(field);
+    await userEvent.type(field, '3{Enter}');
+    expect(actions.setReworkEstimate).toHaveBeenCalledWith('E', 3);
+    expect(panel().queryByText('Use a whole number of days.')).toBeNull();
+    await userEvent.clear(field);
+    await userEvent.tab();
+    expect(actions.setReworkEstimate).toHaveBeenLastCalledWith('E', null);
+    const again = actions.setReworkEstimate as ReturnType<typeof vi.fn>;
+    again.mockClear();
+    await userEvent.type(field, '2');
+    await userEvent.tab();
+    expect(again).not.toHaveBeenCalled();
+  });
+});
+  ```
+  `apps/web/test/workflow-graph/support.tsx` gains `fakeActions` and a default `actions` (apply this diff):
+  ```diff
+--- a/apps/web/test/workflow-graph/support.tsx
++++ b/apps/web/test/workflow-graph/support.tsx
+@@ -4,6 +4,7 @@
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import { engineFromInstance } from '@gisik-nokma/flow-graph';
+ import type { PanelDeps } from '../../src/workflow-graph/panel-deps.js';
++import type { ActionResult, InspectorActions } from '../../src/workflow-graph/inspector-actions.js';
+ import { WorkflowView, type WorkflowViewProps } from '../../src/workflow-graph/workflow-view.js';
+
+ type Ctor = new () => { layout(graph: never): Promise<unknown> };
+@@ -29,6 +30,13 @@
+   };
+ }
+
++const done = async (): Promise<ActionResult> => ({ ok: true });
++
++/** Every write answers done; a test overrides the one it is about. */
++export function fakeActions(over: Partial<InspectorActions> = {}): InspectorActions {
++  return { setWaitForAll: vi.fn(done), setReworkEstimate: vi.fn(done), relabel: vi.fn(done), removeLink: vi.fn(done), ...over };
++}
++
+ export function mountView(read: FlowRead | null, over: Partial<WorkflowViewProps> = {}, deps: FakeDeps = fakeDeps()) {
+   const props: WorkflowViewProps = {
+     workspaceId: 'w1',
+@@ -40,6 +48,7 @@
+     error: null,
+     onRetry: vi.fn(),
+     deps,
++    actions: fakeActions(),
+     ...over,
+   };
+   const utils = render(<WorkflowView {...props} />);
+  ```
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t8w.log 2>&1; tail -n 20 /tmp/wtg3-t8w.log` (FAIL: no `inspector-actions`).
+
+- [ ] **Step 5: GREEN, the web parts**
+
+  `inspector-actions.ts` (events in, sentences out; it never throws):
+  ```ts
+import type { DataSource } from '@gisik-nokma/app-core';
+import { relabelEvents, removeLinkEvents, restoreLinkEvents, reworkEstimateEvent, waitForAllEvent, type LinkRef } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead, IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+
+/** What a write answers: done (with an undo for a removal), or the sentence to show where the person acted. */
+export type ActionResult = { ok: true; undo?: () => Promise<ActionResult> } | { ok: false; message: string };
+
+/** The inspector's writes (WG-3). Each is a few events through `dataSource.ingest`; the live read shows the result. */
+export type InspectorActions = {
+  setWaitForAll(ticketId: string, on: boolean): Promise<ActionResult>;
+  setReworkEstimate(ticketId: string, days: number | null): Promise<ActionResult>;
+  relabel(edgeId: string, next: string | null): Promise<ActionResult>;
+  removeLink(edgeId: string): Promise<ActionResult>;
+};
+
+type Make = (seed: Pick<SubmittedEvent, 'workspaceId' | 'entity' | 'type' | 'payload'>) => SubmittedEvent;
+
+/** The first thing wrong in a batch of answers, as a sentence; `null` when every event committed. */
+export function refusalOf(results: readonly IngestResult[], sent: number): string | null {
+  for (const result of results) {
+    if (result.status === 'refused') return result.reason;
+    if (result.status === 'invalid') return result.message;
+  }
+  return results.length < sent ? 'The server did not answer this change.' : null;
+}
+
+/** Send events and turn the answer, or a transport failure, into a result. Never throws. */
+export async function send(dataSource: DataSource, events: SubmittedEvent[]): Promise<{ ok: true } | { ok: false; message: string; results: IngestResult[] }> {
+  try {
+    const results = await dataSource.ingest(events);
+    const message = refusalOf(results, events.length);
+    return message === null ? { ok: true } : { ok: false, message, results };
+  } catch (cause) {
+    return { ok: false, message: cause instanceof Error ? cause.message : 'The change could not be sent.', results: [] };
+  }
+}
+
+export function makeInspectorActions(deps: { dataSource: DataSource; make: Make; workspaceId: string; read: () => FlowRead | null }): InspectorActions {
+  const { dataSource, make, workspaceId } = deps;
+
+  const linkOf = (edgeId: string): LinkRef | null => {
+    const read = deps.read();
+    const edge = read?.edges.find((e) => e.id === edgeId && e.kind === 'leads_to');
+    if (read === undefined || read === null || edge === undefined) return null;
+    const source = read.nodes.find((n) => n.id === edge.from);
+    const target = read.nodes.find((n) => n.id === edge.to);
+    if (source === undefined || target === undefined) return null;
+    return { source: { id: source.id, draft: source.draft }, target: { id: target.id, draft: target.draft }, label: edge.label };
+  };
+  const gone: ActionResult = { ok: false, message: 'That link is no longer in this flow.' };
+
+  const asResult = async (events: SubmittedEvent[]): Promise<ActionResult> => {
+    const sent = await send(dataSource, events);
+    return sent.ok ? { ok: true } : { ok: false, message: sent.message };
+  };
+
+  return {
+    setWaitForAll: (ticketId, on) => asResult([waitForAllEvent(make, workspaceId, ticketId, on)]),
+    setReworkEstimate: (ticketId, days) => asResult([reworkEstimateEvent(make, workspaceId, ticketId, days)]),
+    async relabel(edgeId, next) {
+      const link = linkOf(edgeId);
+      if (link === null) return gone;
+      const sent = await send(dataSource, relabelEvents(make, workspaceId, link, next));
+      if (sent.ok) return { ok: true };
+      // The remove committed and the add was refused: put the old link back, so a refused rename never deletes a branch.
+      if (sent.results[0]?.status === 'committed') await send(dataSource, restoreLinkEvents(make, workspaceId, link));
+      return { ok: false, message: sent.message };
+    },
+    async removeLink(edgeId) {
+      const link = linkOf(edgeId);
+      if (link === null) return gone;
+      const sent = await send(dataSource, removeLinkEvents(make, workspaceId, link));
+      if (!sent.ok) return { ok: false, message: sent.message };
+      return { ok: true, undo: () => asResult(restoreLinkEvents(make, workspaceId, link)) };
+    },
+  };
+}
+  ```
+  `use-flow-actions.ts`:
+  ```ts
+import { useMemo, useRef } from 'react';
+import { makeSubmittedFactory } from '@gisik-nokma/app-core';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { useAppServices, useCurrentUser } from '../providers.js';
+import { makeInspectorActions, type ActionResult, type InspectorActions } from './inspector-actions.js';
+
+const SIGNED_OUT: ActionResult = { ok: false, message: 'Sign in again to make changes.' };
+const refuse = async (): Promise<ActionResult> => SIGNED_OUT;
+
+/**
+ * Every write the Workflow view can make, built once per signed-in user and workspace. It reads the CURRENT flow through a ref
+ * (a write names an edge by id, and the flow moves under it). Later tasks widen the object they return; none builds its own.
+ */
+export function useFlowActions(read: FlowRead | null, workspaceId: string): InspectorActions {
+  const { dataSource } = useAppServices();
+  const user = useCurrentUser();
+  const latest = useRef(read);
+  latest.current = read;
+  const userId = user?.id ?? null;
+  return useMemo(() => {
+    if (userId === null) return { setWaitForAll: refuse, setReworkEstimate: refuse, relabel: refuse, removeLink: refuse };
+    return makeInspectorActions({ dataSource, make: makeSubmittedFactory({ actorId: userId, origin: 'web' }), workspaceId, read: () => latest.current });
+  }, [dataSource, userId, workspaceId]);
+}
+  ```
+  `flow-inspector.tsx`:
+  ```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { inspectorOf, labelProblem, LABEL_PROBLEM_COPY, parseEstimate, type InspectorModel, type LinkRow } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { Button, Switch, Toast } from '@gisik-nokma/ui';
+import type { ActionResult, InspectorActions } from './inspector-actions.js';
+
+export const WAIT_FOR_ALL_HELPER = 'Off: it moves as soon as any ticket that leads here is done. On: it waits for all of them.';
+
+export type FlowInspectorProps = {
+  read: FlowRead;
+  selectedId: string;
+  actions: InspectorActions;
+  /** `side` on a wide sheet (the right-hand column), `card` below 40rem (under the canvas). */
+  placement: 'side' | 'card';
+  onSelect: (id: string) => void;
+  onOpen: (id: string) => void;
+};
+
+/**
+ * The selected ticket's panel (WG-3). It shows what the read says and writes through `actions`; a refusal is a sentence under the
+ * thing the person did, and the control stays as the read has it. Sections that do not apply are not drawn.
+ */
+export function FlowInspector({ read, selectedId, actions, placement, onSelect, onOpen }: FlowInspectorProps) {
+  const model = inspectorOf(read, selectedId);
+  const [error, setError] = useState<string | null>(null);
+  const [undo, setUndo] = useState<{ message: string; run: () => Promise<ActionResult> } | null>(null);
+  useEffect(() => setError(null), [selectedId]);
+  if (model === null) return null;
+
+  const run = async (act: () => Promise<ActionResult>, afterRemoved?: string): Promise<boolean> => {
+    setError(null);
+    const result = await act();
+    if (!result.ok) {
+      setError(result.message);
+      return false;
+    }
+    if (afterRemoved !== undefined && result.undo !== undefined) setUndo({ message: afterRemoved, run: result.undo });
+    return true;
+  };
+
+  return (
+    <aside className="gn-wf-inspector" data-placement={placement} aria-label="Selected ticket">
+      <header className="gn-wf-inspector__head">
+        <p className="gn-wf-inspector__key">
+          <span>{model.ref}</span>
+          {model.typeLabel === null ? null : <span className="gn-wf-inspector__type">{model.typeLabel}</span>}
+        </p>
+        <h3 className="gn-wf-inspector__title">{model.title}</h3>
+        <ul className="gn-wf-inspector__facts" aria-label="Facts">
+          <li className="gn-wf-inspector__fact">
+            <span className="gn-wf-legend__dot" data-category={model.state.category} aria-hidden="true" />
+            {model.state.name}
+          </li>
+          {model.assignee === null ? null : <li className="gn-wf-inspector__fact">{model.assignee}</li>}
+          {model.due === null ? null : <li className="gn-wf-inspector__fact">{`Due ${model.due}`}</li>}
+        </ul>
+      </header>
+      <p className="gn-wf-inspector__sentence">{model.sentence}</p>
+      {error === null ? null : (
+        <p className="gn-wf-inspector__error" role="alert">
+          {error}
+        </p>
+      )}
+      <WaitForAll model={model} onChange={(on) => run(() => actions.setWaitForAll(model.id, on))} />
+      <LinkSection
+        title="Comes after"
+        rows={model.comesAfter}
+        onSelect={onSelect}
+      />
+      <LeadsTo
+        model={model}
+        onSelect={onSelect}
+        onRename={(row, next) => run(() => actions.relabel(row.edgeId, next))}
+        onRemove={(row) => run(() => actions.removeLink(row.edgeId), `Removed the link to ${row.other.label}.`)}
+      />
+      {model.reworkEstimate.shown ? <ReworkEstimate key={`${model.id}:${model.reworkEstimate.value ?? ''}`} value={model.reworkEstimate.value} onSave={(days) => run(() => actions.setReworkEstimate(model.id, days))} /> : null}
+      {model.autoMoves.length === 0 ? null : (
+        <section className="gn-wf-inspector__section" aria-label="Automatic moves in this flow">
+          <h4 className="gn-wf-inspector__heading">Automatic moves in this flow</h4>
+          <ul className="gn-wf-inspector__moves">
+            {model.autoMoves.map((move) => (
+              <li key={`${move.ticketId}:${move.at}`} className="gn-wf-inspector__move">
+                {move.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <Button className="gn-wf-inspector__open" onClick={() => onOpen(model.id)}>
+        Open ticket
+      </Button>
+      <Toast
+        open={undo !== null}
+        message={undo?.message ?? ''}
+        undo={undo === null ? null : { onUndo: () => void run(undo.run).then(() => setUndo(null)) }}
+        onDismiss={() => setUndo(null)}
+      />
+    </aside>
+  );
+}
+
+function WaitForAll({ model, onChange }: { model: InspectorModel; onChange: (on: boolean) => Promise<boolean> }) {
+  // Shown NOW, taken back if the write is refused: the read catches up when the stream says so.
+  const [shown, setShown] = useState<boolean | null>(null);
+  useEffect(() => setShown(null), [model.id, model.waitForAll.on]);
+  if (!model.waitForAll.shown) return null;
+  return (
+    <section className="gn-wf-inspector__section" aria-label="Wait for all incoming">
+      <Switch
+        checked={shown ?? model.waitForAll.on}
+        onChange={(next) => {
+          setShown(next);
+          void onChange(next).then((ok) => {
+            if (!ok) setShown(null);
+          });
+        }}
+      >
+        Wait for all incoming
+      </Switch>
+      <p className="gn-wf-inspector__helper">{WAIT_FOR_ALL_HELPER}</p>
+    </section>
+  );
+}
+
+function LinkSection({ title, rows, onSelect }: { title: string; rows: LinkRow[]; onSelect: (id: string) => void }) {
+  if (rows.length === 0) return null;
+  return (
+    <section className="gn-wf-inspector__section" aria-label={title}>
+      <h4 className="gn-wf-inspector__heading">{title}</h4>
+      <ul className="gn-wf-inspector__links">
+        {rows.map((row) => (
+          <li key={row.edgeId} className="gn-wf-inspector__link">
+            <button type="button" className="gn-wf-link" onClick={() => onSelect(row.other.id)}>
+              <strong>{row.other.label}</strong> {row.other.title}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function LeadsTo({
+  model,
+  onSelect,
+  onRename,
+  onRemove,
+}: {
+  model: InspectorModel;
+  onSelect: (id: string) => void;
+  onRename: (row: LinkRow, next: string | null) => Promise<boolean>;
+  onRemove: (row: LinkRow) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  if (model.leadsTo.length === 0) return null;
+  return (
+    <section className="gn-wf-inspector__section" aria-label="Leads to">
+      <h4 className="gn-wf-inspector__heading">Leads to</h4>
+      <ul className="gn-wf-inspector__links">
+        {model.leadsTo.map((row) => (
+          <li key={row.edgeId} className="gn-wf-inspector__link">
+            {editing === row.edgeId ? (
+              <RenameRow
+                row={row}
+                others={model.leadsTo.filter((r) => r.edgeId !== row.edgeId).map((r) => r.label)}
+                decision={model.isDecision}
+                onCancel={() => setEditing(null)}
+                onSave={async (next) => {
+                  if (await onRename(row, next)) setEditing(null);
+                }}
+              />
+            ) : (
+              <>
+                {row.label === null ? null : <span className="gn-wf-pill">{row.loop ? `${row.label} (loop)` : row.label}</span>}
+                <button type="button" className="gn-wf-link" onClick={() => onSelect(row.other.id)}>
+                  <strong>{row.other.label}</strong> {row.other.title}
+                </button>
+                <span className="gn-wf-inspector__row-actions">
+                  <button type="button" className="gn-wf-link" aria-label={`Rename the link to ${row.other.label}`} onClick={() => setEditing(row.edgeId)}>
+                    Rename
+                  </button>
+                  <button type="button" className="gn-wf-link" aria-label={`Remove the link to ${row.other.label}`} onClick={() => void onRemove(row)}>
+                    Remove
+                  </button>
+                </span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function RenameRow({ row, others, decision, onCancel, onSave }: { row: LinkRow; others: Array<string | null>; decision: boolean; onCancel: () => void; onSave: (next: string | null) => Promise<void> }) {
+  const [text, setText] = useState(row.label ?? '');
+  const [problem, setProblem] = useState<string | null>(null);
+  const save = async (): Promise<void> => {
+    const found = labelProblem(text, others, decision);
+    if (found !== null) {
+      setProblem(LABEL_PROBLEM_COPY[found]);
+      return;
+    }
+    setProblem(null);
+    await onSave(text.trim() === '' ? null : text.trim());
+  };
+  return (
+    <form
+      className="gn-wf-inspector__rename"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save();
+      }}
+    >
+      <input className="gn-wf-input" aria-label="Branch name" value={text} onChange={(event) => setText(event.target.value)} />
+      <Button type="submit">Save</Button>
+      <Button onClick={onCancel}>Cancel</Button>
+      {problem === null ? null : (
+        <p className="gn-wf-inspector__error" role="alert">
+          {problem}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function ReworkEstimate({ value, onSave }: { value: number | null; onSave: (days: number | null) => Promise<boolean> }) {
+  const [text, setText] = useState(value === null ? '' : String(value));
+  const [problem, setProblem] = useState<string | null>(null);
+  const commit = (): void => {
+    const parsed = parseEstimate(text);
+    if (!parsed.ok) {
+      setProblem(parsed.message);
+      return;
+    }
+    setProblem(null);
+    if (parsed.value !== value) void onSave(parsed.value);
+  };
+  return (
+    <section className="gn-wf-inspector__section" aria-label="Rework estimate">
+      <label className="gn-wf-inspector__heading" htmlFor="gn-wf-rework">
+        Rework estimate (days)
+      </label>
+      <input
+        id="gn-wf-rework"
+        className="gn-wf-input"
+        inputMode="numeric"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit();
+        }}
+      />
+      <p className="gn-wf-inspector__helper">How long the second and later passes take. Blank uses the estimate.</p>
+      {problem === null ? null : (
+        <p className="gn-wf-inspector__error" role="alert">
+          {problem}
+        </p>
+      )}
+    </section>
+  );
+}
+  ```
+  `workflow-view.tsx` and `workflow-panel.tsx` (apply these diffs; `selected` stays the sheet's, `fromList` is T7's select-and-centre):
+  ```diff
+--- a/apps/web/src/workflow-graph/workflow-view.tsx
++++ b/apps/web/src/workflow-graph/workflow-view.tsx
+@@ -8,7 +8,9 @@
+ import { Button } from '@gisik-nokma/ui';
+ import { FlowCanvas, type FlowCanvasHandle } from './flow-canvas.js';
+ import { FlowHeader } from './flow-header.js';
++import { FlowInspector } from './flow-inspector.js';
+ import { FlowList } from './flow-list.js';
++import type { InspectorActions } from './inspector-actions.js';
+ import type { PanelDeps } from './panel-deps.js';
+ import { useContainerOrientation } from './use-container-orientation.js';
+ import { useScene } from './use-scene.js';
+@@ -19,6 +21,8 @@
+   error: string | null;
+   onRetry: () => void;
+   deps: PanelDeps;
++  /** The inspector's writes. */
++  actions: InspectorActions;
+ };
+
+ /**
+@@ -27,7 +31,7 @@
+  * the sheet is open on is the selected one (SH-5), so it wears the ring.
+  */
+ export function WorkflowView(props: WorkflowViewProps) {
+-  const { read, error, onRetry, deps, selected, onSelect, onOpenTicket, onShowLinks } = props;
++  const { read, error, onRetry, deps, actions, selected, onSelect, onOpenTicket, onShowLinks } = props;
+   const rootRef = useRef<HTMLElement>(null);
+   const canvasRef = useRef<FlowCanvasHandle>(null);
+   const orientation = useContainerOrientation(rootRef, deps.measureWidth);
+@@ -84,6 +88,9 @@
+                 onOpen={open}
+               />
+             </div>
++            {shown === null ? null : (
++              <FlowInspector read={read} selectedId={shown} actions={actions} placement={phone ? 'card' : 'side'} onSelect={fromList} onOpen={open} />
++            )}
+           </div>
+           <FlowList read={read} selectedId={shown} onSelect={fromList} onOpen={open} />
+         </>
+--- a/apps/web/src/workflow-graph/workflow-panel.tsx
++++ b/apps/web/src/workflow-graph/workflow-panel.tsx
+@@ -5,6 +5,7 @@
+ import { useAppServices } from '../providers.js';
+ import { createRuntime } from './runtime.js';
+ import { useFlow } from './use-flow.js';
++import { useFlowActions } from './use-flow-actions.js';
+ import { WorkflowView } from './workflow-view.js';
+
+ /**
+@@ -14,7 +15,8 @@
+ export function WorkflowPanel(props: GraphSlotProps) {
+   const { dataSource } = useAppServices();
+   const { read, error, reload } = useFlow(dataSource, props.workspaceId, props.ticketId);
++  const actions = useFlowActions(read, props.workspaceId);
+   const runtime = useMemo(() => createRuntime(), []);
+   useEffect(() => () => runtime.dispose(), [runtime]);
+-  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} />;
++  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} actions={actions} />;
+ }
+  ```
+  Run: `pnpm turbo run build --filter=@gisik-nokma/app-core...` (the web reads app-core's `dist`), then the Step 4 command. Expected PASS (T7's 12 tests plus 10 new). Then `pnpm --filter @gisik-nokma/web exec tsc -p tsconfig.json --noEmit` clean. Commit.
+
+- [ ] **Step 6: The inspector's CSS**
+
+  Append to `packages/ui/src/ui.css`, after T7's block. The column is the mockup's: it scrolls inside the sheet's height, the sentence sits on a quiet panel, the label pill is the one `Yes` / `No` pill the canvas also uses. Portrait follows the CONTAINER's orientation (`data-orientation` on `.gn-wf`, D-W3-20), not a media query:
+  ```css
+  /* WTG3 T8: the inspector (apps/web/src/workflow-graph/flow-inspector.tsx). */
+  .gn-wf-inspector { display: flex; flex: 0 0 18.75rem; flex-direction: column; gap: 14px; min-width: 0; max-height: 100%; overflow-y: auto; padding-inline-end: 4px; font-size: 0.8125rem; color: var(--gn-text); }
+  .gn-wf-inspector__head { display: flex; flex-direction: column; gap: 6px; }
+  .gn-wf-inspector__key { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--gn-text-muted); }
+  .gn-wf-inspector__type { font-weight: 400; }
+  .gn-wf-inspector__title { margin: 0; font-size: 1.0625rem; line-height: 1.3; }
+  .gn-wf-inspector__facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .gn-wf-inspector__fact { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--gn-fill-secondary); }
+  .gn-wf-inspector__sentence { margin: 0; padding: 10px 12px; border-radius: var(--gn-radius-control); background: var(--gn-fill-quaternary); }
+  .gn-wf-inspector__section { display: flex; flex-direction: column; gap: 6px; }
+  .gn-wf-inspector__heading { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-muted); }
+  .gn-wf-inspector__helper { margin: 0; color: var(--gn-text-muted); }
+  .gn-wf-inspector__error { margin: 0; color: var(--gn-danger); }
+  .gn-wf-inspector__links,
+  .gn-wf-inspector__moves { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .gn-wf-inspector__link { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; }
+  .gn-wf-inspector__row-actions { display: inline-flex; gap: 10px; margin-inline-start: auto; }
+  .gn-wf-inspector__rename { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+  .gn-wf-inspector__move { padding: 8px 10px; border-radius: var(--gn-radius-control); background: var(--gn-fill-quaternary); }
+  .gn-wf-inspector__open { align-self: flex-start; }
+  .gn-wf-pill { display: inline-flex; align-items: center; padding: 1px 8px; border: 1px solid var(--gn-flow-edge); border-radius: 999px; background: var(--gn-surface-raised); font-size: 0.75rem; white-space: nowrap; }
+  .gn-wf-input { min-width: 0; padding: 6px 10px; border: 1px solid var(--gn-flow-edge); border-radius: var(--gn-radius-control); background: var(--gn-surface-raised); color: var(--gn-text); font: inherit; }
+  .gn-wf-input:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+  .gn-wf[data-orientation='portrait'] .gn-wf__body { flex-direction: column; height: auto; }
+  .gn-wf[data-orientation='portrait'] .gn-wf__stage { flex: none; height: clamp(18rem, 58vh, 40rem); }
+  .gn-wf[data-orientation='portrait'] .gn-wf-inspector { flex: none; max-height: none; padding: 12px; border-radius: var(--gn-radius-card); background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); }
+  ```
+  `ui.css` change ⇒ the ui, app-core and web suites WHOLE (`> /tmp/wtg3-t8-css.log 2>&1; tail -n 12 /tmp/wtg3-t8-css.log`), `ui-copy.test.ts` among them (23.190: the words `job` and `stage` appear in no string above; `gn-wf__stage` is a class).
+
+- [ ] **Step 7: Paint it**
+
+  As T7 Step 8.3: the worktree on a lane port against the running API, signed in as the e2e seed owner, a ticket with a three-step flow and a Decision (create them through the sheet's Links section; this task adds no create form). Record: (a) the column beside `Workflow-create.png`: key and type, title, chips, sentence panel, switch with helper, the three sections, Open ticket; widths: the column is 18.75rem and the canvas takes the rest; (b) at a 390 px window the card under the canvas beside `Phone-workflow.png`; (c) the switch flips and, with the API stopped, returns with the reason; (d) rename and remove-with-Undo on a Decision's branch. One screenshot per theme for (a) and (b); the paths go in the handoff. A difference that is CSS is fixed here. Kill the lane-port server when done.
+
+- [ ] **Step 8: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.263 | in `loopBodyIds`, `if (toDecision.has(id)) body.add(id);` → `body.add(id);` | the pass-through ticket is in the body |
+  | 29.263 | in `stateSentence`, `node.waitForAll ? 'and' : 'or'` → `'and'` | the "or" sentence |
+  | 29.263 | in `inspectorOf`, `shown: comesAfter.length > 0` → `shown: true` | the Start ticket has a switch |
+  | 29.264 | in `labelProblem`, the duplicate test → `false` | the repeated name |
+  | 29.264 | in `waitForAllEvent`, `value: on ? true : null` → `value: on` | `false` is written |
+  | 29.265 | `placement={phone ? 'card' : 'side'}` → `placement="side"` | the phone assertion |
+  | 29.266 | delete the `restoreLinkEvents` line in `relabel` | the half-done relabel |
+  | 29.266 | delete `if (!ok) setShown(null)` in `WaitForAll` | the switch stays flipped after a refusal |
+  | 29.266 | `if (parsed.value !== value) void onSave(parsed.value);` → `void onSave(parsed.value);` | the unchanged value writes |
+
+  Revert each.
+
+- [ ] **Step 9: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** T7's Features line and 29.262 say "no `+` handle yet"; they stay true (T9 changes them). `grep -rn "inspector" Features.md test-cases docs/manual.md` and fix any line that said the inspector was absent.
+  2. Flip 29.263, 29.264, 29.266 to ✅ and 29.265 to 🟡 (✅ once Step 7's numbers exist, with the screenshot paths in the line).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T8 bullet -->`: `- ✅ **Workflow inspector** — selecting a ticket in the Workflow view shows its key, state, assignee and due day, a plain sentence about where it moves next, the Wait for all incoming switch, Comes after and Leads to (rename a branch, remove a link with Undo), the Rework estimate for loop steps, the flow's latest automatic moves and Open ticket; a refused edit says why. \`apps/web/src/workflow-graph/flow-inspector.tsx\`, \`packages/app-core/src/workflow-graph/inspector-model.ts\``.
+  4. Sweeps: app-core, ui and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). The domain and server are untouched, so no server run is owed; app-core's `online/` is untouched.
+
+  Commit `wtg3 T8: the inspector`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-inspector.md` (the landed names Step 0 found, the screenshot paths, D-W3-25 to D-W3-31). **T9, T10 and T12 edit `workflow-view.tsx`, `workflow-panel.tsx`, `use-flow-actions.ts` and `support.tsx` too, each by a few lines: rebase on whichever landed first and re-run the web suite; never merge by hand.**
+
+
+---
+
+### Task 9: Creating draft steps and publishing the flow: the "+" handle, the New draft form, link drag, the Publish banner and the `publishFlow` door (cases 29.267–29.269)
+
+**Branch** `task/wtg3-create-publish` (needs T7 and T8; the Drafts plan's `ticket.created {draft:true}`, `ticket.discarded`, the draft-side `from` on `ticket.link_added` and `POST …/drafts/publish` must be on `origin/release/<next>`). **NEEDS: browser** for Step 8. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Workflow-create.png` (the "+" handle, the New draft form, the banner "3 drafts in this flow" with Publish flow, dashed draft cards). **Files:**
+- Create:
+  - `packages/app-core/src/workflow-graph/step-events.ts`, `packages/app-core/test/workflow-graph/step-events.test.ts`
+  - `packages/app-core/test/online/publish-flow.test.ts`
+  - `apps/web/src/workflow-graph/{flow-actions,step-actions}.ts`, `apps/web/src/workflow-graph/{new-step-form,link-label-dialog,publish-banner}.tsx`
+  - `apps/web/test/workflow-graph/{step-actions.test.ts,new-step-form.test.tsx,workflow-create.test.tsx}`
+- Modify:
+  - `packages/app-core/src/workflow-graph/index.ts` (the exports below)
+  - `packages/app-core/src/data-source.ts` (`publishFlow`, `PublishFlowResult`), `packages/app-core/src/online/{online-data-source,mappers}.ts`, `packages/app-core/src/replica/replica-data-source.ts`, `packages/app-core/src/index.ts`, `packages/app-core/test/replica/replica-data-source.test.ts` (the 12.185 list)
+  - the doubles and the census: `apps/web/test/helpers/stub-services.ts`, `apps/web/test/data-source-gateway.test.ts`, `packages/app-core/test/helpers/fake-data-source.ts`, `apps/server/test/integration/soft-delete-client-surface.test.ts`
+  - `apps/web/src/workflow-graph/{workflow-view,flow-inspector,use-flow-actions}.ts(x)`, `apps/web/test/workflow-graph/{support.tsx,workflow-view.test.tsx}`
+  - `packages/ui/src/ui.css` (one `/* WTG3 T9 */` block)
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T9 anchors; and 29.262's "no + handle" clause comes out)
+
+**Interfaces:**
+- **Consumes:** T7 `WorkflowView`, `FlowCanvas`'s `onAdd` and `onLink` (T5's `FlowStage` options: `onAdd` from the handle tap and the `N` key, `onLink` from a drag out of the handle; the handle is drawn only when `onAdd` is set), `FlowHeader`, `flowSummary`, `draftBanner`, `nodeLabel`, T7's builders; T8 `InspectorActions`, `makeInspectorActions`, `refusalOf`, `send`, `ActionResult`, `linkEventFor`, `labelProblem`, `LABEL_PROBLEM_COPY`, `parseEstimate`, `useFlowActions`; domain `DECISION_TYPE_ID`, `newUlid`, `FlowNodeRead` (`projectId`, `parentId`, `draft`, `kind`), `FlowRead` (`order`, `draftCount`); app-core `makeSubmittedFactory`, `ReplicaGapError`, `HttpError` (`online/http.ts:26`, `status`, `body`); the kit's `Dialog`, `Toast`, `Button`.
+- **Produces:**
+  - app-core, from `@gisik-nokma/app-core/workflow-graph`: `validateStep(form, source, read)`, `newStepEvents(make, workspaceId, ticketId, value, source)`, `discardStepEvent`, `addLinkProblem(read, fromId, toId, label)`, `publishOrder(read)`, `publishRefusalText(read, refusal)`, `siblingLabels`, `stepFormTitle`, `stepFormHelper`, `EMPTY_STEP_FORM`, `NEW_STEP_PRIORITY`, `TASK_TYPE_ID`, and the types `StepForm`, `StepValue`, `StepProblems`, `PublishRefusal`;
+  - app-core client: `DataSourceQuery.publishFlow(workspaceId: string, ticketIds: string[]): Promise<PublishFlowResult>`, `type PublishFlowResult = { ok: true; published: Array<{ ticketId: string; key: string }> } | { ok: false; ticketId: string | null; rule: string; reason: string }` (exported from the package index), `mapPublishSuccess`, `mapPublishRefusal`;
+  - web: `StepActions { createStep(sourceId, value), addLink(sourceId, targetId, label), publishFlow() }`, `PublishOutcome = { ok: true; published: number } | { ok: false; message: string }`, `makeStepActions({ dataSource, make, workspaceId, read, newId? })`, `NEEDS_CONNECTION`, `FlowActions = InspectorActions & StepActions` (T11 and T12 widen this one line), `NewStepForm`, `LinkLabelDialog`, `PublishFlowBanner`.
+
+Siblings copied: `apps/web/src/components/create-ticket-flow.tsx` (the birth priority is always sent, never left to the wire's fallback); `online-data-source.ts:632-637` (`putPreferences`: a write that lives on `DataSourceQuery`) for where the door goes; `online/http.ts:121-141` (every non-2xx on a POST throws `HttpError` carrying `status` and the parsed `body`, so a 409 refusal is read from `cause.body`); `wire-readers.ts:17-32` (`asRecord`, `asArray`, `asString`) for the mapper.
+
+**Decisions, reported:**
+- **D-W3-32 The New draft form is a Dialog, not the mockup's popover.** `Workflow-create.dc.html` hangs the form beside the "+" handle. The stage exposes no screen position for a node (T5's `FlowStage` reports picks in world space and keeps the camera private), and a popover that must follow a node through pan and zoom would need one. A Dialog is also the one form that works by keyboard and on a phone (WG-9 has no hover). Its fields, order and copy are the mockup's: Outcome label (Decision source only, first), Title, Type, Estimate (days) with the helper, Start, Due.
+- **D-W3-33 `publishFlow` is a refusal-as-data door.** A refused batch is an expected answer the UI words (`draft.publish-refused`, the first failing draft and its cause), so the online door returns `{ ok: false, ticketId, rule, reason }` for a 409 whose body is that refusal, and rethrows everything else (a 401, a 500, a transport failure, a 409 with another body). The replica rejects with `ReplicaGapError` (D-W3-8) and the panel words it `Needs a connection.`.
+- **D-W3-34 A drag onto a loop edge's own source is the same refusal as any repeat.** `addLinkProblem` refuses a link to itself, a repeat of an existing forward link, and an unnamed or repeated Decision branch before anything is sent. It does not try to refuse a link that would close a loop: loops are legal (LK-5) and the server's rule is the judge.
+- **D-W3-35 The inspector also offers Add next step.** The mockup's "+" handle needs hover, and a phone has none (WG-9), so the inspector carries an `Add next step` button that opens the same form. The drag (`onLink`) is desktop only; on a phone a link is made from the sheet's Links section.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-create-publish` from `origin/release/<next>` (T7 and T8 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. **Read what landed** and put the names in the handoff: `grep -n "draft\b\|draft:" packages/domain/src/events/ticket-events.ts` (the `ticket.created` payload's `draft` member and `ticket.discarded`); `grep -n "link_added" -B2 -A12 packages/domain/src/events/ticket-events.ts` (the draft-side `from` member, R42); `grep -rn "drafts/publish" apps/server/src` (the route and its 409 body); `grep -rn "publishDrafts\|publishFlow\|publish_draft" packages/app-core/src` (if the Drafts plan already shipped a client door, use it and delete Step 6.1 to 6.3; say so in the handoff). If a name differs from this task's, change `step-events.ts` and the mapper only, never a test's assertion.
+  3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T9" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The three case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T9 -->`:
+  - `- ❌ **29.267 — The step logic is pure and right:** the New draft form needs a title, a whole-day estimate 1 to 365 or none, and for a Decision source an outcome label that is required and unique among that Decision's branches; a new step is one \`ticket.created\` with \`draft: true\`, \`start: 'backlog'\`, the birth priority, the SOURCE's project and parent (a draft cannot be born without a parent where the project needs one), the estimate and dates only when given, followed by the \`leads_to\` link filed on the DRAFT's stream with \`from\` when the source is published and on the source's own stream when the source is itself a draft; \`ticket.discarded\` is the clean-up; a link between two existing tickets is refused before it is sent when it is to itself, a repeat, or an unnamed Decision branch. Control: an ordinary source needs no label; a new pair with a name passes. Mutation: put \`projectId: ''\` in \`newStepEvents\` → reds.`
+  - `- ❌ **29.268 — Steps are created from the graph:** the "+" handle follows the selected ticket and the \`N\` key opens the form for it; the form is titled \`New draft after GN-150\`, asks Title, Type (Task or Decision), \`Estimate (days)\` with the helper, Start and Due, sends a valid form once (a second press while it is in flight sends nothing more), refuses a blank title or a bad estimate in place, keeps a server refusal in the open form with its reason and the typed values, and Cancel sends nothing; a Decision source asks the outcome label first and refuses a blank or repeated one before sending; the draft and its link go in ONE call in that order, and a link refused after the draft committed files \`ticket.discarded\` so no orphan is left (a refused draft files no discard); dragging from the handle onto another ticket links them, out of a Decision it first asks \`Name this branch\`, a drag onto nothing links nothing, the phone does not drag, and the inspector's \`Add next step\` opens the same form. Controls: an accepted link sends nothing more; a task source asks no label. Mutation: delete the discard in \`createStep\` → reds. Manual half (🟡 until recorded): on a lane port the handle, the form and a dashed draft card beside \`wtg-preview/Workflow-create.png\`.`
+  - `- ❌ **29.269 — Publish flow publishes all of the drafts in an order the route accepts, or none, and says which one stopped it:** the banner reads \`3 drafts in this flow. Only you can see them. Publishing makes every draft a Backlog ticket.\` (\`1 draft …\`) with a \`Publish flow\` button, is not drawn with no drafts, announces a success (\`Published 3 tickets.\`), names a refused draft by its title and the rule's reason (\`"Title" can't be published, so nothing was published. <reason>\`, \`A draft\` when it left the read), leaves the button working again, and ignores a second press while publishing; the ids go in flow order with every draft after its own unpublished parent (the route does not sort); offline is \`Needs a connection.\`; the online door posts \`{ticketIds}\` to \`/v1/workspaces/:ws/drafts/publish\`, maps \`{results:[{ticketId,key}]}\` to \`{ok:true,published}\` and a 409 \`draft.publish-refused\` to \`{ok:false,ticketId,rule,reason}\`, rethrows a 409 with another body, a 500 and a body without \`results\`; the replica rejects with a named gap. Controls: a published parent does not move its child; no drafts is a sentence and sends nothing. Mutation: return the drafts in \`read.order\` untouched from \`publishOrder\` → reds.`
+
+  In the same commit, edit 29.262's line: delete the clause \`no "+" handle is drawn (nothing creates steps yet);\`. In T7's Features bullet nothing names the handle, so nothing else changes there.
+
+- [ ] **Step 2: RED, the app-core tests**
+
+  `packages/app-core/test/workflow-graph/step-events.test.ts` (29.267 and the pure half of 29.269; `make` is hand-rolled, T8's pattern):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { SubmittedEvent } from '@gisik-nokma/domain';
+import type { MakeSubmitted } from '../../src/submit.js';
+import { addLinkProblem, discardStepEvent, EMPTY_STEP_FORM, newStepEvents, publishOrder, publishRefusalText, stepFormHelper, stepFormTitle, validateStep } from '../../src/workflow-graph/step-events.js';
+import { decisionRead, readEdge, readNode, readOf } from '../../src/workflow-graph/testing.js';
+
+let n = 0;
+const make: MakeSubmitted = (seed): SubmittedEvent => ({ id: `e${(n += 1)}`, version: 1, actorId: 'me', origin: 'web', clientTime: '2026-10-03T00:00:00.000Z', ...seed });
+
+describe('creating a draft step (spec CR-1, CR-2, D-W3-9, D-W3-10)', () => {
+  it('29.267 the form needs a title, a whole-day estimate, and for a Decision source a unique branch name; control: the same form for an ordinary source needs no label', () => {
+    const read = decisionRead();
+    const task = read.nodes.find((x) => x.id === 'C')!;
+    const decision = read.nodes.find((x) => x.id === 'D')!;
+    expect(validateStep(EMPTY_STEP_FORM, task, read)).toEqual({ ok: false, problems: { title: 'Give the step a title.' } });
+    expect(validateStep({ ...EMPTY_STEP_FORM, title: 'Book a call', estimate: '400' }, task, read)).toMatchObject({ ok: false, problems: { estimate: 'Use a number of days from 1 to 365.' } });
+    const ok = validateStep({ ...EMPTY_STEP_FORM, title: '  Book a call  ', estimate: '3', due: '2026-10-16' }, task, read);
+    expect(ok).toEqual({ ok: true, value: { title: 'Book a call', kind: 'task', estimate: 3, start: null, due: '2026-10-16', label: null } });
+    // D already leads out by Yes, No and Needs rework
+    expect(validateStep({ ...EMPTY_STEP_FORM, title: 'Escalate' }, decision, read)).toMatchObject({ ok: false, problems: { label: 'Give this branch a name, such as Yes or No.' } });
+    expect(validateStep({ ...EMPTY_STEP_FORM, title: 'Escalate', label: ' yes ' }, decision, read)).toMatchObject({ ok: false, problems: { label: 'Another branch of this decision already has that name.' } });
+    expect(validateStep({ ...EMPTY_STEP_FORM, title: 'Escalate', label: 'Need more info' }, decision, read)).toMatchObject({ ok: true, value: { label: 'Need more info' } });
+  });
+
+  it('29.267 a new step is a draft born in the source\'s project and parent, with the link on the DRAFT\'s stream; a draft source files the link on its own stream; the form says what it will do', () => {
+    const read = decisionRead();
+    const source = { ...read.nodes.find((x) => x.id === 'C')!, projectId: 'p9', parentId: 'story1' };
+    const value = { title: 'Book a call', kind: 'decision' as const, estimate: 3, start: '2026-10-10', due: null, label: null };
+    const [created, link] = newStepEvents(make, 'w1', 'NEW1', value, source);
+    expect(created).toMatchObject({
+      entity: { kind: 'ticket', id: 'NEW1' },
+      type: 'ticket.created',
+      payload: { typeId: 'decision', projectId: 'p9', parentId: 'story1', title: 'Book a call', start: 'backlog', priority: 'P2', draft: true, estimate: 3, startDate: { date: '2026-10-10' } },
+    });
+    expect(created!.payload).not.toHaveProperty('dueDate');
+    expect(link).toMatchObject({ type: 'ticket.link_added', entity: { id: 'NEW1' }, payload: { kind: 'leads_to', targetId: 'NEW1', from: 'C' } });
+    const task = newStepEvents(make, 'w1', 'NEW2', { ...value, kind: 'task', estimate: null, start: null }, source)[0]!;
+    expect(task.payload).toMatchObject({ typeId: 'task' });
+    expect(task.payload).not.toHaveProperty('estimate');
+    // after a draft: the link is plain, on the source draft's stream
+    const draftSource = read.nodes.find((x) => x.id === 'G')!;
+    const [, plain] = newStepEvents(make, 'w1', 'NEW3', value, draftSource);
+    expect(plain).toMatchObject({ entity: { id: 'G' }, payload: { kind: 'leads_to', targetId: 'NEW3' } });
+    expect(plain!.payload).not.toHaveProperty('from');
+    // a Decision source labels the branch
+    const [, labelled] = newStepEvents(make, 'w1', 'NEW4', { ...value, label: 'Need more info' }, read.nodes.find((x) => x.id === 'D')!);
+    expect(labelled!.payload).toMatchObject({ label: 'Need more info', from: 'D' });
+    expect(discardStepEvent(make, 'w1', 'NEW1')).toMatchObject({ type: 'ticket.discarded', entity: { id: 'NEW1' }, payload: {} });
+    expect(stepFormTitle(source)).toBe('New draft after GN-165');
+    expect(stepFormHelper(source)).toBe('Starts when GN-165 is done, unless you give it dates.');
+    expect(stepFormTitle(draftSource)).toBe('New draft after Draft');
+  });
+
+  it('29.267 a link dragged between tickets is refused before it is sent when it is to itself, a repeat, or an unnamed Decision branch; control: a new pair with a name passes', () => {
+    const read = decisionRead();
+    expect(addLinkProblem(read, 'C', 'C', null)).toBe('A ticket cannot lead to itself.');
+    expect(addLinkProblem(read, 'A', 'D', null)).toBe('GN-161 already leads to GN-162.');
+    expect(addLinkProblem(read, 'D', 'F', null)).toBe('Give this branch a name, such as Yes or No.');
+    expect(addLinkProblem(read, 'D', 'F', 'No')).toBe('Another branch of this decision already has that name.');
+    expect(addLinkProblem(read, 'D', 'F', 'Maybe')).toBeNull();
+    expect(addLinkProblem(read, 'S', 'F', null)).toBeNull();
+    expect(addLinkProblem(read, 'S', 'gone', null)).toBe('That ticket is no longer in this flow.');
+  });
+});
+
+describe('publishing a flow (spec CR-3, Drafts R51)', () => {
+  const drafts = () =>
+    readOf(
+      [
+        readNode('A'),
+        readNode('c1', { draft: true, parentId: 'p1', title: 'Child first' }),
+        readNode('p1', { draft: true, title: 'Parent second' }),
+        readNode('z', { draft: true, parentId: 'A', title: 'Under a published ticket' }),
+      ],
+      [readEdge('A', 'c1'), readEdge('c1', 'p1'), readEdge('p1', 'z')],
+    );
+
+  it('29.269 drafts publish in flow order with every draft after its own unpublished parent; control: a published parent does not move its child', () => {
+    expect(publishOrder(drafts())).toEqual(['p1', 'c1', 'z']);
+    expect(publishOrder(decisionRead())).toEqual(['G']);
+    expect(publishOrder(readOf([readNode('A')], []))).toEqual([]);
+    // flow order wins when nothing forces a move
+    const plain = readOf([readNode('a', { draft: true }), readNode('b', { draft: true })], [readEdge('a', 'b')]);
+    expect(publishOrder(plain)).toEqual(['a', 'b']);
+    // a draft missing from `order` still publishes, last
+    const missing = { ...plain, order: ['a'] };
+    expect(publishOrder(missing)).toEqual(['a', 'b']);
+  });
+
+  it('29.269 a refusal names the draft by its title and the rule\'s reason; a draft that is no longer in the read is "A draft"', () => {
+    const read = drafts();
+    expect(publishRefusalText(read, { ticketId: 'c1', rule: 'draft.parent-unpublished', reason: 'Publish the parent first.' })).toBe(
+      '"Child first" can\'t be published, so nothing was published. Publish the parent first.',
+    );
+    expect(publishRefusalText(read, { ticketId: 'gone', rule: 'x', reason: 'Because.' })).toBe("A draft can't be published, so nothing was published. Because.");
+    expect(publishRefusalText(read, { ticketId: null, rule: 'x', reason: 'Because.' })).toContain('A draft');
+  });
+});
+  ```
+  `packages/app-core/test/online/publish-flow.test.ts` (29.269's door half: the mappers on their own, then the real transport through `createOnlineDataSource` with a fetch that answers a status and a body; the shape of `recordingFetch` in `online-data-source.test.ts:52-62`, with a status of its own because that helper only answers 200 or 404):
+  ```ts
+import { describe, expect, it } from 'vitest';
+import { createOnlineDataSource } from '../../src/online/online-data-source.js';
+import { MappingError, mapPublishRefusal, mapPublishSuccess } from '../../src/online/mappers.js';
+
+function answering(status: number, body: unknown) {
+  const calls: Array<{ input: string; init?: RequestInit }> = [];
+  const fetchImpl = async (input: string, init?: RequestInit) => {
+    calls.push(init === undefined ? { input } : { input, init });
+    return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+  };
+  return { fetchImpl, calls };
+}
+
+const REFUSAL = {
+  rule: 'draft.publish-refused',
+  ticketId: 't2',
+  cause: { rule: 'draft.parent-unpublished', reason: 'Its parent is still a draft.' },
+};
+
+describe('29.269 the publish mappers', () => {
+  it('29.269 a success keeps the order the route answered in', () => {
+    expect(mapPublishSuccess({ results: [{ ticketId: 't1', key: 'GN-1' }, { ticketId: 't2', key: 'GN-2' }] })).toEqual({
+      ok: true,
+      published: [{ ticketId: 't1', key: 'GN-1' }, { ticketId: 't2', key: 'GN-2' }],
+    });
+  });
+
+  it('29.269 a success body without results is an error, not an empty publish; control: an empty list is a publish of nothing', () => {
+    expect(() => mapPublishSuccess({})).toThrow(MappingError);
+    expect(() => mapPublishSuccess({ results: [{ ticketId: 't1' }] })).toThrow(MappingError);
+    expect(mapPublishSuccess({ results: [] })).toEqual({ ok: true, published: [] });
+  });
+
+  it('29.269 a refusal carries the draft, the underlying rule and its reason; another body is not a refusal', () => {
+    expect(mapPublishRefusal(REFUSAL)).toEqual({ ok: false, ticketId: 't2', rule: 'draft.parent-unpublished', reason: 'Its parent is still a draft.' });
+    expect(mapPublishRefusal({ rule: 'something.else' })).toBeNull();
+    expect(mapPublishRefusal(undefined)).toBeNull();
+    expect(mapPublishRefusal('nope')).toBeNull();
+  });
+
+  it('29.269 a refusal missing its cause still answers, with the rule it has and a plain reason', () => {
+    expect(mapPublishRefusal({ rule: 'draft.publish-refused', ticketId: null })).toEqual({
+      ok: false,
+      ticketId: null,
+      rule: 'draft.publish-refused',
+      reason: 'The server refused it.',
+    });
+  });
+});
+
+describe('29.269 the publish door', () => {
+  it('29.269 posts the ids in the order given to the drafts route and maps the answer', async () => {
+    const { fetchImpl, calls } = answering(200, { results: [{ ticketId: 't1', key: 'GN-1' }] });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const result = await source.query.publishFlow('ws1', ['t1']);
+    expect(result).toEqual({ ok: true, published: [{ ticketId: 't1', key: 'GN-1' }] });
+    expect(calls[0]?.input).toBe('http://server.test/v1/workspaces/ws1/drafts/publish');
+    expect(calls[0]?.init?.method).toBe('POST');
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ ticketIds: ['t1'] });
+  });
+
+  it('29.269 a 409 draft.publish-refused is data; control: a 409 with another body, a 500 and a 401 are thrown', async () => {
+    const refused = createOnlineDataSource({ baseUrl: '', fetchImpl: answering(409, REFUSAL).fetchImpl });
+    expect(await refused.query.publishFlow('ws1', ['t1', 't2'])).toEqual({ ok: false, ticketId: 't2', rule: 'draft.parent-unpublished', reason: 'Its parent is still a draft.' });
+    for (const [status, body] of [[409, { rule: 'other' }], [500, { error: 'boom' }], [401, {}]] as const) {
+      const source = createOnlineDataSource({ baseUrl: '', fetchImpl: answering(status, body).fetchImpl });
+      await expect(source.query.publishFlow('ws1', ['t1']), String(status)).rejects.toThrow();
+    }
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/workflow-graph/step-events.test.ts test/online/publish-flow.test.ts > /tmp/wtg3-t9a.log 2>&1; tail -n 20 /tmp/wtg3-t9a.log` (FAIL: the modules and the members do not exist).
+
+- [ ] **Step 3: GREEN, the step logic**
+
+  `packages/app-core/src/workflow-graph/step-events.ts` (pure; no " — " and no " · " in any string, 23.191; the words "job" and "stage" appear in none, 23.190):
+  ```ts
+import { DECISION_TYPE_ID, type FlowNodeRead, type FlowRead, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { MakeSubmitted } from '../submit.js';
+import { parseEstimate } from './inspector-events.js';
+import { labelProblem, LABEL_PROBLEM_COPY, linkEventFor } from './link-events.js';
+import { nodeLabel } from './flow-sentences.js';
+
+/** The birth priority every client sends (`create-ticket-flow.tsx` never leaves it to the wire's absence fallback). */
+export const NEW_STEP_PRIORITY = 'P2';
+export const TASK_TYPE_ID = 'task';
+
+export type StepForm = { title: string; kind: 'task' | 'decision'; estimate: string; start: string; due: string; label: string };
+export const EMPTY_STEP_FORM: StepForm = { title: '', kind: 'task', estimate: '', start: '', due: '', label: '' };
+
+/** What the form sends once it is valid. `label` is the outcome label of the source Decision's new branch, else `null`. */
+export type StepValue = { title: string; kind: 'task' | 'decision'; estimate: number | null; start: string | null; due: string | null; label: string | null };
+export type StepProblems = Partial<Record<'title' | 'estimate' | 'label', string>>;
+
+export const stepFormTitle = (source: Pick<FlowNodeRead, 'key' | 'draft'>): string => `New draft after ${nodeLabel(source)}`;
+export const stepFormHelper = (source: Pick<FlowNodeRead, 'key' | 'draft'>): string => `Starts when ${nodeLabel(source)} is done, unless you give it dates.`;
+
+/** The labels the source Decision already uses: the new branch's name must be unique among them (LK-3.3). */
+export function siblingLabels(read: FlowRead, sourceId: string): Array<string | null> {
+  return read.edges.filter((e) => e.kind === 'leads_to' && e.from === sourceId).map((e) => e.label);
+}
+
+/**
+ * CR-1: Title required; Estimate whole days 1 to 365 or blank; when the source is a Decision the form first asks the outcome
+ * label, required and unique among that Decision's branches. Start and Due are day strings from the date inputs and optional.
+ * The server's rules still decide; this keeps a form from sending what it can see will be refused.
+ */
+export function validateStep(form: StepForm, source: FlowNodeRead, read: FlowRead): { ok: true; value: StepValue } | { ok: false; problems: StepProblems } {
+  const problems: StepProblems = {};
+  if (form.title.trim() === '') problems.title = 'Give the step a title.';
+  const estimate = parseEstimate(form.estimate);
+  if (!estimate.ok) problems.estimate = estimate.message;
+  let label: string | null = null;
+  if (source.kind === 'decision') {
+    const found = labelProblem(form.label, siblingLabels(read, source.id), true);
+    if (found !== null) problems.label = LABEL_PROBLEM_COPY[found];
+    else label = form.label.trim();
+  }
+  if (Object.keys(problems).length > 0 || !estimate.ok) return { ok: false, problems };
+  return {
+    ok: true,
+    value: { title: form.title.trim(), kind: form.kind, estimate: estimate.value, start: form.start === '' ? null : form.start, due: form.due === '' ? null : form.due, label },
+  };
+}
+
+/**
+ * CR-1, CR-2, D-W3-9, D-W3-10: a new step is ALWAYS a draft, born in the source's project and under the source's parent, and the
+ * `leads_to` from the source to it (filed on the DRAFT's stream with `from`, because the source is published, R42; on the source's
+ * own stream when the source is itself a draft). Two events, in order.
+ */
+export function newStepEvents(make: MakeSubmitted, workspaceId: string, ticketId: string, value: StepValue, source: FlowNodeRead): SubmittedEvent[] {
+  const created = make({
+    workspaceId,
+    entity: { kind: 'ticket', id: ticketId },
+    type: 'ticket.created',
+    payload: {
+      typeId: value.kind === 'decision' ? DECISION_TYPE_ID : TASK_TYPE_ID,
+      projectId: source.projectId,
+      parentId: source.parentId,
+      title: value.title,
+      start: 'backlog',
+      priority: NEW_STEP_PRIORITY,
+      draft: true,
+      ...(value.estimate === null ? {} : { estimate: value.estimate }),
+      ...(value.start === null ? {} : { startDate: { date: value.start } }),
+      ...(value.due === null ? {} : { dueDate: { date: value.due } }),
+    },
+  });
+  const link = linkEventFor(make, workspaceId, { source: { id: source.id, draft: source.draft }, target: { id: ticketId, draft: true } }, 'added', value.label);
+  return [created, link];
+}
+
+/** The clean-up when the link was refused after the draft committed (D-W3-9): the orphan draft is discarded, not left behind. */
+export function discardStepEvent(make: MakeSubmitted, workspaceId: string, ticketId: string): SubmittedEvent {
+  return make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.discarded', payload: {} });
+}
+
+/** What dragging a link between two tickets needs checked before it is sent: not itself, not twice, a Decision's branch named. */
+export function addLinkProblem(read: FlowRead, fromId: string, toId: string, label: string | null): string | null {
+  const from = read.nodes.find((n) => n.id === fromId);
+  const to = read.nodes.find((n) => n.id === toId);
+  if (from === undefined || to === undefined) return 'That ticket is no longer in this flow.';
+  if (fromId === toId) return 'A ticket cannot lead to itself.';
+  if (read.edges.some((e) => e.kind === 'leads_to' && e.from === fromId && e.to === toId)) return `${nodeLabel(from)} already leads to ${nodeLabel(to)}.`;
+  const found = labelProblem(label, siblingLabels(read, fromId), from.kind === 'decision');
+  return found === null ? null : LABEL_PROBLEM_COPY[found];
+}
+
+/**
+ * CR-3: the drafts in flow order, every draft after its own unpublished parent. The route does not sort (Drafts R51): a child listed
+ * before its unpublished parent fails `draft.parent-unpublished` and rolls the whole batch back. Everything else keeps flow order,
+ * so the earliest draft gets the next key.
+ */
+export function publishOrder(read: FlowRead): string[] {
+  const drafts = new Map(read.nodes.filter((n) => n.draft).map((n) => [n.id, n] as const));
+  const ordered: string[] = [];
+  const placed = new Set<string>();
+  const place = (id: string): void => {
+    if (placed.has(id)) return;
+    placed.add(id);
+    const parent = drafts.get(id)?.parentId;
+    if (parent !== null && parent !== undefined && drafts.has(parent)) place(parent);
+    ordered.push(id);
+  };
+  const inFlowOrder = read.order.filter((id) => drafts.has(id));
+  for (const id of [...inFlowOrder, ...[...drafts.keys()].filter((id) => !inFlowOrder.includes(id))]) place(id);
+  return ordered;
+}
+
+export type PublishRefusal = { ticketId: string | null; rule: string; reason: string };
+
+/** CR-3: the refusal names the draft. A draft the read does not hold (it changed under the person) is "A draft". */
+export function publishRefusalText(read: FlowRead, refusal: PublishRefusal): string {
+  const node = refusal.ticketId === null ? undefined : read.nodes.find((n) => n.id === refusal.ticketId);
+  const name = node === undefined ? 'A draft' : `"${node.title}"`;
+  return `${name} can't be published, so nothing was published. ${refusal.reason}`;
+}
+  ```
+  `index.ts`, append:
+  ```ts
+export {
+  addLinkProblem,
+  discardStepEvent,
+  EMPTY_STEP_FORM,
+  newStepEvents,
+  NEW_STEP_PRIORITY,
+  publishOrder,
+  publishRefusalText,
+  siblingLabels,
+  stepFormHelper,
+  stepFormTitle,
+  TASK_TYPE_ID,
+  validateStep,
+  type PublishRefusal,
+  type StepForm,
+  type StepProblems,
+  type StepValue,
+} from './step-events.js';
+  ```
+
+- [ ] **Step 4: GREEN, the client door**
+
+  1. `packages/app-core/src/data-source.ts`: beside `putPreferences` (`:452` on the tip), in `DataSourceQuery`:
+     ```ts
+  /**
+   * Publish a flow's drafts in the order given, all or none (Drafts R47 to R49). Online: `POST /v1/workspaces/:ws/drafts/publish`.
+   * A refusal the route words (`409 draft.publish-refused`) is an ANSWER here, `{ ok: false }`, because the caller shows it; every
+   * other failure throws. Replica: rejects with `ReplicaGapError` (publishing is one atomic server transaction).
+   */
+  publishFlow(workspaceId: string, ticketIds: string[]): Promise<PublishFlowResult>;
+     ```
+     and, above `DataSourceQuery`:
+     ```ts
+export type PublishFlowResult =
+  | { ok: true; published: Array<{ ticketId: string; key: string }> }
+  | { ok: false; ticketId: string | null; rule: string; reason: string };
+     ```
+     and `PublishFlowResult` exported as a type from `packages/app-core/src/index.ts` beside the other `./data-source.js` type exports (`:8`).
+  2. `packages/app-core/src/online/mappers.ts` (it already imports `MappingError`, `asArray`, `asRecord`, `asString` from `../wire-readers.js`, `:3`); import `type PublishFlowResult` from `../data-source.js`:
+     ```ts
+/** Drafts R49: `200 { results: [{ ticketId, key }] }` in the order given. A body without `results` is an error here, never "nothing published". */
+export function mapPublishSuccess(raw: unknown): PublishFlowResult {
+  const body = asRecord(raw, 'publish response');
+  const results = asArray(body['results'], 'publish response.results');
+  return {
+    ok: true,
+    published: results.map((row, index) => {
+      const record = asRecord(row, `publish response.results[${index}]`);
+      return {
+        ticketId: asString(record['ticketId'], `publish response.results[${index}].ticketId`),
+        key: asString(record['key'], `publish response.results[${index}].key`),
+      };
+    }),
+  };
+}
+
+/** Drafts R49: `409 { rule: 'draft.publish-refused', ticketId, cause: { rule, reason } }`, or `null` when the body is some other refusal. */
+export function mapPublishRefusal(body: unknown): PublishFlowResult | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const record = body as Record<string, unknown>;
+  if (record['rule'] !== 'draft.publish-refused') return null;
+  const cause = typeof record['cause'] === 'object' && record['cause'] !== null ? (record['cause'] as Record<string, unknown>) : {};
+  return {
+    ok: false,
+    ticketId: typeof record['ticketId'] === 'string' ? record['ticketId'] : null,
+    rule: typeof cause['rule'] === 'string' ? cause['rule'] : 'draft.publish-refused',
+    reason: typeof cause['reason'] === 'string' && cause['reason'] !== '' ? cause['reason'] : 'The server refused it.',
+  };
+}
+     ```
+  3. `packages/app-core/src/online/online-data-source.ts`, in `query` directly after `putPreferences` (`:632-637`); `HttpError` is already imported (`:6`) and the two mappers join the `./mappers.js` import:
+     ```ts
+    publishFlow: async (workspaceId, ticketIds) => {
+      try {
+        return mapPublishSuccess(await http.post(`/v1/workspaces/${workspaceId}/drafts/publish`, { ticketIds }));
+      } catch (cause) {
+        if (cause instanceof HttpError && cause.status === 409) {
+          const refusal = mapPublishRefusal(cause.body);
+          if (refusal !== null) return refusal;
+        }
+        throw cause;
+      }
+    },
+     ```
+  4. `packages/app-core/src/replica/replica-data-source.ts`: before `REPLICA_GAPS` (next to T3's `FLOW_ABSENCES`) define
+     ```ts
+/** Workflow graph, Part 3. See `DataSourceQuery.publishFlow`. */
+const PUBLISH_FLOW_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'the drafts publish route (one atomic server transaction)',
+    because:
+      'publishing a flow is every ticket.published (and its backfill rank) of a list of drafts committed or rolled back together by the server; a device that sent them one at a time could stop halfway and leave a flow half published, which is the failure the route exists to prevent',
+    owner: 'Workflow graph plan: publish is online only; offline a single draft is published by its own event (Drafts)',
+  },
+];
+     ```
+     add `publishFlow: PUBLISH_FLOW_ABSENCES,` to `REPLICA_GAPS` directly under T3's `getFlow:` entry (the key order is tested) and `publishFlow: () => Promise.reject(new ReplicaGapError('publishFlow', PUBLISH_FLOW_ABSENCES)),` under `getFlow:` in the method table. `packages/app-core/test/replica/replica-data-source.test.ts`: inside the 12.185 list directly under T3's `getFlow` line add `['publishFlow', () => ds.query.publishFlow(WS, [newUlid()])],` (the owner regex already allows `Workflow graph plan`, T3).
+  5. **The doubles and the census** (a new `DataSourceQuery` member breaks their typecheck; the list on the tip comes from `grep -rn "putPreferences" apps packages --include=*.ts --include=*.tsx`): `apps/web/test/helpers/stub-services.ts` (`:215` shows `putPreferences: async () => undefined`; add `publishFlow: unstubbed('publishFlow'),` beside T3's `getFlow:`: that helper rejects an unstubbed call BY NAME), `apps/web/test/data-source-gateway.test.ts` (`:68`, the same line), `packages/app-core/test/helpers/fake-data-source.ts` (`:106`; add `publishFlow: async () => { throw new Error('fake-data-source: publishFlow is not stubbed'); },`). **The soft-delete census** (`apps/server/test/integration/soft-delete-client-surface.test.ts`: the union at `:484`, the verdict table at `:648`, the callers at `:757`) is total over the query union: add `'publishFlow'` to the union, a verdict copied from `putPreferences`'s shape (`:648-652`) and a caller. The walk calls EVERY member before and after the delete, so the caller must publish nothing: `publishFlow: async () => ds.publishFlow(workspaceId, ['01J9GNODRAFT0000000000000X']),` (a ULID that exists nowhere; never `childId` and never a real draft, because a live draft would be published by the walk), and the verdict is `publishFlow: { verdict: 'excluded', carries: false, why: 'A WRITE, declared rather than skipped so the table stays total over the union. It is called with an id that exists nowhere, so it publishes nothing and its answer is the same before and after a delete.' },`. What the route answers for an unknown id decides the rest, and the executor reads it from the first run: a 409 `draft.publish-refused` comes back as DATA (`{ ok: false, … }`) and the walk records that string; a 404 is an `HttpError` and the member joins the pinned set of members allowed to answer `REFUSED` (`:815-830` on the tip: the invariant test names the set, add `'publishFlow'` to it and say so in the handoff). Either way the before and after readings must be equal. **Bump the member count** the same file asserts (`expect(MEMBERS).toHaveLength(28)` at `:848` on the tip): read the number on the release branch and add one (T3 added `getFlow`, this task adds `publishFlow`), and extend the comment above it.
+  6. Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/online/publish-flow.test.ts test/workflow-graph/step-events.test.ts > /tmp/wtg3-t9b.log 2>&1; tail -n 20 /tmp/wtg3-t9b.log` (PASS), then the app-core suite WHOLE, then `pnpm turbo run typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server`. **App-core `online/` changed ⇒ the server integration files WHOLE** (`pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/integration > /tmp/wtg3-t9i.log 2>&1; tail -n 30 /tmp/wtg3-t9i.log`); add a `publishFlow` agreement case beside T3's `getFlow` one in `test/integration/client-contract.test.ts`: publish two real drafts through the real route (parent first) and `toEqual` the mapped result to the route's body, then a draft whose parent is unpublished and listed after it, and assert the `{ ok: false }` names it. Commit.
+
+- [ ] **Step 5: RED, the web tests**
+
+  `apps/web/test/workflow-graph/step-actions.test.ts` (29.268's writes and 29.269's door as sentences; `DataSource` is a stub with `ingest` and `query.publishFlow`):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { makeSubmittedFactory, ReplicaGapError } from '@gisik-nokma/app-core';
+import type { DataSource } from '@gisik-nokma/app-core';
+import type { IngestResult } from '@gisik-nokma/domain';
+import { makeStepActions } from '../../src/workflow-graph/step-actions.js';
+
+const committed = (n: number): IngestResult => ({ status: 'committed', eventId: `e${n}`, seq: n, serverTime: '2026-10-03T00:00:00.000Z' });
+const refused = (reason: string): IngestResult => ({ status: 'refused', eventId: 'x', rule: 'r', reason });
+const value = { title: 'Book a call', kind: 'task' as const, estimate: null, start: null, due: null, label: null };
+
+function build(answers: IngestResult[][], publish?: (ids: string[]) => Promise<unknown>, read = decisionRead()) {
+  const ingest = vi.fn(async (_events: unknown[]) => answers.shift() ?? []);
+  const publishFlow = vi.fn(async (_ws: string, ids: string[]) => publish?.(ids));
+  const dataSource = { ingest, query: { publishFlow }, subscribe: () => () => undefined } as unknown as DataSource;
+  const actions = makeStepActions({ dataSource, make: makeSubmittedFactory({ actorId: 'me', origin: 'web' }), workspaceId: 'w1', read: () => read, newId: () => 'NEW1' });
+  return { ingest, publishFlow, actions };
+}
+type Sent = Array<{ type: string; entity: { id: string }; payload: Record<string, unknown> }>;
+
+describe('29.268 creating a step is two events, and a refusal leaves nothing behind', () => {
+  it('29.268 the draft and its link go in ONE call, in that order; control: a created draft with an accepted link sends nothing more', async () => {
+    const run = build([[committed(1), committed(2)]]);
+    expect(await run.actions.createStep('C', value)).toEqual({ ok: true });
+    expect(run.ingest).toHaveBeenCalledTimes(1);
+    const sent = run.ingest.mock.calls[0]![0] as Sent;
+    expect(sent.map((e) => e.type)).toEqual(['ticket.created', 'ticket.link_added']);
+    expect(sent[0]!.entity.id).toBe('NEW1');
+    expect(sent[1]!.payload).toMatchObject({ targetId: 'NEW1', from: 'C' });
+  });
+
+  it('29.268 the link refused after the draft committed discards the draft and returns the reason; the draft refused sends no discard; a missing source sends nothing', async () => {
+    const orphan = build([[committed(1), refused('A task cannot sit under a task.')], [committed(3)]]);
+    expect(await orphan.actions.createStep('C', value)).toEqual({ ok: false, message: 'A task cannot sit under a task.' });
+    expect(orphan.ingest).toHaveBeenCalledTimes(2);
+    expect((orphan.ingest.mock.calls[1]![0] as Sent)[0]).toMatchObject({ type: 'ticket.discarded', entity: { id: 'NEW1' } });
+    const first = build([[refused('Guests cannot create tickets.'), refused('That ticket does not exist.')]]);
+    expect(await first.actions.createStep('C', value)).toEqual({ ok: false, message: 'Guests cannot create tickets.' });
+    expect(first.ingest).toHaveBeenCalledTimes(1);
+    const none = build([]);
+    expect(await none.actions.createStep('missing', value)).toEqual({ ok: false, message: 'That ticket is no longer in this flow.' });
+    expect(none.ingest).not.toHaveBeenCalled();
+  });
+
+  it('29.268 a link between existing tickets is checked first and filed on the right stream; a repeat or a self-link sends nothing', async () => {
+    const read = readOf([readNode('P'), readNode('Q', { draft: true }), readNode('R')], [readEdge('P', 'R')], { rootId: 'P' });
+    const ok = build([[committed(1)]], undefined, read);
+    expect(await ok.actions.addLink('P', 'Q', null)).toEqual({ ok: true });
+    expect((ok.ingest.mock.calls[0]![0] as Sent)[0]).toMatchObject({ entity: { id: 'Q' }, payload: { from: 'P', targetId: 'Q' } });
+    const repeat = build([], undefined, read);
+    expect(await repeat.actions.addLink('P', 'R', null)).toEqual({ ok: false, message: 'GN-P already leads to GN-R.' });
+    expect(await repeat.actions.addLink('P', 'P', null)).toEqual({ ok: false, message: 'A ticket cannot lead to itself.' });
+    expect(repeat.ingest).not.toHaveBeenCalled();
+  });
+});
+
+describe('29.269 publishing sends the drafts parent first and says why it was refused', () => {
+  const read = readOf(
+    [readNode('A'), readNode('c1', { draft: true, parentId: 'p1', title: 'Child first' }), readNode('p1', { draft: true, title: 'Parent second' })],
+    [readEdge('A', 'c1'), readEdge('c1', 'p1')],
+  );
+
+  it('29.269 the ids go in publish order and a success reports the count; control: no drafts is a sentence and nothing is sent', async () => {
+    const run = build([], async () => ({ ok: true, published: [{ ticketId: 'p1', key: 'GN-1' }, { ticketId: 'c1', key: 'GN-2' }] }), read);
+    expect(await run.actions.publishFlow()).toEqual({ ok: true, published: 2 });
+    expect(run.publishFlow).toHaveBeenCalledWith('w1', ['p1', 'c1']);
+    const none = build([], undefined, readOf([readNode('A')], []));
+    expect(await none.actions.publishFlow()).toEqual({ ok: false, message: 'There are no drafts in this flow.' });
+    expect(none.publishFlow).not.toHaveBeenCalled();
+  });
+
+  it('29.269 a refusal is worded with the draft\'s title; offline is "Needs a connection."; any other failure keeps its own words', async () => {
+    const refusedRun = build([], async () => ({ ok: false, ticketId: 'c1', rule: 'draft.parent-unpublished', reason: 'Publish the parent first.' }), read);
+    expect(await refusedRun.actions.publishFlow()).toEqual({ ok: false, message: '"Child first" can\'t be published, so nothing was published. Publish the parent first.' });
+    const offline = build([], async () => { throw new ReplicaGapError('publishFlow'); }, read);
+    expect(await offline.actions.publishFlow()).toEqual({ ok: false, message: 'Needs a connection.' });
+    const broken = build([], async () => { throw new Error('HTTP 500'); }, read);
+    expect(await broken.actions.publishFlow()).toEqual({ ok: false, message: 'HTTP 500' });
+  });
+});
+  ```
+  `apps/web/test/workflow-graph/new-step-form.test.tsx`:
+  ```tsx
+// @vitest-environment jsdom
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { NewStepForm } from '../../src/workflow-graph/new-step-form.js';
+
+const read = decisionRead();
+const node = (id: string) => read.nodes.find((n) => n.id === id)!;
+const dialog = () => within(screen.getByRole('dialog'));
+
+describe('29.268 the New draft form', () => {
+  it('29.268 it is titled for its source, asks Title, Type, Estimate (days) with the helper, Start and Due, and sends a valid form once; control: a task source does not ask for an outcome label', async () => {
+    const onSubmit = vi.fn(async () => ({ ok: true as const }));
+    const onCancel = vi.fn();
+    render(<NewStepForm read={read} source={node('C')} onSubmit={onSubmit} onCancel={onCancel} />);
+    expect(screen.getByRole('dialog', { name: 'New draft after GN-165' })).toBeInTheDocument();
+    expect(dialog().queryByLabelText('Outcome label')).toBeNull();
+    expect(dialog().getByText('Starts when GN-165 is done, unless you give it dates.')).toBeInTheDocument();
+    expect(dialog().getByRole('radio', { name: 'Task' })).toBeChecked();
+    expect(dialog().getByRole('radio', { name: 'Decision' })).not.toBeChecked();
+    await userEvent.type(dialog().getByLabelText('Title'), 'Book a follow-up call');
+    await userEvent.type(dialog().getByLabelText('Estimate (days)'), '3');
+    await userEvent.click(dialog().getByRole('radio', { name: 'Decision' }));
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit).toHaveBeenCalledWith({ title: 'Book a follow-up call', kind: 'decision', estimate: 3, start: null, due: null, label: null });
+    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+  });
+
+  it('29.268 a Decision source asks the outcome label first and refuses a blank or repeated one before anything is sent; control: a new name goes through with the label', async () => {
+    const onSubmit = vi.fn(async () => ({ ok: true as const }));
+    render(<NewStepForm read={read} source={node('D')} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    const inputs = dialog().getAllByRole('textbox');
+    expect(inputs[0]).toBe(dialog().getByLabelText('Outcome label'));
+    await userEvent.type(dialog().getByLabelText('Title'), 'Escalate');
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(dialog().getByText('Give this branch a name, such as Yes or No.')).toBeInTheDocument();
+    await userEvent.type(dialog().getByLabelText('Outcome label'), ' no ');
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(dialog().getByText('Another branch of this decision already has that name.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    await userEvent.clear(dialog().getByLabelText('Outcome label'));
+    await userEvent.type(dialog().getByLabelText('Outcome label'), 'Need more info');
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ label: 'Need more info', title: 'Escalate' }));
+  });
+
+  it('29.268 a blank title and a bad estimate are refused in place; a server refusal keeps the form open with its reason and the typed values; Cancel closes without sending', async () => {
+    const onSubmit = vi.fn(async () => ({ ok: false as const, message: 'A task cannot sit under a task.' }));
+    const onCancel = vi.fn();
+    render(<NewStepForm read={read} source={node('C')} onSubmit={onSubmit} onCancel={onCancel} />);
+    await userEvent.type(dialog().getByLabelText('Estimate (days)'), '0');
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(dialog().getByText('Give the step a title.')).toBeInTheDocument();
+    expect(dialog().getByText('Use a number of days from 1 to 365.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    await userEvent.clear(dialog().getByLabelText('Estimate (days)'));
+    await userEvent.type(dialog().getByLabelText('Title'), 'Hello');
+    await userEvent.click(dialog().getByRole('button', { name: 'Create draft' }));
+    expect(await dialog().findByRole('alert')).toHaveTextContent('A task cannot sit under a task.');
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(dialog().getByLabelText('Title')).toHaveValue('Hello');
+    await userEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('29.268 a second press while the first is in flight sends nothing more', async () => {
+    let release: (() => void) | undefined;
+    const onSubmit = vi.fn(() => new Promise<{ ok: true }>((resolve) => { release = () => resolve({ ok: true }); }));
+    render(<NewStepForm read={read} source={node('C')} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    await userEvent.type(dialog().getByLabelText('Title'), 'Once');
+    const create = dialog().getByRole('button', { name: 'Create draft' });
+    await userEvent.click(create);
+    await userEvent.click(create);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(create).toBeDisabled();
+    release?.();
+  });
+});
+  ```
+  `apps/web/test/workflow-graph/workflow-create.test.tsx` (the handle, the `N` key, the inspector button, the drag, the label dialog and the banner, all through T7's `mountView`):
+  ```tsx
+// @vitest-environment jsdom
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { centreOfCard, fakeActions, fakeDeps, mountView, press } from './support.js';
+
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(c.querySelectorAll('.gn-flow-node')).toHaveLength(n));
+const centreOfHandle = (c: HTMLElement) => {
+  const handle = c.querySelector<HTMLElement>('.gn-flow__add')!;
+  const at = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(handle.style.transform)!;
+  return { x: Number(at[1]) + Number.parseFloat(handle.style.width) / 2, y: Number(at[2]) + Number.parseFloat(handle.style.height) / 2 };
+};
+
+describe('29.268 steps are created from the graph', () => {
+  it('29.268 the "+" handle follows the selected ticket and N opens the form for it; the form creates a draft after that ticket; control: with nothing creating steps there would be no handle', async () => {
+    const actions = fakeActions();
+    const { container } = mountView(decisionRead(), { actions });
+    await drawn(container, 8);
+    expect(container.querySelector('.gn-flow__add')).not.toBeNull();
+    fireEvent.keyDown(container.querySelector('.gn-flow')!, { key: 'n' });
+    const dialog = await screen.findByRole('dialog', { name: 'New draft after GN-165' });
+    await userEvent.type(within(dialog).getByLabelText('Title'), 'Book a follow-up call');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create draft' }));
+    expect(actions.createStep).toHaveBeenCalledWith('C', { title: 'Book a follow-up call', kind: 'task', estimate: null, start: null, due: null, label: null });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('29.268 the inspector offers "Add next step" for the selected ticket (the phone has no hover); a refused step shows its reason in the open form', async () => {
+    const createStep = vi.fn(async () => ({ ok: false as const, message: 'You can only add steps to tickets you can edit.' }));
+    const { container } = mountView(decisionRead(), { actions: fakeActions({ createStep }) }, fakeDeps(500));
+    await drawn(container, 8);
+    await userEvent.click(screen.getByRole('button', { name: 'Add next step' }));
+    const dialog = screen.getByRole('dialog', { name: 'New draft after GN-165' });
+    await userEvent.type(within(dialog).getByLabelText('Title'), 'x');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create draft' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('You can only add steps to tickets you can edit.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('29.268 dragging from the "+" handle onto another ticket links them; out of a Decision it first asks the branch name; a drag onto nothing links nothing; control: the phone does not drag', async () => {
+    const actions = fakeActions();
+    const { container } = mountView(readOf([readNode('P'), readNode('Q'), readNode('R', { kind: 'decision' })], [readEdge('P', 'Q')], { rootId: 'P' }), { actions });
+    await drawn(container, 3);
+    const host = container.querySelector('.gn-flow')!;
+    const q = centreOfCard(container, 'Q');
+    const r = centreOfCard(container, 'R');
+    const handle = centreOfHandle(container);
+    host.dispatchEvent(press('pointerdown', handle, 0));
+    host.dispatchEvent(press('pointermove', { x: handle.x + 40, y: handle.y + 40 }, 100));
+    host.dispatchEvent(press('pointermove', r, 200));
+    host.dispatchEvent(press('pointerup', r, 300));
+    expect(actions.addLink).toHaveBeenCalledWith('P', 'R', null);
+    // nothing under the drop
+    host.dispatchEvent(press('pointerdown', handle, 1000));
+    host.dispatchEvent(press('pointermove', { x: handle.x + 40, y: handle.y + 40 }, 1100));
+    host.dispatchEvent(press('pointerup', { x: -200, y: -200 }, 1200));
+    expect(actions.addLink).toHaveBeenCalledTimes(1);
+    expect(q).toBeDefined();
+  });
+
+  it('29.268 a link dragged out of a Decision asks for the branch name and sends it; a repeated name is refused in the dialog', async () => {
+    const actions = fakeActions();
+    const read = readOf([readNode('D', { kind: 'decision', typeId: 'decision' }), readNode('Y'), readNode('N')], [readEdge('D', 'Y', 'Yes')], { rootId: 'D' });
+    const { container } = mountView(read, { actions });
+    await drawn(container, 3);
+    const host = container.querySelector('.gn-flow')!;
+    const target = centreOfCard(container, 'N');
+    const handle = centreOfHandle(container);
+    host.dispatchEvent(press('pointerdown', handle, 0));
+    host.dispatchEvent(press('pointermove', { x: handle.x + 40, y: handle.y + 40 }, 100));
+    host.dispatchEvent(press('pointermove', target, 200));
+    host.dispatchEvent(press('pointerup', target, 300));
+    const dialog = await screen.findByRole('dialog', { name: 'Name this branch' });
+    expect(actions.addLink).not.toHaveBeenCalled();
+    await userEvent.type(within(dialog).getByLabelText('Outcome label'), 'yes');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Another branch of this decision already has that name.');
+    await userEvent.clear(within(dialog).getByLabelText('Outcome label'));
+    await userEvent.type(within(dialog).getByLabelText('Outcome label'), 'No');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add link' }));
+    expect(actions.addLink).toHaveBeenCalledWith('D', 'N', 'No');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(await screen.findByText('Link added.')).toBeInTheDocument();
+  });
+});
+
+describe('29.269 publishing the flow', () => {
+  it('29.269 the banner says how many drafts, offers Publish flow, and a success is announced; control: no drafts, no banner', async () => {
+    const publishFlow = vi.fn(async () => ({ ok: true as const, published: 1 }));
+    const { container } = mountView(decisionRead(), { actions: fakeActions({ publishFlow }) });
+    await drawn(container, 8);
+    const banner = screen.getByRole('region', { name: 'Drafts in this flow' });
+    expect(banner).toHaveTextContent('1 draft in this flow. Only you can see them. Publishing makes every draft a Backlog ticket.');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Publish flow' }));
+    expect(publishFlow).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Published 1 ticket.')).toBeInTheDocument();
+    const none = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]));
+    await drawn(none.container, 2);
+    expect(within(none.container).queryByRole('region', { name: 'Drafts in this flow' })).toBeNull();
+  });
+
+  it('29.269 a refusal names the draft and nothing else changes; the button works again; a second press while publishing does nothing', async () => {
+    let release: ((r: { ok: false; message: string }) => void) | undefined;
+    const publishFlow = vi.fn(() => new Promise<{ ok: false; message: string }>((resolve) => { release = resolve; }));
+    const { container } = mountView(decisionRead(), { actions: fakeActions({ publishFlow }) });
+    await drawn(container, 8);
+    const button = screen.getByRole('button', { name: 'Publish flow' });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(publishFlow).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    release?.({ ok: false, message: '"Announce the launch" can\'t be published, so nothing was published. Publish the parent first.' });
+    expect(await screen.findByRole('alert')).toHaveTextContent('"Announce the launch" can\'t be published, so nothing was published. Publish the parent first.');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish flow' })).toBeEnabled());
+  });
+});
+  ```
+  `support.tsx` (`fakeActions` returns the full `FlowActions`; apply this diff):
+  ```diff
+--- a/apps/web/test/workflow-graph/support.tsx
++++ b/apps/web/test/workflow-graph/support.tsx
+@@ -4,7 +4,8 @@
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import { engineFromInstance } from '@gisik-nokma/flow-graph';
+ import type { PanelDeps } from '../../src/workflow-graph/panel-deps.js';
+-import type { ActionResult, InspectorActions } from '../../src/workflow-graph/inspector-actions.js';
++import type { FlowActions } from '../../src/workflow-graph/flow-actions.js';
++import type { ActionResult } from '../../src/workflow-graph/inspector-actions.js';
+ import { WorkflowView, type WorkflowViewProps } from '../../src/workflow-graph/workflow-view.js';
+
+ type Ctor = new () => { layout(graph: never): Promise<unknown> };
+@@ -33,8 +34,17 @@
+ const done = async (): Promise<ActionResult> => ({ ok: true });
+
+ /** Every write answers done; a test overrides the one it is about. */
+-export function fakeActions(over: Partial<InspectorActions> = {}): InspectorActions {
+-  return { setWaitForAll: vi.fn(done), setReworkEstimate: vi.fn(done), relabel: vi.fn(done), removeLink: vi.fn(done), ...over };
++export function fakeActions(over: Partial<FlowActions> = {}): FlowActions {
++  return {
++    setWaitForAll: vi.fn(done),
++    setReworkEstimate: vi.fn(done),
++    relabel: vi.fn(done),
++    removeLink: vi.fn(done),
++    createStep: vi.fn(done),
++    addLink: vi.fn(done),
++    publishFlow: vi.fn(async () => ({ ok: true as const, published: 1 })),
++    ...over,
++  };
+ }
+
+ export function mountView(read: FlowRead | null, over: Partial<WorkflowViewProps> = {}, deps: FakeDeps = fakeDeps()) {
+  ```
+  T7's `workflow-view.test.tsx` asserts that no "+" handle is drawn. That was true while nothing created steps and is false now; apply this diff, which flips the lone-ticket case to the handle (SH-5) and moves the `N~C` hole assertion into the header test:
+  ```diff
+--- a/apps/web/test/workflow-graph/workflow-view.test.tsx
++++ b/apps/web/test/workflow-graph/workflow-view.test.tsx
+@@ -1,8 +1,8 @@
+ // @vitest-environment jsdom
+-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
++import { act, screen, waitFor, within } from '@testing-library/react';
+ import userEvent from '@testing-library/user-event';
+ import { describe, expect, it, vi } from 'vitest';
+-import { blocksEdge, decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
++import { decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+ import { centreOfCard, fakeDeps, mountView, press } from './support.js';
+
+ const cards = (c: HTMLElement) => c.querySelectorAll('.gn-flow-node');
+@@ -27,6 +27,7 @@
+     expect(rows[7]).toBe('Draft Announce the launch, after GN-168');
+     // the blocks edge to a hidden ticket is neither drawn nor counted, the real one is drawn
+     expect(container.querySelectorAll('path.gn-flow-edge--blocks')).toHaveLength(1);
++    expect(container.querySelectorAll('path[data-edge-id="N~C"]')).toHaveLength(0);
+     // control: a read with no blocks link has no Blocks chip
+     const plain = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]));
+     await drawn(plain.container, 2);
+@@ -94,7 +95,7 @@
+     expect(screen.getByText("This ticket isn't in a flow yet. Add what comes next.")).toBeInTheDocument();
+     expect([...container.querySelectorAll('.gn-flow-pill')].map((p) => p.textContent).sort()).toEqual(['End', 'Start']);
+     expect(screen.getByText('1 ticket in this flow')).toBeInTheDocument();
+-    expect(container.querySelector('.gn-flow__add')).toBeNull();
++    expect(container.querySelector('.gn-flow__add')).not.toBeNull(); // SH-5: one "+" handle, on the only ticket
+     const two = mountView(readOf([readNode('P'), readNode('Q')], [readEdge('P', 'Q')]));
+     await drawn(two.container, 2);
+     expect(within(two.container).queryByText("This ticket isn't in a flow yet. Add what comes next.")).toBeNull();
+@@ -195,15 +196,4 @@
+     queue[1]!();
+     await waitFor(() => expect(again.container.querySelectorAll('.gn-flow-node')).toHaveLength(3));
+   });
+-
+-  it('29.262 the "+" handle is not drawn: nothing creates steps yet, and an untouched card shows none; control: the blocks edge to a hidden ticket draws nothing', async () => {
+-    const { container } = mountView(decisionRead());
+-    await drawn(container, 8);
+-    expect(container.querySelector('.gn-flow__add')).toBeNull();
+-    expect(container.querySelectorAll('path[data-edge-id="N~C"]')).toHaveLength(0);
+-    expect(blocksEdge('C', 'F').kind).toBe('blocks');
+-    await act(async () => undefined);
+-    fireEvent.pointerMove(container.querySelector('.gn-flow')!);
+-    expect(container.querySelector('.gn-flow__add')).toBeNull();
+-  });
+ });
+  ```
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t9w.log 2>&1; tail -n 20 /tmp/wtg3-t9w.log` (FAIL: no `step-actions`).
+
+- [ ] **Step 6: GREEN, the web parts**
+
+  `flow-actions.ts` (the one line T11 and T12 widen):
+  ```ts
+import type { InspectorActions } from './inspector-actions.js';
+import type { StepActions } from './step-actions.js';
+
+/** Every write the Workflow view can make: one object, built by `useFlowActions`. Each task that adds writes widens this line. */
+export type FlowActions = InspectorActions & StepActions;
+  ```
+  `step-actions.ts` (events in, sentences out; it never throws, and `createStep` sends the draft and its link in ONE `ingest` call, then discards the draft if only the link was refused):
+  ```ts
+import { ReplicaGapError, type DataSource } from '@gisik-nokma/app-core';
+import { addLinkProblem, discardStepEvent, linkEventFor, newStepEvents, publishOrder, publishRefusalText, type StepValue } from '@gisik-nokma/app-core/workflow-graph';
+import { newUlid, type FlowRead, type SubmittedEvent } from '@gisik-nokma/domain';
+import { refusalOf, send, type ActionResult } from './inspector-actions.js';
+
+export const NEEDS_CONNECTION = 'Needs a connection.';
+
+export type PublishOutcome = { ok: true; published: number } | { ok: false; message: string };
+
+/** Creating steps, linking existing tickets, and publishing the flow's drafts (CR-1 to CR-3). */
+export type StepActions = {
+  createStep(sourceId: string, value: StepValue): Promise<ActionResult>;
+  addLink(sourceId: string, targetId: string, label: string | null): Promise<ActionResult>;
+  publishFlow(): Promise<PublishOutcome>;
+};
+
+type Make = (seed: Pick<SubmittedEvent, 'workspaceId' | 'entity' | 'type' | 'payload'>) => SubmittedEvent;
+
+export function makeStepActions(deps: { dataSource: DataSource; make: Make; workspaceId: string; read: () => FlowRead | null; newId?: () => string }): StepActions {
+  const { dataSource, make, workspaceId } = deps;
+  const newId = deps.newId ?? newUlid;
+  const gone: ActionResult = { ok: false, message: 'That ticket is no longer in this flow.' };
+
+  return {
+    async createStep(sourceId, value) {
+      const source = deps.read()?.nodes.find((n) => n.id === sourceId);
+      if (source === undefined) return gone;
+      const ticketId = newId();
+      const events = newStepEvents(make, workspaceId, ticketId, value, source);
+      let results;
+      try {
+        results = await dataSource.ingest(events);
+      } catch (cause) {
+        return { ok: false, message: cause instanceof Error ? cause.message : 'The step could not be created.' };
+      }
+      const message = refusalOf(results, events.length);
+      if (message === null) return { ok: true };
+      // D-W3-9: the draft committed and its link was refused: discard the orphan, so a refusal never leaves a draft behind.
+      if (results[0]?.status === 'committed') await send(dataSource, [discardStepEvent(make, workspaceId, ticketId)]);
+      return { ok: false, message };
+    },
+
+    async addLink(sourceId, targetId, label) {
+      const read = deps.read();
+      if (read === null) return gone;
+      const problem = addLinkProblem(read, sourceId, targetId, label);
+      if (problem !== null) return { ok: false, message: problem };
+      const source = read.nodes.find((n) => n.id === sourceId)!;
+      const target = read.nodes.find((n) => n.id === targetId)!;
+      const sent = await send(dataSource, [linkEventFor(make, workspaceId, { source: { id: source.id, draft: source.draft }, target: { id: target.id, draft: target.draft } }, 'added', label)]);
+      return sent.ok ? { ok: true } : { ok: false, message: sent.message };
+    },
+
+    async publishFlow() {
+      const read = deps.read();
+      if (read === null) return { ok: false, message: 'The flow is not loaded yet.' };
+      const ids = publishOrder(read);
+      if (ids.length === 0) return { ok: false, message: 'There are no drafts in this flow.' };
+      try {
+        const result = await dataSource.query.publishFlow(workspaceId, ids);
+        if (result.ok) return { ok: true, published: result.published.length };
+        return { ok: false, message: publishRefusalText(read, result) };
+      } catch (cause) {
+        if (cause instanceof ReplicaGapError) return { ok: false, message: NEEDS_CONNECTION };
+        return { ok: false, message: cause instanceof Error ? cause.message : 'The flow could not be published.' };
+      }
+    },
+  };
+}
+  ```
+  `new-step-form.tsx`:
+  ```tsx
+'use client';
+
+import { useId, useState, type ReactElement } from 'react';
+import { EMPTY_STEP_FORM, stepFormHelper, stepFormTitle, validateStep, type StepForm, type StepProblems, type StepValue } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowNodeRead, FlowRead } from '@gisik-nokma/domain';
+import { Button, Dialog } from '@gisik-nokma/ui';
+import type { ActionResult } from './inspector-actions.js';
+
+export type NewStepFormProps = {
+  read: FlowRead;
+  source: FlowNodeRead;
+  /** Resolves when the step was created; a refusal comes back as the sentence to show and the form stays open. */
+  onSubmit: (value: StepValue) => Promise<ActionResult>;
+  onCancel: () => void;
+};
+
+/**
+ * CR-1, the mockup's "New draft after GN-150". It is a dialog, not the mockup's popover: the stage exposes no screen position for a
+ * node, and a dialog is also the one path that works by keyboard and on a phone (D-W3-32). On a Decision source it asks the outcome
+ * label first. A step made here is always a draft (CR-2).
+ */
+export function NewStepForm({ read, source, onSubmit, onCancel }: NewStepFormProps) {
+  const [form, setForm] = useState<StepForm>(EMPTY_STEP_FORM);
+  const [problems, setProblems] = useState<StepProblems>({});
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const formId = useId();
+  const set = <K extends keyof StepForm>(key: K, value: StepForm[K]): void => setForm((current) => ({ ...current, [key]: value }));
+
+  const submit = async (): Promise<void> => {
+    if (busy) return;
+    const checked = validateStep(form, source, read);
+    if (!checked.ok) {
+      setProblems(checked.problems);
+      return;
+    }
+    setProblems({});
+    setRefusal(null);
+    setBusy(true);
+    const result = await onSubmit(checked.value);
+    setBusy(false);
+    if (result.ok) onCancel();
+    else setRefusal(result.message);
+  };
+
+  return (
+    <Dialog
+      open
+      title={stepFormTitle(source)}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button variant="primary" type="submit" form={formId} disabled={busy}>
+            Create draft
+          </Button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        className="gn-wf-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit();
+        }}
+      >
+        {source.kind === 'decision' ? (
+          <Field label="Outcome label" problem={problems.label} helper="The name of the branch this step is on, such as Yes or No.">
+            {(control) => <input className="gn-wf-input" {...control} value={form.label} onChange={(event) => set('label', event.target.value)} />}
+          </Field>
+        ) : null}
+        <Field label="Title" problem={problems.title}>
+          {(control) => <input className="gn-wf-input" {...control} autoFocus value={form.title} onChange={(event) => set('title', event.target.value)} />}
+        </Field>
+        <fieldset className="gn-wf-form__type">
+          <legend>Type</legend>
+          <label>
+            <input type="radio" name={`${formId}-kind`} checked={form.kind === 'task'} onChange={() => set('kind', 'task')} /> Task
+          </label>
+          <label>
+            <input type="radio" name={`${formId}-kind`} checked={form.kind === 'decision'} onChange={() => set('kind', 'decision')} /> Decision
+          </label>
+        </fieldset>
+        <Field label="Estimate (days)" problem={problems.estimate} helper={stepFormHelper(source)}>
+          {(control) => <input className="gn-wf-input" {...control} inputMode="numeric" value={form.estimate} onChange={(event) => set('estimate', event.target.value)} />}
+        </Field>
+        <div className="gn-wf-form__dates">
+          <Field label="Start">
+            {(control) => <input className="gn-wf-input" {...control} type="date" value={form.start} onChange={(event) => set('start', event.target.value)} />}
+          </Field>
+          <Field label="Due">
+            {(control) => <input className="gn-wf-input" {...control} type="date" value={form.due} onChange={(event) => set('due', event.target.value)} />}
+          </Field>
+        </div>
+        {refusal === null ? null : (
+          <p className="gn-wf-inspector__error" role="alert">
+            {refusal}
+          </p>
+        )}
+      </form>
+    </Dialog>
+  );
+}
+
+type FieldControl = { id: string; 'aria-describedby': string | undefined; 'aria-invalid': true | undefined };
+
+/** A label, the control it names, then the helper and the problem, both announced with the control and neither part of its name. */
+function Field({ label, problem, helper, children }: { label: string; problem?: string | undefined; helper?: string; children: (control: FieldControl) => ReactElement }) {
+  const id = useId();
+  const described = [helper === undefined ? null : `${id}-helper`, problem === undefined ? null : `${id}-problem`].filter((x): x is string => x !== null).join(' ');
+  return (
+    <div className="gn-wf-form__field">
+      <label htmlFor={id} className="gn-wf-inspector__heading">
+        {label}
+      </label>
+      {children({ id, 'aria-describedby': described === '' ? undefined : described, 'aria-invalid': problem === undefined ? undefined : true })}
+      {helper === undefined ? null : (
+        <span id={`${id}-helper`} className="gn-wf-inspector__helper">
+          {helper}
+        </span>
+      )}
+      {problem === undefined ? null : (
+        <span id={`${id}-problem`} className="gn-wf-inspector__error" role="alert">
+          {problem}
+        </span>
+      )}
+    </div>
+  );
+}
+  ```
+  `link-label-dialog.tsx`:
+  ```tsx
+'use client';
+
+import { useId, useState } from 'react';
+import { addLinkProblem } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { Button, Dialog } from '@gisik-nokma/ui';
+
+/** WG-4: a link dragged out of a Decision needs the branch's name before it is sent. */
+export function LinkLabelDialog({ read, fromId, toId, onSubmit, onCancel }: { read: FlowRead; fromId: string; toId: string; onSubmit: (label: string) => void; onCancel: () => void }) {
+  const [label, setLabel] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const id = useId();
+  const save = (): void => {
+    const found = addLinkProblem(read, fromId, toId, label);
+    if (found !== null) {
+      setProblem(found);
+      return;
+    }
+    onSubmit(label.trim());
+  };
+  return (
+    <Dialog
+      open
+      title="Name this branch"
+      onClose={onCancel}
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button variant="primary" onClick={save}>
+            Add link
+          </Button>
+        </>
+      }
+    >
+      <div className="gn-wf-form__field">
+        <label htmlFor={id} className="gn-wf-inspector__heading">
+          Outcome label
+        </label>
+        <input
+          id={id}
+          className="gn-wf-input"
+          autoFocus
+          value={label}
+          aria-invalid={problem === null ? undefined : true}
+          onChange={(event) => setLabel(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') save();
+          }}
+        />
+        {problem === null ? null : (
+          <span className="gn-wf-inspector__error" role="alert">
+            {problem}
+          </span>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+  ```
+  `publish-banner.tsx`:
+  ```tsx
+'use client';
+
+import { useState } from 'react';
+import { draftBanner } from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { Button } from '@gisik-nokma/ui';
+import type { PublishOutcome } from './step-actions.js';
+
+/**
+ * WG-6, CR-3: "3 drafts in this flow. Only you can see them. Publishing makes every draft a Backlog ticket." and one action that
+ * publishes all of them or none. Not drawn when the viewer has no drafts here. A refusal names the draft and stays until the next try.
+ */
+export function PublishFlowBanner({ read, onPublish }: { read: FlowRead; onPublish: () => Promise<PublishOutcome> }) {
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  if (read.draftCount === 0) return null;
+  const { lead, rest } = draftBanner(read.draftCount);
+  const publish = async (): Promise<void> => {
+    if (busy) return;
+    setBusy(true);
+    setRefusal(null);
+    const outcome = await onPublish();
+    setBusy(false);
+    if (!outcome.ok) setRefusal(outcome.message);
+  };
+  return (
+    <section className="gn-wf-banner" aria-label="Drafts in this flow">
+      <p className="gn-wf-banner__text">
+        <strong>{lead}</strong> {rest}
+      </p>
+      <Button variant="primary" disabled={busy} onClick={() => void publish()}>
+        Publish flow
+      </Button>
+      {refusal === null ? null : (
+        <p className="gn-wf-inspector__error gn-wf-banner__refusal" role="alert">
+          {refusal}
+        </p>
+      )}
+    </section>
+  );
+}
+  ```
+  `use-flow-actions.ts`, `flow-inspector.tsx` and `workflow-view.tsx` (apply these diffs against T8; `selected` stays the sheet's, the stage's `onAdd` and `onLink` are T5's, and the `onLink` spread keeps the drag off the phone):
+  ```diff
+--- a/apps/web/src/workflow-graph/use-flow-actions.ts
++++ b/apps/web/src/workflow-graph/use-flow-actions.ts
+@@ -2,23 +2,36 @@
+ import { makeSubmittedFactory } from '@gisik-nokma/app-core';
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import { useAppServices, useCurrentUser } from '../providers.js';
+-import { makeInspectorActions, type ActionResult, type InspectorActions } from './inspector-actions.js';
++import type { FlowActions } from './flow-actions.js';
++import { makeInspectorActions, type ActionResult } from './inspector-actions.js';
++import { makeStepActions } from './step-actions.js';
+
+-const SIGNED_OUT: ActionResult = { ok: false, message: 'Sign in again to make changes.' };
++const SIGNED_OUT = { ok: false as const, message: 'Sign in again to make changes.' };
+ const refuse = async (): Promise<ActionResult> => SIGNED_OUT;
+
+ /**
+  * Every write the Workflow view can make, built once per signed-in user and workspace. It reads the CURRENT flow through a ref
+  * (a write names an edge by id, and the flow moves under it). Later tasks widen the object they return; none builds its own.
+  */
+-export function useFlowActions(read: FlowRead | null, workspaceId: string): InspectorActions {
++export function useFlowActions(read: FlowRead | null, workspaceId: string): FlowActions {
+   const { dataSource } = useAppServices();
+   const user = useCurrentUser();
+   const latest = useRef(read);
+   latest.current = read;
+   const userId = user?.id ?? null;
+   return useMemo(() => {
+-    if (userId === null) return { setWaitForAll: refuse, setReworkEstimate: refuse, relabel: refuse, removeLink: refuse };
+-    return makeInspectorActions({ dataSource, make: makeSubmittedFactory({ actorId: userId, origin: 'web' }), workspaceId, read: () => latest.current });
++    if (userId === null) {
++      return {
++        setWaitForAll: refuse,
++        setReworkEstimate: refuse,
++        relabel: refuse,
++        removeLink: refuse,
++        createStep: refuse,
++        addLink: refuse,
++        publishFlow: async () => ({ ok: false as const, message: SIGNED_OUT.message }),
++      };
++    }
++    const deps = { dataSource, make: makeSubmittedFactory({ actorId: userId, origin: 'web' }), workspaceId, read: () => latest.current };
++    return { ...makeInspectorActions(deps), ...makeStepActions(deps) };
+   }, [dataSource, userId, workspaceId]);
+ }
+--- a/apps/web/src/workflow-graph/flow-inspector.tsx
++++ b/apps/web/src/workflow-graph/flow-inspector.tsx
+@@ -16,13 +16,15 @@
+   placement: 'side' | 'card';
+   onSelect: (id: string) => void;
+   onOpen: (id: string) => void;
++  /** Where a step is added without hovering: the phone has no hover, so the inspector offers it too (WG-4). */
++  onAddStep?: (id: string) => void;
+ };
+
+ /**
+  * The selected ticket's panel (WG-3). It shows what the read says and writes through `actions`; a refusal is a sentence under the
+  * thing the person did, and the control stays as the read has it. Sections that do not apply are not drawn.
+  */
+-export function FlowInspector({ read, selectedId, actions, placement, onSelect, onOpen }: FlowInspectorProps) {
++export function FlowInspector({ read, selectedId, actions, placement, onSelect, onOpen, onAddStep }: FlowInspectorProps) {
+   const model = inspectorOf(read, selectedId);
+   const [error, setError] = useState<string | null>(null);
+   const [undo, setUndo] = useState<{ message: string; run: () => Promise<ActionResult> } | null>(null);
+@@ -88,9 +90,12 @@
+           </ul>
+         </section>
+       )}
+-      <Button className="gn-wf-inspector__open" onClick={() => onOpen(model.id)}>
+-        Open ticket
+-      </Button>
++      <div className="gn-wf-inspector__buttons">
++        <Button className="gn-wf-inspector__open" onClick={() => onOpen(model.id)}>
++          Open ticket
++        </Button>
++        {onAddStep === undefined ? null : <Button onClick={() => onAddStep(model.id)}>Add next step</Button>}
++      </div>
+       <Toast
+         open={undo !== null}
+         message={undo?.message ?? ''}
+--- a/apps/web/src/workflow-graph/workflow-view.tsx
++++ b/apps/web/src/workflow-graph/workflow-view.tsx
+@@ -1,17 +1,20 @@
+ 'use client';
+
+-import { useCallback, useMemo, useRef } from 'react';
++import { useCallback, useMemo, useRef, useState } from 'react';
+ import type { GraphSlotProps } from '@gisik-nokma/app-core';
+ import { FLOW_EMPTY_COPY, flowSummary } from '@gisik-nokma/app-core/workflow-graph';
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import type { Pick as StagePick } from '@gisik-nokma/flow-graph';
+-import { Button } from '@gisik-nokma/ui';
++import { Button, Toast } from '@gisik-nokma/ui';
+ import { FlowCanvas, type FlowCanvasHandle } from './flow-canvas.js';
+ import { FlowHeader } from './flow-header.js';
++import type { FlowActions } from './flow-actions.js';
+ import { FlowInspector } from './flow-inspector.js';
+ import { FlowList } from './flow-list.js';
+-import type { InspectorActions } from './inspector-actions.js';
++import { LinkLabelDialog } from './link-label-dialog.js';
++import { NewStepForm } from './new-step-form.js';
+ import type { PanelDeps } from './panel-deps.js';
++import { PublishFlowBanner } from './publish-banner.js';
+ import { useContainerOrientation } from './use-container-orientation.js';
+ import { useScene } from './use-scene.js';
+
+@@ -21,8 +24,8 @@
+   error: string | null;
+   onRetry: () => void;
+   deps: PanelDeps;
+-  /** The inspector's writes. */
+-  actions: InspectorActions;
++  /** Every write the view can make. */
++  actions: FlowActions;
+ };
+
+ /**
+@@ -56,6 +59,27 @@
+     [onSelect],
+   );
+
++  // Creating steps and links (CR-1, WG-4). `adding` is the source of the open form; `linking` is a drag out of a Decision awaiting its name.
++  const [adding, setAdding] = useState<string | null>(null);
++  const [linking, setLinking] = useState<{ fromId: string; toId: string } | null>(null);
++  const [notice, setNotice] = useState<string | null>(null);
++  const addStep = useCallback((id: string) => setAdding(id), []);
++  const link = useCallback(
++    (fromId: string, toId: string) => {
++      if (read?.nodes.find((n) => n.id === fromId)?.kind === 'decision') {
++        setLinking({ fromId, toId });
++        return;
++      }
++      void actions.addLink(fromId, toId, null).then((result) => setNotice(result.ok ? 'Link added.' : result.message));
++    },
++    [actions, read],
++  );
++  const publish = useCallback(async () => {
++    const outcome = await actions.publishFlow();
++    if (outcome.ok) setNotice(`Published ${outcome.published} ${outcome.published === 1 ? 'ticket' : 'tickets'}.`);
++    return outcome;
++  }, [actions]);
++
+   const summary = read === null ? null : flowSummary(read);
+   const label = summary === null ? 'Workflow graph' : `Flow of ${summary.tickets} ${summary.tickets === 1 ? 'ticket' : 'tickets'} with ${summary.leadsTo} ${summary.leadsTo === 1 ? 'link' : 'links'}. The list below gives the same flow in order.`;
+
+@@ -75,6 +99,7 @@
+       {read !== null ? (
+         <>
+           <FlowHeader read={read} showNotes={false} onShowNeighbours={onShowLinks} />
++          <PublishFlowBanner read={read} onPublish={publish} />
+           {summary !== null && summary.tickets === 1 && read.edges.length === 0 ? <p className="gn-wf__empty">{FLOW_EMPTY_COPY}</p> : null}
+           <div className="gn-wf__body">
+             <div className="gn-wf__stage">
+@@ -86,15 +111,38 @@
+                 deps={deps}
+                 onPick={pick}
+                 onOpen={open}
++                onAdd={addStep}
++                {...(phone ? {} : { onLink: link })}
+               />
+             </div>
+             {shown === null ? null : (
+-              <FlowInspector read={read} selectedId={shown} actions={actions} placement={phone ? 'card' : 'side'} onSelect={fromList} onOpen={open} />
++              <FlowInspector read={read} selectedId={shown} actions={actions} placement={phone ? 'card' : 'side'} onSelect={fromList} onOpen={open} onAddStep={addStep} />
+             )}
+           </div>
+           <FlowList read={read} selectedId={shown} onSelect={fromList} onOpen={open} />
++          {adding !== null && read.nodes.some((n) => n.id === adding) ? (
++            <NewStepForm
++              read={read}
++              source={read.nodes.find((n) => n.id === adding)!}
++              onSubmit={(value) => actions.createStep(adding, value)}
++              onCancel={() => setAdding(null)}
++            />
++          ) : null}
++          {linking !== null ? (
++            <LinkLabelDialog
++              read={read}
++              fromId={linking.fromId}
++              toId={linking.toId}
++              onCancel={() => setLinking(null)}
++              onSubmit={(label) => {
++                void actions.addLink(linking.fromId, linking.toId, label).then((result) => setNotice(result.ok ? 'Link added.' : result.message));
++                setLinking(null);
++              }}
++            />
++          ) : null}
+         </>
+       ) : null}
++      <Toast open={notice !== null} message={notice ?? ''} onDismiss={() => setNotice(null)} />
+     </section>
+   );
+ }
+  ```
+  Run: `pnpm turbo run build --filter=@gisik-nokma/app-core...` (the web reads app-core's `dist`), then the Step 5 command. Expected PASS (T7's 9 view tests and the panel's 2, T8's 10, and 15 new). Then `pnpm --filter @gisik-nokma/web exec tsc -p tsconfig.json --noEmit` clean. Commit.
+
+- [ ] **Step 7: The form's and the banner's CSS**
+
+  Append to `packages/ui/src/ui.css` one block after T8's, headed `/* WTG3 T9: creating steps and publishing (apps/web/src/workflow-graph). */`. Roles only; `.gn-wf-input` and the `.gn-wf-inspector__*` text classes are T8's and are reused:
+  ```css
+  /* WTG3 T9: creating steps and publishing (apps/web/src/workflow-graph). */
+  .gn-wf-form { display: flex; flex-direction: column; gap: 12px; width: min(28rem, 100%); }
+  .gn-wf-form__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .gn-wf-form__dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gn-wf-form__type { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .gn-wf-form__type legend { padding: 0; margin-bottom: 4px; font-size: 0.8125rem; font-weight: 600; color: var(--gn-text-muted); }
+  .gn-wf-form__type label { display: inline-flex; align-items: center; gap: 6px; }
+  .gn-wf-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px; border-radius: var(--gn-radius-card); background: var(--gn-fill-quaternary); border: 1px dashed var(--gn-flow-note-line); }
+  .gn-wf-banner__text { flex: 1 1 16rem; margin: 0; font-size: 0.8125rem; color: var(--gn-text); }
+  .gn-wf-banner__refusal { flex: 1 1 100%; }
+  .gn-wf-inspector__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  @media (max-width: 40rem) {
+    .gn-wf-form__dates { grid-template-columns: 1fr; }
+  }
+  ```
+  `ui.css` change ⇒ the ui, app-core and web suites WHOLE (`> /tmp/wtg3-t9-css.log 2>&1; tail -n 12 /tmp/wtg3-t9-css.log`), `ui-copy.test.ts` among them (23.190 and 23.191: this task's strings contain neither a banned word nor either mark; the banner copy comes from `draftBanner`, T7).
+
+- [ ] **Step 8: Paint it**
+
+  As T7 Step 8.3: the worktree on a lane port against the running API, signed in as the e2e seed owner. Record: (a) the "+" handle on the selected card beside `Workflow-create.png`, and the form opened from it, in both themes (the Dialog's width, the field order, the helper under Estimate, the date fields); (b) a new draft appears dashed, placed beside its source with nothing else moved (T7's lone-leaf placement), and the banner reads `1 draft in this flow …`; (c) a drag from the handle onto another card, and out of a Decision (the label dialog); (d) Publish flow with two drafts, one the other's child (the child created first): both publish, the cards stop being dashed; (e) Publish flow with a draft whose project the person has lost write access to: the refusal names it and nothing publishes; (f) at a 390 px window the inspector card's `Add next step`, and no drag. **A difference that is CSS is fixed here;** one that needs the stage code goes back to T5's owner as a finding. Put the screenshot paths in the handoff. Kill the lane-port server when done.
+
+- [ ] **Step 9: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.267 | in `newStepEvents`, `projectId: source.projectId` → `projectId: ''` | the project assertion |
+  | 29.267 | in `newStepEvents`, `draft: true` → `draft: false` | the draft flag |
+  | 29.267 | in `validateStep`, drop the `source.kind === 'decision'` branch | the label is not asked |
+  | 29.267 | in `addLinkProblem`, delete the `fromId === toId` line | the self-link |
+  | 29.268 | in `createStep`, delete the `ticket.discarded` send | the orphan draft |
+  | 29.268 | in `createStep`, send the two events in two `ingest` calls | the one-call assertion |
+  | 29.268 | in `NewStepForm.submit`, delete `if (busy) return;` | the double press |
+  | 29.268 | in `WorkflowView.link`, always call `actions.addLink(..., null)` | the Decision asks no name |
+  | 29.268 | in `WorkflowView`, spread `onLink` on the phone too | the phone drags |
+  | 29.269 | in `publishOrder`, `return ordered` → `return inFlowOrder` | the parent-first order |
+  | 29.269 | in `publishRefusalText`, drop the title | the refusal names the draft |
+  | 29.269 | in `makeStepActions.publishFlow`, delete the `ReplicaGapError` branch | `Needs a connection.` |
+  | 29.269 | in `mapPublishRefusal`, delete the `rule !== 'draft.publish-refused'` guard | another 409 is data |
+  | 29.269 | in the online `publishFlow`, delete the `throw cause` | a 500 resolves |
+  | 29.269 | in `PublishFlowBanner`, delete `if (busy) return;` | the double publish |
+
+  Revert each.
+
+- [ ] **Step 10: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** T7 and T8 told readers there is no "+" handle yet: `grep -rn "no \"+\"\|nothing creates steps\|no + handle" apps/web test-cases Features.md docs` and fix each (29.262's clause is Step 1's edit). The T7 view test's comment that the handle is absent is replaced by the diff above.
+  2. Flip 29.267 and 29.269 to ✅ and 29.268 to 🟡 (✅ once Step 8's numbers exist, with the screenshot paths in the line).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T9 bullet -->`: `- ✅ **Create and publish from the Workflow view** — a "+" handle on the selected step (or the \`N\` key, or the inspector's Add next step) opens "New draft after GN-150" and creates a draft that leads from it; dragging from the handle onto another step links them (a Decision asks the branch name); a banner counts the flow's drafts and "Publish flow" publishes all of them, parents first, or none, naming the draft that stopped it. Publishing needs a connection. \`apps/web/src/workflow-graph/\`, \`packages/app-core/src/workflow-graph/step-events.ts\`` and `- ⚙️ **\`publishFlow\` client door** — \`DataSourceQuery.publishFlow\` posts the ordered ids to \`POST /v1/workspaces/:ws/drafts/publish\`, answers a \`draft.publish-refused\` 409 as data and rethrows everything else; the replica refuses with a named gap. \`packages/app-core/src/online/online-data-source.ts\``.
+  4. Sweeps: app-core, ui and web suites WHOLE, the server integration files WHOLE (Step 4.6); `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server` (LOCAL).
+
+  Commit `wtg3 T9: create draft steps and publish the flow`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-create-publish.md` written (the landed names Step 0 found, whether the Drafts plan already had a client door, the screenshot paths, D-W3-32 to D-W3-35).
+
+
+---
+
+### Task 10: Note blocks: dotted blocks under their ticket, the Show notes switch, selecting a note, "+N notes" (cases 29.270–29.275)
+
+**Branch** `task/wtg3-notes` (needs T7, T8 and T9: the view files below are edited as diffs against T9's end state, so this task lands after them). **NEEDS: browser** for Step 7. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Main.png` (the dotted note blocks under `GN-141`, the `Notes 4` chip and the Show notes switch). **Files:**
+- Create:
+  - `packages/flow-graph/src/scene/notes.ts`, `packages/flow-graph/test/scene/notes.test.ts`, `packages/flow-graph/test/render/notes-render.test.ts`
+  - `packages/app-core/src/workflow-graph/notes-model.ts`, `packages/app-core/test/workflow-graph/notes-model.test.ts`
+  - `apps/web/src/workflow-graph/{use-show-notes,use-open-note}.ts`, `apps/web/src/workflow-graph/note-inspector.tsx`, `apps/web/test/workflow-graph/workflow-notes.test.tsx`
+- Modify:
+  - `packages/flow-graph/src/scene/build-scene.ts` (T4's no-notes builder becomes the notes builder: a diff)
+  - `packages/app-core/src/workflow-graph/index.ts` (the exports below)
+  - `apps/web/src/workflow-graph/{flow-header,workflow-view,workflow-panel}.tsx`, `apps/web/test/workflow-graph/{support.tsx,workflow-view.test.tsx,workflow-panel.test.tsx}` (diffs)
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T10 anchors)
+- **No CSS in this task.** Every class it draws is T5's (`.gn-flow-note`, `.gn-flow-note__glyph`, `.gn-flow-note__title`, `.gn-flow-note-line`), T7's (`.gn-wf-chip`, `.gn-wf-legend__mark--note`) or T8's (`.gn-wf-inspector__*`). Step 7 checks them against the painted result; a missing rule is fixed by adding it to T5's block, not by a new block here.
+
+**Interfaces:**
+- **Consumes:** T4 `SceneInput` (`SceneNode.notes: SceneNoteIn[]`, `Scene.notes`, `Scene.connectors`, `DrawnNote {id, ticketId, rect, lines, more}`), `layoutInputOf`, `buildScene`; T2 `LayoutNode.notes?: NoteStack`, `NOTE_GAP` (8), `BLOCK.noteWidth` (140), `BLOCK.noteHeight` (40), `wrapLines`; T5 `FlowStage` (draws `.gn-flow-note` blocks and `.gn-flow-note-line` polylines from the scene, reports `Pick {kind: 'note', id, ticketId, more}`); T7 `sceneInputOf` (already honours `showNotes`), `flowSummary().notes` (DISTINCT notes), `legendOf(read, showNotes)`, `listRows` (already names a ticket's notes), `useScene` (`options.showNotes`), `nextScene`; T8 the `.gn-wf-inspector` markup and `Button`; the kit's `Switch`; `next/navigation`'s `useRouter`.
+- **Produces:**
+  - flow-graph: `planNoteBlocks(notes, phone, measure)`, `noteStackOf(plans)`, `NOTES_SHOWN` (3), `NOTE_INDENT` (24) in `scene/notes.ts` (internal to the package: not re-exported);
+  - app-core, from `@gisik-nokma/app-core/workflow-graph`: `SHOW_NOTES_KEY` (`'gn.flow.notes'`), `parseShowNotes(raw)`, `showNotesValue(on)`, `SHOW_NOTES_LABEL`, `OPEN_NOTE_LABEL`, `NOTE_ATTACHED_HEADING`, `moreNotesHeading(label, count)`, `noteInspectorOf(read, noteId)`, `ticketNotesOf(read, ticketId)`, `type NoteInspector`, `type NoteTicketRef`;
+  - web: `useShowNotes(): [boolean, (on: boolean) => void]`, `useOpenNote(): (noteId: string) => void`, `NoteInspector`, `NoteFocus`, `noteFocusHolds`; `WorkflowView` gains the optional prop `onOpenNote`; `FlowHeader` gains the required prop `onShowNotes`; in `support.tsx` `centreOfNote(container, noteId, ticketId)` and `tapAt(container, point, t)`.
+
+Siblings copied: `apps/web/src/notes/workspace-notes-section.tsx:219` (`/notes/${noteId}` is the note's own page); `apps/web/src/notes/note-document.tsx:329` (`router.push` to a note from a ticket); T6's `readGraphView` / `writeGraphView` (every `localStorage` access in try/catch).
+
+**Decisions, reported:**
+- **D-W3-36 The inspector shows a note's title and nothing else of it.** WG-7 says "the note's title and first lines". `FlowNodeRead.notes` is `{id, title}` (T3): there is no excerpt on the wire, and an excerpt would be a second read per note on a route that already walks every ticket. The inspector shows the title, the tickets of this flow the note is attached to, and **Open note**. If the owner wants the first lines, it is one field on the note stub and one line in `NoteInspector`.
+- **D-W3-37 The view opens a note on a quick second tap; Enter does not.** The stage's own double tap and its Enter key are for tickets (`stage.ts` `onUp` and `onKey` act on a node pick and the selected ticket). A note block is selected in the view, not the stage, so the view keeps the last note tapped and opens it when the same block is tapped again within 400 ms. A keyboard user reaches **Open note** by Tab in the inspector, and the accessible list names every note. A stage-level Enter on a note would be a change to T5's `FlowStage` and is reported, not built.
+- **D-W3-38 The chip and the switch are drawn only when the flow has notes.** A switch that changes nothing is not drawn (the same rule as D-W3-26). The chip counts what the flow holds (distinct notes the viewer can see); switching notes off hides the blocks and the legend entry and leaves the count, because the count is a fact about the flow and the switch is about the drawing.
+- **D-W3-39 A note block is selected in the view and the sheet's selection stays a ticket.** `selected` is shared with the Knowledge graph and the Timeline graph (D-W3-16), who know no notes. Selecting a note block therefore sets view state only; the "+N notes" block also selects its ticket (that is a ticket fact: whose notes). The note inspector falls back to the ticket inspector when the note leaves the read, when notes are switched off, or when a ticket is picked.
+- **D-W3-40 "Open note" leaves the sheet.** It pushes `/notes/<id>`, the note's own page, as the Notes list does. Spec WG-4's trail and Back are not built (KG C T9 gives the slot only `onOpenTicket`, D-W3-16), so there is no way back to the graph but the browser's Back, which restores the sheet's route.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-notes` from `origin/release/<next>` (T7, T8 and T9 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. Read what landed: `grep -n "export" packages/flow-graph/src/index.ts`; `grep -n "notes" packages/flow-graph/src/scene/types.ts packages/flow-graph/src/types.ts` (T2/T4 names: `NoteStack`, `NOTE_GAP`, `SceneNoteIn`, `DrawnNote`, `NoteConnector`); `grep -n "kind: 'note'" packages/flow-graph/src/render/pick.ts`; `grep -n "notes" packages/domain/src/flow-read.ts` (T3: `{id, title}`). If a name differs, change THIS task's call sites, not theirs.
+  3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T10" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The six case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T10 -->`:
+  - `- ❌ **29.270 — A ticket's notes are blocks under it, joined by a dotted line with no arrow:** each note is its own 140 x 40 block, 8 px apart, indented 24 px under its ticket, at most three per ticket and then one \`+N notes\` block; a connector per ticket runs from the shape's bottom edge down a dotted trunk with a stub to each block, every segment orthogonal; the stage draws a block per note with its title, the \`+2 notes\` block carries its ticket and its \`more\` flag, and every dotted line is a polyline with neither an end nor a start arrowhead while a flow edge keeps its arrowhead. Control: a ticket without notes has no block and no line. Mutation: \`NOTES_SHOWN = 3\` → \`4\` reds; give the dotted lines a \`marker-end\` reds. Manual half (🟡 until recorded): on a lane port the dash is \`2 4\` with round caps (\`wtg-preview/Main.png\`).`
+  - `- ❌ **29.271 — A note is not a node of the flow:** the layout input's edges, the scene's node list and its order are identical with and without notes; no note block overlaps a node, a pill or another note; the node's reserved box grows by the stack (\`{ width: 164, height: 3 * 40 + 2 * 8 }\` for three notes); turning notes on or off after the first draw is a full layout (the reserved boxes changed) and the same notes again reuses the layout. Control: a node without notes reserves nothing extra. Mutation: drop the \`notes: stack\` from \`layoutInputOf\` → reds.`
+  - `- ❌ **29.272 — Portrait and the phone:** portrait puts the stack to the right of the shape, 8 px away and indented 24 px, its first block level with the shape's top; a phone's note title wraps to two lines and its block grows past 40 px; a desktop title stays one line at 40 px. Control: the same title on the desktop is one line. Mutation: \`phone ? 2 : 1\` → \`1\` reds.`
+  - `- ❌ **29.273 — The Show notes switch:** it is on unless the stored value is \`off\` (a missing or stale value is on); the header draws \`Notes N\` (distinct notes the viewer can see) and the switch only when the flow has notes; switching off removes the blocks and the legend's Note entry, keeps the count, and is remembered per browser under \`gn.flow.notes\`; storage that throws still opens with notes shown and the switch still works for the visit; the switch changes nothing but the notes of the scene input (the node order and the edges are equal). Controls: a flow without notes has neither chip nor switch; the same read with notes off has no note in its scene input. Mutation: \`raw !== 'off'\` → \`raw === 'on'\` reds.`
+  - `- ❌ **29.274 — Selecting a note:** a tap on a block selects the note and the inspector shows its title, \`Attached to\` with every ticket of the flow it is on (a note on two tickets is one note) and \`Open note\`; the sheet's selection is not changed; a tap on a card returns to the ticket's inspector; a quick second tap on the same block opens the note and two slow taps do not; the \`+2 notes\` block selects its ticket and lists all five notes, a title selects that note and the ticket link returns to the ticket; \`Open note\` in the panel goes to \`/notes/<id>\`. Controls: a tap on a different note only selects. Mutation: widen the double-tap window to forever reds.`
+  - `- ❌ **29.275 — A note that goes away takes its inspector with it, and the list always names notes:** switching notes off, or a new read without the selected note, shows the ticket's inspector again; a read that still has the note keeps it; the accessible list row of a ticket names its notes (\`. Notes: Pitch brief, Client call\`) whether or not the canvas shows them, and a ticket without notes names none. Control: an unrelated new read keeps the note inspector. Mutation: \`noteFocusHolds\` always true reds.`
+
+- [ ] **Step 2: RED, the drawing package's tests**
+
+  `packages/flow-graph/test/scene/notes.test.ts` (29.270 to 29.272; the fixture and the in-process engine are T4's and T1's):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { layoutFlow } from '../../src/layout/layout.js';
+import { buildScene, layoutInputOf } from '../../src/scene/build-scene.js';
+import { nextScene } from '../../src/scene/pipeline.js';
+import { NOTES_SHOWN, planNoteBlocks } from '../../src/scene/notes.js';
+import type { Rect } from '../../src/types.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { mockupScene } from './fixture.js';
+
+const ctx = { measure: (text: string) => text.length * 6, labelSize };
+const hit = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const note = (id: string, title = `Note ${id}`) => ({ id, title });
+
+async function sceneWith(notes: Record<string, ReturnType<typeof note>[]>, orientation: 'landscape' | 'portrait' = 'landscape', phone = false) {
+  const input = { ...mockupScene(orientation, Object.fromEntries(Object.entries(notes).map(([id, list]) => [id, { notes: list }]))), phone };
+  const layoutInput = layoutInputOf(input, ctx);
+  return { input, layoutInput, scene: buildScene(input, await layoutFlow(inProcessEngine(), layoutInput, ctx), ctx) };
+}
+
+describe('note blocks (spec WG-7)', () => {
+  it('29.270 each note is its own 140 x 40 block under its ticket, joined by a dotted tree with no arrowhead; at most three, then "+N notes"; control: a ticket without notes has none', async () => {
+    const { scene } = await sceneWith({ '141': [note('n1'), note('n2')], '147': [note('a'), note('b'), note('c'), note('d'), note('e')] });
+    const of = (ticketId: string) => scene.notes.filter((n) => n.ticketId === ticketId);
+    expect(of('141').map((n) => n.id)).toEqual(['n1', 'n2']);
+    expect(of('141').every((n) => n.rect.width === 140 && n.rect.height === 40 && n.more === null)).toBe(true);
+    expect(of('147').map((n) => n.id)).toEqual(['a', 'b', 'c', 'more']);
+    expect(of('147').at(-1)).toMatchObject({ more: 2, lines: ['+2 notes'] });
+    expect(of('140')).toEqual([]);
+    // below the shape, 8 px apart, indented under it
+    const shape = scene.nodes.find((n) => n.node.id === '141')!.rect;
+    expect(of('141')[0]!.rect.y).toBe(shape.y + shape.height + 8);
+    expect(of('141')[1]!.rect.y).toBe(of('141')[0]!.rect.y + 40 + 8);
+    expect(of('141')[0]!.rect.x).toBe(shape.x + 24);
+    // dotted tree: a connector per ticket plus one stub per block; every one an orthogonal polyline
+    const connectors = scene.connectors.filter((c) => c.ticketId === '141' || c.ticketId.startsWith('141:'));
+    expect(connectors).toHaveLength(1 + 2);
+    for (const c of scene.connectors) for (let i = 0; i + 1 < c.points.length; i += 1) expect(c.points[i]!.x === c.points[i + 1]!.x || c.points[i]!.y === c.points[i + 1]!.y).toBe(true);
+    // the stem starts on the shape's bottom edge
+    expect(connectors[0]!.points[0]).toEqual({ x: shape.x + 12, y: shape.y + shape.height });
+  });
+
+  it('29.271 a note is not a node of the flow: the layout input, the flow edges and the node list are identical with and without notes, and no note overlaps a node, a pill or another note; control: the node boxes grew by the stack', async () => {
+    const withNotes = await sceneWith({ '141': [note('n1'), note('n2'), note('n3')], '144': [note('d1')], '151': [note('x'), note('y')] });
+    const without = await sceneWith({});
+    expect(withNotes.layoutInput.edges).toEqual(without.layoutInput.edges);
+    expect(withNotes.scene.nodes.map((n) => n.node.id)).toEqual(without.scene.nodes.map((n) => n.node.id));
+    for (const n of withNotes.scene.notes) {
+      for (const other of withNotes.scene.nodes) expect(hit(n.rect, other.rect), `${n.id} vs ${other.node.id}`).toBe(false);
+      for (const p of withNotes.scene.pills) expect(hit(n.rect, p.rect), `${n.id} vs pill`).toBe(false);
+      for (const m of withNotes.scene.notes) if (m !== n) expect(hit(n.rect, m.rect), `${n.id} vs ${m.id}`).toBe(false);
+    }
+    expect(withNotes.layoutInput.nodes.find((n) => n.id === '141')!.notes).toEqual({ width: 164, height: 3 * 40 + 2 * 8 });
+    expect(without.layoutInput.nodes.find((n) => n.id === '141')!.notes).toBeUndefined();
+  });
+
+  it('29.272 portrait puts the stack to the right of the shape; a phone note title wraps to two lines and its block grows; control: a desktop title stays one line', async () => {
+    const long = 'Client call notes from the second kick-off meeting in March';
+    const portrait = await sceneWith({ '141': [note('n1'), note('n2')] }, 'portrait');
+    const shape = portrait.scene.nodes.find((n) => n.node.id === '141')!.rect;
+    for (const n of portrait.scene.notes) expect(n.rect.x).toBe(shape.x + shape.width + 8 + 24);
+    expect(portrait.scene.notes[0]!.rect.y).toBe(shape.y);
+    const phone = planNoteBlocks([note('p', long)], true, ctx.measure);
+    const desktop = planNoteBlocks([note('p', long)], false, ctx.measure);
+    expect(phone[0]!.lines).toHaveLength(2);
+    expect(phone[0]!.height).toBeGreaterThan(40);
+    expect(desktop[0]!.lines).toHaveLength(1);
+    expect(desktop[0]!.height).toBe(40);
+    expect(NOTES_SHOWN).toBe(3);
+  });
+
+  it('29.271 turning notes on or off after the first draw is a full layout, because the boxes the layout reserves changed; the same notes again is not', async () => {
+    const inner = inProcessEngine();
+    let runs = 0;
+    const engine = { layout: (g: Parameters<typeof inner.layout>[0]) => (runs += 1, inner.layout(g)), terminate: () => inner.terminate() };
+    const bare = mockupScene('landscape');
+    const noted = mockupScene('landscape', { '141': { notes: [note('n1'), note('n2')] } });
+    const first = await nextScene(engine, ctx, bare, null);
+    const on = await nextScene(engine, ctx, noted, first);
+    expect(on.mode).toBe('relayout');
+    expect(on.scene.notes).toHaveLength(2);
+    expect(runs).toBe(2);
+    const same = await nextScene(engine, ctx, noted, on);
+    expect(same.mode).toBe('same');
+    expect(runs).toBe(2);
+    const off = await nextScene(engine, ctx, bare, on);
+    expect(off.mode).toBe('relayout');
+    expect(off.scene.notes).toHaveLength(0);
+  });
+});
+  ```
+  `packages/flow-graph/test/render/notes-render.test.ts` (29.270, the stage half):
+  ```ts
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest';
+import { layoutFlow } from '../../src/layout/layout.js';
+import { FlowStage } from '../../src/render/stage.js';
+import { buildScene, layoutInputOf } from '../../src/scene/build-scene.js';
+import { inProcessEngine, labelSize } from '../engine/inprocess.js';
+import { mockupScene } from '../scene/fixture.js';
+
+const ctx = { measure: (text: string) => text.length * 6, labelSize };
+const hosts: HTMLElement[] = [];
+afterEach(() => {
+  for (const h of hosts.splice(0)) h.remove();
+});
+
+describe('the stage draws note blocks (spec WG-7)', () => {
+  it('29.270 a block per note with its title, a "+2 notes" block, and one dotted line per connector with no arrowhead; control: a flow edge keeps its arrowhead', async () => {
+    const input = mockupScene('landscape', {
+      '141': { notes: [{ id: 'n1', title: 'Pitch brief' }, { id: 'n2', title: 'Client call' }] },
+      '147': { notes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, title: `Note ${id}` })) },
+    });
+    const scene = buildScene(input, await layoutFlow(inProcessEngine(), layoutInputOf(input, ctx), ctx), ctx);
+    const host = document.createElement('div');
+    document.body.append(host);
+    hosts.push(host);
+    new FlowStage(host, { reducedMotion: () => false, schedule: () => undefined }).setScene(scene);
+
+    const blocks = [...host.querySelectorAll<HTMLElement>('.gn-flow-note')];
+    expect(blocks).toHaveLength(scene.notes.length);
+    expect(blocks.map((b) => b.querySelector('.gn-flow-note__title')!.textContent)).toContain('Pitch brief');
+    const more = blocks.find((b) => b.dataset['more'] === 'true')!;
+    expect(more.querySelector('.gn-flow-note__title')!.textContent).toBe('+2 notes');
+    expect(more.dataset['ticketId']).toBe('147');
+
+    const lines = [...host.querySelectorAll('.gn-flow-note-line')];
+    expect(lines).toHaveLength(scene.connectors.length);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      expect(line.tagName.toLowerCase()).toBe('polyline');
+      expect(line.hasAttribute('marker-end')).toBe(false);
+      expect(line.hasAttribute('marker-start')).toBe(false);
+    }
+    const flowEdge = host.querySelector('path[marker-end]');
+    expect(flowEdge).not.toBeNull();
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/flow-graph exec vitest run --maxWorkers=2 test/scene/notes.test.ts test/render/notes-render.test.ts > /tmp/wtg3-t10p.log 2>&1; tail -n 20 /tmp/wtg3-t10p.log` (FAIL: no `scene/notes`; the no-notes builder draws no note).
+
+- [ ] **Step 3: GREEN, the notes in the scene**
+
+  `packages/flow-graph/src/scene/notes.ts`:
+  ```ts
+import type { NoteStack } from '../types.js';
+import { NOTE_GAP } from '../types.js';
+import { BLOCK, wrapLines, type TextMeasure } from '../layout/measure.js';
+import type { SceneNoteIn } from './types.js';
+
+/** At most this many note blocks per ticket, then one "+N notes" block (WG-7). */
+export const NOTES_SHOWN = 3;
+/** The note column is indented under (or beside) its ticket so a dotted trunk can run down its left side. */
+export const NOTE_INDENT = 24;
+
+export type NoteBlockPlan = { id: string; lines: string[]; height: number; more: number | null };
+
+/**
+ * The blocks one ticket shows. A desktop note title is one line; a phone's wraps to two (WG-9). The "+N" block opens the ticket's
+ * Notes, so it is drawn at the same size and carries no title.
+ */
+export function planNoteBlocks(notes: readonly SceneNoteIn[], phone: boolean, measure: TextMeasure): NoteBlockPlan[] {
+  const shown = notes.slice(0, NOTES_SHOWN);
+  const plans: NoteBlockPlan[] = shown.map((note) => {
+    const { lines } = wrapLines(note.title, BLOCK.noteWidth - 2 * 12 - 14, measure, phone ? 2 : 1);
+    const height = lines.length > 1 ? BLOCK.noteHeight + (lines.length - 1) * BLOCK.lineHeight : BLOCK.noteHeight;
+    return { id: note.id, lines: lines.length === 0 ? [''] : lines, height, more: null };
+  });
+  if (notes.length > NOTES_SHOWN) {
+    const rest = notes.length - NOTES_SHOWN;
+    plans.push({ id: 'more', lines: [`+${rest} notes`], height: BLOCK.noteHeight, more: rest });
+  }
+  return plans;
+}
+
+/** The size of the whole stack, for the layout to reserve. `null` when there are no notes. */
+export function noteStackOf(plans: readonly NoteBlockPlan[]): NoteStack | null {
+  if (plans.length === 0) return null;
+  const heights = plans.reduce((sum, plan) => sum + plan.height, 0) + (plans.length - 1) * NOTE_GAP;
+  return { width: NOTE_INDENT + BLOCK.noteWidth, height: heights };
+}
+  ```
+  `packages/flow-graph/src/scene/build-scene.ts`: T4's no-notes builder becomes the notes builder (the layout input reserves each stack; the scene places the blocks, the dotted trunk and the stubs; apply this diff, which is the whole change):
+  ```diff
+--- a/packages/flow-graph/src/scene/build-scene.ts
++++ b/packages/flow-graph/src/scene/build-scene.ts
+@@ -1,8 +1,9 @@
+-import { decisionBlock, ticketBlock, type TextMeasure, type TicketBlock } from '../layout/measure.js';
++import { BLOCK, decisionBlock, ticketBlock, type TextMeasure, type TicketBlock } from '../layout/measure.js';
+ import { GAP } from '../layout/graph-input.js';
+-import type { FlowLayout, LayoutEdge, LayoutInput, LayoutNode, LayoutOptions, Rect } from '../types.js';
++import { NOTE_GAP, type FlowLayout, type LayoutEdge, type LayoutInput, type LayoutNode, type LayoutOptions, type Point, type Rect } from '../types.js';
+ import { roundedPath, routeBetween } from './geometry.js';
+-import type { DrawnEdge, DrawnNode, DrawnPill, Scene, SceneEdge, SceneInput, SceneNode } from './types.js';
++import { NOTE_INDENT, noteStackOf, planNoteBlocks } from './notes.js';
++import type { DrawnEdge, DrawnNode, DrawnNote, DrawnPill, NoteConnector, Scene, SceneEdge, SceneInput, SceneNode } from './types.js';
+
+ export type SceneContext = { measure: TextMeasure; labelSize: LayoutOptions['labelSize'] };
+
+@@ -18,11 +19,12 @@
+   return node.shape === 'decision' ? decisionBlock(node.title, measure) : ticketBlock(node.title, phone, measure);
+ }
+
+-/** The layout's input: measured sizes (never a constant, WG-9) and ONLY the `leads_to` edges. Note stacks are reserved from T9 on. */
++/** The layout's input: measured sizes (never a constant, WG-9), note stacks reserved, and ONLY the `leads_to` edges. */
+ export function layoutInputOf(input: SceneInput, ctx: SceneContext): LayoutInput {
+   const nodes: LayoutNode[] = input.nodes.map((node) => {
+     const block = blockOf(node, input.phone, ctx.measure);
+-    return { id: node.id, shape: node.shape, width: block.width, height: block.height };
++    const stack = noteStackOf(planNoteBlocks(node.notes, input.phone, ctx.measure));
++    return { id: node.id, shape: node.shape, width: block.width, height: block.height, ...(stack === null ? {} : { notes: stack }) };
+   });
+   const edges: LayoutEdge[] = input.edges
+     .filter((e) => e.kind === 'leads_to')
+@@ -38,9 +40,12 @@
+ }
+
+ export function buildScene(input: SceneInput, layout: FlowLayout, ctx: SceneContext): Scene {
++  const landscape = input.orientation === 'landscape';
+   const placed = new Map(layout.nodes.map((n) => [n.id, n]));
+   const nodes: DrawnNode[] = [];
+   const pills: DrawnPill[] = [];
++  const notes: DrawnNote[] = [];
++  const connectors: NoteConnector[] = [];
+
+   for (const node of input.nodes) {
+     const box = placed.get(node.id);
+@@ -51,6 +56,30 @@
+     const { start, end } = pillRects(rect);
+     if (node.start) pills.push({ kind: 'start', nodeId: node.id, rect: start });
+     if (node.end) pills.push({ kind: 'end', nodeId: node.id, rect: end });
++
++    const plans = planNoteBlocks(node.notes, input.phone, ctx.measure);
++    if (plans.length === 0) continue;
++    const trunkX = landscape ? rect.x + NOTE_INDENT / 2 : rect.x + rect.width + NOTE_GAP + NOTE_INDENT / 2;
++    let cursor = landscape ? rect.y + rect.height + NOTE_GAP : box.y;
++    const mids: number[] = [];
++    for (const plan of plans) {
++      const x = landscape ? rect.x + NOTE_INDENT : rect.x + rect.width + NOTE_GAP + NOTE_INDENT;
++      const noteRect: Rect = { x, y: cursor, width: BLOCK.noteWidth, height: plan.height };
++      notes.push({ id: plan.id, ticketId: node.id, rect: noteRect, lines: plan.lines, more: plan.more });
++      mids.push(cursor + plan.height / 2);
++      cursor += plan.height + NOTE_GAP;
++    }
++    // The dotted tree: a stem from the shape, a trunk, and a stub to each block. No arrowhead, no label.
++    const stemFrom: Point = landscape ? { x: trunkX, y: rect.y + rect.height } : { x: rect.x + rect.width, y: rect.y + 12 };
++    const trunkTop: Point = landscape ? stemFrom : { x: trunkX, y: stemFrom.y };
++    const points: Point[] = [stemFrom];
++    if (!landscape) points.push(trunkTop);
++    points.push({ x: trunkX, y: mids[mids.length - 1]! });
++    connectors.push({ ticketId: node.id, points });
++    plans.forEach((plan, i) => {
++      const noteX = landscape ? rect.x + NOTE_INDENT : rect.x + rect.width + NOTE_GAP + NOTE_INDENT;
++      connectors.push({ ticketId: `${node.id}:${plan.id}`, points: [{ x: trunkX, y: mids[i]! }, { x: noteX, y: mids[i]! }] });
++    });
+   }
+
+   const shapes = new Map(nodes.map((n) => [n.node.id, n.rect]));
+@@ -75,8 +104,8 @@
+     }
+   }
+
+-  const all: Rect[] = [...nodes.map((n) => n.box), ...pills.map((p) => p.rect)];
++  const all: Rect[] = [...nodes.map((n) => n.box), ...pills.map((p) => p.rect), ...notes.map((n) => n.rect)];
+   const width = Math.max(layout.width, ...all.map((r) => r.x + r.width + GAP.padding), ...edges.flatMap((e) => e.points.map((p) => p.x + GAP.padding)));
+   const height = Math.max(layout.height, ...all.map((r) => r.y + r.height + GAP.padding), ...edges.flatMap((e) => e.points.map((p) => p.y + GAP.padding)));
+-  return { width, height, orientation: input.orientation, nodes, pills, edges, notes: [], connectors: [] };
++  return { width, height, orientation: input.orientation, nodes, pills, edges, notes, connectors };
+ }
+  ```
+  Run the Step 2 command, then the package suite WHOLE, `typecheck` and `build`. Expected PASS (4 tests in the two files). Commit.
+
+- [ ] **Step 4: RED then GREEN, the model**
+
+  `packages/app-core/test/workflow-graph/notes-model.test.ts` (29.273 to 29.275, the pure half; T7's builders):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { moreNotesHeading, noteInspectorOf, parseShowNotes, showNotesValue, ticketNotesOf } from '../../src/workflow-graph/notes-model.js';
+import { flowSummary, legendOf, sceneInputOf } from '../../src/workflow-graph/flow-model.js';
+import { listRows } from '../../src/workflow-graph/flow-sentences.js';
+import { decisionRead, readEdge, readNode, readOf } from '../../src/workflow-graph/testing.js';
+
+/** A > B, A has five notes (so the stage shows three and "+2 notes"); B shares the note `n1` with A. */
+function notedRead() {
+  const five = ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => ({ id, title: `Note ${id}` }));
+  return readOf([readNode('A', { notes: five }), readNode('B', { notes: [{ id: 'n1', title: 'Note n1' }] })], [readEdge('A', 'B')]);
+}
+
+describe('the Show notes switch (spec WG-6, D-W3-12)', () => {
+  it('29.273 it is on unless the person turned it off; a stale or missing value is on; it round-trips', () => {
+    expect(parseShowNotes(null)).toBe(true);
+    expect(parseShowNotes('on')).toBe(true);
+    expect(parseShowNotes('maybe')).toBe(true);
+    expect(parseShowNotes('off')).toBe(false);
+    expect(parseShowNotes(showNotesValue(false))).toBe(false);
+    expect(parseShowNotes(showNotesValue(true))).toBe(true);
+  });
+
+  it('29.273 the chip counts DISTINCT notes, the legend names a note only while notes are shown and any exist; control: switching them off empties the scene', () => {
+    const read = notedRead();
+    expect(flowSummary(read).notes).toBe(5);
+    expect(legendOf(read, true).some((i) => i.kind === 'note')).toBe(true);
+    expect(legendOf(read, false).some((i) => i.kind === 'note')).toBe(false);
+    expect(legendOf(readOf([readNode('A')], []), true).some((i) => i.kind === 'note')).toBe(false);
+    const on = sceneInputOf(read, { phone: false, orientation: 'landscape', showNotes: true });
+    const off = sceneInputOf(read, { phone: false, orientation: 'landscape', showNotes: false });
+    expect(on.nodes[0]!.notes).toHaveLength(5);
+    expect(off.nodes.every((n) => n.notes.length === 0)).toBe(true);
+    // a note is not a node: the order, the edges and the tickets do not change with the switch
+    expect(off.nodes.map((n) => n.id)).toEqual(on.nodes.map((n) => n.id));
+    expect(off.edges).toEqual(on.edges);
+  });
+});
+
+describe('a selected note (spec WG-7)', () => {
+  it('29.274 a note names its title and every ticket of the flow it is attached to; a note on two tickets is one note; control: an unknown note is null', () => {
+    const read = notedRead();
+    expect(noteInspectorOf(read, 'n1')).toEqual({
+      id: 'n1',
+      title: 'Note n1',
+      tickets: [
+        { id: 'A', label: 'GN-A', title: 'Title A' },
+        { id: 'B', label: 'GN-B', title: 'Title B' },
+      ],
+    });
+    expect(noteInspectorOf(read, 'n3')!.tickets).toHaveLength(1);
+    expect(noteInspectorOf(read, 'gone')).toBeNull();
+  });
+
+  it('29.274 a draft is named "Draft" and a note that left the read is gone; the "+N notes" block lists every note on its ticket in order', () => {
+    const read = readOf([readNode('A', { draft: true, notes: [{ id: 'n1', title: 'Brief' }] })], []);
+    expect(noteInspectorOf(read, 'n1')!.tickets[0]!.label).toBe('Draft');
+    const noted = notedRead();
+    expect(ticketNotesOf(noted, 'A')).toEqual({ ticketId: 'A', label: 'GN-A', notes: ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => ({ id, title: `Note ${id}` })) });
+    expect(ticketNotesOf(noted, 'Z')).toBeNull();
+    expect(ticketNotesOf(decisionRead(), 'C')).toBeNull();
+    expect(moreNotesHeading('GN-A', 5)).toBe('5 notes on GN-A');
+    expect(moreNotesHeading('GN-A', 1)).toBe('1 note on GN-A');
+  });
+
+  it('29.275 the accessible list names a ticket\'s notes whether or not the canvas shows them; a ticket without notes names none', () => {
+    const rows = listRows(decisionRead());
+    expect(rows.find((r) => r.id === 'A')!.text).toContain('. Notes: Pitch brief, Client call');
+    expect(rows.find((r) => r.id === 'C')!.text).not.toContain('Notes');
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/workflow-graph/notes-model.test.ts > /tmp/wtg3-t10a.log 2>&1; tail -n 20 /tmp/wtg3-t10a.log` (FAIL: no `notes-model`).
+
+  `packages/app-core/src/workflow-graph/notes-model.ts` (pure; no " — " and no " · " in any string, 23.191; neither "job" nor "stage" in a string, 23.190):
+  ```ts
+import type { FlowRead } from '@gisik-nokma/domain';
+import { nodeLabel } from './flow-sentences.js';
+
+/**
+ * Note blocks (WG-6, WG-7). A note takes no part in the flow, so nothing here touches the order, the counts of tickets or the
+ * layout; this is the remembered switch, and what the inspector says about a note a person selected.
+ */
+
+/** The browser-local key of the Show notes switch (D-W3-12). */
+export const SHOW_NOTES_KEY = 'gn.flow.notes';
+
+/** WG-6: Show notes is ON by default and stays on unless the person turned it off; anything else stored is a stale value. */
+export function parseShowNotes(raw: string | null): boolean {
+  return raw !== 'off';
+}
+
+export function showNotesValue(on: boolean): 'on' | 'off' {
+  return on ? 'on' : 'off';
+}
+
+export const SHOW_NOTES_LABEL = 'Show notes';
+export const OPEN_NOTE_LABEL = 'Open note';
+export const NOTE_ATTACHED_HEADING = 'Attached to';
+
+/** What the "+N notes" block says it holds, for the inspector's heading. */
+export const moreNotesHeading = (ticketLabel: string, count: number): string => `${count} ${count === 1 ? 'note' : 'notes'} on ${ticketLabel}`;
+
+export type NoteTicketRef = { id: string; label: string; title: string };
+
+/** A selected note: its title and every ticket of THIS flow it is attached to (a note on two tickets is one note). */
+export type NoteInspector = { id: string; title: string; tickets: NoteTicketRef[] };
+
+/**
+ * `null` when the note is no longer in the read (it was detached, or the viewer lost sight of it): the view then falls back to the
+ * ticket's inspector. The read carries the title only; there is no excerpt to show (D-W3-36).
+ */
+export function noteInspectorOf(read: FlowRead, noteId: string): NoteInspector | null {
+  const tickets: NoteTicketRef[] = [];
+  let title: string | null = null;
+  for (const node of read.nodes) {
+    const note = node.notes.find((n) => n.id === noteId);
+    if (note === undefined) continue;
+    title ??= note.title;
+    tickets.push({ id: node.id, label: nodeLabel(node), title: node.title });
+  }
+  return title === null ? null : { id: noteId, title, tickets };
+}
+
+/** The "+N notes" block selected: every note on the ticket, in the read's order. `null` when the ticket left the flow or has none. */
+export function ticketNotesOf(read: FlowRead, ticketId: string): { ticketId: string; label: string; notes: Array<{ id: string; title: string }> } | null {
+  const node = read.nodes.find((n) => n.id === ticketId);
+  if (node === undefined || node.notes.length === 0) return null;
+  return { ticketId, label: nodeLabel(node), notes: node.notes.map((n) => ({ id: n.id, title: n.title })) };
+}
+  ```
+  `index.ts`, append:
+  ```ts
+export {
+  moreNotesHeading,
+  NOTE_ATTACHED_HEADING,
+  noteInspectorOf,
+  OPEN_NOTE_LABEL,
+  parseShowNotes,
+  SHOW_NOTES_KEY,
+  SHOW_NOTES_LABEL,
+  showNotesValue,
+  ticketNotesOf,
+  type NoteInspector,
+  type NoteTicketRef,
+} from './notes-model.js';
+  ```
+  Run the command above (PASS: 5 tests), then `pnpm --filter @gisik-nokma/app-core exec tsc -p tsconfig.typecheck.json` clean. Commit.
+
+- [ ] **Step 5: RED, the web tests**
+
+  `apps/web/test/workflow-graph/workflow-notes.test.tsx` (29.273 to 29.275):
+  ```tsx
+// @vitest-environment jsdom
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { decisionRead, readEdge, readNode, readOf } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { centreOfCard, centreOfNote, mountView, tapAt } from './support.js';
+
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(c.querySelectorAll('.gn-flow-node')).toHaveLength(n));
+const noteBlocks = (c: HTMLElement) => c.querySelectorAll('.gn-flow-note');
+
+/** A has five notes (three shown, then "+2 notes"), B shares `n1` with A. */
+function notedRead() {
+  const five = ['n1', 'n2', 'n3', 'n4', 'n5'].map((id) => ({ id, title: `Note ${id}` }));
+  return readOf([readNode('A', { notes: five }), readNode('B', { notes: [{ id: 'n1', title: 'Note n1' }] })], [readEdge('A', 'B')]);
+}
+
+beforeEach(() => window.localStorage.clear());
+
+describe('29.273 the Show notes switch', () => {
+  it('29.273 notes are drawn by default with a Notes chip and a Show notes switch; switching off removes the blocks and remembers it; control: a flow without notes has neither chip nor switch', async () => {
+    const { container, unmount } = mountView(decisionRead());
+    await drawn(container, 8);
+    expect(noteBlocks(container)).toHaveLength(2);
+    expect(within(screen.getByLabelText('Flow summary')).getByText('Notes').closest('li')).toHaveTextContent('Notes 2');
+    const toggle = screen.getByRole('checkbox', { name: 'Show notes' });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    await waitFor(() => expect(noteBlocks(container)).toHaveLength(0));
+    expect(window.localStorage.getItem('gn.flow.notes')).toBe('off');
+    expect(within(screen.getByLabelText('Legend')).queryByText('Note')).toBeNull();
+    // the chip still counts them: the number is what the flow holds, the switch is what is drawn
+    expect(within(screen.getByLabelText('Flow summary')).getByText('Notes')).toBeInTheDocument();
+    unmount();
+
+    // a fresh mount remembers
+    const again = mountView(decisionRead());
+    await drawn(again.container, 8);
+    expect(noteBlocks(again.container)).toHaveLength(0);
+    expect(screen.getByRole('checkbox', { name: 'Show notes' })).not.toBeChecked();
+    again.unmount();
+
+    window.localStorage.clear();
+    const plain = mountView(readOf([readNode('A'), readNode('B')], [readEdge('A', 'B')]));
+    await drawn(plain.container, 2);
+    expect(screen.queryByRole('checkbox', { name: 'Show notes' })).toBeNull();
+    expect(within(screen.getByLabelText('Flow summary')).queryByText('Notes')).toBeNull();
+  });
+
+  it('29.273 storage that throws still opens with notes shown; control: switching still works for this visit', async () => {
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      const { container } = mountView(decisionRead());
+      await drawn(container, 8);
+      expect(noteBlocks(container)).toHaveLength(2);
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Show notes' }));
+      await waitFor(() => expect(noteBlocks(container)).toHaveLength(0));
+    } finally {
+      get.mockRestore();
+      set.mockRestore();
+    }
+  });
+});
+
+describe('29.274 selecting a note block', () => {
+  it('29.274 a tap selects the note: its title, the tickets it is on and Open note; a tap on a card returns to the ticket; control: the sheet\'s selection never became a note', async () => {
+    const onOpenNote = vi.fn();
+    const onSelect = vi.fn();
+    const { container } = mountView(decisionRead(), { onOpenNote, onSelect });
+    await drawn(container, 8);
+    tapAt(container, centreOfNote(container, 'n1', 'A'), 1000);
+    const aside = await screen.findByRole('complementary', { name: 'Selected note' });
+    expect(within(aside).getByRole('heading', { name: 'Pitch brief' })).toBeInTheDocument();
+    expect(within(aside).getByRole('button', { name: 'GN-161 Design homepage' })).toBeInTheDocument();
+    await userEvent.click(within(aside).getByRole('button', { name: 'Open note' }));
+    expect(onOpenNote).toHaveBeenCalledWith('n1');
+    expect(onSelect).not.toHaveBeenCalled();
+
+    tapAt(container, centreOfCard(container, 'D'), 3000);
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Selected note' })).toBeNull());
+    expect(onSelect).toHaveBeenCalledWith('D');
+  });
+
+  it('29.274 a quick second tap on the same note opens it; two slow taps do not; control: a tap on a different note only selects', async () => {
+    const onOpenNote = vi.fn();
+    const { container } = mountView(decisionRead(), { onOpenNote });
+    await drawn(container, 8);
+    const first = centreOfNote(container, 'n1', 'A');
+    tapAt(container, first, 1000);
+    tapAt(container, centreOfNote(container, 'n2', 'A'), 1100);
+    expect(onOpenNote).not.toHaveBeenCalled();
+    tapAt(container, first, 1200);
+    tapAt(container, first, 1300);
+    expect(onOpenNote).toHaveBeenCalledTimes(1);
+    expect(onOpenNote).toHaveBeenCalledWith('n1');
+    // two taps a second apart are two selections, not an open
+    const clock = vi.spyOn(Date, 'now');
+    try {
+      const slow = centreOfNote(container, 'n2', 'A');
+      clock.mockReturnValue(10_000);
+      tapAt(container, slow, 5000);
+      clock.mockReturnValue(11_000);
+      tapAt(container, slow, 6000);
+    } finally {
+      clock.mockRestore();
+    }
+    expect(onOpenNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('29.274 the "+2 notes" block selects its ticket and lists all five notes; a title selects that note; Back returns to the ticket', async () => {
+    const onSelect = vi.fn();
+    const { container } = mountView(notedRead(), { onSelect });
+    await drawn(container, 2);
+    expect(noteBlocks(container)).toHaveLength(5);
+    tapAt(container, centreOfNote(container, 'more', 'A'), 1000);
+    const aside = await screen.findByRole('complementary', { name: 'Selected notes' });
+    expect(onSelect).toHaveBeenCalledWith('A');
+    expect(within(aside).getByRole('heading', { name: '5 notes on GN-A' })).toBeInTheDocument();
+    expect(within(aside).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Note n1', 'Note n2', 'Note n3', 'Note n4', 'Note n5']);
+    await userEvent.click(within(aside).getByRole('button', { name: 'Note n5' }));
+    const note = await screen.findByRole('complementary', { name: 'Selected note' });
+    expect(within(note).getByRole('heading', { name: 'Note n5' })).toBeInTheDocument();
+    await userEvent.click(within(note).getByRole('button', { name: 'GN-A Title A' }));
+    expect(await screen.findByRole('complementary', { name: 'Selected ticket' })).toBeInTheDocument();
+  });
+});
+
+describe('29.275 a note that goes away takes its inspector with it', () => {
+  it('29.275 switching notes off, or a new read without the note, shows the ticket\'s inspector again; control: a read that still has the note keeps it', async () => {
+    const { container, update } = mountView(decisionRead());
+    await drawn(container, 8);
+    tapAt(container, centreOfNote(container, 'n1', 'A'), 1000);
+    await screen.findByRole('complementary', { name: 'Selected note' });
+    update({ read: { ...decisionRead(), draftCount: 0 } });
+    await drawn(container, 8);
+    expect(screen.getByRole('complementary', { name: 'Selected note' })).toBeInTheDocument();
+    const without = decisionRead();
+    update({ read: { ...without, nodes: without.nodes.map((n) => (n.id === 'A' ? { ...n, notes: [{ id: 'n2', title: 'Client call' }] } : n)) } });
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Selected note' })).toBeNull());
+    expect(screen.getByRole('complementary', { name: 'Selected ticket' })).toBeInTheDocument();
+
+    tapAt(container, centreOfNote(container, 'n2', 'A'), 5000);
+    await screen.findByRole('complementary', { name: 'Selected note' });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Show notes' }));
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Selected note' })).toBeNull());
+  });
+});
+  ```
+  `support.tsx` gains `centreOfNote` and `tapAt` (apply this diff):
+  ```diff
+--- a/apps/web/test/workflow-graph/support.tsx
++++ b/apps/web/test/workflow-graph/support.tsx
+@@ -77,3 +77,19 @@
+ /** jsdom has no PointerEvent; the stage reads clientX, clientY and timeStamp, which a MouseEvent carries. */
+ export const press = (type: string, at: { x: number; y: number }, t: number): Event =>
+   Object.defineProperty(new MouseEvent(type, { clientX: at.x, clientY: at.y, bubbles: true }), 'timeStamp', { value: t });
++
++/** The centre of a drawn note block (one per ticket it is attached to; `more` is the "+N notes" block, whose id is `more`). */
++export function centreOfNote(container: HTMLElement, noteId: string, ticketId: string): { x: number; y: number } {
++  const block = container.querySelector<HTMLElement>(`[data-note-id="${noteId}"][data-ticket-id="${ticketId}"]`);
++  if (block === null) throw new Error(`no note block ${noteId} on ${ticketId}`);
++  const at = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(block.style.transform);
++  if (at === null) throw new Error(`note ${noteId} has no transform`);
++  return { x: Number(at[1]) + Number.parseFloat(block.style.width) / 2, y: Number(at[2]) + Number.parseFloat(block.style.height) / 2 };
++}
++
++/** A quick tap at a point of the canvas, by the camera's identity coordinates. */
++export function tapAt(container: HTMLElement, at: { x: number; y: number }, t: number): void {
++  const host = container.querySelector('.gn-flow')!;
++  host.dispatchEvent(press('pointerdown', at, t));
++  host.dispatchEvent(press('pointerup', at, t + 40));
++}
+  ```
+  T7's view test asserted that the legend has no Note entry and no Notes chip. That was true while the view passed `showNotes: false`; with Show notes on by default (WG-6) the fixture's two notes are counted and named. Apply this diff:
+  ```diff
+--- a/apps/web/test/workflow-graph/workflow-view.test.tsx
++++ b/apps/web/test/workflow-graph/workflow-view.test.tsx
+@@ -18,7 +18,9 @@
+     expect(screen.getByText('8 tickets in this flow')).toBeInTheDocument();
+     const legend = within(screen.getByLabelText('Legend'));
+     for (const word of ['Waits for all incoming', 'Draft', 'Not taken', 'Loop, times taken', 'Done', 'In progress', 'To do']) expect(legend.getByText(word)).toBeInTheDocument();
+-    expect(legend.queryByText('Note')).toBeNull();
++    // Show notes is on by default (WG-6), so the two notes of GN-161 are counted and the legend names a note (T10).
++    expect(legend.getByText('Note')).toBeInTheDocument();
++    expect(within(summary).getByText('Notes').closest('li')).toHaveTextContent('Notes 2');
+     expect(screen.getByRole('img', { name: 'Flow of 8 tickets with 9 links. The list below gives the same flow in order.' })).toBeInTheDocument();
+     const list = screen.getByRole('region', { name: 'This flow, in order' });
+     const rows = within(list).getAllByRole('button').map((b) => b.textContent);
+  ```
+  The panel test gains a router mock and one case (29.274):
+  ```diff
+--- a/apps/web/test/workflow-graph/workflow-panel.test.tsx
++++ b/apps/web/test/workflow-graph/workflow-panel.test.tsx
+@@ -3,12 +3,16 @@
+ import userEvent from '@testing-library/user-event';
+ import { describe, expect, it, vi } from 'vitest';
+ import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
++import { centreOfNote, tapAt } from './support.js';
+ import { Providers } from '../../src/providers.js';
+ import { WorkflowPanel } from '../../src/workflow-graph/workflow-panel.js';
+ import { stubServices } from '../helpers/stub-services.js';
+
+ const dispose = vi.fn();
++const push = vi.fn();
+
++vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
++
+ vi.mock('../../src/auth-client.js', () => ({
+   authClient: {
+     useSession: () => ({ data: { user: { id: 'user_kiro', name: 'Kiro' } }, isPending: false }),
+@@ -52,4 +56,17 @@
+     expect(getFlow).toHaveBeenCalledTimes(2);
+     expect(screen.queryByRole('alert')).toBeNull();
+   });
++
++  it('29.274 Open note on a selected note goes to the note\'s own page', async () => {
++    const getFlow = vi.fn(async () => decisionRead());
++    const { container } = render(
++      <Providers services={stubServices({ getFlow })}>
++        <WorkflowPanel {...props} />
++      </Providers>,
++    );
++    await waitFor(() => expect(container.querySelectorAll('.gn-flow-node')).toHaveLength(8));
++    tapAt(container, centreOfNote(container, 'n2', 'A'), 1000);
++    await userEvent.click(await screen.findByRole('button', { name: 'Open note' }));
++    expect(push).toHaveBeenCalledWith('/notes/n2');
++  });
+ });
+  ```
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t10w.log 2>&1; tail -n 20 /tmp/wtg3-t10w.log` (FAIL: no `use-show-notes`).
+
+- [ ] **Step 6: GREEN, the web parts**
+
+  `use-show-notes.ts`:
+  ```ts
+'use client';
+
+import { useCallback, useState } from 'react';
+import { parseShowNotes, SHOW_NOTES_KEY, showNotesValue } from '@gisik-nokma/app-core/workflow-graph';
+
+/** Every storage access is in try/catch: storage can be absent (a private window), blocked or throw; the switch then stays ON (WG-6). */
+function remembered(): boolean {
+  try {
+    return parseShowNotes(window.localStorage.getItem(SHOW_NOTES_KEY));
+  } catch {
+    return true;
+  }
+}
+
+/** The Show notes switch, remembered per browser (D-W3-12). */
+export function useShowNotes(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(remembered);
+  const set = useCallback((next: boolean) => {
+    setOn(next);
+    try {
+      window.localStorage.setItem(SHOW_NOTES_KEY, showNotesValue(next));
+    } catch {
+      // Blocked storage: the choice holds for this visit only.
+    }
+  }, []);
+  return [on, set];
+}
+  ```
+  `use-open-note.ts`:
+  ```ts
+'use client';
+
+import { useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+
+/** "Open note" leaves the sheet for the note's own page, `/notes/<id>` (`workspace-notes-section.tsx:219` links the same path). */
+export function useOpenNote(): (noteId: string) => void {
+  const router = useRouter();
+  return useCallback((noteId) => router.push(`/notes/${noteId}`), [router]);
+}
+  ```
+  `note-inspector.tsx`:
+  ```tsx
+'use client';
+
+import {
+  moreNotesHeading,
+  NOTE_ATTACHED_HEADING,
+  noteInspectorOf,
+  OPEN_NOTE_LABEL,
+  ticketNotesOf,
+} from '@gisik-nokma/app-core/workflow-graph';
+import type { FlowRead } from '@gisik-nokma/domain';
+import { Button } from '@gisik-nokma/ui';
+
+/** What a person selected among the note blocks: one note, or the "+N notes" block of a ticket. */
+export type NoteFocus = { kind: 'note'; id: string } | { kind: 'more'; ticketId: string };
+
+/** Whether the read still holds what the focus names; the view falls back to the ticket's inspector when it does not. */
+export function noteFocusHolds(read: FlowRead, focus: NoteFocus): boolean {
+  return focus.kind === 'note' ? noteInspectorOf(read, focus.id) !== null : ticketNotesOf(read, focus.ticketId) !== null;
+}
+
+export type NoteInspectorProps = {
+  read: FlowRead;
+  focus: NoteFocus;
+  placement: 'side' | 'card';
+  onSelectNote: (id: string) => void;
+  onSelectTicket: (id: string) => void;
+  onOpenNote: (id: string) => void;
+};
+
+/**
+ * WG-7: selecting a note block shows its title, the tickets it is attached to and Open note. The read carries a note's title only
+ * (no excerpt), so the title is all there is to show (D-W3-36). Selecting "+N notes" lists every note on the ticket.
+ */
+export function NoteInspector({ read, focus, placement, onSelectNote, onSelectTicket, onOpenNote }: NoteInspectorProps) {
+  if (focus.kind === 'more') {
+    const more = ticketNotesOf(read, focus.ticketId);
+    if (more === null) return null;
+    return (
+      <aside className="gn-wf-inspector" data-placement={placement} aria-label="Selected notes">
+        <header className="gn-wf-inspector__head">
+          <h3 className="gn-wf-inspector__title">{moreNotesHeading(more.label, more.notes.length)}</h3>
+        </header>
+        <ul className="gn-wf-inspector__links">
+          {more.notes.map((note) => (
+            <li key={note.id}>
+              <button type="button" className="gn-wf-inspector__link" onClick={() => onSelectNote(note.id)}>
+                {note.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <Button className="gn-wf-inspector__open" onClick={() => onSelectTicket(more.ticketId)}>
+          Back to {more.label}
+        </Button>
+      </aside>
+    );
+  }
+  const note = noteInspectorOf(read, focus.id);
+  if (note === null) return null;
+  return (
+    <aside className="gn-wf-inspector" data-placement={placement} aria-label="Selected note">
+      <header className="gn-wf-inspector__head">
+        <p className="gn-wf-inspector__key">
+          <span>Note</span>
+        </p>
+        <h3 className="gn-wf-inspector__title">{note.title}</h3>
+      </header>
+      <section className="gn-wf-inspector__section">
+        <h4 className="gn-wf-inspector__heading">{NOTE_ATTACHED_HEADING}</h4>
+        <ul className="gn-wf-inspector__links">
+          {note.tickets.map((ticket) => (
+            <li key={ticket.id}>
+              <button type="button" className="gn-wf-inspector__link" onClick={() => onSelectTicket(ticket.id)}>
+                {ticket.label} {ticket.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <Button className="gn-wf-inspector__open" variant="primary" onClick={() => onOpenNote(note.id)}>
+        {OPEN_NOTE_LABEL}
+      </Button>
+    </aside>
+  );
+}
+  ```
+  `flow-header.tsx`, `workflow-view.tsx` and `workflow-panel.tsx` (apply these diffs against T9; the Notes chip and the Show notes switch, the note picks and the double tap, the note inspector in place of the ticket's, and the router in the panel):
+  ```diff
+--- a/apps/web/src/workflow-graph/flow-header.tsx
++++ b/apps/web/src/workflow-graph/flow-header.tsx
+@@ -1,7 +1,8 @@
+ 'use client';
+
+-import { flowSummary, legendOf, ticketsInFlowLabel, type LegendItem } from '@gisik-nokma/app-core/workflow-graph';
++import { flowSummary, legendOf, SHOW_NOTES_LABEL, ticketsInFlowLabel, type LegendItem } from '@gisik-nokma/app-core/workflow-graph';
+ import type { FlowRead } from '@gisik-nokma/domain';
++import { Switch } from '@gisik-nokma/ui';
+
+ const GLYPH: Record<Exclude<LegendItem['kind'], 'status'>, string> = { waits: '⋂', draft: '', note: '', 'not-taken': '', loop: '↺' };
+
+@@ -9,7 +10,7 @@
+  * The strip above the canvas (FL-4, WG-6): the two link counts, the legend of THIS flow, and the ticket count. A status in the
+  * legend carries its NAME next to its dot, as on the cards, so a colour is never the only way to read it (WG-10).
+  */
+-export function FlowHeader({ read, showNotes, onShowNeighbours }: { read: FlowRead; showNotes: boolean; onShowNeighbours: () => void }) {
++export function FlowHeader({ read, showNotes, onShowNotes, onShowNeighbours }: { read: FlowRead; showNotes: boolean; onShowNotes: (on: boolean) => void; onShowNeighbours: () => void }) {
+   const summary = flowSummary(read);
+   const legend = legendOf(read, showNotes);
+   return (
+@@ -24,6 +25,11 @@
+               Blocks <strong>{summary.blocks}</strong>
+             </li>
+           ) : null}
++          {summary.notes > 0 ? (
++            <li className="gn-wf-chip gn-wf-chip--notes">
++              Notes <strong>{summary.notes}</strong>
++            </li>
++          ) : null}
+         </ul>
+         <ul className="gn-wf-legend" aria-label="Legend">
+           {legend.map((item) => (
+@@ -39,6 +45,11 @@
+             </li>
+           ))}
+         </ul>
++        {summary.notes > 0 ? (
++          <Switch checked={showNotes} onChange={onShowNotes}>
++            {SHOW_NOTES_LABEL}
++          </Switch>
++        ) : null}
+         <p className="gn-wf-count">{ticketsInFlowLabel(summary.tickets)}</p>
+       </div>
+       {read.truncated ? (
+--- a/apps/web/src/workflow-graph/workflow-view.tsx
++++ b/apps/web/src/workflow-graph/workflow-view.tsx
+@@ -13,10 +13,12 @@
+ import { FlowList } from './flow-list.js';
+ import { LinkLabelDialog } from './link-label-dialog.js';
+ import { NewStepForm } from './new-step-form.js';
++import { NoteInspector, noteFocusHolds, type NoteFocus } from './note-inspector.js';
+ import type { PanelDeps } from './panel-deps.js';
+ import { PublishFlowBanner } from './publish-banner.js';
+ import { useContainerOrientation } from './use-container-orientation.js';
+ import { useScene } from './use-scene.js';
++import { useShowNotes } from './use-show-notes.js';
+
+ export type WorkflowViewProps = GraphSlotProps & {
+   /** `null` while loading or after a failure. */
+@@ -26,38 +28,63 @@
+   deps: PanelDeps;
+   /** Every write the view can make. */
+   actions: FlowActions;
++  /** Leaves the sheet for a note's own page. Unset, "Open note" is not drawn as a way out (a test or a host without a router). */
++  onOpenNote?: (noteId: string) => void;
+ };
+
++/** A second tap on the same note block within this many milliseconds opens it (the stage's own double tap is for tickets). */
++const NOTE_DOUBLE_MS = 400;
++
+ /**
+  * The Workflow view, as a function of its props (the panel feeds it a live read; a test feeds it a fixed one).
+  * The shared selection is the SHEET's (`selected`); with nothing selected, or a selection that is not in this flow, the ticket
+  * the sheet is open on is the selected one (SH-5), so it wears the ring.
+  */
+ export function WorkflowView(props: WorkflowViewProps) {
+-  const { read, error, onRetry, deps, actions, selected, onSelect, onOpenTicket, onShowLinks } = props;
++  const { read, error, onRetry, deps, actions, selected, onSelect, onOpenTicket, onOpenNote, onShowLinks } = props;
+   const rootRef = useRef<HTMLElement>(null);
+   const canvasRef = useRef<FlowCanvasHandle>(null);
+   const orientation = useContainerOrientation(rootRef, deps.measureWidth);
+   const phone = orientation === 'portrait';
+-  const options = useMemo(() => (orientation === null ? null : { phone, orientation, showNotes: false }), [orientation, phone]);
++  const [showNotes, setShowNotes] = useShowNotes();
++  const options = useMemo(() => (orientation === null ? null : { phone, orientation, showNotes }), [orientation, phone, showNotes]);
+   const scene = useScene(read, options, deps);
+
+   const shown = read === null ? null : selected !== null && read.nodes.some((n) => n.id === selected) ? selected : read.rootId;
+   const open = useCallback((id: string) => onOpenTicket?.(id), [onOpenTicket]);
++  // WG-7: a note block is selected here, in the view; the sheet's shared selection stays a ticket (D-W3-16).
++  const [noteFocus, setNoteFocus] = useState<NoteFocus | null>(null);
++  const lastNoteTap = useRef<{ id: string; at: number } | null>(null);
+   const pick = useCallback(
+     (hit: StagePick | null) => {
+-      if (hit === null) onSelect(null);
+-      else if (hit.kind === 'node') onSelect(hit.id);
++      if (hit === null || hit.kind === 'node') {
++        setNoteFocus(null);
++        lastNoteTap.current = null;
++        onSelect(hit === null ? null : hit.id);
++        return;
++      }
++      if (hit.kind !== 'note') return;
++      if (hit.more !== null) {
++        onSelect(hit.ticketId);
++        setNoteFocus({ kind: 'more', ticketId: hit.ticketId });
++        return;
++      }
++      const again = lastNoteTap.current?.id === hit.id && Date.now() - lastNoteTap.current.at < NOTE_DOUBLE_MS;
++      lastNoteTap.current = again ? null : { id: hit.id, at: Date.now() };
++      if (again) onOpenNote?.(hit.id);
++      else setNoteFocus({ kind: 'note', id: hit.id });
+     },
+-    [onSelect],
++    [onSelect, onOpenNote],
+   );
+   const fromList = useCallback(
+     (id: string) => {
++      setNoteFocus(null);
+       onSelect(id);
+       canvasRef.current?.focusNode(id);
+     },
+     [onSelect],
+   );
++  const showingNote = read !== null && showNotes && noteFocus !== null && noteFocusHolds(read, noteFocus) ? noteFocus : null;
+
+   // Creating steps and links (CR-1, WG-4). `adding` is the source of the open form; `linking` is a drag out of a Decision awaiting its name.
+   const [adding, setAdding] = useState<string | null>(null);
+@@ -98,7 +125,7 @@
+       ) : null}
+       {read !== null ? (
+         <>
+-          <FlowHeader read={read} showNotes={false} onShowNeighbours={onShowLinks} />
++          <FlowHeader read={read} showNotes={showNotes} onShowNotes={setShowNotes} onShowNeighbours={onShowLinks} />
+           <PublishFlowBanner read={read} onPublish={publish} />
+           {summary !== null && summary.tickets === 1 && read.edges.length === 0 ? <p className="gn-wf__empty">{FLOW_EMPTY_COPY}</p> : null}
+           <div className="gn-wf__body">
+@@ -115,7 +142,16 @@
+                 {...(phone ? {} : { onLink: link })}
+               />
+             </div>
+-            {shown === null ? null : (
++            {showingNote !== null ? (
++              <NoteInspector
++                read={read}
++                focus={showingNote}
++                placement={phone ? 'card' : 'side'}
++                onSelectNote={(id) => setNoteFocus({ kind: 'note', id })}
++                onSelectTicket={fromList}
++                onOpenNote={(id) => onOpenNote?.(id)}
++              />
++            ) : shown === null ? null : (
+               <FlowInspector read={read} selectedId={shown} actions={actions} placement={phone ? 'card' : 'side'} onSelect={fromList} onOpen={open} onAddStep={addStep} />
+             )}
+           </div>
+--- a/apps/web/src/workflow-graph/workflow-panel.tsx
++++ b/apps/web/src/workflow-graph/workflow-panel.tsx
+@@ -6,6 +6,7 @@
+ import { createRuntime } from './runtime.js';
+ import { useFlow } from './use-flow.js';
+ import { useFlowActions } from './use-flow-actions.js';
++import { useOpenNote } from './use-open-note.js';
+ import { WorkflowView } from './workflow-view.js';
+
+ /**
+@@ -16,7 +17,8 @@
+   const { dataSource } = useAppServices();
+   const { read, error, reload } = useFlow(dataSource, props.workspaceId, props.ticketId);
+   const actions = useFlowActions(read, props.workspaceId);
++  const openNote = useOpenNote();
+   const runtime = useMemo(() => createRuntime(), []);
+   useEffect(() => () => runtime.dispose(), [runtime]);
+-  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} actions={actions} />;
++  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} actions={actions} onOpenNote={openNote} />;
+ }
+  ```
+  Run: `pnpm turbo run build --filter=@gisik-nokma/app-core... --filter=@gisik-nokma/flow-graph...` (the web reads their `dist`), then the Step 5 command. Expected PASS (T7's 11, T8's 10, T9's 15 and 7 new). Then `pnpm --filter @gisik-nokma/web exec tsc -p tsconfig.json --noEmit` clean. Commit.
+
+- [ ] **Step 7: Paint it**
+
+  As T7 Step 8.3: the worktree on a lane port, signed in as the e2e seed owner, a ticket whose flow has tickets with notes (attach notes through the ticket sheet's Notes section: two on one ticket, five on another, one note on two tickets). Record: (a) the blocks under their ticket beside `Main.png`: 140 x 40, 8 px apart, indented, the dotted trunk and stubs, **dash `2 4` with round caps and no arrowhead** (29.270's manual half; T5's block carries the rule, so a missing one is added there), the `+2 notes` block; (b) the `Notes N` chip and the Show notes switch beside the legend, both themes; (c) switching off and reloading (it stays off); (d) a note selected: the inspector beside the canvas, `Open note` leaves for `/notes/<id>` and the browser's Back returns to the sheet; (e) at a 390 px window the stack to the right of the shape with two-line titles and the inspector as a card. One screenshot per theme for (a) and (e); the paths go in the handoff. Kill the lane-port server when done.
+
+- [ ] **Step 8: Mutations (the reviewer re-runs these)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.270 | in `scene/notes.ts`, `NOTES_SHOWN = 3` → `4` | the three-then-more assertion |
+  | 29.270 | in `syncLines` (`render/stage.ts`), add `line.setAttribute('marker-end', 'url(#x)')` | the no-arrowhead assertion |
+  | 29.271 | in `layoutInputOf`, drop `...(stack === null ? {} : { notes: stack })` | the reserved box |
+  | 29.272 | in `planNoteBlocks`, `phone ? 2 : 1` → `1` | the two-line phone title |
+  | 29.273 | in `parseShowNotes`, `raw !== 'off'` → `raw === 'on'` | the default |
+  | 29.273 | in `sceneInputOf`, `options.showNotes ? … : []` → `…` | switching off keeps the notes |
+  | 29.273 | in `useShowNotes`, the `catch` returns `false` | blocked storage hides notes |
+  | 29.273 | in `FlowHeader`, `summary.notes > 0 ?` before the Switch → `true ?` | the plain flow has a switch |
+  | 29.274 | in `noteInspectorOf`, push only the first ticket | the note on two tickets |
+  | 29.274 | in `WorkflowView.pick`, `< NOTE_DOUBLE_MS` → `< 1e9` | the slow taps open |
+  | 29.274 | in `WorkflowView.pick`, delete `onSelect(hit.ticketId);` in the `more` branch | the "+2 notes" ticket |
+  | 29.274 | in `useOpenNote`, `/notes/` → `/note/` | the panel route |
+  | 29.275 | in `WorkflowView`, delete `showNotes &&` from `showingNote` | switching off keeps the inspector |
+  | 29.275 | in `noteFocusHolds`, return `true` for a note | the note that left |
+
+  Revert each.
+
+- [ ] **Step 9: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** T7's Features line says the view draws "boxes, diamonds, labelled branches, loops, Start and End": it now also draws notes. `grep -rn "notes are not drawn\|showNotes: false\|no Notes chip" apps/web test-cases Features.md docs` and fix any line that says notes are absent. T7's step-5 comment in `workflow-view.test.tsx` is replaced by the diff above.
+  2. Flip 29.271 to 29.275 to ✅ and 29.270 to 🟡 (✅ once Step 7's dash and arrowhead are recorded, with the screenshot paths in the line).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T10 bullet -->`: `- ✅ **Note blocks in the Workflow view** — a ticket's visible notes are drawn as dotted blocks under it (to its right on a phone), at most three then "+N notes"; the header counts them (\`Notes N\`) and a Show notes switch hides them, remembered per browser. A note takes no part in the flow. Selecting one shows its title, the tickets it is on and Open note. \`packages/flow-graph/src/scene/notes.ts\`, \`apps/web/src/workflow-graph/note-inspector.tsx\``.
+  4. Sweeps: flow-graph, app-core and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). No `ui.css` change, so no ui suite is owed.
+
+  Commit `wtg3 T10: note blocks`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-notes.md` written (the landed names Step 0 found, the screenshot paths, D-W3-36 to D-W3-40, and the findings: no note excerpt on the wire, no stage-level Enter on a note, no trail or Back).
+
+---
+
+### Task 11: The Decide door: `POST …/tickets/:id/decide` (dry run and write), the `previewDecide` / `decide` client door and its doubles (cases 29.276–29.279)
+
+**Branch** `task/wtg3-decide-door` (needs T3 for `routes/flow.ts` and `read-models-flow.ts`; Part 2's T16, the server gates `decision.cascade-blocked` and `decision.bad-close-started`; the Drafts task that adds `ingestClientAtomic`; T9 is NOT needed, but both add a member to `DataSourceQuery` and to the census: whichever lands second rebases and bumps the member count by its own number). **NEEDS: db** (a Postgres on the test port, the repo's `createTestDatabase`). No UI in this task: T12 draws the control on top of this door. **Files:**
+- Create:
+  - `apps/server/src/flow/decide-preview.ts`, `apps/server/test/flow/decide-preview.test.ts`
+  - `apps/server/test/routes/flow-decide.test.ts`
+  - `packages/app-core/src/online/decide-door.ts`
+  - `packages/app-core/test/online/{decide-mappers,decide-door}.test.ts`
+- Modify:
+  - `apps/server/src/routes/flow.ts` (T3's file: the second route and a second dependency), `apps/server/src/app.ts` (the one call), `apps/server/src/http/http-origin.ts` (`HTTP_ORIGIN_PROTECTED_ROUTES`)
+  - `packages/domain/src/read-models-flow.ts` (the three wire types)
+  - `packages/app-core/src/data-source.ts` (`previewDecide`, `decide` and four result types), `packages/app-core/src/online/{online-data-source,mappers}.ts`, `packages/app-core/src/replica/replica-data-source.ts`, `packages/app-core/src/index.ts`, `packages/app-core/test/replica/replica-data-source.test.ts` (the 12.185 list)
+  - the doubles and the census: `apps/web/test/helpers/stub-services.ts`, `apps/web/test/data-source-gateway.test.ts`, `packages/app-core/test/helpers/fake-data-source.ts`, `apps/server/test/integration/soft-delete-client-surface.test.ts`, and an agreement case in `apps/server/test/integration/client-contract.test.ts`
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T11 anchors)
+
+**Interfaces:**
+- **Consumes:** T3 `registerFlowRoutes(app, deps, requireSession)` in `routes/flow.ts`, `READ_NOT_FOUND_BODY`, `requireMember`, `ticketIsLive`, `canSee`, `read-models-flow.ts`; Part 2 `readFlow(db, {workspaceId, seedId, viewerId, cap?}) → {nodes: FlowNode[], edges: FlowEdge[], truncated, reached}`, `planSettle({nodes, edges, decisionId, closeStarted?}) → SettlePlan {steps, blocked, started, touchesOthers}`, `SettleStep.kind` (`reopen`, `to-initial`, `to-backlog`, `not-taken-transition`, `not-taken-close`), `FlowNode.firstTerminalStateId`, `sameLabel`, the engine rules `decision.not-a-decision` / `unknown-outcome` / `same-outcome` / `stale-from` / `outcome-required`, and the SERVER GATES `decision.cascade-blocked` and `decision.bad-close-started`; Drafts `ClientIngest.ingestClientAtomic(rawEvents, sessionUserId)` returning `AtomicOutcome = { status: 'committed', results: IngestResult[] } | { status: 'rolled-back', index: number, result: IngestResult }`; Part 2 `PassRecord {pass, outcome, by, at, revisions: PassRevision[]}` on `TicketState.passes` and `FlowNode.passes`, and T16's `decision.cascade-blocked` reason sentence (`This choice cannot be applied: <reason>.`, or `… a step you cannot see is blocking it.`; `gates/decision-gates.ts` `cascadeRefusal`); on the tip `getTicketStateFromDb(db, workspaceId, ticketId)` (`projections/tickets.ts:245`), `foldedWorkflowDefs` / `foldedDefKey` (`read/workflow-defs.ts:64`, `:84`) and `transitionsWithBacklog` (`packages/domain/src/workflow.ts:96`); the existing `request.currentUserId`, `request.authKind`, `SubmittedEvent`, `newUlid`.
+- **Produces:**
+  - domain: `DecideMoveKind` (`'reopen' | 'backlog' | 'not-taken'`), `DecideMoveRead {ticketId, kind}`, `DecidePlanRead {moves, hiddenMoves, started, blocked: {ticketId: string | null, reason: string, sentence: string} | null}` (`reason` is the planner's code, `sentence` the engine's words), `DecideRevisionRead {from: string | null; to: string | null}`, `DecideWriteRead {filed: string[], pass: number, revised: DecideRevisionRead | null}`;
+  - server: `POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide` with body `{outcome: string | null, from?: string | null, closeStarted?: string[], dryRun?: boolean, finishStateId?: string | null}` (closed, `additionalProperties: false`; `finishStateId` omitted = the first-declared terminal state, D-W3-44; `null` = record the outcome only; a string = that terminal state, D-W3-53) answering `200 {plan: DecidePlanRead}` for a dry run and `200 DecideWriteRead` (`{filed, pass, revised}`, D-W3-54) for a write; `409 {rule, reason}` for a stale `from`, `422 {rule, reason}` for every other refusal (including `decision.bad-finish-state`), the shared `404` for anything the caller may not see; `decideRefusal`, `finishRefusal`, `blockedSentence`, `passAndRevision`, `NOTHING_MOVES`, `proposedNodes`, `movesOf`, `previewOf`, `DecideBody`, `DecideRefusal` in `flow/decide-preview.ts`;
+  - app-core client: `DataSourceQuery.previewDecide(workspaceId, ticketId, request: DecideRequest): Promise<PreviewDecideResult>` and `DataSourceQuery.decide(...): Promise<DecideResult>`, the types `DecideRequest {outcome, from?, closeStarted?, finishStateId?}`, `DecideRefusalRead {ok: false, rule, reason}`, `PreviewDecideResult`, `DecideResult {ok: true, filed: string[], pass: number, revised: DecideRevisionRead | null}` (exported from the package index), `mapDecidePlan`, `mapDecideFiled`, `mapDecideRefusal`, `decideDoor(http)`.
+
+Siblings copied: `routes/workspaces.ts:50-130` (`SubmittedEvent` built in the route, `actorId` the session user, `origin: request.authKind === 'mcp-token' ? 'mcp' : 'web'` derived from HOW the request authenticated, a closed body schema that accepts no `origin`, the gated door and never `ingestBatch`); `routes/members.ts:131` (a refused claim becomes `{rule, reason}` on the wire); `routes/builder-reads.ts:1195-1220` (a batch whose later event is refused is answered, not swallowed); T9's `publishFlow` for the refusal-as-data door.
+
+**Decisions, reported:**
+- **D-W3-41 The dry run and the write share one refusal function.** `decideRefusal` runs before both. A preview that said "fine" for what the engine then refuses would be a lie, and a second spelling of the rules would drift. The dry run does NOT run the two server gates (`bad-close-started` needs the write's payload; `cascade-blocked` is already in the plan as `blocked`): it plans, the write judges.
+- **D-W3-42 The plan is computed on the Decision as it would be once finished.** DC-5 files the outcome and the finishing transition as one batch, so a Decision still in To do is planned as terminal and closed (`proposedNodes`). Clearing an outcome leaves the state alone.
+- **D-W3-43 What the viewer may be told is the viewer's own walk.** The plan is computed over the WHOLE flow (`readFlow` with `viewerId: null`, so a hidden ticket between two visible ones still changes the plan), then NAMED through the viewer's own walk (`viewerId: <caller>`): a ticket not in that walk is not named, it only sets `hiddenMoves`. A visible ticket that lies beyond a hole is also not named, because it is not on the caller's graph either. No count of hidden moves is ever sent.
+- **D-W3-44 With no `finishStateId`, the finishing transition goes to the Decision's first-declared terminal state.** `FlowNode.firstTerminalStateId`. A workflow that has no terminal state, or no transition into it, makes the write refuse in the engine (reported below as a finding); a null id answers `422 decision.no-terminal-state` without writing. Everything the choice CAUSES (Not taken, reopen, backlog) is the settle listener's work after the commit, so the response says what was filed, not what will move.
+- **D-W3-45 A refusal is data on the client, a failure is not.** `previewDecide` and `decide` return `{ ok: false, rule, reason }` for a 409 or 422 with the route's own body and for the one 404 (`decision.not-found`, `That decision is no longer here.`); a 401, a 500, a 400, a body that cannot be read and a transport failure are thrown. The replica rejects both with one `ReplicaGapError`.
+- **D-W3-53 `finishStateId` (planner ruling P1, spec §14 `resolve_decision` `close`).** Omitted: D-W3-44. `null`: record the outcome only. On an UNFINISHED Decision the write files `ticket.decided` alone, the Decision keeps its state, and nothing settles (Part 2's settler acts only on a terminal Decision), so the dry run answers `NOTHING_MOVES`, and a non-empty `closeStarted` is refused `422 decision.bad-close-started` ("Nothing is closed when the decision is only recorded."). A string: it must name a terminal state of the Decision's workflow (its folded version, `foldedWorkflowDefs`) with a transition into it from the Decision's current state (`transitionsWithBacklog`, `from` the state or `*`); the Decision finishes there; anything else is `422 decision.bad-finish-state`, in the dry run and in the write alike (D-W3-41). On an ALREADY-finished Decision there is nothing to finish: `finishStateId` is ignored and a revision files the outcome alone, as before; its cascade is PS-6's and the settler's, not the door's to stop.
+- **D-W3-54 The write answers `{filed, pass, revised}` (planner ruling P2, PS-10).** Read from the FOLDED state after the commit (`getTicketStateFromDb`, the same transaction's projections): `pass` is the last pass's number (the pass the recorded outcome belongs to); `revised` is `{from, to}` of the revision THIS write added (the last pass's revision list grew against the node read before the write), else `null`. A first choice and a new pass after a loop are not revisions. The pure half is `passAndRevision(before, after)`.
+- **D-W3-55 `blocked.sentence` is the engine's words (planner ruling P3).** The dry run keeps the planner's code in `blocked.reason` and adds `blocked.sentence`, spelled by `blockedSentence` exactly as Part 2 T16's `cascadeRefusal` spells the write's `422 decision.cascade-blocked` reason (`This choice cannot be applied: <reason>.`, or `… a step you cannot see is blocking it.` when the blocker is not named). `flow-decide.test.ts` pins that the dry run's sentence EQUALS the write's 422 reason for the same choice, so the two cannot drift.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-decide-door` from `origin/release/<next>` (T3 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/server... --filter=@gisik-nokma/web...`.
+  2. **Read what landed** and put the names in `HANDOFF-wtg3-decide-door.md`: `git grep -n "ingestClientAtomic\|AtomicOutcome" apps/server/src packages` (the name and result shape; if the Drafts plan called it something else, change the one call in Step 4 and nothing else); `git grep -n "export" packages/domain/src/flow/index.ts` (is `SettlePlan` exported? if not, import it from the file that defines it); `git grep -n "decision.cascade-blocked\|decision.bad-close-started" apps/server/src` (the two gates; **confirm they run on the ingest path** for `ticket.decided`: if `ingestClientAtomic` does not call the server gates, call them from the route before the batch and say so); `git grep -n "firstTerminalStateId" packages/domain/src/flow`; `grep -n "to:" packages/domain/src/workflow.ts` near `ticketTransitionedPayload` (the real field is `to`, `workflow.ts:201`; Part 2's plan files `to` too (`settleEvents` maps its internal `SettleStep.toStateId` onto `to`), and `toStateId` is right only on Part 2's internal step types and on `ticket.workflow_rebound` (`ticket-events.ts:309`)).
+  3. **Look at the fixtures the DB test needs** and decide, before Step 3: (a) does `readFlow` admit hierarchy children (a child under an epic on a branch)? The blocker case in `flow-decide.test.ts` (flow 4) relies on it; if it does not, build the blocker the way Part 2's cases 29.364 to 29.367 do and keep the assertions; (b) which column holds the outcome on `proj_tickets` (the test avoids it on purpose and reads the ledger; do not add it).
+  4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T11" Features.md test-cases/29-workflow-timeline-graphs.md`.
+  5. **The names D-W3-53 to D-W3-55 lean on:** `git grep -n "export async function getTicketStateFromDb\|export function rowToTicketState" apps/server/src/projections/tickets.ts` (and that `rowToTicketState` spreads `passes`: Part 2 T5); `git grep -n "export async function foldedWorkflowDefs\|export function foldedDefKey" apps/server/src/read/workflow-defs.ts`; `git grep -n "export function transitionsWithBacklog" packages/domain/src/workflow.ts`; `git grep -n "This choice cannot be applied" apps/server/src/gates` (T16's sentence: if its words differ, change `blockedSentence` to them, never the test that pins the two equal).
+
+- [ ] **Step 1: The four case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T11 -->` (planner ruling P1's record-only case is a clause of 29.277 with its own control and mutation: this plan's block 29.230–29.289 has no free id, every one is used once):
+  - `- ❌ **29.276 — A dry run says what a choice would move, for the person asking:** \`POST …/tickets/:id/decide\` with \`dryRun: true\` answers \`{plan}\` and writes nothing (the ledger count is unchanged); moves are named only for tickets the caller can see and a hidden move only sets \`hiddenMoves\` (no name, no count); a loop reads as a reopen to the first state for the loop's own ticket and back to Backlog for the rest; the plan is computed on the Decision as it would be once finished; a blocker names its ticket only when the caller can see it and carries the engine's sentence (\`blocked.sentence\`, the same words the write's 422 gives, beside the planner's code in \`blocked.reason\`); the dry run gives the engine's refusals in its own words and statuses (stale \`from\` 409; not a decision, an unknown outcome that names the labels, the same outcome: 422). Controls: the owner of the same flow is named both tickets; a Decision with nothing hidden has no flag. Mutation: name every move to a member (drop the visibility filter) → reds.`
+  - `- ❌ **29.277 — Deciding files the outcome and the finishing transition as ONE batch, as the caller:** 401 with no session; a byte-identical 404 for a stranger and for an unknown id; a body with an unknown member (an \`origin\`, say) or no \`outcome\` is a 400; deciding an unfinished Decision answers \`{filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null}\`, both ledger rows carry the caller as actor and the \`web\` origin (\`mcp\` for a token), the transition goes to the Decision's terminal state and the Decision stands in a terminal category; a revision of a finished Decision files the outcome alone and answers its pass and \`revised: {from, to}\`; a stale \`from\` is 409 and writes nothing; **record only** (planner ruling P1): \`finishStateId: null\` on an unfinished Decision files \`ticket.decided\` alone, the Decision keeps its state, no flow-actor event follows, and its dry run moves nothing, while \`closeStarted\` with it is 422 \`decision.bad-close-started\`; a string \`finishStateId\` finishes there when it is a terminal state reachable from the current one, and anything else is 422 \`decision.bad-finish-state\` with nothing written. Controls: the revision uses the \`from\` the first call left; the same Decision with \`finishStateId\` omitted finishes to its first terminal state as before. Mutations: let the body say its own origin → reds; ignore \`finishStateId: null\` (push the transition anyway) → the record-only call files two events.`
+  - `- ❌ **29.278 — A blocked or ill-formed choice writes nothing, and a started ticket is moved only when the person chose to close it:** a started ticket on the branch being left is named in \`started\` and is not in \`moves\` until \`closeStarted\` names it, then it is a Not taken move; \`closeStarted\` naming a ticket outside the flow is 422 \`decision.bad-close-started\` and nothing is written; a choice that would close a branch whose epic has a started child is \`blocked\` in the dry run and 422 \`decision.cascade-blocked\` in the write, with nothing written. Controls: the same call naming the flow's own started ticket is filed; the other branch is not blocked. Mutation: skip \`closeStarted\` in the dry run's \`planSettle\` call → reds.`
+  - `- ❌ **29.279 — The client door:** \`previewDecide\` posts the request with \`dryRun: true\` to the ticket's decide path and answers \`{ok: true, plan}\`, \`decide\` posts without it and answers \`{ok: true, filed, pass, revised}\`; a 409 or 422 with the route's \`{rule, reason}\` is data for both calls and a 404 is \`decision.not-found\`; a 500, a 401, a 422 that is not a refusal, a transport failure and a plan or filed list that cannot be read are thrown; the mapper checks every member of a plan (the blocker's \`sentence\` too) and of a write's answer, and keeps the order; the replica rejects both with a named gap; both members are on every double, in the soft-delete census (called with an id that exists nowhere) and agree with the real route through the real transport. Mutation: let the door swallow a 500 → reds.`
+
+- [ ] **Step 2: RED, the pure half and the client door (scratch-validated, run in a bed)**
+
+  `apps/server/src/flow/decide-preview.ts` does not exist yet, so the test fails to load. `apps/server/test/flow/decide-preview.test.ts` (29.276; `node()` and `edge()` build `FlowNode` / `FlowEdge`, so a change to Part 2's node shape is one edit):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { FlowEdge, FlowNode, PassRecord, SettlePlan, WorkflowDef } from '@gisik-nokma/domain';
+import { blockedSentence, decideRefusal, finishRefusal, movesOf, NOTHING_MOVES, passAndRevision, previewOf, proposedNodes } from '../../src/flow/decide-preview.js';
+
+const node = (id: string, over: Partial<FlowNode> = {}): FlowNode => ({
+  id,
+  typeId: 'task',
+  stateId: 'todo',
+  category: 'open',
+  closed: false,
+  trashed: false,
+  draft: false,
+  parentId: null,
+  isDecision: false,
+  outcome: null,
+  passes: [],
+  notTaken: null,
+  waitForAll: false,
+  started: false,
+  rounds: 1,
+  periods: [],
+  explicitStart: null,
+  explicitDue: null,
+  estimate: null,
+  reworkEstimate: null,
+  initialStateId: 'todo',
+  firstTerminalStateId: 'done',
+  ...over,
+});
+const edge = (sourceId: string, targetId: string, label: string | null = null): FlowEdge => ({ sourceId, targetId, label });
+const D = node('D', { typeId: 'decision', isDecision: true });
+const EDGES = [edge('A', 'D'), edge('D', 'B', 'Yes'), edge('D', 'C', 'No'), edge('D', 'A', 'Needs rework')];
+
+describe('the Decide door\'s pure half (spec PS-6, DC-4)', () => {
+  it('29.276 a plan is named only for tickets the viewer can see; a hidden move is a flag, never a name or a count; control: the owner sees all', () => {
+    const plan: SettlePlan = {
+      steps: [
+        { kind: 'not-taken-transition', ticketId: 'C', toStateId: 'done' },
+        { kind: 'not-taken-close', ticketId: 'C' },
+        { kind: 'not-taken-transition', ticketId: 'X', toStateId: 'done' },
+        { kind: 'not-taken-close', ticketId: 'X' },
+      ],
+      blocked: null,
+      started: ['C', 'X'],
+      touchesOthers: true,
+    };
+    const member = previewOf(plan, new Set(['A', 'C', 'D']));
+    expect(member).toEqual({ moves: [{ ticketId: 'C', kind: 'not-taken' }], hiddenMoves: true, started: ['C'], blocked: null });
+    expect(JSON.stringify(member)).not.toContain('"X"');
+    const owner = previewOf(plan, new Set(['A', 'C', 'D', 'X']));
+    expect(owner.moves.map((m) => m.ticketId)).toEqual(['C', 'X']);
+    expect(owner.hiddenMoves).toBe(false);
+  });
+
+  it('29.276 a loop plan reads as Reopened to To do for the loop\'s ticket and back to Backlog for the rest; a lone reopen still counts; a blocked move names its ticket only when visible', () => {
+    const loop: SettlePlan = {
+      steps: [
+        { kind: 'reopen', ticketId: 'A' },
+        { kind: 'to-initial', ticketId: 'A', toStateId: 'todo' },
+        { kind: 'reopen', ticketId: 'D' },
+        { kind: 'to-backlog', ticketId: 'D', toStateId: 'backlog' },
+        { kind: 'to-backlog', ticketId: 'M', toStateId: 'backlog' },
+      ],
+      blocked: null,
+      started: [],
+      touchesOthers: false,
+    };
+    expect(movesOf(loop)).toEqual([
+      { ticketId: 'A', kind: 'reopen' },
+      { ticketId: 'D', kind: 'backlog' },
+      { ticketId: 'M', kind: 'backlog' },
+    ]);
+    expect(movesOf({ ...loop, steps: [{ kind: 'reopen', ticketId: 'Q' }] })).toEqual([{ ticketId: 'Q', kind: 'reopen' }]);
+    const blocked: SettlePlan = { steps: [], blocked: { ticketId: 'X', reason: 'child-open' }, started: [], touchesOthers: false };
+    expect(previewOf(blocked, new Set(['X'])).blocked).toEqual({ ticketId: 'X', reason: 'child-open', sentence: 'This choice cannot be applied: child-open.' });
+    expect(previewOf(blocked, new Set(['A'])).blocked).toEqual({ ticketId: null, reason: 'child-open', sentence: 'This choice cannot be applied: a step you cannot see is blocking it.' });
+    expect(blockedSentence('child-open')).toBe('This choice cannot be applied: child-open.'); // T16's words (Step 4 pins them equal to the 422)
+    expect(previewOf({ ...blocked, blocked: null }, new Set()).blocked).toBeNull();
+  });
+
+  it('29.276 the plan is computed on the Decision as it would be once finished; clearing keeps its state; control: other nodes are untouched', () => {
+    const nodes = [node('A'), D, node('B')];
+    const yes = proposedNodes(nodes, 'D', 'Yes');
+    expect(yes.find((n) => n.id === 'D')).toMatchObject({ outcome: 'Yes', category: 'terminal', closed: true });
+    expect(yes.find((n) => n.id === 'A')).toBe(nodes[0]);
+    const cleared = proposedNodes([{ ...D, outcome: 'Yes', category: 'terminal', closed: true }], 'D', null);
+    expect(cleared[0]).toMatchObject({ outcome: null, category: 'terminal', closed: true });
+  });
+
+  it('29.276 the refusals use the engine\'s rule ids and say why: not a decision, stale from, unknown outcome naming the labels, same outcome; control: a new label passes (any case, any spacing)', () => {
+    expect(decideRefusal(node('T'), EDGES, { outcome: 'Yes' })).toMatchObject({ status: 422, rule: 'decision.not-a-decision' });
+    expect(decideRefusal(D, EDGES, { outcome: 'Maybe' })).toEqual({ status: 422, rule: 'decision.unknown-outcome', reason: 'Choose one of: Yes, No, Needs rework.' });
+    expect(decideRefusal(D, [], { outcome: 'Yes' })).toMatchObject({ rule: 'decision.unknown-outcome', reason: 'This decision has no branches to choose from.' });
+    expect(decideRefusal({ ...D, outcome: 'Yes' }, EDGES, { outcome: ' yes ' })).toMatchObject({ status: 422, rule: 'decision.same-outcome' });
+    expect(decideRefusal({ ...D, outcome: 'Yes' }, EDGES, { outcome: 'No', from: 'No' })).toEqual({ status: 409, rule: 'decision.stale-from', reason: 'The decision changed to Yes since you looked.' });
+    expect(decideRefusal({ ...D, outcome: null }, EDGES, { outcome: 'Yes', from: 'Yes' })).toEqual({ status: 409, rule: 'decision.stale-from', reason: 'The decision changed to no outcome since you looked.' });
+    expect(decideRefusal(D, EDGES, { outcome: '  no  ' })).toBeNull();
+    expect(decideRefusal({ ...D, outcome: 'Yes' }, EDGES, { outcome: 'No', from: 'Yes' })).toBeNull();
+    // clearing: nothing to clear is the same outcome; a stale `from` still wins over it
+    expect(decideRefusal(D, EDGES, { outcome: null })).toMatchObject({ rule: 'decision.same-outcome' });
+    expect(decideRefusal({ ...D, outcome: 'Yes' }, EDGES, { outcome: null, from: 'Yes' })).toBeNull();
+    // record only (D-W3-53): nothing closes, so a close list is refused; control: the same list without `finishStateId: null` passes
+    expect(decideRefusal(D, EDGES, { outcome: 'Yes', finishStateId: null, closeStarted: ['C'] })).toEqual({ status: 422, rule: 'decision.bad-close-started', reason: 'Nothing is closed when the decision is only recorded.' });
+    expect(decideRefusal(D, EDGES, { outcome: 'Yes', closeStarted: ['C'] })).toBeNull();
+    expect(decideRefusal({ ...D, category: 'terminal', closed: true, outcome: 'No' }, EDGES, { outcome: 'Yes', finishStateId: null, closeStarted: ['C'] })).toBeNull(); // finished: ignored
+  });
+
+  it('29.277 record only moves nothing; a named finish state must be terminal and reachable; control: the first terminal state still works', () => {
+    expect(NOTHING_MOVES).toEqual({ moves: [], hiddenMoves: false, started: [], blocked: null });
+    const WF: WorkflowDef = {
+      id: 'wf', version: 1, name: 'Decide', initialStateId: 'todo',
+      states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }, { id: 'dropped', name: 'Dropped', category: 'terminal' }, { id: 'archived', name: 'Archived', category: 'terminal' }],
+      transitions: [{ from: 'todo', to: 'done', rules: [] }, { from: '*', to: 'dropped', rules: [] }],
+    };
+    expect(finishRefusal(WF, 'todo', 'done')).toBeNull();
+    expect(finishRefusal(WF, 'todo', 'dropped')).toBeNull(); // a `*` transition reaches it
+    expect(finishRefusal(WF, 'todo', 'archived')).toEqual({ status: 422, rule: 'decision.bad-finish-state', reason: 'This decision cannot move to Archived from where it is.' });
+    expect(finishRefusal(WF, 'todo', 'todo')).toMatchObject({ rule: 'decision.bad-finish-state', reason: "Choose a finished state of this decision's workflow." });
+    expect(finishRefusal(WF, 'todo', 'nowhere')).toMatchObject({ rule: 'decision.bad-finish-state' });
+  });
+
+  it('29.277 the write names its pass and the revision it made, read from the folded passes; a first choice and a new pass are not revisions', () => {
+    const at = '2026-10-03T09:00:00.000Z';
+    const one: PassRecord = { pass: 1, outcome: 'Yes', by: 'u', at, revisions: [] };
+    expect(passAndRevision([], [one])).toEqual({ pass: 1, revised: null });
+    const revisedOne: PassRecord = { ...one, outcome: 'No', revisions: [{ from: 'Yes', to: 'No', by: 'u', at }] };
+    expect(passAndRevision([one], [revisedOne])).toEqual({ pass: 1, revised: { from: 'Yes', to: 'No' } });
+    const two: PassRecord = { pass: 2, outcome: 'Yes', by: 'u', at, revisions: [] };
+    expect(passAndRevision([revisedOne], [revisedOne, two])).toEqual({ pass: 2, revised: null }); // control: a new pass after a loop
+    const cleared: PassRecord = { ...revisedOne, outcome: null, revisions: [...revisedOne.revisions, { from: 'No', to: null, by: 'u', at }] };
+    expect(passAndRevision([revisedOne], [cleared])).toEqual({ pass: 1, revised: { from: 'No', to: null } });
+  });
+});
+  ```
+  `packages/app-core/test/online/decide-mappers.test.ts` (29.279):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { MappingError } from '../../src/wire-readers.js';
+import { mapDecideFiled, mapDecidePlan, mapDecideRefusal } from '../../src/online/mappers.js';
+
+const PLAN = { moves: [{ ticketId: 'C', kind: 'not-taken' }, { ticketId: 'A', kind: 'reopen' }], hiddenMoves: true, started: ['C'], blocked: { ticketId: null, reason: 'child-open', sentence: 'This choice cannot be applied: a step you cannot see is blocking it.' } };
+
+describe('29.279 the Decide door\'s mappers', () => {
+  it('29.279 a plan is checked member by member and keeps its order; control: a plan with nothing in it is valid', () => {
+    expect(mapDecidePlan(PLAN)).toEqual(PLAN);
+    expect(mapDecidePlan({ moves: [], hiddenMoves: false, started: [], blocked: null })).toEqual({ moves: [], hiddenMoves: false, started: [], blocked: null });
+    expect(mapDecidePlan({ ...PLAN, blocked: { ticketId: 'X', reason: 'parent-finished', sentence: 'This choice cannot be applied: parent-finished.' } }).blocked).toEqual({ ticketId: 'X', reason: 'parent-finished', sentence: 'This choice cannot be applied: parent-finished.' });
+    for (const [label, bad] of [
+      ['moves', { ...PLAN, moves: undefined }],
+      ['a move kind', { ...PLAN, moves: [{ ticketId: 'C', kind: 'delete' }] }],
+      ['hiddenMoves', { ...PLAN, hiddenMoves: 'no' }],
+      ['started', { ...PLAN, started: [1] }],
+      ['blocked.reason', { ...PLAN, blocked: { ticketId: 'X', sentence: 's' } }],
+      ['blocked.sentence', { ...PLAN, blocked: { ticketId: 'X', reason: 'x' } }],
+      ['blocked.ticketId', { ...PLAN, blocked: { ticketId: 4, reason: 'x', sentence: 's' } }],
+    ] as const) expect(() => mapDecidePlan(bad), label).toThrow(MappingError);
+    expect(() => mapDecidePlan(null)).toThrow(MappingError);
+  });
+
+  it('29.279 a write answers what was filed, its pass and the revision it made; a body without them is an error', () => {
+    expect(mapDecideFiled({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null })).toEqual({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null });
+    expect(mapDecideFiled({ filed: ['ticket.decided'], pass: 2, revised: { from: 'Yes', to: null } })).toEqual({ filed: ['ticket.decided'], pass: 2, revised: { from: 'Yes', to: null } });
+    expect(() => mapDecideFiled({})).toThrow(MappingError);
+    expect(() => mapDecideFiled({ filed: [3], pass: 1, revised: null })).toThrow(MappingError);
+    expect(() => mapDecideFiled({ filed: [], revised: null })).toThrow(MappingError); // no pass
+    expect(() => mapDecideFiled({ filed: [], pass: 1 })).toThrow(MappingError); // no revised (null is a value, absent is not)
+    expect(() => mapDecideFiled({ filed: [], pass: 1, revised: { from: 'Yes' } })).toThrow(MappingError);
+  });
+
+  it('29.279 a 409 or 422 with the route\'s rule and reason is data, a 404 is "no longer here", and every other status or body is not (the caller rethrows)', () => {
+    expect(mapDecideRefusal(422, { rule: 'decision.cascade-blocked', reason: 'GN-12 has an open child.' })).toEqual({ ok: false, rule: 'decision.cascade-blocked', reason: 'GN-12 has an open child.' });
+    expect(mapDecideRefusal(409, { rule: 'decision.stale-from', message: 'The decision changed to No since you looked.' })).toEqual({ ok: false, rule: 'decision.stale-from', reason: 'The decision changed to No since you looked.' });
+    expect(mapDecideRefusal(404, { error: 'not_found' })).toEqual({ ok: false, rule: 'decision.not-found', reason: 'That decision is no longer here.' });
+    expect(mapDecideRefusal(404, undefined)).toMatchObject({ ok: false });
+    for (const [status, body] of [[500, { rule: 'x', reason: 'y' }], [401, {}], [422, 'text'], [422, { rule: 'x' }], [409, null], [400, { rule: 'x', reason: 'y' }]] as const) {
+      expect(mapDecideRefusal(status, body), `${status} ${JSON.stringify(body)}`).toBeNull();
+    }
+  });
+});
+  ```
+  `packages/app-core/test/online/decide-door.test.ts` (29.279; the door is tested through a recording `http`, then the real transport is covered by Step 6's agreement case):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import { decideDoor } from '../../src/online/decide-door.js';
+import { HttpError, type HttpClient } from '../../src/online/http.js';
+import { MappingError } from '../../src/wire-readers.js';
+
+const PLAN = { moves: [{ ticketId: 'C', kind: 'not-taken' }], hiddenMoves: false, started: [], blocked: null };
+
+/** A client that answers (or throws) what it is given and records the posts. */
+function client(answer: () => unknown) {
+  const posts: Array<{ path: string; body: unknown }> = [];
+  const http = {
+    post: async (path: string, body: unknown) => {
+      posts.push({ path, body });
+      return answer();
+    },
+  } as unknown as HttpClient;
+  return { door: decideDoor(http), posts };
+}
+
+describe('29.279 the Decide door', () => {
+  it('29.279 a preview posts the request with dryRun to the ticket\'s decide path and answers the plan; control: a decide posts without dryRun', async () => {
+    const { door, posts } = client(() => ({ plan: PLAN }));
+    const preview = await door.previewDecide('w1', 'D', { outcome: 'Yes', from: null, closeStarted: ['C'] });
+    expect(preview).toEqual({ ok: true, plan: PLAN });
+    expect(posts[0]).toEqual({ path: '/v1/workspaces/w1/tickets/D/decide', body: { outcome: 'Yes', from: null, closeStarted: ['C'], dryRun: true } });
+    const filed = client(() => ({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null }));
+    expect(await filed.door.decide('w1', 'D', { outcome: 'No' })).toEqual({ ok: true, filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null });
+    expect(filed.posts[0]!.body).toEqual({ outcome: 'No' });
+    await filed.door.decide('w1', 'D', { outcome: 'No', finishStateId: null });
+    expect(filed.posts[1]!.body).toEqual({ outcome: 'No', finishStateId: null }); // record only travels as an explicit null
+  });
+
+  it('29.279 a refusal the route words comes back as data for both calls; a missing decision is "no longer here"', async () => {
+    const stale = client(() => {
+      throw new HttpError(409, 'p', { rule: 'decision.stale-from', reason: 'The decision changed to No since you looked.' });
+    });
+    expect(await stale.door.decide('w1', 'D', { outcome: 'Yes', from: 'Yes' })).toEqual({ ok: false, rule: 'decision.stale-from', reason: 'The decision changed to No since you looked.' });
+    expect(await stale.door.previewDecide('w1', 'D', { outcome: 'Yes' })).toMatchObject({ ok: false, rule: 'decision.stale-from' });
+    const gone = client(() => {
+      throw new HttpError(404, 'p', { error: 'not_found' });
+    });
+    expect(await gone.door.decide('w1', 'D', { outcome: 'Yes' })).toMatchObject({ ok: false, rule: 'decision.not-found' });
+  });
+
+  it('29.279 everything else is thrown: a 500, a 401, a 422 that is not a refusal, a transport failure, a plan or a filed list that cannot be read', async () => {
+    for (const make of [
+      () => new HttpError(500, 'p', { error: 'boom' }),
+      () => new HttpError(401, 'p', {}),
+      () => new HttpError(422, 'p', 'text'),
+      () => new Error('network down'),
+    ]) {
+      const failing = client(() => {
+        throw make();
+      });
+      await expect(failing.door.decide('w1', 'D', { outcome: 'Yes' })).rejects.toThrow();
+      await expect(failing.door.previewDecide('w1', 'D', { outcome: 'Yes' })).rejects.toThrow();
+    }
+    await expect(client(() => ({ plan: { moves: 3 } })).door.previewDecide('w1', 'D', { outcome: 'Yes' })).rejects.toThrow(MappingError);
+    await expect(client(() => ({})).door.previewDecide('w1', 'D', { outcome: 'Yes' })).rejects.toThrow(MappingError);
+    await expect(client(() => ({})).door.decide('w1', 'D', { outcome: 'Yes' })).rejects.toThrow(MappingError);
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/flow/decide-preview.test.ts > /tmp/wtg3-t11a.log 2>&1; tail -n 20 /tmp/wtg3-t11a.log` and the same for the two app-core files. Expected FAIL (modules missing). Commit.
+
+- [ ] **Step 3: GREEN, the pure half and the wire types**
+
+  1. `packages/domain/src/read-models-flow.ts`, appended (`export *` from the domain index already reaches it, T3):
+     ```ts
+/** What a Decide dry run says one choice would do to ONE ticket (Workflow graph, PS-6). */
+export type DecideMoveKind = 'reopen' | 'backlog' | 'not-taken';
+export type DecideMoveRead = { ticketId: string; kind: DecideMoveKind };
+/**
+ * The plan a Decide dry run answers, for ONE viewer. `moves` and `started` name only tickets that viewer can see; `hiddenMoves` says
+ * that more will move, without a name and without a count. `blocked.ticketId` is null when the blocking ticket is hidden; `blocked.reason`
+ * is the planner's code and `blocked.sentence` the engine's words, the same the write's `422 decision.cascade-blocked` gives (D-W3-55).
+ */
+export type DecidePlanRead = {
+  moves: DecideMoveRead[];
+  hiddenMoves: boolean;
+  started: string[];
+  blocked: { ticketId: string | null; reason: string; sentence: string } | null;
+};
+/** The revision ONE Decide write made to the current pass (PS-10), or null. */
+export type DecideRevisionRead = { from: string | null; to: string | null };
+/** A committed Decide write: the event types filed, the pass the outcome belongs to, and the revision it made (D-W3-54). */
+export type DecideWriteRead = { filed: string[]; pass: number; revised: DecideRevisionRead | null };
+     ```
+  2. `apps/server/src/flow/decide-preview.ts`:
+     ```ts
+import {
+  sameLabel,
+  transitionsWithBacklog,
+  type DecideMoveKind,
+  type DecideMoveRead,
+  type DecidePlanRead,
+  type DecideRevisionRead,
+  type FlowEdge,
+  type FlowNode,
+  type PassRecord,
+  type SettlePlan,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
+
+/**
+ * The Decide door's pure half (PS-6, DC-4): what the request may ask, what a plan looks like to ONE viewer, and the plan's inputs.
+ * It imports no database and no clock; the route composes it with `readFlow` and `planSettle`.
+ */
+
+/** `finishStateId`: omitted = the first-declared terminal state (D-W3-44); `null` = record the outcome only; a string = that terminal state (D-W3-53). */
+export type DecideBody = { outcome: string | null; from?: string | null; closeStarted?: string[]; dryRun?: boolean; finishStateId?: string | null };
+
+export type DecideRefusal = { status: 409 | 422; rule: string; reason: string };
+
+/**
+ * The refusals a dry run must give in the engine's own words (the engine judges the real write; a preview that says "fine" for
+ * what the engine refuses would be a lie). Order: not a Decision, stale `from`, unknown outcome, same outcome.
+ */
+export function decideRefusal(node: FlowNode, edges: readonly FlowEdge[], body: DecideBody): DecideRefusal | null {
+  if (!node.isDecision) return { status: 422, rule: 'decision.not-a-decision', reason: 'Only a decision can be given an outcome.' };
+  if (body.from !== undefined && !sameOutcome(body.from, node.outcome)) {
+    return { status: 409, rule: 'decision.stale-from', reason: `The decision changed to ${node.outcome ?? 'no outcome'} since you looked.` };
+  }
+  const labels = [...new Set(edges.filter((e) => e.sourceId === node.id && e.label !== null).map((e) => e.label as string))];
+  if (body.outcome !== null && !labels.some((label) => sameLabel(label, body.outcome))) {
+    return {
+      status: 422,
+      rule: 'decision.unknown-outcome',
+      reason: labels.length === 0 ? 'This decision has no branches to choose from.' : `Choose one of: ${labels.join(', ')}.`,
+    };
+  }
+  if (sameOutcome(body.outcome, node.outcome)) return { status: 422, rule: 'decision.same-outcome', reason: 'That is already the outcome.' };
+  // Record only (D-W3-53): an unfinished Decision stays where it is, so nothing settles and nothing can be closed.
+  if (body.finishStateId === null && node.category !== 'terminal' && (body.closeStarted ?? []).length > 0) {
+    return { status: 422, rule: 'decision.bad-close-started', reason: 'Nothing is closed when the decision is only recorded.' };
+  }
+  return null;
+}
+
+/**
+ * A named finish state (D-W3-53): a terminal state of the Decision's workflow (the version it is folded to) with a transition into it from the
+ * Decision's current state (a `*` transition counts; the universal Backlog edges never lead into a terminal state).
+ */
+export function finishRefusal(def: WorkflowDef, stateId: string, finishStateId: string): DecideRefusal | null {
+  const state = def.states.find((s) => s.id === finishStateId);
+  if (state === undefined || state.category !== 'terminal') {
+    return { status: 422, rule: 'decision.bad-finish-state', reason: "Choose a finished state of this decision's workflow." };
+  }
+  const reachable = transitionsWithBacklog(def).some((t) => (t.from === stateId || t.from === '*') && t.to === finishStateId);
+  return reachable ? null : { status: 422, rule: 'decision.bad-finish-state', reason: `This decision cannot move to ${state.name} from where it is.` };
+}
+
+/** What a record-only dry run answers (D-W3-53): the Decision stays unfinished, so nothing settles. */
+export const NOTHING_MOVES: DecidePlanRead = { moves: [], hiddenMoves: false, started: [], blocked: null };
+
+/**
+ * The engine's words for a blocked cascade, spelled exactly as Part 2 T16's `cascadeRefusal` spells the write's
+ * `422 decision.cascade-blocked` reason (D-W3-55; `flow-decide.test.ts` pins the two equal). `null` = the blocker is not named.
+ */
+export function blockedSentence(reason: string | null): string {
+  return `This choice cannot be applied: ${reason ?? 'a step you cannot see is blocking it'}.`;
+}
+
+/**
+ * PS-10 for ONE write (D-W3-54): the pass the recorded outcome belongs to (the last pass after the commit) and the revision this write
+ * added to it (its revision list grew against the passes read before the write), else null. A first choice and a new pass after a loop
+ * open a pass and revise nothing. A committed `ticket.decided` always leaves a pass, so `0` is never answered for one.
+ */
+export function passAndRevision(before: readonly PassRecord[], after: readonly PassRecord[]): { pass: number; revised: DecideRevisionRead | null } {
+  const last = after[after.length - 1];
+  if (last === undefined) return { pass: 0, revised: null };
+  const prior = before.find((p) => p.pass === last.pass);
+  const added = prior !== undefined && last.revisions.length > prior.revisions.length ? last.revisions[last.revisions.length - 1] : undefined;
+  return { pass: last.pass, revised: added === undefined ? null : { from: added.from, to: added.to } };
+}
+
+function sameOutcome(a: string | null, b: string | null): boolean {
+  return a === null || b === null ? a === b : sameLabel(a, b);
+}
+
+/**
+ * The nodes the plan is computed on: the Decision as it WOULD be once the person's atomic batch commits (DC-5 files the outcome and
+ * the finishing transition together), so a Decision still in To do is planned as settled. Clearing keeps the state as it is.
+ */
+export function proposedNodes(nodes: readonly FlowNode[], decisionId: string, outcome: string | null): FlowNode[] {
+  return nodes.map((n) => {
+    if (n.id !== decisionId) return n;
+    return outcome === null ? { ...n, outcome: null } : { ...n, outcome, category: 'terminal', closed: true };
+  });
+}
+
+/** One move per ticket, in plan order. A `reopen` is the first half of a pair and counts only when nothing follows it. */
+export function movesOf(plan: SettlePlan): DecideMoveRead[] {
+  const kinds = new Map<string, DecideMoveKind>();
+  for (const step of plan.steps) {
+    if (step.kind === 'reopen') {
+      if (!kinds.has(step.ticketId)) kinds.set(step.ticketId, 'reopen');
+    } else if (step.kind === 'to-initial') kinds.set(step.ticketId, 'reopen');
+    else if (step.kind === 'to-backlog') kinds.set(step.ticketId, 'backlog');
+    else kinds.set(step.ticketId, 'not-taken');
+  }
+  return [...kinds].map(([ticketId, kind]) => ({ ticketId, kind }));
+}
+
+function blockedRead(blocked: NonNullable<SettlePlan['blocked']>, visible: ReadonlySet<string>): NonNullable<DecidePlanRead['blocked']> {
+  const shown = visible.has(blocked.ticketId);
+  return { ticketId: shown ? blocked.ticketId : null, reason: blocked.reason, sentence: blockedSentence(shown ? blocked.reason : null) };
+}
+
+/** PS-6: the plan, named only for tickets this viewer can see. */
+export function previewOf(plan: SettlePlan, visible: ReadonlySet<string>): DecidePlanRead {
+  const all = movesOf(plan);
+  return {
+    moves: all.filter((m) => visible.has(m.ticketId)),
+    hiddenMoves: all.some((m) => !visible.has(m.ticketId)),
+    started: plan.started.filter((id) => visible.has(id)),
+    blocked: plan.blocked === null ? null : blockedRead(plan.blocked, visible),
+  };
+}
+     ```
+  3. Run Step 2's server file; expected PASS (6 tests). Commit.
+
+- [ ] **Step 4: RED then GREEN, the route (not run in this plan: written against the tip and the contract above)**
+
+  1. `apps/server/test/routes/flow-decide.test.ts` (29.276 to 29.278; the fixtures follow `read-scenario.ts`: states `todo`, `doing`, `waiting`, `done`, the types `epic` (rank 1) and `task` (rank 3), the hidden ticket is explicit-visibility owner only; the test defines the `decision` type itself because the scenario has none). It reads the ledger, never a projection column the tip may not have:
+     ```ts
+// @vitest-environment node
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DECISION_TYPE_ID, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+
+let db: TestDatabase;
+let read: ReadWorld;
+
+// Flow 1 (the dry runs and the plain decide): A > D (Yes > B, No > C), C > X (X is hidden from the member), B > E, X > E.
+const one = { a: newUlid(), d: newUlid(), b: newUlid(), c: newUlid(), x: newUlid(), e: newUlid() };
+// Flow 2 (a Decision with nothing started, for the write): D2 (Yes > P, No > Q).
+const two = { d: newUlid(), p: newUlid(), q: newUlid() };
+// Flow 3 (a started ticket on the branch not taken): D3 (Yes > P3, No > Q3), Q3 already Doing.
+const three = { d: newUlid(), p: newUlid(), q: newUlid() };
+// Flow 4 (a blocker): D4 (Yes > P4, No > EPIC); EPIC has a child K that is Doing, so closing EPIC as Not taken is refused by the parent rule.
+const four = { d: newUlid(), p: newUlid(), epic: newUlid(), k: newUlid() };
+// Flow 5 (record only, D-W3-53): D5 (Yes > P5, No > Q5); and flow 6 (a named finish state): D6 (Yes > P6, No > Q6).
+const five = { d: newUlid(), p: newUlid(), q: newUlid() };
+const six = { d: newUlid(), p: newUlid(), q: newUlid() };
+const outside = newUlid(); // a task in no flow
+
+const ACTIVE = 'doing'; // the seeded workflow's started state (`read-scenario.ts:160`)
+
+const url = (ticketId: string) => `/v1/workspaces/${read.world.workspaceId}/tickets/${ticketId}/decide`;
+const post = (role: ReadRole | null, ticketId: string, payload: unknown) =>
+  read.app.inject({ method: 'POST', url: url(ticketId), ...(role === null ? {} : { headers: read.authOf(role) }), payload: payload as never });
+const ledger = async (): Promise<number> =>
+  (await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM events WHERE workspace_id = $1', [read.world.workspaceId])).rows[0]!.n;
+
+const decidedCount = async (ticketId: string): Promise<number> =>
+  (await db.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM events WHERE entity_id = $1 AND type = 'ticket.decided'", [ticketId])).rows[0]!.n;
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  read = await buildReadTestApp(db);
+  const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+  const create = (ticket: string, title: string, typeId = 'task', parentId: string | null = null): LedgerEvent =>
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: ticket }, type: 'ticket.created', payload: { typeId, projectId: read.world.projectId, parentId, title } });
+  const link = (from: string, to: string, label?: string): LedgerEvent =>
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: from }, type: 'ticket.link_added', payload: { kind: 'leads_to', targetId: to, ...(label === undefined ? {} : { label }) } });
+  await applyCommitted(db.pool, [
+    makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: DECISION_TYPE_ID }, type: 'ticket-type.defined', payload: { id: DECISION_TYPE_ID, name: 'Decision', icon: 'help', rank: 3, workflowId: read.world.workflowId, fields: [] } }),
+    create(one.a, 'Draft the pitch'), create(one.d, 'Is the pitch approved', DECISION_TYPE_ID), create(one.b, 'Send to the client'), create(one.c, 'Shelve the pitch'), create(one.x, 'Salary review for the pitch team'), create(one.e, 'Close the file'),
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: one.x }, type: 'visibility.set', payload: { ticketId: one.x, mode: 'explicit', userIds: [read.world.owner] } }),
+    link(one.a, one.d), link(one.d, one.b, 'Yes'), link(one.d, one.c, 'No'), link(one.c, one.x), link(one.b, one.e), link(one.x, one.e),
+    create(two.d, 'Which vendor', DECISION_TYPE_ID), create(two.p, 'Sign with Acme'), create(two.q, 'Sign with Beta'), link(two.d, two.p, 'Yes'), link(two.d, two.q, 'No'),
+    create(three.d, 'Ship now', DECISION_TYPE_ID), create(three.p, 'Announce'), create(three.q, 'Hold the launch'),
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: three.q }, type: 'ticket.transitioned', payload: { to: ACTIVE } }),
+    link(three.d, three.p, 'Yes'), link(three.d, three.q, 'No'),
+    create(four.d, 'Open the beta', DECISION_TYPE_ID), create(four.p, 'Wait a quarter'), create(four.epic, 'Beta programme', 'epic'), create(four.k, 'Recruit testers', 'task', four.epic),
+    makeCommitted({ ...ws, entity: { kind: 'ticket', id: four.k }, type: 'ticket.transitioned', payload: { to: ACTIVE } }),
+    link(four.d, four.p, 'Yes'), link(four.d, four.epic, 'No'),
+    create(five.d, 'Pick a venue', DECISION_TYPE_ID), create(five.p, 'Book the hall'), create(five.q, 'Book the garden'), link(five.d, five.p, 'Yes'), link(five.d, five.q, 'No'),
+    create(six.d, 'Pick a caterer', DECISION_TYPE_ID), create(six.p, 'Order from Lee'), create(six.q, 'Order from Ama'), link(six.d, six.p, 'Yes'), link(six.d, six.q, 'No'),
+    create(outside, 'A task in no flow'),
+  ]);
+}, 60_000);
+afterAll(async () => {
+  await read.app.close();
+  await db.drop();
+});
+
+describe('29.276 the dry run: what a choice would move, for this viewer', () => {
+  it('29.276 a dry run names only tickets the caller can see and flags the rest; the owner sees both; nothing is written; control: the same call without a hidden ticket has no flag', async () => {
+    const before = await ledger();
+    const member = await post('member', one.d, { outcome: 'Yes', dryRun: true });
+    expect(member.statusCode).toBe(200);
+    const plan = member.json().plan;
+    expect(plan.moves).toEqual([{ ticketId: one.c, kind: 'not-taken' }]);
+    expect(plan.hiddenMoves).toBe(true);
+    expect(plan.blocked).toBeNull();
+    expect(member.body).not.toContain(one.x);
+    expect(member.body).not.toContain('Salary review');
+    const owner = (await post('owner', one.d, { outcome: 'Yes', dryRun: true })).json().plan;
+    expect(owner.moves.map((m: { ticketId: string }) => m.ticketId).sort()).toEqual([one.c, one.x].sort());
+    expect(owner.hiddenMoves).toBe(false);
+    // control: a Decision whose branches hold nothing hidden
+    expect((await post('member', two.d, { outcome: 'Yes', dryRun: true })).json().plan).toMatchObject({ moves: [{ ticketId: two.q, kind: 'not-taken' }], hiddenMoves: false });
+    expect(await ledger()).toBe(before);
+  });
+
+  it('29.276 a dry run gives the engine\'s refusals in its words: stale from 409, an unknown outcome naming the labels, the same outcome, not a decision; nothing is written', async () => {
+    const before = await ledger();
+    const stale = await post('owner', one.d, { outcome: 'Yes', from: 'No', dryRun: true });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toEqual({ rule: 'decision.stale-from', reason: 'The decision changed to no outcome since you looked.' });
+    const unknown = await post('owner', one.d, { outcome: 'Maybe', dryRun: true });
+    expect(unknown.statusCode).toBe(422);
+    expect(unknown.json().rule).toBe('decision.unknown-outcome');
+    expect(unknown.json().reason).toMatch(/Yes/);
+    expect(unknown.json().reason).toMatch(/No/);
+    expect((await post('owner', outside, { outcome: 'Yes', dryRun: true })).json()).toMatchObject({ rule: 'decision.not-a-decision' });
+    expect((await post('owner', one.d, { outcome: null, dryRun: true })).json()).toMatchObject({ rule: 'decision.same-outcome' });
+    expect(await ledger()).toBe(before);
+  });
+});
+
+describe('29.277 the write: the outcome and the finishing transition as one batch, by the caller', () => {
+  it('29.277 a stranger, a deleted or unknown ticket and no session answer the shared 404 or 401; a body with an unknown member is a 400; nothing is written', async () => {
+    const before = await ledger();
+    const stranger = await post('stranger', two.d, { outcome: 'Yes' });
+    const unknown = await post('owner', newUlid(), { outcome: 'Yes' });
+    expect(stranger.statusCode).toBe(404);
+    expect(unknown.statusCode).toBe(404);
+    expect(stranger.body).toBe(unknown.body);
+    const anonymous = await post(null, two.d, { outcome: 'Yes' });
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toEqual(UNAUTHENTICATED_BODY);
+    expect((await post('owner', two.d, { outcome: 'Yes', origin: 'mcp' })).statusCode).toBe(400);
+    expect((await post('owner', two.d, {})).statusCode).toBe(400);
+    expect(await ledger()).toBe(before);
+  });
+
+  it('29.277 deciding an unfinished Decision files ticket.decided and the finishing transition together, as the caller, from the web door; a revision on a finished one files the outcome alone; a stale from is 409 and writes nothing', async () => {
+    const before = await ledger();
+    const first = await post('owner', two.d, { outcome: 'Yes', from: null });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toEqual({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null });
+    const rows = (await db.pool.query<{ type: string; origin: string; actor_id: string; payload: Record<string, unknown> }>(
+      'SELECT type, origin, actor_id, payload FROM events WHERE workspace_id = $1 AND entity_id = $2 ORDER BY seq DESC LIMIT 2', [read.world.workspaceId, two.d])).rows.reverse();
+    expect(rows.map((r) => r.type)).toEqual(['ticket.decided', 'ticket.transitioned']);
+    expect(rows.every((r) => r.origin === 'web' && r.actor_id === read.world.owner)).toBe(true);
+    expect(rows[0]!.payload).toEqual({ outcome: 'Yes', from: null });
+    expect(rows[1]!.payload).toMatchObject({ to: 'done' });
+    expect(await ledger()).toBe(before + 2);
+    const state = (await db.pool.query<{ state_category: string }>('SELECT state_category FROM proj_tickets WHERE ticket_id = $1', [two.d])).rows[0]!;
+    expect(state.state_category).toBe('terminal');
+
+    // a revision of a finished Decision is the outcome alone
+    const revised = await post('owner', two.d, { outcome: 'No', from: 'Yes' });
+    expect(revised.json()).toEqual({ filed: ['ticket.decided'], pass: 1, revised: { from: 'Yes', to: 'No' } });
+    // control: the same `from` again is stale
+    const afterRevision = await ledger();
+    const stale = await post('owner', two.d, { outcome: 'Yes', from: 'Yes' });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().rule).toBe('decision.stale-from');
+    expect(await ledger()).toBe(afterRevision);
+  });
+
+  it('29.277 record only: finishStateId null files ticket.decided alone, the Decision keeps its state and nothing settles; its dry run moves nothing; a close list with it is refused; control: omitted finishes as before', async () => {
+    const before = await ledger();
+    expect((await post('owner', five.d, { outcome: 'Yes', finishStateId: null, dryRun: true })).json()).toEqual({ plan: { moves: [], hiddenMoves: false, started: [], blocked: null } });
+    const withClose = await post('owner', five.d, { outcome: 'Yes', finishStateId: null, closeStarted: [five.q] });
+    expect(withClose.statusCode).toBe(422);
+    expect(withClose.json().rule).toBe('decision.bad-close-started');
+    expect(await ledger()).toBe(before);
+    const recorded = await post('owner', five.d, { outcome: 'Yes', finishStateId: null });
+    expect(recorded.statusCode).toBe(200);
+    expect(recorded.json()).toEqual({ filed: ['ticket.decided'], pass: 1, revised: null });
+    expect(await ledger()).toBe(before + 1); // no finishing transition, and no flow-actor event after it
+    const state = (await db.pool.query<{ state_category: string }>('SELECT state_category FROM proj_tickets WHERE ticket_id = $1', [five.d])).rows[0]!;
+    expect(state.state_category).not.toBe('terminal');
+    const moved = (await db.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM events WHERE entity_id = ANY($1) AND type IN ('ticket.transitioned', 'ticket.closed')", [[five.p, five.q]])).rows[0]!.n;
+    expect(moved).toBe(0);
+    // control: the same Decision, finishStateId omitted, now finishes to its first terminal state (a revision of an unfinished one)
+    const finished = await post('owner', five.d, { outcome: 'No', from: 'Yes' });
+    expect(finished.json()).toEqual({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: { from: 'Yes', to: 'No' } });
+  });
+
+  it('29.277 a named finishStateId finishes there when it is a terminal state reachable from the current one; anything else is 422 decision.bad-finish-state in the dry run and the write, and nothing is written', async () => {
+    const before = await ledger();
+    for (const finishStateId of ['todo', 'no-such-state']) {
+      const dry = await post('owner', six.d, { outcome: 'Yes', finishStateId, dryRun: true });
+      expect(dry.statusCode, finishStateId).toBe(422);
+      expect(dry.json().rule).toBe('decision.bad-finish-state');
+      const write = await post('owner', six.d, { outcome: 'Yes', finishStateId });
+      expect(write.statusCode, finishStateId).toBe(422);
+      expect(write.json().rule).toBe('decision.bad-finish-state');
+    }
+    expect(await ledger()).toBe(before);
+    const named = await post('owner', six.d, { outcome: 'Yes', finishStateId: 'done' });
+    expect(named.json()).toMatchObject({ filed: ['ticket.decided', 'ticket.transitioned'] });
+    const rows = (await db.pool.query<{ payload: Record<string, unknown> }>("SELECT payload FROM events WHERE entity_id = $1 AND type = 'ticket.transitioned' ORDER BY seq DESC LIMIT 1", [six.d])).rows;
+    expect(rows[0]!.payload).toMatchObject({ to: 'done' });
+  });
+});
+
+describe('29.278 the gates: a blocked or ill-formed choice writes nothing', () => {
+  it('29.278 a started ticket on the branch not taken is named for a choice and is moved only when the person chose to close it; closeStarted may name only tickets of this Decision\'s flow (anything else is 422 decision.bad-close-started and nothing is written)', async () => {
+    const before = await ledger();
+    const dry = (await post('owner', three.d, { outcome: 'Yes', dryRun: true })).json().plan;
+    expect(dry.started).toEqual([three.q]);
+    expect(dry.moves.map((m: { ticketId: string }) => m.ticketId)).not.toContain(three.q); // not chosen: it keeps going
+    const chosen = (await post('owner', three.d, { outcome: 'Yes', closeStarted: [three.q], dryRun: true })).json().plan;
+    expect(chosen.moves).toContainEqual({ ticketId: three.q, kind: 'not-taken' });
+    const refused = await post('owner', three.d, { outcome: 'Yes', closeStarted: [outside] });
+    expect(refused.statusCode).toBe(422);
+    expect(refused.json().rule).toBe('decision.bad-close-started');
+    expect(await ledger()).toBe(before);
+    expect(await decidedCount(three.d)).toBe(0);
+    // control: the same call naming the flow's own started ticket is filed
+    const filed = await post('owner', three.d, { outcome: 'Yes', closeStarted: [three.q] });
+    expect(filed.statusCode).toBe(200);
+    expect(filed.json()).toMatchObject({ filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null });
+  });
+
+  it('29.278 a choice that would close a branch whose epic has a started child is blocked, in a dry run and in the write; blocked writes nothing', async () => {
+    const before = await ledger();
+    const dry = (await post('owner', four.d, { outcome: 'Yes', dryRun: true })).json().plan;
+    expect(dry.blocked).not.toBeNull();
+    expect(dry.blocked.ticketId).toBe(four.epic);
+    expect(typeof dry.blocked.reason).toBe('string');
+    const blocked = await post('owner', four.d, { outcome: 'Yes' });
+    expect(blocked.statusCode).toBe(422);
+    expect(blocked.json().rule).toBe('decision.cascade-blocked');
+    expect(dry.blocked.sentence).toBe(blocked.json().reason); // D-W3-55: the preview says what the refusal will say
+    expect(await ledger()).toBe(before);
+    expect(await decidedCount(four.d)).toBe(0);
+    // control: the other branch has nothing started under it and is not blocked
+    expect((await post('owner', four.d, { outcome: 'No', dryRun: true })).json().plan.blocked).toBeNull();
+  });
+});
+     ```
+     Run: `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/routes/flow-decide.test.ts > /tmp/wtg3-t11b.log 2>&1; tail -n 40 /tmp/wtg3-t11b.log`. Expected FAIL (no route: 404 on every call). **If a fixture event is refused on the tip, change the SEED to the landed payload (Step 0), never an assertion.**
+  2. `apps/server/src/routes/flow.ts`: the file now needs the ingest door. Change the imports and the signature, and add the second route after the GET (the GET is untouched):
+     ```ts
+import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { Pool } from 'pg';
+import { newUlid, planSettle, type SubmittedEvent } from '@gisik-nokma/domain';
+import { decideRefusal, finishRefusal, NOTHING_MOVES, passAndRevision, previewOf, proposedNodes, type DecideBody } from '../flow/decide-preview.js';
+import { readFlowView } from '../flow/flow-view.js';
+import { readFlow } from '../flow/read-flow.js';
+import type { ClientIngest } from '../ingest/ingest-service.js';
+import { getTicketStateFromDb } from '../projections/tickets.js';
+import { ticketIsLive } from '../read/live-ticket.js';
+import { foldedDefKey, foldedWorkflowDefs } from '../read/workflow-defs.js';
+import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
+import { canSee } from '../visibility/can-see.js';
+
+const ULID_PATTERN = '^[0-9A-HJKMNP-TV-Z]{26}$';
+
+export function registerFlowRoutes(app: FastifyInstance, deps: { pool: Pool; ingest: ClientIngest }, requireSession: preHandlerHookHandler): void {
+  // … the GET …/flow route from T3, unchanged …
+
+  /**
+   * `POST /v1/workspaces/:ws/tickets/:id/decide`: choose (or clear) a Decision's outcome. `dryRun: true` answers the plan for THIS viewer and
+   * writes nothing; otherwise the outcome and, when the Decision is not finished yet, the person's finishing transition are filed as ONE atomic
+   * batch, as the caller, from the door the request came through (never from the body). Every guard that hides a ticket is the shared 404.
+   * The dry run plans; only the write runs the server gates (`decision.bad-close-started`, `decision.cascade-blocked`). `finishStateId`
+   * (D-W3-53): omitted = the first-declared terminal state, `null` = record the outcome only, a string = that terminal state. A write
+   * answers `{filed, pass, revised}` read from the folded state after the commit (D-W3-54).
+   */
+  app.post<{ Params: { workspaceId: string; ticketId: string }; Body: DecideBody }>(
+    '/v1/workspaces/:workspaceId/tickets/:ticketId/decide',
+    {
+      preHandler: requireSession,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['outcome'],
+          additionalProperties: false,
+          properties: {
+            outcome: { type: ['string', 'null'], maxLength: 60 },
+            from: { type: ['string', 'null'], maxLength: 60 },
+            closeStarted: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'string', pattern: ULID_PATTERN } },
+            dryRun: { type: 'boolean' },
+            finishStateId: { type: ['string', 'null'], minLength: 1, maxLength: 64 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { workspaceId, ticketId } = request.params;
+      const body = request.body;
+      const eff = await requireMember(deps.pool, request.currentUserId, workspaceId);
+      if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
+      if (!(await ticketIsLive(deps.pool, workspaceId, ticketId))) return reply.code(404).send(READ_NOT_FOUND_BODY);
+      if (!(await canSee(deps.pool, request.currentUserId, ticketId))) return reply.code(404).send(READ_NOT_FOUND_BODY);
+
+      // The whole flow, hidden tickets included: a hole between two visible tickets still changes the plan.
+      const whole = await readFlow(deps.pool, { workspaceId, seedId: ticketId, viewerId: null });
+      const node = whole.nodes.find((n) => n.id === ticketId);
+      if (node === undefined) return reply.code(404).send(READ_NOT_FOUND_BODY);
+
+      const refusal = decideRefusal(node, whole.edges, body);
+      if (refusal !== null) return reply.code(refusal.status).send({ rule: refusal.rule, reason: refusal.reason });
+
+      // D-W3-53. Only an unfinished Decision has anything to finish; on a finished one `finishStateId` is ignored (a revision files the outcome alone).
+      const unfinished = node.category !== 'terminal';
+      const recordOnly = unfinished && body.finishStateId === null;
+      if (unfinished && body.outcome !== null && typeof body.finishStateId === 'string') {
+        const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
+        const defs = state === null ? new Map() : await foldedWorkflowDefs(deps.pool, workspaceId, [{ workflowId: state.workflowId, version: state.workflowVersion }]);
+        const def = state === null ? undefined : defs.get(foldedDefKey(state.workflowId, state.workflowVersion));
+        const bad = def === undefined
+          ? { status: 422 as const, rule: 'decision.bad-finish-state', reason: "Choose a finished state of this decision's workflow." }
+          : finishRefusal(def, node.stateId, body.finishStateId);
+        if (bad !== null) return reply.code(bad.status).send({ rule: bad.rule, reason: bad.reason });
+      }
+
+      if (body.dryRun === true) {
+        if (recordOnly) return { plan: NOTHING_MOVES };
+        const plan = planSettle({
+          nodes: proposedNodes(whole.nodes, ticketId, body.outcome),
+          edges: whole.edges,
+          decisionId: ticketId,
+          closeStarted: body.closeStarted ?? [],
+        });
+        // What this viewer may be NAMED is what is on this viewer's own graph.
+        const mine = await readFlow(deps.pool, { workspaceId, seedId: ticketId, viewerId: request.currentUserId });
+        return { plan: previewOf(plan, new Set(mine.nodes.map((n) => n.id))) };
+      }
+
+      const origin = request.authKind === 'mcp-token' ? 'mcp' : 'web';
+      const claim = (type: string, payload: Record<string, unknown>): SubmittedEvent => ({
+        id: newUlid(),
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type,
+        version: 1,
+        payload,
+        actorId: request.currentUserId,
+        origin,
+        clientTime: new Date().toISOString(),
+      });
+      const events: SubmittedEvent[] = [
+        claim('ticket.decided', {
+          outcome: body.outcome,
+          ...(body.from === undefined ? {} : { from: body.from }),
+          ...(body.closeStarted === undefined || body.closeStarted.length === 0 ? {} : { closeStarted: body.closeStarted }),
+        }),
+      ];
+      if (body.outcome !== null && unfinished && !recordOnly) {
+        const finishTo = typeof body.finishStateId === 'string' ? body.finishStateId : node.firstTerminalStateId;
+        if (finishTo === null) {
+          return reply.code(422).send({ rule: 'decision.no-terminal-state', reason: 'This decision has no finished state to move to.' });
+        }
+        events.push(claim('ticket.transitioned', { to: finishTo }));
+      }
+
+      const outcome = await deps.ingest.ingestClientAtomic(events, request.currentUserId);
+      if (outcome.status === 'committed') {
+        // PS-10 (D-W3-54): read back from the folded state, compared with the passes the node carried before the write.
+        const after = (await getTicketStateFromDb(deps.pool, workspaceId, ticketId))?.passes ?? [];
+        return { filed: events.map((e) => e.type), ...passAndRevision(node.passes, after) };
+      }
+      const failed = outcome.result;
+      if (failed.status === 'refused') return reply.code(failed.rule === 'decision.stale-from' ? 409 : 422).send({ rule: failed.rule, reason: failed.reason });
+      if (failed.status === 'invalid') return reply.code(400).send({ rule: `ingest.${failed.code}`, reason: failed.message });
+      return reply.code(409).send({ rule: 'decision.not-filed', reason: 'The choice could not be filed. Nothing changed.' });
+    },
+  );
+}
+     ```
+     `apps/server/src/app.ts`: the call T3 added becomes `registerFlowRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);`.
+  3. `apps/server/src/http/http-origin.ts`, in `HTTP_ORIGIN_PROTECTED_ROUTES` (`:157`), after the last entry:
+     ```ts
+  // A cookie-authenticatable POST that appends events (Workflow graph: Decide). The dry run is in the set too: one route string, and
+  // `has(routeUrl)` is an exact match.
+  '/v1/workspaces/:workspaceId/tickets/:ticketId/decide',
+     ```
+     Then run `apps/server/test/http/security-middleware.test.ts` WHOLE: it injects a forged-Origin request at every non-GET route in the assembled table and names a route that is missing from the set. Update any route census row that lists `routes/flow.ts` (grep `routes/flow` under `apps/server/test`).
+  4. Run Step 4.1's file again. Expected PASS. If a case fails, the fixture decides which side is wrong: read the response body first. Two likely findings to REPORT, not to paper over: the plan for the blocker flow, and the finishing transition's target. Commit.
+
+- [ ] **Step 5: The client door**
+
+  1. `packages/app-core/src/data-source.ts`: above `DataSourceQuery`, the result types (T9 may already have added `PublishFlowResult` beside them; keep both):
+     ```ts
+import type { DecidePlanRead, DecideRevisionRead } from '@gisik-nokma/domain';
+
+/**
+ * What a person asks the Decide door for (DC-4). `from` is the outcome they saw; `closeStarted` is PS-6's per-ticket choices;
+ * `finishStateId` omitted = the first-declared terminal state, `null` = record the outcome only, a string = that terminal state (D-W3-53).
+ */
+export type DecideRequest = { outcome: string | null; from?: string | null; closeStarted?: string[]; finishStateId?: string | null };
+/** A refusal the Decide route words (`409`/`422`), or its one `404`: an ANSWER, because the confirmation shows it. */
+export type DecideRefusalRead = { ok: false; rule: string; reason: string };
+export type PreviewDecideResult = { ok: true; plan: DecidePlanRead } | DecideRefusalRead;
+export type DecideResult = { ok: true; filed: string[]; pass: number; revised: DecideRevisionRead | null } | DecideRefusalRead;
+     ```
+     and in `DataSourceQuery`, beside `getFlow`:
+     ```ts
+  /**
+   * What choosing `request.outcome` for a Decision would move, for the signed-in viewer (Workflow graph, PS-6). Online: `POST …/tickets/:id/decide`
+   * with `dryRun: true`. A refusal the route words is an ANSWER, `{ ok: false }`; every other failure throws. Replica: rejects with `ReplicaGapError`.
+   */
+  previewDecide(workspaceId: string, ticketId: string, request: DecideRequest): Promise<PreviewDecideResult>;
+  /** Choose, change or clear a Decision's outcome (the same route without `dryRun`). Refusals and failures as `previewDecide`. */
+  decide(workspaceId: string, ticketId: string, request: DecideRequest): Promise<DecideResult>;
+     ```
+     Export the four types from `packages/app-core/src/index.ts` beside the other `./data-source.js` type exports.
+  2. `packages/app-core/src/online/mappers.ts` (it already imports `MappingError`, `asArray`, `asRecord`, `asString`; add `import type { DecidePlanRead, DecideWriteRead } from '@gisik-nokma/domain';` and `type DecideRefusalRead` to the `../data-source.js` import):
+     ```ts
+/** `{ plan }` from a dry run: every member is checked, because the confirmation lists exactly what this says. */
+export function mapDecidePlan(raw: unknown): DecidePlanRead {
+  const plan = asRecord(raw, 'decide response.plan');
+  const hidden = plan['hiddenMoves'];
+  if (typeof hidden !== 'boolean') throw new MappingError('decide response.plan.hiddenMoves', 'a boolean');
+  const blocked = plan['blocked'];
+  let blockedRead: DecidePlanRead['blocked'] = null;
+  if (blocked !== null) {
+    const record = asRecord(blocked, 'decide response.plan.blocked');
+    const ticketId = record['ticketId'];
+    if (ticketId !== null && typeof ticketId !== 'string') throw new MappingError('decide response.plan.blocked.ticketId', 'a string or null');
+    blockedRead = {
+      ticketId: ticketId as string | null,
+      reason: asString(record['reason'], 'decide response.plan.blocked.reason'),
+      sentence: asString(record['sentence'], 'decide response.plan.blocked.sentence'),
+    };
+  }
+  return {
+    moves: asArray(plan['moves'], 'decide response.plan.moves').map((row, index) => {
+      const move = asRecord(row, `decide response.plan.moves[${index}]`);
+      const kind = move['kind'];
+      if (kind !== 'reopen' && kind !== 'backlog' && kind !== 'not-taken') throw new MappingError(`decide response.plan.moves[${index}].kind`, 'reopen, backlog or not-taken');
+      return { ticketId: asString(move['ticketId'], `decide response.plan.moves[${index}].ticketId`), kind };
+    }),
+    hiddenMoves: hidden,
+    started: asArray(plan['started'], 'decide response.plan.started').map((id, index) => asString(id, `decide response.plan.started[${index}]`)),
+    blocked: blockedRead,
+  };
+}
+
+/** `{ filed: ['ticket.decided', …], pass, revised }` from a committed write (D-W3-54). `revised` is `null` or `{from, to}`, each a string or null. */
+export function mapDecideFiled(raw: unknown): DecideWriteRead {
+  const body = asRecord(raw, 'decide response');
+  const pass = body['pass'];
+  if (typeof pass !== 'number' || !Number.isInteger(pass)) throw new MappingError('decide response.pass', 'an integer');
+  const revised = body['revised'];
+  if (revised === undefined) throw new MappingError('decide response.revised', 'null or {from, to}');
+  let revisedRead: DecideWriteRead['revised'] = null;
+  if (revised !== null) {
+    const record = asRecord(revised, 'decide response.revised');
+    const side = (key: 'from' | 'to'): string | null => {
+      const value = record[key];
+      if (value !== null && typeof value !== 'string') throw new MappingError(`decide response.revised.${key}`, 'a string or null');
+      return value as string | null;
+    };
+    revisedRead = { from: side('from'), to: side('to') };
+  }
+  return {
+    filed: asArray(body['filed'], 'decide response.filed').map((type, index) => asString(type, `decide response.filed[${index}]`)),
+    pass,
+    revised: revisedRead,
+  };
+}
+
+/**
+ * The answers of the Decide door that are DATA, not failures: the route's own `{ rule, reason }` at 409 or 422, and its one 404 (a
+ * decision that is gone, hidden or not one is the same answer). Anything else (a 401, a 500, a body that is not a refusal) is `null`
+ * and the caller rethrows.
+ */
+export function mapDecideRefusal(status: number, body: unknown): DecideRefusalRead | null {
+  if (status === 404) return { ok: false, rule: 'decision.not-found', reason: 'That decision is no longer here.' };
+  if (status !== 409 && status !== 422) return null;
+  if (typeof body !== 'object' || body === null) return null;
+  const record = body as Record<string, unknown>;
+  const rule = record['rule'];
+  const reason = record['reason'] ?? record['message'];
+  if (typeof rule !== 'string' || typeof reason !== 'string') return null;
+  return { ok: false, rule, reason };
+}
+     ```
+  3. `packages/app-core/src/online/decide-door.ts` (a file of its own, so `online-data-source.ts` gains one spread and no logic):
+     ```ts
+import { HttpError, type HttpClient } from './http.js';
+import type { DecideRefusalRead, DecideRequest, DecideResult, PreviewDecideResult } from '../data-source.js';
+import { asRecord } from '../wire-readers.js';
+import { mapDecideFiled, mapDecidePlan, mapDecideRefusal } from './mappers.js';
+
+/**
+ * The Decide door's two members of `DataSourceQuery`. A refusal the route words is an ANSWER (the confirmation shows it); every
+ * other failure (a 401, a 500, a body that is not a refusal) is thrown, as for every other door.
+ */
+export function decideDoor(http: HttpClient): {
+  previewDecide(workspaceId: string, ticketId: string, request: DecideRequest): Promise<PreviewDecideResult>;
+  decide(workspaceId: string, ticketId: string, request: DecideRequest): Promise<DecideResult>;
+} {
+  const post = async <T>(workspaceId: string, ticketId: string, body: Record<string, unknown>, read: (raw: unknown) => T): Promise<T | DecideRefusalRead> => {
+    try {
+      return read(await http.post(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/decide`, body));
+    } catch (cause) {
+      if (cause instanceof HttpError) {
+        const refusal = mapDecideRefusal(cause.status, cause.body);
+        if (refusal !== null) return refusal;
+      }
+      throw cause;
+    }
+  };
+  return {
+    previewDecide: (workspaceId, ticketId, request) =>
+      post(workspaceId, ticketId, { ...request, dryRun: true }, (raw): PreviewDecideResult => ({ ok: true, plan: mapDecidePlan(asRecord(raw, 'decide response')['plan']) })),
+    decide: (workspaceId, ticketId, request) => post(workspaceId, ticketId, { ...request }, (raw): DecideResult => ({ ok: true, ...mapDecideFiled(raw) })),
+  };
+}
+     ```
+  4. `packages/app-core/src/online/online-data-source.ts`, in `query` directly after T9's `publishFlow` (or after `putPreferences` if T9 has not landed), with `import { decideDoor } from './decide-door.js';`:
+     ```ts
+    ...decideDoor(http),
+     ```
+  5. `packages/app-core/src/replica/replica-data-source.ts`: next to T3's `FLOW_ABSENCES` define
+     ```ts
+/** Workflow graph, Part 3. See `DataSourceQuery.previewDecide` and `decide`. */
+const DECIDE_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'the decide route (a whole-flow plan and one atomic batch)',
+    because:
+      'the plan is a walk over every ticket of the flow, including ones this device may not hold or may not see, and the choice is two events committed together or not at all by the server; a device that planned from its partial copy could name the wrong moves, and one that sent the events singly could stop halfway',
+    owner: 'Workflow graph plan: deciding is online only',
+  },
+];
+     ```
+     add `previewDecide: DECIDE_ABSENCES,` and `decide: DECIDE_ABSENCES,` to `REPLICA_GAPS` directly under `getFlow:` (the key order is tested) and, in the method table under `getFlow:`, `previewDecide: () => Promise.reject(new ReplicaGapError('previewDecide', DECIDE_ABSENCES)),` and `decide: () => Promise.reject(new ReplicaGapError('decide', DECIDE_ABSENCES)),`. `packages/app-core/test/replica/replica-data-source.test.ts`: in the 12.185 list under `getFlow` add `['previewDecide', () => ds.query.previewDecide(WS, newUlid(), { outcome: 'Yes' })],` and `['decide', () => ds.query.decide(WS, newUlid(), { outcome: 'Yes' })],`.
+  6. **The doubles and the census** (the list on the tip from `grep -rn "getFlow" apps packages --include=*.ts --include=*.tsx`): `apps/web/test/helpers/stub-services.ts` (add `previewDecide: unstubbed('previewDecide'),` and `decide: unstubbed('decide'),` beside `getFlow:`), `apps/web/test/data-source-gateway.test.ts` (the same two lines), `packages/app-core/test/helpers/fake-data-source.ts` (`previewDecide: async () => { throw new Error('fake-data-source: previewDecide is not stubbed'); },` and the same for `decide`). **The soft-delete census** (`apps/server/test/integration/soft-delete-client-surface.test.ts`: the union at `:484`, the verdict table at `:648`, the callers at `:757`) is total over the query union and walks every member before and after a delete, so neither caller may write or depend on the deleted ticket: use an id that exists nowhere (`'01J9GNODECIDE000000000000X'`), for which both calls answer the same `{ ok: false, rule: 'decision.not-found' }` as data before and after:
+     ```ts
+// verdicts
+previewDecide: { verdict: 'excluded', carries: false, why: 'A dry-run POST, declared so the table stays total over the union. It names an id that exists nowhere, so its answer (a decision that is gone) is the same before and after a delete.' },
+decide: { verdict: 'excluded', carries: false, why: 'A WRITE, declared rather than skipped. It names an id that exists nowhere, so it files nothing and its answer is the same before and after a delete.' },
+// callers
+previewDecide: async () => ds.previewDecide(workspaceId, '01J9GNODECIDE000000000000X', { outcome: 'Yes' }),
+decide: async () => ds.decide(workspaceId, '01J9GNODECIDE000000000000X', { outcome: 'Yes' }),
+     ```
+     plus the two names in the union. **Bump the member count** the same file asserts (`expect(MEMBERS).toHaveLength(28)` at `:848` on the tip): read the number on the release branch and add TWO (T3 added `getFlow`, T9 adds `publishFlow`, this task adds `previewDecide` and `decide`; whichever of T9 and T11 lands second rebases and re-reads), and extend the comment above it.
+  7. Run Step 2's two app-core files; expected PASS. Then the app-core suite WHOLE (`pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 > /tmp/wtg3-t11c.log 2>&1; tail -n 30 /tmp/wtg3-t11c.log`) and `pnpm turbo run typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server`. Commit.
+
+- [ ] **Step 6: Agreement with the real route, and the server integration files**
+
+  **App-core `online/` changed ⇒ the server integration files WHOLE** (`pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/integration > /tmp/wtg3-t11i.log 2>&1; tail -n 30 /tmp/wtg3-t11i.log`). Add to `test/integration/client-contract.test.ts`, beside T3's `getFlow` case (the file's own harness builds a real app and an online data source over the real transport; copy its nearest write case for the setup): a flow with a Decision and two branches; `previewDecide` as the owner `toEqual`s the route's `plan` after the mapper (`ok: true`); `decide` with a stale `from` answers `{ ok: false, rule: 'decision.stale-from' }` and the ledger count is unchanged; `decide` for a stranger's id answers `decision.not-found`; then `decide` for real answers `{ ok: true, filed: ['ticket.decided', 'ticket.transitioned'], pass: 1, revised: null }`, and a second Decision decided with `finishStateId: null` answers `{ ok: true, filed: ['ticket.decided'], pass: 1, revised: null }` (record only, D-W3-53). Expected PASS. Commit.
+
+- [ ] **Step 7: Mutations (the reviewer re-runs these; the thirteen rows on `decide-preview.ts`, `mappers.ts` and `decide-door.ts` were run in the scratch bed and were RED, the route rows are written but not run)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.276 | in `decideRefusal`, `if (!node.isDecision) return` → `if (false) return` | not-a-decision |
+  | 29.276 | in `decideRefusal`, delete the `body.from` stale branch | stale-from |
+  | 29.276 | in `decideRefusal`, `!labels.some(…)` → `false` | unknown outcome |
+  | 29.276 | in `decideRefusal`, delete the same-outcome line | same outcome |
+  | 29.276 | in `proposedNodes`, `{ ...n, outcome, category: 'terminal', closed: true }` → `{ ...n, outcome }` | planned as unfinished |
+  | 29.276 | in `previewOf`, `hiddenMoves: false` | the hidden flag |
+  | 29.276 | in `previewOf`, `moves: all` | the member is named a hidden ticket (also `flow-decide.test.ts`) |
+  | 29.276 | in `previewOf`, `plan.blocked.ticketId` unguarded | a hidden blocker is named |
+  | 29.276 | in `movesOf`, the `to-backlog` kind → `'reopen'` | the loop reading |
+  | 29.277 | in the route, accept `origin` in the schema and use it | the 400 for an `origin` member |
+  | 29.277 | in the route, drop the `ticket.transitioned` push | `filed` and the terminal state |
+  | 29.277 | in the route, `request.currentUserId` → another id for `actorId` | the actor assertion |
+  | 29.277 | in the route, push the transition for a revision too | a revision files the outcome alone |
+  | 29.278 | in the dry run, drop `closeStarted: body.closeStarted ?? []` | the chosen started ticket is not a move |
+  | 29.277 | in the route, `recordOnly` → `false` (ignore `finishStateId: null`) | the record-only call files two events and the dry run moves tickets |
+  | 29.277 | in `finishRefusal`, drop the reachability check | `archived` is accepted (pure) |
+  | 29.277 | in the route, finish to `node.firstTerminalStateId` even when a string is named | the named finish lands elsewhere (needs a workflow whose first terminal is not the named one; the pure `finishRefusal` rows cover the check) |
+  | 29.277 | in `passAndRevision`, `revised: null` always | the revision's `{ from: 'Yes', to: 'No' }` |
+  | 29.276 | in `blockedRead`, `sentence: blocked.reason` | the sentence assertions and the dry-run-equals-422 assertion |
+  | 29.279 | in `mapDecideFiled`, drop the `pass` check | the no-pass body maps |
+  | 29.277 | in the route, `failed.rule === 'decision.stale-from' ? 409 : 422` → `422` | the stale `from` is 409 |
+  | 29.279 | in `mapDecideRefusal`, `status === 404` → `false` | the gone decision |
+  | 29.279 | in `mapDecideRefusal`, delete the `409 and 422` guard | a 500 is data |
+  | 29.279 | in `decideDoor`, `{ ...request, dryRun: true }` → `{ ...request }` | the dry run flag |
+  | 29.279 | in `decideDoor`, `throw cause;` → `return undefined as never;` | a 500 resolves |
+
+  Revert each. The route rows need the DB (`NEEDS: db`).
+
+- [ ] **Step 8: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** `grep -rn "previewDecide\|decide" test-cases/29-workflow-timeline-graphs.md Features.md docs/manual.md` and fix any line that says the Decide door is not built; T3's Features bullet for the flow route said "read-only": `grep -n "wtg-part3-workflow-graph T3 bullet" -A4 Features.md` and add that the file now also carries the decide route.
+  2. Flip 29.276, 29.278 and 29.279 to ✅ and 29.277 to ✅ only when `flow-decide.test.ts` ran green LOCALLY (🟡 with the reason otherwise).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T11 bullet -->`: `- ⚙️ **Decide door** — \`POST /v1/workspaces/:ws/tickets/:id/decide\`: with \`dryRun\` it answers the plan a choice would make, named only for tickets the caller can see (\`hiddenMoves\` for the rest); without it, it files the outcome and the finishing transition as one atomic batch as the caller (\`finishStateId\`: omitted = the first finished state, \`null\` = record the outcome only, a named finished state), answers the pass and the revision it made, and says why a choice is refused (a blocked choice in the engine's own sentence). \`DataSourceQuery.previewDecide\` / \`decide\` return a refusal as data and the replica refuses with a named gap. \`apps/server/src/routes/flow.ts\`, \`apps/server/src/flow/decide-preview.ts\`, \`packages/app-core/src/online/decide-door.ts\``.
+  4. Sweeps: app-core, ui and web suites WHOLE, the server integration files WHOLE (Step 6), `security-middleware.test.ts`, then `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server` (LOCAL).
+
+  Commit `wtg3 T11: the Decide door`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-decide-door.md` written (the landed names Step 0 found, the gates' place, the blocker fixture's result, whether the finishing transition reached the terminal state, D-W3-41 to D-W3-45 and D-W3-53 to D-W3-55).
+
+---
+
+### Task 12: Deciding on the graph: the Decide control, the confirmation with the started-ticket choice, blockers, the passes, alternate and Not-taken lines, and status in words (cases 29.280–29.289)
+
+**Branch** `task/wtg3-decide-ui` (needs T8, T9, T10 and T11: the view files below are edited as diffs against T10's end state, so this task lands after all four). **NEEDS: browser** for Step 7. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Workflow-revised.png` (the Decision's inspector with Passes and the started-ticket question), `Workflow-passes.png` (the passes and the loop count) and `Phone-workflow.png` (the card on a phone). **Files:**
+- Create:
+  - `packages/app-core/src/workflow-graph/decide-model.ts`, `packages/app-core/test/workflow-graph/decide-model.test.ts`
+  - `apps/web/src/workflow-graph/{decide-actions.ts,decide-control.tsx,decide-dialog.tsx}`
+  - `apps/web/test/workflow-graph/{decide-actions.test.ts,use-flow-actions.test.tsx,decide-flow.test.tsx,inspector-lines.test.tsx,status-words.test.tsx,css-scan.ts}`
+- Modify:
+  - `packages/app-core/src/workflow-graph/index.ts` (the exports below), `packages/app-core/src/workflow-graph/inspector-model.ts` (two docblocks: Step 9)
+  - `apps/web/src/workflow-graph/{flow-actions.ts,use-flow-actions.ts,flow-inspector.tsx,workflow-view.tsx,workflow-panel.tsx}`, `apps/web/test/workflow-graph/{support.tsx,workflow-panel.test.tsx}` (diffs)
+  - `packages/ui/src/ui.css` (one `/* WTG3 T12 */` block)
+  - `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` (T12 anchors)
+
+**Interfaces:**
+- **Consumes:** T3 `FlowRead`, `FlowNodeRead` (`kind`, `outcome`, `passes: PassRecord[]` with `{pass, outcome, by, at, revisions: [{from, to, by, at}]}`, `resolution`, `alternates`, `draft`), `FlowEdgeRead`; T7 `diffReads`, `highlightIds`, `FlowRead` fixtures (`decisionRead()`, `readNode`, `readEdge`, `readOf` from `@gisik-nokma/app-core/workflow-graph/testing`), `nodeLabel`, `notTakenTooltip`; T8 `inspectorOf`, `formatMoveTime`, `InspectorActions`, `ActionResult`, `FlowInspector` and its `.gn-wf-inspector__*` classes; T9 `StepActions`, `NEEDS_CONNECTION`; T10 the edited `workflow-view.tsx`; T11 `DataSourceQuery.previewDecide(workspaceId, ticketId, {outcome, from?, closeStarted?, finishStateId?}) → {ok: true, plan: DecidePlanRead} | {ok: false, rule, reason}` and `decide(...) → {ok: true, filed, pass, revised} | {ok: false, rule, reason}`, `DecidePlanRead {moves, hiddenMoves, started, blocked: {ticketId, reason, sentence} | null}` (this view words a blocker from `reason` itself; `sentence` is there for Part 5); domain `sameLabel`, `DecidePlanRead`; the kit's `Button` (`busy`, `variant`), `Dialog` (`initialFocusRef`, `footer`), `Switch`; `useActorLabels(workspaceIds) → (userId) => string` (`apps/web/src/use-actor-labels.ts`).
+- **Produces:**
+  - app-core, from `@gisik-nokma/app-core/workflow-graph`: `decideModelOf(read, id): DecideModel | null` (`{decisionId, outcome, choices: [{label, chosen}], canClear, disabled}`), `confirmationOf(read, plan): Confirmation` (`{needed, summary, hidden, started: [{ticketId, text}], blocked}`), `canConfirm(confirmation, choices)`, `closeStartedOf(confirmation, choices)`, `blockedText(read, blocked)`, `passRowsOf(node, nameOf)`, `alternateRowsOf(read, node)`, `decisionExtrasOf(read, id, nameOf)`, the copy `DECIDE_HEADING`, `CLEAR_LABEL`, `KEEP_GOING`, `CLOSE_NOT_TAKEN`, `HIDDEN_MOVES_COPY`, `PASSES_HEADING`, and the types `DecideChoice`, `DecideModel`, `Confirmation`, `StartedQuestion`, `StartedChoice`, `PassRow`, `AlternateRow`, `DecisionExtras`;
+  - web: `DecideActions { previewDecide(decisionId, outcome): Promise<DecidePreview>; decide(decisionId, outcome, closeStarted): Promise<ActionResult> }`, `DecidePreview = {ok: true; plan} | {ok: false; message}`, `makeDecideActions({ dataSource, workspaceId, read })`, `FlowActions = InspectorActions & StepActions & DecideActions` (the line T9 said T11 and T12 widen; T11 adds no web code, so this task widens it), `DecideControl`, `DecideDialog`; `FlowInspector` gains the optional prop `nameOf`, `WorkflowView` gains the optional prop `nameOf` (the panel passes `useActorLabels([workspaceId])`); in `css-scan.ts` `uiCss()` and `cssRules(css)`.
+
+Siblings copied: `packages/ui/src/components/dialog.tsx` (`initialFocusRef`, focus moves into the panel on open, `:117-124`) for the first-option focus; `packages/ui/src/components/button.tsx` (`busy` disables a button and sets `aria-busy`) for the Confirm button; `packages/ui/src/ui.css` `.gn-filters__chip[aria-pressed='true']` (`:8290`) for a pressed choice; `apps/web/src/use-actor-labels.ts` for "who is this id"; T8's `FlowInspector` sections and T9's Dialog forms.
+
+**Decisions, reported:**
+- **D-W3-46 The control asks the server first and opens the dialog only when something else would move.** PS-6 says "computes `planSettle` locally"; D-W3-7 moved that to the server (the browser holds only the visible subgraph). So a choice is `previewDecide`, then either `decide` at once (the plan moves nothing but the Decision: no dialog for a choice that only records itself) or the confirmation. A refused preview is a sentence under the buttons.
+- **D-W3-47 The two started-ticket options are native radios in a fieldset.** Arrow keys move and choose inside the group and Tab leaves it, as every radio group does; no option is checked on open; the first radio takes focus through the Dialog's `initialFocusRef` without being chosen. Equal weight is guarded twice: both options are the same element with the same class (a test), and the sheet may single one out only by its checked and focus state (a stylesheet scan, `status-words.test.tsx`). The order is the spec's: `Keep going`, then `Close as Not taken` (the mockup draws them the other way round; the spec's audit ruling wins).
+- **D-W3-48 People in the passes come from the workspace roster.** `PassRecord.by` is an id and the read carries no names for it. The panel passes `useActorLabels([workspaceId])` (the roster plus the names-only read, `Unknown person` when neither names them); the pure model takes any `nameOf` and leaves the name out on `null`, so a host without a roster still shows the pass and its time.
+- **D-W3-49 Pass rows follow the approved mockup's words and the repo's copy rule.** `Pass 1, No, chosen by Jangjang Sangma, 3 Oct 15:20 (revised from Yes to No, 3 Oct 15:20)`: commas where the spec and the mockup have a dash or a dot (23.191 forbids both marks in app-core), "chosen by" from the mockup.
+- **D-W3-50 A blocked plan is never confirmable, and it is not re-planned with the person's answers.** The dialog says which ticket and why and offers Close only. If a blocker could be cleared by closing a started ticket, the person cannot do that from here in this release: the server gate (`decision.cascade-blocked`) judges the write either way, so the dialog never offers a write the server would refuse.
+- **D-W3-51 A settle is rung by what already exists.** `diffReads` (T7) compares the fields a card shows plus a Decision's outcome and pass count and a ticket's resolution and round, so a choice and everything it moves is `changed` and the stage rings it (WG-5, WG-8). This task adds no ring code; 29.289 pins that the settle IS a change.
+- **D-W3-52 "Flow changes waiting" (PS-9) is not drawn.** `FlowRead` has no pending-plan field (a Decision whose settle has not run yet looks decided). Reported as a finding for Part 2 / T3: the chip needs one boolean on `FlowNodeRead`.
+
+- [ ] **Step 0: Pre-flight**
+
+  1. Cut `task/wtg3-decide-ui` from `origin/release/<next>` with T8, T9, T10 and T11 merged; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  2. **The diffs below are against T10's end state.** `git apply --check` each (`flow-inspector`, `use-flow-actions`, `workflow-view`, `workflow-panel`, `flow-actions`, `support`, `workflow-panel-test`); a hunk that does not apply means a task above it changed those lines: re-read the file and apply the same edit by hand, never skip it.
+  3. **Read what landed** and put the names in the handoff: `grep -n "previewDecide\|decide(" packages/app-core/src/data-source.ts` (T11's signatures); `grep -n "initialFocusRef\|footer" packages/ui/src/components/dialog.tsx`; `grep -n "busy" packages/ui/src/components/button.tsx`; `grep -n "export function useActorLabels" apps/web/src/use-actor-labels.ts`; `grep -n "previewDecide\|decide:" apps/web/test/helpers/stub-services.ts` (T11 added them; if not, add `previewDecide: unstubbed('previewDecide'), decide: unstubbed('decide')` beside `getFlow`); `grep -n "gn-flow-node__status" packages/ui/src/ui.css` (T5's rule: the scan in Step 4 needs it).
+  4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T12" Features.md test-cases/29-workflow-timeline-graphs.md`.
+
+- [ ] **Step 1: The ten case lines**
+
+  Under `<!-- wtg-part3-workflow-graph T12 -->`:
+  - `- ❌ **29.280 — The Decide choices are right:** a Decision offers one choice per outgoing label in the inspector's order (flow order, a loop last), a label spelled twice with another case or spacing is one choice, the chosen one is marked and matches the outcome ignoring case, \`Clear\` is offered only when there is an outcome, an outcome no label carries marks none but can still be cleared, and the control says why it is off for a draft (\`Publish the flow before choosing.\`), a Decision that was not taken, and a Decision whose links have no names. Control: an ordinary ticket has no control. Mutation: drop the loop-last sort → reds.`
+  - `- ❌ **29.281 — The confirmation says what else will move, in the spec's words:** a branch reads \`This closes GN-152 and GN-153 as Not taken.\`, a loop \`This reopens GN-143 and puts GN-144 back in Backlog.\`, a mix one sentence of three clauses; steps nobody here can see are \`Some steps you can't see will also move.\` with no count; a move of a ticket that left the read is not named; each started ticket is a question (\`GN-146 is already in progress on the branch you are leaving. Close it as Not taken, or keep it going?\`), Confirm needs an answer to every one, and \`closeStarted\` carries only the closes in the order asked; a blocked plan names its ticket (not a hidden one) and why and can never be confirmed; the words carry neither " — " nor " · " nor a banned word. Controls: a plan that moves nothing else needs no confirmation. Mutation: \`every\` → \`some\` in \`canConfirm\` → reds.`
+  - `- ❌ **29.282 — The inspector's lines are right:** a pass reads \`Pass 1, Need more info, chosen by Jangjang Sangma, 2 Oct 14:20\` with \`(revised from Yes to Need more info, 2 Oct 15:00)\` after a revision, a cleared pass says \`no outcome\`, a person nobody names is left out; a ticket on exactly one branch reads \`Alternate of GN-149 Team assembles pitch deck, via GN-151 Client decides (Need more info)\` for each other branch whose first ticket the viewer can see; a Not-taken ticket reads \`Not taken, pass 2, via GN-162 Build the page in-house? (chose No)\`. Controls: an ordinary ticket has none of the three. Mutation: drop the revisions from \`passRowsOf\` → reds.`
+  - `- ❌ **29.283 — The Decide actions:** a preview and a write name the workspace and the decision, always send the outcome the read shows as \`from\` (\`null\` when none), and send \`closeStarted\` only when something is to be closed; a refusal the route words comes back as its reason; a Decision that left the flow is a sentence and sends nothing; offline is \`Needs a connection.\`, any other failure is its own message and none throws; signed out both answer \`Sign in again to make changes.\` and send nothing. Controls: a Decision with no outcome sends \`from: null\`. Mutation: drop \`from\` from the write → reds.`
+  - `- ❌ **29.284 — The Decide control:** the Decision's inspector has a \`Decide\` section with one button per label, the chosen one pressed and marked with a check (not by colour alone), and \`Clear\`; a choice first asks for the plan and, when it moves nothing else, is written at once with no dialog; a choice that moves something opens the confirmation first and writes nothing until it is confirmed; pressing the chosen label does nothing; a second press while the plan is being asked for sends nothing more and the other buttons are off; a refused preview and a refused write are each a sentence under the buttons and the buttons stay as the read has them; a draft Decision shows why the buttons are off. Controls: an ordinary ticket has no section. Mutation: drop the busy lock → reds.`
+  - `- ❌ **29.285 — The confirmation dialog:** titled \`Choose Yes\` for a first choice, \`Change the decision to Yes\` for a revision and \`Clear this decision\`; it says what moves and the hidden-steps sentence; Cancel writes nothing; Confirm writes the choice once (a second press while it is in flight sends nothing and the button is busy) and closes; a refused write stays in the open dialog with its reason and can be confirmed again. Mutation: drop \`busy\` from Confirm → reds.`
+  - `- ❌ **29.286 — The inspector shows the passes, names the alternate branch and says why a ticket was not taken:** a Decision lists \`Passes\` in order with the person (from the workspace roster in the panel) and the time; a Not-taken ticket shows its resolution line; a ticket on one branch shows an \`Alternate of …\` line that selects the other branch's first ticket on a press, and a branch the viewer cannot see is not named. Controls: an ordinary ticket has no Passes. Mutation: drop \`nameOf\` from the panel → reds.`
+  - `- ❌ **29.287 — A started ticket on the branch being left is the person's choice:** each is a group asking the spec's question with \`Keep going\` then \`Close as Not taken\`, neither checked on open, keyboard focus on the first option without choosing it, Confirm off until every group is answered, and \`closeStarted\` carries the closes only; the two options are the same element with the same class and attributes (neither primary nor destructive), and the stylesheet singles an option out only by its checked and focus state. Controls: keeping every ticket going sends no \`closeStarted\`. Mutations: swap the order; pre-select Keep going → reds.`
+  - `- ❌ **29.288 — A plan the engine would refuse writes nothing:** the dialog names the ticket and why (a hidden ticket is \`A step you cannot see\`), says \`Nothing was changed.\`, draws no question and no Confirm, and offers Close only; nothing is written. Controls: the same dialog for an allowed plan has Confirm. Mutation: always draw Confirm → reds.`
+  - `- ❌ **29.289 — Status is never colour alone, and a settle is rung:** every drawn card names its state in words (a Not-taken card its chip in that place, a Decision the word under its key) and no rule in the stylesheet hides that word at any width; between the read before a choice and the read after it, the Decision, the ticket closed Not taken and a ticket the loop reopened are all changed and a read where only the dates moved is not. Controls: the same read twice changes nothing. Mutation: \`display: none\` on the status word → reds. Manual half (🟡 until recorded): on a lane port, the view with the browser's achromatopsia emulation at 1240 px and at 390 px beside \`Main.png\` and \`Phone-workflow.png\`: every card still reads its state.`
+
+- [ ] **Step 2: RED, the app-core test**
+
+  `packages/app-core/test/workflow-graph/decide-model.test.ts` (29.280 to 29.282 and the pure half of 29.289; the fixture is T7's `decisionRead()`: a Decision `D` decided twice, a Not-taken ticket `B`, a loop):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
+import type { DecidePlanRead } from '@gisik-nokma/domain';
+import { diffReads, highlightIds } from '../../src/workflow-graph/flow-diff.js';
+import {
+  alternateRowsOf,
+  canConfirm,
+  CLEAR_LABEL,
+  CLOSE_NOT_TAKEN,
+  closeStartedOf,
+  confirmationOf,
+  decideModelOf,
+  DECIDE_HEADING,
+  decisionExtrasOf,
+  HIDDEN_MOVES_COPY,
+  KEEP_GOING,
+  passRowsOf,
+  PASSES_HEADING,
+} from '../../src/workflow-graph/decide-model.js';
+import { decisionRead, readEdge, readNode, readOf } from '../../src/workflow-graph/testing.js';
+
+const plan = (over: Partial<DecidePlanRead> = {}): DecidePlanRead => ({ moves: [], hiddenMoves: false, started: [], blocked: null, ...over });
+const NO_NAMES = (): string | null => null;
+
+describe('29.280 the Decide choices (DC-6)', () => {
+  it('29.280 one choice per outgoing label in the inspector order (flow order, a loop last), the chosen one marked, Clear only when there is an outcome; control: a pending Decision marks none and offers no Clear', () => {
+    const read = decisionRead();
+    const model = decideModelOf(read, 'D')!;
+    expect(model.choices).toEqual([
+      { label: 'Yes', chosen: false },
+      { label: 'No', chosen: true },
+      { label: 'Needs rework', chosen: false },
+    ]);
+    expect(model).toMatchObject({ decisionId: 'D', outcome: 'No', canClear: true, disabled: null });
+    const pending = { ...read, nodes: read.nodes.map((n) => (n.id === 'D' ? { ...n, outcome: null } : n)) };
+    expect(decideModelOf(pending, 'D')).toMatchObject({ canClear: false, choices: [{ chosen: false }, { chosen: false }, { chosen: false }] });
+    expect(decideModelOf(read, 'C')).toBeNull(); // an ordinary ticket has no control
+    expect(decideModelOf(read, 'missing')).toBeNull();
+  });
+
+  it('29.280 a label spelled twice with other case or spacing is one choice, and the match to the outcome ignores case; an outcome no label carries marks none but can still be cleared', () => {
+    const nodes = [readNode('D', { kind: 'decision', outcome: ' YES ' }), readNode('B'), readNode('C'), readNode('X', { outcome: null })];
+    const read = readOf(nodes, [readEdge('D', 'B', 'Yes'), readEdge('D', 'C', 'yes ')]);
+    expect(decideModelOf(read, 'D')!.choices).toEqual([{ label: 'Yes', chosen: true }]);
+    const orphan = readOf([readNode('D', { kind: 'decision', outcome: 'Gone' }), readNode('B')], [readEdge('D', 'B', 'Yes')]);
+    expect(decideModelOf(orphan, 'D')).toMatchObject({ choices: [{ label: 'Yes', chosen: false }], canClear: true });
+  });
+
+  it('29.280 the control says why it cannot be used: a draft, a Decision that was not taken, and a Decision whose links have no names; control: each of those is enabled once fixed', () => {
+    const base = (over: Parameters<typeof readNode>[1]) => readOf([readNode('D', { kind: 'decision', ...over }), readNode('B')], [readEdge('D', 'B', 'Yes')]);
+    expect(decideModelOf(base({}), 'D')!.disabled).toBeNull();
+    expect(decideModelOf(base({ draft: true }), 'D')!.disabled).toBe('Publish the flow before choosing.');
+    expect(decideModelOf(base({ resolution: { kind: 'not-taken', decisionTicketId: 'Z', outcome: 'No', pass: 1 } }), 'D')!.disabled).toBe('This decision was not taken, so it cannot be decided.');
+    const unnamed = readOf([readNode('D', { kind: 'decision', outcome: 'Yes' }), readNode('B')], [readEdge('D', 'B', null)]);
+    expect(decideModelOf(unnamed, 'D')).toMatchObject({ choices: [], disabled: 'Name the branches first. Each link from this decision needs a name.', canClear: false });
+  });
+});
+
+describe('29.281 the confirmation (PS-6)', () => {
+  const read = decisionRead();
+
+  it('29.281 a branch closes what it leaves, a loop reopens and parks, and a mix reads as one sentence; control: a plan that moves nothing else is written without asking', () => {
+    expect(confirmationOf(read, plan({ moves: [{ ticketId: 'B', kind: 'not-taken' }, { ticketId: 'C', kind: 'not-taken' }] })).summary).toBe('This closes GN-163 and GN-165 as Not taken.');
+    expect(confirmationOf(read, plan({ moves: [{ ticketId: 'A', kind: 'reopen' }, { ticketId: 'E', kind: 'backlog' }] })).summary).toBe('This reopens GN-161 and puts GN-166 back in Backlog.');
+    expect(
+      confirmationOf(read, plan({ moves: [{ ticketId: 'A', kind: 'reopen' }, { ticketId: 'E', kind: 'backlog' }, { ticketId: 'B', kind: 'not-taken' }] })).summary,
+    ).toBe('This reopens GN-161, puts GN-166 back in Backlog and closes GN-163 as Not taken.');
+    expect(confirmationOf(read, plan())).toEqual({ needed: false, summary: null, hidden: null, started: [], blocked: null });
+  });
+
+  it('29.281 steps the person cannot see are one sentence with no count; a move of a ticket that left the read is not named; control: nothing hidden says nothing', () => {
+    const hidden = confirmationOf(read, plan({ moves: [{ ticketId: 'B', kind: 'not-taken' }], hiddenMoves: true }));
+    expect(hidden.hidden).toBe("Some steps you can't see will also move.");
+    expect(hidden.hidden).toBe(HIDDEN_MOVES_COPY);
+    expect(hidden.hidden).not.toMatch(/\d/);
+    expect(confirmationOf(read, plan({ moves: [{ ticketId: 'B', kind: 'not-taken' }] })).hidden).toBeNull();
+    const gone = confirmationOf(read, plan({ moves: [{ ticketId: 'left', kind: 'not-taken' }] }));
+    expect(gone).toMatchObject({ summary: null, needed: false });
+    expect(confirmationOf(read, plan({ hiddenMoves: true })).needed).toBe(true);
+  });
+
+  it('29.281 each started ticket is a question, Confirm needs an answer to every one, and closeStarted carries only the ones to close in the order asked; control: keeping all of them sends none', () => {
+    const c = confirmationOf(read, plan({ started: ['C', 'E'] }));
+    expect(c.needed).toBe(true);
+    expect(c.started).toEqual([
+      { ticketId: 'C', text: 'GN-165 is already in progress on the branch you are leaving. Close it as Not taken, or keep it going?' },
+      { ticketId: 'E', text: 'GN-166 is already in progress on the branch you are leaving. Close it as Not taken, or keep it going?' },
+    ]);
+    expect(canConfirm(c, {})).toBe(false);
+    expect(canConfirm(c, { C: 'close' })).toBe(false);
+    expect(canConfirm(c, { C: 'close', E: 'keep' })).toBe(true);
+    expect(closeStartedOf(c, { C: 'close', E: 'keep' })).toEqual(['C']);
+    expect(closeStartedOf(c, { E: 'close', C: 'close' })).toEqual(['C', 'E']);
+    expect(closeStartedOf(c, { C: 'keep', E: 'keep' })).toEqual([]);
+    expect(canConfirm(confirmationOf(read, plan({ moves: [{ ticketId: 'B', kind: 'not-taken' }] })), {})).toBe(true);
+  });
+
+  it('29.281 a blocked plan says which ticket and why, names nothing it cannot see, and can never be confirmed; an unknown reason still gets a sentence', () => {
+    const c = confirmationOf(read, plan({ blocked: { ticketId: 'C', reason: 'child-open', sentence: 'This choice cannot be applied: child-open.' } }));
+    expect(c.blocked).toBe('GN-165 Brief the agency still has unfinished work under it, so it cannot be closed. Nothing was changed.');
+    expect(c.needed).toBe(true);
+    expect(canConfirm(c, {})).toBe(false);
+    expect(canConfirm(confirmationOf(read, plan({ started: ['C'], blocked: { ticketId: 'C', reason: 'child-open', sentence: 'This choice cannot be applied: child-open.' } })), { C: 'keep' })).toBe(false);
+    expect(confirmationOf(read, plan({ blocked: { ticketId: null, reason: 'parent-finished', sentence: 'This choice cannot be applied: a step you cannot see is blocking it.' } })).blocked).toBe('A step you cannot see sits under a finished parent, so it cannot be moved. Nothing was changed.');
+    expect(confirmationOf(read, plan({ blocked: { ticketId: 'C', reason: 'something-new', sentence: 'This choice cannot be applied: something-new.' } })).blocked).toBe('GN-165 Brief the agency cannot be changed by this choice. Nothing was changed.');
+  });
+
+  it('29.281 the words carry neither " — " nor " · " (23.191) and none of the banned words (23.190)', () => {
+    const c = confirmationOf(read, plan({ moves: [{ ticketId: 'A', kind: 'reopen' }, { ticketId: 'E', kind: 'backlog' }, { ticketId: 'B', kind: 'not-taken' }], hiddenMoves: true, started: ['C'], blocked: { ticketId: 'C', reason: 'child-open', sentence: 'This choice cannot be applied: child-open.' } }));
+    const all = [DECIDE_HEADING, CLEAR_LABEL, KEEP_GOING, CLOSE_NOT_TAKEN, PASSES_HEADING, c.summary, c.hidden, c.blocked, ...c.started.map((q) => q.text)].join('\n');
+    expect(all).not.toMatch(/ — | · /);
+    expect(all).not.toMatch(/\b(job|jobs|stage|stages)\b/i);
+  });
+});
+
+describe('29.282 passes, alternates and the Not-taken line (PS-7, PS-8, PS-10)', () => {
+  it('29.282 a pass reads "Pass n, outcome, chosen by person, time" with each revision after it; a cleared pass says so; a person nobody names is left out; control: the earlier pass is listed as it was', () => {
+    const d = decisionRead().nodes.find((n) => n.id === 'D')!;
+    expect(passRowsOf(d, (id) => (id === 'u1' ? 'Ama Rangsa' : null))).toEqual([
+      { pass: 1, text: 'Pass 1, Yes, chosen by Ama Rangsa, 25 Sep 11:40' },
+      { pass: 2, text: 'Pass 2, No, chosen by Ama Rangsa, 2 Oct 16:05' },
+    ]);
+    expect(passRowsOf(d, NO_NAMES)[0]!.text).toBe('Pass 1, Yes, 25 Sep 11:40');
+    const revised = {
+      ...d,
+      passes: [
+        { pass: 1, outcome: 'Need more info', by: 'u2', at: '2026-10-02T08:50:00Z', revisions: [{ from: 'Yes', to: 'Need more info', by: 'u2', at: '2026-10-02T09:30:00Z' }] },
+        { pass: 2, outcome: null, by: 'u2', at: '2026-10-03T04:30:00Z', revisions: [{ from: 'Yes', to: null, by: 'u2', at: '2026-10-03T04:31:00Z' }] },
+      ],
+    };
+    expect(passRowsOf(revised, () => 'Jangjang Sangma').map((r) => r.text)).toEqual([
+      'Pass 1, Need more info, chosen by Jangjang Sangma, 2 Oct 14:20 (revised from Yes to Need more info, 2 Oct 15:00)',
+      'Pass 2, no outcome, chosen by Jangjang Sangma, 3 Oct 10:00 (revised from Yes to no outcome, 3 Oct 10:01)',
+    ]);
+  });
+
+  it('29.282 a ticket on exactly one branch names the other branch\'s first ticket and the Decision it is via; a first ticket the viewer cannot see is not named; control: a ticket with no alternates has none', () => {
+    const read = decisionRead();
+    const b = { ...read.nodes.find((n) => n.id === 'B')!, alternates: [{ viaDecisionId: 'D', outcome: 'No', firstTicketId: 'C' }, { viaDecisionId: 'D', outcome: 'Later', firstTicketId: 'hidden' }] };
+    expect(alternateRowsOf(read, b)).toEqual([{ ticketId: 'C', text: 'Alternate of GN-165 Brief the agency, via GN-162 Build the page in-house? (No)' }]);
+    expect(alternateRowsOf(read, read.nodes.find((n) => n.id === 'C')!)).toEqual([]);
+    const loose = { ...b, alternates: [{ viaDecisionId: 'gone', outcome: 'No', firstTicketId: 'C' }] };
+    expect(alternateRowsOf(read, loose)[0]!.text).toBe('Alternate of GN-165 Brief the agency (No)');
+  });
+
+  it('29.282 a Not-taken ticket reads its resolution with the pass and the Decision; the extras of an ordinary ticket are empty; control: a Decision has its control and its passes', () => {
+    const read = decisionRead();
+    expect(decisionExtrasOf(read, 'B', NO_NAMES)).toEqual({ decide: null, passes: [], alternates: [], resolution: 'Not taken, pass 2, via GN-162 Build the page in-house? (chose No)' });
+    expect(decisionExtrasOf(read, 'C', NO_NAMES)).toEqual({ decide: null, passes: [], alternates: [], resolution: null });
+    const d = decisionExtrasOf(read, 'D', NO_NAMES)!;
+    expect(d.decide).not.toBeNull();
+    expect(d.passes).toHaveLength(2);
+    expect(decisionExtrasOf(read, 'missing', NO_NAMES)).toBeNull();
+  });
+});
+
+describe('29.289 a settle is rung as a change', () => {
+  it('29.289 between the read before a choice and the read after it, the Decision, the ticket closed Not taken and a ticket the loop reopened are all changed; a read where only the dates moved is not; control: the same read twice changes nothing', () => {
+    const after = decisionRead();
+    const before = {
+      ...after,
+      nodes: after.nodes.map((n) =>
+        n.id === 'D' ? { ...n, outcome: null, passes: [] } : n.id === 'B' ? { ...n, resolution: null } : n.id === 'E' ? { ...n, round: 1 } : n,
+      ),
+    };
+    expect(diffReads(before, after).changed.sort()).toEqual(['B', 'D', 'E']);
+    expect(highlightIds(diffReads(before, after)).sort()).toEqual(['B', 'D', 'E']);
+    expect(highlightIds(diffReads(after, after))).toEqual([]);
+    const dated = { ...after, nodes: after.nodes.map((n) => ({ ...n, periods: [{ start: '2026-10-03', end: null, pass: 1 }] })) };
+    expect(highlightIds(diffReads(after, dated))).toEqual([]);
+  });
+});
+  ```
+  Run: `pnpm --filter @gisik-nokma/app-core exec vitest run --maxWorkers=2 test/workflow-graph/decide-model.test.ts > /tmp/wtg3-t12a.log 2>&1; tail -n 20 /tmp/wtg3-t12a.log`. Expected FAIL (no `decide-model`). Commit.
+
+- [ ] **Step 3: GREEN, the pure model**
+
+  `packages/app-core/src/workflow-graph/decide-model.ts`:
+  ```ts
+import { sameLabel, type DecidePlanRead, type FlowNodeRead, type FlowRead } from '@gisik-nokma/domain';
+import { formatMoveTime } from './inspector-model.js';
+import { nodeLabel, notTakenTooltip } from './flow-sentences.js';
+
+/**
+ * The Decision's side of the inspector, as pure functions of a `FlowRead` and of the plan the server answered (DC-6, PS-6, PS-7,
+ * PS-8, PS-10). The words are the spec's; none has " — " or " · " in it (23.191), and none uses the banned words (23.190).
+ */
+export const DECIDE_HEADING = 'Decide';
+export const CLEAR_LABEL = 'Clear';
+export const KEEP_GOING = 'Keep going';
+export const CLOSE_NOT_TAKEN = 'Close as Not taken';
+export const HIDDEN_MOVES_COPY = "Some steps you can't see will also move.";
+export const PASSES_HEADING = 'Passes';
+
+export type DecideChoice = { label: string; chosen: boolean };
+export type DecideModel = {
+  decisionId: string;
+  outcome: string | null;
+  /** One button per outgoing label, in the order the inspector lists the links (flow order, a loop last). */
+  choices: DecideChoice[];
+  canClear: boolean;
+  /** Why the control cannot be used, or `null`. */
+  disabled: string | null;
+};
+
+const refOf = (read: FlowRead, id: string): FlowNodeRead | undefined => read.nodes.find((n) => n.id === id);
+
+/** `null` unless `id` is a Decision in the read. */
+export function decideModelOf(read: FlowRead, id: string): DecideModel | null {
+  const node = refOf(read, id);
+  if (node === undefined || node.kind !== 'decision') return null;
+  const rank = new Map(read.order.map((nodeId, index) => [nodeId, index] as const));
+  const here = new Set(read.nodes.map((n) => n.id));
+  const labelled = read.edges
+    .filter((e) => e.kind === 'leads_to' && e.from === id && e.label !== null && here.has(e.to))
+    .sort((a, b) => Number(a.loop) - Number(b.loop) || (rank.get(a.to) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.to) ?? Number.MAX_SAFE_INTEGER));
+  const choices: DecideChoice[] = [];
+  for (const edge of labelled) {
+    const label = edge.label as string;
+    if (choices.some((c) => sameLabel(c.label, label))) continue;
+    choices.push({ label, chosen: node.outcome !== null && sameLabel(node.outcome, label) });
+  }
+  let disabled: string | null = null;
+  if (node.draft) disabled = 'Publish the flow before choosing.';
+  else if (node.resolution !== null) disabled = 'This decision was not taken, so it cannot be decided.';
+  else if (choices.length === 0) disabled = 'Name the branches first. Each link from this decision needs a name.';
+  return { decisionId: id, outcome: node.outcome, choices, canClear: node.outcome !== null && disabled === null, disabled };
+}
+
+export type StartedChoice = 'keep' | 'close';
+export type StartedQuestion = { ticketId: string; text: string };
+export type Confirmation = {
+  /** `false`: the choice moves nothing but the Decision, so it is written without asking. */
+  needed: boolean;
+  /** "This closes GN-152 and GN-153 as Not taken." or `null` when no visible ticket moves. */
+  summary: string | null;
+  /** The sentence about steps the person cannot see, with no count; `null` when none move. */
+  hidden: string | null;
+  started: StartedQuestion[];
+  /** The sentence for a plan the engine would refuse; when set, nothing can be written. */
+  blocked: string | null;
+};
+
+function joinAnd(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+const BLOCKED_WORDS: Record<string, string> = {
+  'parent-finished': 'sits under a finished parent, so it cannot be moved',
+  'child-open': 'still has unfinished work under it, so it cannot be closed',
+  'outcome-has-no-branch': 'has no branch for that outcome',
+  'no-terminal-state': 'has a workflow with no finished state to close it in',
+};
+
+/** PS-6 "Blockers": which ticket stops the choice, in words, and that nothing was changed. A hidden ticket is not named. */
+export function blockedText(read: FlowRead, blocked: NonNullable<DecidePlanRead['blocked']>): string {
+  const node = blocked.ticketId === null ? undefined : refOf(read, blocked.ticketId);
+  const name = node === undefined ? 'A step you cannot see' : `${nodeLabel(node)} ${node.title}`;
+  const why = BLOCKED_WORDS[blocked.reason] ?? 'cannot be changed by this choice';
+  return `${name} ${why}. Nothing was changed.`;
+}
+
+/** The confirmation of PS-6 for a plan the server answered. Moves of tickets that are no longer in the read are not named. */
+export function confirmationOf(read: FlowRead, plan: DecidePlanRead): Confirmation {
+  const names = (kind: DecidePlanRead['moves'][number]['kind']): string[] =>
+    plan.moves.filter((m) => m.kind === kind).flatMap((m) => {
+      const node = refOf(read, m.ticketId);
+      return node === undefined ? [] : [nodeLabel(node)];
+    });
+  const reopened = names('reopen');
+  const backlog = names('backlog');
+  const closed = names('not-taken');
+  const clauses = [
+    ...(reopened.length === 0 ? [] : [`reopens ${joinAnd(reopened)}`]),
+    ...(backlog.length === 0 ? [] : [`puts ${joinAnd(backlog)} back in Backlog`]),
+    ...(closed.length === 0 ? [] : [`closes ${joinAnd(closed)} as Not taken`]),
+  ];
+  const started = plan.started.flatMap((id): StartedQuestion[] => {
+    const node = refOf(read, id);
+    return node === undefined
+      ? []
+      : [{ ticketId: id, text: `${nodeLabel(node)} is already in progress on the branch you are leaving. Close it as Not taken, or keep it going?` }];
+  });
+  const summary = clauses.length === 0 ? null : `This ${joinAnd(clauses)}.`;
+  const hidden = plan.hiddenMoves ? HIDDEN_MOVES_COPY : null;
+  const blocked = plan.blocked === null ? null : blockedText(read, plan.blocked);
+  return { needed: summary !== null || hidden !== null || started.length > 0 || blocked !== null, summary, hidden, started, blocked };
+}
+
+/** Confirm is enabled when nothing blocks the plan and every started ticket has a choice (neither is pre-selected). */
+export function canConfirm(confirmation: Confirmation, choices: Readonly<Record<string, StartedChoice | undefined>>): boolean {
+  return confirmation.blocked === null && confirmation.started.every((q) => choices[q.ticketId] !== undefined);
+}
+
+/** The started tickets the person chose to close, in the order they were asked: the request's `closeStarted`. */
+export function closeStartedOf(confirmation: Confirmation, choices: Readonly<Record<string, StartedChoice | undefined>>): string[] {
+  return confirmation.started.filter((q) => choices[q.ticketId] === 'close').map((q) => q.ticketId);
+}
+
+export type PassRow = { pass: number; text: string };
+
+/**
+ * PS-10: "Pass 1, Need more info, chosen by Jangjang Sangma, 2 Oct 14:20 (revised from Yes to Need more info, 2 Oct 15:00)". `nameOf` names the
+ * person (`null` leaves the name out). Earlier passes are shown, never edited.
+ */
+export function passRowsOf(node: FlowNodeRead, nameOf: (userId: string) => string | null): PassRow[] {
+  const say = (outcome: string | null): string => outcome ?? 'no outcome';
+  return node.passes.map((p) => {
+    const who = nameOf(p.by);
+    const revised = p.revisions.map((r) => ` (revised from ${say(r.from)} to ${say(r.to)}, ${formatMoveTime(r.at)})`).join('');
+    return { pass: p.pass, text: `Pass ${p.pass}, ${say(p.outcome)}${who === null ? '' : `, chosen by ${who}`}, ${formatMoveTime(p.at)}${revised}` };
+  });
+}
+
+export type AlternateRow = { ticketId: string; text: string };
+
+/**
+ * PS-7: "Alternate of GN-149 Team assembles pitch deck, via GN-151 Client decides (Need more info)". One line per other branch of a
+ * Decision this ticket is on exactly one branch of; a branch whose first ticket the viewer cannot see is not named.
+ */
+export function alternateRowsOf(read: FlowRead, node: FlowNodeRead): AlternateRow[] {
+  return node.alternates.flatMap((alt): AlternateRow[] => {
+    const first = refOf(read, alt.firstTicketId);
+    if (first === undefined) return [];
+    const via = refOf(read, alt.viaDecisionId);
+    const where = via === undefined ? '' : `, via ${nodeLabel(via)} ${via.title}`;
+    return [{ ticketId: first.id, text: `Alternate of ${nodeLabel(first)} ${first.title}${where} (${alt.outcome})` }];
+  });
+}
+
+export type DecisionExtras = {
+  decide: DecideModel | null;
+  passes: PassRow[];
+  alternates: AlternateRow[];
+  /** PS-8: "Not taken, pass 1, via GN-151 Client decides (chose Yes)" for a ticket closed Not taken. */
+  resolution: string | null;
+};
+
+/** Everything WG-3 adds for the selected ticket beyond T8's inspector model. `null` if it is not in the read. */
+export function decisionExtrasOf(read: FlowRead, id: string, nameOf: (userId: string) => string | null): DecisionExtras | null {
+  const node = refOf(read, id);
+  if (node === undefined) return null;
+  const byId = new Map(read.nodes.map((n) => [n.id, n] as const));
+  return {
+    decide: decideModelOf(read, id),
+    passes: node.kind === 'decision' ? passRowsOf(node, nameOf) : [],
+    alternates: alternateRowsOf(read, node),
+    resolution: node.resolution === null ? null : notTakenTooltip(node, byId),
+  };
+}
+  ```
+  `index.ts`, append:
+  ```ts
+export {
+  alternateRowsOf,
+  blockedText,
+  canConfirm,
+  CLEAR_LABEL,
+  CLOSE_NOT_TAKEN,
+  closeStartedOf,
+  confirmationOf,
+  decideModelOf,
+  DECIDE_HEADING,
+  decisionExtrasOf,
+  HIDDEN_MOVES_COPY,
+  KEEP_GOING,
+  passRowsOf,
+  PASSES_HEADING,
+  type AlternateRow,
+  type Confirmation,
+  type DecideChoice,
+  type DecideModel,
+  type DecisionExtras,
+  type PassRow,
+  type StartedChoice,
+  type StartedQuestion,
+} from './decide-model.js';
+  ```
+  Run Step 2's command; expected PASS (12 tests). The package's `ui-copy` sweep (23.190 and 23.191) scans app-core's source: this file has neither mark nor a banned word. Commit.
+
+- [ ] **Step 4: RED, the web tests**
+
+  `apps/web/test/workflow-graph/css-scan.ts` (the helper both stylesheet checks use; it finds `packages/ui/src/ui.css` by walking up from the test, so it holds wherever the test lives):
+  ```ts
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** The repository's `packages/ui/src/ui.css`, found by walking up from this file. */
+export function uiCss(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let up = 0; up < 12; up += 1) {
+    const candidate = join(dir, 'packages', 'ui', 'src', 'ui.css');
+    if (existsSync(candidate)) return readFileSync(candidate, 'utf8');
+    dir = dirname(dir);
+  }
+  throw new Error('packages/ui/src/ui.css was not found above this test');
+}
+
+export type CssRule = { selectors: string[]; body: string };
+
+/** Every `selector { declarations }` in the sheet, at any depth (an `@media` prelude is not a rule). Comments are dropped first. */
+export function cssRules(css: string): CssRule[] {
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules: CssRule[] = [];
+  for (const match of plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const prelude = match[1]!.trim();
+    if (prelude.startsWith('@')) continue;
+    rules.push({ selectors: prelude.split(',').map((s) => s.trim()), body: match[2]!.trim() });
+  }
+  return rules;
+}
+  ```
+  `decide-actions.test.ts` (29.283):
+  ```ts
+// @vitest-environment node
+import { describe, expect, it, vi } from 'vitest';
+import { ReplicaGapError, type DataSource } from '@gisik-nokma/app-core';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { makeDecideActions } from '../../src/workflow-graph/decide-actions.js';
+
+const PLAN = { moves: [{ ticketId: 'B', kind: 'not-taken' as const }], hiddenMoves: false, started: [], blocked: null };
+
+function rig(query: Partial<Record<'previewDecide' | 'decide', (...args: never[]) => Promise<unknown>>>, read = decisionRead()) {
+  const dataSource = { ingest: async () => [], query, subscribe: () => () => undefined } as unknown as DataSource;
+  return makeDecideActions({ dataSource, workspaceId: 'w1', read: () => read });
+}
+
+describe('29.283 the Decide actions (PS-6, DC-6)', () => {
+  it('29.283 a preview and a write name the workspace and the decision and always send the outcome the read shows as `from`; closeStarted is sent only when something is to be closed', async () => {
+    const previewDecide = vi.fn(async () => ({ ok: true as const, plan: PLAN }));
+    const decide = vi.fn(async () => ({ ok: true as const, filed: ['ticket.decided'], pass: 1, revised: null }));
+    const actions = rig({ previewDecide, decide } as never);
+    expect(await actions.previewDecide('D', 'Yes')).toEqual({ ok: true, plan: PLAN });
+    expect(previewDecide).toHaveBeenCalledWith('w1', 'D', { outcome: 'Yes', from: 'No' });
+    expect(await actions.decide('D', 'Yes', [])).toEqual({ ok: true });
+    expect(decide).toHaveBeenLastCalledWith('w1', 'D', { outcome: 'Yes', from: 'No' });
+    await actions.decide('D', 'Yes', ['C', 'E']);
+    expect(decide).toHaveBeenLastCalledWith('w1', 'D', { outcome: 'Yes', from: 'No', closeStarted: ['C', 'E'] });
+    await actions.decide('D', null, []);
+    expect(decide).toHaveBeenLastCalledWith('w1', 'D', { outcome: null, from: 'No' });
+    // control: a Decision that has no outcome yet sends `from: null`, not a missing member
+    const pending = decisionRead();
+    pending.nodes = pending.nodes.map((n) => (n.id === 'D' ? { ...n, outcome: null } : n));
+    await rig({ previewDecide } as never, pending).previewDecide('D', 'Yes');
+    expect(previewDecide).toHaveBeenLastCalledWith('w1', 'D', { outcome: 'Yes', from: null });
+  });
+
+  it('29.283 a refusal the route words comes back as its reason; a Decision that left the flow is a sentence and sends nothing', async () => {
+    const refusal = { ok: false as const, rule: 'decision.stale-from', reason: 'The decision changed to Yes since you looked.' };
+    const previewDecide = vi.fn(async () => refusal);
+    const decide = vi.fn(async () => refusal);
+    const actions = rig({ previewDecide, decide } as never);
+    expect(await actions.previewDecide('D', 'Yes')).toEqual({ ok: false, message: 'The decision changed to Yes since you looked.' });
+    expect(await actions.decide('D', 'Yes', [])).toEqual({ ok: false, message: 'The decision changed to Yes since you looked.' });
+    previewDecide.mockClear();
+    expect(await actions.previewDecide('missing', 'Yes')).toEqual({ ok: false, message: 'That decision is no longer in this flow.' });
+    expect(await actions.decide('missing', 'Yes', [])).toEqual({ ok: false, message: 'That decision is no longer in this flow.' });
+    expect(previewDecide).not.toHaveBeenCalled();
+  });
+
+  it('29.283 offline is "Needs a connection."; any other failure is its own message; neither throws', async () => {
+    const gap = rig({ previewDecide: async () => { throw new ReplicaGapError('previewDecide'); }, decide: async () => { throw new ReplicaGapError('decide'); } } as never);
+    expect(await gap.previewDecide('D', 'Yes')).toEqual({ ok: false, message: 'Needs a connection.' });
+    expect(await gap.decide('D', 'Yes', [])).toEqual({ ok: false, message: 'Needs a connection.' });
+    const broken = rig({ previewDecide: async () => { throw new Error('boom'); }, decide: async () => { throw 'plain'; } } as never);
+    expect(await broken.previewDecide('D', 'Yes')).toEqual({ ok: false, message: 'boom' });
+    expect(await broken.decide('D', 'Yes', [])).toEqual({ ok: false, message: 'The choice could not be saved.' });
+  });
+});
+  ```
+  `use-flow-actions.test.tsx` (29.283: signed in and signed out; `renderHook` over `Providers`):
+  ```tsx
+// @vitest-environment jsdom
+import { renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { Providers } from '../../src/providers.js';
+import { useFlowActions } from '../../src/workflow-graph/use-flow-actions.js';
+import { stubServices } from '../helpers/stub-services.js';
+
+const PLAN = { moves: [], hiddenMoves: false, started: [], blocked: null };
+
+describe('29.283 the Decide actions are part of every write the view can make', () => {
+  it('29.283 signed in, previewDecide and decide reach the data source with the workspace; signed out, both answer "Sign in again to make changes." and send nothing', async () => {
+    const previewDecide = vi.fn(async () => ({ ok: true as const, plan: PLAN }));
+    const decide = vi.fn(async () => ({ ok: true as const, filed: ['ticket.decided'], pass: 1, revised: null }));
+    const services = stubServices({ previewDecide, decide });
+    const read = decisionRead();
+
+    const signedIn = renderHook(() => useFlowActions(read, 'w1'), {
+      wrapper: ({ children }: { children: ReactNode }) => <Providers services={{ ...services, currentUser: { id: 'u1', name: 'Ama', email: null } }}>{children}</Providers>,
+    });
+    expect(await signedIn.result.current.previewDecide('D', 'Yes')).toEqual({ ok: true, plan: PLAN });
+    expect(await signedIn.result.current.decide('D', 'Yes', [])).toEqual({ ok: true });
+    expect(previewDecide).toHaveBeenCalledWith('w1', 'D', { outcome: 'Yes', from: 'No' });
+    expect(decide).toHaveBeenCalledWith('w1', 'D', { outcome: 'Yes', from: 'No' });
+
+    previewDecide.mockClear();
+    decide.mockClear();
+    const signedOut = renderHook(() => useFlowActions(read, 'w1'), { wrapper: ({ children }: { children: ReactNode }) => <Providers services={services}>{children}</Providers> });
+    expect(await signedOut.result.current.previewDecide('D', 'Yes')).toEqual({ ok: false, message: 'Sign in again to make changes.' });
+    expect(await signedOut.result.current.decide('D', 'Yes', [])).toEqual({ ok: false, message: 'Sign in again to make changes.' });
+    expect(previewDecide).not.toHaveBeenCalled();
+    expect(decide).not.toHaveBeenCalled();
+  });
+});
+  ```
+  `decide-flow.test.tsx` (29.284, 29.285, 29.287, 29.288; the Decision `D` of `decisionRead()` is selected, its outcome is No and it has three branches):
+  ```tsx
+// @vitest-environment jsdom
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import type { DecidePlanRead } from '@gisik-nokma/domain';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import type { DecidePreview } from '../../src/workflow-graph/decide-actions.js';
+import { fakeActions, mountView } from './support.js';
+
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(c.querySelectorAll('.gn-flow-node')).toHaveLength(n));
+const panel = () => within(screen.getByRole('complementary', { name: 'Selected ticket' }));
+const plan = (over: Partial<DecidePlanRead> = {}): DecidePlanRead => ({ moves: [], hiddenMoves: false, started: [], blocked: null, ...over });
+const preview = (over: Partial<DecidePlanRead> = {}) => vi.fn(async (): Promise<DecidePreview> => ({ ok: true, plan: plan(over) }));
+
+/** The Decision `D` of the fixture is selected: outcome No, passes 1 and 2, three labelled branches. */
+async function open(actions = fakeActions()) {
+  const view = mountView(decisionRead(), { selected: 'D', actions });
+  await drawn(view.container, 8);
+  return view;
+}
+
+describe('29.284 the Decide control in the inspector (DC-6)', () => {
+  it('29.284 one button per outgoing label in the inspector order, the chosen one pressed and marked with a check, and Clear; control: an ordinary ticket has no Decide section', async () => {
+    const { update } = await open();
+    const group = panel().getByRole('group', { name: 'Outcome' });
+    const buttons = within(group).getAllByRole('button').map((b) => [b.textContent?.replace(/✓\s*/, '').trim(), b.getAttribute('aria-pressed')]);
+    expect(buttons).toEqual([['Yes', 'false'], ['No', 'true'], ['Needs rework', 'false'], ['Clear', null]]);
+    expect(within(group).getByRole('button', { name: 'No' }).textContent).toContain('✓');
+    expect(within(group).getByRole('button', { name: 'Yes' }).textContent).not.toContain('✓');
+    update({ selected: 'C' });
+    expect(panel().queryByRole('group', { name: 'Outcome' })).toBeNull();
+    expect(panel().queryByRole('heading', { name: 'Decide' })).toBeNull();
+  });
+
+  it('29.284 a choice that moves nothing else is written at once, after one preview, with the outcome the person saw as `from` handled by the actions; no dialog opens', async () => {
+    const previewDecide = preview();
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide, decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('D', 'Yes', []));
+    expect(previewDecide).toHaveBeenCalledWith('D', 'Yes');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('29.284 a choice that moves something opens the confirmation first and writes nothing until it is confirmed; Clear asks with a null outcome', async () => {
+    const previewDecide = preview({ moves: [{ ticketId: 'B', kind: 'not-taken' }] });
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide, decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Change the decision to Yes' });
+    expect(within(dialog).getByText('This closes GN-163 as Not taken.')).toBeInTheDocument();
+    expect(decide).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(panel().getByRole('button', { name: 'Clear' }));
+    expect(previewDecide).toHaveBeenLastCalledWith('D', null);
+    expect(await screen.findByRole('dialog', { name: 'Clear this decision' })).toBeInTheDocument();
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it('29.284 pressing the chosen label does nothing; a second press while the first is being checked sends nothing more; control: after the answer the buttons work again', async () => {
+    let release: (value: DecidePreview) => void = () => undefined;
+    const previewDecide = vi.fn(() => new Promise<DecidePreview>((resolve) => (release = resolve)));
+    await open(fakeActions({ previewDecide }));
+    await userEvent.click(panel().getByRole('button', { name: 'No' }));
+    expect(previewDecide).not.toHaveBeenCalled();
+    await userEvent.dblClick(panel().getByRole('button', { name: 'Yes' }));
+    expect(previewDecide).toHaveBeenCalledTimes(1);
+    expect(panel().getByRole('button', { name: 'Needs rework' })).toBeDisabled();
+    release({ ok: false, message: 'The decision changed to Yes since you looked.' });
+    expect(await panel().findByRole('alert')).toHaveTextContent('The decision changed to Yes since you looked.');
+    expect(panel().getByRole('button', { name: 'Needs rework' })).toBeEnabled();
+  });
+
+  it('29.284 a preview that is refused and a write that is refused are each a sentence under the buttons; nothing else changes', async () => {
+    const decide = vi.fn(async () => ({ ok: false as const, message: 'You can only change tickets you can edit.' }));
+    const previewDecide = vi.fn().mockResolvedValueOnce({ ok: false, message: 'Needs a connection.' }).mockResolvedValue({ ok: true, plan: plan() });
+    await open(fakeActions({ previewDecide, decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    expect(await panel().findByRole('alert')).toHaveTextContent('Needs a connection.');
+    expect(decide).not.toHaveBeenCalled();
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    await waitFor(() => expect(panel().getByRole('alert')).toHaveTextContent('You can only change tickets you can edit.'));
+    expect(panel().getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('29.284 a draft Decision shows why the buttons are off; control: nothing is sent', async () => {
+    const read = decisionRead();
+    read.nodes = read.nodes.map((n) => (n.id === 'D' ? { ...n, draft: true, key: null } : n));
+    const previewDecide = preview();
+    const view = mountView(read, { selected: 'D', actions: fakeActions({ previewDecide }) });
+    await drawn(view.container, 8);
+    expect(panel().getByText('Publish the flow before choosing.')).toBeInTheDocument();
+    expect(panel().getByRole('button', { name: 'Yes' })).toBeDisabled();
+    expect(previewDecide).not.toHaveBeenCalled();
+  });
+});
+
+describe('29.285 the confirmation dialog (PS-6)', () => {
+  it('29.285 it says what moves in one sentence and the steps nobody here can see without a count; Confirm writes the choice once and closes; control: a first choice is titled Choose', async () => {
+    const previewDecide = preview({ moves: [{ ticketId: 'A', kind: 'reopen' }, { ticketId: 'E', kind: 'backlog' }], hiddenMoves: true });
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide, decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Needs rework' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Change the decision to Needs rework' });
+    expect(within(dialog).getByText('This reopens GN-161 and puts GN-166 back in Backlog.')).toBeInTheDocument();
+    expect(within(dialog).getByText("Some steps you can't see will also move.")).toBeInTheDocument();
+    await userEvent.dblClick(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(decide).toHaveBeenCalledWith('D', 'Needs rework', []);
+  });
+
+  it('29.285 a second press of Confirm while the write is in flight sends nothing more and shows the button busy; the dialog closes when the write answers', async () => {
+    let release: (value: { ok: true }) => void = () => undefined;
+    const decide = vi.fn(() => new Promise<{ ok: true }>((resolve) => (release = resolve)));
+    await open(fakeActions({ previewDecide: preview({ moves: [{ ticketId: 'B', kind: 'not-taken' }] }), decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.dblClick(within(dialog).getByRole('button', { name: 'Confirm' }));
+    expect(decide).toHaveBeenCalledTimes(1);
+    expect(within(dialog).getByRole('button', { name: 'Confirm' })).toHaveAttribute('aria-busy', 'true');
+    release({ ok: true });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('29.285 a first choice on a Decision with no outcome is titled Choose', async () => {
+    const read = decisionRead();
+    read.nodes = read.nodes.map((n) => (n.id === 'D' ? { ...n, outcome: null } : n));
+    const view = mountView(read, { selected: 'D', actions: fakeActions({ previewDecide: preview({ moves: [{ ticketId: 'B', kind: 'not-taken' }] }) }) });
+    await drawn(view.container, 8);
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    expect(await screen.findByRole('dialog', { name: 'Choose Yes' })).toBeInTheDocument();
+  });
+
+  it('29.285 a refused write stays in the open dialog with its reason and the choice can be confirmed again; Cancel after a refusal writes nothing more', async () => {
+    const decide = vi.fn().mockResolvedValueOnce({ ok: false, message: 'The decision changed to Yes since you looked.' }).mockResolvedValue({ ok: true });
+    await open(fakeActions({ previewDecide: preview({ moves: [{ ticketId: 'B', kind: 'not-taken' }] }), decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('The decision changed to Yes since you looked.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(decide).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('29.287 a started ticket on the branch being left is the person\'s choice', () => {
+  const started = () => preview({ moves: [{ ticketId: 'B', kind: 'not-taken' }], started: ['C'] });
+
+  it('29.287 the question is the spec\'s; the options are Keep going then Close as Not taken; neither is chosen for the person; focus starts on the first without choosing it; Confirm waits for an answer', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide: started(), decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    const group = within(dialog).getByRole('group', { name: 'GN-165 is already in progress on the branch you are leaving. Close it as Not taken, or keep it going?' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map((r) => r.parentElement?.textContent)).toEqual(['Keep going', 'Close as Not taken']);
+    expect(radios.some((r) => (r as HTMLInputElement).checked)).toBe(false);
+    expect(document.activeElement).toBe(radios[0]);
+    expect((radios[0] as HTMLInputElement).checked).toBe(false);
+    expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    expect(decide).not.toHaveBeenCalled();
+    await userEvent.click(radios[1]!);
+    expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeEnabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('D', 'Yes', ['C']));
+  });
+
+  it('29.287 keeping it going sends no closeStarted; the two options are drawn alike: same element, same class, same attributes, neither primary nor destructive', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide: started(), decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    const [keep, close] = within(dialog).getAllByRole('radio') as HTMLInputElement[];
+    const labelKeep = keep!.parentElement!;
+    const labelClose = close!.parentElement!;
+    expect(labelKeep.tagName).toBe(labelClose.tagName);
+    expect(labelKeep.className).toBe(labelClose.className);
+    expect(`${labelKeep.className} ${labelClose.className}`).not.toMatch(/primary|danger|destructive/);
+    const attrs = (el: Element) => [...el.attributes].filter((a) => a.name !== 'value').map((a) => `${a.name}=${a.value}`).sort();
+    expect(attrs(keep!)).toEqual(attrs(close!));
+    await userEvent.click(keep!);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('D', 'Yes', []));
+  });
+
+  it('29.287 two started tickets are two questions and Confirm needs both answers; the closes go in the order asked', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    await open(fakeActions({ previewDecide: preview({ started: ['C', 'E'] }), decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    const groups = within(dialog).getAllByRole('group');
+    expect(groups).toHaveLength(2);
+    await userEvent.click(within(groups[0]!).getByRole('radio', { name: 'Close as Not taken' }));
+    expect(within(dialog).getByRole('button', { name: 'Confirm' })).toBeDisabled();
+    await userEvent.click(within(groups[1]!).getByRole('radio', { name: 'Close as Not taken' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('D', 'Yes', ['C', 'E']));
+  });
+});
+
+describe('29.288 a plan the engine would refuse writes nothing', () => {
+  it('29.288 the dialog names the ticket and why and offers only Close; there is no Confirm and no question; nothing is written; control: the same dialog for an allowed plan has Confirm', async () => {
+    const decide = vi.fn(async () => ({ ok: true as const }));
+    const blocked = preview({ started: ['C'], blocked: { ticketId: 'C', reason: 'child-open', sentence: 'This choice cannot be applied: child-open.' } });
+    await open(fakeActions({ previewDecide: blocked, decide }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('GN-165 Brief the agency still has unfinished work under it, so it cannot be closed. Nothing was changed.');
+    expect(within(dialog).queryByRole('button', { name: 'Confirm' })).toBeNull();
+    expect(within(dialog).queryAllByRole('radio')).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(decide).not.toHaveBeenCalled();
+  });
+
+  it('29.288 a blocker the person cannot see is not named', async () => {
+    await open(fakeActions({ previewDecide: preview({ blocked: { ticketId: null, reason: 'parent-finished', sentence: 'This choice cannot be applied: a step you cannot see is blocking it.' } }) }));
+    await userEvent.click(panel().getByRole('button', { name: 'Yes' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('A step you cannot see sits under a finished parent, so it cannot be moved. Nothing was changed.');
+  });
+});
+  ```
+  `inspector-lines.test.tsx` (29.286):
+  ```tsx
+// @vitest-environment jsdom
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { mountView } from './support.js';
+
+const drawn = async (c: HTMLElement, n: number) => waitFor(() => expect(c.querySelectorAll('.gn-flow-node')).toHaveLength(n));
+const panel = () => within(screen.getByRole('complementary', { name: 'Selected ticket' }));
+
+describe('29.286 the inspector lists passes, names the alternate branch and says why a ticket was not taken', () => {
+  it('29.286 a Decision lists its passes with the person and the time, in order, under Passes; a name nobody gives is left out; control: an ordinary ticket has no Passes', async () => {
+    const names: Record<string, string> = { u1: 'Ama Rangsa' };
+    const { container, update } = mountView(decisionRead(), { selected: 'D', nameOf: (id) => names[id] ?? null });
+    await drawn(container, 8);
+    const passes = within(panel().getByLabelText('Passes'));
+    expect(passes.getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Pass 1, Yes, chosen by Ama Rangsa, 25 Sep 11:40', 'Pass 2, No, chosen by Ama Rangsa, 2 Oct 16:05']);
+    update({ selected: 'D', nameOf: () => null });
+    expect(within(panel().getByLabelText('Passes')).getAllByRole('listitem')[0]).toHaveTextContent(/^Pass 1, Yes, 25 Sep 11:40$/);
+    update({ selected: 'C' });
+    expect(panel().queryByLabelText('Passes')).toBeNull();
+  });
+
+  it('29.286 a ticket closed Not taken says which pass and which Decision chose what; control: its neighbour on the taken branch says nothing of the kind', async () => {
+    const { container, update } = mountView(decisionRead(), { selected: 'B' });
+    await drawn(container, 8);
+    expect(panel().getByText('Not taken, pass 2, via GN-162 Build the page in-house? (chose No)')).toBeInTheDocument();
+    update({ selected: 'C' });
+    expect(panel().queryByText(/^Not taken/)).toBeNull();
+  });
+
+  it('29.286 a ticket on exactly one branch names the other branch\'s first ticket and selects it on a press; a branch the viewer cannot see is not named', async () => {
+    const read = decisionRead();
+    read.nodes = read.nodes.map((n) =>
+      n.id === 'B' ? { ...n, alternates: [{ viaDecisionId: 'D', outcome: 'No', firstTicketId: 'C' }, { viaDecisionId: 'D', outcome: 'Later', firstTicketId: 'hidden' }] } : n,
+    );
+    const onSelect = vi.fn();
+    const { container } = mountView(read, { selected: 'B', onSelect });
+    await drawn(container, 8);
+    const rows = panel().getAllByRole('button', { name: /^Alternate of/ });
+    expect(rows.map((r) => r.textContent)).toEqual(['Alternate of GN-165 Brief the agency, via GN-162 Build the page in-house? (No)']);
+    await userEvent.click(rows[0]!);
+    expect(onSelect).toHaveBeenCalledWith('C');
+  });
+});
+  ```
+  `status-words.test.tsx` (29.289 and the stylesheet half of 29.287):
+  ```tsx
+// @vitest-environment jsdom
+import { waitFor } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+import { cssRules, uiCss } from './css-scan.js';
+import { mountView } from './support.js';
+
+describe('29.289 status is never colour alone (WG-10)', () => {
+  it('29.289 every drawn card names its state in words, a Not-taken card shows its chip in that place, and a Decision shows the word under its key; control: the words are the read\'s, not a fixed set', async () => {
+    const read = decisionRead();
+    const { container } = mountView(read);
+    await waitFor(() => expect(container.querySelectorAll('.gn-flow-node')).toHaveLength(8));
+    const words = new Map<string, string>();
+    for (const card of container.querySelectorAll<HTMLElement>('.gn-flow-node')) {
+      const word = card.querySelector('.gn-flow-node__status')?.textContent?.trim() ?? '';
+      expect(word, card.dataset['nodeId']).not.toBe('');
+      words.set(card.dataset['nodeId']!, word);
+    }
+    expect(Object.fromEntries(words)).toEqual({
+      S: 'Done',
+      A: 'Done',
+      D: 'Done',
+      B: 'Not taken (pass 2)',
+      C: 'In progress',
+      E: 'To do',
+      F: 'To do',
+      G: 'To do',
+    });
+  });
+
+  it('29.289 no rule in the sheet hides the status word at any width or theme; control: the scan finds the rule that styles it', () => {
+    const rules = cssRules(uiCss()).filter((r) => r.selectors.some((s) => s.includes('gn-flow-node__status')));
+    expect(rules.length).toBeGreaterThan(0);
+    for (const rule of rules) {
+      expect(rule.body, rule.selectors.join(', ')).not.toMatch(/display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0\b|font-size\s*:\s*0\b|clip|width\s*:\s*0\b|height\s*:\s*0\b/);
+    }
+  });
+});
+
+describe('29.287 the two started-ticket options stay equal in the sheet', () => {
+  it('29.287 only the checked and focus states may single one option out: no rule picks an option by value, position or order; both options share the base rule', () => {
+    const rules = cssRules(uiCss()).filter((r) => r.selectors.some((s) => /gn-wf-choice__option(?![-\w])/.test(s)));
+    const selectors = rules.flatMap((r) => r.selectors).sort();
+    expect(selectors).toEqual(['.gn-wf-choice__option', '.gn-wf-choice__option:has(input:checked)', '.gn-wf-choice__option:has(input:focus-visible)'].sort());
+    const base = rules.find((r) => r.selectors.includes('.gn-wf-choice__option'))!;
+    expect(base.body).toMatch(/font-weight\s*:\s*500/);
+    // control: the sheet's own pressed-button rule is NOT one of these (it belongs to the outcome buttons)
+    expect(selectors.join(' ')).not.toMatch(/aria-pressed|first-child|last-child|nth-|value=/);
+  });
+});
+  ```
+  `support.tsx` gains the two defaults in `fakeActions` (apply this diff):
+  ```diff
+--- a/apps/web/test/workflow-graph/support.tsx
++++ b/apps/web/test/workflow-graph/support.tsx
+@@ -43,6 +43,8 @@
+     createStep: vi.fn(done),
+     addLink: vi.fn(done),
+     publishFlow: vi.fn(async () => ({ ok: true as const, published: 1 })),
++    previewDecide: vi.fn(async () => ({ ok: true as const, plan: { moves: [], hiddenMoves: false, started: [], blocked: null } })),
++    decide: vi.fn(done),
+     ...over,
+   };
+ }
+  ```
+  The panel test gains one case (29.286: the roster reaches the passes through `useActorLabels`):
+  ```diff
+--- a/apps/web/test/workflow-graph/workflow-panel.test.tsx
++++ b/apps/web/test/workflow-graph/workflow-panel.test.tsx
+@@ -1,5 +1,5 @@
+ // @vitest-environment jsdom
+-import { render, screen, waitFor } from '@testing-library/react';
++import { render, screen, waitFor, within } from '@testing-library/react';
+ import userEvent from '@testing-library/user-event';
+ import { describe, expect, it, vi } from 'vitest';
+ import { decisionRead } from '@gisik-nokma/app-core/workflow-graph/testing';
+@@ -57,6 +57,19 @@
+     expect(screen.queryByRole('alert')).toBeNull();
+   });
+
++  it('29.286 the passes name the person from the workspace roster', async () => {
++    const getFlow = vi.fn(async () => decisionRead());
++    const getMembers = vi.fn(async () => [{ id: 'u1', name: 'Ama Rangsa', role: 'member' }]);
++    render(
++      <Providers services={stubServices({ getFlow, getMembers })}>
++        <WorkflowPanel {...props} selected="D" />
++      </Providers>,
++    );
++    const passes = await screen.findByLabelText('Passes');
++    await waitFor(() => expect(within(passes).getAllByRole('listitem')[0]).toHaveTextContent('Pass 1, Yes, chosen by Ama Rangsa, 25 Sep 11:40'));
++    expect(getMembers).toHaveBeenCalledWith('w1');
++  });
++
+   it('29.274 Open note on a selected note goes to the note\'s own page', async () => {
+     const getFlow = vi.fn(async () => decisionRead());
+     const { container } = render(
+  ```
+  Run: `pnpm --filter @gisik-nokma/web exec vitest run --maxWorkers=2 test/workflow-graph > /tmp/wtg3-t12w.log 2>&1; tail -n 30 /tmp/wtg3-t12w.log`. Expected FAIL (no `decide-actions`; the stylesheet checks fail until Step 6 for the choice rule only). Commit.
+
+- [ ] **Step 5: GREEN, the web parts**
+
+  1. `apps/web/src/workflow-graph/decide-actions.ts`:
+     ```ts
+import { ReplicaGapError, type DataSource } from '@gisik-nokma/app-core';
+import type { DecidePlanRead, FlowRead } from '@gisik-nokma/domain';
+import type { ActionResult } from './inspector-actions.js';
+import { NEEDS_CONNECTION } from './step-actions.js';
+
+export type DecidePreview = { ok: true; plan: DecidePlanRead } | { ok: false; message: string };
+
+/** Choosing, changing or clearing a Decision's outcome (DC-6, PS-6): ask what it would move, then write it. */
+export type DecideActions = {
+  /** What choosing `outcome` (`null` clears) would move, for this person. A refusal comes back as a sentence. */
+  previewDecide(decisionId: string, outcome: string | null): Promise<DecidePreview>;
+  /** Files the choice. `closeStarted` are the started tickets the person chose to close as Not taken. */
+  decide(decisionId: string, outcome: string | null, closeStarted: readonly string[]): Promise<ActionResult>;
+};
+
+const GONE = 'That decision is no longer in this flow.';
+
+/**
+ * `from` is always the outcome THIS read shows (`null` for none): if the Decision changed since the person looked, the server says
+ * so (409) and the dialog keeps the sentence, instead of silently overwriting someone else's choice (the founding reopen rule).
+ */
+export function makeDecideActions(deps: { dataSource: DataSource; workspaceId: string; read: () => FlowRead | null }): DecideActions {
+  const { dataSource, workspaceId } = deps;
+  const failure = (cause: unknown, fallback: string): { ok: false; message: string } => ({
+    ok: false,
+    message: cause instanceof ReplicaGapError ? NEEDS_CONNECTION : cause instanceof Error ? cause.message : fallback,
+  });
+  return {
+    async previewDecide(decisionId, outcome) {
+      const node = deps.read()?.nodes.find((n) => n.id === decisionId);
+      if (node === undefined) return { ok: false, message: GONE };
+      try {
+        const answer = await dataSource.query.previewDecide(workspaceId, decisionId, { outcome, from: node.outcome });
+        return answer.ok ? { ok: true, plan: answer.plan } : { ok: false, message: answer.reason };
+      } catch (cause) {
+        return failure(cause, 'The choice could not be checked.');
+      }
+    },
+    async decide(decisionId, outcome, closeStarted) {
+      const node = deps.read()?.nodes.find((n) => n.id === decisionId);
+      if (node === undefined) return { ok: false, message: GONE };
+      try {
+        const answer = await dataSource.query.decide(workspaceId, decisionId, {
+          outcome,
+          from: node.outcome,
+          ...(closeStarted.length === 0 ? {} : { closeStarted: [...closeStarted] }),
+        });
+        return answer.ok ? { ok: true } : { ok: false, message: answer.reason };
+      } catch (cause) {
+        return failure(cause, 'The choice could not be saved.');
+      }
+    },
+  };
+}
+     ```
+  2. `apps/web/src/workflow-graph/decide-dialog.tsx`:
+     ```tsx
+'use client';
+
+import { useMemo, useRef, useState } from 'react';
+import { canConfirm, CLOSE_NOT_TAKEN, closeStartedOf, confirmationOf, KEEP_GOING, type StartedChoice } from '@gisik-nokma/app-core/workflow-graph';
+import type { DecidePlanRead, FlowRead } from '@gisik-nokma/domain';
+import { Button, Dialog } from '@gisik-nokma/ui';
+import type { DecideActions } from './decide-actions.js';
+
+export type DecideDialogProps = {
+  read: FlowRead;
+  decisionId: string;
+  /** The outcome being chosen; `null` clears. */
+  outcome: string | null;
+  plan: DecidePlanRead;
+  actions: DecideActions;
+  onClose: () => void;
+};
+
+const OPTIONS: ReadonlyArray<{ value: StartedChoice; label: string }> = [
+  { value: 'keep', label: KEEP_GOING },
+  { value: 'close', label: CLOSE_NOT_TAKEN },
+];
+
+/**
+ * PS-6: the confirmation at the moment of choosing. It says what else will move, asks about each started ticket on the branch being
+ * left (two options of EQUAL weight, neither chosen for the person, Confirm waits for every answer) and, for a plan the engine would
+ * refuse, says so and offers only Close. A refusal of the write stays here with its reason; nothing was changed.
+ */
+export function DecideDialog({ read, decisionId, outcome, plan, actions, onClose }: DecideDialogProps) {
+  const confirmation = useMemo(() => confirmationOf(read, plan), [read, plan]);
+  const [choices, setChoices] = useState<Record<string, StartedChoice | undefined>>({});
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const firstOption = useRef<HTMLInputElement>(null);
+  const current = read.nodes.find((n) => n.id === decisionId)?.outcome ?? null;
+  const title = outcome === null ? 'Clear this decision' : current === null ? `Choose ${outcome}` : `Change the decision to ${outcome}`;
+  const ready = canConfirm(confirmation, choices);
+
+  const confirm = async (): Promise<void> => {
+    setBusy(true);
+    setProblem(null);
+    const result = await actions.decide(decisionId, outcome, closeStartedOf(confirmation, choices));
+    setBusy(false);
+    if (result.ok) onClose();
+    else setProblem(result.message);
+  };
+
+  return (
+    <Dialog
+      open
+      title={title}
+      onClose={onClose}
+      initialFocusRef={confirmation.started.length > 0 ? firstOption : undefined}
+      footer={
+        confirmation.blocked !== null ? (
+          <Button onClick={onClose}>Close</Button>
+        ) : (
+          <>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button variant="primary" busy={busy} disabled={!ready} onClick={() => void confirm()}>
+              Confirm
+            </Button>
+          </>
+        )
+      }
+    >
+      <div className="gn-wf-decide-dialog">
+        {confirmation.summary === null ? null : <p>{confirmation.summary}</p>}
+        {confirmation.hidden === null ? null : <p>{confirmation.hidden}</p>}
+        {confirmation.blocked === null ? null : (
+          <p className="gn-wf-inspector__error" role="alert">
+            {confirmation.blocked}
+          </p>
+        )}
+        {confirmation.blocked !== null
+          ? null
+          : confirmation.started.map((question, row) => (
+              <fieldset key={question.ticketId} className="gn-wf-choice">
+                <legend className="gn-wf-choice__question">{question.text}</legend>
+                <div className="gn-wf-choice__options">
+                  {OPTIONS.map((option, column) => (
+                    <label key={option.value} className="gn-wf-choice__option">
+                      <input
+                        ref={row === 0 && column === 0 ? firstOption : undefined}
+                        type="radio"
+                        name={`started-${question.ticketId}`}
+                        value={option.value}
+                        checked={choices[question.ticketId] === option.value}
+                        onChange={() => setChoices((prior) => ({ ...prior, [question.ticketId]: option.value }))}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+        {problem === null ? null : (
+          <p className="gn-wf-inspector__error" role="alert">
+            {problem}
+          </p>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+     ```
+  3. `apps/web/src/workflow-graph/decide-control.tsx`:
+     ```tsx
+'use client';
+
+import { useRef, useState } from 'react';
+import { CLEAR_LABEL, confirmationOf, DECIDE_HEADING, type DecideModel } from '@gisik-nokma/app-core/workflow-graph';
+import type { DecidePlanRead, FlowRead } from '@gisik-nokma/domain';
+import { Button } from '@gisik-nokma/ui';
+import type { DecideActions } from './decide-actions.js';
+import { DecideDialog } from './decide-dialog.js';
+
+type Phase = { kind: 'idle' } | { kind: 'working' } | { kind: 'confirming'; outcome: string | null; plan: DecidePlanRead };
+
+export type DecideControlProps = { read: FlowRead; model: DecideModel; actions: DecideActions };
+
+/**
+ * DC-6: one button per outgoing label with the chosen one marked (by a check and `aria-pressed`, never by colour alone), and Clear.
+ * A choice first asks the server what it would move (PS-6). When it moves nothing but the Decision it is written at once; otherwise
+ * the confirmation opens first. A refusal is a sentence under the buttons, and the buttons stay as the read has them.
+ */
+export function DecideControl({ read, model, actions }: DecideControlProps) {
+  const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [problem, setProblem] = useState<string | null>(null);
+  const latest = useRef(read);
+  latest.current = read;
+
+  const choose = async (outcome: string | null): Promise<void> => {
+    setProblem(null);
+    setPhase({ kind: 'working' });
+    const preview = await actions.previewDecide(model.decisionId, outcome);
+    if (!preview.ok) {
+      setProblem(preview.message);
+      setPhase({ kind: 'idle' });
+      return;
+    }
+    if (confirmationOf(latest.current, preview.plan).needed) {
+      setPhase({ kind: 'confirming', outcome, plan: preview.plan });
+      return;
+    }
+    const written = await actions.decide(model.decisionId, outcome, []);
+    if (!written.ok) setProblem(written.message);
+    setPhase({ kind: 'idle' });
+  };
+
+  const locked = model.disabled !== null || phase.kind !== 'idle';
+  return (
+    <section className="gn-wf-inspector__section" aria-label={DECIDE_HEADING}>
+      <h4 className="gn-wf-inspector__heading">{DECIDE_HEADING}</h4>
+      {model.disabled === null ? null : <p className="gn-wf-inspector__helper">{model.disabled}</p>}
+      <div className="gn-wf-decide" role="group" aria-label="Outcome">
+        {model.choices.map((choice) => (
+          <Button
+            key={choice.label}
+            className="gn-wf-decide__choice"
+            aria-pressed={choice.chosen}
+            disabled={locked}
+            onClick={() => {
+              if (!choice.chosen) void choose(choice.label);
+            }}
+          >
+            {choice.chosen ? <span aria-hidden="true">{'✓ '}</span> : null}
+            {choice.label}
+          </Button>
+        ))}
+        {model.canClear ? (
+          <Button className="gn-wf-decide__choice" disabled={locked} onClick={() => void choose(null)}>
+            {CLEAR_LABEL}
+          </Button>
+        ) : null}
+      </div>
+      {problem === null ? null : (
+        <p className="gn-wf-inspector__error" role="alert">
+          {problem}
+        </p>
+      )}
+      {phase.kind === 'confirming' ? (
+        <DecideDialog
+          read={read}
+          decisionId={model.decisionId}
+          outcome={phase.outcome}
+          plan={phase.plan}
+          actions={actions}
+          onClose={() => setPhase({ kind: 'idle' })}
+        />
+      ) : null}
+    </section>
+  );
+}
+     ```
+  4. The one line T9 said T11 and T12 widen, and the hook that builds it:
+     ```diff
+--- a/apps/web/src/workflow-graph/flow-actions.ts
++++ b/apps/web/src/workflow-graph/flow-actions.ts
+@@ -1,5 +1,6 @@
++import type { DecideActions } from './decide-actions.js';
+ import type { InspectorActions } from './inspector-actions.js';
+ import type { StepActions } from './step-actions.js';
+
+ /** Every write the Workflow view can make: one object, built by `useFlowActions`. Each task that adds writes widens this line. */
+-export type FlowActions = InspectorActions & StepActions;
++export type FlowActions = InspectorActions & StepActions & DecideActions;
+     ```
+     ```diff
+--- a/apps/web/src/workflow-graph/use-flow-actions.ts
++++ b/apps/web/src/workflow-graph/use-flow-actions.ts
+@@ -3,6 +3,7 @@
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import { useAppServices, useCurrentUser } from '../providers.js';
+ import type { FlowActions } from './flow-actions.js';
++import { makeDecideActions } from './decide-actions.js';
+ import { makeInspectorActions, type ActionResult } from './inspector-actions.js';
+ import { makeStepActions } from './step-actions.js';
+
+@@ -29,9 +30,11 @@
+         createStep: refuse,
+         addLink: refuse,
+         publishFlow: async () => ({ ok: false as const, message: SIGNED_OUT.message }),
++        previewDecide: async () => ({ ok: false as const, message: SIGNED_OUT.message }),
++        decide: refuse,
+       };
+     }
+     const deps = { dataSource, make: makeSubmittedFactory({ actorId: userId, origin: 'web' }), workspaceId, read: () => latest.current };
+-    return { ...makeInspectorActions(deps), ...makeStepActions(deps) };
++    return { ...makeInspectorActions(deps), ...makeStepActions(deps), ...makeDecideActions(deps) };
+   }, [dataSource, userId, workspaceId]);
+ }
+     ```
+  5. The inspector gains the resolution line, the Decide section, Passes and the alternate lines (apply this diff; the order is WG-3's, the resolution line sits directly under the sentence):
+     ```diff
+--- a/apps/web/src/workflow-graph/flow-inspector.tsx
++++ b/apps/web/src/workflow-graph/flow-inspector.tsx
+@@ -1,9 +1,11 @@
+ 'use client';
+
+ import { useEffect, useState } from 'react';
+-import { inspectorOf, labelProblem, LABEL_PROBLEM_COPY, parseEstimate, type InspectorModel, type LinkRow } from '@gisik-nokma/app-core/workflow-graph';
++import { decisionExtrasOf, inspectorOf, labelProblem, LABEL_PROBLEM_COPY, parseEstimate, PASSES_HEADING, type InspectorModel, type LinkRow } from '@gisik-nokma/app-core/workflow-graph';
+ import type { FlowRead } from '@gisik-nokma/domain';
+ import { Button, Switch, Toast } from '@gisik-nokma/ui';
++import { DecideControl } from './decide-control.js';
++import type { DecideActions } from './decide-actions.js';
+ import type { ActionResult, InspectorActions } from './inspector-actions.js';
+
+ export const WAIT_FOR_ALL_HELPER = 'Off: it moves as soon as any ticket that leads here is done. On: it waits for all of them.';
+@@ -11,7 +13,9 @@
+ export type FlowInspectorProps = {
+   read: FlowRead;
+   selectedId: string;
+-  actions: InspectorActions;
++  actions: InspectorActions & DecideActions;
++  /** Names a person for the passes list (`null` leaves the name out). Unset: no names. */
++  nameOf?: (userId: string) => string | null;
+   /** `side` on a wide sheet (the right-hand column), `card` below 40rem (under the canvas). */
+   placement: 'side' | 'card';
+   onSelect: (id: string) => void;
+@@ -24,12 +28,13 @@
+  * The selected ticket's panel (WG-3). It shows what the read says and writes through `actions`; a refusal is a sentence under the
+  * thing the person did, and the control stays as the read has it. Sections that do not apply are not drawn.
+  */
+-export function FlowInspector({ read, selectedId, actions, placement, onSelect, onOpen, onAddStep }: FlowInspectorProps) {
++export function FlowInspector({ read, selectedId, actions, placement, onSelect, onOpen, onAddStep, nameOf }: FlowInspectorProps) {
+   const model = inspectorOf(read, selectedId);
++  const extras = decisionExtrasOf(read, selectedId, nameOf ?? (() => null));
+   const [error, setError] = useState<string | null>(null);
+   const [undo, setUndo] = useState<{ message: string; run: () => Promise<ActionResult> } | null>(null);
+   useEffect(() => setError(null), [selectedId]);
+-  if (model === null) return null;
++  if (model === null || extras === null) return null;
+
+   const run = async (act: () => Promise<ActionResult>, afterRemoved?: string): Promise<boolean> => {
+     setError(null);
+@@ -60,6 +65,7 @@
+         </ul>
+       </header>
+       <p className="gn-wf-inspector__sentence">{model.sentence}</p>
++      {extras.resolution === null ? null : <p className="gn-wf-inspector__resolution">{extras.resolution}</p>}
+       {error === null ? null : (
+         <p className="gn-wf-inspector__error" role="alert">
+           {error}
+@@ -77,7 +83,27 @@
+         onRename={(row, next) => run(() => actions.relabel(row.edgeId, next))}
+         onRemove={(row) => run(() => actions.removeLink(row.edgeId), `Removed the link to ${row.other.label}.`)}
+       />
++      {extras.decide === null ? null : <DecideControl key={model.id} read={read} model={extras.decide} actions={actions} />}
++      {extras.passes.length === 0 ? null : (
++        <section className="gn-wf-inspector__section" aria-label={PASSES_HEADING}>
++          <h4 className="gn-wf-inspector__heading">{PASSES_HEADING}</h4>
++          <ul className="gn-wf-inspector__moves">
++            {extras.passes.map((row) => (
++              <li key={row.pass} className="gn-wf-inspector__move">
++                {row.text}
++              </li>
++            ))}
++          </ul>
++        </section>
++      )}
+       {model.reworkEstimate.shown ? <ReworkEstimate key={`${model.id}:${model.reworkEstimate.value ?? ''}`} value={model.reworkEstimate.value} onSave={(days) => run(() => actions.setReworkEstimate(model.id, days))} /> : null}
++      {extras.alternates.map((row) => (
++        <p key={row.ticketId} className="gn-wf-inspector__alternate">
++          <button type="button" className="gn-wf-link" onClick={() => onSelect(row.ticketId)}>
++            {row.text}
++          </button>
++        </p>
++      ))}
+       {model.autoMoves.length === 0 ? null : (
+         <section className="gn-wf-inspector__section" aria-label="Automatic moves in this flow">
+           <h4 className="gn-wf-inspector__heading">Automatic moves in this flow</h4>
+     ```
+  6. The view and the panel pass the namer through:
+     ```diff
+--- a/apps/web/src/workflow-graph/workflow-view.tsx
++++ b/apps/web/src/workflow-graph/workflow-view.tsx
+@@ -30,6 +30,8 @@
+   actions: FlowActions;
+   /** Leaves the sheet for a note's own page. Unset, "Open note" is not drawn as a way out (a test or a host without a router). */
+   onOpenNote?: (noteId: string) => void;
++  /** Names a person in the Decision's passes; unset, the passes leave the name out. */
++  nameOf?: (userId: string) => string | null;
+ };
+
+ /** A second tap on the same note block within this many milliseconds opens it (the stage's own double tap is for tickets). */
+@@ -41,7 +43,7 @@
+  * the sheet is open on is the selected one (SH-5), so it wears the ring.
+  */
+ export function WorkflowView(props: WorkflowViewProps) {
+-  const { read, error, onRetry, deps, actions, selected, onSelect, onOpenTicket, onOpenNote, onShowLinks } = props;
++  const { read, error, onRetry, deps, actions, selected, onSelect, onOpenTicket, onOpenNote, onShowLinks, nameOf } = props;
+   const rootRef = useRef<HTMLElement>(null);
+   const canvasRef = useRef<FlowCanvasHandle>(null);
+   const orientation = useContainerOrientation(rootRef, deps.measureWidth);
+@@ -152,7 +154,16 @@
+                 onOpenNote={(id) => onOpenNote?.(id)}
+               />
+             ) : shown === null ? null : (
+-              <FlowInspector read={read} selectedId={shown} actions={actions} placement={phone ? 'card' : 'side'} onSelect={fromList} onOpen={open} onAddStep={addStep} />
++              <FlowInspector
++                read={read}
++                selectedId={shown}
++                actions={actions}
++                placement={phone ? 'card' : 'side'}
++                onSelect={fromList}
++                onOpen={open}
++                onAddStep={addStep}
++                {...(nameOf === undefined ? {} : { nameOf })}
++              />
+             )}
+           </div>
+           <FlowList read={read} selectedId={shown} onSelect={fromList} onOpen={open} />
+     ```
+     ```diff
+--- a/apps/web/src/workflow-graph/workflow-panel.tsx
++++ b/apps/web/src/workflow-graph/workflow-panel.tsx
+@@ -3,6 +3,7 @@
+ import { useEffect, useMemo } from 'react';
+ import type { GraphSlotProps } from '@gisik-nokma/app-core';
+ import { useAppServices } from '../providers.js';
++import { useActorLabels } from '../use-actor-labels.js';
+ import { createRuntime } from './runtime.js';
+ import { useFlow } from './use-flow.js';
+ import { useFlowActions } from './use-flow-actions.js';
+@@ -18,7 +19,8 @@
+   const { read, error, reload } = useFlow(dataSource, props.workspaceId, props.ticketId);
+   const actions = useFlowActions(read, props.workspaceId);
+   const openNote = useOpenNote();
++  const nameOf = useActorLabels([props.workspaceId]);
+   const runtime = useMemo(() => createRuntime(), []);
+   useEffect(() => () => runtime.dispose(), [runtime]);
+-  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} actions={actions} onOpenNote={openNote} />;
++  return <WorkflowView {...props} read={read} error={error} onRetry={reload} deps={runtime} actions={actions} onOpenNote={openNote} nameOf={nameOf} />;
+ }
+     ```
+  7. Run Step 4's command; expected PASS except the stylesheet check of the choice rule (Step 6). Then `pnpm turbo run typecheck --filter=@gisik-nokma/web...`. Commit.
+
+- [ ] **Step 6: The sheet**
+
+  Append to `packages/ui/src/ui.css` one block after T9's (or T10's if it added one), headed `/* WTG3 T12 */`. Roles only: `.gn-wf-inspector__*` text classes, `.gn-wf-input` and the pill are T8's. The option rule is ONE rule for both options; a state may add to it only through `:has(input:checked)` and `:has(input:focus-visible)` (the scan in `status-words.test.tsx` fails on anything else):
+  ```css
+/* WTG3 T12: deciding, passes and the started-ticket choice (apps/web/src/workflow-graph). */
+.gn-wf-decide { display: flex; flex-wrap: wrap; gap: 8px; }
+.gn-wf-decide__choice[aria-pressed='true'] { border-color: var(--gn-accent); font-weight: 600; }
+.gn-wf-decide-dialog { display: flex; flex-direction: column; gap: 12px; width: min(30rem, 100%); }
+.gn-wf-decide-dialog p { margin: 0; }
+.gn-wf-choice { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.gn-wf-choice__question { padding: 0; margin-bottom: 4px; font-size: 0.875rem; font-weight: 600; color: var(--gn-text); }
+.gn-wf-choice__options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gn-wf-choice__option { display: flex; align-items: center; gap: 8px; min-height: 2.5rem; padding: 6px 12px; border: 1px solid var(--gn-border-strong); border-radius: var(--gn-radius-control); background: var(--gn-surface-raised); color: var(--gn-text); font-weight: 500; cursor: pointer; }
+.gn-wf-choice__option:has(input:checked) { border-color: var(--gn-accent); box-shadow: inset 0 0 0 1px var(--gn-accent); }
+.gn-wf-choice__option:has(input:focus-visible) { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-wf-inspector__resolution, .gn-wf-inspector__alternate { margin: 0; font-size: 0.8125rem; color: var(--gn-text); }
+@media (max-width: 40rem) {
+  .gn-wf-choice__options { grid-template-columns: 1fr; }
+}
+  ```
+  `ui.css` change ⇒ the ui, app-core and web suites WHOLE (`> /tmp/wtg3-t12-css.log 2>&1; tail -n 12 /tmp/wtg3-t12-css.log`), `ui-copy.test.ts` among them (23.190 and 23.191: nothing in this task's strings has a banned word, " — " or " · "; the check mark in the code is a lone U+2713, not an emoji).
+
+- [ ] **Step 7: Paint it**
+
+  As T7 Step 8.3: the worktree on a lane port against the running API, signed in as the e2e seed owner, a flow with a Decision that has three labelled branches (one a loop), tickets on each branch, one of them started, one under an epic with a started child, and one ticket hidden from a second signed-in member. Record: (a) the Decision's inspector beside `Workflow-revised.png`: the Decide buttons with the chosen one pressed and checked, Clear, the Passes list, the `Alternate of` line and a Not-taken ticket's line, in both themes; (b) a revision with a started ticket on the branch being left: the dialog beside the mockup, `Keep going` first and `Close as Not taken` second, equal in size, border and weight, neither chosen, focus on the first, Confirm off until answered; (c) a blocked choice: the sentence, Close only, and the ledger unchanged (count the Decision's events before and after through the ticket's History); (d) the same dialog as the second member: `Some steps you can't see will also move.` and no hidden title anywhere in the page text; (e) the settle: deciding in one window and watching the Decision and the moved tickets ring and glide in a second window on the same flow, then again with the system's reduced-motion setting (instant); (f) a loop outcome: `Needs rework ↺ 2` on the loop edge after the second pass, the ticket back at its first state and the rest in Backlog; (g) the manual half of 29.289: the browser's achromatopsia emulation at 1240 px and at a 390 px window beside `Main.png` and `Phone-workflow.png`, every card still reads its state, wrapped titles do not overlap, the note stacks and the inspector card on the phone; (h) the keyboard: Tab into Decide, Space on a branch, the dialog traps focus, Escape closes it and focus returns to the button. **A difference that is CSS is fixed here;** one that needs the stage goes back to T5's owner as a finding. Put the screenshot paths in the handoff. Kill the lane-port server when done.
+
+- [ ] **Step 8: Mutations (the reviewer re-runs these; every row was run in the scratch beds and was RED)**
+
+  | Case | Mutation | Expected red |
+  |---|---|---|
+  | 29.280 | in `decideModelOf`, drop `Number(a.loop) - Number(b.loop) \|\|` | loop-last order |
+  | 29.280 | `canClear: node.outcome !== null && disabled === null` → `canClear: true` | Clear on a pending Decision |
+  | 29.280 | `if (node.draft) disabled =` → `if (false) disabled =` | the draft reason |
+  | 29.281 | in `confirmationOf`, the backlog clause → `closes … as Not taken` | the loop sentence |
+  | 29.281 | `plan.hiddenMoves ? HIDDEN_MOVES_COPY : null` → `null` | the hidden sentence |
+  | 29.281 | in `canConfirm`, `.every(` → `.some(` | Confirm needs every answer |
+  | 29.281 | in `canConfirm`, drop `confirmation.blocked === null &&` | a blocked plan confirms |
+  | 29.281 | in `closeStartedOf`, `=== 'close'` → `!== undefined` | closes only |
+  | 29.281 | in `blockedText`, `'A step you cannot see'` → `'A step'` | a hidden blocker is named as hidden |
+  | 29.282 | in `passRowsOf`, `p.revisions.map(` → `[].map(` | the revision text |
+  | 29.282 | in `alternateRowsOf`, delete `if (first === undefined) return [];` | an unseen branch |
+  | 29.283 | in `decide`, delete `from: node.outcome,` | the `from` assertion |
+  | 29.283 | in `decide`, `closeStarted: [...closeStarted]` always | no empty `closeStarted` |
+  | 29.283 | in `failure`, drop the `ReplicaGapError` branch | `Needs a connection.` |
+  | 29.283 | in `useFlowActions`, drop `...makeDecideActions(deps)` | the hook has no Decide actions |
+  | 29.284 | in `DecideControl`, `locked` without `phase.kind !== 'idle'` | the double press |
+  | 29.284 | `if (!choice.chosen) void choose(...)` → `void choose(...)` | the chosen label |
+  | 29.284 | `confirmationOf(…).needed` → `true` | a choice that only records itself opens a dialog |
+  | 29.284 | delete `if (!written.ok) setProblem(...)` | a refused write is silent |
+  | 29.285 | in `DecideDialog`, drop `busy={busy}` from Confirm | the double Confirm |
+  | 29.285 | `else setProblem(result.message)` → `else onClose()` | the refusal stays in the dialog |
+  | 29.286 | in `FlowInspector`, hide Passes (`{true ? null : (`) | the passes list |
+  | 29.286 | in `FlowInspector`, the alternate's `onClick` → `undefined` | the alternate selects |
+  | 29.286 | in `WorkflowPanel`, drop ` nameOf={nameOf}` | the roster names |
+  | 29.287 | swap the two `OPTIONS` | the order |
+  | 29.287 | `checked={choices[…] === option.value}` → `(… ?? 'keep') === option.value` | neither pre-selected |
+  | 29.287 | drop `initialFocusRef=…` | focus on the first option |
+  | 29.287 | drop `disabled={!ready}` | Confirm waits for every answer |
+  | 29.287 | give the close option an extra class | equal weight |
+  | 29.287 | add `.gn-wf-choice__option:last-child { font-weight: 700; }` to the sheet | the stylesheet scan |
+  | 29.288 | draw Confirm for a blocked plan (`confirmation.blocked !== null ?` → `false ?`) | no Confirm when blocked |
+  | 29.289 | add `display: none;` to `.gn-flow-node__status` | the status-word scan |
+  | 29.289 | in T7's `diffReads`, drop `n.resolution` from `cardOf` | the settle is not a change |
+
+  Revert each.
+
+- [ ] **Step 9: Prose, Features, catalogue, sweeps**
+
+  1. **Prose is a claim.** T8 left two docblocks that name this task. In `packages/app-core/src/workflow-graph/inspector-model.ts` replace `Everything the inspector shows for one selected ticket (WG-3, without the Decision's Decide control and passes: T12).` with `Everything the inspector shows for one selected ticket (WG-3). The Decision's side (the Decide control, the passes, the alternate branches and the Not-taken line) is \`decisionExtrasOf\` in \`decide-model.ts\`.`, and in the same file replace the doc comment on `isDecision` (`\`null\` unless the ticket is a Decision (the Decide control is T12's).`) with `True for a Decision: the inspector draws its Decide control from \`decisionExtrasOf\`.` Then `grep -rn "T12\|Decide control" apps/web/src/workflow-graph packages/app-core/src/workflow-graph test-cases/29-workflow-timeline-graphs.md Features.md` and fix any other line that says the Decide control is not built yet.
+  2. Flip 29.280 to 29.288 to ✅ (29.284 and 29.285 only when they ran green LOCALLY in the web suite) and 29.289 to 🟡 (✅ once Step 7(g) is recorded, with the screenshot paths in the line).
+  3. `Features.md`, under `<!-- wtg-part3-workflow-graph T12 bullet -->`: `- ✅ **Decide from the Workflow view** — a Decision's inspector has one button per branch (the chosen one checked), Clear, and its Passes; a choice that moves other tickets asks first (\"This closes GN-152 and GN-153 as Not taken.\", \"Some steps you can't see will also move.\"), asks about each started ticket on the branch being left (Keep going or Close as Not taken, neither chosen for you) and says why a choice that cannot be made writes nothing. A ticket on one branch shows \"Alternate of …\" and a Not-taken ticket says which Decision chose what. \`apps/web/src/workflow-graph/decide-control.tsx\`, \`decide-dialog.tsx\`, \`flow-inspector.tsx\`` and `- ⚙️ **Decide model** — pure: the choices, the confirmation (sentences, started questions, blockers, \`closeStarted\`), the pass, alternate and resolution lines. \`packages/app-core/src/workflow-graph/decide-model.ts\`; \`apps/web/src/workflow-graph/decide-actions.ts\` asks T11's door.`
+  4. Sweeps: app-core, ui and web suites WHOLE (Step 6); `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). The domain, the server and app-core's `online/` are untouched, so no server run is owed.
+
+  Commit `wtg3 T12: deciding on the graph`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-decide-ui.md` written (the landed names Step 0 found, whether every diff applied, the screenshot paths, D-W3-46 to D-W3-52, the "Flow changes waiting" finding).
+
+
+---
+
+## Self-review
+
+**1. Spec coverage** (spec §9 to §10, Part 3; each line names the task and the case ids that pin it):
+- **RN, the renderer and layout (§9.1 to §9.3):** the measured first task, the seam and the findings (T1, 29.230 to 29.233); measured blocks, the band fold, lone-leaf placement, orientation (T2, 29.234 to 29.239); `SceneInput` to `Scene`, rounded orthogonal paths, the seven colour roles with their contrast pairs (T4, 29.246 to 29.250); the stage, geometry picks, fit, centre and pan bars (T5, 29.251 to 29.254). The 90% stability rule is 29.237 (T2); ELK in a Worker is T1 and T7.
+- **SH-1 to SH-5, the sheet:** the wide sheet, the Graph tab, the inner switch learning its options from the mounted slots, no cost on a route that opens no graph, all three hosts (T6, 29.255 to 29.259); opened from a ticket with the ring and a flow of one (T7, 29.262). SH-3 (no Start button) asks for nothing to build: no task here draws one.
+- **WG-1 and WG-2, nodes and edges:** the scene and the drawn words (T4, T5, T7: 29.247, 29.251, 29.260 to 29.262); status words and chips (T5, T7).
+- **WG-3, the inspector:** facts, sentence, wait-for-all, Comes after, Leads to with rename and remove, rework estimate, automatic moves, Open ticket (T8, 29.263 to 29.266); the Decide control, Passes, Alternate of and the Not-taken line (T12, 29.280 to 29.288).
+- **WG-4, interaction:** select, open, fit, zoom, pan and the accessible list (T5, T7); the "+" handle, `N` and the link drag (T5 and T9, 29.253, 29.268); the sheet's Links section on a phone is Spec A's. **Not built:** the trail and Back (KG C T9's slot passes only `onOpenTicket`; reported).
+- **WG-5, live:** a changed read rings what changed and glides (T7, 29.261; T12, 29.289 for a settle).
+- **WG-6, header chips and the Publish banner:** T7 (counts, legend) and T9 (banner), with Show notes (T10, 29.273).
+- **WG-7, note blocks:** layout ports (T2), scene (T4), draw (T5), blocks, switch, "+N notes", the inspector's note and Open note (T10, 29.270 to 29.275).
+- **WG-8, Not taken, alternates, passes, loop count:** muted edges and the pale-fill rule (T4, 29.248, 29.250), the chip, outcome chip, pass count and loop label (T4, T5, T7), the inspector's lines (T12, 29.282, 29.286).
+- **WG-9 and WG-10, phones and status in words:** wrapped, measured blocks (T2, T4); the status word on every card and no rule hiding it (T5, T7, T12 29.289); the greyscale half is manual (T12 Step 7g).
+- **CR-1 to CR-3, creating and publishing:** the form, the draft and its link in one call with a clean-up, the Publish banner and the parent-first order (T9, 29.267 to 29.269); the Decide door that the Decide control needs (T11, 29.276 to 29.279). **CR-4** (a discarded draft takes its links) is the read dropping it: T3 and T7. **CR-5** (attachments on a draft) is the Drafts plan's.
+- **Cases 29.230 to 29.289** are used once each; the per-task split is in the Catalogue bullet of Global Constraints.
+
+**2. Placeholders.** Each "read X first" names the file and the line or the grep where the exact shape lives (Step 0 of T3, T9, T11 and T12 do the Part 2, Drafts and KG reads). The code that was run is marked as run: the pure layers, the mappers and doors, the view and the dialogs were validated in scratch beds with mutations; the server routes and queries (T3, T11), the `DataSourceQuery` members and their doubles and census, every CSS block, the token roles, the sheet and host wiring (T6) and the browser steps were written against the tip's text and were NOT run. No TBD remains.
+
+**3. Type consistency.** These names are used identically across tasks:
+- `FlowRead`, `FlowNodeRead`, `FlowEdgeRead`, `FlowAutoMoveRead` (T3) in T7 to T12; `DecidePlanRead`, `DecideMoveRead`, `DecideRevisionRead`, `DecideWriteRead` (T11) in T12 and Part 5;
+- `sceneInputOf`, `flowSummary`, `diffReads`, `highlightIds` (T7), `inspectorOf` (T8), `decisionExtrasOf` (T12);
+- `FlowActions = InspectorActions & StepActions & DecideActions`: T8 defines the first two members' types, T9 adds `StepActions`, T12 adds `DecideActions`;
+- `DataSourceQuery.getFlow` (T3), `publishFlow` (T9), `previewDecide` and `decide` (T11), each with its replica gap, its three doubles and its census row;
+- `PublishFlowResult`, `DecideRequest`, `DecideRefusalRead`, `PreviewDecideResult`, `DecideResult`;
+- `ActionResult`, `send`, `refusalOf` (T8) in T9 and T12; `NEEDS_CONNECTION` (T9) in T12;
+- the CSS block names `/* WTG3 T4 */` to `/* WTG3 T12 */` and the class prefixes `gn-flow-*` (the stage) and `gn-wf-*` (the panel).
+
+**4. Review focus.** Each line has its case in the owning task: 29.243/29.276 (hidden ticket: T3, T11); 29.262/29.240 (flow of one: T7, T3); 29.269 (publish order: T9); 29.287/29.288/29.278 (started ticket and refused plans: T12, T11); 29.234/29.239/29.271/29.272/29.274/29.289 (phone, long titles, notes: T2, T10, T12).
+
+## Findings for the planner
+
+Contradictions between the spec, the sibling plans and the code, each with where it was read. None blocks the plan; each is handled by a decision above or by a Step 0.
+- **The `ticket.transitioned` payload field is `to`** (`packages/domain/src/workflow.ts:201`), in Part 2's plan as here (reconciled 2026-10-03: Part 2 keeps `toStateId` only on its internal `SettleStep` / `PeriodMove` types and `settleEvents` maps it onto `to`). T11's route and its test use `to` and Step 0 re-reads it.
+- **Part 2's route is a small `FlowReadWire`; Part 3, 4 and 5 need the rich `FlowRead`.** T3 owns the rich route (D-W3-4); Part 4's case 29.292 measures `readFlowView`.
+- **`pin` is counts in the spec's mockup text and a boolean at spec :174** (D-W3-5).
+- **The spec's strings contain " — " and " · "** (the Passes line, the tooltips, the History copy); 23.191 bans both under `apps/web/src`, `apps/web/app`, `packages/app-core/src` and `packages/ui/src`. Every string here uses commas or parentheses instead (D-W3-49), and each task's sweep greps for both marks.
+- **The mockup draws the started-ticket options as `Close as Not taken` then `Keep going`;** the spec's audit ruling fixes `Keep going` first (D-W3-47). The mockup's create popover and revise popover became Dialogs (D-W3-32, D-W3-47).
+- **The mockup's "N more above" and "N more below" chips are not built:** the spec removed paging (the audit), so there is nothing for them to count.
+- **The trail and Back of WG-4 are not built:** the KG release's slot (`knowledgeGraphSlot`) gives a view only `onOpenTicket`, `onShowLinks`, `selected` and `onSelect`. Opening a ticket re-centres the flow.
+- **Part 4, as read, has `timelineGraphSlot` once as a `ReactNode` and once as a component taking `{workspaceId, ticketId, selected, onSelect}` (its consumed-contract row).** T6 declares both slots with the component type (D-W3-16) and Part 4 must match.
+- **`FlowNodeRead` has no type name and no note excerpt.** The inspector shows `Decision` for a Decision only (T8), and a note's title only (D-W3-36).
+- **The stage has no Enter or double tap for notes;** the view adds a quick second tap (D-W3-37).
+- **Counted members:** `soft-delete-client-surface.test.ts` asserts the member count of `DataSourceQuery` (`expect(MEMBERS).toHaveLength(28)` at `:848` on the tip); T3, T9 and T11 each bump it, and whichever lands second re-reads the number.
+- **The four Dockerfiles list every workspace package by hand** (T1 Step 6a) and `scripts/ctl/verbs/gate.sh` counts tasks (41-only at `gate.sh:55` on the KG tip; Part 1 T1 pins its own measured count first); both change with the new package. **Resolved (planner ruling P6):** the gate verb that runs is the primary checkout's (`scripts/ctl/ctl` resolves `verbs/` beside itself), so T1 runs its OWN two-PR pair like Part 1 T1: PR A widens to `N or M`, the owner pulls the primary, PR B pins M-only in its last commit, the owner pulls again (T1 Step 0a; Step 10 items 2, 8a and 9a).
+- **The replica gap owner regex and the 12.185 list name their owners and a count:** T3 extends the regex with `Workflow graph plan` and the list entry; T3 Step 7 says which test title carries the number to bump.
+- **`proj_ticket_links`' `kind` CHECK and Part 2's `label`:** T3 Step 0 reads the migration Part 2 adds; the read is against the landed column names.
+- **PS-6 says the Decide control "computes `planSettle` locally";** the browser holds only the visible subgraph, so the dry run is the server's (D-W3-7, D-W3-46).
+- **PS-9's "Flow changes waiting" chip needs a field `FlowNodeRead` does not carry** (D-W3-52).
+- **The finishing transition goes to the Decision's first-declared terminal state** (D-W3-44) unless the caller names a reachable terminal state or records the outcome only (`finishStateId`, D-W3-53: planner ruling P1, spec §14 `resolve_decision` `close`); a workflow with no way into it refuses the write, and T11 says so in its handoff. The write answers `{filed, pass, revised}` (D-W3-54, ruling P2) and a blocked dry run carries the engine's sentence (D-W3-55, ruling P3).
+- **DC-6's sheet-level Decide control and the sheet header's "Alternate of" line** (the mockup's second screen) live in the ticket sheet, not the Graph tab; this plan builds the inspector's versions (WG-3) and leaves the header to the sheet owner.
+- **Drafts' `ingestClientAtomic` answers `{status: 'committed', results}` or `{status: 'rolled-back', index, result}`,** not an array of results; T11 reads that shape and its Step 0 re-reads the landed one.
+
+## Execution handoff
+
+Execution: the gisik-nokma lanes (one task = one session), per the planner.
+- **Order:** T1 → T2 → T4 → T5; T3 alongside T1 and T2; T6 after the KG release's Graph tab; T7 after T3, T4, T5 and T6; then T8 → T9 → T10 as a chain (shared view files, each a diff on the one before); T11 any time after T3, Part 2's T16 and the Drafts atomic door; T12 last (T8, T9, T10 and T11).
+- **Pointers:** T1, T5, T6 and T7 to T10 and T12 carry `NEEDS: browser`; T3 and T11 carry `NEEDS: db`; T5 to T10 and T12 name `frontend-design`; T1 Step 8, T1 Step 9 and T5 Step 7 STOP and report if a bar misses.
+- **Reviewer focus:** the Review Focus lines, and for every task the mutation table (a survivor is a finding about the test).
+- **What was run when this plan was written:** the pure layers (layout, scene, models, mappers, doors), the web view, inspector, forms, dialogs and their mutation tables in scratch beds that mirror the real paths; NOT run: the server read and the Decide route and their DB tests, the `DataSourceQuery` members' doubles and the soft-delete census, every CSS block, the token roles, the sheet and the three hosts, and every browser step. The lane that runs them names the run LOCAL.
+
+## Ledger rows
+
+```
+wtg-part3-workflow-graph	1	todo	-	-	not started (measure first: the package, the seam, ELK findings, the Worker bars; adds its per-task anchors under Part 1's Part 3 anchor; two PRs: gate widening A (N or M), owner pulls primary, then B pins M; browser)
+wtg-part3-workflow-graph	2	todo	-	-	not started (waits for T1: measured blocks, fold, leaf placement, orientation)
+wtg-part3-workflow-graph	3	todo	-	-	not started (parallel with T1 and T2; needs Part 2 T12 and Drafts T1; db)
+wtg-part3-workflow-graph	4	todo	-	-	not started (waits for T2: scene and the seven colour roles)
+wtg-part3-workflow-graph	5	todo	-	-	not started (waits for T4: the stage and the pan bars; browser)
+wtg-part3-workflow-graph	6	todo	-	-	not started (needs the KG release Graph tab: the wide sheet, the inner switch, the hosts; browser)
+wtg-part3-workflow-graph	7	todo	-	-	not started (waits for T3, T4, T5, T6: the Workflow view)
+wtg-part3-workflow-graph	8	todo	-	-	not started (waits for T7: the inspector)
+wtg-part3-workflow-graph	9	todo	-	-	not started (waits for T8: create and publish; needs Drafts publish route)
+wtg-part3-workflow-graph	10	todo	-	-	not started (waits for T9: note blocks)
+wtg-part3-workflow-graph	11	todo	-	-	not started (waits for T3, Part 2 T16 and Drafts ingestClientAtomic: the Decide door; db)
+wtg-part3-workflow-graph	12	todo	-	-	not started (waits for T8, T9, T10 and T11: deciding on the graph; browser)
+```

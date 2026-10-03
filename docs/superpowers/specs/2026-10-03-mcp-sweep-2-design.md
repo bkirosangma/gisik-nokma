@@ -27,7 +27,7 @@
 |---|---|---|
 | A ticket's attached notes | The ticket sheet's Notes section (`packages/app-core/src/views/ticket-notes-section.tsx:37`), fed by `GET /v1/workspaces/:ws/tickets/:id/notes` (`apps/server/src/routes/notes.ts:87-96`) | `get_ticket` (`read-tools.ts:149-171`) returns the server's ticket detail and the description as Markdown. No notes. `get_note` shows the reverse (`attachedTickets`). |
 | Restore a note version | History panel, **Restore** (`apps/web/src/notes/history-panel.tsx:164-174`) → `note.body_set` (`note-document.tsx:836-848`) | `get_note_history` lists versions, and a version's body as **Markdown** (`note-tools.ts:194-209`). Nothing writes it back. |
-| Bulk close | `BulkCloseDialog` (`packages/app-core/src/views/bulk-close-dialog.tsx:126-286`); List "Bulk close" then "Confirm close (N)" (`Features.md:75`) | `close_ticket`, one ticket (`ticket-tools.ts:105-117`). |
+| Bulk close | `BulkCloseDialog` (`packages/app-core/src/views/bulk-close-dialog.tsx:126-286`); List "Bulk close" then "Confirm close (N)" (`Features.md:75`) | `close_ticket`, one ticket (`ticket-tools.ts:108-120`). |
 | Notification preferences | Account → Notifications (`packages/app-core/src/account/notifications-section.tsx:60-93`), `GET/PUT /v1/me/notification-preferences` (`routes/notification-preferences.ts:25-56`) | `list_notifications`, `mark_notifications_read` only (`discovery-tools.ts:65-77`, `:79`). |
 | Saved filters | The project page's saved views, kept in the per-user preferences document (`GET/PUT /v1/me/preferences?workspaceId=`, `apps/server/src/routes/preferences.ts:96-139`; `savedFilters` up to 50, `packages/domain/src/preferences.ts:112-118`) | Nothing. `list_tickets` takes a `filter` (`read-tools.ts:21`) but the saved ones cannot be read. |
 | Assign by email | The "Assign someone outside this workspace…" arm: `OutsiderFinder` (`views/outsider-finder.tsx:36-120`) → `POST …/people-lookup`, then `POST …/assign-outsider` for a person outside (`routes/people.ts:112-221`; `views/ticket-sheet.tsx:1482-1499`, `:3172-3179`) | `assign_ticket` takes a userId only (`write-tools.ts:134-155`), and so does `create_ticket` (`:25-91`, `"me"` or an id). |
@@ -137,7 +137,8 @@ Side effects the server already has, which the tool does not suppress:
 
 ```ts
 inputSchema: { workspaceId: id, ticketIds: z.array(id).min(1).max(100),
-               confirm_count: z.union([z.string(), z.number().int()]).optional() }
+               confirm_count: z.union([z.string(), z.number()]).optional() }
+// no .int(): a non-integer such as 3.5 must answer the PREVIEW (CT-9), not a schema error
 // without the exact count: a PREVIEW, nothing sent (§5.7)
 // with it, the reply (never an error for a per-ticket refusal)
 {
@@ -313,7 +314,7 @@ It is a **two-call, stateless** confirmation that reuses the house preview (`pre
 **The sentence (ruling 11c).** For a person already in the workspace it is the app's, verbatim: "`<name>` is already in this workspace." (`people/copy.ts:18`). For a person outside it has TWO parts, in this order: first, in so many words, "`<name>` is not in this workspace and WILL BE ADDED AS A GUEST." (the capitals are in the text, so the effect cannot be read past); then the app's own sentence, verbatim: "They will join this workspace as a guest and see only this ticket." (`copy.ts:12`). The in-workspace preview contains no "guest" at all. `joinsAsGuest` carries the same fact for a program.
 
 **Call 2: the same arguments plus `confirm_assignee: "<userId>"`.** The tool looks the email up AGAIN (nothing from call 1 is remembered; `directory.ts:10-12`'s rule), and:
-- if the lookup finds nobody, it answers the miss sentence and its hint (AE-9) and writes nothing;
+- if the lookup finds nobody, it returns the miss sentence and its hint (AE-9) as a thrown error (`isError`) and writes nothing;
 - if `confirm_assignee` is anything but the userId the email resolves to NOW, character for character (a name, the email, a trailing space, the wrong case, or a userId that was right at call 1 and is not any more), it answers a fresh PREVIEW of the person the email resolves to now and writes nothing (`confirmOrPreview`'s exact comparison). The tool cannot tell a wrong id from a changed resolution, and does not try: either way the person shown is the one who would be assigned;
 - if it matches and `inWorkspace`, it submits `ticket.assigned { assigneeId }` through the event door;
 - if it matches and not `inWorkspace`, it posts `{ userId, event }` to `assign-outsider` with the same envelope (`origin: 'mcp'`).
@@ -350,9 +351,9 @@ The app's, by construction, because the tool calls the same routes:
 - **AE-5.** Call 2 with the resolved userId for a person in the workspace sends one `ticket.assigned` through `/v1/events`, `origin: 'mcp'`, and does not call `assign-outsider`.
 - **AE-6.** Call 2 for a person outside calls `assign-outsider` once with `{ userId, event }`; afterwards the person is a guest and the ticket's assignee; the ledger holds `membership.granted` (`origin: 'server'`, actor the caller) then `ticket.assigned` (`origin: 'mcp'`).
 - **AE-7.** A wrong `confirm_assignee` (another userId, the email, the name, the userId with a trailing space, the wrong case) answers the preview of the person the email resolves to and writes nothing. The control, in the same `it`: the exact userId writes.
-- **AE-8.** Re-resolution: if between the calls the email resolves to someone else, call 2 answers a preview naming the NEW person and writes nothing; if it resolves to nobody, call 2 answers the miss sentence (AE-9) and writes nothing. (The stub lookup returns person A at call 1 and person B at call 2.)
-- **AE-9.** No match answers `No user with that email.` (`copy.ts:11`) followed by one hint: someone you can already see is assigned with `assigneeId` from `list_members`. Four inputs get this same answer and the tool never distinguishes them: an unknown address, an unverified account, a synthetic phone address, and an address held by two case-variant accounts (`people.ts:44-56`).
-- **AE-10.** A guest caller and a stranger get `workspace not found or not visible to you`.
+- **AE-8.** Re-resolution: if between the calls the email resolves to someone else, call 2 answers a preview naming the NEW person and writes nothing; if it resolves to nobody, call 2 returns the miss sentence (AE-9) as a thrown error and writes nothing. (The stub lookup returns person A at call 1 and person B at call 2.)
+- **AE-9.** No match is a thrown error (`isError`: nothing was done, so it must not read as a success) carrying `No user with that email.` (`copy.ts:11`) followed by one hint: someone you can already see is assigned with `assigneeId` from `list_members`. Four inputs get this same answer and the tool never distinguishes them: an unknown address, an unverified account, a synthetic phone address, and an address held by two case-variant accounts (`people.ts:44-56`).
+- **AE-10.** A guest caller and a stranger get `workspace not found or not visible to you`. On `assign_ticket` the ticket is read first (AE-11), so a stranger who cannot see the ticket gets AE-11's sentence; only a caller who can read the ticket reaches the lookup and AE-10's sentence. `create_ticket` reads no ticket, so there a stranger gets AE-10's sentence.
 - **AE-11.** A ticket the caller cannot see answers `ticket not found or not visible to you` and no `people-lookup` request is made.
 - **AE-12.** A refusal after confirmation is the server's words, `refused by <rule>: <reason>`. For the outsider arm the refusal arrives wrapped, as `{ result: { status, rule, reason } }` with HTTP 422 (`people.ts:172`, `:179-182`, `:219`); the tool unwraps it as the app's gateway does (`packages/app-core/src/online/people.ts:48-63`), so the assistant never sees `answered 422: {…}` (PL-4). After a refused outsider assignment no guest membership remains.
 - **AE-13.** A 429 from the lookup answers a sentence saying lookups are rate-limited and to wait (PL-5). The preview step spends the same budget as the app's Find button.
