@@ -485,7 +485,7 @@ export function applyTicketEvent(
       ticketPublishedPayload.parse(env.payload);
       if (state.draft === undefined) {
         throw new Error(
-          `applyTicketEvent: ticket.published for ticket ${state.id} that is not a draft — the engine must refuse it before it reaches a projection`,
+          `applyTicketEvent: ticket.published for ticket ${state.id} that is not a draft; the engine must refuse it before it reaches a projection`,
         );
       }
       // Re-pin to the type's binding in force NOW (spec §2.3): a draft may sit for weeks, and
@@ -495,7 +495,7 @@ export function applyTicketEvent(
       const workflow = type === undefined ? undefined : deps.getWorkflow(type.workflowId);
       if (type === undefined || workflow === undefined) {
         throw new Error(
-          `applyTicketEvent: ticket.published for ticket ${state.id}: its type "${state.typeId}" or that type's workflow is not defined — the engine must refuse it first`,
+          `applyTicketEvent: ticket.published for ticket ${state.id}: its type "${state.typeId}" or that type's workflow is not defined; the engine must refuse it first`,
         );
       }
       // Backlog is `open` in every workflow, but ask rather than assume.
@@ -510,7 +510,7 @@ export function applyTicketEvent(
       ticketDiscardedPayload.parse(env.payload);
       if (state.draft === undefined) {
         throw new Error(
-          `applyTicketEvent: ticket.discarded for ticket ${state.id} that is not a draft — the engine must refuse it before it reaches a projection`,
+          `applyTicketEvent: ticket.discarded for ticket ${state.id} that is not a draft; the engine must refuse it before it reaches a projection`,
         );
       }
       return { ...state, draft: { ...state.draft, discarded: true } };
