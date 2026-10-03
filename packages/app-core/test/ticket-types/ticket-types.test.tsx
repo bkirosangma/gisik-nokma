@@ -768,7 +768,7 @@ describe('TicketTypeListScreen — the `"N tickets"` segment (Task 8, built 2026
     // The list is not collateral: the counts are one segment of one meta line,
     // and their read is a separate promise precisely so a failure cannot take
     // the screen down to "Loading ticket types…" for ever.
-    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.queryByText('Loading ticket types')).toBeNull(); // the skeleton region's name (smoothness T8)
     expect(screen.getByText('Invoice')).toBeTruthy();
     // The rest of the meta line is untouched by the failure.
     expect(metaOf(container, 'Invoice')).toContain('rank 5');
@@ -1702,7 +1702,7 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
     const row = await screen.findByTestId('type-editor-header');
     expect(within(row).getByRole('heading', { name: task.name })).toBeInTheDocument();
     expect(within(row).getByRole('link', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.getByText('Loading ticket types…')).toBeInTheDocument();
+    expect(screen.getByText('Loading ticket types')).toBeInTheDocument(); // the skeleton region's name (smoothness T8, 25.130)
   });
 
   /**
@@ -1845,7 +1845,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
       />,
     );
     expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
-    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.queryByText('Loading ticket types')).toBeNull(); // the skeleton region's name (smoothness T8)
   });
 
   /**
@@ -1869,7 +1869,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
       />,
     );
     expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
-    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.queryByText('Loading ticket types')).toBeNull(); // the skeleton region's name (smoothness T8)
     expect(screen.getByTestId('type-editor-header')).toBeTruthy();
   });
 });
@@ -1911,7 +1911,7 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
       />,
     );
     expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
-    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.queryByText('Loading ticket types')).toBeNull(); // the skeleton region's name (smoothness T8)
     cleanup();
 
     // ARM TWO — the editor, `listTicketTypes` rejecting.
@@ -1927,7 +1927,7 @@ describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
       />,
     );
     expect(await screen.findByText('Could not load ticket types. Reload to try again.')).toBeTruthy();
-    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.queryByText('Loading ticket types')).toBeNull(); // the skeleton region's name (smoothness T8)
   });
 });
 

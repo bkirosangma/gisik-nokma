@@ -204,7 +204,8 @@ describe('13.772 the breadcrumb is on every arm of the builder route', () => {
     // a tick before it reaches its own loading branch — a synchronous
     // `getByText` here would assert against that earlier state.
     renderWithAuthoring({ getWorkflow: () => new Promise(() => {}) });
-    expect(await screen.findByText('Loading this workflow…')).toBeInTheDocument();
+    // A skeleton region since smoothness T8 (25.130): the wait is named for assistive tech, never a sentence.
+    expect(await screen.findByText('Loading this workflow')).toBeInTheDocument();
     expectTheCrumb();
   });
 

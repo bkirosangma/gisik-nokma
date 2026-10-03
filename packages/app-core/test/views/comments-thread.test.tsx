@@ -270,7 +270,9 @@ describe('CommentsThread', () => {
     // …no failure is claimed either — nobody refused anything…
     expect(screen.queryByTestId('sheet-comments-unavailable')).toBeNull();
     // …and the state the person is actually in is on screen.
-    expect(screen.getByTestId('sheet-comments-loading')).toHaveTextContent('Loading…');
+    // (a skeleton region since smoothness T8, 25.131: busy and named, never a sentence)
+    expect(screen.getByText('Loading comments').parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Loading…')).toBeNull();
   });
 
   it('V4 CONTROL: an ANSWERED empty read still says “No comments yet.” with a count of 0', () => {
@@ -279,7 +281,7 @@ describe('CommentsThread', () => {
     // the same defect in the opposite direction.
     expect(screen.getByText('Comments (0)')).toBeInTheDocument();
     expect(screen.getByText('No comments yet.')).toBeInTheDocument();
-    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+    expect(screen.queryByText('Loading comments')).toBeNull();
   });
 
   it('V4 CONTROL: a FAILED read outranks the wait — null data plus an error is the failure, not a load', () => {
@@ -288,7 +290,7 @@ describe('CommentsThread', () => {
     // that had already failed — a spinner for a read that is never coming back.
     render(<CommentsThread comments={null} commentsUnavailable="the route answered 404" nameOf={nameOf} />);
     expect(screen.getByTestId('sheet-comments-unavailable')).toHaveTextContent('the route answered 404');
-    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+    expect(screen.queryByText('Loading comments')).toBeNull();
     expect(screen.queryByText('No comments yet.')).toBeNull();
   });
 });

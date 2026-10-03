@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * **V6 — the project page's five `Loading…` arms are `role="status"`. Case `13.1056`.**
+ * **V6 — the project page's five tab-loading arms announce themselves. Case `13.1056`, amended by smoothness T6 as `25.071`.**
+ * (They were bare `<p role="status">Loading…</p>`; T6 made them skeletons; the region carries no role and the words go out through the shell's polite status region (`useAnnounce`) — see the sweep below.)
  *
  * The finding: five tab-loading arms rendered a bare `<p>Loading…</p>` —
  * calendar, timeline, list, board and backlog — **in a file that uses
@@ -30,37 +31,24 @@ const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROJECT_PAGE = join(WEB_ROOT, 'app/w/[workspaceId]/p/[projectId]/page.tsx');
 
 describe('V6 the tab-loading arms announce themselves', () => {
-  it('13.1056 every Loading… arm carries role="status", and there are exactly five', () => {
-    // Comments stripped: the file's own docblocks DISCUSS `Loading…` (lines
-    // 99-100 do, at length) and a raw search counts prose as implementation.
+  it('13.1056 / 25.071 the five tab arms are skeletons and no Loading… sentence remains', () => {
+    // Comments stripped: the file's own docblocks DISCUSS `Loading…` and a raw search counts prose as implementation.
     const source = readFileSync(PROJECT_PAGE, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '');
 
+    // Smoothness T6 (spec S4, amendment S-R1; FD4): the bare sentence arms became `ProjectTabSkeleton`, so the pin flips from
+    // "exactly five announcing sentences" to "zero sentences, five skeleton sites". A sixth bare arm, or a skeleton arm
+    // removed, both redden: the second half is the one an empty-list loop would miss.
     const arms = [...source.matchAll(/<p\b[^>]*>\s*Loading…\s*<\/p>/g)].map((m) => m[0]);
+    expect(arms, `found ${arms.length} bare Loading… arms`).toHaveLength(0);
+    expect(source.match(/<ProjectTabSkeleton\b/g) ?? []).toHaveLength(5);
 
-    // THE COUNT, pinned rather than described. The finding measured five; a
-    // sixth arm added bare reddens here, and one removed reddens too — which is
-    // the half a `for (const arm of arms)` loop over an empty list would miss.
-    expect(arms, `found ${arms.length} Loading… arms`).toHaveLength(5);
-
-    const bare = arms.filter((arm) => !/role="status"/.test(arm));
-    expect(bare, `Loading… arms with no role:\n${bare.join('\n')}`).toEqual([]);
-
-    // The file's own three create-region waits, checked in the same sweep so
-    // this case is about the FILE's convention and not one arm's spelling.
-    //
-    // ⚠ THE NUMBER IS A SUM AND NOT A LITERAL, corrected here because the first
-    // cut read `toBe(3)` — written against the PRE-fix file and left in place
-    // when the five arms joined it, so it failed `expected 8 to be 3` on the
-    // very run that proved the fix. A count that has to be re-derived every
-    // time the thing it counts grows is a count nobody will maintain; this one
-    // says where it comes from.
+    // The create region keeps two `role="status"` waits (the signed-out sentence and the types-fallback arm): the
+    // "Preparing the Create ticket form…" arm is a busy BUTTON now (FD8), so the count is two, not three.
     const statuses = [...source.matchAll(/<p\b[^>]*role="status"[^>]*>/g)].map((m) => m[0]);
-    expect(statuses, 'the create region lost its status sites').toHaveLength(arms.length + 3);
-    // ...and NONE of them spells `aria-live`, which is why the arms were given
-    // `role="status"` and NOT a second, redundant live-region attribute: the
-    // role carries an implicit polite one, and spelling both would be two
+    expect(statuses, 'the create region lost or regained a status site').toHaveLength(2);
+    // ...and NONE spells `aria-live`: `role="status"` carries an implicit polite live region, and spelling both would be two
     // sources for one behaviour.
     const withLive = statuses.filter((tag) => /aria-live/.test(tag));
     expect(withLive, `status sites that also spell aria-live:\n${withLive.join('\n')}`).toEqual([]);
