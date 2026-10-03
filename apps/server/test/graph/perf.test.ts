@@ -1,10 +1,11 @@
 /**
  * Knowledge Graph spec C, ring read (`read/graph-neighbours.ts`): 27.208-27.209 smoke on every run, 27.210 the p95 per ring
- * (`KG_PERF=1`). The link and reference tables come from `./shim.ts` until plan A's and plan B's migrations are on the branch.
+ * (`KG_PERF=1`), 27.211 the within-ring edge and the page's card keys. The link and reference tables come from `./shim.ts` until plan A's and plan B's migrations are on the branch.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { graphRef, membershipId, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { graphRef, membershipId, newUlid, ticketKey, type LedgerEvent } from '@gisik-nokma/domain';
 import { readGraphRing } from '../../src/read/graph-neighbours.js';
+import { ticketNumbers } from '../../src/read/ticket-numbers.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { ensureLinkAndReferenceTables } from './shim.js';
@@ -25,15 +26,15 @@ const insertUser = (id: string, name: string) =>
 type Ids = { ws: string; owner: string; member: string; project: string; workflowId: string; typeId: string };
 
 /** The workspace, its memberships, one project, a workflow and a ticket type. Fresh ids per call: the fixed `wf-errands` ids of read-scenario collide on a second seed. */
-function worldEvents(ids: Ids, extraProjects: string[] = []): LedgerEvent[] {
+function worldEvents(ids: Ids, extraProjects: string[] = [], prefixes?: { workspace: string; project: string }): LedgerEvent[] {
   const { ws, owner, member, project, workflowId, typeId } = ids;
   const base = { workspaceId: ws, actorId: owner };
   return [
-    makeCommitted({ ...base, entity: { kind: 'workspace', id: ws }, type: 'workspace.created', payload: { name: 'Graph Corp' } }),
+    makeCommitted({ ...base, entity: { kind: 'workspace', id: ws }, type: 'workspace.created', payload: { name: 'Graph Corp', ...(prefixes ? { prefix: prefixes.workspace } : {}) } }),
     makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(ws, owner) }, type: 'membership.granted', payload: { userId: owner, role: 'owner' } }),
     makeCommitted({ ...base, entity: { kind: 'membership', id: membershipId(ws, member) }, type: 'membership.granted', payload: { userId: member, role: 'member' } }),
     ...[project, ...extraProjects].flatMap((id, i) => [
-      makeCommitted({ ...base, entity: { kind: 'project', id }, type: 'project.created', payload: { name: `Project ${String(i)}` } }),
+      makeCommitted({ ...base, entity: { kind: 'project', id }, type: 'project.created', payload: { name: `Project ${String(i)}`, ...(prefixes && i === 0 ? { prefix: prefixes.project } : {}) } }),
       makeCommitted({ ...base, entity: { kind: 'project', id }, type: 'project.member_added', payload: { userId: owner, projectAdmin: true } }),
       makeCommitted({ ...base, entity: { kind: 'project', id }, type: 'project.member_added', payload: { userId: member, projectAdmin: false } }),
     ]),
@@ -71,13 +72,35 @@ async function seedSmall(database: TestDatabase) {
   return { ws: ids.ws, owner: ids.owner, member: ids.member, parent, child, grandchild, hidden };
 }
 
+/** A parent with two children and a `relates` link BETWEEN the children, in a workspace and project with ENTERED prefixes (`GK` / `PL`). */
+async function seedSiblings(database: TestDatabase) {
+  const ids = freshIds();
+  await insertUser(ids.owner, 'Olive Owner');
+  await insertUser(ids.member, 'Mira Member');
+  const [parent, left, right] = [newUlid(), newUlid(), newUlid()] as [string, string, string];
+  const base = { workspaceId: ids.ws, actorId: ids.owner };
+  const create = (id: string, parentId: string | null, title: string) =>
+    makeCommitted({ ...base, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId: ids.typeId, projectId: ids.project, parentId, title } });
+  await applyCommitted(database.pool, [
+    ...worldEvents(ids, [], { workspace: 'GK', project: 'PL' }),
+    create(parent, null, 'Parent'),
+    create(left, parent, 'Left sibling'),
+    create(right, parent, 'Right sibling'),
+  ]);
+  await database.pool.query(
+    `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, created_by, created_at, origin, seq) VALUES ($1, $2, $3, 'relates', $4, now(), 'test', 1)`,
+    [ids.ws, left, right, ids.owner],
+  );
+  return { ws: ids.ws, member: ids.member, parent, left, right };
+}
+
 /** Every group: what the perf case reads. */
 const all = new Set(['blocks', 'relates', 'dup', 'structure', 'attached', 'projects', 'ref', 'people'] as const);
 
 /** The smoke case isolates the parent edge; with `projects` on, a ticket's project is a legitimate ring-1 item (plan text drift: its `all` includes it). */
 const structureOnly = new Set(['structure'] as const);
 
-describe('27.208–27.209 the ring read, smoke', () => {
+describe('27.208–27.209, 27.211 the ring read, smoke', () => {
   it('27.208 ring 1 of a parent holds its child and the parent edge; control: ring 2 holds the grandchild and not the child', async () => {
     const world = await seedSmall(db);
     const r1 = await readGraphRing(db.pool, world.member, { center: { kind: 'ticket', id: world.parent }, hops: 1, workspaceIds: [world.ws], projectIds: [], groups: structureOnly, offset: 0 });
@@ -85,6 +108,26 @@ describe('27.208–27.209 the ring read, smoke', () => {
     expect(r1?.edges.map((e) => e.kind)).toEqual(['parent']);
     const r2 = await readGraphRing(db.pool, world.member, { center: { kind: 'ticket', id: world.parent }, hops: 2, workspaceIds: [world.ws], projectIds: [], groups: structureOnly, offset: 0 });
     expect(r2?.items.map((i) => i.ref)).toEqual([graphRef('ticket', world.grandchild)]);
+  });
+
+  it('27.211 ring 1 holds the link BETWEEN two of its items (the `among` read); the page labels a ticket with its card key, not its title', async () => {
+    const world = await seedSiblings(db);
+    const centre = { kind: 'ticket' as const, id: world.parent };
+    const read = (groups: ReadonlySet<'structure' | 'relates'>) =>
+      readGraphRing(db.pool, world.member, { center: centre, hops: 1, workspaceIds: [world.ws], projectIds: [], groups, offset: 0 });
+    const withLinks = await read(new Set(['structure', 'relates'] as const));
+    const relatesId = `relates|${graphRef('ticket', world.left)}|${graphRef('ticket', world.right)}`;
+    expect(withLinks?.edges.map((e) => e.id)).toContain(relatesId);
+    expect(withLinks?.edges.map((e) => e.kind).sort()).toEqual(['parent', 'parent', 'relates']);
+    // control: with `relates` off the same ring has the two parent edges and no link
+    const structureOnlyRing = await read(new Set(['structure'] as const));
+    expect(structureOnlyRing?.edges.map((e) => e.kind)).toEqual(['parent', 'parent']);
+    // the page label: the card key from the ENTERED prefixes and the ledger number; `title` stays the title
+    const numbers = await ticketNumbers(db.pool, world.ws, [world.left, world.right]);
+    const left = withLinks?.items.find((i) => i.id === world.left);
+    expect(left?.label).toBe(ticketKey('GK', 'PL', numbers.get(world.left)!));
+    expect(left?.label).toMatch(/^GKPL-\d+$/);
+    expect(left?.title).toBe('Left sibling');
   });
 
   it('27.209 a centre the viewer cannot see answers null (the route turns it into 404); control: the owner reads it', async () => {
