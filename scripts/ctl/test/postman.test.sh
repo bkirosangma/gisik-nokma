@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1991 and 13.2040–. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -166,7 +166,7 @@ check "13.1947 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 mi
 NOW=$((NOW+1300)); pm_noage postman once >/dev/null 2>&1
 check "13.1972 …the page is not repeated while the message stays open" '[ "$(rec_n exec3)" = 5 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
-for dt in 200 620 1220; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done
+for dt in 200 620 1220 5; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done     # the last pass delivers the page the 4th try posted to the planner
 check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file" \
   '[ "$(count_kind page planner)" = 1 ] && grep -q "⚑ POSTMAN" "$N" && grep -q "#1" "$N"'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 4
@@ -174,8 +174,14 @@ NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1; sleep 4; p1="$(count_kind pa
 check "13.1980 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min" '[ "$p1" = 0 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat planner idle; pm post planner --kind question --text "which way?" --from exec3 >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
-check "13.1954 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line" \
-  '[ "$(rec_n planner)" = 0 ] && ! grep -q "⚑ POSTMAN" "$N" && { NOW=$((NOW+1500)); pm postman once >/dev/null 2>&1; NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; [ "$(grep -c "⚑ POSTMAN" "$N")" = 1 ] && [ "$(rec_n planner)" = 0 ]; }'
+check "13.1954 planner seat: never a pane paste (inbox only); the message is flagged ONCE when delivered (a ⚑ line at once, not repeated by later passes); unacked 30 min → exactly ONE more ⚑ line, the reminder" \
+  '[ "$(rec_n planner)" = 0 ] && [ "$(grep -c "⚑ POSTMAN" "$N")" = 1 ] && { NOW=$((NOW+1500)); pm postman once >/dev/null 2>&1; NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; [ "$(grep -c "⚑ POSTMAN" "$N")" = 2 ] && [ "$(rec_n planner)" = 0 ]; }'
+reset; mkseat planner idle; mkseat exec3 idle; pm post planner --kind note --text "blocked: need a ruling on X" --from exec3 >/dev/null 2>&1; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; pm postman once >/dev/null 2>&1
+check "13.2040 a message TO THE PLANNER is a ⚑ line in the notes file — one per message, its text carried, repeated passes add none — and never a pane paste; CONTROL in the same check: the message to exec3 in the same passes is pasted into its pane and flagged nowhere" \
+  '[ "$(grep -c "⚑ POSTMAN → PLANNER: #1 note ← exec3: blocked: need a ruling on X" "$N")" = 1 ] && [ "$(grep -c "⚑" "$N")" = 1 ] && [ "$(rec_n planner)" = 0 ] && [ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #2 fix"'
+reset
+check "13.2041 ctl postman run/once/status/audit/restarted refuse an unknown flag (exit 1, nothing ran: no ledger root, no daemon pid, no restart marker); CONTROL in the same check: the same subcommands with --dry-run are accepted" \
+  'o="$(CTL_POSTMAN_MAX_PASSES=1 pm postman run --shadw 2>&1)"; [ $? = 1 ] && printf "%s" "$o" | tail -1 | grep -q "^FAIL postman.*unknown flag --shadw" && { pm postman once --nope >/dev/null 2>&1; [ $? = 1 ]; } && { pm postman status --nope >/dev/null 2>&1; [ $? = 1 ]; } && { pm postman audit --nope >/dev/null 2>&1; [ $? = 1 ]; } && { pm postman restarted exec3 --nope >/dev/null 2>&1; [ $? = 1 ]; } && [ ! -e "$R/postman" ] && CTL_POSTMAN_MAX_PASSES=1 pm postman run --dry-run >/dev/null 2>&1 && pm postman once --dry-run >/dev/null 2>&1 && pm postman status --dry-run >/dev/null 2>&1 && pm postman restarted exec3 --dry-run >/dev/null 2>&1'
 reset; f="$T/gone.md"; echo x > "$f"; pm post exec3 --kind fix --body "$f" --from reviewerA >/dev/null 2>&1; rm -f "$f"; pm postman once >/dev/null 2>&1
 check "13.1949 lost body: bounced — a bounce message goes back to the sender, nothing is delivered" \
   '[ "$(count_kind bounce reviewerA)" = 1 ] && [ ! -s "$R/postman/inbox/exec3.jsonl" ] && ! status_of exec3 | grep -q "head=#1"'

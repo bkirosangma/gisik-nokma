@@ -351,6 +351,16 @@ def notes_line(text):
     with open(NOTES, "a") as f: f.write("%s ⚑ POSTMAN → PLANNER: %s\n" % (hhmm(now()), text))
 
 
+def flag_planner(m, st):
+    """A message to the planner is never a pane paste (design choice 2): its delivery IS a ⚑ line in the owner-visible notes file.
+    Once per message (state.flagged); the line is written BEFORE the state, so a crash between the two repeats the line, never loses it."""
+    if st.get("flagged"): return
+    try: t = " ".join(open(m["body"]).read().split()) if m["body"].startswith(p("spool") + os.sep) else "see %s" % m["body"]
+    except OSError: t = "see %s" % m["body"]
+    notes_line("#%d %s ← %s: %s" % (m["id"], m["kind"], m["from"], t[:300]))
+    st["flagged"] = now(); write_state(m["id"], st)
+
+
 def page(m, reason):
     if m["kind"] in NO_PAGE: return
     st = read_state(m["id"])
@@ -358,8 +368,8 @@ def page(m, reason):
     st["paged"] = now(); write_state(m["id"], st)
     text = "#%d %s → %s unacked: %s. See: ctl postman status" % (m["id"], m["kind"], m["to"], reason)
     if m["to"] not in ("main", "planner"): append_message("postman", "main", "page", text=text)
-    elif m["to"] == "main": append_message("postman", "planner", "page", text=text); notes_line(text)
-    else: notes_line(text)
+    elif m["to"] == "main": append_message("postman", "planner", "page", text=text)     # flagged into the notes by flag_planner when delivered
+    else: notes_line(text)                                                               # a reminder: the message itself was flagged on delivery
 
 
 def bounce(m, stats):
@@ -434,6 +444,7 @@ def deliver(stats):
             if m in gated: continue
             st = read_state(m["id"])
             if not st.get("inboxed_ts") and not to_inbox(m, st, stats): continue
+            if inbox_only: flag_planner(m, st)
             if inbox_only and m["kind"] not in NO_PAGE and now() - st.get("inboxed_ts", now()) >= PAGE_AGE:
                 page(m, "planner has not acked in %d min" % ((now() - st["inboxed_ts"]) // 60))
         for m in gated:                                    # head of the queue only
@@ -609,19 +620,28 @@ def once():
 def summary(stats): return ", ".join("%d %s" % (v, k) for k, v in stats.items() if v) or "nothing to do"
 
 
+CMD_FLAGS = {   # subcommand → (valued flags, boolean flags); an unknown flag is refused, never ignored (a typo must not start a live run)
+    "restarted": ((), ("--dry-run",)), "status": ((), ("--dry-run",)), "audit": ((), ("--dry-run",)),
+    "once": ((), ("--dry-run",)), "run": ((), ("--dry-run",)),
+}
+
+
 def cmd_postman(args):
     if not args: fail("postman", "usage: ctl postman run|once|status|audit|restarted <seat>")
     sub, rest = args[0], args[1:]
-    dry = "--dry-run" in rest
+    if sub not in CMD_FLAGS: fail("postman", "unknown subcommand %s" % sub)
+    valued, bools = CMD_FLAGS[sub]
+    try: pos, o = parse_flags(rest, valued + ("--repo",), bools)
+    except ValueError as e: fail("postman", "%s: %s" % (sub, e))
+    dry = "--dry-run" in o
     if sub == "restarted":
-        seat = norm_seat(next((a for a in rest if not a.startswith("--")), ""))
+        seat = norm_seat(pos[0] if pos else "")
         if not seat: fail("postman", "restarted needs a seat name")
         if dry: print("DRY: mark %s restarted" % seat); ok("postman", "dry-run")
         os.makedirs(p("restarts"), exist_ok=True); open(p("restarts", seat), "w").write(str(int(now()) + 2))   # +2 s: a message posted in the second before the restart is the old session's
         ok("postman", "restart of %s recorded (its older open messages are cancelled on the next pass)" % seat)
     if sub == "audit": return cmd_audit()
     if sub == "status": return status()
-    if sub not in ("once", "run"): fail("postman", "unknown subcommand %s" % sub)
     guard()
     os.environ.setdefault("CTL_PROOF_TRIES", "8")
     if dry: print("DRY: one %s pass over %s (session %s)" % (sub, ROOT, SESSION)); ok("postman", "dry-run")
