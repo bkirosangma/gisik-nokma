@@ -132,7 +132,8 @@ describe('28.050 the draft census', () => {
     );
     expect(planted).toEqual({ tickets: 1, visibility: 1, canSee: 1, resolved: 0, getResolved: 0 });
     expect(problems({}, { 'routes/planted.ts': planted })).toEqual([expect.stringContaining('UNLISTED')]);
-    expect(problems({ 'routes/planted.ts': { ...planted, groups: ['B'], why: 'x' } }, {})).toEqual([expect.stringContaining('STALE')]);
+    const listed: Site = { ...planted, groups: ['B'], why: 'x' };
+    expect(problems({ 'routes/planted.ts': listed }, {})).toEqual([expect.stringContaining('STALE')]);
 
     expect(problems(CENSUS, scanSource())).toEqual([]);
   });
