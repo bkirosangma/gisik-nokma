@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * The width up to which the bottom bar replaces the top bar's destination links, as the query string
@@ -24,21 +24,19 @@ export const TABLET_BAR_QUERY = '(max-width: 64rem)';
  * (`.gn-bottom-bar { display: none }` above 64rem) stays as the belt: the paint is right even in the
  * first frame, before this effect has run.
  *
- * `false` on the server, on the first client render and wherever `matchMedia` does not exist, so the
- * markup the server sent is what hydrates; the real answer arrives in an effect and follows a
+ * `false` on the server and wherever `matchMedia` does not exist. It is a `useSyncExternalStore` (smoothness T8, case 25.141/25.144,
+ * audit SM-08): the server snapshot is `false`, so on a HARD LOAD the server markup paints and hydrates first (the CSS belt keeps the
+ * corner links hidden in that frame) and the client answer follows the hydration commit. On every CLIENT mount (each route hop
+ * remounts `AppNav`) the first render already has the answer, with no effect and no flash of the wrong shell; it follows a
  * foldable opening or a window resize through the `change` event.
  */
 export function useTabletBar(): boolean {
-  const [bar, setBar] = useState(false);
+  return useSyncExternalStore(subscribeTabletBar, () => typeof window.matchMedia === 'function' && window.matchMedia(TABLET_BAR_QUERY).matches, () => false);
+}
 
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const query = window.matchMedia(TABLET_BAR_QUERY);
-    const update = (): void => setBar(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
-  return bar;
+function subscribeTabletBar(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia(TABLET_BAR_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
 }

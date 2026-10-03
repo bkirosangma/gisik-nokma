@@ -102,7 +102,8 @@ describe('3.119 the invite page — a session still loading is not a signed-out 
     session = { isPending: true };
     mount({ getInvite: async () => SUMMARY });
     expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Checking whether you are signed in');
+    // A skeleton region since smoothness T8 (25.147): busy and named, never a sentence.
+    expect(screen.getByText('Checking whether you are signed in').parentElement).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('link', { name: 'Sign in to accept' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Join / })).toBeNull();
   });

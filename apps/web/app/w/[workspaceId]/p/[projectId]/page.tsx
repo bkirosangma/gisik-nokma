@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Suspense, startTransition, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ProjectPageSkeleton } from '../../../../../src/skeletons/page-shells.js';
+import { ProjectPageSkeleton, ProjectTabBodySkeleton } from '../../../../../src/skeletons/page-shells.js';
 import {
   BACKLOG_STATE,
   BACKLOG_STATE_ID,
@@ -52,11 +52,16 @@ import {
 import { TicketEditorSlot, prefetchEditor, uploadAttachmentHttp } from '../../../../../src/editor-slot.js';
 import {
   Avatar,
+  Button,
   Chip,
+  PlusIcon,
   RemoveIcon,
   SegmentedControl,
+  Skeleton,
+  SkeletonRegion,
   Switch,
   Toast,
+  useAnnounce,
   type SegmentedOption,
 } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
@@ -91,12 +96,13 @@ import { useIsPhone } from '../../../../../src/use-is-phone.js';
 import { ProjectTitle } from '../../../../../src/project-title.js';
 import {
   DEFAULT_PROJECT_TAB,
-  readProjectTab,
   rememberProjectTab,
   useLastProject,
+  useRememberedProjectTab,
   type ProjectTab,
 } from '../../../../../src/use-last-project.js';
 import { useCanModerateComments } from '../../../../../src/use-can-moderate-comments.js';
+import { useMyWorkspaces } from '../../../../../src/use-my-workspaces.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
 import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
 import { ticketSheetHint } from '../../../../../src/ticket-sheet-hint.js';
@@ -127,8 +133,8 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  * the same invented fact the spinner over a refused read produces: the defect
  * this page's own `parentCandidates` note was written about, one tab across. So
  * the calendar and timeline arms use this page's own `error → ShellRefusal,
- * null → Loading…, data → view` shape, and Step 5b's `<p>{board.error ??
- * 'Loading…'}</p>` spellings are NOT adopted for the two existing arms either —
+ * null → skeleton, data → view` shape (the wait is `ProjectTabSkeleton`, smoothness T6, where it was a `Loading…` sentence), and
+ * Step 5b's `<p>{board.error ?? 'Loading…'}</p>` spellings are NOT adopted for the two existing arms either —
  * those would have deleted `ShellRefusal` from the board and the list on the way
  * past.
  *
@@ -136,8 +142,12 @@ import { DocumentTitle } from '../../../../../src/document-title.js';
  * page — without it `next build` fails the route rather than warning.
  */
 export default function ProjectPage() {
+  // The fallback draws the REMEMBERED tab's shape (spec D9, S1): the id of the last person with a session picks the key
+  // before the session answers. The server snapshot of the hook is `null`, so the server's HTML is the board shape.
+  const { projectId } = useParams<{ projectId: string }>();
+  const rememberedTab = useRememberedProjectTab(projectId, undefined) ?? DEFAULT_PROJECT_TAB;
   return (
-    <Suspense fallback={<ProjectPageSkeleton />}>
+    <Suspense fallback={<ProjectPageSkeleton tab={rememberedTab} />}>
       <ProjectBoard />
     </Suspense>
   );
@@ -239,6 +249,27 @@ const PROJECT_VIEW_OPTIONS: ReadonlyArray<SegmentedOption<ProjectTab>> = (
   ['backlog', 'board', 'list', 'calendar', 'timeline'] as const
 ).map((tab) => ({ value: tab, label: PROJECT_VIEW_LABELS[tab] }));
 
+/**
+ * The five tab arms' wait (smoothness T6, spec S4, amendment S-R1; audit SM-02, SM-09): the tab's own shape (`ProjectTabBodySkeleton`,
+ * shared with the route's Suspense fallback) under a named busy region, in place of the bare `<p role="status">Loading…</p>`
+ * sentence they were. The region itself carries no role; the words go out through the shell's one polite status region
+ * (`useAnnounce`), which is what 13.1056 asked for (a screen reader gets the wait announced) without a second live region.
+ */
+function ProjectTabSkeleton({ tab }: { tab: ProjectTab }) {
+  const announce = useAnnounce();
+  const label = `Loading the ${tab}`;
+  useEffect(() => {
+    announce(label);
+  }, [announce, label]);
+  return (
+    <SkeletonRegion label={label} className="gn-project__tab-skeleton">
+      <div data-testid="project-tab-skeleton" className="gn-project__tab-skeleton-body">
+        <ProjectTabBodySkeleton tab={tab} />
+      </div>
+    </SkeletonRegion>
+  );
+}
+
 function ProjectBoard() {
   const router = useRouter();
   const params = useParams<{ workspaceId: string; projectId: string }>();
@@ -288,6 +319,11 @@ function ProjectBoard() {
    * pending or refused; see each hook's own docblock.
    */
   const workspaceName = useWorkspaceName(workspaceId);
+  // Whether the two names are still being WAITED for (smoothness T6, S1): they reserve their place as placeholder parts while
+  // the shared workspaces read is open, and are omitted, as before, once it has answered without them or been refused (a
+  // placeholder that pulses for ever over a refusal would claim a wait that is over). Signed out never reads, so never waits.
+  const myWorkspaces = useMyWorkspaces();
+  const namesPending = session.kind !== 'signed-out' && myWorkspaces.rows === null && myWorkspaces.error === null;
   /**
    * E2-38 (round-2 ruling, MINOR) — the project's OWN state, on the project's own
    * page.
@@ -328,71 +364,66 @@ function ProjectBoard() {
   // `typecheck` exactly as it did when the union was inline. That property is
   // the reason the inline-ness was recorded in the first place; it was never
   // the inline-ness itself.
-  const [view, setViewState] = useState<ProjectTab>(DEFAULT_PROJECT_TAB);
-
   /**
    * THE REMEMBERED TAB (owner, 2026-09-18: *"on click, open the project page
-   * (save the last open tab as well)"*).
+   * (save the last open tab as well)"*), painted from the FIRST client render
+   * (smoothness T6, spec D9; audit SM-02).
    *
    * GLOBAL, which the owner said directly: it applies whenever a project opens,
    * not only when you arrive through the nav item. A project reached from a
    * card, a bookmark or a pasted link lands you where you left off.
    *
-   * **Seeded by an EFFECT, not by `useState`'s initialiser**, and the difference
-   * is not stylistic. A client component is still rendered on the server, where
-   * `window` does not exist; an initialiser reading storage would answer
-   * `'board'` there and something else on the client, and React would meet a
-   * hydration mismatch on `aria-selected`. `theme-toggle.tsx` reads `gn-theme`
-   * in an effect for exactly this reason, and this follows that convention
-   * rather than inventing a second one. The cost is one frame on the default
-   * tab before the remembered one arrives, which is stated rather than hidden.
+   * **Read through `useSyncExternalStore`, not an effect and not `useState`'s
+   * initialiser.** The effect this replaces seeded the tab AFTER the first
+   * paint, so a person who left a project on the List saw the Board's frame for
+   * a beat before the List arrived (the "one frame on the default tab" the old
+   * docblock stated rather than hid; audit SM-02). An initialiser reading
+   * storage would fix the beat and break hydration instead: this component is
+   * rendered on the server, where `window` does not exist, and would answer
+   * `'board'` there and the remembered tab on the client (a mismatch on
+   * `aria-selected`). The hook's server snapshot is `null`, so the HTML is the
+   * default tab's, and the client's first render (or its re-render straight
+   * after hydrating) is the remembered one. `theme-toggle.tsx` reads `gn-theme`
+   * in an effect for the same hydration reason; this is the same constraint met
+   * without the extra frame.
    *
-   * `userId` is `null` when signed out, never `''`: the tab map is keyed by
-   * user, and an empty string is a key like any other — it would let a
-   * signed-out viewer's click be read back by the next signed-out viewer.
+   * **Whose memory:** the signed-in person's id; while the session has not
+   * answered (`'loading'`), the id of the last person who had one on this
+   * device (`last-user-id.ts`), which only picks WHICH key to read, and
+   * `readProjectTab` refuses a map that is not that person's. Signed out, the
+   * answer is `null` (never `''`: the tab map is keyed by user, and an empty
+   * string is a key like any other, which would let a signed-out viewer's click
+   * be read back by the next signed-out viewer). `currentUserId` above is NOT
+   * reused, and the difference is exactly that empty string.
    *
-   * `currentUserId` above is NOT reused, and the difference is exactly that
-   * empty string: it exists for the ticket reads, which want `''`, and this
-   * wants `null`.
+   * **A tab the person CHOSE on this page outranks the memory** (13.880): the
+   * rail is clickable during the one round trip the session read takes, and the
+   * session landing used to put the stored tab back over the choice just made.
+   * `chosen` carries the project it was chosen FOR, so a choice made on one
+   * project is not applied to the next one the person navigates to.
+   *
+   * **What this does NOT fix, stated rather than implied:** a click made while
+   * the session is pending is not written to the tab map, because there is no
+   * user id to key it by yet. The choice stands for as long as the page does
+   * and is forgotten on the next visit. Keying a write to a user the session has
+   * not named would be inventing one, and the window is a single round trip;
+   * recorded in the catalogue as a known limitation rather than papered over.
+   *
+   * The `TAB_NOUN` record below is still `Record<typeof view, string>`, so a
+   * sixth member added to `PROJECT_TABS` and forgotten there still fails
+   * `typecheck`. The default stays `'board'` (`DEFAULT_PROJECT_TAB`, named once
+   * so the page and the nav cannot come to different conclusions): Backlog is
+   * the FIRST tab in the rail (it precedes the board in a ticket's lifecycle),
+   * not the first one a person lands on.
    */
   const tabUserId = session.kind === 'signed-in' ? session.user.id : null;
-  /**
-   * A tab the person chose on THIS page outranks the memory, so the seed is
-   * applied at most once per project and never after a click — case 13.880,
-   * which a reviewer found and which the first version of this effect carried.
-   *
-   * The rail is not gated on the session. This page's main return is
-   * unconditional and nothing between it and the tablist asks what
-   * `session.kind` is, so the tabs are clickable during the one network round
-   * trip the session read takes. In that window `tabUserId` is `null`, so the
-   * click's own write goes nowhere — and because `tabUserId` is this effect's
-   * dependency, the session landing then RE-RAN it and put the stored tab back
-   * over the choice just made.
-   *
-   * Two refs rather than one, because they answer different questions:
-   * `seededForProject` is how a new project gets a fresh chance to be seeded,
-   * and `tabChosenHere` is what a click sets. Resetting the second when the
-   * FIRST changes is the whole of it — a person clicking in the loading window
-   * is not clicking "for" the project they navigated to next.
-   *
-   * **What this does NOT fix, stated rather than implied:** that click is still
-   * not written to the tab map, because there is no user id to key it by yet.
-   * The choice stands for as long as the page does and is forgotten on the next
-   * visit. Keying a write to a user the session has not named would be
-   * inventing one, and the window is a single round trip; recorded in the
-   * catalogue as a known limitation rather than papered over.
-   */
-  const seededForProject = useRef<string | null>(null);
-  const tabChosenHere = useRef(false);
-  useEffect(() => {
-    if (seededForProject.current !== projectId) {
-      seededForProject.current = projectId;
-      tabChosenHere.current = false;
-    }
-    if (tabChosenHere.current) return;
-    const rememberedTab = readProjectTab(projectId, tabUserId);
-    if (rememberedTab !== null) setViewState(rememberedTab);
-  }, [projectId, tabUserId]);
+  const rememberedTab = useRememberedProjectTab(
+    projectId,
+    session.kind === 'signed-in' ? session.user.id : session.kind === 'loading' ? undefined : null,
+  );
+  const [chosenTab, setChosenTab] = useState<{ projectId: string; tab: ProjectTab } | null>(null);
+  const view: ProjectTab =
+    chosenTab !== null && chosenTab.projectId === projectId ? chosenTab.tab : (rememberedTab ?? DEFAULT_PROJECT_TAB);
 
   /**
    * Opening a project is what makes it the last one opened — the counterpart of
@@ -410,9 +441,9 @@ function ProjectBoard() {
    */
   const setView = useCallback(
     (tab: ProjectTab): void => {
-      // Read by the seed effect above, which must not undo this.
-      tabChosenHere.current = true;
-      setViewState(tab);
+      // A transition (spec S4): the new tab's tree renders at a lower priority than the click, so a heavy tab never holds the
+      // press. The WRITE below is not deferred with it.
+      startTransition(() => setChosenTab({ projectId, tab }));
       rememberProjectTab(projectId, tab, tabUserId);
     },
     [projectId, tabUserId],
@@ -456,7 +487,19 @@ function ProjectBoard() {
    * whole-document PUT gated on `canSetPrefs`, and the user who most needs the
    * control may be unable to persist anything. Persisting is its own change.
    */
-  const [activeOnly, setActiveOnly] = useState(false);
+  //
+  // **Two states, one control (smoothness T6, spec S4).** `activeOnly` is what the READS ask (the list filter, the narrowing
+  // words, the parent picker's scope) and changes inside a transition, so the walk that answers a toggle never holds the
+  // press; `activeOnlyChecked` is what the control SHOWS and changes at once. Without the second, a controlled switch inside a
+  // transition would snap back until the transition committed. The list keeps its previous rows while the new walk answers
+  // (`useTicketList`), so nothing on screen is replaced by a skeleton for a toggle.
+  const [activeOnly, setActiveOnlyReads] = useState(false);
+  const [activeOnlyChecked, setActiveOnlyChecked] = useState(false);
+  const [, startFiltering] = useTransition();
+  const setActiveOnly = useCallback((next: boolean): void => {
+    setActiveOnlyChecked(next);
+    startFiltering(() => setActiveOnlyReads(next));
+  }, []);
   const listFilter = useMemo(
     () => (activeOnly ? { stateCategories: ['active'] as StateCategory[] } : {}),
     [activeOnly],
@@ -617,6 +660,10 @@ function ProjectBoard() {
    * below.
    */
   const [filter, setFilter] = useState<FilterSpec>({});
+  // The narrowings the board and the List read are computed from this, so typing in the search box (which writes
+  // `filter` and must paint at once) never waits on re-filtering a large board: React renders the box first and the
+  // narrowing after, abandoning the second if another keystroke arrives (smoothness T12, audit SM-10; owner D12).
+  const deferredFilter = useDeferredValue(filter);
 
   /**
    * THE FILTERS SHEET (Task 5) — open/closed state, and the trigger's own
@@ -689,46 +736,36 @@ function ProjectBoard() {
   const [showClosedOnDates, setShowClosedOnDates] = useState(false);
 
   /**
-   * THE ONE ENUMERATION of the six axes a board can answer — `Pick`'s own
-   * field list, restated here exactly once. `boardNarrowing` below and
-   * `activeFilterChips` further down BOTH read this SAME value; before the
-   * review that asked for this, they were two independently hand-written
-   * lists of "which axes exist" that had already drifted (the chip builder
-   * only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
-   * `buildFilterChips` for the full account. A future axis added to
-   * `BoardFilterSpec` now has exactly one object literal to update, not two.
+   * THE ONE ENUMERATION of the six axes a board can answer — `boardSpecOf` (module scope, below), `Pick`'s own
+   * field list restated exactly once. `boardNarrowing` below and `activeFilterChips` further down BOTH read a spec made
+   * by it; before the review that asked for this, they were two independently hand-written lists of "which axes exist"
+   * that had already drifted (the chip builder only ever checked `text`) — see `board-search-scope.ts`'s own docblock on
+   * `buildFilterChips` for the full account. A future axis added to `BoardFilterSpec` now has exactly one object literal
+   * to update, not two.
+   *
+   * TWO COPIES, ONE SHAPE (Smoothness T12). `boardFilter` is made from the DEFERRED filter and is the board's narrowing
+   * input only (`boardNarrowing`): the search box paints at once and the board narrows a render later. `liveBoardFilter`
+   * is made from the LIVE filter and feeds the two chip lists (`activeFilterChips`, `listFilterChips`), so a chip's ×
+   * and a sheet toggle repaint the strip at once instead of waiting for the narrowing.
    */
   const boardFilter: BoardFilterSpec = useMemo(
-    () => ({
-      text: filter.text,
-      assigneeIds: filter.assigneeIds,
-      typeIds: filter.typeIds,
-      stateIds: filter.stateIds,
-      stateCategories: filter.stateCategories,
-      projectIds: filter.projectIds,
-      // The exclude half, the same five — `collaboratorIds` deliberately dropped
-      // (`BoardFilterSpec.exclude` cannot carry it; `describeUnappliedBoardAxes`
-      // discloses it). Exclude-mode spec §1/§3.
-      exclude:
-        filter.exclude === undefined
-          ? undefined
-          : {
-              assigneeIds: filter.exclude.assigneeIds,
-              typeIds: filter.exclude.typeIds,
-              stateIds: filter.exclude.stateIds,
-              stateCategories: filter.exclude.stateCategories,
-              projectIds: filter.exclude.projectIds,
-            },
-    }),
+    () => boardSpecOf(deferredFilter),
+    // The six axes and `exclude` only — `closed` and the list-only axes changing must not rebuild the board's spec.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
-      filter.text,
-      filter.assigneeIds,
-      filter.typeIds,
-      filter.stateIds,
-      filter.stateCategories,
-      filter.projectIds,
-      filter.exclude,
+      deferredFilter.text,
+      deferredFilter.assigneeIds,
+      deferredFilter.typeIds,
+      deferredFilter.stateIds,
+      deferredFilter.stateCategories,
+      deferredFilter.projectIds,
+      deferredFilter.exclude,
     ],
+  );
+  const liveBoardFilter: BoardFilterSpec = useMemo(
+    () => boardSpecOf(filter),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filter.text, filter.assigneeIds, filter.typeIds, filter.stateIds, filter.stateCategories, filter.projectIds, filter.exclude],
   );
 
   /**
@@ -826,32 +863,32 @@ function ProjectBoard() {
    */
   const listFilterSpec: ListFilterSpec = useMemo(
     () => ({
-      text: filter.text,
-      assigneeIds: filter.assigneeIds,
-      typeIds: filter.typeIds,
-      stateIds: filter.stateIds,
-      stateCategories: filter.stateCategories,
-      projectIds: filter.projectIds,
-      dueBefore: filter.dueBefore,
-      dueAfter: filter.dueAfter,
-      fields: filter.fields,
+      text: deferredFilter.text,
+      assigneeIds: deferredFilter.assigneeIds,
+      typeIds: deferredFilter.typeIds,
+      stateIds: deferredFilter.stateIds,
+      stateCategories: deferredFilter.stateCategories,
+      projectIds: deferredFilter.projectIds,
+      dueBefore: deferredFilter.dueBefore,
+      dueAfter: deferredFilter.dueAfter,
+      fields: deferredFilter.fields,
       // Task 11 (spec §5.5): the List tab honours the Closed control's
-      // EXPLICIT choice only — `filter.closed` itself, never defaulted to
+      // EXPLICIT choice only — `deferredFilter.closed` itself, never defaulted to
       // `false` the way Calendar/Timeline's own `datesNarrowing` does below.
       // An unset control shows every ticket on the List tab, open or closed.
-      closed: filter.closed,
+      closed: deferredFilter.closed,
       exclude:
-        filter.exclude === undefined
+        deferredFilter.exclude === undefined
           ? undefined
           : {
-              assigneeIds: filter.exclude.assigneeIds,
-              typeIds: filter.exclude.typeIds,
-              stateIds: filter.exclude.stateIds,
-              stateCategories: filter.exclude.stateCategories,
-              projectIds: filter.exclude.projectIds,
+              assigneeIds: deferredFilter.exclude.assigneeIds,
+              typeIds: deferredFilter.exclude.typeIds,
+              stateIds: deferredFilter.exclude.stateIds,
+              stateCategories: deferredFilter.exclude.stateCategories,
+              projectIds: deferredFilter.exclude.projectIds,
             },
     }),
-    [filter],
+    [deferredFilter],
   );
 
   /**
@@ -891,12 +928,12 @@ function ProjectBoard() {
    */
   const datesNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
-    const effectiveClosed = filter.closed ?? (showClosedOnDates ? undefined : false);
+    const effectiveClosed = deferredFilter.closed ?? (showClosedOnDates ? undefined : false);
     const rows = listNarrowing.rows.filter((row) =>
       matchesListRow(row, projectId, { ...listFilterSpec, closed: effectiveClosed }),
     );
     return { rows, shown: rows.length, total: list.rows.length };
-  }, [list.rows, listNarrowing, listFilterSpec, filter.closed, showClosedOnDates, projectId]);
+  }, [list.rows, listNarrowing, listFilterSpec, deferredFilter.closed, showClosedOnDates, projectId]);
 
   const listUnappliedAxes = useMemo(() => describeUnappliedListAxes(filter), [filter.collaboratorIds, filter.exclude]);
 
@@ -1322,8 +1359,12 @@ function ProjectBoard() {
    * key moves and two reads keyed on the bare `workspaceId` would be two
    * questions wearing one name.
    */
-  const ticketTypes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:ticket-types`, () =>
-    dataSource.query.getTicketTypes(workspaceId),
+  const ticketTypes = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${workspaceId}:ticket-types`,
+    () => dataSource.query.getTicketTypes(workspaceId),
+    { cacheKey: `types:${workspaceId}` },
   );
 
   /**
@@ -1363,6 +1404,7 @@ function ProjectBoard() {
       }
       return defs;
     },
+    { cacheKey: `wf:backlog:${backlogWorkflowIds.join(',')}` },
   );
 
   // Every read on this page, one rule, one author — see `src/expired-session.tsx`.
@@ -1516,8 +1558,12 @@ function ProjectBoard() {
    * and a refusal panel for it would put the calendar behind a read the calendar
    * does not need in order to be correct.
    */
-  const members = useLiveQuery(dataSource, workspaceId, `${workspaceId}:members`, () =>
-    dataSource.query.getMembers(workspaceId),
+  const members = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${workspaceId}:members`,
+    () => dataSource.query.getMembers(workspaceId),
+    { cacheKey: `members:${workspaceId}` },
   );
   /**
    * The names-only read (`getActorNames`), for the people the roster omits — a
@@ -1925,6 +1971,7 @@ function ProjectBoard() {
       }
       return defs;
     },
+    { cacheKey: `wf:types:${ticketTypeWorkflowIds.join(',')}` },
   );
   /**
    * `NewTicketDialogProps.workflowStates` — a workflow id in, its
@@ -2020,7 +2067,7 @@ function ProjectBoard() {
   const activeFilterChips = useMemo(
     () =>
       buildFilterChips(
-        boardFilter,
+        liveBoardFilter,
         {
           assigneeName: nameOf,
           typeName: (id) => typeNameById.get(id) ?? id,
@@ -2028,7 +2075,7 @@ function ProjectBoard() {
         },
         setFilter,
       ),
-    [boardFilter, nameOf, typeNameById, boardStateNames],
+    [liveBoardFilter, nameOf, typeNameById, boardStateNames],
   );
 
   /**
@@ -2110,7 +2157,7 @@ function ProjectBoard() {
   const listFilterChips = useMemo(
     () =>
       buildFilterChips(
-        { ...boardFilter, closed: filter.closed },
+        { ...liveBoardFilter, closed: filter.closed },
         {
           assigneeName: nameOf,
           typeName: (id) => typeNameById.get(id) ?? id,
@@ -2118,7 +2165,7 @@ function ProjectBoard() {
         },
         setFilter,
       ),
-    [boardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
+    [liveBoardFilter, filter.closed, nameOf, typeNameById, boardStateNames],
   );
 
   /**
@@ -2219,11 +2266,18 @@ function ProjectBoard() {
     // re-read is not a reason to take the button away. The comment two lines
     // below was already half of this argument — a list REFUSAL stopped
     // withholding the form — and a list RELOAD is the other half.
+    //
+    // **The control is the real trigger, busy (smoothness T6, S1; audit SM-02).** It was a sentence a different size from the
+    // button it became (229×23 against 116×44), so the header moved when the wait ended. `CreateTicketFlow`'s trigger is
+    // `Button variant="primary"` with a `PlusIcon`; this is the same element with `busy`, and `busyLabel` is left off ON PURPOSE:
+    // a busy label replaces the children, which would drop the icon and change the box. `busy` disables it (a fast click goes
+    // nowhere: the window 3.144 closed) and sets `aria-busy`.
     if (session.kind === 'loading' || (!list.rowsHaveAnswered && list.error === null)) {
       return (
-        <p role="status" className="gn-new-ticket__gate">
-          Preparing the Create ticket form…
-        </p>
+        <Button variant="primary" busy>
+          <PlusIcon />
+          Create ticket
+        </Button>
       );
     }
     /**
@@ -2386,9 +2440,15 @@ function ProjectBoard() {
               <div className="gn-project__identity">
                 {workspaceName !== null ? (
                   <p className="gn-project__breadcrumb">{workspaceName}</p>
+                ) : namesPending ? (
+                  <p className="gn-project__breadcrumb">
+                    <Skeleton width="8rem" height="1em" />
+                  </p>
                 ) : null}
                 {projectName !== null ? (
                   <ProjectTitle workspaceId={workspaceId} projectId={projectId} projectName={projectName} />
+                ) : namesPending ? (
+                  <Skeleton className="gn-project__title-skeleton" width="14rem" height="var(--gn-title-page-size)" />
                 ) : null}
                 {/* The SAME component and the SAME word the workspace home's card
                     uses for this state, so the two screens cannot describe one fact
@@ -2551,7 +2611,7 @@ function ProjectBoard() {
                   to be whole and is the reason this control exists.
                 */}
                 {isPhone ? null : (
-                  <Switch checked={activeOnly} onChange={setActiveOnly}>
+                  <Switch checked={activeOnlyChecked} onChange={setActiveOnly}>
                     Only tickets in progress
                   </Switch>
                 )}
@@ -3113,20 +3173,11 @@ function ProjectBoard() {
                   hideEpicRows
                 />
               ) : (
-                /* exec1's V6, and the same `role` all five of this chain's arms
-                   now carry: each tab's read-in-flight state announces itself.
-                   This file had ALREADY decided its waits deserve one — the
-                   create region carries `role="status"` three times (`:1759`,
-                   `:1768`, `:1810`) — and these five were the ones that did not
-                   match it, so a screen reader got the words with no
-                   announcement on every view but the one. ⚠ **No `aria-live`**,
-                   matching those three rather than inventing a second shape for
-                   the same job: `role="status"` carries an implicit polite
-                   live region, and spelling both would be two sources for one
-                   behaviour. The five are asserted by a sweep that PINS the
-                   count, because exactly one arm renders at a time and no
-                   single mount can see them all. */
-                <p role="status">Loading…</p>
+                /* The wait is a skeleton of the tab's own shape, never a sentence (smoothness T6, S4; V6 / 13.1056 made these
+                   announce, and `ProjectTabSkeleton` still does, through the shell's one status region). The sweep in
+                   `loading-status.test.tsx` pins five of them, because exactly one arm renders at a time and no single
+                   mount can see them all. */
+                <ProjectTabSkeleton tab="calendar" />
               )
             ) : view === 'timeline' ? (
               list.error !== null ? (
@@ -3164,7 +3215,7 @@ function ProjectBoard() {
                   hideEpicRows
                 />
               ) : (
-                <p role="status">Loading…</p>
+                <ProjectTabSkeleton tab="timeline" />
               )
             ) : view === 'board' ? (
               board.error !== null ? (
@@ -3300,7 +3351,7 @@ function ProjectBoard() {
                     : {})}
                 />
               ) : (
-                <p role="status">Loading…</p>
+                <ProjectTabSkeleton tab="board" />
               )
             ) : view === 'backlog' ? (
               // Task 10 (backlog/closed spec §5.4) — the Backlog tab. Same
@@ -3453,7 +3504,7 @@ function ProjectBoard() {
                   ) : null}
                 </>
               ) : (
-                <p role="status">Loading…</p>
+                <ProjectTabSkeleton tab="backlog" />
               )
             ) : list.error !== null ? (
               <ShellRefusal what="The ticket list" message={list.error} />
@@ -3634,7 +3685,7 @@ function ProjectBoard() {
                   : {})}
               />
             ) : (
-              <p role="status">Loading…</p>
+              <ProjectTabSkeleton tab="list" />
             )}
           </div>
         )}
@@ -3907,7 +3958,7 @@ function ProjectBoard() {
                     : null,
                 workflowValue: resolvedWorkflowFilter,
                 onWorkflowChange: setWorkflowFilter,
-                activeOnly,
+                activeOnly: activeOnlyChecked,
                 onActiveOnlyChange: setActiveOnly,
               }
             : null
@@ -4003,6 +4054,32 @@ export const FILTERS_SHEET_CLEARABLE_AXES = [
   'closed',
   'exclude',
 ] as const satisfies readonly (keyof FilterSpec)[];
+
+/**
+ * THE ONE ENUMERATION of the six axes a board can answer, plus the exclude half's five (`collaboratorIds` deliberately
+ * dropped: `BoardFilterSpec.exclude` cannot carry it, and `describeUnappliedBoardAxes` discloses it — exclude-mode spec
+ * §1/§3). The page calls it twice, on the deferred filter for the narrowing and on the live one for the chips.
+ */
+function boardSpecOf(spec: FilterSpec): BoardFilterSpec {
+  return {
+    text: spec.text,
+    assigneeIds: spec.assigneeIds,
+    typeIds: spec.typeIds,
+    stateIds: spec.stateIds,
+    stateCategories: spec.stateCategories,
+    projectIds: spec.projectIds,
+    exclude:
+      spec.exclude === undefined
+        ? undefined
+        : {
+            assigneeIds: spec.exclude.assigneeIds,
+            typeIds: spec.exclude.typeIds,
+            stateIds: spec.exclude.stateIds,
+            stateCategories: spec.exclude.stateCategories,
+            projectIds: spec.exclude.projectIds,
+          },
+  };
+}
 
 /**
  * Resets every axis named in `FILTERS_SHEET_CLEARABLE_AXES` to `undefined`,

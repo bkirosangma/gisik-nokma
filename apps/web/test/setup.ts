@@ -1,5 +1,6 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
+import { clearLiveQueryCache } from '@gisik-nokma/app-core';
 import '@testing-library/jest-dom/vitest';
 
 /**
@@ -54,6 +55,11 @@ afterEach(cleanup);
  */
 beforeEach(() => {
   window.localStorage.clear();
+  // The read cache is session-scoped and module-level (smoothness T3): once the project page's board, list, members and types
+  // reads carry a `cacheKey` (T6), a case that mounts the page would otherwise be served the PREVIOUS case's answers on its
+  // first frame, and a case about a read that has not answered would never see it wait. The same module-state argument as the
+  // storage line above; `@gisik-nokma/app-core` is a package, not `src/`, so the import rule below is not touched.
+  clearLiveQueryCache();
 });
 
 /**
