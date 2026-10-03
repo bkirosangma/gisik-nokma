@@ -673,7 +673,7 @@ describe('applyTicketEvent', () => {
 });
 
 describe('TICKET_EVENT_TYPES', () => {
-  it('lists exactly the registered types whose entity kind is a ticket', () => {
+  it('28.009 lists exactly the registered types whose entity kind is a ticket; nineteen members, both draft types among them', () => {
     // MEMBERSHIP, not identity, since the notes series (Plan 1 of 6): the
     // registry's `entityKind` may now name a LIST, and `comment.added` — the one
     // type in this list that has one — declares `['ticket', 'note']` because a
@@ -694,6 +694,8 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
+    // NINETEEN of the TWENTY-FOUR (drafts T1, 2026-10-03, case 28.009: 'ticket.published' and
+    // 'ticket.discarded' joined the list — both fold into `draft`).
     // SEVENTEEN of the TWENTY-TWO registered against entityKind 'ticket' (typed-links T1, 2026-10-03:
     // 'ticket.link_added' and 'ticket.link_removed' joined the list — both fold into `links`).
     // The earlier arithmetic read FIFTEEN of EIGHTEEN (backlog/closed
@@ -709,7 +711,10 @@ describe('TICKET_EVENT_TYPES', () => {
     // iterates. A pair added to the registry but not to this list would parse at
     // the door and then be skipped by every fold that iterates it — the two would
     // disagree with no error anywhere, which is why the count is asserted at all.
-    expect(TICKET_EVENT_TYPES).toHaveLength(17);
+    expect(TICKET_EVENT_TYPES).toHaveLength(19);
+    for (const type of ['ticket.published', 'ticket.discarded']) {
+      expect((TICKET_EVENT_TYPES as readonly string[]).includes(type), type).toBe(true);
+    }
   });
 });
 

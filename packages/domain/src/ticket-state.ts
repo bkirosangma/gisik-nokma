@@ -10,9 +10,11 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketDeletedPayload,
+  ticketDiscardedPayload,
   ticketFieldSetPayload,
   ticketLinkAddedPayload,
   ticketLinkRemovedPayload,
+  ticketPublishedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -60,7 +62,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — SEVENTEEN of the TWENTY-TWO registered against
+ * The event types this reducer folds — NINETEEN of the TWENTY-FOUR registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -78,7 +80,8 @@ export type TicketStateDeps = {
  * whole job is to stop a reader mistaking the list for the entity set, and a
  * stale count is the first half of that mistake. The link pair (spec A) moved both
  * numbers again, to seventeen and twenty-two: they fold into `links`, so they belong here
- * too. (`comment.edited` and `comment.deleted` are the other two absent from this list;
+ * too. The draft pair (drafts spec §2.2) moved both numbers again, to nineteen and twenty-four:
+ * `ticket.published` and `ticket.discarded` fold into `TicketState.draft`. (`comment.edited` and `comment.deleted` are the other two absent from this list;
  * `sync-routes.ts` backfills them with the three above.)
  *
  * `ticket-type.defined` is deliberately absent for a different reason: it is
@@ -102,6 +105,8 @@ export const TICKET_EVENT_TYPES = [
   'ticket.restored',
   'ticket.link_added',
   'ticket.link_removed',
+  'ticket.published',
+  'ticket.discarded',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -263,6 +268,8 @@ export function applyTicketEvent(
       // concerned, and both read `null` — which is what the undo
       // (`ticket.restored`) folds BACK to, not a third value.
       deleted: null,
+      // Drafts (spec §2.3): the key is ABSENT for a published ticket, never `undefined`.
+      ...(p.draft === true ? { draft: { authorId: env.actorId, at: env.serverTime } } : {}),
     };
   }
 
@@ -473,6 +480,40 @@ export function applyTicketEvent(
       // Absent, never `[]`: the shape `rowToTicketState` reads back (T1 "Why links is absent").
       const { links: _dropped, ...without } = state;
       return without;
+    }
+    case 'ticket.published': {
+      ticketPublishedPayload.parse(env.payload);
+      if (state.draft === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.published for ticket ${state.id} that is not a draft — the engine must refuse it before it reaches a projection`,
+        );
+      }
+      // Re-pin to the type's binding in force NOW (spec §2.3): a draft may sit for weeks, and
+      // `migrate_ticket_type` cannot touch it. The ticket "is created" under the workflow in force at
+      // publish — the owner's rule that a ticket pins the workflow it was created under (2026-08-26).
+      const type = deps.getTicketType(state.typeId);
+      const workflow = type === undefined ? undefined : deps.getWorkflow(type.workflowId);
+      if (type === undefined || workflow === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.published for ticket ${state.id}: its type "${state.typeId}" or that type's workflow is not defined — the engine must refuse it first`,
+        );
+      }
+      // Backlog is `open` in every workflow, but ask rather than assume.
+      const category = stateCategoryOf(workflow, state.stateId);
+      if (!category) {
+        throw new Error(`applyTicketEvent: workflow "${workflow.id}" has no state "${state.stateId}"`);
+      }
+      const { draft: _published, ...rest } = state;
+      return { ...rest, workflowId: type.workflowId, workflowVersion: workflow.version, stateCategory: category };
+    }
+    case 'ticket.discarded': {
+      ticketDiscardedPayload.parse(env.payload);
+      if (state.draft === undefined) {
+        throw new Error(
+          `applyTicketEvent: ticket.discarded for ticket ${state.id} that is not a draft — the engine must refuse it before it reaches a projection`,
+        );
+      }
+      return { ...state, draft: { ...state.draft, discarded: true } };
     }
     case 'comment.added':
     case 'attachment.added':

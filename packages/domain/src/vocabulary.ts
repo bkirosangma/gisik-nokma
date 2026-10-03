@@ -42,9 +42,11 @@ import {
   ticketCollaboratorPayload,
   ticketCreatedPayload,
   ticketDeletedPayload,
+  ticketDiscardedPayload,
   ticketFieldSetPayload,
   ticketLinkAddedPayload,
   ticketLinkRemovedPayload,
+  ticketPublishedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -283,6 +285,25 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: ticketLinkRemovedPayload,
+});
+
+/**
+ * The draft pair (drafts spec §2.2): filed against the draft/ticket itself. Both FOLD (`TicketState.draft`),
+ * so both are in `TICKET_EVENT_TYPES` and neither is backfilled below a snapshot. Entity kind stays
+ * `ticket`: a draft is a ticket with a flag, not a new kind (`ENTITY_KINDS` is unchanged).
+ */
+domainRegistry.register({
+  type: 'ticket.published',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketPublishedPayload,
+});
+
+domainRegistry.register({
+  type: 'ticket.discarded',
+  version: 1,
+  entityKind: 'ticket',
+  payloadSchema: ticketDiscardedPayload,
 });
 
 /**
