@@ -178,9 +178,19 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     );
     const { rerender } = render(tree());
     const h1 = screen.getByRole('heading', { level: 1 });
-    const seen = new Set<string>([h1.textContent ?? '']);
-    const observer = new MutationObserver(() => seen.add(h1.textContent ?? ''));
-    observer.observe(h1, { childList: true, characterData: true, subtree: true });
+    // Not seeded with the first text: only the observer may put "Home" here, so the control below is not vacuous.
+    const seen = new Set<string>();
+    // Record every text the h1 HELD, not its text when the callback runs: `rerender` commits a one-render flash
+    // AND its correction inside one sync `act`, so a live `textContent` read would see only the correction.
+    // Task 3's "getHome is never called with ws_1" is a CALL SPY on `getHome`, not this observer: a request leaves no DOM trace.
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.oldValue !== null) seen.add(record.oldValue);
+        record.removedNodes.forEach((node) => seen.add(node.textContent ?? ''));
+      }
+      seen.add(h1.textContent ?? '');
+    });
+    observer.observe(h1, { childList: true, characterData: true, characterDataOldValue: true, subtree: true });
 
     // The workspaces answered, the session is still pending: Home waits.
     await act(async () => {
@@ -196,6 +206,8 @@ describe('27.628 which workspace Home shows (D-E4)', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Second Workspace'));
     seen.add(screen.getByRole('heading', { level: 1 }).textContent ?? '');
     observer.disconnect();
+    // Control: the observer DID record a change, "Home" being the text the h1 held before ws_2's name.
+    expect([...seen]).toContain('Home');
     expect([...seen]).not.toContain('First Workspace');
   });
 });
