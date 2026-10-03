@@ -173,17 +173,20 @@ describe('G-3 addendum: the last note opened, per device', () => {
     await waitFor(() => expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'));
 
     // A different workspace has its own key: only WS_B's key set, and it is B's note that is resumed.
+    // Unmount FIRST, spy cleared AFTER: the resume can fire twice per render (measured: two reads, two `replace`
+    // calls), so a second `replace` can already be committed when the wait above returns and fire inside
+    // `cleanup()`. Cleared before it, that stray call lands on the next spy and fails the CONTROL below under load.
+    cleanup();
     window.localStorage.clear();
     replace.mockClear();
-    cleanup();
     window.localStorage.setItem(lastNoteKey('u_kiro', WS_B), NOTE_B);
     renderPage();
     await waitFor(() => expect(replace).toHaveBeenCalledWith(`/notes/${NOTE_B}`));
 
-    // CONTROL: nothing remembered, nothing resumed; another user's key is not ours.
+    // CONTROL: nothing remembered, nothing resumed; another user's key is not ours. Same order: leave, then clear.
+    cleanup();
     window.localStorage.clear();
     replace.mockClear();
-    cleanup();
     window.localStorage.setItem(lastNoteKey('u_other', WS_A), NOTE_A);
     renderPage();
     await screen.findByRole('navigation', { name: 'Notes' });
