@@ -840,11 +840,11 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1922 🧪 watch: starting a second watcher for the seat stops the old one by its exact pid and takes over
 - 13.1923 🧪 watch: a file that shrinks below the cursor restarts at 0 (acked ids skipped, new ones shown)
 - 13.1924 🧪 watch: the heartbeat file is touched on every poll
-- 13.1930 🧪 bridge: FIX/NEXT/MERGETIP lines become messages to the right exec seat (laneN accepted); ref from the line or the brief
+- 13.1930 🧪 bridge: a FIX / NEXT / MERGETIP queue line becomes ONE note to main (from queue; laneN accepted; ref from the line or the brief) — `needs ctl restart` for FIX/NEXT, `needs ctl tipmerge` for MERGETIP — and NOTHING is pasted into any lane (planner ruling 2026-10-04 02:08); CONTROL in the same check: a manual `ctl post` of a fix IS pasted
 - 13.1931 🧪 bridge: the first run starts at EOF — history is never reposted
-- 13.1932 🧪 bridge: the same line seen twice (a reset cursor) makes ONE message (src dedupe)
-- 13.1933 🧪 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane
-- 13.1934 🧪 bridge: a number INSIDE 1–5 whose window is not exec* (3 = reviewerA here) and orchestrator/planner targets are refused, never routed; CONTROL in the same check: FIX 2 reaches exec2
+- 13.1932 🧪 bridge: the same line seen twice (a reset cursor) makes ONE note (src dedupe); CONTROL in the same check: a different line makes a second
+- 13.1933 🧪 bridge: an unparsable line (missing brief, target orchestrator or a branch, a MERGETIP without a release base) is never dropped — one `could not route` note to main quoting it each; CONTROL in the same check: FIX 6 / FIX 7 parse and make ordinary notes; nothing reaches a lane
+- 13.1934 🧪 bridge: a line addressed to a window that is not an exec lane (3 = reviewerA here) reaches no pane — notes only; CONTROL in the same check: a manual post to that window IS pasted (the pane tier is alive)
 - 13.1935 🧪 bridge: TOOK/DONE/NOTE/HOLD are ignored by name; CLOSE sends no lane message, only a note to main
 - 13.1936 🧪 bridge: with the pane tier ON a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message (13.1981: never in the shadow run)
 - 13.1940 🧪 deliver: the message reaches the inbox file first (one line) and the state records the time; no window → nothing else
@@ -855,13 +855,13 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1945 🧪 ack stops redelivery: nothing more is pasted after the ack, however late
 - 13.1946 🧪 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked
 - 13.1947 🧪 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try
-- 13.1948 🧪 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file
+- 13.1948 🧪 page chain: an unreachable main pages the planner (inbox) and the page is flagged into the notes file as a ⚑ line when it is delivered (the next pass)
 - 13.1949 🧪 lost body: bounced — a bounce message goes back to the sender, nothing is delivered
 - 13.1950 🧪 crash between writing the attempt and the paste: nothing typed, ledger intact
 - 13.1951 🧪 a second daemon is refused while the first pid is alive
 - 13.1952 🧪 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs (both halves run `postman once --dry-run`: the guard precedes the dry-run exit, and a guard-removal mutant only prints DRY)
 - 13.1953 🧪 restart supersedes: a message posted BEFORE the restart is cancelled-by-restart with ONE note to main listing its id; one posted AFTER is kept
-- 13.1954 🧪 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line
+- 13.1954 🧪 planner seat: never a pane paste (inbox only); the message is flagged ONCE when delivered (a ⚑ line at once, not repeated by later passes); unacked 30 min → exactly ONE more ⚑ line, the reminder
 - 13.1955 🧪 audit: inside the grace nothing is reported (the FIX may still be coming)
 - 13.1960 🧪 pane_state menu: a permission/option menu is refused (a pasted Enter would pick option 1); CONTROL in the same check: an idle pane is pasted
 - 13.1961 🧪 pane_state text: a box holding foreign text is never cleared or pasted over; CONTROL in the same check: an idle pane is pasted
@@ -884,7 +884,7 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line; CONTROL: exit 0 once a fix message with that ref exists, and on an empty queue
 - 13.1979 🧪 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled
 - 13.1980 🧪 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min
-- 13.1981 🧪 shadow run (CTL_POSTMAN_PANE=0): the bridge posts the message but writes NO DONE line into QUEUE-dispatch.md — the dispatcher's open line stays open; CONTROL in the same check: pane tier on → a DONE line for the handled AND for the refused line
+- 13.1981 🧪 pane tier off (CTL_POSTMAN_PANE=0): the bridge posts its notes but writes NO DONE line into QUEUE-dispatch.md — the dispatcher's open line stays open; CONTROL in the same check: pane tier on → a DONE line for the handled AND for the refused line
 - 13.1982 🧪 audit matches THIS verdict: FIX 1's message 35 min before a FIX 2 verdict does not satisfy it — exactly ONE note after the grace; CONTROL in the same check: a FIX 2 message posted after the verdict → no note
 - 13.1983 🧪 ctl postman audit (on demand) applies the same window: FIX 1's message does not satisfy a FIX 2 verdict 35 min later (exit 1, names it); a FIX 2 message after it does (exit 0); with a FIX 1 and a FIX 2 verdict and only FIX 2's message, exactly the FIX 1 verdict is named
 - 13.1984 🧪 ack re-check: a seat that acks between pane_state and the paste is never typed into; CONTROL in the same check: without that ack the pointer is pasted
@@ -895,3 +895,31 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1989 🧪 `ctl postman audit` (on demand) across midnight: a 23:50 verdict followed by a 00:10 line, read at 00:20 the next day, is dated yesterday, so task/m's 23:55 message satisfies it (exit 0); CONTROL in the same check: with no message task/m is named (exit 1)
 - 13.1990 🧪 `ctl postman audit` (on demand): a `needs-tip` verdict is satisfied by a `mergetip` message with that ref; CONTROL in the same check: a `fix` message with that ref does not (exit 1, named)
 - 13.1991 🧪 `ctl restart` whose dry-run exit is REMOVED (a stripped copy of the ctl tree) reaches no tmux write: the `CTL_TMUX_SESSION` guard refuses it (rc ≠ 0, "a live restart refuses it"), the tmux shim log is empty and `tmux list-panes -a` (names and pids) is identical before and after; CONTROL in the same check: the shim logs a write it is handed (a forward-everything shim is red), still forwards `list-windows`, and the unmodified `restart --dry-run` prints `DRY: mark … restarted` and `OK restart`
+- 13.2040 🧪 a message TO THE PLANNER is a ⚑ line in the notes file — one per message, its text carried, repeated passes add none — and never a pane paste; CONTROL in the same check: the message to exec3 in the same passes is pasted and flagged nowhere
+- 13.2041 🧪 `ctl postman run/once/status/audit/restarted` refuse an unknown flag (exit 1, nothing ran); CONTROL in the same check: the same subcommands with `--dry-run` are accepted
+- 13.2042 🧪 a MERGETIP queue line that arrives AFTER its lane was restarted produces only the note to main (`ctl tipmerge`) — nothing is pasted into the new session; CONTROL in the same check: a manual mergetip message to the same lane IS pasted
+- 13.2043 🧪 `--shadow` computes every delivery and writes nothing a seat can see: no tmux write (a PATH-front shim logs every non-read subcommand), no pane line, no inbox file, no notes line, no DONE write-back, no ledger line; the shadow log holds the queue line, the manual fix (channel pane, would paste) and the planner question (channel flag); CONTROL in the same check: the same passes without `--shadow` reach the shim with a load-buffer, create the inbox and write a ⚑ line
+- 13.2044 🧪 `--shadow` logs ONE record per message however many passes ran (four passes over the backoff ladder and a reset QUEUE cursor add none); CONTROL in the same check: a new queue line adds exactly one
+- 13.2045 🧪 `--shadow` and the planner: a message to the planner is logged as channel flag and writes NO notes line; CONTROL in the same check: the next live pass writes exactly ONE ⚑ line for it
+- 13.2046 🧪 `run --shadow` exits 0 after its passes and leaves no daemon pid; messages in the ledger at the first shadow pass are baseline, never replayed; CONTROL in the same check: a message posted after it is logged
+- 13.2047 🧪 `audit --parity`, clean window: every dispatcher delivery pairs with a shadow delivery → exit 0, matched=2 missed=0 duplicate=0; CONTROL in the same check: an unpaired dispatcher delivery exits 1, MISSED
+- 13.2048 🧪 `audit --parity`, MISSED: a delivery the bridge refused is named with the bridge's reason, exit 1; CONTROL in the same check: without it exit 0
+- 13.2049 🧪 `audit --parity`, DUPLICATE: the same QUEUE line recorded twice is a duplicate, exit 1; CONTROL in the same check: distinct srcs pair cleanly, exit 0
+- 13.2050 🧪 `audit --parity`, ledger leg: two ledger messages to one seat with the same kind and body within 10 min are a DUPLICATE, a ledger message the shadow run never recorded is MISSED (both exit 1); CONTROL in the same check: distinct bodies, each recorded, exit 0
+- 13.2051 🧪 `audit --parity`, EXTRA: a shadow delivery the dispatcher never logged is listed and does not fail (exit 0); CONTROL in the same check: an extra never hides a miss
+- 13.2052 🧪 audit windows: `--window 2` and `--since T` leave an old miss outside the window (exit 0; the delivery count and condition A "NOT met under 20" are printed); CONTROL in the same check: `--parity` over the whole log exits 1; `--since` with `--window`, `--window 0` and an unreadable time are refused
+- 13.2053 🧪 DISPATCH-log grammar over real line shapes: `FIX 2 … delivered to lane 2; FIX 3 skipped`, `MERGETIP lane 2 + FIX lane 4 … delivered`, `delivered G-3 MERGETIP (…) to lane 5` and the exact `DELIVERED FIX 3` form each give their deliveries; HOLD / not delivered / nothing delivered / HELD give none; CONTROL in the same check: a line that names a verb and says sent but pairs nothing is printed UNPARSED
+- 13.2054 🧪 plain `ctl postman audit` (no window flag) stays the mechanism-g sweep and ignores the shadow log; CONTROL in the same check: `--parity` over the same files exits 1, and with no shadow log it refuses
+- 13.2055 🧪 end to end: a real `--shadow` pass over a QUEUE-dispatch FIX 2 and the dispatcher's DISPATCH-log line for it audit as matched=1 missed=0; CONTROL in the same check: the same log line for FIX 3 (no queue line) is MISSED
+
+Block `13.2040`–`13.2069` (measured 2026-10-04 over 891 `origin/*` refs: the high-water was `13.2039`, `task/ctl-model-effort`). `13.2040`–`13.2055` are `task/ctl-postman-followup` (`postman.test.sh`): the planner-target ⚑, strict flags, the bridge's note-only rule, `--shadow` and the parity audit; `13.1930`–`13.1934`, `13.1948`, `13.1954` and `13.1981` above were rewritten for them.
+
+## `ctl check-base` — a REVIEW line's stated base against the base the branch was cut from (`task/ctl-postman-followup`, planner ruling 2026-10-04 02:08)
+
+Run by `scripts/ctl/test/check-base.test.sh`, a `pnpm check:ctl` step, on a scratch repo with a bare origin.
+
+- 13.2060 🧪 a branch cut from release/smoothness and stated as knowledge-graph is WRONG-BASE (exit 1, both refs and the behind counts named); CONTROL in the same check: stated as smoothness it is OK
+- 13.2061 🧪 a STALE branch (behind its stated base, but cut from it) is OK — a younger release with fewer new commits is not a closer base; CONTROL in the same check: stated as a release it was not cut from it IS WRONG-BASE
+- 13.2062 🧪 a TIE — a branch on the commit two releases share — is OK; CONTROL in the same check: a branch one commit past release/ta stated as release/tb IS WRONG-BASE
+- 13.2063 🧪 origin/main is a candidate: a branch cut from main (past X) stated as a release that lacks those commits is WRONG-BASE, closest=main; CONTROL in the same check: stated main is OK
+- 13.2064 🧪 usage and bad input (missing args, a stated base that is not main/release/*, unknown branch or release) are refused, exit 1, no WRONG-BASE line; CONTROL in the same check: a valid call is accepted

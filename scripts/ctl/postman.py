@@ -34,7 +34,10 @@ AUDIT_GRACE = int(os.environ.get("CTL_POSTMAN_AUDIT_GRACE", "600"))
 UNREACH = {"no-window": 120, "not-claude": 120, "menu": 300, "text": 300, "copy-mode": 300}
 
 
-def pane_on(): return os.environ.get("CTL_POSTMAN_PANE", "1") != "0"      # off = the shadow run: inbox + bridge + audit only
+SHADOW = False        # `ctl postman run|once --shadow`: compute every delivery, write ONLY the shadow log (+ the private cursors/state); see shadow_* below
+
+
+def pane_on(): return not SHADOW and os.environ.get("CTL_POSTMAN_PANE", "1") != "0"      # CTL_POSTMAN_PANE=0: inbox + bridge + audit only (the older partial shadow)
 
 
 def now():
@@ -146,6 +149,33 @@ def alive(pid):
     except PermissionError: return True
 
 
+# ───────────────────────────── the shadow log ─────────────────────────────
+# `--shadow` writes NOTHING a seat can see: no ledger line, no inbox line, no notes line, no pane paste, no DONE write-back, no page. It appends
+# one JSON object per computed delivery to postman/shadow.jsonl and `ctl postman audit --since|--window|--parity` compares that with
+# DISPATCH-log.md and the ledger. Records: origin "queue" (a QUEUE-dispatch line: verb, win, line_time, src, refused), "ledger" (a message a seat
+# posted with ctl post: id, channel flag|inbox|pane, would), "msg" (a message the run would have appended: notes, audit notes), "baseline".
+def shadow_path(): return p("shadow.jsonl")
+
+
+def load_shadow():
+    out = []
+    try:
+        with open(shadow_path()) as f:
+            for line in f:
+                try: out.append(json.loads(line))
+                except ValueError: pass
+    except FileNotFoundError: pass
+    return out
+
+
+def shadow_add(rec):
+    os.makedirs(PM, exist_ok=True)
+    rec = dict(rec, ts=iso(now()), epoch=now())
+    fd = os.open(shadow_path(), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try: os.write(fd, (json.dumps(rec, ensure_ascii=False) + "\n").encode())
+    finally: os.close(fd)
+
+
 # ───────────────────────────── messages ─────────────────────────────
 def norm_seat(s):
     s = ALIASES.get(s, s)
@@ -153,7 +183,14 @@ def norm_seat(s):
 
 
 def append_message(frm, to, kind, body=None, text=None, reply_to=None, src=None, ref=None):
-    """Allocate the id under the lock and append ONE ledger line. Returns the message dict."""
+    """Allocate the id under the lock and append ONE ledger line. Returns the message dict. Under --shadow nothing is appended: the message
+    is logged to the shadow log (origin msg, a shadow id `sid` in its own numbering) and returned with that id."""
+    if SHADOW:
+        sid = len(load_shadow()) + 1
+        txt = text if text is not None else "see %s" % body
+        m = {"id": sid, "ts": iso(now()), "from": frm, "to": to, "kind": kind, "body": None, "text": txt, "reply_to": reply_to, "src": src, "ref": ref}
+        shadow_add({"origin": "msg", "sid": sid, "from": frm, "to": to, "kind": kind, "src": src, "ref": ref, "text": txt[:300]})
+        return m
     lk = lock_acquire()
     try:
         last = max([m["id"] for m in load_ledger()] or [0])
@@ -355,10 +392,14 @@ def flag_planner(m, st):
     """A message to the planner is never a pane paste (design choice 2): its delivery IS a ⚑ line in the owner-visible notes file.
     Once per message (state.flagged); the line is written BEFORE the state, so a crash between the two repeats the line, never loses it."""
     if st.get("flagged"): return
+    notes_line(planner_text(m))
+    st["flagged"] = now(); write_state(m["id"], st)
+
+
+def planner_text(m):
     try: t = " ".join(open(m["body"]).read().split()) if m["body"].startswith(p("spool") + os.sep) else "see %s" % m["body"]
     except OSError: t = "see %s" % m["body"]
-    notes_line("#%d %s ← %s: %s" % (m["id"], m["kind"], m["from"], t[:300]))
-    st["flagged"] = now(); write_state(m["id"], st)
+    return ("#%d %s ← %s: %s" % (m["id"], m["kind"], m["from"], t))[:340]
 
 
 def page(m, reason):
@@ -457,6 +498,26 @@ def deliver(stats):
             break
 
 
+def deliver_shadow(stats):
+    """--shadow: log, once per ledger message, what the real pass would do with it. Reads panes (pane_state is read-only), types nothing."""
+    recs = load_shadow()
+    base = next((r for r in recs if r.get("origin") == "baseline"), None)
+    ledger = load_ledger()
+    if base is None:
+        base = {"origin": "baseline", "upto": max([m["id"] for m in ledger] or [0])}; shadow_add(base)     # history is never replayed
+    seen = {r["id"] for r in recs if r.get("origin") == "ledger"}
+    for m in ledger:
+        if m["id"] <= base["upto"] or m["id"] in seen: continue
+        if m["to"] == "planner": chan, would, state = "flag", "flag", None
+        elif m["kind"] not in GATED: chan, would, state = "inbox", "inbox", None
+        else:
+            wid = window_id(m["to"]); state = sh("ctl_pane_state", wid) if wid else "no-window"
+            chan, would = "pane", ("paste" if state in ("ok", "busy", "ours") else "defer:%s" % state)
+        shadow_add({"origin": "ledger", "id": m["id"], "to": m["to"], "from": m["from"], "kind": m["kind"], "ref": m.get("ref"), "body": m["body"],
+                    "channel": chan, "would": would, "pane_state": state, "text": pointer(m)[:340] if chan != "flag" else planner_text(m)})
+        stats["shadowed"] += 1
+
+
 def restarts(stats):
     d = p("restarts")
     if not os.path.isdir(d): return
@@ -493,7 +554,7 @@ def bridge(stats):
     if off > size: off = 0
     with open(q, "rb") as f:
         f.seek(off); chunk = f.read()
-    known = {m["src"] for m in load_ledger() if m.get("src")}
+    known = {m["src"] for m in load_ledger() if m.get("src")} | {r["src"] for r in load_shadow() if r.get("origin") == "queue" and r.get("src")}
     pos = off
     for raw in chunk.splitlines(keepends=True):
         if not raw.endswith(b"\n"): break
@@ -507,29 +568,43 @@ def bridge(stats):
 
 
 def handle_queue_line(line, lt, verb, toks, src, stats):
+    """Planner ruling 2026-10-04 02:08: a new task, a FIX and a MERGETIP are the orchestrator's (`ctl restart` / `ctl tipmerge`), so the
+    bridge pastes NOTHING into a lane: every queue line becomes ONE note to main (kind note, from queue; ref = the branch, so the audit can
+    match a reviewer verdict to it). A line that does not parse is a note quoting it."""
     def refuse(why):
         m = append_message("postman", "main", "note", text="bridge could not route QUEUE-dispatch line (%s): %s" % (why, line), src=src)
         queue_done(lt, "postman refused #%d: %s" % (m["id"], why)); stats["refused"] += 1
+        shadow_queue(lt, verb, toks, src, refused=why)
     win = toks[0] if toks else ""
-    mm = re.fullmatch(r"(?:lane)?([1-5])", win)
+    mm = re.fullmatch(r"(?:lane)?([0-9]{1,2})", win)
     if verb == "CLOSE" and mm:
-        m = append_message("postman", "main", "note", text="CLOSE %s needs `ctl close %s` (a lane cannot close itself)" % (win, mm.group(1)), src=src)
+        m = append_message("queue", "main", "note", text="CLOSE %s needs `ctl close %s` (a lane cannot close itself)" % (win, mm.group(1)), src=src)
+        shadow_queue(lt, verb, toks, src, m=m)
         return queue_done(lt, "postman #%d (note to main)" % m["id"])
-    if not mm: return refuse("target '%s' is not 1-5 or laneN" % win)
-    name = next((n for _, n, ix in windows() if ix == mm.group(1)), None)
-    if not name or not name.startswith("exec"): return refuse("window %s is %s, not an exec lane" % (mm.group(1), name or "absent"))
+    if not mm: return refuse("target '%s' is not a lane number (N or laneN)" % win)
     if verb in ("NEXT", "FIX"):
         brief = resolve_brief(toks[1]) if len(toks) > 1 else None
         if not brief: return refuse("brief file '%s' not found" % (toks[1] if len(toks) > 1 else ""))
         rm = BRANCH_RE.search(" ".join(toks[2:])) or BRANCH_RE.search(open(brief, errors="replace").read(4096))
         ref = rm.group(0) if rm else None
-        m = append_message("queue", name, verb.lower(), body=brief, src=src, ref=ref)
+        text = "%s %s %s needs ctl restart (a new task or a FIX is a fresh session; nothing was pasted into the lane)" % (verb, mm.group(1), brief)
     else:
         br = toks[1] if len(toks) > 1 else ""
         bm = next((re.fullmatch(r"base=(release/[A-Za-z0-9._/-]+)", t) for t in toks[2:] if re.fullmatch(r"base=release/[A-Za-z0-9._/-]+", t)), None)
         if not re.fullmatch(r"task/[A-Za-z0-9._/-]+", br) or not bm: return refuse("MERGETIP needs task/<branch> and base=release/<name>")
-        m = append_message("queue", name, "mergetip", text="Read the WHOLE file %s/BRIEF-merge-tip.md and do it for branch %s, base %s." % (ROOT, br, bm.group(1)), src=src, ref=br)
-    queue_done(lt, "postman #%d" % m["id"]); stats["bridged"] += 1
+        ref = br
+        text = "MERGETIP %s base=%s needs ctl tipmerge (lane %s; nothing was pasted into the lane)" % (br, bm.group(1), mm.group(1))
+    m = append_message("queue", "main", "note", text=text, src=src, ref=ref)
+    shadow_queue(lt, verb, toks, src, m=m)
+    queue_done(lt, "postman #%d (note to main)" % m["id"]); stats["bridged"] += 1
+
+
+def shadow_queue(lt, verb, toks, src, m=None, refused=None):
+    """--shadow: the outcome of one QUEUE-dispatch line (what the dispatcher would have been compared against)."""
+    if not SHADOW: return
+    mm = re.fullmatch(r"(?:lane)?([0-9]{1,2})", toks[0]) if toks else None
+    shadow_add({"origin": "queue", "verb": verb, "win": mm.group(1) if mm else (toks[0] if toks else ""), "line_time": lt, "src": src,
+                "sid": m["id"] if m else None, "ref": m.get("ref") if m else None, "refused": refused, "to": "main"})
 
 
 def queue_done(lt, result):
@@ -543,9 +618,16 @@ AUDIT_RE = re.compile(r"^\d\d:\d\d DONE \d\d:\d\d (FIX|needs-tip) (task/\S+) ([0
 AUDIT_LEAD = 600     # a message may predate the verdict line's first sighting by this much (a scan that lagged), never more: an EARLIER round's message must not satisfy this verdict
 
 
+def queue_note_verb(m):
+    """The verb a bridged QUEUE-dispatch note carries (FIX / MERGETIP / NEXT / CLOSE → lower case), else None."""
+    if m["from"] != "queue" or m["kind"] != "note": return None
+    try: return open(m["body"]).read().split(" ", 1)[0].lower()
+    except OSError: return None
+
+
 def audit_matched(kind, branch, since, until=None):
     for m in load_ledger():
-        if m["kind"] == kind and m.get("ref") == branch and epoch(m["ts"]) >= since and (until is None or epoch(m["ts"]) < until): return True
+        if (m["kind"] == kind or queue_note_verb(m) == kind) and m.get("ref") == branch and epoch(m["ts"]) >= since and (until is None or epoch(m["ts"]) < until): return True
     return False
 
 
@@ -598,7 +680,134 @@ def audit_scan(stats):
             with open(f_, "w") as jf: json.dump(a, jf)
 
 
-def cmd_audit():
+# ───────────────────────────── the shadow parity audit ─────────────────────────────
+# `ctl postman audit --parity | --since T | --window N` compares the shadow log with the dispatcher's own record (DISPATCH-log.md) and the
+# ledger. Buckets (planner conditions A+B for retiring the dispatcher: >= 20 deliveries AND one gate cycle with zero missed / duplicate):
+#   matched   a delivery the dispatcher logged (verb, lane) paired one-to-one with a shadow queue record of that verb and lane, the shadow record
+#             no later than 2 min after the log line and no more than CTL_POSTMAN_AUDIT_TOL (45 min) before it;
+#   missed    a dispatcher delivery with no shadow record to pair with (named with the bridge's refusal reason when there is one), or a ledger
+#             message since the shadow baseline with no shadow record;                                            -> exit 1
+#   duplicate a surplus shadow record: the same queue src twice, the same ledger id twice, or two ledger messages to one seat with the same kind
+#             and body within CTL_POSTMAN_DUP_WINDOW (10 min);                                                     -> exit 1
+#   extra     a shadow queue delivery the dispatcher never logged (the orchestrator did it directly, or the line was held); informational.
+# A DISPATCH-log line is free text. It counts as ONE delivery per (NEXT|FIX|MERGETIP, lane) pair named in a clause (split on ';') that says
+# delivered/sent and none of not delivered / nothing delivered / held / HOLD / skipped / refused / cancelled; the exact form
+# `HH:MM DELIVERED <VERB> <lane> ...` is always read. A line that names a verb and says delivered/sent but yields no pair is printed as UNPARSED.
+DELIVER_VERBS = ("NEXT", "FIX", "MERGETIP")
+AUDIT_TOL = int(os.environ.get("CTL_POSTMAN_AUDIT_TOL", "2700"))
+DUP_WINDOW = int(os.environ.get("CTL_POSTMAN_DUP_WINDOW", "600"))
+D_G0 = re.compile(r"^\d\d:\d\d DELIVERED (NEXT|FIX|MERGETIP) (?:lane\s*)?([0-9]{1,2})\b")
+D_PAIR = re.compile(r"\b(NEXT|FIX|MERGETIP)\s+(?:lane\s*)?([0-9]{1,2})\b")
+D_REV = re.compile(r"\b(?:delivered|sent)\b.*?\b(NEXT|FIX|MERGETIP)\b.*?\blane\s*([0-9]{1,2})\b")
+D_POS = re.compile(r"\b(?:delivered|sent)\b")
+D_NEG = re.compile(r"not delivered|nothing delivered|nothing to deliver|deliver nothing|not sent|\bheld\b|\bHELD\b|\bHOLD\b|skipped|refused|cancelled", re.I)
+
+
+def parse_dispatch_line(line):
+    """-> (pairs [(verb, lane)], unparsed bool) for one DISPATCH-log line."""
+    m0 = D_G0.match(line)
+    if m0: return [(m0.group(1), m0.group(2))], False
+    pairs, cand = [], False
+    for clause in re.split(r";", line[6:]):
+        if not D_POS.search(clause) or D_NEG.search(clause): continue
+        found = D_PAIR.findall(clause)
+        if not found:
+            mr = D_REV.search(clause)
+            if mr: found = [mr.groups()]
+        pairs += found
+    if not pairs and D_POS.search(line) and re.search(r"\b(NEXT|FIX|MERGETIP)\b", line) and not D_NEG.search(line): cand = True
+    return pairs, cand
+
+
+def parse_when(v):
+    if re.fullmatch(r"[0-9]{9,11}", v): return float(v)
+    mt = re.fullmatch(r"([0-9]{1,2}):([0-9]{2})", v)
+    if mt:
+        d = datetime.date.fromtimestamp(now()); t = time.mktime(datetime.datetime(d.year, d.month, d.day, int(mt.group(1)), int(mt.group(2))).timetuple())
+        return t if t <= now() else t - 86400
+    try: return float(epoch(v))
+    except ValueError: pass
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M:%S"):
+        try: return time.mktime(time.strptime(v, fmt))
+        except ValueError: pass
+    raise ValueError("cannot read '%s' as a time (HH:MM, 'YYYY-MM-DD HH:MM', ISO Z, or epoch seconds)" % v)
+
+
+def audit_parity(o):
+    if "--since" in o and "--window" in o: fail("postman", "audit: --since and --window are exclusive")
+    recs = load_shadow()
+    if not recs: fail("postman", "audit: no shadow log at %s — run `ctl postman run --shadow` first" % shadow_path())
+    queue = [r for r in recs if r.get("origin") == "queue"]
+    lrecs = [r for r in recs if r.get("origin") == "ledger"]
+    base = next((r["upto"] for r in recs if r.get("origin") == "baseline"), 0)
+    deliveries = sorted([r for r in queue if r["verb"] in DELIVER_VERBS and not r.get("refused")] + lrecs, key=lambda r: r["epoch"])
+    since, desc = 0.0, "all shadow records"
+    try:
+        if "--window" in o:
+            n = int(o["--window"]); assert n > 0
+            since = deliveries[-n]["epoch"] if len(deliveries) >= n else 0.0; desc = "last %d deliveries" % n
+        elif "--since" in o: since = parse_when(o["--since"]); desc = "since %s" % o["--since"]
+    except (ValueError, AssertionError) as e: fail("postman", "audit: %s" % (e if str(e) else "--window needs a positive number"))
+    inw = lambda r: r["epoch"] >= since
+    missed, dups, extras, matched, unparsed = [], [], [], [], []
+    # duplicates among shadow records
+    seen = {}
+    for r in queue:
+        if inw(r) and r.get("src"):
+            seen.setdefault(r["src"], []).append(r)
+    pool = []
+    for src, rs in seen.items():
+        pool.append(rs[0])
+        for _ in rs[1:]: dups.append("queue line %s %s %s recorded %d times (src %s)" % (rs[0]["line_time"], rs[0]["verb"], rs[0]["win"], len(rs), src[-12:]))
+    lseen = {}
+    for r in lrecs:
+        if inw(r): lseen[r["id"]] = lseen.get(r["id"], 0) + 1
+    for i, n in sorted(lseen.items()):
+        if n > 1: dups.append("ledger #%d recorded %d times" % (i, n))
+    ledger = [m for m in load_ledger() if m["id"] > base and epoch(m["ts"]) >= since]
+    for m in ledger:
+        if m["id"] not in lseen: missed.append("ledger #%d %s → %s has no shadow record" % (m["id"], m["kind"], m["to"]))
+    grp = {}
+    for m in ledger:
+        grp.setdefault((m["to"], m["kind"], m["body"]), []).append(m)
+    for (to, kind, body), ms in grp.items():
+        ms.sort(key=lambda m: m["id"]); last = ms[0]
+        for m in ms[1:]:
+            if epoch(m["ts"]) - epoch(last["ts"]) < DUP_WINDOW: dups.append("ledger #%d repeats #%d (%s → %s, same body) within %d s" % (m["id"], last["id"], kind, to, DUP_WINDOW))
+            last = m
+    # the dispatcher's deliveries
+    dl = os.path.join(ROOT, "DISPATCH-log.md")
+    lines = open(dl, errors="replace").read().splitlines()[-1500:] if os.path.exists(dl) else []
+    ts = verdict_times(lines); dis = []
+    for i, line in enumerate(lines):
+        if ts[i] is None or ts[i] < since - 60: continue
+        pairs, cand = parse_dispatch_line(line)
+        for verb, win in pairs: dis.append((ts[i], verb, str(int(win)), line))
+        if cand: unparsed.append(line)
+    avail = sorted([r for r in pool if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])
+    refused = [r for r in pool if r.get("refused")]
+    for t, verb, win, line in sorted(dis):
+        hit = next((r for r in avail if r["verb"] == verb and str(int(r["win"])) == win and r["epoch"] <= t + 120 and t - r["epoch"] <= AUDIT_TOL), None) if win.isdigit() else None
+        if hit: avail.remove(hit); matched.append((hit, line))
+        else:
+            why = next((" (the bridge refused it: %s)" % r["refused"] for r in refused if r["verb"] == verb and str(r["win"]).lstrip("0") == win.lstrip("0") and abs(t - r["epoch"]) <= AUDIT_TOL), "")
+            missed.append("%s %s: the dispatcher delivered it, no shadow delivery to pair with%s — %s" % (verb, win, why, line[:160]))
+    extras = ["%s %s %s %s (no dispatcher delivery logged)" % (r["line_time"], r["verb"], r["win"], r.get("ref") or "") for r in avail]
+    n_in = sum(1 for r in deliveries if inw(r))
+    for x in matched: print("MATCHED   %s %s (shadow %s) = %s" % (x[0]["verb"], x[0]["win"], x[0]["ts"], x[1][:110]))
+    for x in missed: print("MISSED    " + x)
+    for x in dups: print("DUPLICATE " + x)
+    for x in extras: print("EXTRA     " + x)
+    for x in unparsed: print("UNPARSED  " + x[:200])
+    print("window: %s; shadow deliveries in it: %d (condition A needs >= 20: %s)" % (desc, n_in, "met" if n_in >= 20 else "NOT met"))
+    print("POSTMAN AUDIT %s %d/%d/%d" % (desc, len(matched), len(missed), len(dups)))
+    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed))
+    if missed or dups: fail("postman", "audit parity %s" % tail)
+    ok("postman", "audit parity %s" % tail)
+
+
+def cmd_audit(o=None):
+    if o and any(k in o for k in ("--since", "--window", "--parity")): return audit_parity(o)
     q = os.path.join(ROOT, "QUEUE-review.md")
     lines = open(q, errors="replace").read().splitlines()[-300:] if os.path.exists(q) else []
     ts, keys, bad = verdict_times(lines), [verdict_key(l) for l in lines], []
@@ -612,8 +821,10 @@ def cmd_audit():
 
 
 def once():
-    stats = dict(inboxed=0, pasted=0, deferred=0, bounced=0, bridged=0, refused=0, cancelled=0, audited=0)
-    bridge(stats); audit_scan(stats); restarts(stats); deliver(stats)
+    stats = dict(inboxed=0, pasted=0, deferred=0, bounced=0, bridged=0, refused=0, cancelled=0, audited=0, shadowed=0)
+    bridge(stats); audit_scan(stats)
+    if SHADOW: deliver_shadow(stats)           # no restarts (they ack real messages), no inbox, no pane, no pages
+    else: restarts(stats); deliver(stats)
     return stats
 
 
@@ -621,8 +832,8 @@ def summary(stats): return ", ".join("%d %s" % (v, k) for k, v in stats.items() 
 
 
 CMD_FLAGS = {   # subcommand → (valued flags, boolean flags); an unknown flag is refused, never ignored (a typo must not start a live run)
-    "restarted": ((), ("--dry-run",)), "status": ((), ("--dry-run",)), "audit": ((), ("--dry-run",)),
-    "once": ((), ("--dry-run",)), "run": ((), ("--dry-run",)),
+    "restarted": ((), ("--dry-run",)), "status": ((), ("--dry-run",)), "audit": (("--since", "--window"), ("--parity", "--dry-run")),
+    "once": ((), ("--dry-run", "--shadow")), "run": ((), ("--dry-run", "--shadow")),
 }
 
 
@@ -640,12 +851,14 @@ def cmd_postman(args):
         if dry: print("DRY: mark %s restarted" % seat); ok("postman", "dry-run")
         os.makedirs(p("restarts"), exist_ok=True); open(p("restarts", seat), "w").write(str(int(now()) + 2))   # +2 s: a message posted in the second before the restart is the old session's
         ok("postman", "restart of %s recorded (its older open messages are cancelled on the next pass)" % seat)
-    if sub == "audit": return cmd_audit()
+    if sub == "audit": return cmd_audit(o)
     if sub == "status": return status()
+    global SHADOW
+    SHADOW = "--shadow" in o
     guard()
     os.environ.setdefault("CTL_PROOF_TRIES", "8")
-    if dry: print("DRY: one %s pass over %s (session %s)" % (sub, ROOT, SESSION)); ok("postman", "dry-run")
-    if sub == "once": ok("postman", "once: " + summary(once()))
+    if dry: print("DRY: one %s pass%s over %s (session %s)" % (sub, " (shadow)" if SHADOW else "", ROOT, SESSION)); ok("postman", "dry-run")
+    if sub == "once": ok("postman", "once%s: " % (" --shadow" if SHADOW else "") + summary(once()))
     os.makedirs(PM, exist_ok=True); pidf = p("daemon.pid")
     try:
         other = int(open(pidf).read().strip())
@@ -672,6 +885,8 @@ def status():
     try: pid = int(open(p("daemon.pid")).read().strip()); d = "daemon pid %d %s" % (pid, "alive" if alive(pid) else "NOT running (stale pidfile)")
     except (FileNotFoundError, ValueError): d = "daemon not running"
     print(d)
+    sh_recs = load_shadow()
+    if sh_recs: print("shadow log: %d record(s), last %s (%s)" % (len(sh_recs), sh_recs[-1]["ts"], shadow_path()))
     acked, by = acked_ids(), {}
     for m in load_ledger():
         if m["id"] not in acked and not read_state(m["id"]).get("bounced"): by.setdefault(m["to"], []).append(m)
