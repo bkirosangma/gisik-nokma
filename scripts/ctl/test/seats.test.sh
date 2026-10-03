@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1819 for `ctl seats`; run by `ctl selftest`.
+# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1823 for `ctl seats`; run by `ctl selftest`.
 # Two layers: seats.py is driven over a directory of captured panes (+ their git facts), and the whole verb is driven
 # against a fake `tmux` on PATH that serves those panes and logs every call (so "capture-pane only, never send-keys" is
 # a measured fact, not a promise). Real captures live in fixtures/seats/ (taken from the live gisik session 2026-10-03
@@ -35,6 +35,12 @@ run() { local d="$1"; shift; CTL_SEATS_NOW="$NOW" python3 "$PY" --dir "$d" "$@";
 # jv JSON IDX EXPR — evaluate EXPR over the seat object `d` of window IDX.
 jv() { printf '%s\n' "$1" | python3 -c 'import sys,json; d=[json.loads(l) for l in sys.stdin if l.startswith("{")]; d=[x for x in d if x["window"]==int(sys.argv[1])][0]; r=eval(sys.argv[2]); print(" ".join(map(str,r)) if isinstance(r,tuple) else r)' "$2" "$3" 2>/dev/null || echo ERR; }
 fixture() { local dir; dir=$(mktemp -d "$T/fx.XXXX"); echo "$dir"; }
+flagsof() { jv "$(run "$1" --json)" "$2" "\",\".join(d[\"flags\"])"; }
+# addpanel FILE N — the background-agent panel Claude Code opens BELOW the footer: "⏺ main", then N agent rows with the
+# selection marker ❯ on the LAST one (the marker moves with the cursor; fixtures/seats/agents-panel-ghost.pane is the real shape).
+addpanel() { local f="$1" n="$2" i; { printf '\n\033[1m  \xe2\x8f\xba main\033[0m\n'; for i in $(seq 1 "$n"); do
+    if [ "$i" = "$n" ]; then printf '\033[38;5;241m\xe2\x9d\xaf \xe2\x97\xaf general-purpose\033[39m  \033[38;5;241mChecking route-shells %s\033[39m\n' "$i"
+    else printf '\033[38;5;241m  \xe2\x97\xaf general-purpose\033[39m  \033[38;5;241mChecking route-shells %s\033[39m\n' "$i"; fi; done; } >> "$f"; }
 
 # ============ 1. state: busy / idle, from the real captures ============
 d=$(fixture); cp "$FX/busy-sonnet.pane" "$d/2.pane"; meta "$d" 2 exec2 0 task/x abc1234 0 2
@@ -78,6 +84,21 @@ d=$(fixture); mkpane "$d/5.pane" "⏺ ok" "" 12 sonnet-5-5 ""; meta "$d" 5 exec5
 J=$(run "$d" --json)
 check "13.1805 copy-mode: pane_in_mode=1 reads copy_mode true, and the state is unknown (a scrolled view hides the spinner)" '[ "$(jv "$J" 5 "d[\"copy_mode\"],d[\"state\"]")" = "True unknown" ]'
 
+# ---- the background-agent panel (13.1820): its selected row's ❯ sits BELOW the footer and is not the input box ----
+d=$(fixture); cp "$FX/agents-panel-ghost.pane" "$d/6.pane"; meta "$d" 6 planner 0
+J=$(run "$d" --json)
+check "13.1820 panel: the REAL capture (panel open, selection on an agent row) reads box empty, no box-text flag, and still busy from the spinner (live gisik:6 flagged box-text)" '[ "$(jv "$J" 6 "d[\"box\"],d[\"state\"],d[\"elapsed\"]")" = "empty busy 6s" ] && ! flagsof "$d" 6 | grep -q box-text'
+d=$(fixture); python3 -c 'import sys;s=open(sys.argv[1],encoding="utf-8").read();s=s.replace("\u276f\xa0\x1b[39m","\u276f\xa0\x1b[39m\x1b[2mok keep going\x1b[0m",1);open(sys.argv[2],"w",encoding="utf-8").write(s)' "$FX/agents-panel-ghost.pane" "$d/6.pane"; meta "$d" 6 planner 0
+check "13.1820 panel: a dim ghost suggestion in the real box (panel open) is still not input" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box\"]")" = empty ]'
+d=$(fixture); mkpane "$d/6.pane" "✢ Misting… (32s · ↓ 2k tokens)" "" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
+check "13.1820 panel: a spinner above the real box is read with 12 agent rows below the footer (the window anchors on the real box, not on the panel's ❯)" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"],d[\"elapsed\"],d[\"box\"]")" = "busy 32s empty" ]'
+d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 " · esc to interrupt"; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
+check "13.1820 panel: \"esc to interrupt\" in the footer is read with 12 agent rows below it" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"]")" = busy ]'
+d=$(fixture); mkpane "$d/6.pane" "⏺ x" "please review the diff" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
+check "13.1820 CONTROL: real text typed in the box with the panel open is still box text, and it is the typed text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box\"],d[\"box_text\"]")" = "text please review the diff" ]'
+d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
+check "13.1820 CONTROL: a panel alone makes an idle seat neither busy nor box-text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"],d[\"box\"]")" = "idle empty" ]'
+
 # ============ 3. last DONE / CHECKPOINT / needs fresh session ============
 repo="$T/repo"; mkdir -p "$repo"; ( cd "$repo" && git init -q . && GIT_AUTHOR_DATE=2026-10-03T01:48:00Z GIT_COMMITTER_DATE=2026-10-03T01:48:00Z git -c user.name=t -c user.email=t@t commit -q --allow-empty -m one )
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -99,6 +120,27 @@ check "13.1808 last: a sha the worktree does not know falls back to the next tur
 d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ needs fresh session at step 2\n⏺ a long reply')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
 check "13.1808 last: with neither a known sha nor a later stamp the age is null (shown as ?)" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"][\"age_s\"]")" = None ] && run "$d" | grep -q "needs-fresh.*(? ago)"'
 
+# ---- protocol lines from MSG-no-midtask-seats (13.1821) ----
+d=$(fixture); mkpane "$d/9.pane" "$(printf '  CHECKPOINT reviewer idle after task/ctl-run-tests fe844305')" "" 12 opus-5-5 " · 1 monitor"; meta "$d" 9 reviewerB 0
+J=$(run "$d" --json)
+check "13.1821 last: a reviewer's \"CHECKPOINT reviewer idle after task/<b> <sha8>\" is a CHECKPOINT signal (live gisik:9 read last: none)" '[ "$(jv "$J" 9 "d[\"last\"][\"kind\"]")" = CHECKPOINT ] && run "$d" | grep -q "last: CHECKPOINT reviewer idle after task/ctl-run-tests fe844305"'
+d=$(fixture); mkpane "$d/9.pane" "$(printf '⏺ CHECKPOINT reviewer idle after <branch> <sha8>')" "" 12 opus-5-5 " · 1 monitor"; meta "$d" 9 reviewerB 0
+check "13.1821 CONTROL: the reviewer TEMPLATE (CHECKPOINT reviewer idle after <branch> <sha8>, no hex sha) is not a signal" '[ "$(jv "$(run "$d" --json)" 9 "d[\"last\"]")" = None ]'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ needs fresh FIX session')" "" 12 sonnet-5-5 " · 1 shell"; meta "$d" 2 exec2 0
+check "13.1821 needs-fresh: a lane's \"needs fresh FIX session\" is kind needs-fresh, flagged needs-fresh-session, and shown on the line" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"][\"kind\"]")" = needs-fresh ] && [ "$(flagsof "$d" 2)" = needs-fresh-session ] && run "$d" | grep -q "last: needs-fresh FIX session"'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '%s' '"needs fresh FIX session" is the line to print')" "" 12 sonnet-5-5 " · 1 shell"; meta "$d" 2 exec2 0
+check "13.1821 CONTROL: a QUOTED \"needs fresh FIX session\" at the start of a line (a brief quoting the protocol) is not a signal" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"]")" = None ]'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ CHECKPOINT task/x %s DONE' "$sha")" "" 12 sonnet-5-5 " · 1 monitor"; meta "$d" 2 exec2 0 "" "" "" "" "$repo"
+check "13.1821 final checkpoint: a lane's \"CHECKPOINT task/<b> <sha> DONE\" counts as DONE — idle-no-task even with a monitor armed (as 13.1811's DONE)" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"][\"kind\"]")" = DONE ] && [ "$(flagsof "$d" 2)" = idle-no-task ]'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ CHECKPOINT task/x %s step 2/3' "$sha")" "" 12 sonnet-5-5 " · 1 monitor"; meta "$d" 2 exec2 0 "" "" "" "" "$repo"
+check "13.1821 CONTROL: a STEP checkpoint (step 2/3) is not DONE — kind CHECKPOINT, and a lane waiting on its monitor is not flagged" '[ "$(jv "$(run "$d" --json)" 2 "d[\"last\"][\"kind\"]")" = CHECKPOINT ] && [ "$(flagsof "$d" 2)" = "" ]'
+# a stamp later than now belongs to yesterday: now 00:05, "done 11:58 PM" is 7 minutes old (13.1822)
+NOW_MIDNIGHT=$(python3 -c 'import calendar;print(calendar.timegm((2026,10,3,0,5,0)))')
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ CHECKPOINT task/ctl-seats 0123456789abcdef0123456789abcdef01234567 step 1/3\n✻ Sautéed for 1s · done 11:58 PM\n⏺ next')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
+check "13.1822 last: a turn-end stamp later than now is yesterday's (now 00:05, done 11:58 PM -> 7 min)" '[ "$(CTL_SEATS_NOW="$NOW_MIDNIGHT" python3 "$PY" --dir "$d" --json | python3 -c "import sys,json; print(json.loads(sys.stdin.readline())[\"last\"][\"age_s\"])")" = 420 ]'
+d=$(fixture); mkpane "$d/2.pane" "$(printf '⏺ CHECKPOINT task/ctl-seats 0123456789abcdef0123456789abcdef01234567 step 1/3\n✻ Sautéed for 1s · done 12:03 AM\n⏺ next')" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
+check "13.1822 CONTROL: a stamp earlier than now stays today (now 00:05, done 12:03 AM -> 2 min, not 24 h)" '[ "$(CTL_SEATS_NOW="$NOW_MIDNIGHT" python3 "$PY" --dir "$d" --json | python3 -c "import sys,json; print(json.loads(sys.stdin.readline())[\"last\"][\"age_s\"])")" = 120 ]'
+
 # ============ 4. roles and the text line ============
 d=$(fixture)
 i=0; for n in main exec1 planner reviewerA reviewerC dispatcher scratch; do i=$((i+1)); cp "$FX/idle-done-sonnet.pane" "$d/$i.pane"; meta "$d" $i $n 0; done
@@ -107,12 +149,13 @@ check "13.1809 roles: main -> controller, exec* -> lane, planner, reviewer*, dis
 d=$(fixture); cp "$FX/busy-sonnet.pane" "$d/2.pane"; meta "$d" 2 exec2 0 task/x abc1234 3 2
 check "13.1810 text line: one line per seat — window, name, role | state | sh/mon | box | Ctx model | branch@head unpushed dirty | last" '[ "$(run "$d" | head -1)" = "gisik:2 exec2 lane | busy 3m59s | sh 0 mon 0 | box empty | Ctx 11% sonnet-5-5 | task/x@abc1234 unpushed 3 dirty 2 | last: none" ]'
 d=$(fixture); mkpane "$d/2.pane" "⏺ x" "hello" 12 sonnet-5-5 " · 1 shell"; meta "$d" 2 exec2 1 task/x abc1234 0 0
-check "13.1810 text line: copy mode and box text are visible on the line" 'run "$d" | head -1 | grep -q "copy-mode" && run "$d" | head -1 | grep -q "box text: hello"'
+check "13.1810 text line: copy mode is in the STATE field (| unknown copy-mode |) and box text is visible" 'run "$d" | head -1 | grep -q "| unknown copy-mode |" && run "$d" | head -1 | grep -q "box text: hello"'
+d2=$(fixture); mkpane "$d2/2.pane" "⏺ x" "" 12 sonnet-5-5 " · 2 shells, 1 monitor"; meta "$d2" 2 exec2 0
+check "13.1810 text line: shells before monitors, with different counts (sh 2 mon 1 — a swap reads sh 1 mon 2)" 'run "$d2" | head -1 | grep -q "| sh 2 mon 1 |"'
 check "13.1810 the last line of the output is one OK summary naming the seat count" 'run "$d" | tail -1 | grep -q "^OK seats 1 window"'
 check "13.1810 --json: one object per line, the summary line goes to stderr and not into the stream" 'out=$(run "$d" --json 2>/dev/null); [ "$(printf "%s\n" "$out" | grep -vc "^{")" = 0 ] && run "$d" --json 2>&1 >/dev/null | grep -q "^OK seats"'
 
 # ============ 5. --flag: only the seats that need action ============
-flagsof() { jv "$(run "$1" --json)" "$2" "\",\".join(d[\"flags\"])"; }
 d=$(fixture); mkpane "$d/2.pane" "⏺ x" "" 12 sonnet-5-5 ""; meta "$d" 2 exec2 0
 check "13.1811 flag: a lane idle with no shell and no monitor is idle-no-task" '[ "$(flagsof "$d" 2)" = idle-no-task ]'
 d=$(fixture); mkpane "$d/2.pane" "⏺ x" "" 12 sonnet-5-5 " · 1 shell"; meta "$d" 2 exec2 0
@@ -184,20 +227,29 @@ check "13.1816 verb: unpushed counts against origin/<branch> (1: commit b), not 
 check "13.1816 verb: dirty counts the changed files (2 untracked)" '[ "$(jv "$out" 1 "d[\"dirty\"]")" = 2 ]'
 check "13.1816 verb: a window whose directory is not a git worktree has no branch facts (null), and the line still prints" '[ "$(jv "$out" 2 "d[\"branch\"]")" = None ] && vrun | grep -q "^gisik:2 reviewerA reviewer "'
 check "13.1816 verb: unpushed with no origin/<branch> counts commits on no origin ref at all (b and c = 2)" '( cd "$co" && git switch -q -c task/z && git commit -q --allow-empty -m c ); o=$(vrun --json 2>&1); r=$(jv "$o" 1 "d[\"unpushed\"]"); ( cd "$co" && git switch -q task/y ); [ "$r" = 2 ]'
-check "13.1817 read-only: the verb called tmux with list-windows, capture-pane and display-message only — no send-keys, paste-buffer, load-buffer, kill-window" '! grep -E "^(send-keys|paste-buffer|load-buffer|kill-window|new-window|select-window|copy-mode)" "$fd/calls" && grep -q "^capture-pane" "$fd/calls"'
+check "13.1817 read-only: the verb called tmux with has-session, list-windows and capture-pane ONLY (the set is exact: no send-keys, paste-buffer, load-buffer, kill-window, display-message)" '[ "$(awk "{print \$1}" "$fd/calls" | sort -u | tr "\n" " ")" = "capture-pane has-session list-windows " ]'
 check "13.1817 read-only: the verb ran and did not change the checkout (same dirty files, same HEAD)" '[ "$(jv "$out" 1 "d[\"dirty\"]")" = 2 ] && [ "$(git -C "$co" status --porcelain | wc -l | tr -d " ")" = 2 ] && [ "$(git -C "$co" rev-parse --short HEAD)" = "$head7" ]'
 check "13.1818 --dry-run touches no tmux at all and exits OK" ': > "$fd/calls"; o=$(vrun --dry-run 2>&1); [ $? -eq 0 ] && printf "%s" "$o" | tail -1 | grep -q "^OK seats dry-run" && [ ! -s "$fd/calls" ]'
 # 13 windows, all in the same worktree, timed (the budget is 2 s; the real run is quoted in DONE).
 : > "$fd/windows"; for i in $(seq 1 13); do cp "$FX/busy-sonnet.pane" "$fd/panes/$i.pane"; printf '%s exec%s 0 %s\n' "$i" "$i" "$co" >> "$fd/windows"; done
 s=$(python3 -c 'import time;print(time.time())'); n13=$(vrun --json 2>/dev/null | grep -c "^{"); e=$(python3 -c 'import time;print(time.time())')
+check "13.1816 verb: windows print in NUMERIC order (2 before 10, 10-13 after 9 — a text sort puts 10 before 2)" '[ "$(vrun --json 2>/dev/null | python3 -c "import sys,json; print(\" \".join(str(json.loads(l)[\"window\"]) for l in sys.stdin if l.startswith(\"{\")))")" = "1 2 3 4 5 6 7 8 9 10 11 12 13" ] && [ "$(vrun 2>/dev/null | grep -o "^gisik:[0-9]*" | tr "\n" " ")" = "gisik:1 gisik:2 gisik:3 gisik:4 gisik:5 gisik:6 gisik:7 gisik:8 gisik:9 gisik:10 gisik:11 gisik:12 gisik:13 " ]'
 check "13.1819 speed: 13 windows in under 2 s through the fake tmux" '[ "$n13" = 13 ] && python3 -c "import sys; sys.exit(0 if $e - $s < 2.0 else 1)"'
 # parity with lib.sh: the box this verb reads is the box ctl_box_text reads, on every box variant used above.
-check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed ghost, an unclosed ghost, and real+ghost" 'ok=1
+check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed ghost, an unclosed ghost, real+ghost, and the agent-panel shape (empty box; typed text)" 'ok=1
   for variant in "plain words" "\\033[2mghost\\033[0m" "\\033[2munclosed ghost" "real \\033[2mghost\\033[0m" ""; do
     pd=$(fixture); mkpane "$pd/1.pane" "⏺ x" "$variant" 12 sonnet-5-5 ""; meta "$pd" 1 exec1 0
     want=$(FAKE_DIR="$fd" FAKE_PANES="$pd" FAKE_WINDOWS="$fd/windows" PATH="$fk:$PATH" bash -c ". \"$HERE/lib.sh\"; ctl_box_text gisik:1")
     got=$(jv "$(run "$pd" --json)" 1 "d[\"box_text\"]")
     [ "$want" = "$got" ] || { ok=0; echo "    variant [$variant]: ctl_box_text=[$want] seats=[$got]"; }
-  done; [ $ok = 1 ]'
+  done
+  pd=$(fixture); cp "$FX/agents-panel-ghost.pane" "$pd/1.pane"; meta "$pd" 1 exec1 0
+  pd2=$(fixture); mkpane "$pd2/1.pane" "⏺ x" "typed words" 12 sonnet-5-5 ""; addpanel "$pd2/1.pane" 12; meta "$pd2" 1 exec1 0
+  for pdir in "$pd" "$pd2"; do   # the panel shape: the selected agent row below the footer is not the box
+    want=$(FAKE_DIR="$fd" FAKE_PANES="$pdir" FAKE_WINDOWS="$fd/windows" PATH="$fk:$PATH" bash -c ". \"$HERE/lib.sh\"; ctl_box_text gisik:1")
+    got=$(jv "$(run "$pdir" --json)" 1 "d[\"box_text\"]")
+    [ "$want" = "$got" ] || { ok=0; echo "    panel [$pdir]: ctl_box_text=[$want] seats=[$got]"; }
+  done
+  [ $ok = 1 ]'
 rm -rf "$T"
 [ "$fails" -eq 0 ] && echo "seats tests green" || { echo "$fails seats tests red"; exit 1; }

@@ -13,8 +13,9 @@ fixtures. CTL_SEATS_NOW (epoch) pins "now" for them.
 """
 import argparse, datetime, glob, json, os, re, subprocess, sys, time
 
-ANSI = re.compile(r"\x1b\[[0-9;]*m")
-DIM = re.compile(r"\x1b\[2m.*?(?:\x1b\[0m|\x1b\[22m|$)", re.S)       # a dim span ends at its reset or at the line's end (lib.sh ctl_box_text)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from boxtext import ANSI, box_index, box_text, plain_of, status_index   # the box reading shared with lib.sh ctl_box_text (13.1820)
+
 SPINNER = re.compile(r"^[^\s\w⏺⎿❯|─-]\s+\S+…\s+\((?:(\d+h) )?(?:(\d+m) )?(\d+s)")   # "✢ Misting… (1m 26s · ↓ 8.0k tokens)", at column 0
 DONE_STAMP = re.compile(r"done (\d{1,2}):(\d{2})(?: ?([AaPp])[Mm])?")                  # "✻ Sautéed for 1s · done 1:53 AM · …"
 CTX = re.compile(r"Ctx (\d+)%")
@@ -22,7 +23,10 @@ SHELLS = re.compile(r"(\d+) shells?\b")
 MONITORS = re.compile(r"(\d+) monitors?\b")
 PREFIX = r"^[\s⏺⎿·•-]*"
 SIGNAL = re.compile(PREFIX + r"((?:DONE|CHECKPOINT) task/\S+ ([0-9a-f]{7,40})\b.*)$")   # a template (`task/<branch> <sha40>`) has no hex sha
+REVIEWER_IDLE = re.compile(PREFIX + r"(CHECKPOINT reviewer idle after \S+ ([0-9a-f]{7,40})\b.*)$")   # the reviewer's quiet-point line; its template has `<sha8>`
+FINAL = re.compile(r"CHECKPOINT task/\S+ [0-9a-f]{7,40}\s+DONE\b")                                    # a lane's last checkpoint IS its DONE
 FRESH = re.compile(PREFIX + r"[\"'`]?(needs fresh session at step (\d+))\b")
+FRESH_FIX = re.compile(PREFIX + r"needs fresh FIX session\b")                                         # no placeholder to tell a quote from the line, so no quote prefix
 BOUNDARY_CTX = int(os.environ.get("GISIK_SEATS_BOUNDARY_CTX", "20"))
 MIDSTEP_CTX = int(os.environ.get("GISIK_SEATS_MIDSTEP_CTX", "30"))     # plan #18: 300k of a 1M window
 
@@ -43,14 +47,6 @@ def read_meta(path):
     except OSError:
         pass
     return meta
-
-
-def box_text(lines):
-    """The REAL (non-dim) text on the last ❯ line — the same reading as lib.sh ctl_box_text."""
-    idx = max((i for i, l in enumerate(lines) if "❯" in l), default=None)
-    if idx is None: return ""
-    after = lines[idx].split("❯", 1)[1]
-    return ANSI.sub("", DIM.sub("", after)).strip()
 
 
 def stamp_epoch(m, now):
@@ -74,15 +70,17 @@ def sha_epoch(wt, sha):
 
 
 def last_signal(plain, wt, now):
-    """The last DONE / CHECKPOINT / needs-fresh-session line in the scrollback, with its age when it can be known:
+    """The last DONE / CHECKPOINT (a lane's, or a reviewer's "reviewer idle after") / needs-fresh line in the scrollback, with its age when it can be known:
     the checkpointed commit's time, else the next turn-end stamp below it, else None."""
     found = None
     for i, l in enumerate(plain):
-        m = SIGNAL.match(l)
+        m = SIGNAL.match(l) or REVIEWER_IDLE.match(l)
         if m:
-            found = (i, m.group(1).split(" ", 1)[0], m.group(1).strip(), m.group(2)); continue
+            kind = "DONE" if FINAL.match(m.group(1)) else m.group(1).split(" ", 1)[0]
+            found = (i, kind, m.group(1).strip(), m.group(2)); continue
         m = FRESH.match(l)
-        if m: found = (i, "needs-fresh", f"needs fresh session at step {m.group(2)}", None)
+        if m: found = (i, "needs-fresh", f"needs fresh session at step {m.group(2)}", None); continue
+        if FRESH_FIX.match(l): found = (i, "needs-fresh", "needs fresh FIX session", None)
     if not found: return None
     i, kind, text, sha = found
     ts = sha_epoch(wt, sha) if sha else None
@@ -103,9 +101,9 @@ def fmt_age(s):
 
 def parse_seat(idx, pane, meta, now):
     lines = pane.split("\n")
-    plain = [ANSI.sub("", l).replace(" ", " ").rstrip() for l in lines]
+    plain = [plain_of(l) for l in lines]
     name = meta.get("name", f"w{idx}")
-    status = next((i for i in range(len(plain) - 1, -1, -1) if CTX.search(plain[i]) and "|" in plain[i]), None)
+    status = status_index(plain)
     ctx = model = None
     shells = monitors = 0
     if status is not None:
@@ -115,7 +113,8 @@ def parse_seat(idx, pane, meta, now):
         foot = " ".join(plain[status + 1:status + 4])
         m = SHELLS.search(foot); shells = int(m.group(1)) if m else 0
         m = MONITORS.search(foot); monitors = int(m.group(1)) if m else 0
-    box_idx = max((i for i, l in enumerate(plain) if "❯" in l), default=len(plain))
+    box = box_index(plain, status)   # the prompt box, not the agent panel's ❯ below the footer
+    box_idx = len(plain) if box is None else box
     elapsed = None; busy = False
     for l in plain[max(0, box_idx - 16):box_idx]:
         m = SPINNER.match(l)
@@ -128,7 +127,7 @@ def parse_seat(idx, pane, meta, now):
         m = stamps[-1]; done_at = f"{m.group(1)}:{m.group(2)}" + (f" {m.group(3).upper()}M" if m.group(3) else "")
     copy_mode = meta.get("mode", "0") == "1"
     state = "unknown" if (copy_mode or status is None) else ("busy" if busy else "idle")
-    text = box_text(lines)
+    text = box_text(lines, box)
     num = lambda k: int(meta[k]) if meta.get(k, "").lstrip("-").isdigit() else None
     seat = {"window": idx, "name": name, "role": role_of(name), "state": state,
             "elapsed": elapsed if state == "busy" else None, "done_at": done_at if state == "idle" else None,
@@ -170,7 +169,7 @@ def text_line(s):
         git = "no-worktree"
     if s["last"]:
         l = s["last"]; shown = re.sub(r"\b([0-9a-f]{7})[0-9a-f]{33}\b", r"\1", l["text"])[:90]
-        last = f"last: {shown if l['kind'] != 'needs-fresh' else 'needs-fresh at step ' + shown.rsplit(' ', 1)[1]} ({fmt_age(l['age_s'])} ago)"
+        last = f"last: {shown if l['kind'] != 'needs-fresh' else shown.replace('needs fresh session ', 'needs-fresh ').replace('needs fresh FIX', 'needs-fresh FIX')} ({fmt_age(l['age_s'])} ago)"
     else:
         last = "last: none"
     line = f"gisik:{s['window']} {s['name']} {s['role']} | {state} | sh {s['shells']} mon {s['monitors']} | {box} | {ctx} | {git} | {last}"
