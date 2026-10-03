@@ -109,20 +109,43 @@ describe('27.210 p95 per ring at 500 items (spec §2.2, §7)', () => {
   }
   it('27.210 / 27.305 p95 ≤ 150 ms for every ring of the hub ticket, as a MEMBER (the predicates do work; an owner compiles to TRUE)', async () => {
     const corpus = await seedGraphCorpus(db, { tickets: 10_000, notes: 2_500, people: 12, links: 3_000, references: 6_000 });
-    for (const hops of [1, 2, 3]) {
-      const req = { center: { kind: 'ticket' as const, id: corpus.hub }, hops, workspaceIds: [corpus.ws], projectIds: [], groups: all, offset: 0 };
-      const first = await readGraphRing(db.pool, corpus.member, req); // warm
-      const timings: number[] = [];
-      for (let i = 0; i < 100; i += 1) {
-        const started = process.hrtime.bigint();
-        await readGraphRing(db.pool, corpus.member, req);
-        timings.push(Number(process.hrtime.bigint() - started) / 1e6);
+    const failures: string[] = [];
+    const noProjects = new Set(['blocks', 'relates', 'dup', 'structure', 'attached', 'ref', 'people'] as const);
+    const traceHolder = globalThis as unknown as { __kgTrace?: Record<string, number> };
+    for (const [shape, groups] of [['all groups', all], ['without the project fan-out', noProjects]] as const) {
+      for (const hops of [1, 2, 3]) {
+        const req = { center: { kind: 'ticket' as const, id: corpus.hub }, hops, workspaceIds: [corpus.ws], projectIds: [], groups, offset: 0 };
+        const first = await readGraphRing(db.pool, corpus.member, req); // warm
+        const timings: number[] = [];
+        const trace: Record<string, number> = {};
+        traceHolder.__kgTrace = trace;
+        const reps = hops === 3 ? 30 : 100;
+        for (let i = 0; i < reps; i += 1) {
+          const started = process.hrtime.bigint();
+          await readGraphRing(db.pool, corpus.member, req);
+          timings.push(Number(process.hrtime.bigint() - started) / 1e6);
+        }
+        traceHolder.__kgTrace = undefined;
+        timings.sort((x, y) => x - y);
+        const p95 = percentile(timings, 0.95);
+        const mean = Object.entries(trace).map(([k, v]) => `${k} ${(v / reps).toFixed(1)}`).join(', ');
+        console.log(`kg-perf (LOCAL) on ${process.platform}/${process.arch}: ${shape}, ring ${hops}: ${first?.items.length} items, ${first?.edges.length} edges, p95 ${p95.toFixed(1)} ms (target 150) [mean ms per stage: ${mean}]`);
+        if (p95 > 150) failures.push(`${shape}, ring ${hops}: p95 ${p95.toFixed(1)} ms`);
       }
-      timings.sort((a, b) => a - b);
-      const p95 = percentile(timings, 0.95);
-      console.log(`kg-perf (LOCAL) on ${process.platform}/${process.arch}: ring ${hops}: ${first?.items.length} items, ${first?.edges.length} edges, p95 ${p95.toFixed(1)} ms (target 150)`);
-      expect(p95, `spec §7, ring ${hops}`).toBeLessThanOrEqual(150);
     }
+    // EXPLAIN ANALYZE of the heaviest reads, for the report (is any of them a sequential scan on a big table?).
+    const explain = async (label: string, sql: string, params: unknown[]) => {
+      const { rows } = await db.pool.query<Record<string, string>>(`EXPLAIN (ANALYZE, BUFFERS OFF, COSTS OFF, TIMING OFF) ${sql}`, params);
+      const plan = rows.map((r) => r['QUERY PLAN'] as string);
+      console.log(`kg-explain ${label}: ${plan.filter((l) => /Seq Scan|Index|Bitmap|Execution Time/.test(l)).map((l) => l.trim()).join(' | ')}`);
+    };
+    const someTickets = (await db.pool.query<{ ticket_id: string }>('SELECT ticket_id FROM proj_tickets LIMIT 2000')).rows.map((r) => r.ticket_id);
+    await explain('parent/children', 'SELECT ticket_id, parent_id FROM proj_tickets WHERE parent_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) OR parent_id = ANY ($1::text[]))', [someTickets]);
+    await explain('project membership', 'SELECT ticket_id, project_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[]) OR project_id = ANY ($2::text[])', [someTickets, []]);
+    await explain('links', "SELECT source_id, target_id FROM proj_ticket_links WHERE kind = ANY ('{blocks,relates,duplicates}') AND (source_id = ANY ($1::text[]) OR target_id = ANY ($1::text[]))", [someTickets]);
+    await explain('assignee', 'SELECT ticket_id, assignee_id FROM proj_tickets WHERE assignee_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) OR assignee_id = ANY ($2::text[]))', [someTickets, []]);
+    await explain('visibility join', 'SELECT t.ticket_id FROM proj_tickets t JOIN proj_visibility v ON v.ticket_id = t.ticket_id WHERE t.ticket_id = ANY ($1::text[])', [someTickets]);
+    expect(failures, 'spec §7: p95 ≤ 150 ms per ring').toEqual([]);
     // the shape the bar is about: some ring holds at least 500 items
     const r2 = await readGraphRing(db.pool, corpus.member, { center: { kind: 'ticket', id: corpus.hub }, hops: 2, workspaceIds: [corpus.ws], projectIds: [], groups: all, offset: 0 });
     expect(r2!.items.length).toBeGreaterThanOrEqual(500);
