@@ -938,3 +938,31 @@ Task 7. Ids come from the plan's block `14.200`–`14.299` (`docs/superpowers/pl
 - ✅ **14.555 — the final registry is the 63 tools in the plan's order, spelled out in `register.test.ts` (not read from the fixture) and equal to `allTools`, the fixture and a REAL client's `tools/list` (the hosted door: `mcp-http.test.ts` 14.262 equal to `allTools`);** control: every tool described. Mutation: swap two tools in `allTools` → the pin reddens.
 
 ### T14 — the real client
+
+## 14.15 MCP sweep 2 (MCP sweep 2 plan; block `14.600`–`14.659`)
+
+*Spec `docs/superpowers/specs/2026-10-03-mcp-sweep-2-design.md`; plan `docs/superpowers/plans/2026-10-03-mcp-sweep-2.md`. Ships on `release/workflow-graph`. Blocks per task: T2 14.600–14.604 · T3 14.605–14.609 · T4 14.610–14.616 · T5 14.617–14.626 · T6 14.627–14.637 · T7 14.638–14.652 (14.639–14.645, 14.647, 14.649 and 14.652 stay 🟡 until T8 adds `create_ticket`) · T8 14.653–14.656 · T9 14.657–14.659. T1 mints no id: the O1 measurement is not a case. All 60 ids are allocated; do not mint 14.660 or above. Each task appends its cases under its own `### T<n>` heading, below its anchor.*
+
+### T2 — plumbing
+<!-- ms2 T2 -->
+
+### T3 — `get_ticket` notes
+<!-- ms2 T3 -->
+
+### T4 — `restore_note_version`
+<!-- ms2 T4 -->
+
+### T5 — `close_tickets`
+<!-- ms2 T5 -->
+
+### T6 — notification preferences and saved filters
+<!-- ms2 T6 -->
+
+### T7 — `assign_ticket` by email
+<!-- ms2 T7 -->
+
+### T8 — `create_ticket` by email
+<!-- ms2 T8 -->
+
+### T9 — registry, manual, README, round trip
+<!-- ms2 T9 -->
