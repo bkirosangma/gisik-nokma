@@ -38,6 +38,7 @@ export * from './submit.js';
 export { makeEnvelope } from './testing.js';
 export * from './ticket-state.js';
 export * from './workflow-helpers.js';
+export * from './graph.js';
 export * from './doc-embeds.js';
 export * from './attachment-kinds.js';
 export * from './events/workspace-settings.js';

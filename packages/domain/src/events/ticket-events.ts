@@ -207,6 +207,30 @@ export const ticketFieldSetPayload = z.object({
 
 export const ticketReparentedPayload = z.object({ newParentId: ulidString.nullable() });
 
+/**
+ * Typed ticket links (Knowledge Graph spec A §2.2). Both events go on the
+ * SOURCE ticket's stream, whoever writes them, so a link has one history.
+ * `relates` is stored as written; its "either direction" rule is the engine's
+ * (`rule-engine/src/checks/links.ts`), not this schema's.
+ */
+export const TICKET_LINK_KINDS = ['blocks', 'relates', 'duplicates'] as const;
+export type TicketLinkKind = (typeof TICKET_LINK_KINDS)[number];
+export const ticketLinkAddedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
+export const ticketLinkRemovedPayload = z.object({ kind: z.enum(TICKET_LINK_KINDS), targetId: ulidString }).strict();
+export const TICKET_LINK_EVENT_TYPES = ['ticket.link_added', 'ticket.link_removed'] as const;
+export function isTicketLinkEvent(type: string): boolean {
+  return (TICKET_LINK_EVENT_TYPES as readonly string[]).includes(type);
+}
+const READINGS: Record<TicketLinkKind, { out: string; in: string }> = {
+  blocks: { out: 'blocks', in: 'is blocked by' },
+  relates: { out: 'relates to', in: 'relates to' },
+  duplicates: { out: 'duplicates', in: 'is duplicated by' },
+};
+/** How a link reads from one end (spec §2.1). One table for the engine's reasons, History, the app and MCP. */
+export function linkReading(kind: TicketLinkKind, direction: 'out' | 'in'): string {
+  return READINGS[kind][direction];
+}
+
 /** Body is opaque structured-doc JSON — the editor plan owns its schema. */
 export const commentAddedPayload = z.object({ body: z.record(z.string(), z.unknown()) });
 

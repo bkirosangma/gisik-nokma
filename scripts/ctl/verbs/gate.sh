@@ -50,7 +50,9 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-echo "$T" | grep -q '36 successful, 36 total' || ctl_fail gate "$summary (log $log)"
+# The gate graph: 36 (through G-9's workflow-canvas-browser) + 5 for Knowledge Graph C T1 (packages/knowledge-graph: build, test, typecheck;
+# packages/knowledge-graph-browser: test, typecheck) = 41. The match is anchored, so 141, 410 and mixed pairs fail (13.1840-13.1849).
+echo "$T" | grep -Eq '^Tasks: +41 successful, 41 total *$' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"

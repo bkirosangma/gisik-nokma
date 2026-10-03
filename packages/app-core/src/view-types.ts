@@ -764,6 +764,12 @@ export type TicketHistoryEvent = {
   clientTime: string;
   serverTime: string;
   seq: number;
+  /**
+   * Link events only (typed-links T4's history route): the other end's key,
+   * `null` when the server withheld a target this viewer cannot see, absent
+   * when this event was not labelled (any other type, or an older server).
+   */
+  linkTarget?: { key: string | null } | null;
 };
 
 export type WorkItem = {
