@@ -65,6 +65,8 @@ export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
   'ticket.collaborator_added': 'a person id, not a document',
   'ticket.collaborator_removed': 'a person id, not a document',
   'ticket.reparented': 'structure (spec C reads proj_tickets.parent_id)',
+  'ticket.link_added': 'a typed link {kind, targetId} between tickets, not a document (spec A; spec C reads it)',
+  'ticket.link_removed': 'a typed link {kind, targetId} between tickets, not a document (spec A; spec C reads it)',
   'ticket.workflow_rebound': 'a workflow id',
   'ticket.closed': 'no body',
   'ticket.reopened': 'no body',
