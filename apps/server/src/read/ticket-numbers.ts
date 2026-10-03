@@ -1,6 +1,17 @@
 import type { Queryable } from '../db/queryable.js';
 
 /**
+ * The ledger rows that GIVE a number (drafts spec §6.1, R25): a `ticket.created` that does not say
+ * `draft: true`, and every `ticket.published`. A draft's creation is not a numbering row, so a draft
+ * consumes no number and a discarded one leaves no gap; its publish takes the next one. The purge keeps
+ * both kinds of row, redacted (`purge_ledger`, migration `1791600000000_drafts.sql`): a purged unpublished
+ * draft keeps `draft: true`, a purged published one keeps its `ticket.published`.
+ * `IS DISTINCT FROM 'true'`, not `<> 'true'`: a creation with no `draft` member is NULL there, and
+ * `NULL <> 'true'` is NULL, which would silently drop every ticket the ledger holds.
+ */
+export const NUMBERING_ROWS_SQL = `((type = 'ticket.created' AND payload->>'draft' IS DISTINCT FROM 'true') OR type = 'ticket.published')`;
+
+/**
  * The number in a ticket key — `1183` in `CCSO-1183` — for one workspace's
  * tickets.
  *
@@ -21,7 +32,8 @@ import type { Queryable } from '../db/queryable.js';
  *   a number allocated outside it would end that.
  *
  * So the number is a fact about the LEDGER, read from it, and the counter is the
- * ticket's position among its project's creations. It is a counter in every
+ * ticket's position among its project's NUMBERING ROWS (`NUMBERING_ROWS_SQL`
+ * below: its non-draft creations and its publishes). It is a counter in every
  * sense that matters to a reader: per project, monotonic, never reused.
  *
  * ## What it orders by, and why that is provable rather than assumed
@@ -30,7 +42,9 @@ import type { Queryable } from '../db/queryable.js';
  * `proj_tickets` does not have (measured: the table's columns are ticket_id,
  * workspace_id, project_id, type_id, parent_id, workflow_id, workflow_version,
  * state_id, state_category, assignee_id, collaborator_ids, fields, transitions,
- * rank, closed_at, closed_by, reopened_at — no `created_at` anywhere). The
+ * rank, closed_at, closed_by, reopened_at — no `created_at` anywhere; the
+ * columns added since, the drafts T2 trio `draft_author_id`, `draft_at` and
+ * `draft_discarded` among them, still include none). The
  * dispatch that asked for this said the controller could not confirm one, and
  * could not, because it does not exist.
  *
@@ -68,6 +82,10 @@ import type { Queryable } from '../db/queryable.js';
  * would have found a corrupt ledger, which is a different and louder fact than
  * "somebody abandoned a form".
  *
+ * A draft changes none of this: its creation is not a numbering row and a
+ * discard erases it, so numbers stay 1..N with no holes; its `ticket.published`
+ * is, and `workspace_seq` still never repeats, so a number is still never reused.
+ *
  * **The property the dispatch was protecting is kept, and kept absolutely:
  * a number is NEVER REUSED.** That follows from `workspace_seq` never
  * repeating. What is not kept is the expectation of holes.
@@ -76,15 +94,17 @@ import type { Queryable } from '../db/queryable.js';
  *
  * `payload->>'projectId'` is the ticket's project — `ticketCreatedPayload`
  * requires it, so every `ticket.created` in the ledger has one, and it is also
- * the key `proj_tickets` is written with. Partitioning on the event's own field
+ * the key `proj_tickets` is written with. `ticketPublishedPayload` requires it
+ * too, and the engine refuses a publish naming any project but the draft's
+ * (`draft.project-mismatch`); a purge keeps it on both redacted shapes. Partitioning on the event's own field
  * rather than joining the projection means this read answers from the ledger
  * alone, which is what a rebuild has.
  *
  * ## The cost, named
  *
- * The window runs over every `ticket.created` in the WORKSPACE and the id filter
+ * The window runs over every numbering row (`NUMBERING_ROWS_SQL`) in the WORKSPACE and the id filter
  * is applied after it, because filtering first would renumber the survivors.
- * That is one scan of a workspace's ticket-creations per call, not per row — a
+ * That is one scan of a workspace's numbering rows per call, not per row — a
  * board or list page pays it once. An index on `(workspace_id, type)` would help
  * it; none is added here because the product's workspaces are small and an index
  * maintained on every append for a read that may never be hot is the trade
@@ -106,7 +126,7 @@ export async function ticketNumbers(
        SELECT entity_id AS ticket_id,
               row_number() OVER (PARTITION BY payload->>'projectId' ORDER BY workspace_seq) AS number
          FROM events
-        WHERE workspace_id = $1 AND type = 'ticket.created'
+        WHERE workspace_id = $1 AND ${NUMBERING_ROWS_SQL}
      ) ranked
      ${filter}`,
     params,
@@ -115,10 +135,11 @@ export async function ticketNumbers(
 }
 
 /**
- * The number for one ticket, or `null` when the ledger holds no `ticket.created`
+ * The number for one ticket, or `null` when the ledger holds no numbering row
  * for it — a ticket this replica has been told about but whose creation is not
  * in the workspace's stream, which is the snapshot-bounded case
- * `app-core`'s replica already names.
+ * `app-core`'s replica already names, or a draft, which has no number until
+ * its `ticket.published`.
  *
  * Returns `null` rather than throwing, and the caller renders the absence: a
  * key is not worth refusing a ticket read over, and inventing a number would
@@ -135,8 +156,8 @@ export async function ticketNumber(
 
 /**
  * The tickets numbered `number` in each of `projectIds` — at most one per project, since a number
- * is a ticket's position among its project's creations. The inverse of `ticketNumbers`, over the
- * same ranking and under the same cost (one scan of the workspace's creations), so a key and the
+ * is a ticket's position among its project's numbering rows. The inverse of `ticketNumbers`, over the
+ * same ranking and under the same cost (one scan of the workspace's numbering rows), so a key and the
  * number it names can never disagree about which ticket is which.
  */
 export async function ticketIdsAtNumber(
@@ -154,7 +175,7 @@ export async function ticketIdsAtNumber(
               payload->>'projectId' AS project_id,
               row_number() OVER (PARTITION BY payload->>'projectId' ORDER BY workspace_seq) AS number
          FROM events
-        WHERE workspace_id = $1 AND type = 'ticket.created'
+        WHERE workspace_id = $1 AND ${NUMBERING_ROWS_SQL}
      ) ranked
      WHERE project_id = ANY($2) AND number = $3
      ORDER BY ticket_id`,
