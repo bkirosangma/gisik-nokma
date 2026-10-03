@@ -3758,7 +3758,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 ### Knowledge Graph view (spec C)
 
-<!-- KG-C bullet -->
+- ⚙️ **The Knowledge Graph's foundations: two packages, the renderer seam, the stress probe and the ring read** (KG-C T1; `packages/domain/src/graph.ts`, `packages/knowledge-graph/`, `packages/knowledge-graph-browser/`, `apps/server/src/read/graph-neighbours.ts`) — `domain/graph.ts` is the wire vocabulary (item and edge kinds, the nine filter groups in RING ORDER, `compareRingEntries`, `inGraphScope`) shared by the server read and the client engine. `@gisik-nokma/knowledge-graph` pins Sigma v4 (`sigma@4.0.0-beta.7`, `@sigma/node-image@4.0.0-alpha.3`, `graphology@0.26.0`); only `src/render/sigma/` may import them, enforced by a resolved-import test, and `program.ts` is the one Sigma program (node cards via `layerImage`, `ICON_ATLAS_DEBOUNCE_MS = 20` so the cold first sweep meets spec §7). `@gisik-nokma/knowledge-graph-browser` is the Playwright stress probe (500 cards + 2,000 fog + 3,000 edges, port 3191; the real-GPU bar runs with `KG_GPU=1`). `readGraphRing` answers one ring around a centre, statelessly, through the per-workspace visibility predicates (a hidden item is never walked through; out-of-scope items become fog and are not walked past), 2,000 items to a page; its p95 is measured by the `KG_PERF=1` case. Both packages add gate tasks: `build`, `test`, `typecheck` for the first, `test`, `typecheck` for the second (41 in all). Cases 27.200–27.210.
 
 ### D — MCP graph query and semantic layer
 
