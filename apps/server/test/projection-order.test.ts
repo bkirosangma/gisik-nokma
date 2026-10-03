@@ -157,6 +157,9 @@ describe('projection registration order (coordination §8)', () => {
       // ingest transaction. Its one reader is the ticket-comments route, a
       // read-time caller on a request path.
       'proj_ticket_comments',
+      // Knowledge Graph B (27.112). APPENDED: `apply` reads only its own rows and
+      // `purged_entities`, and no projection reads proj_references in a transaction.
+      'proj_references',
     ]);
   });
 
@@ -224,6 +227,7 @@ describe('projection registration order (coordination §8)', () => {
       // would put the same event in front of two `apply` functions, each
       // re-stating which kind it takes.
       ['proj_ticket_comments', ['proj_ticket_comments', 'proj_note_comments']],
+      ['proj_references', ['proj_references']],
     ]);
   });
 

@@ -12,7 +12,7 @@ import { insertEvent, lockEntity, lockWorkspace, nextSeq, nextWorkspaceSeq } fro
 import type { ProjectionRegistry } from '../projections/registry.js';
 import { rederiveWorkspaceLexemes } from '../projections/note-search.js';
 import { eraseRows, objectKeysOf, recordPurged, replayRemaining, toErasureSet, type PurgeTarget } from './erasure.js';
-import { collectSurvivors, rederiveSurvivors } from './survivors.js';
+import { collectSurvivors, lockSurvivors, rederiveSurvivors } from './survivors.js';
 import { deletePendingObjects, queuePendingObjects } from './pending-objects.js';
 
 export type { PurgeTarget } from './erasure.js';
@@ -123,6 +123,7 @@ export async function purgeItem(pool: Pool, target: PurgeTarget, deps: PurgeDeps
     const set = toErasureSet(target, item.workspaceId, rows);
     const survivors = await collectSurvivors(client, set);
     const keys = await objectKeysOf(client, set);
+    await lockSurvivors(client, survivors); // BEFORE eraseRows: see lockSurvivors (27.123)
     await eraseRows(client, set);
     await recordPurged(client, set, deps.now.toISOString());
     await replayRemaining(client, set, deps.projections);

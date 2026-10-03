@@ -15,6 +15,10 @@ step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run
 step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
 step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
+# The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~3.5 min).
+step "postman suite (ledger, ack, watcher, bridge, state machine, pane safety)" "bash '$HERE/test/postman.test.sh'"
+step "post/ack/postman --dry-run write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' post exec3 --kind fix --text x --from main --dry-run && CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --dry-run && [ ! -e \$d/LEDGER.jsonl ]"
+step "ack refuses an unknown id" "d=\$(mktemp -d); ! CTL_POSTMAN_ROOT=\$d '$HERE/ctl' ack 99 --seat exec3"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
 # only those two named refusals are accepted here — any other non-zero exit is a red step.

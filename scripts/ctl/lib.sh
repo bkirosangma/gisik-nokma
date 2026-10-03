@@ -159,3 +159,44 @@ ctl_delivered() {
   done
   return 1
 }
+
+# --- the postman's pane checks (postman design §6, 2026-10-03). An ALLOWLIST for "safe to type": anything not proven
+# to be an idle Claude Code prompt is refused, because a pointer line pasted into a shell would be EXECUTED and a
+# pasted Enter on a permission menu picks option 1.
+# True when the pane's foreground command is a Claude Code session: the measured version string (2.1.288), claude, node.
+ctl_cmd_is_claude() { local re="${CTL_POSTMAN_CMD_RE:-^([0-9]+\.[0-9]+\.[0-9]+|claude|node)\$}"; [[ "$1" =~ $re ]]; }
+
+# ctl_pane_state TARGET — exactly one token: no-window | not-claude | copy-mode | menu | ours | text | busy | ok.
+#   ours = the box holds our own unsubmitted pointer ("[postman #…"); text = any other real text (never cleared);
+#   menu = no prompt on screen, or the last ❯ line is a numbered option ("❯ 1. Yes"); busy = a running spinner or the queued hint.
+ctl_pane_state() {
+  local t="$1" cmd mode cap last box
+  cmd="$(tmux display-message -p -t "$t" '#{pane_current_command}' 2>/dev/null)" || { echo no-window; return 0; }
+  [ -n "$cmd" ] || { echo no-window; return 0; }
+  ctl_cmd_is_claude "$cmd" || { echo not-claude; return 0; }
+  mode="$(tmux display-message -p -t "$t" '#{pane_in_mode}' 2>/dev/null)"
+  [ "$mode" = 1 ] && { echo copy-mode; return 0; }
+  cap="$(tmux capture-pane -p -t "$t" 2>/dev/null)"
+  last="$(printf '%s\n' "$cap" | grep '❯' | tail -1)"
+  [ -n "$last" ] || { echo menu; return 0; }
+  printf '%s' "$last" | grep -qE '❯[[:space:]]*[0-9]+\.' && { echo menu; return 0; }
+  box="$(ctl_box_text "$t")"
+  if [ -n "$box" ]; then case "$box" in "[postman #"*) echo ours;; *) echo text;; esac; return 0; fi
+  if ctl_box_queued "$t" || [ "$(ctl_pane_above "$t" | tail -8 | ctl_count_spinners)" -gt 0 ]; then echo busy; else echo ok; fi
+}
+
+# ctl_pane_deliver_line TARGET LINE — paste ONE line (no trailing newline: a single-line paste submits on the first Enter),
+# submit, and read the proof. Prints echoed | queued | unproven | unsubmitted | failed.
+ctl_pane_deliver_line() {
+  local t="$1" line="$2" f snap b proof
+  f="$(mktemp)"; snap="$f.before"; printf '%s' "$line" > "$f"; ctl_pane_above "$t" > "$snap"
+  b="ctlpm$$"
+  if ! { tmux load-buffer -b "$b" "$f" && tmux paste-buffer -b "$b" -d -t "$t"; }; then rm -f "$f" "$snap"; echo failed; return 1; fi
+  sleep 1
+  if ! ctl_submit "$t" >/dev/null; then rm -f "$f" "$snap"; echo unsubmitted; return 1; fi
+  if proof="$(ctl_delivered "$t" "$(printf '%s' "$line" | cut -c1-30)" "$snap")"; then case "$proof" in queued*) echo queued;; *) echo echoed;; esac; else echo unproven; fi
+  rm -f "$f" "$snap"
+}
+
+# ctl_pane_submit_pending TARGET — Enter presses only (our own earlier paste is still in the box). Prints submitted | unsubmitted.
+ctl_pane_submit_pending() { if ctl_submit "$1" >/dev/null; then echo submitted; else echo unsubmitted; return 1; fi; }

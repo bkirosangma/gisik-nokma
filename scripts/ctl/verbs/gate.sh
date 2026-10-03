@@ -50,10 +50,9 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-# TEMPORARY "36 or 41": the verb that runs is the PRIMARY checkout's (release/smoothness: 36 tasks), but Knowledge Graph C T1 adds a package, so its gate is 41.
-# Both halves must match one graph — an anchored two-alternative match, so 4136, 360/410 and mixed pairs fail. KG C T1's LAST commit pins 41-ONLY here
-# (and flips 13.1849 to a FAIL control); delete this comment with the 36 arm. Same shape as #954's "34 or 36" (13.1844-13.1849).
-echo "$T" | grep -Eq '^Tasks: +(36 successful, 36|41 successful, 41) total *$' || ctl_fail gate "$summary (log $log)"
+# The gate graph: 36 (through G-9's workflow-canvas-browser) + 5 for Knowledge Graph C T1 (packages/knowledge-graph: build, test, typecheck;
+# packages/knowledge-graph-browser: test, typecheck) = 41. The match is anchored, so 141, 410 and mixed pairs fail (13.1840-13.1849).
+echo "$T" | grep -Eq '^Tasks: +41 successful, 41 total *$' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"
