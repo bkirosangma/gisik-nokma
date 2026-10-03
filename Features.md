@@ -3764,6 +3764,8 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 ### D — MCP graph query and semantic layer
 
+- ⚙️ **Semantic core (D T1, measured first):** kNN (k 10, τ 0.35 chosen by `selectTau` from the measured sweep), seeded Louvain communities, class-based TF-IDF labels, order-free signatures, audience partitions (a suggestion never mixes audiences) and D4's `hiddenItems` (the LIVE items a viewer cannot see, fail-closed on a missing `proj_visibility` row). Measured on the labelled 60 and a synthetic corpus: precision@5 0.847, six suggestions at purity 0.966, 10 000 items in 20.4 s (bar 60 s), `hiddenItems` over 500 items p95 3.1 ms (bar 150 ms). Cases 27.400–27.415. (`apps/server/src/semantic/`, `apps/server/src/read/item-visibility.ts`)
+- ⚙️ **`pnpm --filter @gisik-nokma/server semantic:measure`** prints precision@5, the τ sweep, the embedding rate and the pipeline time per size. (`apps/server/src/tools/measure-semantic.ts`)
 <!-- D T1 -->
 <!-- D T2 -->
 <!-- D T3 -->

@@ -20,6 +20,7 @@
     "seed:cc": "tsx src/seed/cli-seed-convenience-corner.ts",
     "seed:dev": "tsx src/seed/cli-seed-dev-workspace.ts",
     "seed:search-corpus": "tsx src/tools/seed-search-corpus.ts",
+    "semantic:measure": "tsx src/tools/measure-semantic.ts",
     "ops:backup-once": "tsx src/ops/backup-daemon-main.ts --once",
     "ops:fetch-backup": "tsx src/ops/fetch-backup.ts"
   },
@@ -39,6 +40,9 @@
     "better-auth": "^1.7.2",
     "fastify": "^5.3.0",
     "file-type": "^19.6.0",
+    "graphology": "0.26.0",
+    "graphology-communities-louvain": "2.0.2",
+    "graphology-types": "0.24.8",
     "node-pg-migrate": "^7.9.0",
     "nodemailer": "^10.0.0",
     "pg": "^8.13.0",
