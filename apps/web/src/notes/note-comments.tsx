@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import type { EditorSubmission } from '@gisik-nokma/editor';
+import { TicketEditorSlot } from '../editor-slot.js';
 import {
   CommentsThread,
   commentDeletedSeed,
@@ -13,6 +14,7 @@ import {
   type CommentActions,
   type TicketComment,
 } from '@gisik-nokma/app-core';
+import { Button } from '@gisik-nokma/ui';
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 
@@ -42,6 +44,24 @@ import { buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callb
  * copy of that logic here is exactly the drift `canEdit`'s own docblock in
  * `note-document.tsx` warns against.
  */
+/**
+ * The comment composer, built when the reader reaches for it (smoothness T9, 25.153; spec S7). A second Tiptap instance
+ * under every note, mounted on open, is most of what a note page costs to show and most readers never type a comment: until
+ * the click this is one button, and the click mounts the editor focused, so the first keystroke lands in it. The label is
+ * the placeholder the editor itself shows (`Add a comment`).
+ */
+function LazyComposer(props: ComponentProps<typeof TicketEditorSlot>) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <Button className="gn-notes__add-comment" onClick={() => setOpen(true)}>
+        Add a comment
+      </Button>
+    );
+  }
+  return <TicketEditorSlot {...props} autoFocus />;
+}
+
 export function NoteComments({
   workspaceId,
   noteId,
@@ -83,7 +103,7 @@ export function NoteComments({
   const comments = useLiveQuery(dataSource, workspaceId, `note-comments:${noteId}`, async () => {
     const rows = await dataSource.query.getNoteComments(workspaceId, noteId);
     return rows.map((row): TicketComment => ({ ...row, files: [] }));
-  });
+  }, { cacheKey: `note-comments:${noteId}` });
   const purged = usePurgedPredicate(
     dataSource.query,
     (comments.data ?? []).map((row) => row.body),
@@ -199,7 +219,7 @@ export function NoteComments({
       {...(actions === undefined ? {} : { actions })}
       composer={
         canComment ? (
-          <TicketEditorSlot
+          <LazyComposer
             mode="comment"
             doc={null}
             readOnly={false}

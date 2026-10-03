@@ -50,9 +50,7 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-# TEMPORARY "34 or 36": the release tip must accept both counts BEFORE G-9 (36 tasks: packages/workflow-canvas-browser) can land, because the verb that runs is
-# the tip's. G-9's merge takes ITS 36-only side of this line; a 34-task run must FAIL on the merged tip (13.1843).
-echo "$T" | grep -Eq '(34 successful, 34|36 successful, 36) total' || ctl_fail gate "$summary (log $log)"
+echo "$T" | grep -q '36 successful, 36 total' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { NoteSummary } from '@gisik-nokma/domain';
+import { prefetchEditor } from '../editor-slot.js';
 
 /**
  * One row of the notes tree (spec §9.2).
@@ -31,6 +32,11 @@ export function NoteRow({ note, open }: { note: NoteSummary; open: boolean }) {
         className={open ? 'gn-notes__row gn-notes__row--open' : 'gn-notes__row'}
         aria-current={open ? 'page' : undefined}
         data-testid={`note-row-${note.noteId}`}
+        // The note this opens carries the editor, a chunk of its own (smoothness T10, T9 case 25.164): warm it on the first sign of
+        // intent. One shared load, so a hover, a focus and the click together fetch it once.
+        onPointerEnter={prefetchEditor}
+        onFocus={prefetchEditor}
+        onClick={prefetchEditor}
       >
         <span className="gn-notes__row-title">{note.title}</span>
         {note.attachedTickets.length > 0 ? (

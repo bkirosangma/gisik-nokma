@@ -70,10 +70,10 @@ function recoverDraft(draftKey: string, note: NoteDetail | null): Recovery {
 }
 
 /**
- * A note saves itself (spec §9.4, D14): every change is drafted to
- * `localStorage` and coalesced into one `note.body_set` per pause, so a tab
- * closed mid-sentence loses nothing and the ledger is not asked to hold one
- * event per keystroke.
+ * A note saves itself (spec §9.4, D14): changes are coalesced into one `note.body_set` per pause, and the
+ * draft is written to `localStorage` when that save is sent (smoothness T9, 25.161: not once per keystroke), so a tab
+ * closed mid-sentence loses nothing (`beforeunload` and unmount send it) and neither the ledger nor the device is
+ * asked to hold one write per keystroke.
  *
  * ## The caller makes "synchronous recovery" true, not this hook alone
  *
@@ -139,6 +139,15 @@ export function useNoteAutosave({
     // still in flight sees nothing pending rather than double-submitting the
     // same draft.
     pendingDocRef.current = null;
+    // The draft reaches the device here, when a save is SENT (the pause, a blur-save, `beforeunload`, unmount), not on every
+    // keystroke: a stringify of the whole document per key was the per-keystroke cost (25.161). It is written before the
+    // `ingest`, so a refused or unanswered save still leaves it behind (18.207) and a reload still recovers it.
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({ doc: pending, at: Date.now() }));
+    } catch {
+      // Private window, or blocked site data: the draft still lives in the ledger's outbox if the save was queued —
+      // only the reload-survives-a-crash guarantee is lost.
+    }
     setSaveState('saving');
     const make = makeSubmittedFactory({ actorId: userId, origin: 'web' });
     const event = make({
@@ -183,13 +192,6 @@ export function useNoteAutosave({
   const onDraft = useCallback(
     (doc: unknown) => {
       pendingDocRef.current = doc;
-      try {
-        window.localStorage.setItem(draftKey, JSON.stringify({ doc, at: Date.now() }));
-      } catch {
-        // Private window, or blocked site data: the draft still lives in
-        // `pendingDocRef` and will flush through `onSave`/unmount/the timer —
-        // only the reload-survives-a-crash guarantee is lost.
-      }
       setSaveState('saving');
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, AUTOSAVE_COALESCE_MS);
@@ -220,7 +222,7 @@ export function useNoteAutosave({
     }
     // `initial`/`draftKey` are fixed for the life of this instance — see the
     // docblock's remount argument. Re-running this on every render would risk
-    // deleting a key an `onDraft` just legitimately wrote.
+    // deleting a key `flush` just legitimately wrote.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

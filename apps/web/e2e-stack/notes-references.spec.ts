@@ -121,6 +121,8 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   // POSITIVE CONTROL FIRST: the note's own comment thread mounted.
   await expect(page.getByTestId('sheet-comments')).toBeVisible({ timeout: 20_000 });
 
+  // The note's composer is one "Add a comment" button until clicked (25.153); the editor mounts focused.
+  await page.getByTestId('sheet-comments').getByRole('button', { name: 'Add a comment' }).click();
   const composer = page.getByTestId('sheet-comments').getByRole('textbox', { name: 'Comment' });
   await composer.click();
   await composer.pressSequentially(`see :ticket ${ticketTitle}`);
