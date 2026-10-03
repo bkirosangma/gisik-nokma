@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   applyTicketEvent,
   domainRegistry,
+  isTicketLinkEvent,
+  linkReading,
   makeEnvelope,
   newUlid,
   parseEvent,
@@ -104,5 +106,20 @@ describe('27.003 the reducer folds links', () => {
     expect(c.links).toEqual([{ kind: 'relates', targetId: TARGET }]);
     const d = applyTicketEvent(c, link('ticket.link_removed', 'relates', TARGET), deps);
     expect('links' in d).toBe(false);
+  });
+});
+
+describe('27.008 how a link reads, and the link-event predicate', () => {
+  it('27.008 all six readings, as linkReading(kind, direction) states them, and the predicate names exactly the two link events', () => {
+    // The wire names are not the readings: `blocks.in` is "is blocked by", and a mutation that returns the kind itself must fail here.
+    const readings = TICKET_LINK_KINDS.map((kind) => [kind, linkReading(kind, 'out'), linkReading(kind, 'in')]);
+    expect(readings).toEqual([
+      ['blocks', 'blocks', 'is blocked by'],
+      ['relates', 'relates to', 'relates to'],
+      ['duplicates', 'duplicates', 'is duplicated by'],
+    ]);
+    expect(isTicketLinkEvent('ticket.link_added')).toBe(true);
+    expect(isTicketLinkEvent('ticket.link_removed')).toBe(true);
+    expect(isTicketLinkEvent('ticket.assigned')).toBe(false); // control: a ticket event that is not a link
   });
 });

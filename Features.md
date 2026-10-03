@@ -3739,7 +3739,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 *Typed links between tickets, a reference index, the Knowledge Graph view, MCP graph tools and Home. Specs `docs/superpowers/specs/2026-10-03-*-design.md` (A–E); mirrored by `test-cases/27-knowledge-graph.md`.*
 
-- ⚙️ **Typed ticket links: the events** (typed-links T1; `packages/domain/src/events/ticket-events.ts`, `vocabulary.ts`, `ticket-state.ts`) — `ticket.link_added` / `ticket.link_removed {kind: blocks|relates|duplicates, targetId}` on the source ticket's stream; they fold into `TicketState.links` (outbound, absent when empty). History narrates them, links notify nobody, a purged target refuses the claim, and a registry census (`apps/server/test/census/ticket-vocabulary-census.test.ts`) fails when a new ticket type reaches no reader. Cases 27.001–27.007.
+- ⚙️ **Typed ticket links: the events** (typed-links T1; `packages/domain/src/events/ticket-events.ts`, `vocabulary.ts`, `ticket-state.ts`) — `ticket.link_added` / `ticket.link_removed {kind: blocks|relates|duplicates, targetId}` on the source ticket's stream; they fold into `TicketState.links` (outbound, absent when empty). History narrates them, links notify nobody, a purged target refuses the claim, and a registry census (`apps/server/test/census/ticket-vocabulary-census.test.ts`) fails when a new ticket type reaches no reader. Cases 27.001–27.008.
 <!-- A T2 bullet -->
 <!-- A T3 bullet -->
 <!-- A T4 bullet -->
