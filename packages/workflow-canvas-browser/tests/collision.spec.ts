@@ -198,6 +198,11 @@ test('25.525 an arrow moves the focused state one grid step and Alt+arrow one px
   await page.keyboard.press('ArrowRight');
   await page.keyboard.up('Alt');
   await expect.poll(async () => (await draftOf(page, A)).x).toBeCloseTo(x0 + 17, 2);
+  // control for the U11 arrow below: ArrowLeft, away from B, is a FREE step (A moves -16 in the draft); ArrowRight brings it back to x0 + 17
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await draftOf(page, A)).x).toBeCloseTo(x0 + 1, 2);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await draftOf(page, A)).x).toBeCloseTo(x0 + 17, 2);
 
   // Escape: show the outline FIRST (the control that makes "gone" mean something), then cancel
   const { zoom } = await viewport(page);
@@ -216,8 +221,9 @@ test('25.525 an arrow moves the focused state one grid step and Alt+arrow one px
   await expect(page.locator('.gn-canvas-outline')).toHaveCount(0);
   await expect(page.locator('.gn-canvas-guide')).toHaveCount(0);
   // an arrow key during the cancelled gesture: the gesture is still ACTIVE (cancelled, not ended), so neither this key nor React Flow's
-  // drag-end change on release is a nudge. (A hook that forgot the gesture on Escape would read both as one and commit +16.)
-  await page.keyboard.press('ArrowRight');
+  // drag-end change on release is a nudge. (A hook that forgot the gesture on Escape would read both as one and commit -16: ArrowLeft is the
+  // free step the control above proved; toward B the step would be BLOCKED either way and the draft could not show the difference.)
+  await page.keyboard.press('ArrowLeft');
   await page.mouse.up();
   // React Flow's drag-end change (dragging: false) must not be read as a nudge either
   expect(await readDraftPositions(page)).toEqual(before);
