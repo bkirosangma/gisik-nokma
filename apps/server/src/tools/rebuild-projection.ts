@@ -1,7 +1,14 @@
 import { pathToFileURL } from 'node:url';
+import type { Pool } from 'pg';
 import { createPool } from '../db.js';
+import { optionalDatabaseCaCert } from '../ops/backup-env.js';
 import { buildProjectionRegistry } from '../projections/index.js';
 import { rebuildProjection } from '../projections/rebuild.js';
+
+/** The pool this tool writes through: a managed database presents a CA the trust store does not carry (runbook, TLS paragraph). */
+export function toolPool(databaseUrl: string, env: NodeJS.ProcessEnv): Pool {
+  return createPool(databaseUrl, { caCert: optionalDatabaseCaCert(env) });
+}
 
 /**
  * `pnpm --filter @gisik-nokma/server rebuild:projection <name>` — reset ONE projection
@@ -22,7 +29,7 @@ async function main(): Promise<void> {
     console.error('DATABASE_URL is required');
     process.exit(2);
   }
-  const pool = createPool(databaseUrl);
+  const pool = toolPool(databaseUrl, process.env);
   try {
     const started = Date.now();
     await rebuildProjection(name, { pool, projections: buildProjectionRegistry() });

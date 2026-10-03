@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { readEntityEvents } from '../ledger/event-store.js';
+import { lockEntity, readEntityEvents } from '../ledger/event-store.js';
 import { reindexNote } from '../projections/note-search.js';
 import type { Projection, ProjectionRegistry } from '../projections/registry.js';
 import type { ErasureSet } from './erasure.js';
@@ -103,5 +103,25 @@ export async function rederiveSurvivors(
         WHERE invite_id = $1`,
       [inviteId, set.projectIds],
     );
+  }
+
+  // Knowledge Graph spec B: a survivor's own rows and its comments' rows are
+  // replayed AFTER recordPurged, so the projection skips the purged targets and
+  // renders their chips as Deleted item, exactly as a rebuild over the
+  // post-purge ledger does.
+  const references = projectionNamed(registry, 'proj_references');
+  for (const [kind, ids] of [['ticket', survivors.ticketIds], ['note', survivors.noteIds]] as const) {
+    for (const id of ids) {
+      // The boot backfill replays an entity under this same lock; taking it here keeps
+      // a purge and a concurrent backfill from interleaving on one survivor. A purge
+      // holds the workspace and the target's lock (purge-item.ts:106-107) and then each
+      // survivor's; the backfill holds one entity lock at a time, so there is no cycle,
+      // and ingest takes workspace → entity, the same direction.
+      await lockEntity(db, kind, id);
+      await db.query('DELETE FROM proj_references WHERE source_parent_kind = $1 AND source_parent_id = $2', [kind, id]);
+      for (const event of await readEntityEvents(db, kind, id)) {
+        await references.apply(event, db);
+      }
+    }
   }
 }
