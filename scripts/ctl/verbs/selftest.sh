@@ -34,4 +34,6 @@ step "restart --dry-run refuses window 0" "! '$HERE/ctl' restart 0 '$repo' '$HER
 step "rebuild --dry-run"     "'$HERE/ctl' rebuild --dry-run"
 step "tipmerge refuses main as the branch" "out=\$('$HERE/ctl' tipmerge main --base release/x --expect abcdef0 --repo '$repo' --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'not a task branch'"
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
+step "archive suite (exclusions with controls, notes roll, landing guard, dry-run default)" "bash '$HERE/test/archive.test.sh'"
+step "archive refuses an unknown argument" "out=\$('$HERE/ctl' archive --nope 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'unknown arg'"
 [ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"
