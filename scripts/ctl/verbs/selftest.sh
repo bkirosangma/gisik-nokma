@@ -18,6 +18,7 @@ step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved �
 # The postman suite builds a scratch tmux session with fake panes and a scratch ledger (never a live seat; ~3.5 min).
 step "postman suite (ledger, ack, watcher, bridge, state machine, pane safety)" "bash '$HERE/test/postman.test.sh'"
 step "post/ack/postman --dry-run write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' post exec3 --kind fix --text x --from main --dry-run && CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --dry-run && [ ! -e \$d/LEDGER.jsonl ]"
+step "postman --shadow --dry-run and an unknown flag write nothing" "d=\$(mktemp -d); CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadow --dry-run && ! CTL_POSTMAN_ROOT=\$d CTL_TMUX_SESSION=ctlst-\$\$ '$HERE/ctl' postman once --shadw && [ ! -e \$d/postman ] && [ ! -e \$d/LEDGER.jsonl ]"
 step "ack refuses an unknown id" "d=\$(mktemp -d); ! CTL_POSTMAN_ROOT=\$d '$HERE/ctl' ack 99 --seat exec3"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
