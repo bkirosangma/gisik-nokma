@@ -70,6 +70,9 @@ describe('25.527/25.528 Add state with a near point', () => {
     const sizes = { [only]: { width: 200, height: 192 }, [small]: { width: 100, height: 60 } };
     const id = store.actions.addState({ near: { x: 0, y: -100 }, sizes });
     expect(store.getState().positions[id]).toEqual({ x: 0, y: -208 });
+    // the same on x: 200 wide + the gap puts the first free column to the left at -208, where the smallest box (100) would say -112
+    const beside = store.actions.addState({ near: { x: -100, y: 0 }, sizes });
+    expect(store.getState().positions[beside]).toEqual({ x: -208, y: 0 });
     // and with nothing measured the guess stands: 120 + 8 = 128
     const bare = createDraftStore(newDraft('Unmeasured'));
     const lone = bare.actions.addState();
