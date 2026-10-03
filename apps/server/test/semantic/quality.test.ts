@@ -21,6 +21,33 @@ async function fixtureItems(): Promise<{ items: PipelineItem[]; labelOf: (key: s
   return { items, labelOf: (key) => labels.get(key) ?? '?' };
 }
 
+describe('27.408 precisionAt5 excludes the item itself', () => {
+  it('two groups of five: each item has only four same-label neighbours, so precision is 0.8, not 1.0; control: groups of six reach 1.0', () => {
+    const axis = (group: number, jitter: number): Float32Array => {
+      const v = new Float32Array(4);
+      v[group] = 1;
+      v[2 + group] = jitter;
+      const n = Math.hypot(...v);
+      return v.map((x) => x / n);
+    };
+    const build = (size: number): { vectors: Float32Array[]; labels: string[] } => {
+      const vectors: Float32Array[] = [];
+      const labels: string[] = [];
+      for (const group of [0, 1]) {
+        for (let i = 0; i < size; i += 1) {
+          vectors.push(axis(group, 0.01 * (i + 1)));
+          labels.push(`g${String(group)}`);
+        }
+      }
+      return { vectors, labels };
+    };
+    const five = build(5);
+    expect(precisionAt5(five.vectors, five.labels)).toBeCloseTo(0.8, 10);
+    const six = build(6);
+    expect(precisionAt5(six.vectors, six.labels)).toBeCloseTo(1, 10); // control
+  });
+});
+
 describe('27.408–27.410 the quality bars (spec D §4.1)', () => {
   it('27.408 similar() top-5 precision ≥ 0.6 on the labelled 60; control: shuffled labels fall far below it', async () => {
     expect(FIXTURE.items).toHaveLength(60);

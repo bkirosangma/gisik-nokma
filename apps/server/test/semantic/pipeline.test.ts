@@ -56,6 +56,15 @@ describe('27.401 communities', () => {
     for (let a = 0; a < 8; a += 1) for (let b = a + 1; b < 8; b += 1) clique.push({ a, b, weight: 1 });
     expect(new Set(communities(8, clique, 42)).size).toBe(1); // control: one uniform clique is one community
   });
+
+  it('is stable for the same seed on a graph with many tied partitions (a ring), where the default Math.random would wander', () => {
+    const ring = Array.from({ length: 60 }, (_unused, a) => ({ a: Math.min(a, (a + 1) % 60), b: Math.max(a, (a + 1) % 60), weight: 1 }));
+    const first = communities(60, ring, 20261003);
+    for (let run = 0; run < 8; run += 1) expect(communities(60, ring, 20261003)).toEqual(first);
+    // Control: the ring really is seed-sensitive, so the loop above could fail.
+    const others = new Set([1, 2, 3, 4, 5, 6].map((seed) => JSON.stringify(communities(60, ring, seed))));
+    expect(others.size).toBeGreaterThan(1);
+  });
 });
 
 describe('27.402 topTerms (class-based TF-IDF)', () => {
@@ -136,6 +145,15 @@ describe('27.407 sizes 3–12, and a community already ≥ 50% in one concept is
     const one = new Map([['ticket:T0', ['C1']]]);
     expect(suggestAll(four, { ...BASE, conceptsOf: (k) => one.get(k) ?? [] })).toHaveLength(1); // control
     expect(suggestAll(four, BASE)[0]?.label).toMatch(/·|^\w+$/);
+    // A community of two beside a community of four is dropped by the size filter itself (not by the early return).
+    const withPair = [
+      ...four,
+      item('ticket:P0', 'w', unit(8, 0, 0, 0, 0, 1, 0.02), 'sign in'),
+      item('ticket:P1', 'w', unit(8, 0, 0, 0, 0, 1, 0.05), 'sign in'),
+    ];
+    const kept = suggestAll(withPair, BASE);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.itemKeys.every((k) => k.startsWith('ticket:T'))).toBe(true);
   });
 });
 
