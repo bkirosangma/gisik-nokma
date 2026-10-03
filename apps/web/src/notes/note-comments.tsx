@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
+import type { EditorSubmission } from '@gisik-nokma/editor';
+import { TicketEditorSlot } from '../editor-slot.js';
 import {
   CommentsThread,
   commentDeletedSeed,

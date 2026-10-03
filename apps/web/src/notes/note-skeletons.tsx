@@ -1,17 +1,20 @@
 'use client';
 
 import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
+import { EditorSkeleton } from '../skeletons/editor-skeleton.js';
 
 /**
  * The notes screen's placeholders (smoothness T9; spec S1, amendment S-R1 rule 1: a skeleton IS the real component's box).
  *
  * `NoteRowSkeleton` is `NoteRow`'s own container (`li.gn-notes__row-item` > `.gn-notes__row`) with a title part and a key
  * chip, `rows` of them, named once. It stands for the tree while the workspaces read is out and for a search that has not
- * answered. `NoteEditorBand` is the editor slot's own box (`.editor-slot.editor-slot--note` > `.ticket-editor` >
- * `.gn-field__input.ticket-editor__content`), so the notes floor rule (`--gn-notes-editor-min`, `globals.css`) sizes it with no
- * number of its own; it stands for the editor wherever it has not drawn yet (the note is loading, or the purged-chip read
- * `NoteEditorPane` waits for). `NoteDocumentSkeleton` is the document column while the note itself is loading: a title part and
- * the band, inside `.gn-notes__editor`. Every fill is the shared `.gn-skeleton` placeholder role, never the well.
+ * answered. `NoteEditorBand` IS T10's `EditorSkeleton` in note mode (`.editor-slot.editor-slot--note` > `.ticket-editor` >
+ * `.gn-field__input.ticket-editor__content`, then the slot's footer), the same skeleton the lazy `TicketEditorSlot` draws while
+ * the editor chunk loads, so the band, the slot's skeleton and the loaded editor are one box and the swap between them moves
+ * nothing; the notes floor rule (`--gn-notes-editor-min`, `globals.css`) sizes it with no number of its own. It stands for the
+ * editor wherever it has not drawn yet (the note is loading, or the purged-chip read `NoteEditorPane` waits for).
+ * `NoteDocumentSkeleton` is the document column while the note itself is loading: a title part and the band, inside
+ * `.gn-notes__editor`. Every fill is the shared `.gn-skeleton` placeholder role, never the well.
  */
 export function NoteRowSkeleton({ label, rows = 6 }: { label: string; rows?: number }) {
   return (
@@ -32,16 +35,9 @@ export function NoteRowSkeleton({ label, rows = 6 }: { label: string; rows?: num
   );
 }
 
-export function NoteEditorBand({ label }: { label: string }) {
-  return (
-    <SkeletonRegion label={label} className="editor-slot editor-slot--note">
-      <div className="ticket-editor">
-        <div className="gn-field__input ticket-editor__content">
-          <Skeleton shape="line" width="70%" rows={3} />
-        </div>
-      </div>
-    </SkeletonRegion>
-  );
+/** `readOnly` is the editor's own: a note opened to edit draws the formatting strip's place too, as the real slot will. */
+export function NoteEditorBand({ label, readOnly = true }: { label: string; readOnly?: boolean }) {
+  return <EditorSkeleton mode="note" readOnly={readOnly} label={label} />;
 }
 
 export function NoteDocumentSkeleton() {

@@ -9,6 +9,7 @@ import { useLiveQuery } from '@gisik-nokma/app-core';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { useNotesSearch } from '../use-notes-search.js';
+import { prefetchEditor } from '../editor-slot.js';
 import { NoteRow } from './note-row.js';
 import { NoteRowSkeleton } from './note-skeletons.js';
 import { SCOPE_LABELS } from './note-scope-options.js';
@@ -214,7 +215,13 @@ export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
                   data-testid={`notes-result-${hit.noteId}`}
                   data-source={hit.source}
                 >
-                  <Link href={`/notes/${hit.noteId}`} className="gn-notes__result-title">
+                  <Link
+                    href={`/notes/${hit.noteId}`}
+                    className="gn-notes__result-title"
+                    onPointerEnter={prefetchEditor}
+                    onFocus={prefetchEditor}
+                    onClick={prefetchEditor}
+                  >
                     {hit.title}
                   </Link>
                   <p className="gn-notes__snippet">{renderSnippet(hit.snippet)}</p>

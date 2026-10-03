@@ -11,8 +11,10 @@ import { stubServices } from './helpers/stub-services.js';
  * edit or a delete is filed against and WHO may see the controls, not the editor's own behaviour.
  */
 let capturedSlotProps: Array<Record<string, unknown>> = [];
-vi.mock('@gisik-nokma/editor', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@gisik-nokma/editor')>();
+// The seam is the page's own editor slot (`../src/editor-slot.js`, the lazy wrapper, smoothness T10/T9 case 25.163), so a capture
+// is synchronous with the render instead of waiting for the editor chunk's dynamic import.
+vi.mock('../src/editor-slot.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/editor-slot.js')>();
   return {
     ...actual,
     TicketEditorSlot: function CapturingSlot(props: Record<string, unknown>) {

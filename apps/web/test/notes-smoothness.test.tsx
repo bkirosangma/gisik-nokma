@@ -11,6 +11,8 @@ import type { NoteDetail, NoteSummary } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { clearReadCaches } from '../src/clear-read-caches.js';
 import { NotesPageShell } from '../src/skeletons/page-shells.js';
+import { EditorSkeleton } from '../src/skeletons/editor-skeleton.js';
+import { NoteEditorBand } from '../src/notes/note-skeletons.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -67,6 +69,19 @@ vi.mock('@gisik-nokma/editor', async (importOriginal) => {
     TicketEditorSlot: function CapturingSlot(props: { mode?: string; editorRef?: { current: Editor | null } }) {
       if (props.mode === 'note') noteEditor = props.editorRef ?? null;
       return createElement(actual.TicketEditorSlot as never, props as never);
+    },
+  };
+});
+
+// The editor chunk's prefetch (T10's `prefetchEditor`): counted at the seam, calling the real one (25.164, 25.166).
+const prefetch = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('../src/editor-slot.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/editor-slot.js')>();
+  return {
+    ...actual,
+    prefetchEditor: () => {
+      prefetch.calls += 1;
+      actual.prefetchEditor();
     },
   };
 });
@@ -160,6 +175,7 @@ beforeEach(() => {
   renders.sections = 0;
   renders.byline = 0;
   noteEditor = null;
+  prefetch.calls = 0;
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -437,5 +453,48 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     await act(async () => held.resolve([]));
     await waitFor(() => expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(1));
     expect(screen.queryByText('Loading the editor')).toBeNull();
+  });
+
+  it('25.164 the notes list warms the editor chunk on the first sign of intent (hover, focus, click) before a note opens, and not before; CONTROL: a settled list with no pointer has asked for nothing', async () => {
+    render(page(world(), 'a'));
+    const row = await screen.findByTestId('note-row-n2');
+    await act(() => tick(60));
+    expect(prefetch.calls).toBe(0);
+    await userEvent.hover(row);
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+    prefetch.calls = 0;
+    act(() => row.focus());
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+    prefetch.calls = 0;
+    row.addEventListener('click', (event) => event.preventDefault(), { once: true }); // jsdom cannot navigate
+    fireEvent.click(row);
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+  });
+
+  it('25.166 opening a note starts the editor chunk with the page, before the note\'s own read and the purged-chip read let the slot render; CONTROL: /notes with no note open does not', async () => {
+    render(page(world(), 'a'));
+    await screen.findByTestId('note-row-n1');
+    await act(() => tick(60));
+    expect(prefetch.calls).toBe(0);
+    cleanup();
+    const held = deferred<NoteDetail | null>();
+    currentPath = '/notes/n1';
+    render(page(world({ getNote: async () => held.promise }), 'b', 'n1'));
+    await act(() => tick(20));
+    expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(0);
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+  });
+
+  it('25.167 the band IS the editor slot\'s skeleton: same markup as T10\'s EditorSkeleton in note mode (read and edit), so band → slot skeleton → editor moves nothing; CONTROL: an editing band draws the formatting strip, a reading one none', () => {
+    for (const readOnly of [true, false]) {
+      const band = render(<NoteEditorBand label="Loading the editor" readOnly={readOnly} />);
+      const slot = render(<EditorSkeleton mode="note" readOnly={readOnly} label="Loading the editor" />);
+      expect(band.container.innerHTML, `readOnly=${readOnly}`).toBe(slot.container.innerHTML);
+      expect(band.container.querySelector('.editor-slot.editor-slot--note > .ticket-editor > .ticket-editor__content')).not.toBeNull();
+      expect(band.container.querySelector('.editor-slot__footer'), 'the footer is part of the slot\'s box').not.toBeNull();
+      expect(band.container.querySelector('.ticket-editor__toolbar') !== null, `strip, readOnly=${readOnly}`).toBe(!readOnly);
+      band.unmount();
+      slot.unmount();
+    }
   });
 });

@@ -2,16 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  TicketEditorSlot,
-  exportMarkdown,
-  ReadingProgress,
-  extractReadingMeta,
-  readingTimeMinutes,
-  uploadAttachmentHttp,
-  type ReadingMeta,
-  type TicketEditorSlotProps,
-} from '@gisik-nokma/editor';
+import type { TicketEditorSlotProps } from '@gisik-nokma/editor';
+import { ReadingProgress, extractReadingMeta, readingTimeMinutes, type ReadingMeta } from '@gisik-nokma/editor/reading';
+import { TicketEditorSlot, exportMarkdown, prefetchEditor, uploadAttachmentHttp } from '../editor-slot.js';
 import { Button } from '@gisik-nokma/ui';
 import {
   DeleteDialog,
@@ -149,6 +142,9 @@ function NoteDocumentBody({
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
   const router = useRouter();
   const searchParams = useSearchParams();
+  // The editor is its own chunk (smoothness T10) and every note opens it, so start the fetch with the page, not when the editor's
+  // gates (the note's own read, the purged-chip read) first let the slot render (25.166).
+  useEffect(() => prefetchEditor(), []);
 
   // The workspace that holds this note. A note opened before on this device starts from the one that answered (`note-homes.ts`),
   // so a remount knows its cache key on the first render and paints the cached note at once; otherwise every workspace is asked.
@@ -749,9 +745,7 @@ function NoteDocumentBody({
         }}
         readingLabel={readingLabel(wordCount)}
         onCopyMarkdown={() => {
-          void navigator.clipboard.writeText(
-            exportMarkdown(draftRef.current ?? note.body),
-          );
+          void exportMarkdown(draftRef.current ?? note.body).then((markdown) => navigator.clipboard.writeText(markdown));
         }}
         onOpenHistory={() => setHistoryOpen(true)}
         {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}
@@ -815,7 +809,7 @@ function NoteDocumentBody({
             onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
           />
         ) : (
-          <NoteEditorBand label="Loading the editor" />
+          <NoteEditorBand label="Loading the editor" readOnly={!editing} />
         )}
       </div>
 
@@ -1075,7 +1069,7 @@ function NoteEditorPane({
       ) : (
         // Held open while the purged-chip read is out: the editor mounts on `ready`, and a bare nothing here collapsed the
         // band to its siblings and pushed it back out when the editor arrived (25.165).
-        <NoteEditorBand label="Loading the editor" />
+        <NoteEditorBand label="Loading the editor" readOnly={!editing} />
       )}
     </>
   );

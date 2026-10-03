@@ -14,8 +14,10 @@ import { stubServices } from './helpers/stub-services.js';
  * behaviour, which `packages/editor` already proves.
  */
 let capturedSlotProps: Array<Record<string, unknown>> = [];
-vi.mock('@gisik-nokma/editor', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@gisik-nokma/editor')>();
+// The seam is the page's own editor slot (`../src/editor-slot.js`, the lazy wrapper, smoothness T10/T9 case 25.163), so a capture
+// is synchronous with the render instead of waiting for the editor chunk's dynamic import.
+vi.mock('../src/editor-slot.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/editor-slot.js')>();
   return {
     ...actual,
     TicketEditorSlot: function CapturingSlot(props: Record<string, unknown>) {

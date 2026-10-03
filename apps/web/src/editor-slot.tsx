@@ -54,6 +54,16 @@ export const TicketEditorSlot = (props: TicketEditorSlotProps) => {
 // Only the fetch helper, from its own subpath, so importing it drags no Tiptap (`packages/editor/package.json` `./upload`).
 export { uploadAttachmentHttp } from '@gisik-nokma/editor/upload';
 
+/**
+ * `exportMarkdown` (a note's "Copy as Markdown"), through the same load so the serializer's Tiptap/markdown-it code is not in the
+ * route's static graph (smoothness T9, case 25.163). A page that has shown an editor, or called `prefetchEditor()`, has the chunk
+ * already, so this settles in a microtask; the copy handler awaits it.
+ */
+export async function exportMarkdown(body: Parameters<typeof import('@gisik-nokma/editor').exportMarkdown>[0]): Promise<string> {
+  const { exportMarkdown: serialize } = await import('@gisik-nokma/editor');
+  return serialize(body);
+}
+
 /** Warm the editor chunk when a ticket or note is about to be shown. */
 export function prefetchEditor(): void {
   void load();
