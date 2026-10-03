@@ -115,7 +115,23 @@ async function measureBackfill(): Promise<{ ms: number; rssMb: number; maxEntity
   const timer = setInterval(() => {
     peak = Math.max(peak, process.memoryUsage().rss);
   }, 25);
-  const result = await backfillReferences(db.pool, { projections: buildProjectionRegistry() });
+  // Diagnostic only (not the bar): the replay-to-commit time of every entity, from the probe stages, so a single
+  // spike in `maxEntityMs` can be told from a slow body of entities.
+  const spans: number[] = [];
+  let mark = 0;
+  const result = await backfillReferences(db.pool, {
+    projections: buildProjectionRegistry(),
+    probe: async (stage) => {
+      if (stage === 'replaying') mark = performance.now();
+      else spans.push(performance.now() - mark);
+    },
+  });
+  const sorted = [...spans].sort((x, y) => x - y);
+  const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
+  console.log(
+    `refs-perf: backfill entity replay+commit p50 ${at(0.5).toFixed(1)} ms, p99 ${at(0.99).toFixed(1)} ms, p99.9 ${at(0.999).toFixed(1)} ms, ` +
+      `${sorted.filter((ms) => ms > BAR_ENTITY_MS).length} of ${sorted.length} over ${BAR_ENTITY_MS} ms, first entity ${(spans[0] ?? 0).toFixed(1)} ms`,
+  );
   clearInterval(timer);
   peak = Math.max(peak, process.memoryUsage().rss);
   return { ms: result.ms, rssMb: (peak - base) / 1_048_576, maxEntityMs: result.maxEntityMs, entities: result.entities };
