@@ -22,7 +22,7 @@ import {
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
-import { isRedactedTicketCreated } from './purge.js';
+import { isRedactedTicketCreated, isRedactedTicketPublished } from './purge.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
 // ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
 // events/ticket-events.ts says so in its own header. Its destination field is
@@ -141,6 +141,13 @@ export function applyTicketEvent(
   if (isRedactedTicketCreated(env)) {
     throw new Error(
       `applyTicketEvent: ticket.created for ticket ${env.entity.id} is a purged (redacted) row — fold with foldTicketEvent, which produces no ticket from it`,
+    );
+  }
+  // Drafts T2 (spec §6.3, R29): a purged ticket's `ticket.published` is kept too, redacted, as a numbering
+  // row. Refused by NAME for the same reason as the creation above.
+  if (isRedactedTicketPublished(env)) {
+    throw new Error(
+      `applyTicketEvent: ticket.published for ticket ${env.entity.id} is a purged (redacted) row; fold with foldTicketEvent, which produces nothing from it`,
     );
   }
   if (env.type === 'ticket.created') {
@@ -534,8 +541,9 @@ export function applyTicketEvent(
 
 /**
  * `applyTicketEvent` for a caller whose state may be absent and whose stream
- * may hold a purged ticket's redacted creation (spec §5.4, D7): that row
- * produces no ticket, so the input state comes back unchanged. Every other event
+ * may hold a purged ticket's redacted creation (spec §5.4, D7) or, since drafts
+ * T2, its redacted `ticket.published` (a kept numbering row): neither row
+ * produces a ticket, so the input state comes back unchanged. Every other event
  * goes to `applyTicketEvent` untouched. A separate function rather than a wider
  * return type on `applyTicketEvent`, because three callers store its result as
  * a definite `TicketState` (`apps/server/src/projections/tickets.ts`,
@@ -547,7 +555,7 @@ export function foldTicketEvent(
   env: EventEnvelope,
   deps: TicketStateDeps,
 ): TicketState | undefined {
-  if (isRedactedTicketCreated(env)) return state;
+  if (isRedactedTicketCreated(env) || isRedactedTicketPublished(env)) return state;
   return applyTicketEvent(state, env, deps);
 }
 

@@ -48,7 +48,7 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
   events: {
     rule: 'erase',
     by: ['workspace_id', 'entity_id'],
-    why: 'The ledger. Erased ONLY by purge_ledger (Task 4); a ticket purge redacts each ticket.created in place (spec §5.4).',
+    why: 'The ledger. Erased ONLY by purge_ledger (Task 4); a ticket purge redacts each ticket.created in place (spec §5.4) and each ticket.published (drafts T2).',
   },
   snapshots: {
     rule: 'erase',
@@ -58,7 +58,7 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
   proj_entity_heads: {
     rule: 'rederive',
     by: ['workspace_id', 'entity_id'],
-    why: 'Deleted for the set, then re-derived from the rows that remain (redacted creations, the tombstone) — a rebuild writes a head for each.',
+    why: 'Deleted for the set, then re-derived from the rows that remain (redacted creations and, since drafts T2, redacted publishes; the tombstone) — a rebuild writes a head for each.',
   },
   proj_workflows: { rule: 'erase', by: ['workspace_id'], why: 'Workspace-scoped definitions; go with their workspace.' },
   user: { rule: 'not-entity-bearing', why: AUTH },
