@@ -93,7 +93,7 @@ export async function foldTicketHead(
     // nothing here. `transitions[]` carries `actorId` and `seq` and no clock at
     // all, so the state claim does; and the assignment claim is on no part of
     // the state.
-    if (env.type === 'ticket.created' || env.type === 'ticket.transitioned') {
+    if (env.type === 'ticket.created' || env.type === 'ticket.transitioned' || env.type === 'ticket.published') {
       stateClaim = { actorId: env.actorId, clientTime: env.clientTime, serverTime: env.serverTime };
     }
     if (env.type === 'ticket.assigned') {

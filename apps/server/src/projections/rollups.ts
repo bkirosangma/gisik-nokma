@@ -225,6 +225,9 @@ async function recomputeParent(
     // trigger below has no trailing DELETE the way `recomputeProject` does for
     // the ticket-delete path), recorded here rather than fixed: fixing it is a
     // rollup-staleness question, not a T10 container-clause one.
+    //
+    // `draft_author_id IS NULL` (drafts T3, C1, spec R19): a draft is not a child anyone counts, so a
+    // parent's progress never moves on work only its author can see.
     `INSERT INTO proj_rollups
        (parent_ticket_id, workspace_id, project_id,
         total_children, open_children, active_children, terminal_children)
@@ -235,6 +238,7 @@ async function recomputeParent(
        FROM proj_tickets
       WHERE workspace_id = $1 AND parent_id = $2
         AND deleted_at IS NULL
+        AND draft_author_id IS NULL
      HAVING count(*) > 0
      ON CONFLICT (parent_ticket_id) DO UPDATE SET
        project_id = EXCLUDED.project_id,
@@ -342,7 +346,7 @@ async function recomputeProject(
         AND parent_ticket_id NOT IN (
           SELECT parent_id FROM proj_tickets
            WHERE workspace_id = $1 AND project_id = $2 AND parent_id IS NOT NULL
-             AND deleted_at IS NULL)`,
+             AND deleted_at IS NULL AND draft_author_id IS NULL)`,
     [workspaceId, projectId],
   );
 }
@@ -409,9 +413,12 @@ export const rollupsProjection: Projection = {
       // `ticket.workflow_rebound` belongs here and is absent from the plan's
       // own listing: a rebind changes `state_category` with no transition, so
       // leaving it out is a live-versus-rebuild divergence, not a slow path.
+      // `ticket.published` (drafts T3, C1): the published draft joins its parent's child set exactly as a
+      // created ticket does. A redacted publish finds no `proj_tickets` row: `recomputeParentOf` is a no-op.
       case 'ticket.created':
       case 'ticket.transitioned':
       case 'ticket.workflow_rebound':
+      case 'ticket.published':
         await recomputeParentOf(tx, event);
         return;
       // The soft-delete pair (2026-09-20). This is the case this file's header

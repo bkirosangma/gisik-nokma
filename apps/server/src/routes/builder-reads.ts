@@ -1074,10 +1074,14 @@ export function registerBuilderReadRoutes(
         );
       }
 
+      // `draft_author_id IS NULL` (drafts T3, C5): a draft is not migrated; it is re-pinned to the type's
+      // CURRENT workflow when it is published (spec §2.3). And being invisible to everyone else, it must not
+      // count as "not visible to you" in the `hidden` loop below, which would block the migration and
+      // disclose that the draft exists (Q9).
       const { rows: tickets } = await deps.pool.query<{ ticket_id: string; state_id: string; closed_at: Date | null }>(
         `SELECT ticket_id, state_id, closed_at
            FROM proj_tickets
-          WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3
+          WHERE workspace_id = $1 AND type_id = $2 AND workflow_id = $3 AND draft_author_id IS NULL
           ORDER BY ticket_id`,
         [workspaceId, typeId, fromWorkflowId],
       );

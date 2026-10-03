@@ -102,7 +102,8 @@ async function deletedWorkspaceItem(db: Queryable, workspaceId: string): Promise
     containedCount: await containedCount(
       db,
       'SELECT count(*) FROM proj_projects WHERE workspace_id = $1 AND deleted_at IS NULL',
-      'SELECT count(*) FROM proj_tickets WHERE workspace_id = $1 AND deleted_at IS NULL',
+      // A draft is not a ticket the confirm counts (drafts T3, C3): only its author knows it exists.
+      'SELECT count(*) FROM proj_tickets WHERE workspace_id = $1 AND deleted_at IS NULL AND draft_author_id IS NULL',
       'SELECT count(*) FROM proj_notes WHERE workspace_id = $1 AND deleted = FALSE',
       workspaceId,
     ),
@@ -138,7 +139,7 @@ async function deletedProjectItems(db: Queryable, workspaceId: string, workspace
       containedCount: await containedCount(
         db,
         null,
-        'SELECT count(*) FROM proj_tickets WHERE project_id = $1 AND deleted_at IS NULL',
+        'SELECT count(*) FROM proj_tickets WHERE project_id = $1 AND deleted_at IS NULL AND draft_author_id IS NULL',
         'SELECT count(*) FROM proj_notes WHERE home_project_id = $1 AND deleted = FALSE',
         row.project_id,
       ),

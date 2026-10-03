@@ -60,7 +60,7 @@ export async function stateProvenanceFor(
        FROM events
       WHERE entity_kind = 'ticket'
         AND entity_id = ANY($1::text[])
-        AND type IN ('ticket.created', 'ticket.transitioned')
+        AND type IN ('ticket.created', 'ticket.transitioned', 'ticket.published')
       ORDER BY entity_id, seq DESC`,
     [ticketIds],
   );
