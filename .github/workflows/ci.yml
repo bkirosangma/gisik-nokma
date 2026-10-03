@@ -121,7 +121,7 @@ jobs:
     outputs:
       code_changed: ${{ steps.scope.outputs.code_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The diff below is against the merge base, which needs history.
           fetch-depth: 0
@@ -189,9 +189,9 @@ jobs:
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -242,9 +242,9 @@ jobs:
   check-runbook:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -270,9 +270,9 @@ jobs:
   check-citations:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -294,9 +294,9 @@ jobs:
   check-help:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -309,10 +309,10 @@ jobs:
     needs: scope
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: node scripts/check-task-ledger.mjs
@@ -357,10 +357,10 @@ jobs:
   check-migrations:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: no migration may be numbered below one already on the base ref
@@ -377,13 +377,13 @@ jobs:
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -403,16 +403,16 @@ jobs:
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
       # Same key as `build` -- this job runs after it, so the cache `build`
       # just saved is what gets restored, and `turbo run typecheck` replays
       # its outputs instead of rebuilding from source.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -465,13 +465,13 @@ jobs:
           --health-cmd "pg_isready -U gisik" --health-interval 5s
           --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -526,13 +526,13 @@ jobs:
           --health-cmd "pg_isready -U gisik" --health-interval 5s
           --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -540,6 +540,8 @@ jobs:
             turbo-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build
+      # G-9 T1: `workflow-canvas-browser`'s `test` drives a real Chromium against its own Vite harness (:3190).
+      - run: pnpm --filter @gisik-nokma/workflow-canvas-browser exec playwright install --with-deps chromium
       - run: pnpm turbo run test --filter='!@gisik-nokma/server'
 
   # apps/web/e2e (Playwright) needs a deployable stack -- Plan 11 Task 13's
@@ -554,7 +556,7 @@ jobs:
     if: needs.scope.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Task 13's real invocation. The job this replaces only DETECTED
       # docker-compose.dev.yml and printed that Task 13 must supply the
       # invocation -- which meant that the moment Task 6 landed that file, this
@@ -578,8 +580,8 @@ jobs:
       # `test:e2e:stack` is a real script, so their absence is a defect and
       # must fail loudly rather than skip quietly. The docs-only case is
       # already handled by `scope`, which skips this whole job.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -632,7 +634,7 @@ jobs:
 
       - name: upload the E2E traces on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-stack-test-results
           path: apps/web/test-results
@@ -692,9 +694,9 @@ jobs:
     if: needs.scope.outputs.code_changed == 'true' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -702,7 +704,7 @@ jobs:
       # from source. The safety property is the one the `build` job states:
       # the controller's own pre-merge gate runs `--force` and never consults
       # this cache, so a hit here cannot become the merge decision.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
@@ -727,7 +729,7 @@ jobs:
       # of the runner.
       - name: viewport traces on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: viewport-traces
           path: apps/web/test-results/
@@ -752,7 +754,7 @@ jobs:
       [scope, check-env, check-runbook, check-citations, check-help, check-tasks, check-migrations, build, typecheck, server-tests, other-tests, e2e, viewport]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: require every job succeeded or was legitimately skipped

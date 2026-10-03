@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PHONE_BOARD_QUERY } from '../../views/use-phone-board.js';
-import { Button, useScrollEdges } from '@gisik-nokma/ui';
+import { Button, Skeleton, SkeletonRegion, useScrollEdges } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
 import { AuthoringReadRefused, type WorkflowAuthoringGateway, type WorkspaceMember } from '../gateway.js';
@@ -28,7 +28,7 @@ import { WorkflowCanvas } from './workflow-canvas.js';
  * workspaces (a session token this product does not have), must not share a
  * slot.
  */
-function draftStorageKey(workspaceId: string, workflowId: string): string {
+export function draftStorageKey(workspaceId: string, workflowId: string): string {
   return `gn-workflow-draft:${workspaceId}:${workflowId}`;
 }
 
@@ -181,7 +181,11 @@ export function WorkflowBuilderScreen(props: {
     );
   }
   if (data === null) {
-    return <p className="workflow-builder-screen__loading">Loading workspace people and types…</p>;
+    return (
+      <SkeletonRegion label="Loading workspace people and types" className="workflow-builder-screen">
+        <Skeleton shape="block" height="3rem" rows={4} />
+      </SkeletonRegion>
+    );
   }
 
   const env: BuilderEnvironment = {

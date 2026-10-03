@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { PageIcon } from '@gisik-nokma/ui';
 
 /**
@@ -33,7 +34,7 @@ export function NotesNavLink({ active = false }: { active?: boolean } = {}) {
       aria-current={active ? 'page' : undefined}
     >
       <PageIcon />
-      Notes
+      <NavPending>Notes</NavPending>
     </Link>
   );
 }

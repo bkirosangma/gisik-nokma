@@ -6,7 +6,8 @@ import {
   SESSION_EXPIRED_COPY,
   SessionExpiredError,
   type DataSource,
-} from '@gisik-nokma/app-core';
+} from '@gisik-nokma/app-core/data';
+import { clearReadCaches } from './clear-read-caches.js';
 
 /**
  * The ONE author of "a 401 is not a refusal, it is a session that ended".
@@ -63,6 +64,10 @@ export function isExpiredSession(message: string | null): boolean {
  * whether that happened so the caller can suppress the refusal it would
  * otherwise render.
  *
+ * It also empties the read caches as it redirects (`clearReadCaches`, smoothness
+ * T3, case 25.028): the session ended, and the next person on this device must not
+ * be served what this one read.
+ *
  * The return value is the half that keeps the two claims from disagreeing. A
  * hook that only pushed would leave the page rendering *"cannot be shown yet"*
  * for the frame or two before the router moves — and under `next/navigation`'s
@@ -76,6 +81,9 @@ export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>
   const expired = messages.some(isExpiredSession);
   useEffect(() => {
     if (!expired) return;
+    // The session ended: what this device read for that person is not the next
+    // person's to be served (smoothness T3, case 25.028).
+    clearReadCaches();
     // E5-32: the destination is CARRIED, not dropped. This hook was the ONE
     // author of the 401 redirect and pushed a bare `/sign-in`, while
     // `docs/manual.md` promises the opposite in two places — *"it puts you back
@@ -145,8 +153,10 @@ export function ExpiredSessionNotice() {
  * added tomorrow would otherwise need a tenth copy of this, and the site that
  * forgot would be silent in the direction nobody audits.
  *
- * The failure is RE-THROWN unchanged. This wrapper's only job is the redirect;
- * the sentence is the view's, and swallowing the throw here would leave a view
+ * The failure is RE-THROWN unchanged. This wrapper's jobs are the redirect and,
+ * just before it, emptying the read caches (`clearReadCaches`: a session that
+ * ended is a person who may be replaced, smoothness T3, case 25.028); the
+ * sentence is the view's, and swallowing the throw here would leave a view
  * rendering a success it never had.
  */
 /**
@@ -167,7 +177,12 @@ export function withSignInOnExpiredWrite(source: DataSource, onExpired: () => vo
       try {
         return await source.ingest(events);
       } catch (cause) {
-        if (cause instanceof SessionExpiredError) onExpired();
+        if (cause instanceof SessionExpiredError) {
+          // Before the redirect: the cache is emptied whether or not the router
+          // gets there (smoothness T3, case 25.028).
+          clearReadCaches();
+          onExpired();
+        }
         throw cause;
       }
     },

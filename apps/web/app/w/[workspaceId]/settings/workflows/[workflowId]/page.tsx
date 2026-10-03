@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { WorkflowBuilderScreen, draftFromPublished, type WorkflowDraft } from '@gisik-nokma/app-core';
+import { draftFromPublished, type WorkflowDraft } from '@gisik-nokma/app-core';
+import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../../../src/shell-refusal.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
+import { WorkflowBuilderScreen } from '../../../../../../src/authoring/workflow-builder-dynamic.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/[workflowId]` — the published definition,
@@ -85,7 +87,9 @@ export default function EditWorkflowPage() {
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
       ) : draft.kind === 'loading' ? (
-        <p role="status">Loading this workflow…</p>
+        <SkeletonRegion label="Loading this workflow">
+          <Skeleton shape="block" height="3rem" rows={4} />
+        </SkeletonRegion>
       ) : draft.kind === 'missing' ? (
         <p>No published workflow has this id. It may never have existed, or it may not be yours.</p>
       ) : draft.kind === 'failed' ? (

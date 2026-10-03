@@ -7,6 +7,9 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
+    // HK-7 (13.1733): one budget for every package, as apps/server's 30_000 already was; parallel runs stay.
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
     // `scripts/` too: the build guard lives there because it must run from
     // package.json's `build` script, and a gate whose own cases cannot run is
     // the shape this repo has been burned by. (The backticks in this comment

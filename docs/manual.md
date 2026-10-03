@@ -610,6 +610,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   removed for everyone.* — and leaves *Comment deleted*, with who wrote it and when, where it was. Only the person
   who wrote a comment can edit it; they, or a workspace owner or admin, can delete it. Mentions you add in an edit
   notify the new people only. The ticket's History tab reads *Comment edited* and *Comment deleted*.
+- **A comment box keeps its formatting tools out of the way.** Under every comment box, on a ticket or a note, and
+  in a comment you are editing, a small **Aa** button sits at the left of the row, next to **Attach**. Press it
+  (it reads *Show formatting*) to open the same formatting tools above the box, and press it again (*Hide formatting*)
+  to put them away; Escape inside the tools closes them too. Your choice is kept on this device for every comment
+  box. Hidden tools are still there to type with: Ctrl or ⌘ with B, I or K, Markdown such as `**bold**`, pasting,
+  `@` mentions and `:ticket` links all work. A ticket's description and a note's own body always show their tools.
 - **You can attach a file to a ticket now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The ticket sheet's
   **Attachments** tab lists the ticket's files and has its own **Attach a file** button, and the comment
@@ -1852,6 +1858,10 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 ### Writing a note
 
+A note opens for reading: the page shows the finished text, with no toolbar and nowhere to type. Press **Edit** at
+the top right of the note to write in it, and **Done** to go back to reading. A note you have just created opens
+ready to write. If you cannot edit a note, there is no **Edit** button.
+
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
 **Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
 Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**,
@@ -1860,6 +1870,13 @@ it has one, and the markdown you can type instead. Undo and Redo grey out when t
 or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link.
 **Insert note** and **Insert ticket** each drop the `:note`/`:ticket` trigger at the cursor and open the same
 picker typing it would — the same two triggers work from the keyboard too, and `[[` still works for a note.
+
+On a phone the toolbar is a single row that sits just above the on-screen keyboard while you type, and scrolls
+sideways when it does not all fit. It carries Bold, Italic, Bullet list, Task item, the Heading level menu, Link,
+**Insert ticket** and **Insert note**; **More tools** at its right end opens a sheet from the bottom with the rest —
+Undo, Redo, Numbered list, Strikethrough, Code, Quote, Code block, Collapsible, Horizontal rule and **Insert table** —
+as large labelled buttons. Pick one and the sheet closes and you are back in the text where you were; Escape or a tap
+outside the sheet closes it without changing anything.
 
 **Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you
 want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
@@ -1908,9 +1925,11 @@ animating if your device is set to reduce motion.
 ### Finding a note
 
 The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title
-filter that narrows every group as you type. It opens on that list when no note is open. On a narrow
-screen the list is a drawer: the **Notes** button beside **Create note** opens and closes it, and
-**Create note** is on screen whether the drawer is open or shut.
+filter that narrows every group as you type. It opens on that list when no note is open, and when you come
+back to Notes it opens the note you last had open on this device. On a tablet-width screen the list is a drawer: the
+**Notes** button beside **Create note** opens and closes it. On a phone the list and the search box are in a
+panel behind the round button at the bottom right, with a **Notes** / **Contents** switch once a note is open:
+**Contents** lists that note's headings. **Create note** is on screen either way.
 
 There is also a search box. Type into it and two things happen: spelling matches — the words you typed,
 allowing for a near miss — appear almost immediately, and matches **by meaning** are added a little

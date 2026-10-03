@@ -3909,6 +3909,72 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
+                      "text": "A comment box keeps its formatting tools out of the way."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " Under every comment box, on a ticket or a note, and in a comment you are editing, a small "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Aa"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button sits at the left of the row, next to "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". Press it (it reads "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Show formatting"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") to open the same formatting tools above the box, and press it again ("
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "Hide formatting"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ") to put them away; Escape inside the tools closes them too. Your choice is kept on this device for every comment box. Hidden tools are still there to type with: Ctrl or ⌘ with B, I or K, Markdown such as "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "**bold**"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", pasting, "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "@"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " mentions and "
+                    },
+                    {
+                      "kind": "code",
+                      "text": ":ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " links all work. A ticket's description and a note's own body always show their tools."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
                       "text": "You can attach a file to a ticket now."
                     },
                     {
@@ -9902,6 +9968,39 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
+                    "text": "A note opens for reading: the page shows the finished text, with no toolbar and nowhere to type. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at the top right of the note to write in it, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Done"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to go back to reading. A note you have just created opens ready to write. If you cannot edit a note, there is no "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Edit"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
                     "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: "
                   },
                   {
@@ -9991,6 +10090,47 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " still works for a note."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "On a phone the toolbar is a single row that sits just above the on-screen keyboard while you type, and scrolls sideways when it does not all fit. It carries Bold, Italic, Bullet list, Task item, the Heading level menu, Link, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "More tools"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at its right end opens a sheet from the bottom with the rest — Undo, Redo, Numbered list, Strikethrough, Code, Quote, Code block, Collapsible, Horizontal rule and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — as large labelled buttons. Pick one and the sheet closes and you are back in the text where you were; Escape or a tap outside the sheet closes it without changing anything."
                   }
                 ]
               },
@@ -10221,7 +10361,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type. It opens on that list when no note is open. On a narrow screen the list is a drawer: the "
+                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type. It opens on that list when no note is open, and when you come back to Notes it opens the note you last had open on this device. On a tablet-width screen the list is a drawer: the "
                   },
                   {
                     "kind": "bold",
@@ -10237,7 +10377,31 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " opens and closes it, and "
+                    "text": " opens and closes it. On a phone the list and the search box are in a panel behind the round button at the bottom right, with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " / "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Contents"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch once a note is open: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Contents"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " lists that note's headings. "
                   },
                   {
                     "kind": "bold",
@@ -10245,7 +10409,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " is on screen whether the drawer is open or shut."
+                    "text": " is on screen either way."
                   }
                 ]
               },

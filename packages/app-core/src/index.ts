@@ -29,7 +29,21 @@ export {
   type PrecheckResult,
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
-export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
+export { useLiveQuery, type LiveQueryOptions, type LiveQueryResult } from './views/use-live-query.js';
+export {
+  LIVE_QUERY_CACHE_MAX,
+  LIVE_QUERY_CACHE_TTL_MS,
+  clearLiveQueryCache,
+  forgetLiveQuery,
+  liveQueryAgeMs,
+  liveQueryStoreKey,
+  recallLiveQuery,
+  rememberLiveQuery,
+  staleWorkspaces,
+} from './views/live-query-cache.js';
+export { scheduleReload, subscribeReloads } from './views/reload-scheduler.js';
+export { withInflightDedupe } from './inflight-dedupe.js';
+export { readEpoch } from './read-epoch.js';
 export { useActorNames } from './views/use-actor-names.js';
 export {
   Board,
@@ -139,6 +153,8 @@ export {
   type NewTicketDraft,
 } from './views/new-ticket-dialog.js';
 export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';
+export { usePendingCreates, type PendingCreate } from './views/board-move-state.js';
+export { useOptimisticTicket, type TicketOverlay } from './views/optimistic-ticket.js';
 export { OutsiderFinder } from './views/outsider-finder.js';
 export type { AssignOutsider, LookedUpPerson, LookupPerson } from './people/types.js';
 export { outsiderIngest } from './people/outsider-ingest.js';

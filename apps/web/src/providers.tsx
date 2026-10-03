@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import {
   createClientStateCache,
   withCacheFeed,
+  withInflightDedupe,
   type ClientStateCache,
   type DataSource,
   type NotificationPreferencesGateway,
   type NotificationsGateway,
   type WorkflowAuthoringGateway,
-} from '@gisik-nokma/app-core';
+} from '@gisik-nokma/app-core/data';
 import {
   createHttpClient,
   createHttpFoundingGateway,
@@ -30,8 +31,11 @@ import {
   type MyInvitationsGateway,
 } from '@gisik-nokma/app-core/online';
 import { authClient } from './auth-client.js';
+import { rememberLastUserId } from './last-user-id.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
+import { clearReadCaches } from './clear-read-caches.js';
+import { useFreshness } from './freshness.js';
 import { signInWithNext, withSignInOnExpiredWrite } from './expired-session.js';
 
 /**
@@ -137,7 +141,10 @@ export function Providers({
     // The ONE wrap that turns any write's expired session into the redirect
     // (E5-25) — see `withSignInOnExpiredWrite`'s own docblock for why this is
     // not repeated at each of the nine write sites.
-    const dataSource = withSignInOnExpiredWrite(withCacheFeed(online, cache), () =>
+    // Identical reads in flight share one request (smoothness T3, audit SM-05); the
+    // dedupe sits INSIDE the guard so a write's 401 still reaches it, and outside the
+    // cache feed so a shared `getTicket` feeds the cache once.
+    const dataSource = withSignInOnExpiredWrite(withInflightDedupe(withCacheFeed(online, cache)), () =>
       // The destination is carried, as it is on the read path (E5-32) — read
       // off `window` at the moment of the redirect, which is the only moment the
       // answer is right. No `usePathname` here: `Providers` is mounted once
@@ -174,6 +181,7 @@ export function Providers({
     };
   }, [services]);
   const value = services ?? constructed;
+  useFreshness();
   return <AppServicesContext.Provider value={value}>{children}</AppServicesContext.Provider>;
 }
 
@@ -298,6 +306,12 @@ type Resolved =
 function resolveSession(session: ReturnType<typeof authClient.useSession>): Resolved {
   const user = session.data?.user;
   if (user !== undefined && user !== null) {
+    // A different person than the one this tab last knew: whatever it read as
+    // them is not theirs to be served (smoothness T3, case 25.028 door 4). The
+    // first resolve (`lastKnownUser === null`) and a re-render are not changes.
+    if (lastKnownUser !== null && lastKnownUser.id !== user.id) clearReadCaches();
+    // The id outlives the page so a screen can read ITS remembered tab in the first frame (spec D9).
+    if (lastKnownUser?.id !== user.id && typeof window !== 'undefined') rememberLastUserId(user.id);
     lastKnownUser = {
       id: user.id,
       name: user.name,
@@ -311,16 +325,24 @@ function resolveSession(session: ReturnType<typeof authClient.useSession>): Reso
     return lastKnownUser === null ? { kind: 'error' } : { kind: 'signed-in', user: lastKnownUser };
   }
   if (session.isPending) return { kind: 'loading' };
+  // Signed out (another tab, an expired cookie): the person this tab knew is gone.
+  if (lastKnownUser !== null) clearReadCaches();
   lastKnownUser = null;
+  if (typeof window !== 'undefined') rememberLastUserId(null);
   return { kind: 'signed-out' };
 }
 
 export function useSessionStatus(): SessionStatus {
   const resolved = resolveSession(authClient.useSession());
-  if (resolved.kind === 'signed-in') {
-    return { kind: 'signed-in', user: { id: resolved.user.id, name: resolved.user.displayName } };
-  }
-  return resolved;
+  const kind = resolved.kind;
+  const id = resolved.kind === 'signed-in' ? resolved.user.id : '';
+  const name = resolved.kind === 'signed-in' ? resolved.user.displayName : '';
+  // ONE object per (kind, id, name), not one per render (smoothness T12, audit SM-10): the answer is read by a
+  // dozen consumers, and a session refetch that changes nothing a consumer can see must not hand each a new object.
+  return useMemo<SessionStatus>(
+    () => (kind === 'signed-in' ? { kind, user: { id, name } } : { kind }),
+    [kind, id, name],
+  );
 }
 
 /**

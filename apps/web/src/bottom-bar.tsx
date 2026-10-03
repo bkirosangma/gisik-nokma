@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { NavPending } from './nav-pending.js';
 import { Sheet } from '@gisik-nokma/ui';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isWithin } from './path-within.js';
 import {
@@ -111,12 +112,17 @@ export function BottomBar({
   userId: string;
   pathname: string;
 }) {
-  // The default first, the remembered bar in an effect: the markup the server sent is what hydrates.
+  // The remembered bar from the FIRST client render (smoothness T8, case 25.142; audit SM-08): the bar mounts only once
+  // `useTabletBar` has answered `true` (a client-only snapshot), so there is no server markup for it to mismatch, and a
+  // customised bar never paints the default and then swaps.
   // `userId=""` is a session that never loaded (F-6, 23.285): the bar offers the default and remembers nothing, so the project
   // helpers below get `null` — their own "no user" door — rather than a record keyed by an empty id.
   const knownUser = userId === '' ? null : userId;
-  const [slots, setSlots] = useState<BarDestination[]>([...DEFAULT_BAR]);
+  const [slots, setSlots] = useState<BarDestination[]>(() => (typeof window === 'undefined' ? [...DEFAULT_BAR] : readBottomBar(userId)));
+  const slotsFor = useRef(userId);
   useEffect(() => {
+    if (slotsFor.current === userId) return;
+    slotsFor.current = userId;
     setSlots(readBottomBar(userId));
   }, [userId]);
 
@@ -177,7 +183,7 @@ export function BottomBar({
             >
               {d.icon}
               {dot ? <span className="gn-bottom-bar__dot" aria-hidden="true" /> : null}
-              <span className="gn-bottom-bar__label">{d.label}</span>
+              <span className="gn-bottom-bar__label"><NavPending>{d.label}</NavPending></span>
               <span className="gn-bottom-bar__indicator" aria-hidden="true" />
             </Link>
           );
@@ -248,7 +254,7 @@ function MoreBody({
             <li key={id}>
               <Link href={href} className="gn-bar-sheet__row" aria-current={current ? 'page' : undefined} onClick={() => { onClick?.(); onNavigate(); }}>
                 {DESTINATIONS[id].icon}
-                <span>{DESTINATIONS[id].label}</span>
+                <span><NavPending>{DESTINATIONS[id].label}</NavPending></span>
               </Link>
             </li>
           );
@@ -256,18 +262,18 @@ function MoreBody({
         {workspaceId !== undefined ? (
           <li>
             <Link href={`/settings?workspaceId=${workspaceId}`} className="gn-bar-sheet__row" onClick={onNavigate}>
-              <span>Settings</span>
+              <span><NavPending>Settings</NavPending></span>
             </Link>
           </li>
         ) : null}
         <li>
           <Link href="/account" className="gn-bar-sheet__row" onClick={onNavigate}>
-            <span>Account</span>
+            <span><NavPending>Account</NavPending></span>
           </Link>
         </li>
         <li>
           <Link href="/help" className="gn-bar-sheet__row" onClick={onNavigate}>
-            <span>Help</span>
+            <span><NavPending>Help</NavPending></span>
           </Link>
         </li>
       </ul>

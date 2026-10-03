@@ -12,7 +12,8 @@ import { fontVariableName, themeStylesheet } from '@gisik-nokma/ui/tokens';
  * `:root` block anywhere in the file. The definitions come from one place,
  * `themeStylesheet()`, and until this module existed exactly one shipped call
  * site reached it — `apps/web/app/layout.tsx:32`. `apps/desktop/src/main.tsx`
- * imported `ui.css` alone and `apps/desktop/index.html` carries no `<style>`,
+ * imported `ui.css` alone and `apps/desktop/index.html` carried no `<style>` (T13 has since added a ground-only `<style data-gn-ground>`;
+ * it defines no `--gn-` token, so the point stands),
  * so every `color: var(--gn-text)` and `background: var(--gn-surface)` in the
  * desktop window resolved to nothing and the elements fell back to browser
  * defaults.
@@ -39,11 +40,16 @@ import { fontVariableName, themeStylesheet } from '@gisik-nokma/ui/tokens';
  * `theme.test.ts` call this and assert what it actually appended.
  *
  * Light is the default and dark arrives by OS preference through the media
- * query `themeStylesheet()` already emits, so this restores BOTH themes. It
- * deliberately does NOT port the web shell's `localStorage` theme-init script:
- * that belongs with a desktop theme TOGGLE, and there is no such control in
- * this app yet. Adding the persistence half alone would be dead code that reads
- * like a working feature.
+ * query `themeStylesheet()` already emits, so this restores BOTH themes.
+ *
+ * AMENDED 2026-10-03 (smoothness T13, spec §3.3): this module still ports no
+ * theme TOGGLE, but `index.html` now carries the web shell's tiny `localStorage`
+ * theme-init script (`gn-theme` → `data-theme`) together with an `html`
+ * background of the stored theme's `surface`, so the window is never white
+ * before React. The script's choice reaches the token stylesheet above too
+ * (`[data-theme="dark"]` / `:root:not([data-theme="light"])`). Until a desktop
+ * control WRITES `gn-theme`, a stored value only exists if something else set
+ * it; the honest reading is "the OS preference unless a value is stored".
  */
 /**
  * ## AND IT WAS SHIPPING WITH NO TYPEFACE EITHER (2026-09-15)

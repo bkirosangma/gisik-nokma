@@ -36,6 +36,8 @@ const HOSTS = [
 ] as const;
 
 describe('9.363 the toolbar tooltip of every composer host is drawn INSIDE the slot that clips', () => {
+  // G-6: a comment editor keeps its toolbar behind the Format button, and pressing it stores the choice.
+  afterEach(() => window.localStorage.clear());
   for (const host of HOSTS) {
     it(`9.363 ${host.name} (mode="${host.mode}"): hover and focus show role="tooltip" inside .editor-slot`, async () => {
       const view = render(
@@ -49,6 +51,15 @@ describe('9.363 the toolbar tooltip of every composer host is drawn INSIDE the s
           submit={async () => true}
         />,
       );
+      if (host.mode === 'comment') {
+        // G-6 (25.380): hidden until the Format button opens it — the tooltip is still proven for this host.
+        expect(view.container.querySelector('button[aria-label="Bold"]')).toBeNull();
+        fireEvent.click(await waitFor(() => {
+          const format = view.container.querySelector<HTMLButtonElement>('.editor-slot__format');
+          if (format === null) throw new Error('no Format button yet');
+          return format;
+        }));
+      }
       const bold = await waitFor(() => {
         const found = view.container.querySelector<HTMLButtonElement>('button[aria-label="Bold"]');
         if (found === null) throw new Error('no toolbar yet');

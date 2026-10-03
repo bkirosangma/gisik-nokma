@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TicketEditorSlot } from '@gisik-nokma/editor';
-import { Button, Sheet } from '@gisik-nokma/ui';
+import { TicketEditorSlot } from '../editor-slot.js';
+import { Button, Sheet, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import type { NoteVersion } from '@gisik-nokma/domain';
 import { useAppServices } from '../providers.js';
 
@@ -118,7 +118,9 @@ export function HistoryPanel({
       {viewing === null ? (
         <ul className="gn-notes__history-list" data-testid="history-list">
           {versions === null ? (
-            <li className="gn-notes__hint">Loading…</li>
+            <SkeletonRegion as="li" label="Loading history">
+              <Skeleton shape="block" height="2.25rem" rows={4} />
+            </SkeletonRegion>
           ) : versions.length === 0 ? (
             <li className="gn-notes__hint">No saved versions yet</li>
           ) : (
@@ -142,7 +144,9 @@ export function HistoryPanel({
             Viewing version from {relativeLabel(viewing.recordedAt)}
           </p>
           {viewedBody.status === 'loading' ? (
-            <p className="gn-notes__hint">Loading…</p>
+            <SkeletonRegion label="Loading this version">
+              <Skeleton shape="block" height="12rem" />
+            </SkeletonRegion>
           ) : (
             <div className="gn-notes__editor">
               <TicketEditorSlot

@@ -19,8 +19,7 @@
       "surfaceRaised": "#fbf7f3",
       "surfaceSunken": "#e4d8cc",
       "surfaceTrack": "#e8ded4",
-      "surfaceWell": "#f3ece5",
-      "fieldRim": "#6c6c70"
+      "surfaceWell": "#f3ece5"
     }
   },
   "hig/dark": {
@@ -43,8 +42,7 @@
       "surfaceRaised": "#20294a",
       "surfaceSunken": "#2a3560",
       "surfaceTrack": "#10152a",
-      "surfaceWell": "#1a213b",
-      "fieldRim": "#98989d"
+      "surfaceWell": "#1a213b"
     }
   },
   "minimal/light": {
@@ -67,8 +65,7 @@
       "surfaceRaised": "#fbf7f3",
       "surfaceSunken": "#e4d8cc",
       "surfaceTrack": "#e8ded4",
-      "surfaceWell": "#f3ece5",
-      "fieldRim": "#6c6c70"
+      "surfaceWell": "#f3ece5"
     }
   },
   "minimal/dark": {
@@ -91,8 +88,7 @@
       "surfaceRaised": "#20294a",
       "surfaceSunken": "#2a3560",
       "surfaceTrack": "#10152a",
-      "surfaceWell": "#1a213b",
-      "fieldRim": "#98989d"
+      "surfaceWell": "#1a213b"
     }
   }
 }

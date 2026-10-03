@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { NavPending } from './nav-pending.js';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useAppServices, useSessionStatus } from './providers.js';
 
 /** The plan's cadence: "the badge and the list update within a minute". */
@@ -90,7 +91,7 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
           : 'Inbox'
       }
     >
-      <InboxIcon />
+      <NavPending><InboxIcon /></NavPending>
       {unread > 0 ? <span className="gn-nav__inbox-dot" aria-hidden="true" /> : null}
     </Link>
   );
@@ -108,49 +109,81 @@ export function InboxNavLink({ active = false }: { active?: boolean } = {}) {
  * docblock above is about, extracted unchanged so the phone bottom bar's Inbox slot
  * (`bottom-bar.tsx`, mobile-web Task 3) shows the same number from the same rule. Every sentence of
  * that docblock about gating on the session, a failed refresh keeping the last count, and the count
- * not outliving its session describes THIS hook. At ≤40rem the bar replaces the corner link rather
- * than joining it (`AppNav` renders one or the other), so the two never poll together.
+ * not outliving its session describes THIS hook.
+ *
+ * ONE STORE, ONE POLL (smoothness T8, case 25.143/25.145; audit SM-08): the count and the timer live at module level
+ * (`store` below), started by the first subscriber and stopped by the last, and every badge reads the same number through
+ * `useSyncExternalStore`. Two badges on one page are one request per tick, not two — the bottom bar's slot and the
+ * corner's link can coexist during the frame in which the viewport answer changes. When the last listener leaves the
+ * count is zeroed with the timer, so the next session's first paint is a bare "Inbox", never the previous one's total.
  */
 export function useInboxUnread(): number {
   const { notifications } = useAppServices();
   const session = useSessionStatus();
   const signedIn = session.kind === 'signed-in';
-  const [unread, setUnread] = useState(0);
+  // A signed-out badge subscribes to nothing: the sign-out is the last listener leaving (the count zeroes), and the
+  // returned 0 below covers the render before that cleanup runs (11.169).
+  const subscribe = useMemo(
+    () => (signedIn ? subscribeInboxUnread(notifications) : () => () => undefined),
+    [notifications, signedIn],
+  );
+  const count = useSyncExternalStore(subscribe, () => store.count, () => 0);
+  return signedIn ? count : 0;
+}
 
-  useEffect(() => {
-    if (!signedIn) {
-      // NOT just an early return, and the difference is a sentence on screen.
-      // A session can end IN PLACE — a cookie expiring while the tab sits open —
-      // and this component stays mounted through it. Without this line the nav
-      // keeps rendering the PREVIOUS session's count to whoever is looking now,
-      // which is a stranger's unread total in someone else's chrome. The Sign
-      // out button hides the bug rather than avoiding it: it navigates, so the
-      // nav unmounts and the count goes with it. Witnessed at 11.169, which is
-      // the signed-in -> signed-out direction neither 11.153 (signed out from
-      // mount) nor 11.154 (loading -> signed in) walks.
-      setUnread(0);
-      return;
+type UnreadSource = { unreadCount: () => Promise<number> };
+const store: { count: number; listeners: Set<() => void>; stop: (() => void) | null } = { count: 0, listeners: new Set(), stop: null };
+
+function setCount(count: number): void {
+  if (store.count === count) return;
+  store.count = count;
+  for (const listener of [...store.listeners]) listener();
+}
+
+function startPolling(notifications: UnreadSource): () => void {
+  let cancelled = false;
+  async function refresh(): Promise<void> {
+    try {
+      const count = await notifications.unreadCount();
+      if (!cancelled) setCount(count);
+    } catch {
+      // Signed out mid-session, or offline: the badge keeps its last honest
+      // value. See the docblock — a reset to 0 would be a claim.
     }
-    let cancelled = false;
+  }
+  void refresh();
+  // A hidden tab polls nothing (audit SM-15): the badge catches up the moment the tab is shown again.
+  const timer = setInterval(() => {
+    if (document.visibilityState !== 'hidden') void refresh();
+  }, REFRESH_MS);
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') void refresh();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    cancelled = true;
+    clearInterval(timer);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+}
 
-    async function refresh(): Promise<void> {
-      try {
-        const count = await notifications.unreadCount();
-        if (!cancelled) setUnread(count);
-      } catch {
-        // Signed out mid-session, or offline: the badge keeps its last honest
-        // value. See the docblock — a reset to 0 would be a claim.
-      }
-    }
-
-    void refresh();
-    const timer = setInterval(() => void refresh(), REFRESH_MS);
+function subscribeInboxUnread(notifications: UnreadSource): (listener: () => void) => () => void {
+  return (listener) => {
+    store.listeners.add(listener);
+    if (store.listeners.size === 1) store.stop = startPolling(notifications);
     return () => {
-      cancelled = true;
-      clearInterval(timer);
+      store.listeners.delete(listener);
+      if (store.listeners.size === 0) resetInboxUnreadStore();
     };
-  }, [notifications, signedIn]);
-  return unread;
+  };
+}
+
+/** Stops the poll and zeroes the count: the last listener leaving, and the tests' clean slate between cases. */
+export function resetInboxUnreadStore(): void {
+  store.stop?.();
+  store.stop = null;
+  store.listeners.clear();
+  store.count = 0;
 }
 
 function InboxIcon() {

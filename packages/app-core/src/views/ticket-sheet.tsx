@@ -25,6 +25,7 @@ import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.j
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { actorLabelFrom, memberLabel } from '../member-label.js';
 import { useActorNames } from './use-actor-names.js';
+import { useSheetHeaderCompact } from './sheet-header-compact.js';
 import { mentionCandidatesOf } from '../mention-candidates.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
@@ -50,6 +51,7 @@ import { TicketNotesSection } from './ticket-notes-section.js';
 import { ReopenDialog } from './reopen-dialog.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
+import { useOptimisticTicket, type OverlayField, type TicketOverlay } from './optimistic-ticket.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 import { usePhoneBoard } from './use-phone-board.js';
 import { usePurgedPredicate } from './use-purged-predicate.js';
@@ -195,6 +197,12 @@ export type TicketSheetProps = {
   cache?: ClientStateCache;
   workspaceId: string;
   ticketId: string;
+  /**
+   * The workflow the opener already knows the ticket is on (the board card's group), so the workflow read starts
+   * with the sheet instead of waiting for the ticket read (smoothness T7 F3, plan Task 7 Step 3). A HINT, never
+   * the truth: once the ticket's own read lands its `workflowId@version` is what the sheet follows.
+   */
+  hint?: { workflowId: string; workflowVersion: number };
   currentUserId: string;
   /**
    * The viewer is a workspace owner or admin (MCP-everything T5): they may DELETE anyone's comment, never edit
@@ -663,6 +671,9 @@ function TitleField({
     const observer = new ResizeObserver(() => {
       if (el.clientWidth === width) return;
       width = el.clientWidth;
+      // G-8: while the phone header is compacting, the title's width is tweened every frame and
+      // `useSheetHeaderCompact` re-fits it itself when its natural width changes.
+      if (el.closest('[data-compact]') !== null) return;
       fit();
     });
     observer.observe(el);
@@ -683,11 +694,18 @@ function TitleField({
   );
 }
 
+/**
+ * What a claim line says while its field's write is open or its read has not landed (smoothness T7): the overlay
+ * carries no actor and no time, so no "set by … on …" is printed for a value nobody has stamped yet.
+ */
+const SAVING_CLAIM = 'Saving…';
+
 export function TicketSheet({
   dataSource,
   cache,
   workspaceId,
   ticketId,
+  hint,
   currentUserId,
   canModerateComments,
   onClose,
@@ -945,18 +963,29 @@ export function TicketSheet({
   >(null);
   const [subtaskParentRefusal, setSubtaskParentRefusal] = useState<Refusal | null>(null);
 
-  const read = useLiveQuery(dataSource, workspaceId, ticketId, () =>
-    dataSource.query.getTicket(workspaceId, ticketId),
-  );
-  const ticketState = read.data?.ticket ?? null;
-  const workflowKey =
-    ticketState === null ? '' : `${ticketState.workflowId}@${ticketState.workflowVersion}`;
-  const workflow = useLiveQuery(dataSource, workspaceId, workflowKey, async () => {
-    const current = read.data?.ticket ?? null;
-    return current === null
-      ? null
-      : dataSource.query.getWorkflowDef(workspaceId, current.workflowId, current.workflowVersion);
+  // `cacheKey`s (T7 F3): reopening a ticket this session shows its last answer at once while the fresh read lands.
+  const read = useLiveQuery(dataSource, workspaceId, ticketId, () => dataSource.query.getTicket(workspaceId, ticketId), {
+    cacheKey: `ticket:${ticketId}`,
   });
+  // Every edit is shown at once and rolled back honestly (smoothness T7, spec S5; `optimistic-ticket.ts`).
+  // `read` stays the DATA (the workflow, the subtasks and the reloads below ask it); what is DRAWN is `optimistic.ticket`.
+  const optimistic = useOptimisticTicket(read, ticketId);
+  const ticketState = read.data?.ticket ?? null;
+  // The ticket's own answer wins; until it lands, the opener's hint starts the workflow read (F3).
+  const workflowRef =
+    ticketState !== null
+      ? { id: ticketState.workflowId, version: ticketState.workflowVersion }
+      : hint === undefined
+        ? null
+        : { id: hint.workflowId, version: hint.workflowVersion };
+  const workflowKey = workflowRef === null ? '' : `${workflowRef.id}@${workflowRef.version}`;
+  const workflow = useLiveQuery(
+    dataSource,
+    workspaceId,
+    workflowKey,
+    async () => (workflowRef === null ? null : dataSource.query.getWorkflowDef(workspaceId, workflowRef.id, workflowRef.version)),
+    workflowRef === null ? undefined : { cacheKey: `wf:${workflowKey}` },
+  );
   const members = useLiveQuery(dataSource, workspaceId, workspaceId, () =>
     dataSource.query.getMembers(workspaceId),
   );
@@ -1131,6 +1160,25 @@ export function TicketSheet({
     (comments.data ?? []).map((comment) => comment.body),
   );
 
+  /**
+   * G-8 — THE PHONE HEADER THAT COMPACTS WITH THE SCROLL (`sheet-header-compact.ts` has the whole
+   * mechanism). Off above 40rem, where it changes nothing. `headingRef` is the `titleSlot` root. It is
+   * called HERE, above the early returns, because a hook cannot follow them; the layout key is built
+   * from what is known at this point (`read.data` is `null` until the read lands).
+   */
+  const headingRef = useRef<HTMLDivElement>(null);
+  const compactHeader = useSheetHeaderCompact(
+    headingRef,
+    [
+      titleDraft ?? read.data?.title ?? '',
+      workspaceName ?? '',
+      projectName ?? '',
+      read.data?.key ?? '',
+      read.data?.epic?.id ?? '',
+      read.data?.parent?.id ?? '',
+    ].join('\u0001'),
+  );
+
   if (read.error !== null) {
     return (
       <Sheet open title="Ticket" onClose={onClose}>
@@ -1166,7 +1214,7 @@ export function TicketSheet({
     );
   }
 
-  const ticketRead: TicketRead = read.data;
+  const ticketRead: TicketRead = optimistic.ticket ?? read.data;
   /**
    * What the "Who can see this" section draws, from the ONE read this sheet
    * already made — with the caller's `visibility` prop winning when one is
@@ -1268,6 +1316,25 @@ export function TicketSheet({
    * Field claims go FIRST and the transition last, in one ordered batch, so a
    * `require-field` rule sees the value the dialog just collected.
    */
+  /**
+   * The overlay a move lays over the sheet: the target state (with its category, so the chip's tone and the Close
+   * button follow) and every collected field value whose id is an overlay field, in the overlay's own shape — the
+   * level for a priority, the day for a date. A value that is not in that shape is left to the reload.
+   */
+  const overlayOf = (submission: TransitionSubmission): TicketOverlay => {
+    const overlay: TicketOverlay = { stateId: submission.toStateId };
+    const category = workflow.data === null ? undefined : statesWithBacklog(workflow.data).find((candidate) => candidate.id === submission.toStateId)?.category;
+    if (category !== undefined) overlay.stateCategory = category;
+    for (const [fieldId, value] of Object.entries(submission.fieldValues)) {
+      if (fieldId === 'priority' && prioritySchema.safeParse(value).success) overlay.priority = value as Priority;
+      if (fieldId === 'startDate' || fieldId === 'dueDate') {
+        if (value === null) overlay[fieldId] = null;
+        else if (typeof value === 'object' && typeof (value as { date?: unknown }).date === 'string') overlay[fieldId] = (value as { date: string }).date;
+      }
+    }
+    return overlay;
+  };
+
   const submitTransition = async (submission: TransitionSubmission): Promise<void> => {
     // E5-27 — the latch, the same one and the same shape `submitTicketEvent`
     // above uses. The early return is the belt; the `disabled` the dialog
@@ -1303,9 +1370,25 @@ export function TicketSheet({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
+    // The move is shown NOW (smoothness T7, spec S5) — the State row, and every collected value that names an
+    // overlay field. A custom field has no overlay: the reload below is what shows it.
+    const shownFields = overlayOf(submission);
+    const shown = Object.keys(shownFields) as OverlayField[];
+    optimistic.begin(shownFields);
     try {
       const results = await dataSource.ingest([...fieldEvents, transition]);
       const failed = results.find((result) => result.status !== 'committed');
+      // INDEPENDENT per field: a field claim that committed stays shown (and waits for its read) even when the
+      // transition after it is refused — the E2-36 batch already holds it on the server — while the state goes back.
+      const stateFields = shown.filter((field) => field === 'stateId' || field === 'stateCategory');
+      const claimFields = shown.filter((field) => field !== 'stateId' && field !== 'stateCategory');
+      const entries = Object.keys(submission.fieldValues);
+      const claimCommitted = (field: OverlayField): boolean =>
+        results[entries.indexOf(field)]?.status === 'committed';
+      optimistic.settle(...claimFields.filter(claimCommitted));
+      optimistic.drop(...claimFields.filter((field) => !claimCommitted(field)));
+      if (failed === undefined) optimistic.settle(...stateFields);
+      else optimistic.drop(...stateFields);
       /*
         BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
         The batch above is ordered `[...fieldEvents, transition]` so a
@@ -1366,6 +1449,7 @@ export function TicketSheet({
       // carries the sentence: it is the surface in view, and the retry lives
       // there.
       const message = cause instanceof Error ? cause.message : String(cause);
+      optimistic.drop(...shown);
       setServerRefusal(null);
       setTransportError(`We could not reach the server for this move: ${message}`);
     } finally {
@@ -1405,17 +1489,27 @@ export function TicketSheet({
     // The outsider door (access plan W6) for someone found by email who is not
     // in the workspace; the ordinary door for everyone else. Same answer shape,
     // same refusal rendering below (case 3.990).
-    const results =
-      viaOutsider && assignOutsider !== undefined && assigneeId !== null
-        ? await outsiderIngest(assignOutsider, assigneeId)([event])
-        : await dataSource.ingest([event]);
+    // The assignee is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+    optimistic.begin({ assigneeId });
+    let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+    try {
+      results =
+        viaOutsider && assignOutsider !== undefined && assigneeId !== null
+          ? await outsiderIngest(assignOutsider, assigneeId)([event])
+          : await dataSource.ingest([event]);
+    } catch (cause) {
+      optimistic.drop('assigneeId');
+      throw cause;
+    }
     const failed = results.find((result) => result.status !== 'committed');
     if (failed === undefined) {
+      optimistic.settle('assigneeId');
       setServerRefusal(null);
       read.reload();
       history.reload();
       return;
     }
+    optimistic.drop('assigneeId');
     if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
     else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
@@ -1914,7 +2008,7 @@ export function TicketSheet({
    * `checks/fields.ts:118-123` answers `field.title-required` for `null` and
    * `field.type-mismatch` for anything whose `value.trim().length` is 0. That
    * is the same rule the New-ticket form leans on — `ticketCreatedPayload`'s
-   * *"must not be blank — a title of only spaces names nothing"* — so a second
+   * *"must not be blank: a title of only spaces names nothing"* — so a second
    * rule here would be a second, weaker door to one field, which is exactly
    * what this sheet refuses elsewhere. The value travels AS TYPED and the
    * engine's answer is what the reader sees.
@@ -1962,14 +2056,24 @@ export function TicketSheet({
         type: 'ticket.field_set',
         payload: { fieldId: 'title', value: next },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ title: next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('title');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('title');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('title');
         setServerRefusal(null);
         setTransportError(null);
         setTitleDraft(null);
@@ -1981,6 +2085,7 @@ export function TicketSheet({
       // hand the reader back the old title next to a sentence refusing the new
       // one, with their words gone — the same rule `TicketEditorSlot` states for
       // a refused description.
+      optimistic.drop('title');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2047,14 +2152,24 @@ export function TicketSheet({
         // own `v || null`, and the shape this event's door docblock names.
         payload: { fieldId: 'dueDate', value: next === '' ? null : { date: next } },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ dueDate: next === '' ? null : next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('dueDate');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('dueDate');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('dueDate');
         setServerRefusal(null);
         setTransportError(null);
         setDueDraft(null);
@@ -2062,6 +2177,7 @@ export function TicketSheet({
         history.reload();
         return;
       }
+      optimistic.drop('dueDate');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2099,20 +2215,31 @@ export function TicketSheet({
         type: 'ticket.field_set',
         payload: { fieldId: 'priority', value: next },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ priority: next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('priority');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('priority');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('priority');
         setServerRefusal(null);
         setTransportError(null);
         read.reload();
         history.reload();
         return;
       }
+      optimistic.drop('priority');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2151,14 +2278,24 @@ export function TicketSheet({
         // `v || null` shape `submitDueDate` gives for the same reason.
         payload: { fieldId: 'startDate', value: next === '' ? null : { date: next } },
       });
-      const results = await dataSource.ingest([event]);
+      // The value is shown NOW (smoothness T7, spec S5); the answer settles it or takes it back.
+      optimistic.begin({ startDate: next === '' ? null : next });
+      let results: Awaited<ReturnType<typeof dataSource.ingest>>;
+      try {
+        results = await dataSource.ingest([event]);
+      } catch (cause) {
+        optimistic.drop('startDate');
+        throw cause;
+      }
       const result = results[0];
       if (result === undefined) {
+        optimistic.drop('startDate');
         setServerRefusal(null);
         setTransportError('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
+        optimistic.settle('startDate');
         setServerRefusal(null);
         setTransportError(null);
         setStartDraft(null);
@@ -2166,6 +2303,7 @@ export function TicketSheet({
         history.reload();
         return;
       }
+      optimistic.drop('startDate');
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
     } finally {
@@ -2824,8 +2962,28 @@ export function TicketSheet({
     label: string,
     href: string | undefined,
     testId: string,
+    fold?: { expanded: boolean; onToggle: () => void },
   ): ReactElement =>
-    href === undefined ? (
+    fold !== undefined ? (
+      // G-8: in the compact phone header, when the line does not fit, the project crumb IS the
+      // "…" — narrowed by the header's own width tween — and is the button that opens the full
+      // breadcrumb. A real `<button>`, never a role on a link.
+      <button
+        type="button"
+        className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--fold"
+        data-testid={testId}
+        data-peek-opener=""
+        aria-label="Show the full breadcrumb"
+        aria-expanded={fold.expanded}
+        onClick={fold.onToggle}
+      >
+        {/* The name narrows with the travel; once the header has settled (p = 1) CSS shows only the lone "…" (both stay in the DOM so a re-measure still reads the name's natural width). */}
+        <span className="gn-ticket-sheet__fold-label">{label}</span>
+        <span className="gn-ticket-sheet__fold-dots" aria-hidden="true">
+          …
+        </span>
+      </button>
+    ) : href === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>
         {label}
       </span>
@@ -2886,6 +3044,10 @@ export function TicketSheet({
     setMoveOpen(true);
   };
 
+  const titleText = titleDraft ?? ticketRead.title;
+  const crumbsPeekOpen = compactHeader.peek?.kind === 'crumbs' && !compactHeader.peek.closing;
+  const titlePeekOpen = compactHeader.peek?.kind === 'title' && !compactHeader.peek.closing;
+
   /**
    * THE ASSIGNEE ROW — a control, a claim line, and FOUR arms for the candidate
    * list. The owner's ruling is *"assignee should not be read only"*.
@@ -2922,8 +3084,9 @@ export function TicketSheet({
   const UNASSIGNED = '__unassigned__';
   const OUTSIDER_OPTION = '__outsider__';
   const assigneeRow = ((): { control: ReactNode; claim: string } => {
-    const claim =
-      ticketRead.assignedProvenance === null
+    const claim = optimistic.overlaidFields.has('assigneeId')
+      ? SAVING_CLAIM
+      : ticketRead.assignedProvenance === null
         ? // `null` is the whole truth for BOTH "never assigned" and "assigned,
           // then cleared" — the server's own reader says why they cannot be told
           // apart (there is no claim without an actor), so this sentence claims
@@ -3177,7 +3340,7 @@ export function TicketSheet({
         control mid-edit is not a name.
       */
       titleSlot={
-        <div className="gn-sheet__heading">
+        <div className="gn-sheet__heading" ref={headingRef}>
           {/*
             ⚠ THE WHOLE NAV IS GATED ON BOTH NAMES, and my first cut was wrong
             in a way worth recording. It drew whatever crumbs it had — so a
@@ -3203,7 +3366,14 @@ export function TicketSheet({
               <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                 ›
               </span>
-              {locationCrumb(projectCrumb, projectHref, 'sheet-crumb-project')}
+              {locationCrumb(
+                projectCrumb,
+                projectHref,
+                'sheet-crumb-project',
+                compactHeader.mode === 'compact' && compactHeader.folded
+                  ? { expanded: crumbsPeekOpen, onToggle: () => compactHeader.togglePeek('crumbs') }
+                  : undefined,
+              )}
               {/* THE ANCESTORS, in the authority's order and under its own
                   conditionals (`desktop.dc.html:3410-3419`): the grandparent
                   only when there is one, the parent only when there is one.
@@ -3299,6 +3469,73 @@ export function TicketSheet({
               }
             }}
           />
+          {/*
+            G-8 — THE COMPACT HEADER'S TWO TAPS AND THEIR OVERLAYS (phone, compact only).
+
+            The small title is the textarea itself, scaled; this button sits over it so a tap opens the
+            FULL-SIZE title (with Move beside it — the header's own Move button, moved there by CSS), and
+            carries the one-line ellipsised copy of the title that shows once the header has settled
+            (a textarea cannot ellipsise). Both overlays hang below the header, change no layout and no
+            scroll position, and collapse on an outside tap, Escape or any scroll.
+          */}
+          {compactHeader.mode === 'compact' ? (
+            <button
+              type="button"
+              className="gn-sheet__title-hit"
+              data-peek-opener=""
+              aria-label="Show the full title"
+              aria-expanded={titlePeekOpen}
+              onClick={() => compactHeader.togglePeek('title')}
+            >
+              <span className="gn-sheet__title-hit-text" aria-hidden="true">
+                {titleText}
+              </span>
+            </button>
+          ) : null}
+          {compactHeader.peek?.kind === 'crumbs' && workspaceCrumb !== null && projectCrumb !== null ? (
+            <div
+              className="gn-sheet__peek gn-sheet__peek--crumbs"
+              role="group"
+              aria-label="Full breadcrumb"
+              data-state={compactHeader.peek.closing ? 'closing' : 'open'}
+            >
+              {locationCrumb(workspaceCrumb, workspaceHref, 'sheet-peek-crumb-workspace')}
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              {locationCrumb(projectCrumb, projectHref, 'sheet-peek-crumb-project')}
+              {epicCrumb === null || epicCrumbIsTheParent ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(epicCrumb, 'sheet-peek-crumb-epic', openParentSheet, 'epic')}
+                </>
+              )}
+              {parent === null ? null : (
+                <>
+                  <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                    ›
+                  </span>
+                  {ancestorCrumb(parent, 'sheet-peek-crumb-parent', openParentSheet, 'parent')}
+                </>
+              )}
+              <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
+                ›
+              </span>
+              <span className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--current">{lastCrumb}</span>
+            </div>
+          ) : null}
+          {compactHeader.peek?.kind === 'title' ? (
+            <div
+              className="gn-sheet__peek gn-sheet__peek--title"
+              role="group"
+              aria-label="Full title"
+              data-state={compactHeader.peek.closing ? 'closing' : 'open'}
+            >
+              <p className="gn-sheet__peek-title">{titleText}</p>
+            </div>
+          ) : null}
         </div>
       }
       /*
@@ -3329,6 +3566,7 @@ export function TicketSheet({
           aria-label="Move this ticket"
           onClick={openMove}
           disabled={closed !== null}
+          inert={compactHeader.moveInert}
         >
           Move
         </Button>
@@ -3605,7 +3843,7 @@ export function TicketSheet({
                 <div className="gn-ticket-sheet__state">
                   <Chip tone={state.stateCategory}>{currentStateName}</Chip>
                   <span className="gn-ticket-sheet__provenance">
-                    {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
+                    {optimistic.overlaidFields.has('stateId') ? SAVING_CLAIM : formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
                   </span>
                   {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
                       moved UP into the chips line (`sheet-chips`, above the tabs) on
@@ -3714,7 +3952,7 @@ export function TicketSheet({
                     rebuilt since priority became built-in.
                   </span>
                 ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('priority') ? SAVING_CLAIM : `set by ${nameOf(priorityClaim.actorId)} on ${formatDate(priorityClaim.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3782,7 +4020,7 @@ export function TicketSheet({
                      comment exists to prevent. The ABSENT copy stays the
                      prototype's ("No date claimed") — that sentence is about
                      the DATE, and the claim line is about the ACTOR. */
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('dueDate') ? SAVING_CLAIM : `set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>
@@ -3828,7 +4066,7 @@ export function TicketSheet({
                 {startDate === null ? (
                   <span className="gn-ticket-sheet__absent">No date claimed</span>
                 ) : (
-                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
+                  <span className="gn-ticket-sheet__claim">{optimistic.overlaidFields.has('startDate') ? SAVING_CLAIM : `set by ${nameOf(startDate.actorId)} on ${formatDate(startDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>

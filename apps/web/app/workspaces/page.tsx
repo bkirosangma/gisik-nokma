@@ -26,6 +26,7 @@ import {
 import { AppNav } from '../../src/app-nav.js';
 import { istToday } from '../../src/ist-today.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
+import { bumpProjectsVersion } from '../../src/projects-version.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
 import {
@@ -37,6 +38,7 @@ import {
 } from '../../src/workspace-viewer.js';
 import { displayLabelOf } from '../../src/display-label.js';
 import { WorkspaceCardMenu } from '../../src/workspace-card-menu.js';
+import { InvitationsBandSkeleton, WorkspaceListSkeleton } from '../../src/skeletons/screen-skeletons.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -79,6 +81,8 @@ export default function WorkspacesPage() {
           const outcome = classifyBatch(results, seeds.length);
           if (outcome.status === 'unanswered') setRefusal(unansweredLine(outcome.answered, seeds.length));
           else if (outcome.status !== 'committed') setRefusal(outcome.reason);
+          // A committed archive/restore changes the list the nav's dropdown holds (smoothness T4 FIX 1, 25.049).
+          if (outcome.status === 'committed') bumpProjectsVersion();
           reload();
         },
         (cause: unknown) => {
@@ -157,7 +161,7 @@ export default function WorkspacesPage() {
         ) : error !== null ? (
           <ShellRefusal what="Your workspaces" message={error} />
         ) : workspaces === null ? (
-          <p>Loading…</p>
+          <WorkspaceListSkeleton />
         ) : workspaces.length === 0 ? (
           // The second sentence this always needed (Plan 6 Task 15b, item 1). A
           // person with a session and no workspace used to be told only to wait
@@ -242,6 +246,7 @@ export default function WorkspacesPage() {
             onDeleted={({ permanent }) => {
               setNotice(deletedNotice('workspace', deleting.name, permanent));
               setDeleting(null);
+              bumpProjectsVersion(); // the workspace left the person's list: the nav's shared read must ask again (25.049)
               reload();
             }}
           />
@@ -573,9 +578,11 @@ const ROLE_SENTENCE: Record<PendingInvitation['role'], string> = {
  *
  * A person with no invitation must not be told about invitations. So the empty
  * answer produces no heading, no empty state and no placeholder — the honest
- * rendering of "nothing is waiting" is nothing. The same is true while the read
- * is still in flight: a banner that flashed "Loading…" would announce a
- * possibility that usually is not there.
+ * rendering of "nothing is waiting" is nothing. While the read is still in flight the
+ * band's own container is drawn as a skeleton (smoothness T8, case 25.123): no sentence
+ * announces a possibility that usually is not there, the page below does not jump when
+ * an invitation DOES arrive, and an answered-empty list removes the band (the one
+ * collapse, because nothing was waiting).
  *
  * ## A failed read does NOT take the page down
  *
@@ -626,7 +633,11 @@ function InvitationBanner() {
     };
     if (action === 'accept') {
       void myInvitations.accept(invitation.inviteId).then(
-        ({ workspaceId }) => router.push(`/w/${workspaceId}/my-work`),
+        ({ workspaceId }) => {
+          // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
+          bumpProjectsVersion();
+          router.push(`/w/${workspaceId}/my-work`);
+        },
         done,
       );
       return;
@@ -652,7 +663,8 @@ function InvitationBanner() {
   if (failure !== null) {
     return <p className="gn-invitations__failure">Your invitations could not be loaded: {failure}</p>;
   }
-  if (invitations === null || invitations.length === 0) return null;
+  if (invitations === null) return <InvitationsBandSkeleton />;
+  if (invitations.length === 0) return null;
 
   return (
     <section className="gn-invitations" aria-labelledby="gn-invitations-heading">
@@ -813,7 +825,11 @@ function FoundingForm({ onCancel }: { onCancel: () => void }) {
         a confirmation; this is the cheaper of the two remedies the finding
         offers and the one that puts a working control in front of the person.
       */
-      ({ workspaceId }) => router.push(`/w/${workspaceId}`),
+      ({ workspaceId }) => {
+        // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
+        bumpProjectsVersion();
+        router.push(`/w/${workspaceId}`);
+      },
       (cause: unknown) => {
         setSending(false);
         setRefusal(

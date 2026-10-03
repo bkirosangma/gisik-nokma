@@ -4,7 +4,7 @@ import { initReplica, type ReplicaInitDeps } from './init-replica.js';
 /**
  * 12.402 — E2-43: a rejection in the init pipeline (any of the four awaits)
  * resolves to `{ok:false, error}` instead of an unhandled rejection, so
- * `App` can render a failure instead of "Opening local replica…" forever.
+ * `App` can render a failure instead of the opening skeleton ("Opening your local copy") forever.
  */
 describe('initReplica', () => {
   const opts = { apiBase: 'http://api', token: 't', workspaceId: 'ws1' };

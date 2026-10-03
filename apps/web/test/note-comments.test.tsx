@@ -1,5 +1,5 @@
 import { searchTermSchema } from '@gisik-nokma/domain';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, NoteComment, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
@@ -14,8 +14,10 @@ import { stubServices } from './helpers/stub-services.js';
  * behaviour, which `packages/editor` already proves.
  */
 let capturedSlotProps: Array<Record<string, unknown>> = [];
-vi.mock('@gisik-nokma/editor', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@gisik-nokma/editor')>();
+// The seam is the page's own editor slot (`../src/editor-slot.js`, the lazy wrapper, smoothness T10/T9 case 25.163), so a capture
+// is synchronous with the render instead of waiting for the editor chunk's dynamic import.
+vi.mock('../src/editor-slot.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/editor-slot.js')>();
   return {
     ...actual,
     TicketEditorSlot: function CapturingSlot(props: Record<string, unknown>) {
@@ -73,6 +75,12 @@ function committedIngest(ingested: SubmittedEvent[]): (events: SubmittedEvent[])
       serverTime: '2026-09-23T09:00:00.000Z',
     }));
   };
+}
+
+/** The composer is a button until it is reached for (smoothness T9, 25.153); the click mounts the editor slot. */
+async function openComposer(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: /Add a comment/ }));
+  await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
 }
 
 function slotProps(): Record<string, unknown> {
@@ -138,7 +146,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     await waitFor(() => expect(getNoteComments).toHaveBeenCalledTimes(1));
 
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
@@ -178,7 +186,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
 
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
     const body = {
@@ -218,7 +226,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
     let accepted = false;
     await act(async () => {
@@ -287,7 +295,7 @@ describe('18.213-18.215 NoteComments', () => {
     expect(link).toHaveAttribute('href', `/w/${WS}/p/p1?ticket=t1`);
 
     // 18.273 — the composer's own two callbacks.
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryTickets = slotProps().queryTickets as (
       q: string,
     ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
@@ -347,7 +355,7 @@ describe('18.213-18.215 NoteComments', () => {
         <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canModerate={false} canComment />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryTickets = slotProps().queryTickets as (
       q: string,
     ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
@@ -391,7 +399,7 @@ describe('18.213-18.215 NoteComments', () => {
         />
       </Providers>,
     );
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    await openComposer();
     const queryNotes = slotProps().queryNotes as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
     expect(queryNotes).toBeDefined();
     expect(await queryNotes('compr')).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);

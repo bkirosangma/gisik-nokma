@@ -573,4 +573,23 @@ mcp-everything	10	in-flight	-	-	landed in release/mcp-everything as #929; reache
 mcp-everything	11	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	12	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	13	in-flight	-	-	landed in release/mcp-everything as #935; reaches main with that release
-mcp-everything	14	todo	-	-	not started; owner step, runs after the merge to main (Q6)
+mcp-everything	14	done	937	f27485e	owner step: the real claude.ai check against production at f27485e (the merge of release/mcp-everything, #937) was reported SUCCESSFUL by the owner (2026-10-02 21:3x, relayed by the planner 21:33); case 14.298 is the record
+smoothness	1	in-flight	-	-	ready on task/smoothness-docs (spec, plan, bucket 25, Features §22); its PR into release/smoothness is not open yet; reaches main with that release
+smoothness	2	todo	-	-	not started
+smoothness	3	todo	-	-	not started
+smoothness	4	todo	-	-	not started
+smoothness	5	todo	-	-	not started
+smoothness	6	todo	-	-	not started
+smoothness	7	todo	-	-	not started
+smoothness	8	todo	-	-	not started
+smoothness	9	todo	-	-	not started
+smoothness	10	todo	-	-	not started
+smoothness	11	todo	-	-	not started
+smoothness	12	todo	-	-	not started
+smoothness	13	todo	-	-	not started
+smoothness	14	todo	-	-	not started
+workflow-canvas	1	in-flight	-	-	G-9 T1 on task/g9-t1-live-drag (lane 7); not merged into release/smoothness yet
+workflow-canvas	2	in-flight	-	-	G-9 T2 on task/g9-t2-collision-snap (98e73a78, in review); not merged into release/smoothness yet
+workflow-canvas	3	todo	-	-	not started (waits for T1 + T2)
+workflow-canvas	4	todo	-	-	not started (waits for T1)
+workflow-canvas	5	todo	-	-	not started (waits for T3 + T4)

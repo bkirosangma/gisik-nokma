@@ -3,9 +3,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, NoteSummary, SubmittedEvent } from '@gisik-nokma/domain';
+import { clearReadCaches } from '../src/clear-read-caches.js';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -94,6 +95,9 @@ function mediaBlocksTouching(css: string, prefix: string): Array<{ condition: st
   }
   return blocks;
 }
+
+// The shell's per-person reads are module state (smoothness T3/T4/T9): each case starts with none, as a first visit does.
+beforeEach(() => clearReadCaches());
 
 describe('18.226 the scanners are proven against planted input before they are trusted', () => {
   it('reads classes out of selectors, ignores commented-out ones', () => {
@@ -224,7 +228,12 @@ describe('18.224 the two-column layout and its ONE breakpoint', () => {
   it('13.1486 the visible editor field carries a min-height built from --app-nav-offset (AMENDED: no longer the wrapper)', () => {
     const rule = declarationsFor(CSS, '.gn-notes__editor .ticket-editor .ticket-editor__content');
     expect(rule).not.toBeNull();
-    expect(rule ?? '').toMatch(/min-height:\s*max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+    // AMENDED by smoothness T9 (25.156): the field reads `--gn-notes-editor-min`, declared once on `:root`, and the derivation
+    // this case pins now lives in that declaration (the skeleton in the route shell reads the same number).
+    expect(rule ?? '').toMatch(/min-height:\s*var\(--gn-notes-editor-min\)/);
+    expect(CSS.match(/--gn-notes-editor-min:\s*([^;]+);/)?.[1] ?? '').toMatch(
+      /max\(40dvh,\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/,
+    );
     expect(declarationsFor(CSS, '.gn-notes__editor') ?? '').not.toMatch(/min-height/);
   });
 
@@ -439,7 +448,12 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
       </Providers>,
     );
     await screen.findByTestId('note-document');
-    const launcher = await screen.findByRole('button', { name: 'On this page' });
+    // 2026-10-03 (HK-7, CI run 37101308000 on #961): the launcher waits on the headings the EDITOR reports, and the editor slot is lazy
+    // (smoothness T9/T10: `editor-slot.tsx` imports `@gisik-nokma/editor` on first render). This is the first arm in the file to mount it, so a
+    // cold runner pays the Tiptap/ProseMirror import here, and findByRole's own 1000 ms budget (not the test's 20 s) is what ran out in CI
+    // (test 1505 ms there). Measured here, from note-document to the launcher: 236-283 ms quiet (3 runs), 461-642 ms with 8 bounded CPU spinners
+    // on 10 cores (load average 7-17, 10 runs); CI ran the whole test 3.6x slower than this machine. 10 s is more than 15x the loaded worst case.
+    const launcher = await screen.findByRole('button', { name: 'On this page' }, { timeout: 10_000 });
     await user.click(launcher);
     await waitFor(() => expect(screen.getAllByRole('link', { name: /Overview|Readings|Actions/ })).toHaveLength(3));
     first.unmount();
@@ -465,6 +479,9 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
       </Providers>,
     );
     await screen.findAllByTestId('note-document');
+    // The editor's own ready signal FIRST (its ProseMirror root exists once the lazy slot has loaded and mounted), so the absence below is
+    // asked of an editor that has had its chance to report, never of a skeleton still waiting for the chunk.
+    await waitFor(() => expect(screen.getByTestId('note-editor').querySelector('.ProseMirror')).not.toBeNull(), { timeout: 10_000 });
     // A settling window equal to the one the positive arm needed, so the
     // control is not merely "asked before the effect could have run".
     await act(async () => {
@@ -512,6 +529,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       getNote: async (_ws, id) => (id === OPEN_NOTE ? openNote : null),
       getNotes: async () => [{ ...openNote }, groupNote],
       getDeletedNotes: async () => [deletedNote],
+      getNoteComments: async () => [],
       getNoteHistory: async () => [{ eventId: 'ev_1', authorId: 'u_kiro', recordedAt: '2026-09-23T08:00:00.000Z', seq: 2 }],
       getNoteVersion: async () => body([paragraph('An earlier version')]),
       searchNotes: async (_ws, text, options) =>
@@ -558,6 +576,8 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await screen.findByTestId('note-document');
+    // The composer is a button until reached for (smoothness T9, 25.153): `gn-notes__add-comment` is rendered once the thread has loaded.
+    await screen.findByRole('button', { name: /Add a comment/ });
     snap(container); // header, bar, body, tree, tree-head, filter, rows/row/row-item/row-title/keys/key,
     // group/group-title, deleted/restore button, session-absent, editor,
     // title, byline, author, edited, scope/scope-wrap, badges, reading-time,
@@ -678,13 +698,14 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     snap(emptyRender.container); // empty, dialog, dialog-empty, hint (NO_NOTE_COPY)
     emptyRender.unmount();
 
-    // Loading: the workspaces read never lands.
+    // Loading: the workspaces read never lands (a first visit: the shared read would otherwise carry the previous render's rows).
+    clearReadCaches();
     const loadingRender = render(
       <Providers services={stubServices({ getMyWorkspaces: () => new Promise(() => {}) })}>
         <NotesPage />
       </Providers>,
     );
-    await screen.findByText('Loading…');
+    await screen.findByText('Loading your notes'); // the tree's skeleton region (smoothness T9, 25.159), no longer "Loading…"
     snap(loadingRender.container); // loading
     loadingRender.unmount();
 
@@ -708,7 +729,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
 
     // NEITHER LIST IS TYPED HERE — see the inbox scanner's own docblock for why.
     expect(rendered).toEqual(styled);
-  }, 20_000);
+  });
 
   it('the one data-attribute globals.css keys a .gn-notes rule on is really rendered', async () => {
     const services = stubServices({
@@ -723,7 +744,9 @@ describe('18.226 every class the Notes page renders is a class globals.css style
       </Providers>,
     );
     await within(container).findByRole('navigation', { name: 'Notes' });
-    const styled = styledAttributes(CSS);
+    // `data-style` is the document's own style switch (on <html>, read by every `[data-style="neo"] …` rule, G-2 25.324), not a
+    // thing this page renders; the one attribute a Notes rule keys on is the drawer's `data-open`.
+    const styled = styledAttributes(CSS).filter((attribute) => attribute !== 'data-style');
     expect(styled).toEqual(['data-open']);
     const rendered = [...container.querySelectorAll<HTMLElement>('*')].flatMap((el) =>
       el.getAttributeNames().filter((name) => name.startsWith('data-')),

@@ -75,11 +75,23 @@ const ROSTER: RosterMember[] = [
   { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
 ];
 
+/** The REAL roster's table: past the skeleton, which is a table of its own (smoothness T8, 25.122). */
+async function rosterTable(): Promise<HTMLElement> {
+  await waitFor(() => expect(document.querySelector('.gn-members .gn-skeleton')).toBeNull());
+  return screen.getByRole('table');
+}
+
+/** The real roster's rows (the header is rows[0]), past the skeleton. */
+async function rosterRows(): Promise<HTMLElement[]> {
+  return within(await rosterTable()).getAllByRole('row');
+}
+
 /**
  * A `WorkspaceRef`. `projects` defaults to EMPTY, which is the shape the summary
  * line's one caller needs; the invite form's select (ruling E5-11) is the
  * second caller and passes real rows.
  */
+
 function workspaceRef(name: string, projects: ProjectRef[] = []): WorkspaceRef {
   return { id: WS, name, prefix: 'CC', role: 'owner', archived: false, memberCount: 2, nameRestrictedProjectCount: 0, projects };
 }
@@ -817,7 +829,8 @@ describe('16.61 the Person cell carries the address on a second line, and only w
         },
       ],
     });
-    const table = await screen.findByRole('table');
+    await screen.findByText('Anselma Marak'); // past the roster's skeleton, which is a table of its own
+    const table = screen.getByRole('table');
     const row = within(table).getAllByRole('row')[1]!;
     expect(within(row).getByText('Anselma Marak')).toBeInTheDocument();
     expect(within(row).getByText('anselma@example.test')).toBeInTheDocument();
@@ -829,7 +842,8 @@ describe('16.61 the Person cell carries the address on a second line, and only w
         { id: '01J9USER000000000000000010', name: '', role: 'member', email: 'phone@example.test' },
       ],
     });
-    const table = await screen.findByRole('table');
+    await screen.findAllByText('phone@example.test'); // past the roster's skeleton, which is a table of its own
+    const table = screen.getByRole('table');
     const row = within(table).getAllByRole('row')[1]!;
     // The label falls back to the address, so the cell names this person ONCE.
     // Counted rather than queried: `getByText` would find the first and pass.
@@ -840,7 +854,7 @@ describe('16.61 the Person cell carries the address on a second line, and only w
 describe('13.761 the roster is a table with a Person and a Role column', () => {
   it('renders one row per person, each wearing the role the server spelled', async () => {
     mount({ listPending: async () => [] });
-    const table = await screen.findByRole('table');
+    const table = await rosterTable();
     expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
       'Person',
       'Role',
@@ -1077,13 +1091,15 @@ describe('13.765 an empty roster says what is listed, not who exists', () => {
  * yet.
  */
 describe('13.766 the heading is Members, and nothing is counted before the roster answers', () => {
-  it('shows the heading and a loading line while the read is in flight, and no roster', () => {
+  it('shows the heading and the roster skeleton (no sentence) while the read is in flight, and no roster', () => {
     mount({ listPending: async () => [] }, undefined, undefined, {
       getMembers: () => new Promise<RosterMember[]>(() => undefined),
     });
     expect(screen.getByRole('heading', { level: 1, name: 'Members' })).toBeInTheDocument();
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
-    expect(screen.queryByRole('table')).toBeNull();
+    // The wait is the roster's own skeleton since smoothness T8 (25.122): busy and named, no sentence, and nothing real in it.
+    expect(screen.getByText('Loading members').parentElement).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('Loading…')).toBeNull();
+    expect(document.querySelectorAll('.gn-members tbody .gn-members__name')).toHaveLength(0);
     expect(screen.queryByText(/You can see/)).toBeNull();
   });
 });
@@ -1319,7 +1335,7 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
    */
   it('13.828 an OWNER’s row keeps the chip, because the control cannot state the value it holds', async () => {
     mount({ listPending: async () => [] });
-    const table = await screen.findByRole('table');
+    const table = await rosterTable();
     const ownerRow = within(table).getAllByRole('row')[1]!;
     expect(within(ownerRow).getByText('owner')).toBeInTheDocument();
     expect(within(ownerRow).queryByRole('button')).toBeNull();
@@ -1501,7 +1517,7 @@ describe('13.960 the roster shows the address when the name is absent, and names
       getMembers: async () => NAMELESS,
     });
 
-    const rows = await screen.findAllByRole('row');
+    const rows = await rosterRows();
     // rows[0] is the header; the roster follows it in fixture order.
     const emailRow = rows[1]!;
     const phoneRow = rows[2]!;
@@ -1590,7 +1606,9 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
     await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
-    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'))).toHaveAttribute('role', 'status');
+    // 2026-10-02 (HK-7): findByText has its OWN 1000 ms budget, which the config's testTimeout does not touch. CI run 37019480109 (#937) missed this
+    // line after 2554 ms while the test itself was inside its budget: the line renders after the mint round trip and a re-render, which a loaded runner delays.
+    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'), undefined, { timeout: 10_000 })).toHaveAttribute('role', 'status');
     expect(screen.getByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
     expect(screen.getByText(/It stops working after/)).toBeInTheDocument();
   });

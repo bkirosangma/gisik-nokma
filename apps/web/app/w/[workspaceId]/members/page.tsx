@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Card, Dialog, Select } from '@gisik-nokma/ui';
+import { Button, Card, Dialog, Select, Skeleton } from '@gisik-nokma/ui';
 import { INVITE_CHANNELS, membershipId } from '@gisik-nokma/domain';
 import {
   formatDateTime,
@@ -15,6 +15,7 @@ import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-
 import { AppNav } from '../../../../src/app-nav.js';
 import { OverflowMenu } from '../../../../src/overflow-menu.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
+import { MembersInviteSkeleton, MembersRosterSkeleton } from '../../../../src/skeletons/screen-skeletons.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import {
@@ -490,13 +491,17 @@ export default function MembersPage() {
             read that has not returned is a number nobody counted. */}
         {members !== null && members.length > 0 ? (
           <p className="gn-members__summary">{memberSummary(members, workspaceName)}</p>
+        ) : membersError === null && members === null ? (
+          <p className="gn-members__summary">
+            <Skeleton width="14rem" height="1rem" />
+          </p>
         ) : null}
       </div>
 
       {membersError !== null ? (
         <ShellRefusal what="The roster" message={membersError} />
       ) : members === null ? (
-        <p className="gn-members__loading">Loading…</p>
+        <MembersRosterSkeleton />
       ) : members.length === 0 ? (
         /*
          * THE EMPTY ROSTER IS TWO READINGS WEARING ONE SHAPE, and this says the
@@ -720,7 +725,7 @@ export default function MembersPage() {
       ) : null}
 
       {adminGate.kind === 'asking' ? (
-        <p>Checking whether you can invite people…</p>
+        <MembersInviteSkeleton />
       ) : adminGate.kind === 'failed' ? (
         <ShellRefusal what="The invitations for this workspace" message={adminGate.why} />
       ) : adminGate.kind === 'member' ? (

@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -38,11 +40,13 @@ import { moveOutcome } from './board-moves.js';
 import {
   EMPTY_SESSION,
   MoveStateContext,
+  applyPendingCreates,
   applyPendingMoves,
   landingIndex,
   useMoveState,
   type FlightRect,
   type MoveState,
+  type PendingCreate,
 } from './board-move-state.js';
 import {
   FLIGHT_MAX_AGE_MS,
@@ -72,6 +76,12 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 export type BoardProps = {
   board: BoardViewData;
   onOpenTicket: (ticketId: string) => void;
+  /**
+   * Tickets whose `ticket.created` is in flight (smoothness T7, spec S5): each is drawn at once as a dimmed ghost
+   * card with the key `…` at the end of its column, and replaced by the real card when the read shows the id
+   * (`applyPendingCreates`). The shell owns the list and removes an entry when the write is refused.
+   */
+  pendingCreates?: readonly PendingCreate[];
   /**
    * The create affordance the empty board offers, and the reason it is
    * OPTIONAL rather than required.
@@ -487,7 +497,7 @@ const useHydrationLayoutEffect = typeof document === 'undefined' ? useEffect : u
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today, currentUserId }: BoardProps) {
+export function Board({ board: realBoard, onOpenTicket, pendingCreates, onCreateTicket, isNarrowed, epicsHidden, moves, today, currentUserId }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -512,7 +522,10 @@ export function Board({ board: realBoard, onOpenTicket, onCreateTicket, isNarrow
    * meant (the auto-expand rule).
    */
   const move = useMoveState(realBoard);
-  const board = useMemo(() => applyPendingMoves(realBoard, move.pending), [realBoard, move.pending]);
+  const board = useMemo(
+    () => applyPendingCreates(applyPendingMoves(realBoard, move.pending), pendingCreates ?? []),
+    [realBoard, move.pending, pendingCreates],
+  );
   /** Edge auto-scroll for a live drag (`board-motion.ts`): begun on a card's `dragstart`, ended by the drop, the dragend or unmount. */
   const scrollerRef = useRef<ReturnType<typeof createEdgeScroller> | null>(null);
   scrollerRef.current ??= createEdgeScroller();
@@ -1117,6 +1130,14 @@ function BoardGroupSection({
   const depthRef = useRef(new Map<string, number>());
   /** The card being dragged from THIS group, or `null` (another group's drag shows nothing here). */
   const [drag, setDrag] = useState<BoardDrag | null>(null);
+  // The two callbacks every card slot is handed, made referentially stable (smoothness T12, audit SM-10) so a
+  // `memo`'d slot is skipped when the section re-renders for a drag, a drop target or a collapse: `setDrag` is
+  // a state setter (stable), and the page's `onOpenTicket` is a new closure every page render.
+  const stableOpenTicket = useStableCallback(onOpenTicket);
+  const beginCardDrag = useCallback(
+    (ticketId: string, fromStateId: string, height: number) => setDrag({ ticketId, fromStateId, height }),
+    [],
+  );
   /** What a column is to the drag over it: its own column, a legal target, an illegal one, or unknown. */
   const verdictOf = (stateId: string): 'own' | 'legal' | 'refused' | 'unknown' =>
     drag === null || canDropOn === null
@@ -1350,10 +1371,10 @@ function BoardGroupSection({
               key={card.ticketId}
               card={card}
               stateName={column.name}
-              onOpen={() => onOpenTicket(card.ticketId)}
-              onOpenTicket={onOpenTicket}
-              arrows={arrows === null ? null : arrows(card, column.stateId)}
-              onDragBegin={(height) => setDrag({ ticketId: card.ticketId, fromStateId: column.stateId, height })}
+              stateId={column.stateId}
+              onOpenTicket={stableOpenTicket}
+              arrows={arrows}
+              onDragBegin={beginCardDrag}
               today={today}
             />
           ));
@@ -1685,7 +1706,11 @@ function BoardGroupWithMoves({
   // `group.columns` order IS `def.states` order for this pinned version —
   // `arrowTarget`'s own docblock cites the server code that guarantees it —
   // so this is the rendered column list, not a second derivation from `def`.
-  const columnOrder = group.columns.map((column) => column.stateId);
+  // Keyed on the joined ids, not the array: `group` is a new object whenever the board reloads, and `columnOrder`
+  // reaches every `MoveArrows` through the stable `arrows` factory below.
+  const columnOrderKey = group.columns.map((column) => column.stateId).join('\u0000');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columnOrder = useMemo(() => group.columns.map((column) => column.stateId), [columnOrderKey]);
   const workflowDef = workflow.data;
 
   /**
@@ -1698,14 +1723,48 @@ function BoardGroupWithMoves({
    * effect's cleanup after a newer effect's setup for the same ticket id —
    * StrictMode's synthetic double-invoke is exactly this shape.
    */
-  const registerAttempt = (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void): (() => void) => {
-    moveRegistry.current.set(ticketId, attempt);
-    return () => {
-      if (moveRegistry.current.get(ticketId) === attempt) {
-        moveRegistry.current.delete(ticketId);
-      }
-    };
-  };
+  const registerAttempt = useCallback(
+    (ticketId: string, attempt: (toStateId: string, from?: FlightRect) => void): (() => void) => {
+      moveRegistry.current.set(ticketId, attempt);
+      return () => {
+        if (moveRegistry.current.get(ticketId) === attempt) {
+          moveRegistry.current.delete(ticketId);
+        }
+      };
+    },
+    [moveRegistry],
+  );
+  // The page builds `moves` afresh on every render. Its identity-bearing fields are what the cards read, so the
+  // capability they are handed is rebuilt only when one of THOSE changes; the two callbacks go through a latest-ref
+  // (their closures are new each render and are only ever called from an event, never in a render).
+  const onMoved = useStableCallback(moves.onMoved);
+  const uploadEvidence = useStableCallback(moves.uploadEvidence ?? NO_UPLOAD);
+  const hasUpload = moves.uploadEvidence !== undefined;
+  // Spread, then override the two callbacks: a field added to `BoardMoveCapability` is forwarded by default (a hand-listed
+  // copy silently dropped it), and only the deps below say which of them may change the capability's identity.
+  const stableMoves = useMemo<BoardMoveCapability>(
+    () => ({ ...moves, onMoved, ...(hasUpload ? { uploadEvidence } : {}) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `moves` itself is new every render; these are the fields a card reads.
+    [moves.dataSource, moves.workspaceId, moves.currentUserId, moves.cache, onMoved, hasUpload, uploadEvidence],
+  );
+  // ONE factory for the whole group — the slot calls it with its own card — so a slot's props do not change
+  // while a drag is in flight. `null` is "capability absent" exactly as before.
+  const arrows = useMemo(
+    () =>
+      workflowDef === null
+        ? null
+        : (card: BoardCardData, fromStateId: string): ReactNode => (
+            <MoveArrows
+              card={card}
+              workflow={workflowDef}
+              fromStateId={fromStateId}
+              columnOrder={columnOrder}
+              moves={stableMoves}
+              registerAttempt={registerAttempt}
+            />
+          ),
+    [workflowDef, columnOrder, stableMoves, registerAttempt],
+  );
 
   /**
    * A column's whole drop contract (board-prototype-port Task 14): read the
@@ -1752,20 +1811,7 @@ function BoardGroupWithMoves({
       onToggleColumn={onToggleColumn}
       onOpenTicket={onOpenTicket}
       onCreateTicket={onCreateTicket}
-      arrows={
-        workflowDef === null
-          ? null
-          : (card, fromStateId) => (
-              <MoveArrows
-                card={card}
-                workflow={workflowDef}
-                fromStateId={fromStateId}
-                columnOrder={columnOrder}
-                moves={moves}
-                registerAttempt={registerAttempt}
-              />
-            )
-      }
+      arrows={arrows}
       onDropCard={handleDrop}
       // `moveOutcome`'s own answer, so a column and an arrow can never disagree; `{}` fields
       // because only `refused` is asked, and refusal never reads them (they split direct from dialog).
@@ -1780,6 +1826,23 @@ function BoardGroupWithMoves({
   );
 }
 
+/** The `uploadEvidence` a capability without one is given by `useStableCallback`; never reached (`hasUpload` gates it). */
+const NO_UPLOAD = (): Promise<{ attachmentId: string }> => Promise.reject(new Error('uploadEvidence is not supplied'));
+
+/**
+ * A function whose identity never changes and which always calls the LATEST one it was given — for a callback
+ * a `memo`'d child receives but only ever calls from an event (never during render), where a page-level closure
+ * that is new every render would otherwise defeat the memo.
+ */
+function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const latest = useRef(fn);
+  // After the commit, not in the render: a render React discards (a deferred one) must not leave its closure behind.
+  useHydrationLayoutEffect(() => {
+    latest.current = fn;
+  });
+  return useCallback((...args: A) => latest.current(...args), []);
+}
+
 /**
  * Anything inside the card that is a control of its own, or belongs to the
  * `TransitionDialog` `MoveArrows` mounts INSIDE the card (`Dialog` in
@@ -1788,6 +1851,34 @@ function BoardGroupWithMoves({
  */
 const CARD_CLICK_BAIL_SELECTOR =
   'button, a, input, select, textarea, label, [role="dialog"], .gn-dialog__scrim';
+
+export type BoardCardSlotProps = {
+  card: BoardCardData;
+  stateName: string;
+  /** The column this card is drawn in; `arrows` and `onDragBegin` are keyed on it. */
+  stateId: string;
+  /**
+   * `Board`'s own `onOpenTicket`, referentially stable (`BoardGroupSection` wraps it). The slot binds it to its
+   * own card for the click (`onOpen`) and hands it on raw to the parent badge and the epic chip, which open a
+   * DIFFERENT ticket.
+   */
+  onOpenTicket: (ticketId: string) => void;
+  /**
+   * The group's one arrows factory (smoothness T12), or `null` where the capability is absent. A factory rather
+   * than a ready-made node because a node is a new object every render, and the slot is `memo`'d: with a stable
+   * factory, a render of the section for a drag or a drop target re-renders only the slots whose card changed.
+   */
+  arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
+  /**
+   * Tells the workflow group a drag of THIS card began, with the card's measured
+   * height (board drag fixes D2) — the one thing a target column cannot read
+   * from a `dragover`. Called before the source turns into a placeholder. Takes the card's identity as
+   * arguments so ONE stable function serves every slot.
+   */
+  onDragBegin: (ticketId: string, fromStateId: string, height: number) => void;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
+};
 
 /**
  * The `<li>` around one card — one component per card (as `MoveArrows`
@@ -1855,37 +1946,19 @@ const CARD_CLICK_BAIL_SELECTOR =
  * carries `cursor: pointer` for the read-only path, where a card can be
  * opened but not dragged.
  */
-function BoardCardSlot({
+const BoardCardSlot = memo(function BoardCardSlot({
   card,
   stateName,
-  onOpen,
+  stateId,
   onOpenTicket,
-  arrows,
+  arrows: arrowsOf,
   onDragBegin,
   today,
-}: {
-  card: BoardCardData;
-  stateName: string;
-  onOpen: () => void;
-  /**
-   * `Board`'s own `onOpenTicket`, threaded through UNCHANGED from `onOpen`
-   * above (owner request, 2026-09-23: parent-key badge, epic chip). `onOpen`
-   * opens THIS card's own ticket and is what the `<li>`'s bail-guarded click
-   * handler calls; the parent badge and the epic chip open a DIFFERENT
-   * ticket, which needs the raw function rather than a closure already bound
-   * to `card.ticketId`.
-   */
-  onOpenTicket: (ticketId: string) => void;
-  arrows: ReactNode;
-  /**
-   * Tells the workflow group a drag of THIS card began, with the card's measured
-   * height (board drag fixes D2) — the one thing a target column cannot read
-   * from a `dragover`. Called before the source turns into a placeholder.
-   */
-  onDragBegin: (height: number) => void;
-  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
-  today?: string;
-}) {
+}: BoardCardSlotProps) {
+  // A ghost (a create in flight, smoothness T7) is not a ticket yet: it cannot be opened, moved or dragged.
+  const creating = card.pendingCreate === true;
+  const onOpen = creating ? (): void => {} : () => onOpenTicket(card.ticketId);
+  const arrows = creating || arrowsOf === null ? null : arrowsOf(card, stateId);
   const draggedRef = useRef(false);
   // The placeholder (Task 5A): the source slot, one frame after `dragstart`.
   const [placeholder, setPlaceholder] = useState(false);
@@ -1895,6 +1968,10 @@ function BoardCardSlot({
   // Where this card flies from, when it has just been drawn in a new place (see the layout effect below).
   const [flight, setFlight] = useState<{ dx: number; dy: number } | null>(null);
   const phase = moveState?.pending[card.ticketId]?.phase;
+  // A Close in flight (T7 F2): the card stays where it is, dimmed and busy, until the answer — it cannot be dragged
+  // (the Move and Close buttons are already disabled by `submitting`). Once committed the overlay hides it instead.
+  const closing = moveState?.pending[card.ticketId]?.closes === true && phase !== 'committed';
+  const movable = arrows !== null && !closing;
 
   // Let the board find this slot by ticket id, to measure where the card is drawn right now.
   const slots = moveState?.slots;
@@ -1971,6 +2048,8 @@ function BoardCardSlot({
     'gn-board__card-slot',
     placeholder ? 'gn-board__card-slot--placeholder' : '',
     phase === 'awaiting' ? 'gn-board__card-slot--waiting' : '',
+    creating ? 'gn-board__card-slot--creating' : '',
+    closing ? 'gn-board__card-slot--closing' : '',
     flight !== null ? 'gn-board__card-slot--flight' : '',
   ]
     .filter((name) => name !== '')
@@ -1985,11 +2064,12 @@ function BoardCardSlot({
           : ({ '--gn-flip-x': `${flight.dx}px`, '--gn-flip-y': `${flight.dy}px` } as CSSProperties)
       }
       data-move-phase={phase}
+      aria-busy={creating || closing ? 'true' : undefined}
       onAnimationEnd={flight === null ? undefined : () => setFlight(null)}
       data-testid={`ticket-card-${card.ticketId}`}
-      draggable={arrows !== null}
+      draggable={movable}
       onDragStart={
-        arrows === null
+        !movable
           ? undefined
           : (event) => {
               draggedRef.current = true;
@@ -1998,7 +2078,7 @@ function BoardCardSlot({
               event.dataTransfer.setData(DRAG_CARD_MARKER, '');
               const cardElement = event.currentTarget.firstElementChild;
               const cardRect = (cardElement instanceof HTMLElement ? cardElement : event.currentTarget).getBoundingClientRect();
-              onDragBegin(cardRect.height);
+              onDragBegin(card.ticketId, stateId, cardRect.height);
               // Where the pointer took hold of the card, so a drop can be turned back into the card's corner.
               if (moveState !== null) {
                 moveState.grab.current = {
@@ -2019,7 +2099,7 @@ function BoardCardSlot({
       // Fires on a drop, on Esc and on a refused drop. `draggedRef` is NOT touched
       // here: it is cleared on the next `mousedown`, never on `dragend` (docblock above).
       onDragEnd={
-        arrows === null
+        !movable
           ? undefined
           : () => {
               if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -2047,7 +2127,7 @@ function BoardCardSlot({
       />
     </li>
   );
-}
+});
 
 /**
  * A card never renders a state as a standing fact. It says what happened — "Moved to
@@ -2223,7 +2303,7 @@ function BoardCardView({
         {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
         <span
           className={`gn-board-card__priority gn-board-card__priority--${priorityLevel}`}
-          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
+          title={card.pendingCreate === true ? undefined : `${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
         >
           {priorityIcon}
           {card.priority.value}
@@ -2254,14 +2334,19 @@ function BoardCardView({
           the provenance line, then the controls right-aligned. Layout only — both children are exactly what
           they were. */}
       <div className="gn-board-card__footer">
-        <button
-          type="button"
-          className="gn-board-card__provenance"
-          aria-expanded={unfolded}
-          onClick={() => setUnfolded((value) => !value)}
-        >
-          {formatCardProvenance(stateName, card.stateProvenance, today, unfolded)}
-        </button>
+        {card.pendingCreate === true ? (
+          // A ghost has no claim to unfold: nobody has stamped anything yet, so the line says what is happening.
+          <span className="gn-board-card__provenance">Creating…</span>
+        ) : (
+          <button
+            type="button"
+            className="gn-board-card__provenance"
+            aria-expanded={unfolded}
+            onClick={() => setUnfolded((value) => !value)}
+          >
+            {formatCardProvenance(stateName, card.stateProvenance, today, unfolded)}
+          </button>
+        )}
         {arrows}
       </div>
     </Card>
@@ -2642,11 +2727,17 @@ function MoveArrows({
    * `committed` answer does next — `submitDirect` leaves the card exactly
    * where the server placed it; `closeCard` calls the SAME `moves.onMoved()`
    * `submitDirect` calls, which reaches `board.reload()`. The server's own
-   * `getBoard` excludes closed tickets (spec §3.2) — the reload, not a local
-   * optimistic removal, is what makes the card leave the board, so this test
-   * suite asserts the ingest payload and the `onMoved` call rather than the
-   * card's disappearance (`useBoard`/`board.reload()` are not this
-   * component's to fake a refetch of). The copy strings say "this close",
+   * `getBoard` excludes closed tickets (spec §3.2), so the reload is what ENDS
+   * the card's life on the board — but it no longer waits for it to leave
+   * (smoothness T7, spec S5): the card is DIMMED in place the moment Close is
+   * pressed (a `closes` pending entry; the slot draws `aria-busy` and the dim),
+   * hidden by `applyPendingMoves` once the server commits, retired when a read
+   * no longer holds the card, and undimmed through `dropPending` when the write
+   * is refused. The refusal
+   * lives on the board-level session, so it is still there when the card
+   * returns. This test suite asserts the ingest payload and the `onMoved` call
+   * (`useBoard`/`board.reload()` are not this component's to fake a refetch
+   * of) and, since T7, the card's dimming while the write is open (25.097). The copy strings say "this close",
    * never "this move" — the two sentences `submitDirect` uses become "The
    * server did not answer this close." and "We could not reach the server
    * for this close — …", the same word substitution `ticket-sheet.tsx` made
@@ -2669,6 +2760,12 @@ function MoveArrows({
    */
   const closeCard = async (): Promise<void> => {
     setSubmitting(true);
+    // The card is dimmed in place at once (T7 F2); a commit hides it, every other arm undims it.
+    moveState.beginPending(
+      { ticketId: card.ticketId, workflowId: workflow.id, fromStateId: displayedStateId, toStateId: displayedStateId, phase: 'writing', closes: true },
+      undefined,
+      false,
+    );
     try {
       const closed = make({
         workspaceId: moves.workspaceId,
@@ -2686,11 +2783,13 @@ function MoveArrows({
         // beside the new one, describing an answer that no longer holds.
         setServerRefusal(null);
         setTransportError('The server did not answer this close.');
+        moveState.dropPending(card.ticketId);
         return;
       }
       if (result.status === 'committed') {
         setServerRefusal(null);
         setTransportError(null);
+        moveState.setPhase(card.ticketId, 'committed');
         moves.onMoved();
         return;
       }
@@ -2700,7 +2799,9 @@ function MoveArrows({
           ? { rule: result.rule, reason: result.reason }
           : { rule: result.code, reason: result.message },
       );
+      moveState.dropPending(card.ticketId);
     } catch (cause) {
+      moveState.dropPending(card.ticketId);
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel `submitDirect` uses, own sentence, never
       // `serverRefusal`. E5-25: the 401 arm joins it, one author.
@@ -3076,5 +3177,11 @@ export function useBoard(
   // exactly what changes when the board is pointed somewhere else. Passing it
   // as the key is what makes a project switch refetch at all — see the two
   // effects in `useLiveQuery`.
-  return useLiveQuery(source, workspaceId, projectId, () => source.query.getBoard(projectId));
+  //
+  // `cacheKey` (smoothness T6, spec S4; audit SM-01): the last answer for THIS project is painted on the first frame of a
+  // revisit while the fresh read is open. The key names the project, and the cache stores it under the workspace as well,
+  // so another project or another workspace never borrows it.
+  return useLiveQuery(source, workspaceId, projectId, () => source.query.getBoard(projectId), {
+    cacheKey: `board:${projectId}`,
+  });
 }

@@ -36,7 +36,7 @@ export type Grouping = z.infer<typeof groupingSchema>;
  */
 const NUL = '\u0000';
 const hasNoNul = (value: string): boolean => !value.includes(NUL);
-const NO_NUL = 'must not contain U+0000 — Postgres text cannot carry a NUL byte';
+const NO_NUL = 'must not contain U+0000: Postgres text cannot carry a NUL byte';
 /**
  * EXPORTED so `preferences.ts` can apply the same refusal to the two string
  * slots the schemas in this file do not reach (a saved filter's `id` and

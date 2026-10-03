@@ -1,3 +1,4 @@
+import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyRequest, onRouteHookHandler } from 'fastify';
@@ -507,6 +508,37 @@ export function buildApp(
     const hsts = hstsHeaderFor(request.protocol);
     if (hsts !== null) void reply.header('strict-transport-security', hsts);
     return undefined;
+  });
+
+  // ── Compressed responses (smoothness T11, spec D7, audit SM-06) ────────────
+  //
+  // gzip and brotli for anything over 1 KB, for a client that sends `Accept-Encoding`; a request
+  // without that header gets the plain bytes, which is what the in-process MCP door
+  // (`mcp/in-process-fetch.ts`: `app.inject` with the package's own headers, body parsed as text)
+  // relies on. A board answer is ~146 KB of JSON and compresses about six-fold; the baseline
+  // (item 7) could not say whether the edge does it for production (it saw only 401s of 27
+  // bytes), so the server does not assume it. A response that already carries a
+  // `content-encoding` is left alone by the plugin.
+  //
+  // UNCONDITIONAL, outside the `security` block and the `webOrigin` branch below, for the reason
+  // HSTS is: `cors` lives inside `if (security?.webOrigin)`, so "beside cors" (the plan's
+  // placement) would leave every call site that does not pass `security` — roughly sixty test
+  // files and any deployment without it — uncompressed, and no test could witness it.
+  //
+  // CALLED, NOT `register`ed — MEASURED, and the reason is the whole of this paragraph. The plugin
+  // works through an `onRoute` hook, and a hook added by a plugin that has not loaded yet reaches no
+  // route declared before it does. `buildApp` is synchronous (around sixty call sites depend on
+  // that) and declares nearly every route straight on `app`, so `void app.register(compress, …)`
+  // compressed ONLY the routes declared inside a child `register` and answered `/v1/…/board`,
+  // `/v1/me/workspaces` and the rest uncompressed — with no error and a green build (the first
+  // draft of `test/http/compression.test.ts`, case 25.193, failed on exactly this: a bare
+  // `Fastify()` with `register(compress)` then `get('/big')` returns 7,100 plain bytes). The
+  // plugin is an ordinary `(instance, options, done)` function, so it is applied to the root
+  // directly: its `onRoute` hook exists before the first route below is declared, and reaches the
+  // encapsulated surfaces too (case 25.198). The `done` it calls is synchronous; a refusal of its
+  // options throws here, at build time, not at the first request.
+  compress(app, { encodings: ['br', 'gzip'], threshold: 1024 }, (err) => {
+    if (err) throw err;
   });
 
   // ── The deployment security surface (Plan 11 Task 2) ───────────────────────

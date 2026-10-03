@@ -1035,6 +1035,10 @@ a.gn-ticket-sheet__crumb--link {
     box-shadow: none;
     background: var(--gn-surface);
   }
+  /* G-5 (25.372): the panel is a tabindex=-1 focus container (Sheet focuses it on open), not a control. Full-screen, the UA
+     `:focus-visible` outline ran down both screen edges beside the body (the sticky header covers it above), read as a
+     dark strip. The close button and the fields keep their own rings. */
+  .gn-sheet:focus-visible { outline: none; }
   /* The header stays put while the body scrolls under it. */
   .gn-sheet__header {
     position: sticky;
@@ -1065,6 +1069,237 @@ a.gn-ticket-sheet__crumb--link {
     max-height: 90dvh;
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+}
+
+/* ── G-8 (smoothness add-on, owner 2026-10-02): THE PHONE TICKET-SHEET HEADER COMPACTS WITH THE SCROLL.
+   `useSheetHeaderCompact` (app-core, `sheet-header-compact.ts`) is the whole mechanism; this block is its look.
+
+   PHONES ONLY: every rule is under 40rem AND keyed on `[data-compact]`, which only that hook sets, so a desktop,
+   a server render and every other sheet are untouched.
+
+   NO JITTER, BY CONSTRUCTION. The header leaves the flow (`position: absolute`) and the scroller reserves its FULL
+   height once (`padding-top: --gh-h0`), so the content starts where it always did and moves by exactly the scroll
+   delta. Each child sits at the origin and moves by `transform: translate(from + (to - from) * --p)`; the from/to
+   points are measured once and arrive as unitless custom properties. The header's own `height` is the one thing
+   besides transforms that follows `--p`, and nothing in the body's flow depends on it.
+
+   `--p` is the eased scroll progress; `--gh-h0` / `--gh-h1` the full and compact header heights; `--g{t,c,m}{x,y,w,h}{0,1,2}`
+   the title / close / Move from, to and (Move only) overlay points; each crumb part carries `--gx0 --gy0 --gw0 --gx1 --gy1
+   --gw1 --gfade`. Nothing here restates an `animation`, and the overlays' own 130ms fade is switched off for reduced motion. */
+.gn-sheet__title-hit,
+.gn-sheet__peek { display: none; }
+@media (max-width: 40rem) {
+  .gn-sheet[data-compact] { position: relative; }
+  .gn-sheet[data-compact] .gn-sheet__body {
+    padding-top: calc(var(--gh-h0, 0) * 1px);
+    overflow-anchor: none;
+  }
+  .gn-sheet[data-compact] .gn-sheet__header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: block;
+    box-sizing: border-box;
+    padding: 0;
+    height: calc((var(--gh-h0) + (var(--gh-h1) - var(--gh-h0)) * var(--p, 0)) * 1px);
+  }
+  /* The hairline under the compact header is a pseudo-element placed by TRANSFORM (the header's own bottom edge is the one
+     thing here whose layout follows `--p`, and an element anchored to that edge would register as a layout shift); its
+     opacity follows `--p` too, so it appears as the header settles. */
+  .gn-sheet[data-compact] .gn-sheet__header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    background: var(--gn-border);
+    opacity: var(--p, 0);
+    pointer-events: none;
+    transform: translateY(calc((var(--gh-h0) + (var(--gh-h1) - var(--gh-h0)) * var(--p, 0) - 1) * 1px));
+  }
+  /* The heading's box goes away: its children are placed against the header. */
+  .gn-sheet[data-compact] .gn-sheet__heading { display: contents; }
+  .gn-sheet[data-compact] .gn-ticket-sheet__crumbs {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 0;
+    display: block;
+  }
+  .gn-sheet[data-compact] .gn-ticket-sheet__crumbs > * {
+    position: absolute;
+    left: 0;
+    top: 0;
+    box-sizing: border-box;
+    height: 1.125rem;
+    line-height: 1.125rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    width: calc((var(--gw0) + (var(--gw1) - var(--gw0)) * var(--p, 0)) * 1px);
+    opacity: calc(1 - var(--gfade, 0) * var(--p, 0) * 2);
+    transform: translate(
+      calc((var(--gx0) + (var(--gx1) - var(--gx0)) * var(--p, 0)) * 1px),
+      calc((var(--gy0) + (var(--gy1) - var(--gy0)) * var(--p, 0)) * 1px)
+    );
+  }
+  /* A part the compact line folds away keeps its natural wrapped look (it only fades and slides up), so the top of the sheet
+     reads exactly as it did before the header learned to compact. The same holds for EVERY part while the sheet is at the top
+     (`data-top`, p = 0: "fully expanded if the sheet is scrolled back to the top"): a project name longer than the line wraps
+     there as it always did, instead of being cut off with an ellipsis; the one-line nowrap form starts with the first pixel of
+     scroll. The reserved space (`--gh-h0`) is the measured full height either way. */
+  .gn-sheet[data-compact][data-top] .gn-ticket-sheet__crumbs > *,
+  .gn-sheet[data-compact] .gn-ticket-sheet__crumbs > [data-collapsed] {
+    height: auto;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+  /* The title scales to the crumb size and widens to one line: width and height are in the title's own (pre-scale)
+     pixels, so the visible width is `width * scale`. The inline height `TitleField` sets is capped, never fought. */
+  .gn-sheet[data-compact] .gn-ticket-sheet__title-input {
+    --gs: calc(1 - (1 - var(--gts, 0.5)) * var(--p, 0));
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    width: calc((var(--gtw0) + (var(--gtw1) - var(--gtw0)) * var(--p, 0)) / var(--gs) * 1px);
+    max-height: calc((var(--gth0) + (var(--gth1) - var(--gth0)) * var(--p, 0)) * 1px);
+    transform: translate(
+        calc((var(--gtx0) + (var(--gtx1) - var(--gtx0)) * var(--p, 0)) * 1px),
+        calc((var(--gty0) + (var(--gty1) - var(--gty0)) * var(--p, 0)) * 1px)
+      )
+      scale(var(--gs));
+  }
+  .gn-sheet[data-compact="compact"] .gn-ticket-sheet__title-input { pointer-events: none; }
+  .gn-sheet[data-compact][data-settled] .gn-ticket-sheet__title-input { opacity: 0; }
+  .gn-sheet[data-compact] .gn-sheet__close {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    transform: translate(
+        calc((var(--gcx0) + (var(--gcx1) - var(--gcx0)) * var(--p, 0)) * 1px),
+        calc((var(--gcy0) + (var(--gcy1) - var(--gcy0)) * var(--p, 0)) * 1px)
+      )
+      scale(calc(1 - (1 - var(--gcs, 1)) * var(--p, 0)));
+  }
+  /* Shrunk to 28px the ✕ keeps a 44px hit area: the pseudo-element grows with `--p`. */
+  .gn-sheet[data-compact] .gn-sheet__close::after {
+    content: "";
+    position: absolute;
+    inset: calc(var(--p, 0) * -13px);
+  }
+  /* Move slides up into the corner, shrinking, and is gone by the half-way point (where it goes inert);
+     the actions row below still has Close / Move…. */
+  .gn-sheet[data-compact] .gn-sheet__move {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(
+        calc((var(--gmx0) + (var(--gmx1) - var(--gmx0)) * var(--p, 0)) * 1px),
+        calc((var(--gmy0) + (var(--gmy1) - var(--gmy0)) * var(--p, 0)) * 1px)
+      )
+      scale(calc(1 - 0.5 * var(--p, 0)));
+    opacity: calc(1 - var(--p, 0) * 2);
+  }
+  /* The tap targets of the compact state. */
+  .gn-sheet[data-compact] .gn-sheet__title-hit {
+    display: block;
+    position: absolute;
+    left: calc(var(--gtx1) * 1px);
+    top: calc(var(--gty1) * 1px - 6px);
+    width: calc(var(--gtw1) * 1px);
+    height: calc(var(--gth1) * var(--gts) * 1px + 12px);
+    z-index: 1;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--gn-text);
+    font: inherit;
+    font-size: 0.8125rem;
+    line-height: 1rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    border-radius: var(--gn-radius-control);
+  }
+  .gn-sheet[data-compact] .gn-sheet__title-hit:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+  .gn-sheet[data-compact] .gn-sheet__title-hit-text {
+    display: block;
+    padding-top: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    opacity: 0;
+  }
+  .gn-sheet[data-compact][data-settled] .gn-sheet__title-hit-text { opacity: 1; }
+  button.gn-ticket-sheet__crumb--fold {
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    color: var(--gn-text-accent);
+  }
+  .gn-ticket-sheet__fold-dots { display: none; }
+  /* F3 (G-8 FIX 1): at p = 1 the folded middle is exactly "…" (the pinned shape), not the name clipped to "S..". */
+  .gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-label { display: none; }
+  .gn-sheet[data-compact][data-settled] .gn-ticket-sheet__fold-dots { display: inline; }
+  button.gn-ticket-sheet__crumb--fold:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+  /* The two overlays: below the compact header, over the content, no layout and no scroll change. */
+  .gn-sheet[data-compact] .gn-sheet__peek {
+    display: block;
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    top: calc(var(--gh-h1) * 1px + 6px);
+    z-index: 2;
+    box-sizing: border-box;
+    padding: 0.75rem;
+    background: var(--gn-surface-raised);
+    border: 1px solid var(--gn-border);
+    border-radius: var(--gn-radius-card);
+    box-shadow: var(--gn-shadow-overlay);
+    animation: gnFade 130ms ease-out;
+    transition: opacity 130ms ease-in;
+  }
+  .gn-sheet[data-compact] .gn-sheet__peek[data-state="closing"] { opacity: 0; }
+  .gn-sheet[data-compact] .gn-sheet__peek--crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    color: var(--gn-text-muted);
+  }
+  .gn-sheet[data-compact] .gn-sheet__peek-title {
+    margin: 0;
+    padding-right: calc(var(--gmw, 0) * 1px + 0.75rem);
+    font-size: 1.625rem;
+    line-height: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  /* While the title overlay is open Move comes back, beside the full-size title. */
+  .gn-sheet[data-compact][data-peek="title"] .gn-sheet__move {
+    z-index: 3;
+    transform: translate(calc(var(--gmx2) * 1px), calc(var(--gmy2) * 1px));
+    opacity: 1;
+    transition: transform 130ms ease-out, opacity 130ms ease-out;
+  }
+  .gn-sheet[data-compact][data-peek="title"][data-peek-state="closing"] .gn-sheet__move { opacity: 0; }
+}
+@media (max-width: 40rem) and (prefers-reduced-motion: reduce) {
+  .gn-sheet[data-compact] .gn-sheet__peek,
+  .gn-sheet[data-compact][data-peek="title"] .gn-sheet__move { animation: none; transition: none; }
 }
 
 /* Ticket sheet Close/Reopen (backlog/closed spec §5.3, 2026-09-17). The badge
@@ -1710,6 +1945,12 @@ a.gn-ticket-sheet__crumb--link {
   opacity: 0.6;
   pointer-events: none;
 }
+/* A ticket being created (smoothness T7, spec S5): the ghost card is the card's OWN container, drawn dimmed while
+   the server has not answered. A card being CLOSED (F2) is the same dim, in place: ONE opacity rule for both. No
+   fill of its own — dimming is `opacity` on the card, never a wash and never the well (Amendment S-R1) — and
+   nothing else about its box changes, so the real card replaces it without a jump. */
+.gn-board__card-slot--creating > .gn-board-card,
+.gn-board__card-slot--closing > .gn-board-card { opacity: 0.65; }
 /* THE DROP TARGET (plan D25, SUPERSEDED by owner feedback 2026-09-30: D25
    assumed the landing slot was unknowable; it is not — a column is ordered by
    ticket id, see `landingIndex` in board.tsx). A column under a drag is still
@@ -3345,6 +3586,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   .gn-ticket-sheet__field { grid-template-columns: 1fr; }
   .gn-ticket-sheet__field dd { min-width: 0; align-items: flex-start; text-align: left; }
   .gn-ticket-sheet__field dt { padding: 0.5rem 0.75rem 0 0.75rem; }
+  /* G-5 (2026-10-02, 25.370/25.371): stacked, the two desktop cells were two boxes with mismatched edges (label square on its
+     right, control square on its left, control flush to the band edge). On a phone the ROW is the band: it paints the fill
+     and the full radius, its cells paint nothing, and the control takes the label's inset. */
+  .gn-ticket-sheet__field--tinted { background: var(--gn-fill-quaternary); border-radius: calc(var(--gn-radius-card) - 0.5rem); }
+  .gn-ticket-sheet__field--tinted dt, .gn-ticket-sheet__field--tinted dd { background: transparent; border-radius: 0; }
+  .gn-ticket-sheet__field--tinted dd { padding-left: 0.75rem; }
   .gn-sheet__full { display: none; }
 }
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }
@@ -3905,6 +4152,20 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   /* F-5 (N3): the reason line wrapped nowhere and widened To do over the edge to Doing; 13rem (208px) is under a 260px column. */
   max-width: 13rem;
 }
+/* G-9: T1 dragging */
+/* The state under the pointer lifts: above its neighbours, a touch larger, on the board's drag-image shadow (nodes rest flat). */
+.react-flow__node-state, .react-flow__node-anyState { cursor: grab; }
+.react-flow__node.dragging { z-index: 1000 !important; cursor: grabbing; }
+.react-flow__node.dragging .gn-state-node,
+.react-flow__node.dragging .gn-any-state-node { transform: scale(1.02); box-shadow: var(--gn-shadow-lift-drag); }
+
+/* G-9: T3 guides+outline */
+
+/* G-9: T4 tidy+add-transition */
+
+/* G-9: T5 fullscreen */
+
+/* G-9: end */
 .gn-state-node--open { border-left: 6px solid var(--gn-category-open); }
 .gn-state-node--active { border-left: 6px solid var(--gn-category-active); }
 .gn-state-node--terminal { border-left: 6px solid var(--gn-category-terminal); }
@@ -4396,7 +4657,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-select__option-label { flex: 1; }
 
 .ticket-type-list { display: flex; flex-direction: column; gap: 0.9rem; }
-.ticket-type-list__loading { margin: 0; color: var(--gn-text-muted); }
 /* `wrap`, the same measured reason `.gn-mcp-tokens__row` carries it: at 390px
    the heading column and the New-type button do not share a line. */
 .ticket-type-list__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
@@ -4548,7 +4808,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .ticket-type-list__meta-sep { font-size: 0.75rem; color: var(--gn-text-muted); }
 
 .ticket-type-editor { display: flex; flex-direction: column; gap: 0.9rem; }
-.ticket-type-editor__loading { margin: 0; color: var(--gn-text-muted); }
 .ticket-type-editor__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 1rem; align-items: start; }
 .ticket-type-editor__main,
 .ticket-type-editor__aside { display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
@@ -4822,7 +5081,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (max-width: 40rem) {
   .template-gallery__cards { grid-template-columns: minmax(0, 1fr); }
 }
-.workflow-builder-screen__loading { margin: 0; color: var(--gn-text-muted); }
 /* `--gn-text`, NOT `--gn-danger`, and this is a measurement rather than a
    preference. `danger` used as TEXT on `surface` measures **4.40** under
    `hig`/`minimal` light (`neo` light 6.28, both darks 5.47-6.12) — below the
@@ -7366,17 +7624,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the owner reversed the waiver for TEXT FIELDS: **"borders on buttons only" became "borders on buttons and text
    fields".** It stays in full for cards, wells, notices and rows, which keep their shadow-only edge.
 
-   (U5, SUPERSEDED for neo by N10 below.) The ring was a 1px FULL border in `--gn-field-rim` (neo light #897362, neo dark #6f7997; at least 3:1 on surface,
-   raised, sunken and well, `CONTRAST_PAIRS`), kept beside the sunken shadow so the field still reads recessed.
-   `hig` and `minimal` are UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291), and `fieldRim` resolves
-   to that same colour for them. Radius is inherited from the base rule; the ring replaces `border: none`, which
-   also removes the 1px that a neo field lost to its missing border compared with a hig one.
+   (U5, SUPERSEDED for neo by N10 below, and its role retired by HK-4, 24.120.) The ring was a 1px FULL border in a dedicated ring colour (neo light #897362,
+   neo dark #6f7997; at least 3:1 on surface, raised, sunken and well), kept beside the sunken shadow so the field still reads
+   recessed. `hig` and `minimal` were UNTOUCHED: they keep the base rule's `--gn-border` edge (13.291). Radius is inherited from
+   the base rule; the ring replaced `border: none`, which also removed the 1px that a neo field lost to its missing border
+   compared with a hig one.
 
    OWNER RULING N10 (2026-10-02, "go with B in neumorphic"; case 24.040): a neo text field has NO uniform rim. Its boundary is the
    recess edge — a crisp 1px line at >= 3:1 on one side, as WCAG 1.4.11's partial-edge example allows (light: the dark line
    top-left, #897362, 3.31 on the fill; dark: the light lip bottom-right, #7d88a8, 4.86 on the fill, 4.38 against the page).
    The 1px border stays TRANSPARENT so the box keeps its size. hig and minimal keep the base rule's `--gn-border` edge above
-   (13.291; U5's ring was neo-only, so there is no ring for them to keep); `fieldRim` stays mapped for them. The field ground is `surfaceSunken`, which is the well colour since N2. */
+   (13.291; U5's ring was neo-only, so there is no ring for them to keep). The field ground is `surfaceSunken`, which is the well colour since N2. */
 [data-style="neo"] .gn-field__input {
   border: 1px solid transparent;
   background: var(--gn-surface-sunken);
@@ -8120,7 +8378,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    one screen over. The remedy is the one `.ticket-type-list__badge` already
    ships — keep the fill, add the compact sunken shadow under `neo`. */
 .workflow-list { display: flex; flex-direction: column; gap: 0.9rem; }
-.workflow-list__loading { margin: 0; color: var(--gn-text-muted); }
 /* The same `--gn-text` the sibling screen's own load-error uses
    (`.workflow-builder-screen__load-error`), rather than a danger tone: the
    failure here is "we could not read", not "something is wrong with your data". */
@@ -8204,7 +8461,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    reader who cannot see it, and this screen's whole subject is which version
    you are looking at. */
 .workflow-history { display: flex; flex-direction: column; gap: 0.9rem; }
-.workflow-history__loading { margin: 0; color: var(--gn-text-muted); }
 .workflow-history__load-error { margin: 0; color: var(--gn-text); }
 .workflow-history__empty { margin: 0; color: var(--gn-text-muted); }
 /* A hole in the chain is said out loud rather than rendered as a shorter list. */
@@ -9077,7 +9333,6 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* V4 — the WAIT arm. Deliberately the muted ink of `.gn-comments__empty` and
    not the danger tone of `__error`: a read in flight is a state, not a fault,
    and painting it red would be the same misreading in the other direction. */
-.gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
 /* ⚠ MARGIN ONLY, and the four declarations that used to sit here were the
    composer's CHROME — radius, `--gn-surface` ground, `--gn-shadow-raised` and
    `overflow: hidden`. The chrome moved to `.editor-slot` in `packages/editor`'s
@@ -9233,4 +9488,73 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   width: max(100%, 2.75rem);
   height: max(100%, 2.75rem);
   transform: translate(-50%, -50%);
+}
+
+/* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
+   Owner, 2026-10-02: "many examples in both desktop and mobile, where due to containers, the lights and shadows are getting cut off
+   in the UI." A scroller paints nothing outside its padding box, so a raised card flush against its edge lost the 14 px halo that
+   crosses it. `--gn-shadow-reach` (`tokens.ts`, `shadowReachOf`: DERIVED from the shadow table, emitted for neo only) is the room
+   a raised child needs; the padding makes it and the equal negative margin hands the same box back to the layout, so nothing
+   around the scroller moves. EVERY rule here sits under `[data-style="neo"]`, so hig and minimal are byte-identical (24.002).
+   `scroll-padding-inline` keeps the snap and scroll-into-view stop on the padded content edge rather than the clipped one.
+   The bottom edge is not padded: `.gn-board__rail`'s own `padding-bottom` (1.5rem) already exceeds the reach. */
+[data-style="neo"] .gn-board__rail {
+  padding-top: var(--gn-shadow-reach);
+  padding-inline: var(--gn-shadow-reach);
+  margin-top: calc(-1 * var(--gn-shadow-reach));
+  margin-inline: calc(-1 * var(--gn-shadow-reach));
+  scroll-padding-inline: var(--gn-shadow-reach);
+}
+/* The composer's slot is the CLIP on purpose (it owns the corners), so the room is made INSIDE it: the strip and the footer hold the
+   raised tools and the Attach/Submit buttons at least one card halo (`--gn-halo`, the `raised` role's own reach) from the slot's
+   edge, and the shadow lands on the tray instead of on the clip. `max()` keeps the editor's own padding where it is already larger. */
+[data-style="neo"] .editor-slot .ticket-editor__toolbar {
+  padding: max(0.375rem, var(--gn-halo)) max(0.5rem, var(--gn-halo));
+}
+[data-style="neo"] .editor-slot__footer {
+  padding: max(0.5rem, var(--gn-halo)) max(0.625rem, var(--gn-halo));
+}
+/* The padded rail's top strip reaches back over what sits above it, and a scroller paints and takes the pointer over an earlier,
+   non-positioned sibling: on a phone the column picker above the rail lost its bottom edge to it (measured with `elementFromPoint`,
+   25.320). A positioned picker paints and takes the pointer above that transparent strip; `z-index: 1` because the rail's scroll-fade
+   mask makes it a stacking context later in the DOM, which a bare `position: relative` ties with and loses to. */
+[data-style="neo"] .gn-board-phone-picker {
+  position: relative;
+  z-index: 1;
+}
+/* The same strip reaches back over the workflow heading above the rail: its toggle's foot (the bottom 2 px of the drawn box, and the
+   hit-slop below it) lay under the rail whenever the rail wears the scroll-fade mask (content past an edge), because the mask makes the
+   rail a stacking context later in the DOM than the toggle's `position: relative`, which a bare level ties with and loses to. Measured
+   with `elementFromPoint` on the CI seed's "Errand with waits" group (23 tickets, the rail overflows) at 1440: the toggle's bottom
+   edge answered `div.gn-board__rail.gn-scroll-fade` (25.320/25.327); a rail with no overflow, and so no mask, answered the button. */
+[data-style="neo"] .gn-board__workflow-toggle {
+  z-index: 1;
+}
+
+/* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
+   Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.
+   The keyframe lives beside its ONE consumer (the header's rule for keyframes).
+   Structural skeletons (S-R1): a screen's skeleton renders the real component's own container and fills it with these
+   PARTS, so no rule here names a container style, and none names a style attribute. The fill is the `surfacePlaceholder`
+   role: the track primitive in hig and minimal (unchanged look), a flat step off `surface` in neo, never the well. */
+.gn-skeleton {
+  display: block;
+  background: var(--gn-surface-placeholder);
+  border-radius: var(--gn-radius-control);
+  width: var(--gn-skeleton-w, 60%);
+  height: var(--gn-skeleton-h, 1em);
+  animation: gnPulse 1600ms var(--gn-motion-ease-out) infinite;
+}
+.gn-skeleton--block { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 4rem); }
+.gn-skeleton--circle { border-radius: 50%; width: var(--gn-skeleton-w, 2rem); height: var(--gn-skeleton-h, 2rem); }
+.gn-skeleton--card { border-radius: var(--gn-radius-card); width: var(--gn-skeleton-w, 100%); height: var(--gn-skeleton-h, 5.5rem); }
+.gn-skeleton__rows { display: flex; flex-direction: column; gap: var(--gn-space-2); }
+.gn-skeleton-region { display: block; }
+.gn-pending > * { opacity: var(--gn-disabled-opacity); }
+@keyframes gnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-skeleton { animation: none; opacity: 0.8; }
 }

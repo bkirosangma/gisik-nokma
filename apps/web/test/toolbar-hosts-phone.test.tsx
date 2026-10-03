@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import { NewTicketDialog, TicketSheet, type TicketRead } from '@gisik-nokma/app-core';
 import { PHONE_TOOLBAR_QUERY, TicketEditorSlot } from '@gisik-nokma/editor';
-import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
+import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf, type CssRule } from '../../../packages/ui/test/helpers/css-rules.js';
 import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns.js';
 import { stubServices } from './helpers/stub-services.js';
 import { PHONE, SELECT_WIDTH, pack, packingRules, px, readEditorCss, type PackingRules } from './helpers/toolbar-packing.js';
@@ -127,11 +127,12 @@ async function mountDialog(phone: boolean): Promise<Mounted & { unmount: () => v
 }
 
 const barTools = (toolbar: HTMLElement): (string | null)[] =>
-  [...toolbar.querySelectorAll<HTMLElement>(':scope > .ticket-editor__tool-group .ticket-editor__tool')].map((button) => button.getAttribute('aria-label'));
-const toolNamed = (root: HTMLElement, name: string): HTMLButtonElement => {
-  const found = root.querySelector<HTMLButtonElement>(`.ticket-editor__tool[aria-label="${name}"]`);
-  if (found === null) throw new Error(`no toolbar control named ${name}`);
-  return found;
+  [...toolbar.querySelectorAll<HTMLElement>('.ticket-editor__tool')].map((button) => button.getAttribute('aria-label'));
+/** G-7: a sheet cell by its visible label (the sheet is a portal on the body, not inside the toolbar). */
+const sheetCell = (name: string): HTMLButtonElement => {
+  const cell = [...document.body.querySelectorAll<HTMLButtonElement>('.ticket-editor__sheet-cell')].find((c) => c.querySelector('.ticket-editor__sheet-label')?.textContent === name);
+  if (cell === undefined) throw new Error(`no sheet cell named ${name}`);
+  return cell;
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -141,22 +142,21 @@ type Mounter = (phone: boolean) => Promise<Mounted & { unmount: () => void }>;
 /** One host's phone/desktop pair — the same body serves 21.233 (sheet) and 21.234 (dialog). */
 async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
   const phone = await mount(true);
-  // The phone bar: "More tools" is there; the three tray-only tools are NOT on the bar.
+  // The phone bar (AMENDED by G-7: seven tools, and the sheet holds the rest): "More tools" is there; the three sheet-only tools are NOT on the bar.
   expect(within(phone.toolbar).getByRole('button', { name: 'More tools' })).toBeInTheDocument();
   const onBar = barTools(phone.toolbar);
   for (const { name } of TRAY_TOOLS) expect(onBar, `${name} must not be on the phone bar`).not.toContain(name);
-  expect(onBar).toHaveLength(9);
+  expect(onBar).toHaveLength(8); // G-7: seven tools and More (the heading select is not a `.ticket-editor__tool`)
 
   // Every tray-only tool is REACHABLE: More opens the tray, the tool is in it, pressing it inserts its node.
   for (const { name, node } of TRAY_TOOLS) {
     expect(phone.host.querySelector(`.ProseMirror ${node}`), `${node} before ${name}`).toBeNull();
     fireEvent.click(within(phone.toolbar).getByRole('button', { name: 'More tools' }));
-    const tray = phone.toolbar.querySelector<HTMLElement>('.ticket-editor__tray');
-    expect(tray, `More opens the tray for ${name}`).not.toBeNull();
-    fireEvent.click(toolNamed(tray as HTMLElement, name));
+    expect(document.body.querySelector('.ticket-editor__sheet'), `More opens the sheet for ${name}`).not.toBeNull();
+    fireEvent.click(sheetCell(name));
     await waitFor(() => expect(phone.host.querySelector(`.ProseMirror ${node}`), `${name} inserts a ${node}`).not.toBeNull());
-    // Running a tray tool closes the tray (21.140), so the next loop pass opens it again.
-    expect(phone.toolbar.querySelector('.ticket-editor__tray')).toBeNull();
+    // Running a sheet tool closes the sheet (21.140), so the next loop pass opens it again.
+    expect(document.body.querySelector('.ticket-editor__sheet')).toBeNull();
   }
   phone.unmount();
 
@@ -172,14 +172,14 @@ async function phoneBarReachesEveryTool(mount: Mounter): Promise<void> {
 describe('21.233 the ticket sheet gets the phone bar, and every tool stays reachable', () => {
   it('21.233 at ≤40rem the sheet description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountSheet);
-  }, 20_000);
+  });
 });
 
 // 20 s per `it`: see the 21.236 / 21.237 comment below (same real-host mounts).
 describe('21.234 the new-ticket dialog gets the phone bar, and every tool stays reachable', () => {
   it('21.234 at ≤40rem the dialog description editor has More tools and no Code block / Collapsible / Horizontal rule on the bar; each inserts from the tray; desktop has all seventeen', async () => {
     await phoneBarReachesEveryTool(mountDialog);
-  }, 20_000);
+  });
 });
 
 // ── 21.235: the editor's OWN phone arm ────────────────────────────────────────────────────────────────────────────
@@ -201,27 +201,47 @@ describe('21.235 editor.css has its own ≤40rem arm: 44px tools and select, no 
     for (const base of ['.ticket-editor__tool', '.ticket-editor__heading-select', '.ticket-editor__tool-divider']) {
       expect(indexOfRule(base, PHONE), `${base}: the phone rule comes after the base`).toBeGreaterThan(indexOfRule(base, null));
     }
-    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('wrap');
+    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__tool-group', PHONE), 'flex-wrap')).toBe('nowrap'); // G-7: one scrolling row
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'padding-left')).toBe('0.25rem');
     expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'padding-right')).toBe('0.25rem');
+    expect(valueOf(ruleExactly(editorCss, '.ticket-editor__toolbar', PHONE), 'flex-wrap')).toBe('nowrap');
     expect(indexOfRule('.ticket-editor__tool-group', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__tool-group', null));
     expect(indexOfRule('.ticket-editor__toolbar', PHONE)).toBeGreaterThan(indexOfRule('.ticket-editor__toolbar', null));
-    // The arm is EXACTLY these five rules, none scoped under a host (`.gn-notes …` was the Notes-only form that left
-    // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here.
-    const arm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE);
+    // The arm is EXACTLY these rules (G-7 added the one-row declarations to the toolbar and the group rules and appended its own block, 25.411–25.416), none scoped under a host (`.gn-notes …` was the Notes-only form that left
+    // the sheet and the dialog at 32px with dividers drawn); an added rule or declaration reddens here. The sixth is
+    // smoothness G-6's Format button (25.388): the comment composers' footer control, floored at 44px on a phone and
+    // placed after its own base rule, which sits below the strip's rules in the file.
+    // The editor SKELETON's own phone rules (smoothness T10 FIX 2, 25.182) live in the same breakpoint block, after the editor's: they
+    // draw the web app's loading placeholder in the real bar's phone boxes and are the only other rules the arm may hold.
+    const isSkeletonRule = (rule: Pick<CssRule, 'selectors'>) => rule.selectors.every((selector) => selector.includes('gn-editor-skeleton__'));
+    const skeletonArm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && isSkeletonRule(rule));
+    expect(skeletonArm.map((rule) => rule.selectors.join(', '))).toEqual([
+      '.gn-editor-skeleton__set--desktop',
+      '.gn-editor-skeleton__set--phone',
+      '.gn-skeleton.gn-editor-skeleton__tool, .gn-skeleton.gn-editor-skeleton__format',
+      '.gn-skeleton.gn-editor-skeleton__select',
+    ]);
+    // AMENDED 2026-10-02 (G-7): the editor's arm is the six rules below (file order, skeleton rules excluded); everything after them is G-7's own
+    // block at the foot of the file (the unbox, dock, scroll and sheet rules), each selector pinned by `phone-editors.test.tsx`
+    // (25.411–25.416), so the list is no longer the whole arm.
+    const fullArm = parseRules(editorCss).filter((rule) => rule.atRule === PHONE && !isSkeletonRule(rule));
+    expect(fullArm.length, 'G-7 appended its block after the six').toBeGreaterThan(6);
+    const arm = fullArm.slice(0, 6);
     expect(arm.map((rule) => rule.selectors.join(', '))).toEqual([
       '.ticket-editor__toolbar',
       '.ticket-editor__tool',
       '.ticket-editor__heading-select',
       '.ticket-editor__tool-divider',
       '.ticket-editor__tool-group',
+      '.editor-slot__format',
     ]);
     expect(arm.map((rule) => [...rule.body.matchAll(/(?:^|;|\{)\s*([a-z-]+)\s*:/g)].map((hit) => hit[1]))).toEqual([
-      ['padding-left', 'padding-right'],
+      ['position', 'flex-wrap', 'height', 'padding-left', 'padding-right'],
       ['min-height', 'min-width'],
       ['min-height'],
       ['display'],
       ['flex-wrap'],
+      ['min-height', 'min-width'],
     ]);
     // …and the GLOBAL sheet no longer carries a Notes-scoped copy of any of them (they would fork the cascade).
     const scoped = parseRules(readGlobalsCss()).filter((rule) => rule.selectors.some((selector) => /\.gn-notes\b.*\.ticket-editor__/.test(selector)));
@@ -325,9 +345,9 @@ async function twoRowsInHost(mount: Mounter, side: number): Promise<void> {
 describe('21.236 / 21.237 the phone bar is at most two rows, and fits its box, in the sheet and in the dialog at 360–466', () => {
   it('21.236 the ticket sheet (viewport − 2 × the sheet body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountSheet, hostWidths().sheetSide);
-  }, 20_000);
+  });
   it('21.237 the new-ticket dialog (viewport − 2 × the dialog body padding) at 360, 390, 430, 466; the pre-#875 bar clips', async () => {
     await twoRowsInHost(mountDialog, hostWidths().dialogSide);
-  }, 20_000);
+  });
 });
 

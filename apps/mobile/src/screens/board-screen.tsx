@@ -4,6 +4,9 @@ import { useNavigation } from '@react-navigation/native';
 import { SYNC_NOTICE_DISMISS, syncStatusLabel, type ReplicaDataSource, type SyncNoticeView, type TicketSummary } from '@gisik-nokma/app-core';
 import { loadBoard } from './board-read.js';
 import { boardRowAccessibilityLabel } from './board-row-a11y.js';
+import { BOARD_ROW_FRAME_STYLE } from './board-row-frame.js';
+import { BOARD_EMPTY_TEXT, BOARD_NO_MATCH_TEXT, boardListState } from './board-view-state.js';
+import { SkeletonList } from '../components/skeleton.js';
 
 type Nav = { navigate(name: 'Ticket', params: { ticketId: string }): void };
 
@@ -18,7 +21,8 @@ export function BoardScreen(props: {
   initError?: string | null;
 }) {
   const navigation = useNavigation<Nav>();
-  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  // `null` until the first read answers (spec §3.3): the list area tells "not read yet" from "read, empty".
+  const [tickets, setTickets] = useState<TicketSummary[] | null>(null);
   const [query, setQuery] = useState('');
   const [offlineCopy, setOfflineCopy] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
@@ -41,6 +45,8 @@ export function BoardScreen(props: {
     refresh();
     return ds.subscribe(workspaceId, 0, refresh);
   }, [ds, workspaceId, query]);
+
+  const listState = boardListState({ tickets, readError, initError: props.initError, query });
 
   return (
     <View>
@@ -72,23 +78,28 @@ export function BoardScreen(props: {
       <TextInput placeholder="Search" value={query} onChangeText={setQuery} />
       {offlineCopy && query !== '' ? <Text>searching offline copy</Text> : null}
       {readError !== null ? <Text accessibilityRole="alert">{readError}</Text> : null}
-      <FlatList
-        data={tickets}
-        keyExtractor={(t) => t.ticketId}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Ticket', { ticketId: item.ticketId })}
-            accessibilityRole="button"
-            accessibilityLabel={boardRowAccessibilityLabel(item)}
-          >
-            <Text>
-              {item.title} · {item.stateId}
-            </Text>
-            {item.pending ? <Text>claim in transit</Text> : null}
-            {item.openContests > 0 ? <Text>{item.openContests} contested</Text> : null}
-          </TouchableOpacity>
-        )}
-      />
+      {listState === 'loading' ? <SkeletonList rows={6} /> : null}
+      {listState !== 'loading' && listState !== 'error' ? (
+        <FlatList
+          data={tickets ?? []}
+          keyExtractor={(t) => t.ticketId}
+          ListEmptyComponent={<Text>{listState === 'no-match' ? BOARD_NO_MATCH_TEXT : BOARD_EMPTY_TEXT}</Text>}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={BOARD_ROW_FRAME_STYLE}
+              onPress={() => navigation.navigate('Ticket', { ticketId: item.ticketId })}
+              accessibilityRole="button"
+              accessibilityLabel={boardRowAccessibilityLabel(item)}
+            >
+              <Text>
+                {item.title} · {item.stateId}
+              </Text>
+              {item.pending ? <Text>claim in transit</Text> : null}
+              {item.openContests > 0 ? <Text>{item.openContests} contested</Text> : null}
+            </TouchableOpacity>
+          )}
+        />
+      ) : null}
     </View>
   );
 }

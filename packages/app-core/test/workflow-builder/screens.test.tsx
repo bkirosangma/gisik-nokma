@@ -23,7 +23,7 @@ describe('WorkflowBuilderScreen', () => {
         initialDraft={draftFromTemplate(kanban)}
       />,
     );
-    expect(screen.getByText('Loading workspace people and types…')).toBeInTheDocument();
+    expect(screen.getByText('Loading workspace people and types')).toBeInTheDocument(); // the skeleton region's name (smoothness T8, 25.130)
     expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue('Simple kanban');
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
     expect(screen.getByText('System rules in every workflow')).toBeInTheDocument();

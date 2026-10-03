@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
-import { MIN_HEADINGS, ReadingTOC, type ReadingMeta } from '@gisik-nokma/editor';
+import { MIN_HEADINGS, ReadingTOC, type ReadingMeta } from '@gisik-nokma/editor/reading';
 
 /**
  * The floating table-of-contents launcher (owner request 2026-09-23: "a

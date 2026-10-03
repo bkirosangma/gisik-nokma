@@ -1,4 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { getMarkRange } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 import { TablePicker } from './TablePicker.js';
@@ -108,15 +109,8 @@ import { TablePicker } from './TablePicker.js';
  *   link, not just the caret/partial selection (`MarkdownEditor.tsx:755`).
  */
 
-const MARKDOWN_ENTRIES: { key: string; markdown: string }[] = [
-  { key: 'bold', markdown: '**bold**' },
-  { key: 'italic', markdown: '*italic*' },
-  { key: 'code', markdown: '`code`' },
-  { key: 'quote', markdown: '> quote' },
-  { key: 'list', markdown: '- list' },
-  { key: 'link', markdown: '[text](url)' },
-];
-export const MARKDOWN_HINT = `Markdown: ${MARKDOWN_ENTRIES.map((entry) => entry.markdown).join(', ')}`;
+import { MARKDOWN_ENTRIES, MARKDOWN_HINT } from '../markdown-hint.js';
+export { MARKDOWN_HINT };
 
 /**
  * Per-tool markdown triggers beyond MARKDOWN_HINT's own six — kept OUT of
@@ -374,11 +368,21 @@ function usePhoneToolbar(): boolean {
 }
 
 /**
- * The tools that stay on the bar at ≤40rem, in the owner's order (2026-10-01): undo, redo, bold,
- * italic, link, bullet list, numbered list, task list — and the heading select, rendered after them.
- * Every other tool moves into the "More tools" tray. Above 40rem nothing moves.
+ * The tools that stay on the bar at ≤40rem, in the owner's order (G-7, 2026-10-02): bold, italic, bullet list, task
+ * list, [the heading select], link, insert ticket, insert note — one row that scrolls sideways, with More pinned at the
+ * right edge. Every other tool (undo, redo, numbered list, strikethrough, code, quote, code block, collapsible, rule,
+ * table) lives in the More sheet. Above 40rem nothing moves.
  */
-export const PHONE_VISIBLE_TOOLS: readonly string[] = ['undo', 'redo', 'bold', 'italic', 'link', 'list', 'orderedList', 'task'];
+/** The room kept between the caret and the docked bar's top edge, in px (G-7 FIX 1, F2). */
+const DOCK_CARET_GAP_PX = 8;
+
+export const PHONE_VISIBLE_TOOLS: readonly string[] = ['bold', 'italic', 'list', 'task', 'link', 'insertTicket', 'insertNote'];
+
+/** The phone bar left to right: `PHONE_VISIBLE_TOOLS` with the heading select after the task list. */
+const PHONE_BAR_ORDER: readonly string[] = ['bold', 'italic', 'list', 'task', 'heading', 'link', 'insertTicket', 'insertNote'];
+
+/** The More sheet's cells, in the owner's order: every tool the bar does not carry. */
+const SHEET_ORDER: readonly string[] = ['undo', 'redo', 'orderedList', 'strike', 'code', 'quote', 'codeBlock', 'collapsible', 'rule', 'table'];
 
 /** How long a finger must rest on a tool before its name shows (the touch stand-in for hover). */
 const LONG_PRESS_MS = 500;
@@ -450,6 +454,19 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
   // it there, and it is left where the stylesheet put it.
   useLayoutEffect(() => {
     const tip = tooltipRef.current;
+    if (tip !== null && tip.closest('.ticket-editor__scroll') !== null) {
+      // The phone bar (G-7): its scroll area clips a tip drawn inside it, and BELOW the docked bar is the keyboard. So
+      // the name is drawn ABOVE the button in fixed coordinates, kept inside the screen sideways.
+      const wrap = tip.parentElement?.getBoundingClientRect();
+      if (wrap === undefined) return;
+      const width = tip.getBoundingClientRect().width;
+      tip.style.position = 'fixed';
+      tip.style.top = 'auto';
+      tip.style.transform = 'none';
+      tip.style.bottom = `${Math.round(window.innerHeight - wrap.top + 6)}px`;
+      tip.style.left = `${Math.round(Math.max(8, Math.min(wrap.left, window.innerWidth - width - 8)))}px`;
+      return;
+    }
     const clip = tip?.closest('.editor-slot') ?? null;
     if (tip === null || clip === null) return;
     tip.style.transform = '';
@@ -573,6 +590,128 @@ function HeadingSelect({ editor }: { editor: Editor }): React.JSX.Element {
   );
 }
 
+/**
+ * The phone's "More tools" sheet (G-7): a bottom sheet holding every tool the one-row bar does not carry, as a grid of
+ * icon + label cells (the label IS the cell's accessible name, so what is read is what is seen). It copies the CONTRACT
+ * of `@gisik-nokma/ui`'s `Sheet` — `role="dialog"`, `aria-modal`, a scrim tap and Escape close it (with the table grid open, Escape
+ * closes only the grid), focus moves in on open — and not the component: this package cannot
+ * import `ui` (the dependency runs the other way, and the mobile webview bundles this package alone), and `Sheet` is the
+ * ticket sheet's RIGHT-hand panel. Portalled to <body>, so the composer's `overflow: hidden` cannot clip it; React
+ * events still bubble through the portal to the sheet's React ANCESTORS, so the scrim and the panel stop `click`, and
+ * Escape is taken at the window in the capture phase (see `onEscape`) — a press in the sheet must not reach the host's own
+ * handlers (the note page focuses its editor on a click; the dialog or sheet around the editor closes on an Escape). The
+ * comment Format strip is NOT such a handler: it sits on the toolbar element, and the portal is a sibling of that
+ * element, not a child (25.418).
+ */
+function MoreSheet({
+  id,
+  controls,
+  inTable,
+  tablePanelOpen,
+  onTableToggle,
+  onTableSelect,
+  onTableClose,
+  onPick,
+  onClose,
+}: {
+  id: string;
+  controls: ToolControl[];
+  inTable: boolean;
+  tablePanelOpen: boolean;
+  onTableToggle: () => void;
+  onTableSelect: (rows: number, cols: number) => void;
+  onTableClose: () => void;
+  onPick: (control: ToolControl) => void;
+  onClose: () => void;
+}): React.JSX.Element {
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
+  // Escape is taken at the WINDOW, in the capture phase, so it runs before anything a host listens with. The new-ticket
+  // dialog closes on an unconditional `document` capture listener (`Dialog`, ui), which no handler inside the sheet can
+  // outrun — measured on the lane port: one Escape in this sheet closed the sheet AND the dialog. The ticket sheet's own
+  // listener (bubble, honours `defaultPrevented`) and an editor ancestor's `onKeyDown` are covered by the same line. The
+  // table grid's Escape is handled here too, for the same reason: it closes only the grid and hands focus back to the cell.
+  const latest = useRef({ tablePanelOpen, onTableClose, onClose });
+  latest.current = { tablePanelOpen, onTableClose, onClose };
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      event.preventDefault();
+      if (latest.current.tablePanelOpen) {
+        latest.current.onTableClose();
+        panelRef.current?.querySelector<HTMLElement>('[aria-expanded]')?.focus();
+        return;
+      }
+      latest.current.onClose();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  }, []);
+  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
+    if (event.key !== 'Tab') return;
+    // `aria-modal` alone does not keep Tab inside: wrap it by hand.
+    const focusable = [...(panelRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])];
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (first === undefined || last === undefined) return;
+    const at = document.activeElement;
+    if (event.shiftKey && (at === first || at === panelRef.current)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && at === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+  return (
+    <div
+      className="ticket-editor__sheet-scrim"
+      data-testid="editor-more-scrim"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClose();
+      }}
+    >
+      <section
+        ref={panelRef}
+        id={id}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="More tools"
+        className="ticket-editor__sheet"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={onKeyDown}
+      >
+        <div className="ticket-editor__sheet-grab" aria-hidden="true" />
+        <div className="ticket-editor__sheet-grid">
+          {controls.map((control) => (
+            <button
+              key={control.key}
+              type="button"
+              className={control.active === true ? 'ticket-editor__sheet-cell ticket-editor__sheet-cell--active' : 'ticket-editor__sheet-cell'}
+              disabled={control.disabled === true}
+              {...(control.active === null ? {} : { 'aria-pressed': control.active })}
+              {...(control.key === 'table' ? { 'aria-expanded': tablePanelOpen } : {})}
+              onClick={() => (control.key === 'table' ? onTableToggle() : onPick(control))}
+            >
+              <span className="ticket-editor__sheet-icon" aria-hidden="true">
+                {control.label}
+              </span>
+              <span className="ticket-editor__sheet-label">{control.key === 'table' ? 'Insert table' : control.name}</span>
+            </button>
+          ))}
+        </div>
+        {inTable ? <p className="ticket-editor__sheet-note">A table can&apos;t be placed inside another table.</p> : null}
+        {tablePanelOpen ? <TablePicker onSelect={onTableSelect} onClose={onTableClose} /> : null}
+      </section>
+    </div>
+  );
+}
+
 export type EditorToolbarProps = {
   editor: Editor | null;
   /** The toolbar is chrome for a composer someone may type into; read-only has none. */
@@ -585,9 +724,16 @@ export type EditorToolbarProps = {
    * `navigator.platform` to vary (advisor rule, ADDENDUM 3).
    */
   platform?: 'mac' | 'other';
+  /** The strip's `id`, so a control elsewhere can name it in `aria-controls` (the comment editors' Format button, G-6). */
+  id?: string;
+  /**
+   * Set by a host that lets the reader hide the strip (G-6): Escape inside the strip that nothing else claimed (the
+   * tooltip, the More tray and the link field each take their own first) calls it. Absent, Escape does nothing here.
+   */
+  onClose?: () => void;
 };
 
-export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps): React.JSX.Element | null {
+export function EditorToolbar({ editor, editable, platform, id, onClose }: EditorToolbarProps): React.JSX.Element | null {
   /**
    * The URL field's own state. `null` = closed, which is the ordinary case and
    * what Escape returns to. It is deliberately NOT cleared on a successful
@@ -598,8 +744,108 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
   const [tableOpen, setTableOpen] = useState(false);
   const phone = usePhoneToolbar();
   const [moreOpen, setMoreOpen] = useState(false);
-  const trayId = useId();
+  const sheetId = useId();
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: true });
+  const measureEdges = useCallback(() => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    const start = el.scrollLeft <= 1;
+    const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+    setEdges((was) => (was.start === start && was.end === end ? was : { start, end }));
+  }, []);
+  // DOCK (G-7): on a phone the bar floats at the bottom of the VISUAL viewport — just above the on-screen keyboard — for as
+  // long as focus is anywhere in this editor (its text, the bar, the link field) or the More sheet is open.
+  const [focusWithin, setFocusWithin] = useState(false);
+  const docked = phone && editable && (focusWithin || moreOpen);
+  const [dockBottom, setDockBottom] = useState<number | null>(null);
+  // A modal dialog or sheet (`role="dialog"` + `aria-modal`) is drawn over the web app's phone bottom bar, so an editor
+  // inside one has no bar to clear: the bar's lift is 0 there (G-7 FIX 1, F3 — measured: the lift left a 56px strip of
+  // page showing under the docked bar in the ticket sheet).
+  const [onModalLayer, setOnModalLayer] = useState(false);
+  useEffect(() => {
+    if (!phone || !editor) return;
+    const root = toolbarRef.current?.closest('.ticket-editor') ?? null;
+    if (root === null) return;
+    setFocusWithin(root.contains(document.activeElement));
+    const onIn = () => setFocusWithin(true);
+    const onOut = (event: Event) => {
+      if (!root.contains((event as FocusEvent).relatedTarget as Node | null)) setFocusWithin(false);
+    };
+    root.addEventListener('focusin', onIn);
+    root.addEventListener('focusout', onOut);
+    return () => {
+      root.removeEventListener('focusin', onIn);
+      root.removeEventListener('focusout', onOut);
+    };
+  }, [phone, editor, editable]);
+  // CARET (G-7 FIX 1 F2, FIX 2 F1): ProseMirror scrolls a caret into the VISUAL viewport with a 5px margin, and the docked bar
+  // covers the bottom of that viewport — so the last visible line put the caret UNDER the bar. While docked, the view's bottom
+  // margin AND threshold are the bar's reach into the visual viewport plus a gap: the caret starts scrolling when it enters
+  // the bar's zone and stops a gap above it. The reach is MEASURED — the distance from the bar's top edge to the visual
+  // viewport's bottom — not the bar's height, because with no keyboard the page's bottom bar lifts the bar (`--gn-bar-lift`)
+  // and the reach is lift + bar. It is re-read whenever the dock offset moves (the `measure` above, and after commit once the
+  // lift has taken effect). The other sides keep ProseMirror's own values (margin 5, threshold 0). Undocking hands back the
+  // default by clearing both props (`someProp` then falls through to 5 and 0).
+  const applyCaretClearance = useCallback((): void => {
+    const bar = toolbarRef.current;
+    if (!editor || editor.isDestroyed || bar === null) return;
+    const vv = window.visualViewport ?? null;
+    const visualBottom = vv === null ? window.innerHeight : vv.offsetTop + vv.height;
+    const reach = Math.max(bar.offsetHeight, Math.round(visualBottom - bar.getBoundingClientRect().top));
+    const bottom = reach + DOCK_CARET_GAP_PX;
+    editor.view.setProps({ scrollMargin: { top: 5, right: 5, bottom, left: 5 }, scrollThreshold: { top: 0, right: 0, bottom, left: 0 } });
+  }, [editor]);
+  useLayoutEffect(() => {
+    if (!docked) {
+      setDockBottom(null);
+      return;
+    }
+    // `fixed` is laid out against the LAYOUT viewport, which the keyboard does not shrink (iOS) — so the bar's bottom is
+    // how far the visual viewport's bottom edge sits above the layout viewport's.
+    setOnModalLayer(toolbarRef.current?.closest('[role="dialog"][aria-modal="true"]') != null);
+    const vv = window.visualViewport ?? null;
+    const measure = () => {
+      setDockBottom(vv === null ? 0 : Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))));
+      // The bar's place moved: re-read it now, and once more after the frame (the page's `--gn-bar-lift` follows the same
+      // resize through React's commit, so the bar's rect is only final then).
+      applyCaretClearance();
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(applyCaretClearance);
+    };
+    let frame = 0;
+    measure();
+    vv?.addEventListener('resize', measure);
+    vv?.addEventListener('scroll', measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      vv?.removeEventListener('resize', measure);
+      vv?.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, [docked, applyCaretClearance]);
+  useEffect(() => {
+    if (!docked || !editor || editor.isDestroyed) return;
+    applyCaretClearance();
+    return () => {
+      if (!editor.isDestroyed) editor.view.setProps({ scrollMargin: undefined, scrollThreshold: undefined });
+    };
+  }, [docked, editor, applyCaretClearance]);
+  // After a commit that changed what lifts the bar (the offset, or the modal zeroing of the lift), the rect is final.
+  useEffect(() => {
+    if (docked) applyCaretClearance();
+  }, [docked, dockBottom, onModalLayer, applyCaretClearance]);
+  useEffect(() => {
+    if (!phone) return;
+    measureEdges();
+    const el = scrollRef.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measureEdges);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [phone, editor, editable, measureEdges]);
   // The transaction subscription that re-reads `isActive`. Same shape and same
   // reason as `ImageWrapMenu`'s repaint: `useEditor` does not re-render this
   // tree on every transaction, and a toggle button that never updates its own
@@ -859,35 +1105,39 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
   ];
 
-  // PHONE (≤40rem, owner 2026-10-01): at most two rows. The tools in PHONE_VISIBLE_TOOLS stay on the
-  // bar and the rest move into a tray opened by one "More tools" button. The tray is an in-place
-  // disclosure (a `role="group"` of the SAME `ToolButton`s, below the bar) and not a floating menu:
-  // `.editor-slot` is `overflow: hidden` and a note comment composer is only ~88px of body, so a
-  // popover would be clipped; a text menu would also lose `aria-pressed`, `disabled`, the tooltips
-  // and the table picker. Above 40rem nothing moves and there is no More.
-  const trayControls = phone ? controls.filter((control) => !PHONE_VISIBLE_TOOLS.includes(control.key)) : [];
-  const barControls = phone ? controls.filter((control) => PHONE_VISIBLE_TOOLS.includes(control.key)) : controls;
-  const trayOpen = phone && moreOpen;
-  if (phone) {
-    barControls.push({
-      key: 'more',
-      label: MORE_ICON,
-      name: 'More tools',
-      active: null,
-      expanded: trayOpen,
-      run: () => setMoreOpen((was) => !was),
-      group: 'more',
-    });
-  }
-  // Running a tray tool closes the tray; the table button only toggles its size grid, which lives in
-  // the tray, so it keeps it open (the grid's own `onSelect` closes both).
-  const closeTray = (control: ToolControl): ToolControl =>
-    control.key === 'table' ? control : { ...control, run: () => { control.run(); setMoreOpen(false); } };
+  // PHONE (≤40rem, G-7 2026-10-02, replacing the owner's 2026-10-01 two-row tray): ONE row. The tools in
+  // PHONE_BAR_ORDER scroll sideways inside `.ticket-editor__scroll`; "More tools" is pinned outside that scroll area and
+  // opens a bottom sheet (a modal dialog, portalled to <body>) with the rest, as a labelled grid. A sheet and not a
+  // floating menu or an in-bar tray: `.editor-slot` clips a popover, a text menu would lose `aria-pressed`, `disabled`
+  // and the table picker, and a tray would make the bar a second row. Above 40rem nothing moves and there is no More.
+  const byKey = (key: string): ToolControl | undefined => controls.find((control) => control.key === key);
+  const sheetControls = phone ? SHEET_ORDER.map(byKey).filter((control): control is ToolControl => control !== undefined) : [];
+  const moreControl: ToolControl = {
+    key: 'more',
+    label: MORE_ICON,
+    name: 'More tools',
+    active: null,
+    expanded: moreOpen,
+    run: () => setMoreOpen((was) => !was),
+    group: 'more',
+  };
+  // The sheet closes FIRST, and the focus returns to the editor in the same press (a pick, Escape or the backdrop): the
+  // text keeps its selection (ProseMirror holds it in state while blurred) and on iOS the keyboard comes back inside the
+  // gesture. `view.focus()` is synchronous; tiptap's own `focus()` command defers to an animation frame.
+  const closeSheet = (): void => {
+    setMoreOpen(false);
+    setTableOpen(false);
+    editor.view.focus();
+  };
 
-  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['history', 'marks', 'blocks', 'insert', 'more'] as ToolGroup[])
-    .map((key) => ({ key, controls: barControls.filter((control) => control.group === key) }))
+  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['history', 'marks', 'blocks', 'insert'] as ToolGroup[])
+    .map((key) => ({ key, controls: controls.filter((control) => control.group === key) }))
     .filter((group) => group.controls.length > 0);
 
+  // On a phone a bar tool's press must not take focus off the text: a button that takes it blurs the contenteditable,
+  // the keyboard closes, the visual viewport grows and the bar jumps mid-tap. (The heading select is not a ToolButton:
+  // it has to open its native picker.)
+  const keepFocus = phone ? { onMouseDown: (event: React.MouseEvent) => event.preventDefault() } : {};
   const buttonFor = (control: ToolControl) => (
     <ToolButton
       key={control.key}
@@ -895,40 +1145,71 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       isMac={isMac}
       extraProps={
         control.key === 'link'
-          ? { 'aria-expanded': linkOpen }
+          ? { ...keepFocus, 'aria-expanded': linkOpen }
           : control.key === 'more'
-            ? { 'aria-controls': trayOpen ? trayId : undefined, 'aria-haspopup': undefined, 'data-tool': 'more' }
-            : undefined
+            ? { ...keepFocus, 'aria-controls': moreOpen ? sheetId : undefined, 'aria-haspopup': 'dialog', 'data-tool': 'more' }
+            : phone
+              ? keepFocus
+              : undefined
       }
     />
   );
 
-  return (
-    <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting" ref={toolbarRef}>
-      {groups.map((group, index) => (
-        <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
-          {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
-          {group.key === 'blocks' && !phone ? <HeadingSelect editor={editor} /> : null}
-          {group.controls.map(buttonFor)}
-          {group.key === 'blocks' && phone ? <HeadingSelect editor={editor} /> : null}
-        </div>
-      ))}
-      {trayOpen ? (
-        <div
-          id={trayId}
-          className="ticket-editor__tray"
-          role="group"
-          aria-label="More tools"
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return;
-            event.stopPropagation();
-            setMoreOpen(false);
-            toolbarRef.current?.querySelector<HTMLElement>('[data-tool="more"]')?.focus();
-          }}
-        >
-          {trayControls.map((control) => buttonFor(closeTray(control)))}
-        </div>
-      ) : null}
+  const toolbar = (
+    <div
+      className={docked ? 'ticket-editor__toolbar ticket-editor__toolbar--docked' : 'ticket-editor__toolbar'}
+      role="toolbar"
+      aria-label="Formatting"
+      ref={toolbarRef}
+      {...(id === undefined ? {} : { id })}
+      {...(docked && dockBottom !== null
+        ? {
+            style: {
+              '--ticket-editor-dock-bottom': `${dockBottom}px`,
+              ...(onModalLayer ? { '--gn-bar-lift': '0px' } : {}),
+            } as React.CSSProperties,
+          }
+        : {})}
+      {...(onClose === undefined
+        ? {}
+        : {
+            onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>): void => {
+              if (event.key !== 'Escape' || event.defaultPrevented) return;
+              event.preventDefault();
+              onClose();
+            },
+          })}
+    >
+      {phone ? (
+        <>
+          <div
+            className="ticket-editor__scroll"
+            ref={scrollRef}
+            data-at-start={String(edges.start)}
+            data-at-end={String(edges.end)}
+            onScroll={measureEdges}
+          >
+            <div className="ticket-editor__tool-group" role="group" aria-label="Tools">
+              {PHONE_BAR_ORDER.map((key) => {
+                if (key === 'heading') return <HeadingSelect key="heading" editor={editor} />;
+                const control = byKey(key);
+                return control === undefined ? null : buttonFor(control);
+              })}
+            </div>
+          </div>
+          <div className="ticket-editor__tool-group ticket-editor__more" role="group" aria-label={GROUP_LABEL.more}>
+            {buttonFor(moreControl)}
+          </div>
+        </>
+      ) : (
+        groups.map((group, index) => (
+          <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
+            {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
+            {group.key === 'blocks' ? <HeadingSelect editor={editor} /> : null}
+            {group.controls.map(buttonFor)}
+          </div>
+        ))
+      )}
       {linkOpen ? (
         <input
           className="ticket-editor__link-url"
@@ -956,5 +1237,37 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
         />
       ) : null}
     </div>
+  );
+
+  if (!phone) return toolbar;
+  return (
+    <>
+      {/* The anchor holds the bar's place while it floats, so docking never moves the text under it (editor.css). */}
+      <div className="ticket-editor__toolbar-anchor" data-docked={String(docked)}>
+        {toolbar}
+      </div>
+      {moreOpen
+        ? createPortal(
+            <MoreSheet
+              id={sheetId}
+              controls={sheetControls}
+              inTable={inTable}
+              tablePanelOpen={tablePanelOpen}
+              onTableToggle={() => setTableOpen((was) => !was)}
+              onTableSelect={(rows, cols) => {
+                closeSheet();
+                editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+              }}
+              onTableClose={() => setTableOpen(false)}
+              onPick={(control) => {
+                closeSheet();
+                control.run();
+              }}
+              onClose={closeSheet}
+            />,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

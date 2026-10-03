@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { useBuilderEnv } from './builder-context.js';
 
 /** The distinguished source for from-any ('*') transitions — a real node so authors can draw from it. */
-export function AnyStateNode() {
+export const AnyStateNode = memo(function AnyStateNode() {
   const { canAuthor } = useBuilderEnv();
   return (
     <div className="gn-any-state-node">
@@ -11,4 +12,4 @@ export function AnyStateNode() {
       <Handle type="source" position={Position.Right} isConnectable={canAuthor} />
     </div>
   );
-}
+});

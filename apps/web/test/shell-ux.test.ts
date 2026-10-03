@@ -44,8 +44,11 @@ describe('23.040 the work surfaces escape the 80rem shell; reading pages keep it
         expect(classes.split(/\s+/), `${file}: ${classes}`).toEqual(expect.arrayContaining(['gn-shell', 'gn-shell--wide']));
       }
     }
-    // The project page has BOTH a real <main> and a fallback <main>: neither may be left at 80rem.
-    expect(mainClasses(read(`../${WORK_SURFACES[0]}`)).length).toBeGreaterThanOrEqual(2);
+    // The project page's real <main> carries it; its Suspense fallback is `ProjectPageSkeleton` since smoothness T5 (25.052), whose own
+    // <main> carries it too: neither may be left at 80rem.
+    expect(mainClasses(read(`../${WORK_SURFACES[0]}`)).length).toBeGreaterThanOrEqual(1);
+    expect(read(`../${WORK_SURFACES[0]}`)).toContain('fallback={<ProjectPageSkeleton');
+    expect(read('../src/skeletons/page-shells.tsx')).toContain('<main id="gn-main" className="gn-shell gn-shell--wide gn-shell--skeleton"');
 
     // CONTROL (same `it`): the reading pages keep the cap, and `.gn-shell--wide` is what lifts it.
     for (const file of READING_PAGES) {

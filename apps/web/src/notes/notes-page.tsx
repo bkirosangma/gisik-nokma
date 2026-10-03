@@ -3,18 +3,22 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button, Toast } from '@gisik-nokma/ui';
+import { Button, SegmentedControl, Toast } from '@gisik-nokma/ui';
 import type { ReadingMeta } from '@gisik-nokma/editor';
-import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { RosterMember } from '@gisik-nokma/app-core';
 import type { NoteScopeMode } from '@gisik-nokma/domain';
 import { AppNav } from '../app-nav.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { useMyWorkspaces } from '../use-my-workspaces.js';
 import { CreateNoteDialog } from './create-note-dialog.js';
-import { NoteDocument } from './note-document.js';
+import { NoteDocument, markNoteAsNew } from './note-document.js';
+import { NoteDocumentSkeleton, NoteRowSkeleton } from './note-skeletons.js';
+import { NotesContents, NotesLauncher, NotesPanel, useNotesPanelBehaviour, useNotesPhone } from './notes-phone-panel.js';
 import { NotesSearchHeader } from './notes-search-header.js';
 import { TocLauncher } from './toc-launcher.js';
 import { carryTreeScroll } from './tree-scroll.js';
+import { useRememberedNote } from './use-remembered-note.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -44,7 +48,10 @@ let pendingLostAccessToast = false;
  *
  * The read happens ONCE, in this component, and the answer is handed down. A
  * second read anywhere would be a second definition of "the workspaces you are
- * in" (case 18.183 asserts the once).
+ * in" (case 18.183 asserts the once). Since smoothness T9 the read is the shell's
+ * shared one (`useMyWorkspaces`, the nav's and the project list's too): a note
+ * change remounts this page, and the remount paints the tree from the last answer
+ * and asks again only once that answer is 30 s old (case 25.150).
  *
  * ## The three read states, and why they are three
  *
@@ -78,8 +85,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const signedIn = session.kind === 'signed-in' && user !== null;
   const [createOpen, setCreateOpen] = useState(false);
 
-  const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const { rows: workspaces, error: refusal } = useMyWorkspaces();
   /**
    * ONE filter for every section (18.190). It lives on the page rather than in
    * each section because "narrow the tree" is one act by one person, and two
@@ -161,27 +167,52 @@ export function NotesPage({ noteId }: { noteId?: string }) {
    */
   const [treeOpen, setTreeOpen] = useState(noteId === undefined);
 
+  /**
+   * THE PHONE (≤47.9375rem, /help's own breakpoint; smoothness G-3, 25.342–25.346). The tree becomes /help's
+   * floating panel — `treeOpen` is then the panel's open state, so a phone landing on `/notes` still opens onto
+   * the list — and the Manual/FAQ switch's slot holds a Notes/Contents switch. The switch exists only with a note
+   * open: with none there are no headings to list, so Contents is not offered (hidden, not a dead segment).
+   */
+  const phone = useNotesPhone();
+  const [pane, setPane] = useState<'notes' | 'contents'>(noteId === undefined ? 'notes' : 'contents');
+  const activePane = noteId === undefined ? 'notes' : pane;
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  /**
+   * Entering the Notes area with no note in the URL resumes the note this device last had open (G-3 addendum,
+   * 25.350–25.353). Desktop goes straight to it, read-only like every note; a phone keeps the list — switch on
+   * "Notes", the remembered note marked current and scrolled into view — and does not force the document over it.
+   */
+  const remembered = useRememberedNote({
+    enabled: noteId === undefined && signedIn,
+    userId: user?.id ?? '',
+    workspaces,
+    dataSource,
+  });
   useEffect(() => {
-    if (!signedIn) return;
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        // A later success clears an earlier refusal, so a retry that works does
-        // not leave the panel standing — the same device the workspaces page
-        // records for its own pair.
-        setRefusal(null);
-        setWorkspaces(rows);
-      },
-      (cause: unknown) => {
-        if (cancelled) return;
-        setRefusal(cause instanceof Error ? cause.message : String(cause));
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, signedIn]);
+    if (remembered === null || phone) return;
+    router.replace(`/notes/${remembered.noteId}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remembered, phone]);
+  const currentNoteId = noteId ?? remembered?.noteId;
+
+  useNotesPanelBehaviour({
+    active: phone,
+    open: treeOpen,
+    setOpen: setTreeOpen,
+    asideRef: panelRef,
+    launcherRef,
+    revealKey: `${activePane}:${currentNoteId ?? ''}`,
+  });
+  const togglePanel = (): void => {
+    if (treeOpen) {
+      setTreeOpen(false);
+      return;
+    }
+    setTreeOpen(true);
+    requestAnimationFrame(() => panelRef.current?.focus({ preventScroll: true }));
+  };
 
   /**
    * The Author filter's options: every member reachable from ANY workspace
@@ -206,26 +237,80 @@ export function NotesPage({ noteId }: { noteId?: string }) {
     };
   }, [dataSource, workspaces]);
 
+  // ONE search node (/help's 23.239: one field, never two kept in sync). Above the phone breakpoint it sits in the
+  // page header; on a phone the same element is the first thing in the floating panel.
+  // Same gate as the tree head's filter below: a search box with nothing to search — no workspace, no member
+  // roster to filter by — is a control that does nothing, which this repo refuses to draw.
+  const searchNode =
+    signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
+      <NotesSearchHeader
+        value={searchQuery}
+        onChange={setSearchQuery}
+        authorId={authorId}
+        onAuthor={setAuthorId}
+        scopeMode={scopeMode}
+        onScope={setScopeMode}
+        members={members}
+      />
+    ) : null;
+
+  const treeBody = (
+    <>
+      {/* The tree head — the title filter (the Create button is in the bar above, outside the drawer).
+          The FILTER is drawn only once there are rows for it to narrow — filtering an empty tree can only
+          ever produce the same empty tree. */}
+      {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
+        <div className="gn-notes__tree-head">
+          <input
+            type="text"
+            className="gn-notes__filter"
+            aria-label="Filter by title"
+            placeholder="Filter by title"
+            value={titleFilter}
+            onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
+          />
+        </div>
+      ) : null}
+      {!signedIn ? (
+        session.kind === 'loading' ? (
+          <NoteRowSkeleton label="Checking your session" />
+        ) : (
+          <p className="gn-notes__session" role="status">
+            <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link>{' '}
+            to see your notes. You land back here.
+          </p>
+        )
+      ) : refusal !== null ? (
+        <ShellRefusal what="Your notes" message={refusal} />
+      ) : workspaces === null ? (
+        <NoteRowSkeleton label="Loading your notes" />
+      ) : workspaces.length === 0 ? (
+        <p className="gn-notes__empty" role="status">
+          {EMPTY_NOTES_COPY}
+        </p>
+      ) : (
+        workspaces.map((workspace) => (
+          <WorkspaceNotesSection
+            key={workspace.id}
+            workspace={workspace}
+            openNoteId={currentNoteId}
+            titleFilter={titleFilter}
+            searchQuery={searchQuery}
+            authorId={authorId === '' ? undefined : authorId}
+            scopeMode={scopeMode === '' ? undefined : (scopeMode as NoteScopeMode)}
+          />
+        ))
+      )}
+    </>
+  );
+
   return (
     <main id="gn-main" className="gn-shell gn-shell--wide gn-notes-page">
       <AppNav />
       <div className="gn-notes" data-testid="notes-page">
         <div className="gn-notes__header">
           <h1 className="gn-page-title">Notes</h1>
-          {/* Same gate as the tree head's filter below: a search box with nothing to
-              search — no workspace, no member roster to filter by — is a
-              control that does nothing, which this repo refuses to draw. */}
-          {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
-            <NotesSearchHeader
-              value={searchQuery}
-              onChange={setSearchQuery}
-              authorId={authorId}
-              onAuthor={setAuthorId}
-              scopeMode={scopeMode}
-              onScope={setScopeMode}
-              members={members}
-            />
-          ) : null}
+          {phone ? null : searchNode}
         </div>
         {/* The BAR — the drawer toggle and the Create button, OUTSIDE both the drawer and the grid (UX fixes
             T9, 23.161, audit NP-02). The Create button used to sit inside `<nav id="gn-notes-tree">`, which
@@ -243,89 +328,86 @@ export function NotesPage({ noteId }: { noteId?: string }) {
               NP-01): the bare `<button>` it was drew the browser's grey slab, the one square object on a neo
               screen. `.gn-button` brings the fill, pill radius, font and the 44px floor;
               `.gn-notes__tree-toggle` still decides WHEN it is drawn. */}
-          <Button
-            className="gn-notes__tree-toggle"
-            aria-expanded={treeOpen}
-            aria-controls="gn-notes-tree"
-            onClick={() => setTreeOpen((open) => !open)}
-          >
-            Notes
-          </Button>
+          {phone ? null : (
+            <Button
+              className="gn-notes__tree-toggle"
+              aria-expanded={treeOpen}
+              aria-controls="gn-notes-tree"
+              onClick={() => setTreeOpen((open) => !open)}
+            >
+              Notes
+            </Button>
+          )}
           {signedIn && refusal === null && workspaces !== null ? (
             <Button onClick={() => setCreateOpen(true)}>Create note</Button>
           ) : null}
         </div>
         <div className="gn-notes__body">
-          <nav
-            ref={treeRef}
-            aria-label="Notes"
-            id="gn-notes-tree"
-            className="gn-notes__tree gn-notes__tree--drawer"
-            data-open={treeOpen ? 'true' : 'false'}
-          >
-            {/* The tree head — the title filter (the Create button is in the bar above, outside the drawer).
-                The FILTER is drawn only once there are rows for it to narrow — filtering an empty tree can only
-                ever produce the same empty tree. */}
-            {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
-              <div className="gn-notes__tree-head">
-                <input
-                  type="text"
-                  className="gn-notes__filter"
-                  aria-label="Filter by title"
-                  placeholder="Filter by title"
-                  value={titleFilter}
-                  onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
-                />
-              </div>
-            ) : null}
-            {!signedIn ? (
-              <p className="gn-notes__session" role="status">
-                {session.kind === 'loading' ? (
-                  'Checking your session…'
-                ) : (
-                  <>
-                    <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link>{' '}
-                    to see your notes. You land back here.
-                  </>
-                )}
-              </p>
-            ) : refusal !== null ? (
-              <ShellRefusal what="Your notes" message={refusal} />
-            ) : workspaces === null ? (
-              <p className="gn-notes__loading" role="status">
-                Loading…
-              </p>
-            ) : workspaces.length === 0 ? (
-              <p className="gn-notes__empty" role="status">
-                {EMPTY_NOTES_COPY}
-              </p>
-            ) : (
-              workspaces.map((workspace) => (
-                <WorkspaceNotesSection
-                  key={workspace.id}
-                  workspace={workspace}
-                  openNoteId={noteId}
-                  titleFilter={titleFilter}
-                  searchQuery={searchQuery}
-                  authorId={authorId === '' ? undefined : authorId}
-                  scopeMode={scopeMode === '' ? undefined : (scopeMode as NoteScopeMode)}
-                />
-              ))
-            )}
-          </nav>
+          {phone ? (
+            <NotesPanel
+              open={treeOpen}
+              asideRef={panelRef}
+              onPick={(event) => {
+                if (event.target instanceof Element && event.target.closest('a') !== null) {
+                  setTreeOpen(false);
+                  launcherRef.current?.focus({ preventScroll: true });
+                }
+              }}
+              head={
+                <>
+                  {searchNode}
+                  {noteId === undefined ? null : (
+                    <SegmentedControl
+                      options={
+                        [
+                          { value: 'notes', label: 'Notes' },
+                          { value: 'contents', label: 'Contents' },
+                        ] as const
+                      }
+                      value={activePane}
+                      onChange={setPane}
+                      aria-label="Notes panel"
+                    />
+                  )}
+                </>
+              }
+            >
+              {activePane === 'contents' ? <NotesContents headings={headings} query={searchQuery} /> : treeBody}
+            </NotesPanel>
+          ) : (
+            <nav
+              ref={treeRef}
+              aria-label="Notes"
+              id="gn-notes-tree"
+              className="gn-notes__tree gn-notes__tree--drawer"
+              data-open={treeOpen ? 'true' : 'false'}
+            >
+              {treeBody}
+            </nav>
+          )}
           <section className="gn-notes__document" data-testid="note-document-region" ref={documentRegionRef}>
             {noteId === undefined ? (
               <p className="gn-notes__hint">{NO_NOTE_COPY}</p>
+            ) : !signedIn ? (
+              // Audit NP-03 (case 25.154): a signed-out note URL used to hold "Loading…" for ever, because the workspaces
+              // read is never asked without a session. Say how to get in, as the tree beside it does; while the session
+              // itself is still resolving the document is a wait.
+              session.kind === 'loading' ? (
+                <NoteDocumentSkeleton />
+              ) : (
+                <p className="gn-notes__hint" role="status">
+                  <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link> to read this note. You land
+                  back here.
+                </p>
+              )
             ) : workspaces === null && refusal === null ? (
               // R7b (case 18.462): the workspaces read is still in flight, so
               // the document has nothing to search. Mounting it with `[]` made
               // its search find nothing and draw "That note is no longer
               // shared with you." until the read landed. `[]` is a legitimate
               // ANSWER (no workspaces) and stays the document's to word; only
-              // "not asked yet" is held here.
-              <p className="gn-notes__hint" role="status">
-                Loading…
-              </p>
+              // "not asked yet" is held here, as the editor's own band (25.152).
+              <NoteDocumentSkeleton />
             ) : (
               <NoteDocument
                 noteId={noteId}
@@ -351,8 +433,9 @@ export function NotesPage({ noteId }: { noteId?: string }) {
               at every width — see this class's own docblock in globals.css.
               `TocLauncher` wraps `ReadingTOC` rather than replacing it. */}
           <aside className="gn-notes__toc" aria-label="On this page">
-            <TocLauncher headings={headings} scrollContainerRef={editorRootRef} />
+            {phone ? null : <TocLauncher headings={headings} scrollContainerRef={editorRootRef} />}
           </aside>
+          {phone ? <NotesLauncher open={treeOpen} onToggle={togglePanel} buttonRef={launcherRef} /> : null}
         </div>
       </div>
       {/* Spec §9.7: a note that stops being readable while open. Mounted at
@@ -376,6 +459,8 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         defaultHome={{ workspaceId: workspaces?.[0]?.id ?? '', projectId: '' }}
         onCreated={(noteId) => {
           setCreateOpen(false);
+          // A new note opens straight in edit mode (G-3, 25.343; through this door, 25.357).
+          markNoteAsNew(noteId);
           router.push(`/notes/${noteId}`);
         }}
       />

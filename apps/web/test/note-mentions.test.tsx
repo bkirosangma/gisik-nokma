@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Editor } from '@tiptap/core';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -116,6 +116,8 @@ async function bothEditors(container: HTMLElement): Promise<{ body: Editor; comm
   // appearance is the signal the roster has loaded — typing before it would ask
   // the picker for people the page does not know yet.
   await screen.findByText('Kiro');
+  // The composer's editor mounts on click (smoothness T9, 25.153).
+  fireEvent.click(await screen.findByRole('button', { name: /Add a comment/ }));
   await waitFor(() => expect(container.querySelectorAll('.ProseMirror').length).toBeGreaterThanOrEqual(2));
   const [body, comment] = [...container.querySelectorAll('.ProseMirror')];
   return { body: editorOf(body!), comment: editorOf(comment!) };
@@ -124,6 +126,8 @@ async function bothEditors(container: HTMLElement): Promise<{ body: Editor; comm
 describe('18.401–18.402 the @ picker lists the workspace people in both note editors', () => {
   it('18.401 typing @an in the note BODY lists the people whose label matches — and not the others', async () => {
     const { container } = renderDocument();
+    // G-3: a note opens to READ; typing needs the editor, which "Edit" mounts (25.341).
+    fireEvent.click(await screen.findByTestId('note-edit'));
     const { body } = await bothEditors(container);
     typeInto(body, '@an');
     await waitFor(() => expect(popupNames().length).toBeGreaterThan(0));

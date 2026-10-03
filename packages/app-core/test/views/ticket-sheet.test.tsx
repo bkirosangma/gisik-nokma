@@ -492,7 +492,7 @@ describe('TicketSheet — the transition round-trip', () => {
     // Belt and braces: the plan's key must not be present under any value.
     expect(Object.keys(batch[0]!.payload as Record<string, unknown>)).not.toContain('toStateId');
     // 13.1725 — a 20 s budget for THIS test only: four userEvent clicks plus a typed comment through the real engine took 5249 ms in CI against the 5000 ms default (a ~102 s file under turbo load). The assertions above are unchanged, so the budget buys time without weakening the proof.
-  }, 20_000);
+  });
 
   it('PLANTED DEFECT: prompted field claims are emitted BEFORE the transition, in one ordered batch', async () => {
     const user = userEvent.setup();
@@ -2466,7 +2466,7 @@ describe('F — the subtasks section', () => {
         // typecheck refused it: an `as const` on a member that does not exist
         // asserts the shape rather than checking it.
         code: 'invalid-payload' as const,
-        message: 'must not be blank — a title of only spaces names nothing',
+        message: 'must not be blank: a title of only spaces names nothing',
       }));
     };
     renderSheet(read, source);
@@ -5377,7 +5377,20 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
    */
   it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
     const user = userEvent.setup();
-    const source = renderSheet(ticketRead());
+    // T7: a committed Move now SHOWS the ticket in its new state at once (the overlay), so Done is no longer
+    // a destination on the second Move — the way back (`done → doing`) is the next one, and it asks for a
+    // comment too, so the stale-comment hazard is witnessed on the same box.
+    const read = ticketRead();
+    const wired = sheetSource(read);
+    Object.assign(wired.query, {
+      getWorkflowDef: async () => ({
+        ...WF_ERRAND,
+        transitions: WF_ERRAND.transitions.map((t) =>
+          t.from === 'done' && t.to === 'doing' ? { ...t, rules: [{ kind: 'require-comment' as const }] } : t,
+        ),
+      }),
+    });
+    const source = renderSheet(read, wired);
     await settled();
 
     // ARM ONE — pick Done, write the comment, commit.
@@ -5396,10 +5409,10 @@ describe('17.072 a committed move does not carry its comment to the next one (E2
       comment: { text: 'shipped on the morning van' },
     });
 
-    // ARM TWO — reopen and pick the SAME destination again.
+    // ARM TWO — reopen and pick the way back (the box belongs to a NEW move).
     await user.click(screen.getByRole('button', { name: 'Move…' }));
     await user.click(screen.getByRole('button', { name: /Move to/ }));
-    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Doing' }));
 
     expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
   });

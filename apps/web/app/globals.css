@@ -971,7 +971,15 @@ input, textarea, select { font-family: inherit; }
    trailing edge, while a switch in a form field wants its control beside its
    own label. Both are correct for their screen, so the edge-alignment lives
    HERE, on the account row, rather than in the shared component. */
-.gn-account__notification-row { justify-content: space-between; }
+/* G-4 (25.360, 25.361): a switch row is ONE line of layout. The shared base rule above wraps, which a session row needs
+   (its button drops under its text) and a switch row must not: a label that wrapped to two lines let the switch
+   fall BELOW it at the left while one-line rows kept it at the right (measured at 390: the switch's right edge was
+   346 on one-line rows and 95 on a wrapped one). So the row never wraps, the label takes the column and wraps INSIDE
+   it (`min-width: 0` is the shared label's), and `.gn-switch` is already `flex: none` and `order: 2`, so it is always
+   the row's last item at its trailing edge. The shared `.gn-switch-row` and `.gn-switch__label` stay untouched: the
+   Settings → Workspace switch wants its control beside its own label. */
+.gn-account__notification-row { justify-content: space-between; flex-wrap: nowrap; }
+.gn-account__notification-row .gn-switch__label { flex: 1 1 auto; }
 
 /* ── Your workspaces — the row is a door. ──────────────────────────────────
    The prototype's row is a control that opens the workspace, with an accent
@@ -1389,20 +1397,66 @@ input, textarea, select { font-family: inherit; }
 .gn-project-card__chevron { flex: none; color: var(--gn-text-muted); }
 .gn-project-card__door:hover .gn-project-card__chevron,
 .gn-project-card__door:focus-visible .gn-project-card__chevron { color: var(--gn-text); }
-/* Grouped view (prefixes and groups Task 7, cases 22.140/22.141): each group is a section headed by its
-   name and a level strip, and a child group nests inside its parent. The strip's colour is the LEVEL's
-   (ruling R5, `--gn-level-N`), never the group's own; the strip is also named, so colour is never the only
-   signal. The ungrouped section has no strip: it is not a level. */
+/* Grouped view (prefixes and groups Task 7, cases 22.140/22.141; collapse and guides, smoothness G-1, cases
+   25.300-25.307): each group is a section headed by a disclosure button and its name, and a child group nests
+   inside its parent's body. The LEVEL GUIDE is the section's own `::before`: one 2px line down its left edge, from the
+   heading row (the section's top) to the bottom of its last child (the section's bottom), like an IDE's bracket
+   guide, so 1-4 parallel guides show each group's extent. Its colour is the LEVEL's (ruling R5, `--gn-level-N`), never
+   the group's own. It is decoration drawn by CSS (no element, no text, no contrast pair) and flat in every style:
+   a line, not a surface, so no style gives it a shadow. A collapsed group's body is `hidden`, so its section is
+   its heading row and so is its guide. The ungrouped section has no `data-level`: it is not a level, so it has no
+   guide and no indent. */
 .gn-grouped-projects { display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-group-section { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
-.gn-group-section .gn-group-section { margin-left: 1rem; }
-.gn-group-section__head { display: flex; align-items: center; gap: 0.625rem; }
+.gn-group-section[data-level] { position: relative; padding-inline-start: 0.875rem; }
+.gn-group-section[data-level]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.gn-group-section[data-level="1"]::before { background: var(--gn-level-1); }
+.gn-group-section[data-level="2"]::before { background: var(--gn-level-2); }
+.gn-group-section[data-level="3"]::before { background: var(--gn-level-3); }
+.gn-group-section[data-level="4"]::before { background: var(--gn-level-4); }
+.gn-group-section__head { display: flex; align-items: center; gap: 0.25rem; }
 .gn-group-section__name { margin: 0; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
-.gn-group-section__strip { flex: none; align-self: stretch; width: 0.375rem; min-height: 1.5rem; border-radius: 999px; }
-.gn-group-section__strip[data-level="1"] { background: var(--gn-level-1); }
-.gn-group-section__strip[data-level="2"] { background: var(--gn-level-2); }
-.gn-group-section__strip[data-level="3"] { background: var(--gn-level-3); }
-.gn-group-section__strip[data-level="4"] { background: var(--gn-level-4); }
+/* The count a collapsed heading carries: "<name> · N projects". */
+.gn-group-section__count { font-size: 0.8rem; color: var(--gn-text-muted); }
+/* A real `<button>` (44px target) whose caret is a separate aria-hidden span, so its accessible name is exactly
+   "Collapse <name>" / "Expand <name>"; `▸` closed, `▾` open, keyed off the `aria-expanded` the button writes (the
+   board's workflow caret is the precedent, `.gn-board__workflow-caret`). */
+.gn-group-section__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin-inline-start: -0.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-group-section__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+.gn-group-section__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-group-section__caret { font-size: 1.25rem; line-height: 1; }
+.gn-group-section__caret::after { content: '▸'; }
+.gn-group-section__toggle[aria-expanded='true'] .gn-group-section__caret::after { content: '▾'; }
+/* The body is `display: flex`, which outranks the UA sheet's own `hidden`: without this rule the attribute that
+   collapses a group is decoration (the pair is asserted together, 25.305). */
+.gn-group-section__body { display: flex; flex-direction: column; gap: 0.75rem; }
+.gn-group-section__body[hidden] { display: none; }
+@media (max-width: 40rem) {
+  .gn-group-section[data-level] { padding-inline-start: 0.5rem; }
+}
 .gn-workspace-home__count { font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-workspace-home__empty,
 .gn-workspace-home__stranger { margin: 0; color: var(--gn-text-muted); }
@@ -1560,6 +1614,9 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
   border-left: 2px solid transparent;
 }
+/* A collapsed node's column is `hidden` (so its controls cannot take focus); `display: flex` above outranks the UA's
+   own `hidden`, so the attribute needs saying again (25.310, 25.313). */
+.gn-groups__children[hidden] { display: none; }
 .gn-groups__children::before {
   content: '';
   position: absolute;
@@ -1578,11 +1635,32 @@ input, textarea, select { font-family: inherit; }
   bottom: -0.5rem;
   background: var(--gn-border);
 }
-.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after { top: calc(1.625rem - 1px); }
+.gn-groups__children > .gn-groups__node:not(:only-child):first-child::after {
+  top: calc(1.625rem - 1px);
+  border-radius: 1px 1px 0 0;
+}
 .gn-groups__children > .gn-groups__node:not(:only-child):last-child::after {
   bottom: auto;
   height: calc(0.5rem + 1.625rem + 1px);
+  border-radius: 0 0 1px 1px;
 }
+/* THE SPINE IS THE LEVEL GUIDE (smoothness G-1, 25.313): the one vertical line of a children column, from the
+   parent's row (the first child's elbow is on the parent's own row) to the last child's elbow, painted in the
+   PARENT's level colour (the column carries `data-level` = its parent's level) with the elbows that join it, so
+   the tree shows each group's extent in its colour without a second line beside the first. Flat: a line, not a
+   surface, so no style gives it a shadow. */
+.gn-groups__children[data-level="1"]::before,
+.gn-groups__children[data-level="1"] > .gn-groups__node::before { border-top-color: var(--gn-level-1); }
+.gn-groups__children[data-level="2"]::before,
+.gn-groups__children[data-level="2"] > .gn-groups__node::before { border-top-color: var(--gn-level-2); }
+.gn-groups__children[data-level="3"]::before,
+.gn-groups__children[data-level="3"] > .gn-groups__node::before { border-top-color: var(--gn-level-3); }
+.gn-groups__children[data-level="4"]::before,
+.gn-groups__children[data-level="4"] > .gn-groups__node::before { border-top-color: var(--gn-level-4); }
+.gn-groups__children[data-level="1"] > .gn-groups__node::after { background: var(--gn-level-1); }
+.gn-groups__children[data-level="2"] > .gn-groups__node::after { background: var(--gn-level-2); }
+.gn-groups__children[data-level="3"] > .gn-groups__node::after { background: var(--gn-level-3); }
+.gn-groups__children[data-level="4"] > .gn-groups__node::after { background: var(--gn-level-4); }
 .gn-groups__children > .gn-groups__node { gap: 0; }
 /* `gap: 0` above puts the child's stub flush against its box, but it also removed the gap between that child's box
    and ITS OWN children column, so at level 2 and below the column's `::before` ran over the box's last 1rem (next
@@ -1644,6 +1722,44 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer;
 }
 .gn-groups__add:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+/* The Delete control is the add control's twin in size and placement: a 44px round target around a ~20px red ⊖ glyph
+   (G-1c, 25.315). Flat in every style: no fill, rim or shadow of its own, only the hover wash `.gn-groups__add` has. */
+.gn-groups__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--gn-danger);
+  cursor: pointer;
+}
+.gn-groups__delete:hover { background: var(--gn-fill-quaternary); }
+.gn-groups__delete:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+/* The disclosure sits in the Delete slot: a node with children is never deletable, so a box never holds both and
+   every box keeps its width. Its caret is a separate aria-hidden span (the name stays "Collapse <name>"). */
+.gn-groups__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-groups__toggle:hover { background: var(--gn-fill-quaternary); color: var(--gn-text); }
+.gn-groups__toggle:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-groups__caret { font-size: 1.25rem; line-height: 1; }
+.gn-groups__caret::after { content: '▸'; }
+.gn-groups__toggle[aria-expanded='true'] .gn-groups__caret::after { content: '▾'; }
 .gn-groups__name--button:focus-visible,
 .gn-groups__add:focus-visible,
 .gn-groups__input:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
@@ -1656,7 +1772,13 @@ input, textarea, select { font-family: inherit; }
 .gn-groups__confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 @media (max-width: 40rem) {
   .gn-groups__node { display: block; }
-  .gn-groups__children { margin-left: 1rem; border-left: 0; padding-left: 0; margin-top: 0.5rem; }
+  /* The list form's guide is the column's own 2px border, in the parent's level colour, from the box above to the
+     last child's bottom (25.307): it starts at the box above (no margin), so the line is continuous with the heading row. */
+  .gn-groups__children { margin-left: 1rem; border-left: 2px solid var(--gn-border); padding-left: 0.5rem; margin-top: 0; padding-top: 0.5rem; }
+  .gn-groups__children[data-level="1"] { border-left-color: var(--gn-level-1); }
+  .gn-groups__children[data-level="2"] { border-left-color: var(--gn-level-2); }
+  .gn-groups__children[data-level="3"] { border-left-color: var(--gn-level-3); }
+  .gn-groups__children[data-level="4"] { border-left-color: var(--gn-level-4); }
   .gn-groups__children::before { display: none; }
   .gn-groups__children > .gn-groups__node::before { display: none; }
   .gn-groups__children > .gn-groups__node::after { display: none; }
@@ -1833,10 +1955,8 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
-/* Loading and the empty roster are one muted register, and both are `<p>`s
-   whose UA `margin-block: 1em` would otherwise reappear on top of the shell's
-   own flow. */
-.gn-members__loading,
+/* The empty roster is a muted `<p>` whose UA `margin-block: 1em` would otherwise reappear on top of the shell's
+   own flow. (The loading line is gone: the roster draws its own skeleton, smoothness T8.) */
 .gn-members__empty {
   margin: 1.25rem 0 0;
   color: var(--gn-text-muted);
@@ -2208,6 +2328,13 @@ input, textarea, select { font-family: inherit; }
 }
 
 :root { --app-nav-offset: 4.35rem; }
+/* The notes editor band's floor, written ONCE (smoothness T9, 25.156): the taller of 40dvh and what is left of the screen under
+   the page's own chrome. The note editor's field reads it (`.gn-notes__editor .ticket-editor .ticket-editor__content`, 23.162's
+   rule) and so does the document skeleton in the route shell, so the band the reader sees while the note loads is the band the
+   editor then fills. On `:root` beside `--app-nav-offset`, whose value it reads (the phone arm below re-declares that on the same
+   element, so the floor follows it); `20rem` is the chrome above AND below the field (nav, title, byline, toolbar, hint,
+   "Saved"), a minimum and not a pixel-exact fit. */
+:root { --gn-notes-editor-min: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem)); }
 /* The chrome around the workflow builder's wide screen, each number published ONCE (polish 2, 2026-10-01, case 10.164).
    `packages/ui/src/ui.css` bounds `.workflow-builder-screen` to `100dvh - app bar - crumb margin - crumb line - shell
    bottom padding`, and these are the rules that draw the last three: `.gn-shell`'s bottom padding, and the breadcrumb
@@ -4285,6 +4412,11 @@ input, textarea, select { font-family: inherit; }
   white-space: nowrap;
 }
 
+.gn-notes__add-comment {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .gn-notes__keys {
   flex: none;
   display: inline-flex;
@@ -4397,11 +4529,11 @@ input, textarea, select { font-family: inherit; }
   padding: 0.125rem 0.375rem;
 }
 
-/* The four sentences the tree can say about a READ rather than about notes:
-   loading, refused, empty, and your-session-is-not-here. Muted because every
+/* The sentences the tree can say about a READ rather than about notes:
+   empty, and your-session-is-not-here (and the document's hint). Muted because every
    one of them is the page telling the reader something in passing, and none is
-   the page's subject. */
-.gn-notes__loading,
+   the page's subject. Loading is no longer a sentence: it is the list item's own
+   skeleton (T9, 25.159). */
 .gn-notes__empty,
 .gn-notes__session,
 .gn-notes__hint {
@@ -4444,6 +4576,29 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
   min-width: 0;
 }
+
+/* G-3 (25.340): the note's header row — the breadcrumb on the left, the Edit / Done button top right at every width.
+   The button is a plain `.gn-button` (the 44px floor comes from it); this rule only places it. */
+.gn-note-document__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.gn-note-document__head .gn-breadcrumb {
+  min-width: 0;
+}
+.gn-note-document__mode {
+  flex: none;
+}
+
+/* G-3 (25.346): the phone panel's Contents list borrows /help's classes (`.gn-help__nav-link` and its list), so
+   the only rule of its own is the indent a deeper heading level needs — /help's list is flat. Keyed on the
+   `data-heading-level` attribute rather than a class: no new class name for the 18.226 render/style sets to track. */
+.gn-help__group-items > li[data-heading-level='3'] > .gn-help__nav-link { padding-left: 1.25rem; }
+.gn-help__group-items > li[data-heading-level='4'] > .gn-help__nav-link,
+.gn-help__group-items > li[data-heading-level='5'] > .gn-help__nav-link,
+.gn-help__group-items > li[data-heading-level='6'] > .gn-help__nav-link { padding-left: 2rem; }
 
 /* The crumb row. A list because the trail is ordered, with the separators drawn
    by the stylesheet so they are not read out as text. */
@@ -4528,13 +4683,11 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
   cursor: text;
 }
-/* The visible editing field is the floor (23.162): the taller of 40dvh and what is left of the screen under the
-   page's own chrome. Reuses `--app-nav-offset` (`:root`) with its `0px` fallback; `20rem` is the chrome above
-   AND below the field (nav, title, byline, toolbar, hint, "Saved") — a minimum, not a pixel-exact fit. Three
-   classes, so it beats the editor sheet's `.editor-slot .ticket-editor__content` (8.375rem) without leaning on
-   source order. */
+/* The visible editing field is the floor (23.162), and its number is `--gn-notes-editor-min`, declared once on `:root`
+   (above, 18.483) (T9, 25.156). Three classes, so it beats the editor sheet's `.editor-slot .ticket-editor__content` (8.375rem) without
+   leaning on source order. */
 .gn-notes__editor .ticket-editor .ticket-editor__content {
-  min-height: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem));
+  min-height: var(--gn-notes-editor-min);
 }
 
 /* ── The notes screen on a phone (mobile-web plan Task 9, cases 21.130–21.131) ───────────────
@@ -5265,6 +5418,13 @@ input, textarea, select { font-family: inherit; }
     overscroll-behavior: contain;
     padding-bottom: 3rem;
   }
+  /* Smoothness G-2 (25.320): the open note scrolls here and its Edit/Done button sits at the very top, so the button's raised shadow lost its
+     top edge to this clip. The recipe the Notes tree uses below: the padding is the reach, the equal negative margin hands the box back, so
+     the title and body stay where they were. Inside this block, not a block of its own: 18.224/18.483 pin the notes page to ONE breakpoint. */
+  [data-style="neo"] .gn-notes__document {
+    padding-top: var(--gn-shadow-reach);
+    margin-top: calc(-1 * var(--gn-shadow-reach));
+  }
   .gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
     scroll-margin-top: 1rem;
   }
@@ -5683,4 +5843,71 @@ input, textarea, select { font-family: inherit; }
   .gn-groups__heading,
   .gn-workspace-settings__title,
   .gn-mcp-tokens__subtitle { font-size: var(--gn-title-section-phone); line-height: 1.5rem; }
+}
+
+/* ── Smoothness G-2 (cases 25.320–25.339): neo's raised shadows are not cut off by the containers that hold them. ───────────────
+   The room comes from `--gn-shadow-reach` (`tokens.ts`; neo only) — see the block at the foot of `packages/ui/src/ui.css` for the why.
+   Each scroller below is padded by the reach and handed the same box back with the equal negative margin, so its neighbours do not
+   move. All under `[data-style="neo"]`: hig and minimal are byte-identical. */
+[data-style="neo"] .gn-groups__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The tree's padded top edge reaches back over the toolbar's bottom (the 0.75rem gap is smaller than the reach); a positioned toolbar
+   paints, and takes the pointer, above that transparent strip, so the Add group button stays whole. */
+[data-style="neo"] .gn-groups__toolbar {
+  position: relative;
+}
+/* The same, for the bar above the notes body: "Create note" and the drawer toggle lost their bottom edge to the padded tree below. Above
+   60rem the tree is itself positioned (and later in the DOM), so a bare `position: relative` ties and loses: the bar takes `z-index: 1`. */
+[data-style="neo"] .gn-notes__bar {
+  position: relative;
+  z-index: 1;
+}
+/* The notes tree scrolls only above 60rem (the drawer arm hides it below); its Restore buttons sat flush with the right edge. */
+[data-style="neo"] .gn-notes__tree {
+  padding: var(--gn-shadow-reach);
+  margin: calc(-1 * var(--gn-shadow-reach));
+}
+/* The phone chip row: the unscoped rule above gave it 0.25rem, which is less than a chip's lift. In neo the padding is the reach and
+   the negative margin returns the row to where it sat (its 1.4rem top margin is kept, the sides and foot are handed back). */
+@media (max-width: 40rem) {
+  [data-style="neo"] .gn-workspace-home__links {
+    padding: var(--gn-shadow-reach);
+    margin: calc(1.4rem - var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach)) calc(-1 * var(--gn-shadow-reach));
+  }
+}
+
+/* ── ROUTE SHELLS AND THE PENDING LINK HINT (smoothness T5, spec D5/S1/P10; amendment S-R1). Appended after every earlier rule, as
+   the placeholder block in ui.css is. A shell is the page's OWN container (`main.gn-shell`, `.gn-nav`, `.gn-notes__body`, the board's
+   column and card) filled with placeholder parts, so these rules only LAY OUT: none names a fill, a border, a shadow or a style. */
+.gn-nav--skeleton { min-height: var(--app-nav-offset); }
+.gn-shell--skeleton .gn-skeleton-region { display: contents; }
+.gn-project__tabs-skeleton { display: flex; gap: var(--gn-space-2); }
+/* inline-flex + min-width: 0, not inline-block: the link is an inline-flex row whose `.gn-nav__label` child truncates with an ellipsis, and a
+   block-level wrapper in between stops the label shrinking (the workspace and project names then overlap their neighbours). */
+.gn-nav__pending { display: inline-flex; min-width: 0; max-width: 100%; }
+.gn-nav__pending[data-pending="true"] { animation: gnPulse 1600ms var(--gn-motion-ease-out) 100ms infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gn-nav__pending[data-pending="true"] { animation: none; opacity: 0.8; }
+}
+
+/* ── THE PROJECT PAGE'S TAB ARMS (smoothness T6, S1). `ProjectTabSkeleton` names the wait and holds the board / list shape, but adds no
+   box of its own: the shape inside it is the real view's container (`.gn-board__rail`, `.gn-list`), and a wrapper that took a box of its
+   own would move it relative to the page's other children. Layout only. */
+.gn-project__tab-skeleton, .gn-project__tab-skeleton-body { display: contents; }
+
+/* ── SECONDARY SCREEN SKELETONS (smoothness T8; spec S1, §4.3; amendment S-R1). Appended after every earlier rule. Like the route-shell
+   block above, these only LAY OUT: none names a fill, a border, a shadow, a colour or a style, so the skeletons stay style-neutral. */
+/* The sign-in methods row reserves the control's height before /auth/methods answers, so the form below never shifts (25.132). The
+   slot is always the card's first child; `ready` is the answered state (the segmented control, or nothing when the answer was a refusal). */
+.gn-sign-in__methods-slot { display: block; }
+.gn-sign-in__methods-slot[data-state="pending"] { min-height: 2.5rem; }
+/* Answered with nothing to show (no phone, or the read was refused): the slot leaves no empty flex item behind it, so the card's gap does not double. */
+.gn-sign-in__methods-slot[data-state="ready"]:empty { display: none; }
+/* The Notes and Inbox links in the top bar's corner are the bottom bar's at ≤64rem (`useTabletBar`'s own query): hidden by CSS too,
+   the belt behind the script gate, so even the pre-script paint is right (25.146). */
+@media (max-width: 64rem) {
+  .gn-nav__corner > .gn-nav__notes,
+  .gn-nav__corner > .gn-nav__inbox { display: none; }
 }
