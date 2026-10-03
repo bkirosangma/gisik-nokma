@@ -5919,6 +5919,37 @@ input, textarea, select { font-family: inherit; }
   .gn-project__header > .gn-project__create-slot { order: 1; margin-left: auto; }
 }
 
+/* ── NOTES AT PHONE WIDTH: ONE LAYOUT FROM THE FIRST FRAME (smoothness-2 G1, 2026-10-03; cases 25.245-25.248; notes 390 CLS 1.05) ──
+   (1) The first paint is the desktop arm (`useNotesPhone` is false until script): the in-flow tree, open on landing, and the drawer
+   toggle. At the phone breakpoint (/help's own, `HELP_PHONE_QUERY`) neither is ever drawn by the phone arm, so CSS removes them from
+   the pre-script frame and nothing leaves the flow when script swaps the arm in (0.17). AFTER the `max-width: 60rem` arm above. */
+@media (max-width: 47.9375rem) {
+  .gn-notes__tree--drawer,
+  .gn-notes__tree--drawer[data-open='true'],
+  .gn-notes__tree-toggle { display: none; }
+}
+/* (2) The bar holds Create note's 2.75rem from the first frame (it appears once the workspaces read answers; 0 -> 44 pushed the body). */
+.gn-notes__bar--reserved { min-height: 2.75rem; }
+/* (2b) The phone panel's head holds the search header's height (the input and the Author / Scope row, two 2.75rem rows and a 0.5rem gap,
+   the same `.gn-notes__search` rules) before the header arrives with the workspaces read: the list below it sat 96px higher until then.
+   At 48rem and up the header is in the page's own header row, which holds the 2.75rem input's height (the h1 line is 41px: 3px). */
+.gn-notes__panel-head--reserved { min-height: 6rem; }
+@media (min-width: 48rem) {
+  .gn-notes__header { min-height: 2.75rem; }
+}
+/* (3) The lists of every workspace arrive together, inside this wrapper: it adds no box of its own. */
+.gn-notes__sections { display: contents; }
+.gn-notes__sections[hidden] { display: none; }
+/* (4) The phone panel has ONE height while open (owner, 2026-10-03: a fixed panel height, not content-sized): the height /help's panel
+   is capped at (`.gn-help__sidebar`, `ui.css`, same two lines), so its top edge never moves as its head, then its lists, arrive. The
+   list is already the panel's one scroller (`.gn-help__nav`). A short list sits in a tall panel with room under it. */
+@media (max-width: 47.9375rem) {
+  .gn-help__sidebar--notes {
+    height: calc(100vh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+    height: calc(100dvh - var(--app-nav-offset, 0px) - max(1rem, env(safe-area-inset-bottom, 0px)) - var(--gn-bar-lift, 0px) - 5.5rem);
+  }
+}
+
 /* ── SECONDARY SCREEN SKELETONS (smoothness T8; spec S1, §4.3; amendment S-R1). Appended after every earlier rule. Like the route-shell
    block above, these only LAY OUT: none names a fill, a border, a shadow, a colour or a style, so the skeletons stay style-neutral. */
 /* The sign-in methods row reserves the control's height before /auth/methods answers, so the form below never shifts (25.132). The

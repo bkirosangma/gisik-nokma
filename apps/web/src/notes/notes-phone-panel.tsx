@@ -81,12 +81,15 @@ export function NotesPanel({
   open,
   asideRef,
   head,
+  reserveSearch = false,
   children,
   onPick,
 }: {
   open: boolean;
   asideRef: RefObject<HTMLElement | null>;
   head: ReactNode;
+  /** The search header is on its way (smoothness-2 G1, 25.245): the head holds its height, so the list below never moves when it arrives. */
+  reserveSearch?: boolean;
   children: ReactNode;
   onPick: (event: { target: EventTarget | null }) => void;
 }) {
@@ -94,14 +97,14 @@ export function NotesPanel({
   return (
     <aside
       id="gn-notes-panel"
-      className="gn-help__sidebar"
+      className="gn-help__sidebar gn-help__sidebar--notes"
       aria-label="Notes and contents"
       ref={asideRef}
       tabIndex={-1}
       data-testid="notes-panel"
       data-panel-open={open ? 'true' : 'false'}
     >
-      <div className="gn-help__sidebar-head">{head}</div>
+      <div className={reserveSearch ? 'gn-help__sidebar-head gn-notes__panel-head--reserved' : 'gn-help__sidebar-head'}>{head}</div>
       <div className="gn-help__nav gn-scroll-fade gn-scroll-fade--y" ref={edgesRef} onClick={onPick}>
         {children}
       </div>
@@ -193,6 +196,8 @@ export function useNotesPanelBehaviour({
       if (current === null) return false;
       const within = nav.getBoundingClientRect();
       const at = current.getBoundingClientRect();
+      // A row inside the page's hidden lists (the lists show together once every workspace has answered, smoothness-2 G1) has no box yet.
+      if (at.height === 0) return false;
       // A row already inside the list stays where it is; one above or below the fold is centred (25.354).
       if (at.top >= within.top && at.bottom <= within.bottom) return true;
       nav.scrollTop += at.top - within.top - (within.height - at.height) / 2;
@@ -202,7 +207,7 @@ export function useNotesPanelBehaviour({
     const observer = new MutationObserver(() => {
       if (reveal()) observer.disconnect();
     });
-    observer.observe(nav, { childList: true, subtree: true });
+    observer.observe(nav, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-current'] });
     const timer = setTimeout(() => observer.disconnect(), 5000);
     return () => {
       observer.disconnect();

@@ -289,18 +289,33 @@ describe('G-3 addendum: the last note opened, per device', () => {
         if (list !== null) return rect(rowTop - (list.scrollTop - startAt), 40);
         return original.call(this);
       });
+      // Every list starts scrolled to `startAt`. It used to be assigned after the panel mounted, which only worked while the panel mounted
+      // BEFORE its rows; the panel now arrives with the session and its lists together (smoothness-2 G1, 25.247), and the reveal can
+      // run before a late assignment, which then erased it.
+      const scrolled = new WeakMap<Element, number>();
+      const own = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+      Object.defineProperty(Element.prototype, 'scrollTop', {
+        configurable: true,
+        get(this: Element) {
+          return scrolled.get(this) ?? startAt;
+        },
+        set(this: Element, value: number) {
+          scrolled.set(this, value);
+        },
+      });
       stubPhone(true);
       window.localStorage.clear();
       window.localStorage.setItem(lastNoteKey('u_kiro', WS_A), NOTE_A);
       const view = renderPage();
       const panel = await screen.findByTestId('notes-panel');
       const nav = panel.querySelector<HTMLElement>('.gn-help__nav')!;
-      nav.scrollTop = startAt;
       await within(panel).findByTestId(`note-row-${NOTE_A}`);
       await settle();
       const at = nav.scrollTop;
       view.unmount();
       vi.restoreAllMocks();
+      if (own === undefined) Reflect.deleteProperty(Element.prototype, 'scrollTop');
+      else Object.defineProperty(Element.prototype, 'scrollTop', own);
       return at;
     };
     // Below the fold: 600 - 0 - (200 - 40) / 2 = 520 more than where it started.
