@@ -38,7 +38,7 @@ Ledger line (all fields always present):
 
 - `id`: integer, allocated under an `mkdir` lock as `last id + 1` (read from the last ledger line), so concurrent posters never collide and ids follow ledger order. Seats type `ack 42`.
 - `from`/`to`: tmux window names. `to` may be given as a bare number (`ctl post 2 …`) and is stored as the window's current NAME. Allowed names: `main|planner|dispatcher|exec<N>|reviewer<X>` (alias `orch` → `main`). A name with no window now is accepted with a warning (the seat may be mid-restart); it stays posted.
-- `kind` ∈ `next fix mergetip ready ruling question note page bounce`. `ack` is false only for `note` (delivered to the inbox, then closed; never pasted).
+- `kind` ∈ `next fix mergetip question note page bounce` (READY/RULING stay QUEUE-gate lines, §8, so they are not kinds; `question` is a seat asking the orchestrator or planner, e.g. a lane's BLOCKED). `ack` is false only for `note` (delivered to the inbox, then closed; never pasted).
 - `body`: absolute path. `--body FILE` stores that path (+ sha256, bytes, taken at post time); `--text "…"` writes `spool/<id>.txt` and stores that. Long documents are always referenced by path; a body is a short instruction or a brief.
 - `reply_to`: an id; `ctl post … --reply-to 7` also acks 7 for the poster (replying is receiving).
 - `src`: set only by the bridge (`queue-dispatch:<sha1 of the line>`); the bridge refuses a `src` already in the ledger, so a reset cursor cannot repost history.
@@ -63,11 +63,12 @@ posted ──(head of its seat's queue, body present)──▶ delivered(inbox) 
 
 - **Order: one open message per seat.** The head is the lowest-id unacked, un-bounced, ack-required message to that seat; later ones stay `posted` ("queued") and do not appear in the inbox file until the head is acked. This is the cure for crossed dispatches (e): a lane never holds a NEXT and a FIX at once. `ctl inbox` still lists the queued ones.
 - **`delivered(inbox)`**: append the ledger line to `inbox/<seat>.jsonl`; record `inboxed_ts`. A seat with a live watcher (heartbeat < 10 s old) sees it within one poll.
-- **Pane tier.** `grace`: 45 s after `inboxed_ts` when the seat is watched (the watcher should have produced an ack), 0 s when it is not (every lane; any seat whose 30-min Monitor expired — self-healing, no config). Then attempt a pane pointer when due: attempts at 0, +3 min, +10 min, +20 min (`CTL_POSTMAN_BACKOFF`); after a PROVEN delivery (echoed above the prompt with a new spinner, or the queued-messages hint) the next attempt waits 15 min, because the seat has the text and is just busy. Each attempt first runs `pane_state` (§6).
+- **Pane tier.** A WATCHED seat (heartbeat < 10 s old) gets the pane tier only when it is idle (`pane_state` = `ok`) and 120 s have passed without an ack; while it is `busy` the pane tier is skipped altogether (its Monitor event is already queued in its session, and a pasted pointer on top would be a second delivery of the same text), up to the 30-min page. An UNWATCHED seat gets the pane tier at once (every lane; any seat whose 30-min Monitor expired — self-healing, no config). Then attempt a pane pointer when due: attempts at 0, +3 min, +10 min, +20 min (`CTL_POSTMAN_BACKOFF`); after a PROVEN delivery (echoed above the prompt with a new spinner, or the queued-messages hint) the next attempt waits 15 min, because the seat has the text and is just busy. Each attempt first runs `pane_state` (§6).
 - **Ack**: `ctl ack <id>` creates `acks/<id>` exclusively. Presence is checked at the top of every pass and again just before a paste. Terminal.
 - **Page**: once per message (`state.paged`), when tries ≥ 4, or open > 30 min, or the seat has been unreachable (dead/menu/box-text/copy-mode) > 5 min (dead window: 2 min). A page is a `kind=page` message from `postman` to `main` ("#42 → exec3 unacked after 4 tries, last: box-text"). If the target IS `main`, page `planner`; if the target is `planner`, append a `⚑` line to `CTL-TO-PLANNER-notes.md` (owner-visible). A page never blocks the original message; it stays open and keeps its slow retry.
 - **Crash safety (at-least-once).** `state/<id>.json` is written with the attempt BEFORE the paste (`attempt n, ts`), and the outcome after. A kill between the two repeats the paste after the backoff, never loses it; the id in the text and the idempotent ack make a repeat harmless. A restarted daemon recomputes everything from ledger + acks + state.
 - **Done.** The plan's fourth state (`done`) is dropped: completion is already the `DONE`/`TOOK` lines of the QUEUE files and the lane's DONE+REVIEW. `acked` is terminal for delivery.
+- **Restart supersedes.** Under one-task-one-session a fresh session is started by `ctl restart` with its task as the launch prompt, so a message still open for that seat was addressed to a session that no longer exists and would otherwise jam the head of the queue (the postman re-pointing #42 at a session that never saw it, which is already working something else). Rule: **`ctl restart` supersedes every open message to that seat posted before the restart**: it writes `postman/restarts/<seat>` (epoch) and the daemon, on its next pass, writes `acks/<id>` = `cancelled-by-restart` for each such message and posts ONE `note` to `main` listing the ids and kinds, so the orchestrator reposts what is still wanted. A message posted AFTER the restart is untouched. Consequence for senders: **restart first, then post** (a `post` followed by a `restart` is cancelled). Follow-up, not MVP: the daemon also notices a changed `pane_pid` for a seat (a restart done by hand) and applies the same rule.
 - **Operator escape**: `ctl ack <id> --cancel [--note T]` closes a message nobody should receive any more (writes the ack with `cancelled`).
 
 ## 5. The verbs
@@ -86,7 +87,7 @@ posted ──(head of its seat's queue, body present)──▶ delivered(inbox) 
 
 **The inbox watcher** (`ctl inbox --watch`; B6: ONE per seat; Monitor timeout 30 min, re-armed on expiry): reads `inbox/<seat>.jsonl` from the byte offset in `cursor-<seat>-inbox` and prints, for each line whose id has no ack yet, the pointer line; flushes; THEN advances the cursor (a kill between read and emit replays the line). A MISSING cursor starts at 0, not EOF (unlike `watch-cursor.py`): replaying an inbox is safe because acked ids are skipped, and a lost cursor must never lose a message. A file that shrinks restarts at 0. Dedupe: acked ids skipped, plus an in-process set so one run never prints an id twice. **Single instance:** on start it reads `inbox-watch-<seat>.pid`; if that pid is alive and `ps -o args= -p <pid>` contains `inbox --watch` for the same seat, it SIGTERMs that exact pid (never `pkill`) and takes over, so a stray watcher that survived `/clear` (mechanism d) dies at the next arm. It touches `.hb` every poll (the daemon's "watched" signal). No regex filter exists, so a differently worded line cannot be dropped (mechanism f).
 
-**Queue bridge** (the dispatcher's retirement path; `postman run` only): tails `QUEUE-dispatch.md` from `cursor-queue-dispatch` (first run: EOF; the 312 KB of history is never reposted) and parses exactly these grammars, nothing fuzzy:
+**Queue bridge** (the dispatcher's retirement path; `postman run` only): tails `QUEUE-dispatch.md` from `cursor-queue-dispatch` (first run: EOF; the 312 KB of history is never reposted) and parses exactly these grammars, nothing fuzzy. **What `<win>` means (measured in the file, 289 lines):** it is NOT reliably a window index. Of the 124 FIX + 141 MERGETIP + 23 NEXT + 1 CLOSE lines, the target token is `1`–`5` in 252, but also `lane1`/`lane3`/`lane4`/`lane5` (35), `7` (3 FIX lines, 03:20–04:56 today, a lane at a time when window 7 is `reviewerA` now), `orchestrator`, `planner`, and sometimes a BRANCH name or a path. **Resolution rule:** the target token must be `N` or `laneN` with N in 1–5; it is resolved to a window NAME through `tmux list-windows` (`exec<N>`), and the resolved name must match `exec*`. Anything else (`7`, `orchestrator`, `planner`, a branch, a window whose name is not `exec*`, a number with no window) is NEVER delivered: one `note` to `main` quoting the line. A mis-numbered FIX can therefore only be refused, never routed to a reviewer or the planner.
 
 | Line | Message |
 |---|---|
@@ -99,12 +100,12 @@ posted ──(head of its seat's queue, body present)──▶ delivered(inbox) 
 
 ## 6. `pane_state` — the checks before any paste (new in lib.sh, used by the daemon, optionally by `ctl dispatch`)
 
-Returns exactly one token for `session:window-name`:
+Returns exactly one token for `session:window-name` (an allowlist for "safe to type", everything else is refused):
 
 | Token | Test | Daemon action |
 |---|---|---|
 | `nowindow` | no window of that name | defer; page after 2 min |
-| `shell` | `pane_current_command` ∈ zsh/bash/sh/fish (claude is not running) | **never type**; page after 2 min (a pointer line pasted into a shell would be EXECUTED) |
+| `notclaude` | `pane_current_command` does NOT match the claude signature `^[0-9]+\.[0-9]+\.[0-9]+$` (the measured form, `2.1.288`) or `claude`/`node` — an ALLOWLIST: a shell, `less`, `vim`, `python3`, `ssh` all fail it | **never type**; page after 2 min (a pointer line pasted into a shell would be EXECUTED) |
 | `copy-mode` | `pane_in_mode`=1 | defer; after `CTL_POSTMAN_CM_CANCEL` (180 s) of unbroken copy-mode send `-X cancel` once, then proceed (an abandoned copy-mode is the failure; a user scrolling is given 3 min) |
 | `menu` | the last `❯` line is `❯ <digit>.` (a permission/option menu; "a pasted Enter picks option 1") or no `❯` is on screen | defer; page after 5 min |
 | `ours` | box holds real text beginning `[postman #<id>` (our own unsubmitted paste, mechanism c) | submit-pending: Enter presses only (`ctl_submit`), never a second paste |
@@ -123,7 +124,10 @@ Proof waits are capped at 8 s inside the daemon (`CTL_PROOF_TRIES=8`) so one slo
 | Input box holds our own earlier paste | text starts `[postman #id` | submit-pending only, no second paste |
 | Input box holds someone's text | any other real text | never cleared; defer; page at 5 min |
 | Permission/option menu on screen | `❯ <n>.` / no prompt | defer; page at 5 min (never a blind Enter) |
-| Dead seat (window gone, or a shell) | `nowindow` / `shell` | nothing typed; message stays posted/delivered; page at 2 min; delivered automatically when the window returns and is `ok` |
+| Dead seat (window gone, or claude not running) | `nowindow` / `notclaude` | nothing typed; message stays posted/delivered; page at 2 min; delivered automatically when the window returns and is `ok` |
+| Seat restarted with a message open | `postman/restarts/<seat>` newer than the message | `cancelled-by-restart` ack + ONE note to `main` listing the ids; a message posted after the restart is kept |
+| Watched seat mid-turn | heartbeat fresh + `busy` | no pane paste (its Monitor line is queued); paged at 30 min |
+| `$TMUX_PANE` unset (seat identity) | env empty | `--from` / `--seat` is required, else the verb fails (verified: this lane's Bash tool carries `TMUX_PANE`; a pane has its window name) |
 | Seat acks twice / ack replayed | `acks/<id>` exists | second `ctl ack` is `OK … already acked`, no new file, no event |
 | Ack from the wrong seat | `to` ≠ caller | refused (exit 1); `--seat` is the operator override |
 | Ack for an unknown id | not in the ledger | exit 1 |
@@ -145,13 +149,17 @@ Proof waits are capped at 8 s inside the daemon (`CTL_PROOF_TRIES=8`) so one slo
 ## 8. Migration plan (what stays manual)
 
 1. **Build** (steps 2–3 after the go): verbs + daemon + tests on a scratch tmux session and ledger. No live seat touched.
-2. **Shadow run**: `ctl postman run --shadow` in a tmux window `postman` on the LIVE ledger: the bridge posts messages and logs "would deliver", the pane tier is off. The dispatcher keeps delivering. The orchestrator compares ledger vs the dispatcher's actual deliveries (`DISPATCH-log.md`) for one gate cycle; any miss is a bridge bug.
+2. **Shadow run** (follow-up flag; until it exists, run the daemon with the pane tier disabled by `CTL_POSTMAN_PANE=0`): `ctl postman run --shadow` in a tmux window `postman` on the LIVE ledger: the bridge posts messages and logs "would deliver", the pane tier is off. The dispatcher keeps delivering. The orchestrator compares ledger vs the dispatcher's actual deliveries (`DISPATCH-log.md`) for one gate cycle; any miss is a bridge bug.
 3. **Cutover, lanes first** (pane tier only, lowest risk): the daemon runs unshadowed; the dispatcher stops delivering NEXT/FIX/MERGETIP and only watches. Then each of the orchestrator, the reviewers and the dispatcher's replacement duties arm ONE `ctl inbox --watch` Monitor and drop their regex monitors on QUEUE-gate/QUEUE-dispatch (the cards change in B12; each restart card's first step is `TaskStop` of every monitor, then arm).
 4. **Retire the dispatcher** once the shadow log shows parity and one full release of lane traffic ran unshadowed.
 
 What moves into the postman: delivery of NEXT/FIX/MERGETIP, proof of delivery (ack), the undelivered-FIX sweep (`audit`), the delivery half of `DISPATCH-log.md` (the ledger). **What stays manual (the orchestrator, per `ctl seats`/`LANES.md`):** deciding a lane's next task and writing a brief; the HOLD/overlap rules; reading a BLOCKED and answering it; `ctl close`; `QUEUE-review.md` as the shared claim-by-`TOOK` work queue (reviewers pull; a REVIEW line is not addressed to one seat); `QUEUE-gate.md` READY/RULING lines (the orchestrator's cursor watcher already covers them, and they stay the audit trail); every landing and every release.
 
-Small hardening in this task: `ctl restart` keeps the window's existing NAME (today it renames window 10 `exec6` to `exec10`, which would orphan a message addressed `exec6`).
+Small changes to `ctl restart` in this task: it keeps the window's existing NAME (today it renames window 10 `exec6` to `exec10`, which would orphan a message addressed `exec6`), and it writes the supersede marker of §4.
+
+## 8b. MVP cut line (owner's speed ruling)
+
+**MVP (one pass, the dispatcher can retire on this):** `post`, `ack`, `inbox` (+ `--watch`), `postman once/run` with the inbox + pane tiers, `pane_state`, the QUEUE-dispatch bridge, restart-supersede, `postman status`. **Follow-up, a second small task:** `audit`, `rebuild-inbox`, `--shadow`, the page chain into the notes file (MVP pages only `main`, and `planner` when the target is `main`), the pane-pid restart detector, the daily ledger copy.
 
 ## 9. Test plan (`scripts/ctl/test/postman.test.sh`, wired into `ctl selftest`; every case id carried in the test name)
 
@@ -162,7 +170,7 @@ Everything runs against a temp `CTL_POSTMAN_ROOT`, a scratch tmux session `ctlpm
 - **Watcher**: cursor advances only after emit (a `CTL_TEST_DIE_AFTER_READ` kill replays the line); missing cursor replays unacked from 0; duplicate watcher replaces the old pid; a shrunk file restarts at 0; heartbeat touched.
 - **Bridge**: each grammar → the right message; first run starts at EOF; the same line twice → one message (`src`); an unparsable line → a `note` to `main`; TOOK/DONE/NOTE/HOLD ignored; `CLOSE` → a note.
 - **State machine** (fake clock): inbox first, pane after the grace; watched vs unwatched grace; backoff ladder; proven delivery waits 15 min; ack stops redelivery; one open message per seat, in id order; page after 4 tries, exactly once, and the page chain (`main` → planner → notes); bounce on a lost body; crash between state write and paste repeats the paste; second daemon refused; live/scratch guard.
-- **Pane safety** (real scratch panes): `ok` → pasted and echoed; `copy-mode` → nothing typed, then cancelled after 180 s; `shell` → the pointer text NEVER appears in the pane; `menu` → untouched; `ours` → exactly one copy of the pointer and the box submitted; `text` → box unchanged; `busy` → pasted once, not again before 15 min; `nowindow` → stays posted.
+- **Pane safety** (real scratch panes): `ok` → pasted and echoed; `copy-mode` → nothing typed, then cancelled after 180 s; `notclaude` (a bash pane, and a `less` pane) → the pointer text NEVER appears in the pane; `menu` → untouched; `ours` → exactly one copy of the pointer and the box submitted; `text` → box unchanged; `busy` → pasted once, not again before 15 min; `nowindow` → stays posted.
 - Own mutation pass (≥ 1 mutation per case) before DONE: e.g. remove the shell refusal, advance the cursor before emitting, drop the exclusive create on acks, drop the lock, skip the ack re-check, page twice.
 
 ## 10. Open questions for the planner (recommendation first)
