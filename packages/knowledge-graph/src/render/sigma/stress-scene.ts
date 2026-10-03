@@ -5,6 +5,30 @@ import { iconUri } from './icons.js';
 import { initialsOf } from '../initials.js';
 import { createSigma } from './program.js';
 
+/**
+ * Resolves once Sigma has drawn nothing for `quietMs` (or after `capMs`). The icon atlas and the label attachments are built
+ * asynchronously after the first draw and each build redraws, so a quiet render loop is the observable "textures are loaded
+ * and uploaded": the first camera move must not be the thing that pays for them (spec §7, cold start).
+ */
+function renderQuiet(sigma: { on(event: 'afterRender', cb: () => void): unknown; off(event: 'afterRender', cb: () => void): unknown }, quietMs: number, capMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    let timer = 0;
+    const finish = () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(cap);
+      sigma.off('afterRender', arm);
+      resolve();
+    };
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(finish, quietMs);
+    };
+    const cap = window.setTimeout(finish, capMs);
+    sigma.on('afterRender', arm);
+    arm();
+  });
+}
+
 export type SweepStats = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
 /** `fps`/`worstMs` and the rest describe the FIRST sweep (what the spec §7 bar reads); `pass2` is an identical second sweep, warm. */
 export type StressResult = SweepStats & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: SweepStats };
@@ -39,7 +63,7 @@ export async function runStress(
     k += 1;
   }
   const sigma = createSigma(graph, container, () => palette, { nodeHovered: () => false, highlightOn: () => false });
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await renderQuiet(sigma, 200, 10_000);
   const camera = sigma.getCamera();
   /** One timed camera sweep: every frame's delta, from a fresh `last`. */
   const sweep = () =>

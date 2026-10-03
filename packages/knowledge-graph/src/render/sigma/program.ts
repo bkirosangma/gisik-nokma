@@ -13,6 +13,14 @@ export type EdgeState = { isNb: boolean; isSel: boolean };
 /** The adapter's handle type. Named here because tsc cannot spell the inferred one portably (TS2742, pnpm layout). */
 export type KgSigma = Sigma<NodeAttributes, EdgeAttributes, Attributes, NodeState, EdgeState>;
 
+/**
+ * @sigma/node-image@4.0.0-alpha.3 builds the icon atlas (draw + GPU upload) `debounceTimeout` ms after the first image
+ * loads, 500 by default. Measured (KG-C T1, M2 Pro): that landed ~230 ms into the first camera sweep and cost 2 frames of
+ * 33-58 ms, failing spec §7's worst-frame bar on a cold start. A short debounce still coalesces the burst of loads but
+ * builds the atlas while the view is opening, before the first camera move.
+ */
+export const ICON_ATLAS_DEBOUNCE_MS = 20;
+
 export type ViewFlags = { nodeHovered: () => boolean; highlightOn: () => boolean };
 
 const big = (lv: Level | 'fog') => lv === 'card' || lv === 'cardS';
@@ -53,7 +61,7 @@ export function createSigma(
       nodes: {
         variables: { image: { type: 'string', default: '' } }, // trap 4: icons are a declared node variable
         shapes: [sdfCircle(), sdfSquare()],
-        layers: [layerFill(), layerImage({ drawingMode: 'image', textureManagerOptions: { size: { mode: 'force', value: 64 }, objectFit: 'contain' } })],
+        layers: [layerFill(), layerImage({ drawingMode: 'image', textureManagerOptions: { size: { mode: 'force', value: 64 }, objectFit: 'contain', debounceTimeout: ICON_ATLAS_DEBOUNCE_MS } })],
         labelAttachments: { subL: sub, subD: sub },
       },
       edges: {
