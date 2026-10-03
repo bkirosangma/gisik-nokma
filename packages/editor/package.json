@@ -14,12 +14,27 @@
       "types": "./dist/webview/bridge.d.ts",
       "default": "./dist/webview/bridge.js"
     },
+    "./upload": {
+      "types": "./dist/upload.d.ts",
+      "default": "./dist/upload.js"
+    },
+    "./comment-toolbar-pref": {
+      "types": "./dist/comment-toolbar-pref.d.ts",
+      "default": "./dist/comment-toolbar-pref.js"
+    },
+    "./markdown-hint": {
+      "types": "./dist/markdown-hint.d.ts",
+      "default": "./dist/markdown-hint.js"
+    },
     "./markdown-doc": {
       "types": "./dist/markdown-doc/index.d.ts",
       "default": "./dist/markdown-doc/index.js"
     },
     "./editor.css": "./src/styles/editor.css"
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:webview": "vite build --config vite.webview.config.ts",

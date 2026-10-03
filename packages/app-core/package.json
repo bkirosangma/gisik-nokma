@@ -10,11 +10,26 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "default": "./dist/data.js"
+    },
+    "./help": {
+      "types": "./dist/help/index.d.ts",
+      "default": "./dist/help/index.js"
+    },
+    "./workflow-builder": {
+      "types": "./dist/workflow-builder/index.d.ts",
+      "default": "./dist/workflow-builder/index.js"
+    },
     "./online": {
       "types": "./dist/online/index.d.ts",
       "default": "./dist/online/index.js"
     }
   },
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

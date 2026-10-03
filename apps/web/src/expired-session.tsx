@@ -6,7 +6,7 @@ import {
   SESSION_EXPIRED_COPY,
   SessionExpiredError,
   type DataSource,
-} from '@gisik-nokma/app-core';
+} from '@gisik-nokma/app-core/data';
 import { clearReadCaches } from './clear-read-caches.js';
 
 /**

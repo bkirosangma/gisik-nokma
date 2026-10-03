@@ -12,11 +12,11 @@ import {
   createReplicaDataSource,
   type ReplicaDataSource,
   type SyncNoticeView,
-  type TicketSummary,
 } from '@gisik-nokma/app-core';
 import { createTauriSqlStorage } from './storage/tauri-sql-storage.js';
 import { initReplica } from './init-replica.js';
 import { SIGNED_OUT_HINT } from './copy.js';
+import { OpeningSkeleton, TicketList } from './ticket-list.js';
 
 // Dev configuration; Plan 11 owns real endpoints. Session/workspace selection
 // follows Plan 6's session handling once it lands (Open questions) — until
@@ -176,35 +176,10 @@ export function App() {
       {initError !== null ? (
         <p role="alert">{initError}</p>
       ) : ds === null ? (
-        <p>Opening local replica…</p>
+        <OpeningSkeleton />
       ) : (
         <TicketList ds={ds} workspaceId={workspaceId} />
       )}
     </div>
-  );
-}
-
-function TicketList(props: { ds: ReplicaDataSource; workspaceId: string }) {
-  const [tickets, setTickets] = useState<TicketSummary[]>([]);
-  useEffect(() => {
-    // DEVIATION beyond the plan text: ds.query.listTickets does not exist on
-    // ReplicaDataSource's query surface — the real method is
-    // listTicketSummaries(workspaceId), which already returns {ticketId,
-    // title, stateId, pending, openContests} among other fields.
-    const refresh = (): void => void props.ds.query.listTicketSummaries(props.workspaceId).then(setTickets);
-    refresh();
-    return props.ds.subscribe(props.workspaceId, 0, refresh);
-  }, [props.ds, props.workspaceId]);
-  return (
-    <ul className="ticket-list">
-      {tickets.map((t) => (
-        <li className="ticket-list__row" key={t.ticketId}>
-          <span className="ticket-list__title">{t.title}</span>
-          <span className="ticket-list__state">{t.stateId}</span>
-          {t.pending ? <span className="ticket-list__badge ticket-list__badge--pending">claim in transit</span> : null}
-          {t.openContests > 0 ? <span className="ticket-list__badge ticket-list__badge--contested">{t.openContests} contested</span> : null}
-        </li>
-      ))}
-    </ul>
   );
 }

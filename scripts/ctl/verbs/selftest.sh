@@ -14,6 +14,7 @@ step "gate cache correctness (turbo task hashes)" "bash '$HERE/test/gate-cache.t
 step "run-tests suite (semaphore, summary, gate priority)" "bash '$HERE/test/run-tests.test.sh'"
 step "run-tests --dry-run"  "'$HERE/ctl' run-tests --repo '$repo' --dry-run -- true"
 step "run-tests refuses a missing command" "! '$HERE/ctl' run-tests --repo '$repo' --dry-run"
+step "tipmerge suite (clean → pushed + tree proof, conflict → paths, moved → refused)" "bash '$HERE/test/tipmerge.test.sh'"
 step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
 # only those two named refusals are accepted here — any other non-zero exit is a red step.
@@ -29,5 +30,6 @@ step "lanes"                 "'$HERE/ctl' lanes"
 step "dispatch --dry-run refuses a missing file" "! '$HERE/ctl' dispatch 2 /nonexistent --dry-run"
 step "restart --dry-run refuses window 0" "! '$HERE/ctl' restart 0 '$repo' '$HERE/README.md' --dry-run"
 step "rebuild --dry-run"     "'$HERE/ctl' rebuild --dry-run"
+step "tipmerge refuses main as the branch" "out=\$('$HERE/ctl' tipmerge main --base release/x --expect abcdef0 --repo '$repo' --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'not a task branch'"
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
-[ "$fails" -eq 0 ] && ctl_ok selftest "19 steps" || ctl_fail selftest "$fails steps red"
+[ "$fails" -eq 0 ] && ctl_ok selftest "21 steps" || ctl_fail selftest "$fails steps red"

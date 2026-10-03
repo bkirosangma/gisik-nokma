@@ -29,6 +29,7 @@ import { ProjectEditForm, type EditRefusal, type ProjectEditValues } from '../..
 import { fieldRefusalHandler, ProjectGroupField } from '../../../src/project-group-field.js';
 import { groupSeeds, type GroupChoice } from '../../../src/group-picker-seeds.js';
 import { useWorkspaceGroups } from '../../../src/use-workspace-groups.js';
+import { useOptimisticName } from '../../../src/use-optimistic-name.js';
 import { WorkspacePrefixEdit } from '../../../src/workspace-prefix-edit.js';
 import { bumpProjectsVersion } from '../../../src/projects-version.js';
 import { updateSeeds } from '../../../src/project-update-seeds.js';
@@ -318,6 +319,8 @@ export default function WorkspaceHomePage() {
       whenDone: () => void,
       /** A form that shows a refusal under its own field claims it (returns true) so the page does not say it twice. */
       onRefused?: (rule: string, reason: string) => boolean,
+      /** Called on EVERY arm that is not a commit — the optimistic rename takes its name back here (smoothness T7). */
+      whenFailed?: () => void,
     ): void => {
       setRefusal(null);
       // Refused HERE and not sent, for the same reason the members page refuses
@@ -330,6 +333,7 @@ export default function WorkspaceHomePage() {
       // from two different reads of the session. One check, one id, one place.
       if (user === null) {
         setRefusal('You are not signed in, so nothing was sent.');
+        whenFailed?.();
         return;
       }
       const seeds = build(user.id);
@@ -352,6 +356,7 @@ export default function WorkspaceHomePage() {
             setRefusal(
               `The server answered ${results.length} of ${seeds.length} claims, so what happened is not known.`,
             );
+            whenFailed?.();
             reload();
             return;
           }
@@ -378,6 +383,7 @@ export default function WorkspaceHomePage() {
                 : `${bad.code}: ${bad.message}`,
             );
           }
+          whenFailed?.();
           // Re-read on a refusal too: a partly-committed batch changed the
           // world, and a stale list beside a refusal shows two contradictory
           // things at once.
@@ -386,6 +392,7 @@ export default function WorkspaceHomePage() {
         (cause: unknown) => {
           setBusy(false);
           setRefusal(cause instanceof Error ? cause.message : String(cause));
+          whenFailed?.();
         },
       );
     },
@@ -928,6 +935,7 @@ function WorkspaceHome({
     build: (actorId: string) => EnvelopeSeed[],
     whenDone: () => void,
     onRefused?: (rule: string, reason: string) => boolean,
+    whenFailed?: () => void,
   ) => void;
   refusal: string | null;
   createOpen: boolean;
@@ -1048,6 +1056,8 @@ function WorkspaceHome({
    */
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  /** The name the page DRAWS: the one just typed while its write is open or unread, else the served one. */
+  const shownName = useOptimisticName(workspace.name);
 
   const onRename = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -1056,6 +1066,12 @@ function WorkspaceHome({
     // `displayName`'s own refine refuses a blank name, so sending one would
     // spend a round trip to be told what this form already knows.
     if (name === '') return;
+    // The new name is on the page NOW and the field closes; a refusal takes the name back and reopens the field
+    // with what the person typed, beside the reason (smoothness T7, spec S5).
+    if (name !== workspace.name) {
+      shownName.begin(name);
+      setRenaming(false);
+    }
     onSubmit(
       () => [
         {
@@ -1065,7 +1081,16 @@ function WorkspaceHome({
           payload: { name },
         },
       ],
-      () => setRenaming(false),
+      () => {
+        shownName.settle();
+        setRenaming(false);
+      },
+      undefined,
+      () => {
+        shownName.drop();
+        setNameDraft(name);
+        setRenaming(true);
+      },
     );
   };
 
@@ -1075,12 +1100,12 @@ function WorkspaceHome({
           is the component that holds the workspace's name — the page above it
           has only the id. exec1 P12: the browser tab, the window title, history
           and a screen reader's page announcement all read this. */}
-      <DocumentTitle title={workspace.name} />
+      <DocumentTitle title={shownName.name} />
       <div className="gn-workspace-home__header">
         {/* Tint keyed on the workspace ID, never the name — Task 18's own
             survivor mutation, restated here rather than re-measured: a rename
             must not change a colour a person has learned. */}
-        <Avatar size="large" name={workspace.name} tint={workspace.id} />
+        <Avatar size="large" name={shownName.name} tint={workspace.id} />
         <div className="gn-workspace-home__header-titles">
           {/**
            * THE NAME IS THE RENAME'S CONTROL (owner, 2026-09-19: *"have the
@@ -1161,27 +1186,27 @@ function WorkspaceHome({
                   <button
                     type="button"
                     className="gn-workspace-home__rename-trigger"
-                    aria-label={`Rename ${workspace.name}`}
+                    aria-label={`Rename ${shownName.name}`}
                     disabled={busy}
                     onClick={() => {
-                      setNameDraft(workspace.name);
+                      setNameDraft(shownName.name);
                       setRenaming(true);
                     }}
                   >
-                    <span id={RENAME_NAME_ID}>{workspace.name}</span>
+                    <span id={RENAME_NAME_ID}>{shownName.name}</span>
                   </button>
                 ) : (
-                  workspace.name
+                  shownName.name
                 )}
               </h1>
               {isAdmin ? (
                 <button
                   type="button"
                   className="gn-workspace-home__rename-icon"
-                  aria-label={`Rename ${workspace.name}`}
+                  aria-label={`Rename ${shownName.name}`}
                   disabled={busy}
                   onClick={() => {
-                    setNameDraft(workspace.name);
+                    setNameDraft(shownName.name);
                     setRenaming(true);
                   }}
                 >
