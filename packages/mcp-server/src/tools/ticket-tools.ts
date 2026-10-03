@@ -38,7 +38,10 @@ const updateShape = {
 };
 
 /** A payload without any document in it (owner question Q4): the ledger's facts, never a body. One rule for a line and for a contested claim's original. */
-function redactedPayload(type: string, eventId: string, payload: Record<string, unknown>): Record<string, unknown> {
+export function redactedPayload(type: string, eventId: string, payload: Record<string, unknown>): Record<string, unknown> {
+  if (type === 'ticket.link_added' || type === 'ticket.link_removed') {
+    return payload['targetId'] === null ? { kind: payload['kind'], target: "a ticket you can't see" } : payload;
+  }
   if (type === 'comment.added') return { commentId: eventId };
   if (type === 'comment.edited' || type === 'comment.deleted') return { commentId: payload['commentId'] };
   if (type === 'ticket.field_set' && payload['fieldId'] === 'description') return { fieldId: 'description' };

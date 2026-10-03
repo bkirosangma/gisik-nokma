@@ -1,3 +1,4 @@
+import { linkReading, TICKET_LINK_KINDS, type TicketLinkKind } from '@gisik-nokma/domain';
 import { actorLabel, formatDate } from '../provenance.js';
 import type { TicketHistoryEvent } from '../view-types.js';
 
@@ -221,6 +222,16 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
         return name === null ? event.type : `Linked Drive file ${name}`;
       }
       return event.type;
+    }
+    case 'ticket.link_added':
+    case 'ticket.link_removed': {
+      const kind = str(payload, 'kind');
+      if (kind === null || !(TICKET_LINK_KINDS as readonly string[]).includes(kind)) return event.type;
+      const other =
+        event.linkTarget === null ? "a ticket you can't see"
+        : event.linkTarget?.key ?? 'another ticket';
+      const verb = event.type === 'ticket.link_added' ? 'Linked' : 'Removed link';
+      return `${verb}: ${linkReading(kind as TicketLinkKind, 'out')} ${other}`;
     }
     case 'claim.contested':
       return 'Conflicting claim recorded';

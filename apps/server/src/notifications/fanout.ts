@@ -387,6 +387,8 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           ) {
             await handleMentions(env, parsed.data.value, 'description');
           }
+        } else if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
+          // Spec A §7: links notify nobody. An explicit arm so the census can see the decision.
         } else if (env.type === 'claim.contested') {
           await handleContested(env);
         }

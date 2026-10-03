@@ -63,7 +63,9 @@ describe('27.001 link payloads', () => {
       entity: { kind: 'ticket', id: SOURCE },
       payload: { kind: 'blocks', targetId: TARGET },
     });
-    expect(() => parseEvent(submitted)).not.toThrow();
+    expect(parseEvent(submitted).ok).toBe(true);
+    // and through the door, the strict schema still refuses an extra member
+    expect(parseEvent({ ...submitted, payload: { kind: 'blocks', targetId: TARGET, note: 'x' } }).ok).toBe(false);
   });
 });
 
@@ -83,7 +85,9 @@ describe('27.002 registration', () => {
       entity: { kind: 'note', id: SOURCE },
       payload: { kind: 'blocks', targetId: TARGET },
     });
-    expect(() => parseEvent(onNote)).toThrow();
+    const refused = parseEvent(onNote);
+    expect(refused.ok).toBe(false);
+    expect(refused.ok ? null : refused.code).toBe('entity-kind-mismatch');
   });
 });
 

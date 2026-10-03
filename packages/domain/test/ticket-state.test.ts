@@ -694,7 +694,7 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
-    // SEVENTEEN of the TWENTY registered against entityKind 'ticket' (typed-links T1, 2026-10-03:
+    // SEVENTEEN of the TWENTY-TWO registered against entityKind 'ticket' (typed-links T1, 2026-10-03:
     // 'ticket.link_added' and 'ticket.link_removed' joined the list — both fold into `links`).
     // The earlier arithmetic read FIFTEEN of EIGHTEEN (backlog/closed
     // spec, 2026-09-17: 'ticket.closed' and 'ticket.reopened' joined the list —

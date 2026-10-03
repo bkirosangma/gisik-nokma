@@ -1,3 +1,4 @@
+import type { TicketLinkKind } from './events/ticket-events.js';
 import type { StateCategory } from './workflow.js';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
@@ -117,7 +118,16 @@ export type TicketState = {
    * deleted is a filter the server applies, not a fact the card needs.
    */
   deleted?: { actorId: string; at: string } | null;
+  /**
+   * Outbound typed links, in the order added. ABSENT when there are none, on
+   * the reducer and on `rowToTicketState` alike (typed-links plan T1/T2): the
+   * reducer drops the key with the last link, so the two shapes agree.
+   */
+  links?: TicketLink[];
 };
+
+/** One OUTBOUND typed link (spec A §2.2). Inbound links live on the other ticket's state. */
+export type TicketLink = { kind: TicketLinkKind; targetId: string };
 
 export type MembershipState = {
   kind: 'membership';
