@@ -45,6 +45,8 @@ export type DraftActions = {
   setInitialState(stateId: string): void;
   removeState(stateId: string): void;
   moveState(nodeId: string, position: StatePosition): void;
+  /** Replaces every position in ONE notify (Tidy, and its undo): not a `moveState` per id. */
+  setPositions(positions: Record<string, StatePosition>): void;
   addTransition(from: string, to: string): void;
   removeTransition(index: number): void;
   addRule(transitionIndex: number, rule: Rule): void;
@@ -248,6 +250,9 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
     },
     moveState(nodeId, position) {
       set({ ...state, positions: { ...state.positions, [nodeId]: position } });
+    },
+    setPositions(positions) {
+      set({ ...state, positions });
     },
     addTransition(from, to) {
       setDef({ ...state.def, transitions: [...state.def.transitions, { from, to, rules: [] }] });

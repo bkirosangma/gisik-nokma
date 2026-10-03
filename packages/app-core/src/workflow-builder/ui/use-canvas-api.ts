@@ -11,6 +11,18 @@ export type CanvasApi = {
   sizes(): Record<string, { width: number; height: number }>;
 };
 
+/** React Flow's measured nodes as sizes by position key (`s:<id>` becomes `<id>`, `any-state` stays). A node not yet measured has no entry. */
+export function measuredSizes(nodes: readonly Node[]): Record<string, { width: number; height: number }> {
+  const sizes: Record<string, { width: number; height: number }> = {};
+  for (const candidate of nodes) {
+    const { width, height } = candidate.measured ?? {};
+    if (width !== undefined && height !== undefined) {
+      sizes[candidate.id === ANY_STATE_NODE_ID ? candidate.id : candidate.id.slice('s:'.length)] = { width, height };
+    }
+  }
+  return sizes;
+}
+
 export function useCanvasApi(onReady: ((api: CanvasApi | null) => void) | undefined, nodes: RefObject<{ nodes: Node[] }>) {
   const { getViewport } = useReactFlow();
   const rf = useStoreApi();
@@ -22,14 +34,7 @@ export function useCanvasApi(onReady: ((api: CanvasApi | null) => void) | undefi
         return { x: (width / 2 - x) / zoom, y: (height / 2 - y) / zoom };
       },
       sizes() {
-        const sizes: Record<string, { width: number; height: number }> = {};
-        for (const candidate of nodes.current.nodes) {
-          const { width, height } = candidate.measured ?? {};
-          if (width !== undefined && height !== undefined) {
-            sizes[candidate.id === ANY_STATE_NODE_ID ? candidate.id : candidate.id.slice('s:'.length)] = { width, height };
-          }
-        }
-        return sizes;
+        return measuredSizes(nodes.current.nodes);
       },
     });
     return () => onReady?.(null);

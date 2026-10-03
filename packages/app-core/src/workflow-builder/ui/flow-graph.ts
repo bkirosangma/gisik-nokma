@@ -75,7 +75,7 @@ export function connectionToTransition(connection: {
 /** F-5 (WF-03): the zoom a phone-width canvas opens at. High enough that a node's 13px checkbox is drawn near its CSS size. */
 export const PHONE_OPEN_ZOOM = 0.8;
 
-/** The start node's size before React Flow has measured it. It always carries the "start state always allows new tickets" reason, so it sits at `.gn-state-node`'s 13rem cap (208px); about 120px tall. */
+/** A node's size for a key React Flow has not measured yet: the phone opening view's start node, and Tidy / Add state for a state with no measurement. Width is `.gn-state-node`'s 13rem cap (208px); the 120px height is a floor, not a measurement: a real state is 196–214px tall in neo (the start state 227×210), so any caller that has measured sizes must pass them. */
 export const UNMEASURED_NODE = { width: 208, height: 120 };
 
 /** Where a phone-width canvas opens: the centre of the START state at {@link PHONE_OPEN_ZOOM}, not the whole graph. */

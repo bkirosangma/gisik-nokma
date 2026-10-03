@@ -21,7 +21,8 @@ import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './build
 import { usePhoneBoard } from '../../views/use-phone-board.js';
 import { connectionToTransition, phoneOpeningView, toFlowGraph, UNMEASURED_NODE, type StateNodeData } from './flow-graph.js';
 import { StateNode } from './state-node.js';
-import { useCanvasApi, type CanvasApi } from './use-canvas-api.js';
+import { TidyControl } from './tidy-control.js';
+import { measuredSizes, useCanvasApi, type CanvasApi } from './use-canvas-api.js';
 import { useCanvasKeys } from './use-canvas-keys.js';
 import { TransitionEdge } from './transition-edge.js';
 import { useDragEscape, useWorkingNodes } from './use-working-nodes.js';
@@ -77,7 +78,7 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
   const { canAuthor } = useBuilderEnv();
   const draft = useDraft();
   const summaryCtx = useSummaryCtx();
-  const { fitView, getViewport } = useReactFlow();
+  const { fitView, getNodes, getViewport } = useReactFlow();
   const phone = usePhoneBoard();
   const graph = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
   const working = useWorkingNodes(graph.nodes);
@@ -250,13 +251,17 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
         <Background />
         <CanvasOverlays guides={guides} outline={outline} />
         <Panel position="bottom-left">
-          <button
-            type="button"
-            className="gn-workflow-canvas__fit"
-            onClick={() => void fitView({ ...FIT_OPTIONS, duration: 200 })}
-          >
-            Fit to screen
-          </button>
+          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. */}
+          <div className="gn-workflow-canvas__corner">
+            <button
+              type="button"
+              className="gn-workflow-canvas__fit"
+              onClick={() => void fitView({ ...FIT_OPTIONS, duration: 200 })}
+            >
+              Fit to screen
+            </button>
+            <TidyControl sizes={() => measuredSizes(getNodes())} />
+          </div>
         </Panel>
       </ReactFlow>
       <div className="gn-visually-hidden" aria-live="polite">
