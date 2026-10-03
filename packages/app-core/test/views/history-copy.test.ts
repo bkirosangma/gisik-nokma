@@ -22,8 +22,8 @@ import { describeEvent } from '../../src/views/history-copy.js';
  * ## What this case cannot see, named rather than implied
  *
  * The two exported lists do not cover the whole entity-kind-`ticket` set: the
- * eighteen registrations in `vocabulary.ts` read as
- * `TICKET_EVENT_TYPES` (15) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`} —
+ * twenty registrations in `vocabulary.ts` read as
+ * `TICKET_EVENT_TYPES` (17) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`} —
  * `visibility.set` is registered against a ticket but is in NEITHER list, so it
  * is the one member spelled by hand here. **A NEW event type registered against
  * entity kind `ticket` and added to neither exported list would not be seen by
@@ -40,12 +40,12 @@ const ENTITY_KIND_TICKET_UNIVERSE = [
 ] as const;
 
 /**
- * The registrations that read this way on 2026-09-21. Pinned as a NUMBER so a
+ * The registrations that read this way on 2026-10-03 (18 on 2026-09-21; the typed-links pair made it 20). Pinned as a NUMBER so a
  * change to the domain's lists fails loudly here rather than quietly shrinking
  * what this census covers: the failure message says to re-read the
  * registrations, which is the actual remedy.
  */
-const REGISTRATIONS_ON_2026_09_21 = 18;
+const REGISTRATIONS_ON_2026_10_03 = 20;
 
 /**
  * ONE VALID PAYLOAD PER TYPE, and the table is what makes this a census of
@@ -91,6 +91,8 @@ const VALID_PAYLOAD: Record<string, unknown> = {
   'ticket.ranked': { rank: 'a1' },
   'ticket.deleted': {},
   'ticket.restored': {},
+  'ticket.link_added': { kind: 'blocks', targetId: '01J9GTKB000000000000000000' },
+  'ticket.link_removed': { kind: 'relates', targetId: '01J9GTKB000000000000000000' },
   'comment.added': { body: {} },
   'attachment.added': { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' },
   'claim.contested': { originalEvent: {}, rule: 'r', reason: 'why' },
@@ -122,9 +124,9 @@ describe('3.183 history copy — the census', () => {
     expect(
       TICKET_EVENT_TYPES.length,
       'TICKET_EVENT_TYPES changed shape: re-read packages/domain/src/vocabulary.ts and re-derive the universe',
-    ).toBe(15);
+    ).toBe(17);
     expect(CONTEST_EVENT_TYPES.length).toBe(2);
-    expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_09_21);
+    expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_10_03);
   });
 
   /**
@@ -268,5 +270,32 @@ describe('26.117 comment edits and deletions are narrated, never echoed', () => 
     expect(describeEvent(ev('comment.edited', { commentId: '01C', body: { type: 'doc' } }))).toBe('Comment edited');
     expect(describeEvent(ev('comment.deleted', { commentId: '01C' }))).toBe('Comment deleted');
     expect(describeEvent(ev('comment.added', { body: { type: 'doc' } }))).toBe('Comment added'); // control
+  });
+});
+
+/**
+ * 27.005 (typed-links T1) — the link pair, read as sentences from the SOURCE's side. `linkTarget` is T4's
+ * annotation: absent = unlabelled (an older server), `null` = the server withheld a target this viewer cannot see.
+ * The payload's `targetId` is `null` in the withheld case, which the strict schema would refuse, so the sentence reads
+ * only `kind` (a closed list) and never parses the payload whole.
+ */
+describe('27.005 history copy — link sentences', () => {
+  const linkEvent = (type: string, kind: string, linkTarget?: { key: string | null } | null): TicketHistoryEvent => ({
+    ...eventOf(type),
+    payload: { kind, targetId: linkTarget === null ? null : '01J9GTKB000000000000000000' },
+    ...(linkTarget === undefined ? {} : { linkTarget }),
+  });
+
+  it('27.005 link sentences, three kinds, both events, withheld and unlabelled targets', () => {
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', { key: 'GN-142' }))).toBe('Linked: blocks GN-142');
+    expect(describeEvent(linkEvent('ticket.link_added', 'relates', { key: 'GN-120' }))).toBe('Linked: relates to GN-120');
+    expect(describeEvent(linkEvent('ticket.link_added', 'duplicates', { key: 'GN-142' }))).toBe('Linked: duplicates GN-142');
+    expect(describeEvent(linkEvent('ticket.link_removed', 'blocks', { key: 'GN-142' }))).toBe('Removed link: blocks GN-142');
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks', null))).toBe("Linked: blocks a ticket you can't see");
+    expect(describeEvent(linkEvent('ticket.link_added', 'blocks'))).toBe('Linked: blocks another ticket');
+    // a payload this build cannot label (an unknown kind) falls back to the wire name
+    expect(describeEvent(linkEvent('ticket.link_added', 'parent', { key: 'GN-1' }))).toBe('ticket.link_added');
+    // control: an unknown type still falls back
+    expect(describeEvent({ ...eventOf('ticket.closed'), type: 'ticket.never_seen' })).toBe('ticket.never_seen');
   });
 });

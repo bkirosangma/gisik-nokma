@@ -1,0 +1,104 @@
+import { describe, expect, it } from 'vitest';
+import {
+  applyTicketEvent,
+  domainRegistry,
+  makeEnvelope,
+  newUlid,
+  parseEvent,
+  TICKET_EVENT_TYPES,
+  TICKET_LINK_KINDS,
+  ticketLinkAddedPayload,
+  ticketLinkRemovedPayload,
+  type TicketState,
+  type TicketStateDeps,
+} from '../src/index.js';
+
+const SOURCE = newUlid();
+const TARGET = newUlid();
+const PROJECT = '01J9GPRJ000000000000000000';
+
+// The same one-workflow world `ticket-state.test.ts` folds in; a link never reads it, `ticket.created` does.
+const deps: TicketStateDeps = {
+  getTicketType: (id) =>
+    id === 'task' ? { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: 'wf-basic', fields: [] } : undefined,
+  getWorkflow: (id) =>
+    id === 'wf-basic'
+      ? {
+          id: 'wf-basic',
+          version: 1,
+          name: 'Basic',
+          initialStateId: 'todo',
+          states: [{ id: 'todo', name: 'To do', category: 'open' }],
+          transitions: [{ from: '*', to: 'todo', rules: [] }],
+        }
+      : undefined,
+};
+
+function bornState(): TicketState {
+  return applyTicketEvent(
+    undefined,
+    makeEnvelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: SOURCE },
+      payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' },
+    }),
+    deps,
+  );
+}
+
+const link = (type: 'ticket.link_added' | 'ticket.link_removed', kind: string, targetId: string) =>
+  makeEnvelope({ type, entity: { kind: 'ticket', id: SOURCE }, payload: { kind, targetId } });
+
+describe('27.001 link payloads', () => {
+  it('27.001 accepts each kind; refuses an unknown kind, an extra member, a non-ULID target', () => {
+    for (const schema of [ticketLinkAddedPayload, ticketLinkRemovedPayload]) {
+      for (const kind of TICKET_LINK_KINDS) expect(schema.safeParse({ kind, targetId: TARGET }).success).toBe(true);
+      expect(schema.safeParse({ kind: 'parent', targetId: TARGET }).success).toBe(false);
+      expect(schema.safeParse({ kind: 'blocks', targetId: TARGET, note: 'x' }).success).toBe(false);
+      expect(schema.safeParse({ kind: 'blocks', targetId: 'GN-142' }).success).toBe(false);
+    }
+    // control: the whole event parses on a ticket
+    const { serverTime: _s, seq: _q, ...submitted } = makeEnvelope({
+      type: 'ticket.link_added',
+      entity: { kind: 'ticket', id: SOURCE },
+      payload: { kind: 'blocks', targetId: TARGET },
+    });
+    expect(() => parseEvent(submitted)).not.toThrow();
+  });
+});
+
+describe('27.002 registration', () => {
+  it('27.002 both types at v1 against ticket only; registrations() lists each once', () => {
+    for (const type of ['ticket.link_added', 'ticket.link_removed']) {
+      expect(domainRegistry.get(type, 1)?.entityKind).toBe('ticket');
+      expect((TICKET_EVENT_TYPES as readonly string[]).includes(type)).toBe(true);
+    }
+    const keys = domainRegistry.registrations().map((r) => `${r.type}@${r.version}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toContain('ticket.link_added@1');
+    expect(keys).toContain('ticket.link_removed@1');
+    // control: a note is refused at the door
+    const { serverTime: _s, seq: _q, ...onNote } = makeEnvelope({
+      type: 'ticket.link_added',
+      entity: { kind: 'note', id: SOURCE },
+      payload: { kind: 'blocks', targetId: TARGET },
+    });
+    expect(() => parseEvent(onNote)).toThrow();
+  });
+});
+
+describe('27.003 the reducer folds links', () => {
+  it('27.003 add appends (idempotent), remove drops the pair, the last removal leaves no key', () => {
+    const born = bornState();
+    expect('links' in born).toBe(false); // control
+    const a = applyTicketEvent(born, link('ticket.link_added', 'blocks', TARGET), deps);
+    expect(a.links).toEqual([{ kind: 'blocks', targetId: TARGET }]);
+    expect(applyTicketEvent(a, link('ticket.link_added', 'blocks', TARGET), deps)).toBe(a); // idempotent
+    const b = applyTicketEvent(a, link('ticket.link_added', 'relates', TARGET), deps);
+    expect(b.links).toHaveLength(2); // control: another kind is another link
+    const c = applyTicketEvent(b, link('ticket.link_removed', 'blocks', TARGET), deps);
+    expect(c.links).toEqual([{ kind: 'relates', targetId: TARGET }]);
+    const d = applyTicketEvent(c, link('ticket.link_removed', 'relates', TARGET), deps);
+    expect('links' in d).toBe(false);
+  });
+});
