@@ -50,6 +50,18 @@ describe('27.101 nesting: the snippet is the innermost block, ordinals run in do
   });
 });
 
+describe('27.101 an outer block holding a nested block keeps each reference with its own block', () => {
+  it('27.101 listItem [para(chip A), chip B]: B’s snippet marks B, not A; A’s marks A (control)', () => {
+    // A document from another producer: the list item holds a nested paragraph AND a chip of its own.
+    const item = { type: 'listItem', content: [para(chip('A', 'GN-1', 'One')), chip('B', 'GN-2', 'Two')] };
+    const refs = extractDocReferences(doc({ type: 'bulletList', content: [item] }));
+    expect(refs.map((r) => [r.targetId, r.snippet])).toEqual([
+      ['A', '[[GN-1 One]]'], // CONTROL: the nested paragraph's own reference is marked in the paragraph
+      ['B', 'GN-1 One [[GN-2 Two]]'], // the item's own snippet: A's chip sits in a nested block, so it is shown but never marked for B
+    ]);
+  });
+});
+
 describe('27.102 the snippet is at most 160 characters, centred on the reference', () => {
   it('27.102 long text is cut on both sides with an ellipsis; the marker is whole; short text is untouched (control)', () => {
     const long = extractDocReferences(doc(para(text('a'.repeat(300)), chip('T1', 'GN-142', 'Chiller'), text('b'.repeat(300)))))[0]!;
@@ -75,6 +87,34 @@ describe('27.103 literal brackets in the text never forge a second marker', () =
     expect(r.snippet).toBe('array[ [0] ] or [ [ [x] ] ] [[GN-142 Chiller]]');
     expect(r.snippet.split('[[').length - 1).toBe(1);
     expect(r.snippet.split(']]').length - 1).toBe(1);
+  });
+
+  it('27.103 a bracket touching the marker never moves it: Task 2’s splitSnippet recovers exactly the reference’s own text', () => {
+    // Task 2 (Linked-from, linked-from.ts) owns the real splitSnippet; this is a local copy of its pinned rule
+    // (plan Task 2: the first "[[", then the first "]]" after it) so the invariant is pinned where the snippets are made.
+    const splitSnippet = (snippet: string) => {
+      const open = snippet.indexOf('[[');
+      const close = snippet.indexOf(']]', open + 2);
+      return open < 0 || close < 0 ? null : { before: snippet.slice(0, open), marked: snippet.slice(open + 2, close), after: snippet.slice(close + 2) };
+    };
+    const shapes: Array<{ name: string; body: unknown; own: string }> = [
+      { name: 'control: a plain chip', body: para(text('see '), chip('T1', 'GN-1', 'Crash'), text(' now')), own: 'GN-1 Crash' },
+      { name: 'a ticket title ending ]', body: para(text('see '), chip('T1', 'GN-1', 'Crash on save [iOS]'), text(' now')), own: 'GN-1 Crash on save [iOS]' },
+      { name: 'a note title ending ]', body: para(text('see '), link('N1', 'Rulings [v2]')), own: 'Rulings [v2]' },
+      { name: 'a [ typed right before the chip, a ] right after', body: para(text('(see ['), chip('T1', 'GN-1', 'Crash'), text('])')), own: 'GN-1 Crash' },
+      { name: 'a title starting with [', body: para(text('see '), link('N1', '[draft] Plan'), text(' now')), own: '[draft] Plan' },
+      { name: 'a title that is only brackets', body: para(text('a['), link('N1', '[]'), text(']b')), own: '[]' },
+    ];
+    for (const { name, body, own } of shapes) {
+      const ref = extractDocReferences(doc(body))[0]!;
+      const parts = splitSnippet(ref.snippet);
+      expect(parts, name).not.toBeNull();
+      expect(parts!.marked.trim(), name).toBe(own);
+      expect(parts!.before.includes('[[') || parts!.before.includes(']]'), name).toBe(false);
+      expect(parts!.after.includes('[[') || parts!.after.includes(']]'), name).toBe(false);
+      expect(ref.snippet.split('[[').length - 1, name).toBe(1);
+      expect(ref.snippet.split(']]').length - 1, name).toBe(1);
+    }
   });
 });
 

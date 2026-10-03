@@ -32,7 +32,8 @@ import type { ProjectionRegistry } from './registry.js';
  */
 export const REFERENCES_BACKFILL = 'proj_references';
 
-export type BackfillProbe = (stage: 'replaying' | 'committed', entity: { kind: 'ticket' | 'note'; id: string }, index: number) => Promise<void>;
+/** Test seams: `locked` = the entity lock is held, nothing deleted yet; `replaying` = its old rows are deleted, its events not yet replayed; `committed` = after COMMIT. */
+export type BackfillProbe = (stage: 'locked' | 'replaying' | 'committed', entity: { kind: 'ticket' | 'note'; id: string }, index: number) => Promise<void>;
 export type BackfillDeps = { projections: ProjectionRegistry; probe?: BackfillProbe; shouldStop?: () => boolean; log?: (message: string) => void };
 export type BackfillResult = { ran: boolean; entities: number; ms: number; maxEntityMs: number };
 
@@ -63,6 +64,7 @@ export async function backfillReferences(pool: Pool, deps: BackfillDeps): Promis
       try {
         await client.query('BEGIN');
         await lockEntity(client, entity.kind, entity.id);
+        await deps.probe?.('locked', entity, index);
         await client.query('DELETE FROM proj_references WHERE source_parent_kind = $1 AND source_parent_id = $2', [entity.kind, entity.id]);
         await deps.probe?.('replaying', entity, index);
         for (const event of await readEntityEvents(client, entity.kind, entity.id)) {

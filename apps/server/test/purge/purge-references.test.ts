@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, PURGED_ITEM_LABEL } from '@gisik-nokma/domain';
+import { backfillReferences } from '../../src/projections/backfill-references.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { purgeItem, type PurgeDeps } from '../../src/purge/purge-item.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
@@ -62,14 +63,19 @@ describe('27.114 a purged SOURCE takes its own rows and its comments’ rows', (
   it('27.114 T’s description rows and the rows of comments on T go; a survivor’s rows stay (control)', async () => {
     const w = await buildReferenceWorld(db.pool);
     const X = newUlid();
+    const NX = newUlid();
     await applyCommitted(db.pool, [
       ev(w, 'ticket', w.T, 'ticket.field_set', { fieldId: 'description', value: doc(ticketRef(X, w.P, 'PG-7', 'X')) }),
       ev(w, 'ticket', w.T, 'comment.added', { body: doc(ticketRef(X, w.P, 'PG-7', 'X')) }),
+      // CONTROL: a source OUTSIDE T that chips the same X. Its row to X is not T's and not to T: it must outlive the purge.
+      noteCreated(w, NX, { title: 'Outside', homeProjectId: '', scope: { mode: 'workspace' }, body: doc(text('also '), ticketRef(X, w.P, 'PG-7', 'X')) }),
     ]);
     expect((await refRows(`source_parent_id = $1`, [w.T])).length).toBe(2);
+    const keep = await refRows(`source_id = $1`, [NX]);
+    expect(keep).toEqual([{ source_id: NX, target_id: X, snippet: 'also [[PG-7 X]]' }]);
     await purgeItem(db.pool, { kind: 'ticket', id: w.T }, deps(await dueAt(db.pool, 'ticket', w.T)));
     expect(await refRows(`source_parent_id = $1`, [w.T])).toEqual([]);
-    expect((await refRows(`source_parent_id = $1`, [w.N1])).length).toBe(0); // N1 chipped only T
+    expect(await refRows(`source_id = $1`, [NX])).toEqual(keep);
     await clean();
   });
 });
@@ -114,4 +120,55 @@ describe('27.116 a workspace purge empties the workspace’s rows', () => {
     expect((await refRows('workspace_id = $1', [pair.W2.WS])).length).toBe(1);
     await clean();
   });
+});
+
+describe('27.123 a purge and the boot backfill meeting on a survivor of the purged item', () => {
+  it('27.123 the backfill holds a survivor’s lock when the purge starts: both complete, the rows equal a rebuild, no 40P01 escapes; the same run with no purge is the control', async () => {
+    const w = await buildReferenceWorld(db.pool);
+    // First boot after the migration, with the rows the live ingest has written since (the world's own events): no marker,
+    // and S1 already HAS a row to T. That row is what the purge's erasure DELETE locks and the backfill's DELETE then waits on.
+    const firstBoot = async () => {
+      await db.pool.query('DELETE FROM projection_backfills');
+    };
+    const toT = async () => (await db.pool.query<{ p: string }>('SELECT source_parent_id AS p FROM proj_references WHERE target_id = $1 ORDER BY 1', [w.T])).rows.map((r) => r.p);
+    // S1 (a ticket whose comment chips T) is a survivor of T's purge. The backfill reaches it, takes its lock, and the purge
+    // starts while it is held: the order in which a purge that erased the rows to T FIRST would deadlock with the backfill's
+    // DELETE of S1's rows (the purge waiting for S1's lock, the backfill waiting for the purge's rows).
+    let purging: Promise<unknown> | null = null;
+    const run = async (withPurge: boolean) => {
+      await firstBoot();
+      purging = null;
+      let reached = false;
+      const result = await backfillReferences(db.pool, {
+        projections: buildProjectionRegistry(),
+        probe: async (stage, entity) => {
+          if (stage !== 'locked' || entity.id !== w.S1) return;
+          reached = true;
+          if (!withPurge) return;
+          purging = purgeItem(db.pool, { kind: 'ticket', id: w.T }, deps(await dueAt(db.pool, 'ticket', w.T)));
+          purging.catch(() => undefined); // its outcome is awaited below; never an unhandled rejection meanwhile
+          // Hold the lock until the purge is BLOCKED on an advisory lock (S1's): that is the moment the order matters.
+          for (let i = 0; i < 1000; i += 1) {
+            const { rows } = await db.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted");
+            if ((rows[0]?.n ?? 0) > 0) return;
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          throw new Error('the purge never waited on the survivor’s entity lock');
+        },
+      });
+      expect(reached).toBe(true);
+      return result;
+    };
+
+    // CONTROL: the same run, the same probe point, no concurrent transaction: S1's row to T is indexed.
+    expect(await run(false)).toMatchObject({ ran: true });
+    expect(await toT()).toContain(w.S1);
+
+    const result = await run(true);
+    expect(result).toMatchObject({ ran: true });
+    expect(await (purging as Promise<unknown> | null)).toMatchObject({ status: 'purged' });
+    expect(await toT()).toEqual([]);
+    expect((await db.pool.query('SELECT 1 FROM projection_backfills')).rowCount).toBe(1);
+    await clean(); // the rows equal a rebuild over the post-purge ledger
+  }, 60_000);
 });

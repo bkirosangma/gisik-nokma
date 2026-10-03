@@ -29,10 +29,13 @@ import type { Projection } from './registry.js';
  * ## Known cost
  * Each body event costs three round trips — the `purged_entities` lookup, the
  * DELETE of the source's rows, the INSERT. At the size floor (100 000 body +
- * 400 000 other events) `rebuildProjection` takes ~2.5 x `proj_search`'s rebuild
- * (124 s vs 50 s, 27.118). Left as is on purpose (planner ruling 2026-10-03 13:24 (⚑ LANE 6, KG-B T1 rebuild bar, RULING A):
- * no optimisation at prod's size, far under the floor); the deploy path is the
- * boot backfill, whose longest single-entity transaction was 35 ms.
+ * 400 000 other events) `rebuildProjection` took 86 401 ms against 40 059 ms
+ * for `proj_search` in the same run (2.16 x), 193 332 rows (27.118 quotes the
+ * run). Left as is on purpose (planner ruling 2026-10-03 13:24, ⚑ LANE 6 KG-B T1
+ * rebuild bar, RULING A: the bar is 3 x the `proj_search` baseline of the same
+ * run; no optimisation at prod's size, far under the floor). The deploy path is
+ * the boot backfill: its longest single-entity transaction was 40 ms in that
+ * run (two runs under heavier load reached 110 and 159 ms, one spike each).
  *
  * ## Trash and purge
  * A trash event is not a body event: rows stay, reads hide them
@@ -52,9 +55,9 @@ export const REFERENCE_BODY_EVENT_TYPES = [
 
 /**
  * Every other type on a ticket or note stream, and why it carries no document. 27.111 holds this total.
- * LANE: these keys are written from the plan's memory, NOT read. Fill the list from TICKET_EVENT_TYPES,
- * NOTE_EVENT_TYPES, COMMENT_EVENT_TYPES and CONTEST_EVENT_TYPES as they are on the branch; 27.111 names
- * every missing key and every stale one (a key here that is in no array is dead: delete it).
+ * 27.111 reports every type of TICKET_/NOTE_/COMMENT_/CONTEST_EVENT_TYPES (domain) that is in neither this table nor `REFERENCE_BODY_EVENT_TYPES`
+ * (and fails on a body type listed here). It does not flag a key that is in no list: delete an entry by
+ * hand when its event type is removed.
  */
 export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
   'ticket.transitioned': 'its optional comment is plain text `{ text }`, not a document (`mcp-server` `redactedPayload`)',

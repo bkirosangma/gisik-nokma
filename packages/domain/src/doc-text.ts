@@ -288,7 +288,13 @@ function snippetFor(block: unknown, indexInBlock: number, options: DocTextOption
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\[(?=\[)/g, '[ ')
-    .replace(/\](?=\])/g, '] ');
+    .replace(/\](?=\])/g, '] ')
+    // A bracket TOUCHING the marker would join it into "[[[" / "]]]" and move the pair for
+    // Task 2's splitSnippet (the first "[[", then the first "]]" after it): keep a space between.
+    .replace(/\[(?=\uE000)/g, '[ ')
+    .replace(/(?<=\uE000)\[/g, ' [')
+    .replace(/\](?=\uE001)/g, '] ')
+    .replace(/(?<=\uE001)\]/g, ' ]');
   const open = flat.indexOf(MARK_OPEN);
   const close = flat.indexOf(MARK_CLOSE);
   if (open < 0 || close < open) return flat.slice(0, SNIPPET_MAX_CHARS);

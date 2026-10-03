@@ -112,6 +112,26 @@ describe('27.121 a crash mid-run leaves no marker, and the next boot re-runs to 
   });
 });
 
+describe('27.121 an error INSIDE an entity’s transaction rolls that entity back and aborts the run', () => {
+  it('27.121 a non-lock error thrown while T1 is replaying: the run rejects, T1’s deleted rows are back, no marker; the same run without the throw completes (control)', async () => {
+    const live = await snapshot();
+    expect(live.length).toBe(4);
+    await db.pool.query('DELETE FROM projection_backfills'); // rows kept: the marker is what a crashed first boot lacks
+    const boom = deps(async (stage, entity) => {
+      if (stage === 'replaying' && entity.id === T1) throw new Error('simulated failure inside the transaction');
+    });
+    await expect(backfillReferences(db.pool, boom)).rejects.toThrow('simulated failure inside the transaction');
+    // T1's own DELETE ran before the throw (the probe sits after it): without the ROLLBACK the rows would be gone or the
+    // connection would hold an open transaction. The rows are all there, unchanged, and nothing is recorded.
+    expect(await snapshot()).toEqual(live);
+    expect((await db.pool.query('SELECT 1 FROM projection_backfills')).rowCount).toBe(0);
+    // CONTROL: the same run with nothing thrown completes and leaves the same rows.
+    expect(await backfillReferences(db.pool, deps())).toMatchObject({ ran: true });
+    expect(await snapshot()).toEqual(live);
+    expect((await db.pool.query('SELECT 1 FROM projection_backfills')).rowCount).toBe(1);
+  });
+});
+
 describe('27.122 an event committed DURING the backfill is in the table afterwards', () => {
   // One envelope for both its: the control runs FIRST, before the event exists in the ledger.
   // `late` is built in beforeAll (the workspace exists only then); control first, the event enters the ledger in the second it.
