@@ -147,9 +147,17 @@ describe('27.123 a purge and the boot backfill meeting on a survivor of the purg
           if (!withPurge) return;
           purging = purgeItem(db.pool, { kind: 'ticket', id: w.T }, deps(await dueAt(db.pool, 'ticket', w.T)));
           purging.catch(() => undefined); // its outcome is awaited below; never an unhandled rejection meanwhile
-          // Hold the lock until the purge is BLOCKED on an advisory lock (S1's): that is the moment the order matters.
+          // Hold the lock until the purge is BLOCKED on S1's advisory lock. pg_locks is CLUSTER-wide and 54329 is shared by every
+          // lane and gate, so the wait is matched on this database AND on S1's own key (lockEntity: hashtextextended('ticket:<id>', 0),
+          // shown as classid = the high 32 bits, objid = the low 32, objsubid 1): a foreign waiter cannot end the hold early.
           for (let i = 0; i < 1000; i += 1) {
-            const { rows } = await db.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted");
+            const { rows } = await db.pool.query<{ n: number }>(
+              `SELECT count(*)::int AS n FROM pg_locks l, (SELECT hashtextextended($1, 0) AS k) h
+                WHERE l.locktype = 'advisory' AND NOT l.granted AND l.objsubid = 1
+                  AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+                  AND l.classid::bigint = ((h.k >> 32) & 4294967295) AND l.objid::bigint = (h.k & 4294967295)`,
+              [`ticket:${w.S1}`],
+            );
             if ((rows[0]?.n ?? 0) > 0) return;
             await new Promise((r) => setTimeout(r, 10));
           }
