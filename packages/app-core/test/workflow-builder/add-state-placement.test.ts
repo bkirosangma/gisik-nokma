@@ -55,7 +55,24 @@ describe('25.527/25.528 Add state with a near point', () => {
     const placed = store.getState().positions[id]!;
     expect(Math.abs(placed.x % GRID)).toBe(0);
     expect(Math.abs(placed.y % GRID)).toBe(0);
-    expect(rectsOf(store, wide, id).every((o) => !rectsOverlap({ ...placed, ...UNMEASURED_NODE }, o, NODE_GAP))).toBe(true);
+    // the new state is as big as the biggest MEASURED state (here 600 wide), not the 208x120 guess
+    expect(rectsOf(store, wide, id).every((o) => !rectsOverlap({ ...placed, ...wide[ids[0]!]! }, o, NODE_GAP))).toBe(true);
+  });
+
+  it('25.527 the new state takes the largest measured box, and the gap decides the answer (a state measures taller than the 120 guess; its edge sits off the grid)', () => {
+    const store = createDraftStore(newDraft('Measured'));
+    const only = store.actions.addState();
+    store.actions.moveState(only, { x: 0, y: 0 });
+    // 192 = 12 grid steps: with no gap the first free row above is y = -192, with the 8 px gap it is -208; the 120 guess would say -128
+    const sizes = { [only]: { width: 200, height: 192 } };
+    const id = store.actions.addState({ near: { x: 0, y: -100 }, sizes });
+    expect(store.getState().positions[id]).toEqual({ x: 0, y: -208 });
+    // and with nothing measured the guess stands: 120 + 8 = 128
+    const bare = createDraftStore(newDraft('Unmeasured'));
+    const lone = bare.actions.addState();
+    bare.actions.moveState(lone, { x: 0, y: 0 });
+    const guessed = bare.actions.addState({ near: { x: 0, y: -100 } });
+    expect(bare.getState().positions[guessed]).toEqual({ x: 0, y: -128 });
   });
 
   it('25.527 nothing free within the search keeps the old nextFreePosition rather than failing', () => {

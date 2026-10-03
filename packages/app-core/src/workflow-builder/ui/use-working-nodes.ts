@@ -25,7 +25,7 @@ type Gesture = { id: string; start: Point; last: Point; cancelled: boolean };
  * changes only for the active, un-cancelled gesture's id. Every other change is dropped, because the draft owns membership
  * and placement: `remove` (React Flow's Backspace default), `add`, `replace`, and a `position` with no gesture or for another id
  * (an arrow-key nudge, a box-select move) would otherwise change the canvas and leave the draft behind, a delete or a move
- * that never happened. T4's nudge commits through the draft store, outside this filter.
+ * that never happened. The canvas's arrow nudge (`workflow-canvas.tsx`, `nudge`) commits through the draft store, outside this filter.
  * React Flow keeps emitting position changes for the id until pointer-up, and its last one (`dragging: false`)
  * carries the RAW pointer position (`@xyflow/system` :2330-2331); after a cancel every change for the id is dropped.
  */

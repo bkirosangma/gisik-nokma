@@ -29,7 +29,7 @@ export type DraftActions = {
   setWorkflowName(name: string): void;
   /**
    * `near` (flow coordinates; the canvas passes the centre of what the author is looking at) places the new state on the free grid point nearest it,
-   * clear of every state by `NODE_GAP`; `sizes` (by position key) are the measured node sizes, `UNMEASURED_NODE` otherwise. Without `near`, or with
+   * clear of every state by `NODE_GAP`; `sizes` (by position key) are the measured node sizes, `UNMEASURED_NODE` otherwise. The new state's own box is the largest measured state's (`UNMEASURED_NODE` when none is measured). Without `near`, or with
    * no free point inside 40 grid steps, the old `nextFreePosition` stands, so templates are unchanged.
    */
   addState(input?: {
@@ -156,12 +156,20 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
     });
   }
 
+  /** A fresh state renders as big as the biggest state React Flow has measured (sizes differ per style and theme); the unmeasured guess only when none is. */
+  function largestMeasured(measured: Array<{ width: number; height: number } | undefined>): { width: number; height: number } {
+    const found = measured.filter((size) => size !== undefined);
+    if (found.length === 0) return UNMEASURED_NODE;
+    return { width: Math.max(...found.map((size) => size.width)), height: Math.max(...found.map((size) => size.height)) };
+  }
+
   /** Spec §3.4: the free grid point nearest `near`, searched out to `FREE_PLACEMENT_RADIUS` grid steps. */
   function freePositionNear(
     near: StatePosition,
     sizes: Record<string, { width: number; height: number }>,
   ): StatePosition | null {
     const placed: Rect[] = Object.entries(state.positions).map(([key, position]) => ({ ...position, ...(sizes[key] ?? UNMEASURED_NODE) }));
+    const box = largestMeasured(state.def.states.map((found) => sizes[found.id]));
     const centre = { x: Math.round(near.x / GRID) * GRID, y: Math.round(near.y / GRID) * GRID };
     const candidates: StatePosition[] = [];
     for (let i = -FREE_PLACEMENT_RADIUS; i <= FREE_PLACEMENT_RADIUS; i++) {
@@ -169,7 +177,7 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
     }
     const distance = (p: StatePosition) => (p.x - near.x) ** 2 + (p.y - near.y) ** 2;
     candidates.sort((a, b) => distance(a) - distance(b) || a.y - b.y || a.x - b.x);
-    return candidates.find((p) => placed.every((o) => !rectsOverlap({ ...p, ...UNMEASURED_NODE }, o, NODE_GAP))) ?? null;
+    return candidates.find((p) => placed.every((o) => !rectsOverlap({ ...p, ...box }, o, NODE_GAP))) ?? null;
   }
 
   const actions: DraftActions = {

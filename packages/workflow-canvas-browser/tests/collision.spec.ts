@@ -41,6 +41,11 @@ async function pickUp(page: Page, name: string) {
   await page.mouse.move(x + 5, y, { steps: 5 });
   return { x: x + 5, y };
 }
+async function boxOfNode(page: Page, id: string): Promise<Flow> {
+  const b = (await page.locator(`.react-flow__node[data-id="${id}"]`).boundingBox())!;
+  const v = await viewport(page);
+  return { x: (b.x - v.tx) / v.zoom, y: (b.y - v.ty) / v.zoom, width: b.width / v.zoom, height: b.height / v.zoom };
+}
 const gap = (a: Flow, b: Flow) =>
   Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width), b.y - (a.y + a.height), a.y - (b.y + b.height));
 
@@ -220,20 +225,32 @@ test('25.525 an arrow moves the focused state one grid step and Alt+arrow one px
   expect(Math.abs(after.x - start.x) + Math.abs(after.y - start.y)).toBeLessThan(1);
 });
 
-test('25.526 an arrow that would push the state into its neighbour changes nothing and announces who blocks it; control: the arrows before it moved the state', async ({ page }) => {
+test('25.526 an arrow moves a state exactly 16 px (1 with Alt) on ONE axis or not at all: into a neighbour it changes nothing and announces who blocks it; a state that starts inside a neighbour can still be nudged out', async ({ page }) => {
   await openHarness(page);
   const live = page.locator('[aria-live="polite"]');
   await expect(live).toBeAttached();
   await node(page, A).locator('.gn-state-node__name').click();
   const x0 = (await flowBox(page, A)).x;
-  await page.keyboard.press('ArrowRight');
-  await expect.poll(async () => (await draftOf(page, A)).x).toBeCloseTo(x0 + 16, 2);
-  await page.keyboard.press('ArrowRight'); // 16 more would overlap B's gap: the clamp stops it flush, a step short
-  await expect.poll(async () => (await draftOf(page, A)).x).toBeGreaterThan(x0 + 16.5);
-  await expect(live).not.toContainText('Blocked by');
-  const flush = await draftOf(page, A);
+  // control: arrows step exactly 16 on x (dy 0) until the next step would break the 8 px gap, then the press is blocked
+  let flush = await draftOf(page, A);
+  let moves = 0;
+  for (let i = 0; i < 12; i++) {
+    const before = await draftOf(page, A);
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(async () => (await draftOf(page, A)).x !== before.x || /Blocked by/.test((await live.textContent()) ?? '')).toBe(true);
+    const after = await draftOf(page, A);
+    if (after.x === before.x) break;
+    expect(after.x - before.x).toBeCloseTo(16, 2);
+    expect(after.y).toBe(before.y);
+    await expect(live).not.toContainText('Blocked by');
+    flush = after;
+    moves++;
+  }
+  expect(moves).toBeGreaterThan(0);
+  expect(flush.x).toBeCloseTo(x0 + 16 * moves, 1);
+  await expect(live).toContainText('Blocked by Doing');
   const box = await flowBox(page, A);
-  expect(gap(box, await flowBox(page, B))).toBeLessThan(8 + 0.6);
+  expect(gap(box, await flowBox(page, B))).toBeGreaterThanOrEqual(8 - 0.6);
   // blocked: twice, so React Flow's own 5 px drift in its store cannot show either
   for (let i = 0; i < 2; i++) {
     await page.keyboard.press('ArrowRight');
@@ -256,6 +273,72 @@ test('25.526 an arrow that would push the state into its neighbour changes nothi
   const dragged = await flowBox(page, A);
   expect(Math.abs(dragged.x - box.x)).toBeLessThan(0.6);
   expect(dragged.y - box.y).toBeGreaterThan(90);
+
+  // never diagonal (spec §3.3): with "To do" just above-left of Doing, so its bottom plus the gap overlaps Doing's top by ~4 flow px,
+  // an arrow that is blocked must NOT slide the state up along the neighbour's edge (the drag's clamp does; a key must not)
+  await openHarness(page);
+  const a0 = await flowBox(page, A);
+  const b0 = await flowBox(page, B);
+  await node(page, A).locator('.gn-state-node__name').click();
+  let up = Math.round(a0.y - (b0.y - a0.height - 8 + 4));
+  for (; up >= 16; up -= 16) await page.keyboard.press('ArrowUp');
+  await page.keyboard.down('Alt');
+  for (; up > 0; up -= 1) await page.keyboard.press('ArrowUp');
+  await page.keyboard.up('Alt');
+  await expect.poll(async () => (await flowBox(page, A)).y).toBeCloseTo(b0.y - a0.height - 8 + 4, 0);
+  const steps: Array<{ dx: number; dy: number }> = [];
+  let prev = await flowBox(page, A);
+  let sawBlocked = false;
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(150);
+    const now = await flowBox(page, A);
+    steps.push({ dx: +(now.x - prev.x).toFixed(2), dy: +(now.y - prev.y).toFixed(2) });
+    if (Math.abs(now.x - prev.x) < 0.6) {
+      await expect(live).toContainText('Blocked by Doing');
+      sawBlocked = true;
+    }
+    prev = now;
+  }
+  for (const step of steps) {
+    expect(Math.abs(step.dy), `no vertical drift ${JSON.stringify(steps)}`).toBeLessThan(0.6);
+    expect([0, 16].some((d) => Math.abs(step.dx - d) < 0.6), `dx is 0 or 16 ${JSON.stringify(steps)}`).toBe(true);
+  }
+  expect(sawBlocked, `a blocked press happened ${JSON.stringify(steps)}`).toBe(true);
+
+  // a state that STARTS inside a neighbour (a template's 140 px rows, states ~200 px tall) is not trapped: it can be nudged OUT by
+  // exactly 16 (1 with Alt) with dy = 0, while a step deeper into the neighbour is blocked
+  await openHarness(page, { seed: 'errand-with-waits' });
+  const names = await page.locator('.react-flow__node .gn-state-node__name').allTextContents();
+  const boxes = new Map<string, Flow>();
+  for (const name of names) boxes.set(name, await flowBox(page, name));
+  const partners = (a: string) => names.filter((b) => b !== a && gap(boxes.get(a)!, boxes.get(b)!) < 8);
+  const inner = names.find((a) => partners(a).length === 1);
+  expect(inner, 'errand-with-waits opens with a state that overlaps exactly one neighbour').toBeDefined();
+  const [outer] = partners(inner!);
+  const a = boxes.get(inner!)!;
+  const o = boxes.get(outer!)!;
+  // how far the state must move each way to clear the neighbour by the gap: the smallest is the way OUT, the opposite is deeper in
+  const pushes = { ArrowRight: o.x + o.width + 8 - a.x, ArrowLeft: a.x + a.width + 8 - o.x, ArrowDown: o.y + o.height + 8 - a.y, ArrowUp: a.y + a.height + 8 - o.y };
+  const [away] = Object.entries(pushes).sort((p, q) => p[1] - q[1])[0]! as [keyof typeof pushes, number];
+  const toward = { ArrowRight: 'ArrowLeft', ArrowLeft: 'ArrowRight', ArrowDown: 'ArrowUp', ArrowUp: 'ArrowDown' }[away] as keyof typeof pushes;
+  expect(pushes[toward] - 16, 'a 16 px step toward still overlaps, and deeper').toBeGreaterThan(pushes[away]);
+  const along = away === 'ArrowLeft' || away === 'ArrowRight' ? 'x' : 'y';
+  const across = along === 'x' ? 'y' : 'x';
+  const sign = away === 'ArrowLeft' || away === 'ArrowUp' ? -1 : 1;
+  await node(page, inner!).locator('.gn-state-node__name').click();
+  const start = await draftOf(page, inner!);
+  await page.keyboard.press(toward);
+  await expect(live).toContainText(`Blocked by ${outer}`);
+  expect(await draftOf(page, inner!)).toEqual(start);
+  await page.keyboard.press(away);
+  await expect.poll(async () => (await draftOf(page, inner!))[along]).toBeCloseTo(start[along] + sign * 16, 2);
+  expect((await draftOf(page, inner!))[across]).toBe(start[across]);
+  await page.keyboard.down('Alt');
+  await page.keyboard.press(away);
+  await page.keyboard.up('Alt');
+  await expect.poll(async () => (await draftOf(page, inner!))[along]).toBeCloseTo(start[along] + sign * 17, 2);
+  expect((await draftOf(page, inner!))[across]).toBe(start[across]);
 });
 
 test('25.527 the Add state button drops the new state clear of every other state, inside the part of the board the author is looking at', async ({ page }) => {
@@ -273,4 +356,25 @@ test('25.527 the Add state button drops the new state clear of every other state
   expect(b.x + b.width / 2).toBeLessThan(pane.x + pane.width);
   expect(b.y + b.height / 2).toBeGreaterThan(pane.y);
   expect(b.y + b.height / 2).toBeLessThan(pane.y + pane.height);
+
+  // the new state is as big as a REAL state (~200 flow px tall in neo), not the 120 px guess: pan so the centre sits 150 flow px above Doing
+  // (a 120 px box fits there with its gap, a real one does not) and add another; it must still clear every state by the gap
+  const before = await page.locator('.react-flow__node').evaluateAll((all) => all.map((n) => n.getAttribute('data-id')));
+  const doing = await flowBox(page, 'Doing');
+  const grid = (await page.locator('.react-flow__pane').boundingBox())!;
+  const view = await viewport(page);
+  const panX = grid.x + grid.width / 2 - (view.tx + (doing.x + doing.width / 2) * view.zoom);
+  const panY = grid.y + grid.height / 2 - (view.ty + (doing.y - 150) * view.zoom);
+  await page.mouse.move(grid.x + 20, grid.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(grid.x + 20 + panX, grid.y + 20 + panY, { steps: 20 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Add state' }).click();
+  await expect(page.locator('.react-flow__node')).toHaveCount(before.length + 1);
+  const fresh = (await page.locator('.react-flow__node').evaluateAll((all) => all.map((n) => n.getAttribute('data-id')))).find((id) => !before.includes(id))!;
+  await expect.poll(async () => (await page.locator(`.react-flow__node[data-id="${fresh}"]`).boundingBox())!.height).toBeGreaterThan(150);
+  const second = await boxOfNode(page, fresh);
+  for (const at of before.filter((id) => id?.startsWith('s:'))) {
+    expect(gap(second, await boxOfNode(page, at!)), `clear of ${at}`).toBeGreaterThanOrEqual(8 - 0.6);
+  }
 });

@@ -12,7 +12,7 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { clampToAvoidOverlap, NODE_GAP, rectsOverlap, type Rect } from '../collision.js';
+import { NODE_GAP, rectsOverlap, type Rect } from '../collision.js';
 import { ANY_STATE_NODE_ID } from '../layout.js';
 import { GRID, snapPosition, type Guide } from '../snap.js';
 import { AnyStateNode } from './any-state-node.js';
@@ -50,6 +50,25 @@ const sizeOf = (candidate: Node): Size => ({
   height: candidate.measured?.height ?? UNMEASURED_NODE.height,
 });
 const rectOf = (candidate: Node): Rect => ({ ...candidate.position, ...sizeOf(candidate) });
+/** How far `a` would have to move to clear `b` by `NODE_GAP`: the smallest push over the four sides. Only meaningful while they overlap. */
+const overlapDepth = (a: Rect, b: Rect) =>
+  Math.min(a.x + a.width + NODE_GAP - b.x, b.x + b.width + NODE_GAP - a.x, a.y + a.height + NODE_GAP - b.y, b.y + b.height + NODE_GAP - a.y);
+
+/**
+ * The state an arrow press would run into (spec §3.3): a step either is clear of every other state or it is blocked, never slid
+ * along an edge (the drag's `clampToAvoidOverlap` does that, and a key must move by exactly one step). A state that STARTS inside a
+ * neighbour (a template's rows are shorter than a state is tall) is not trapped: against a neighbour it already overlaps, only a step
+ * that sinks deeper is blocked, so it can be nudged out.
+ */
+function nudgeBlocker(from: Rect, to: Rect, others: Node[]): Node | null {
+  return (
+    others.find((candidate) => {
+      const rect = rectOf(candidate);
+      if (!rectsOverlap(to, rect, NODE_GAP)) return false;
+      return !rectsOverlap(from, rect, NODE_GAP) || overlapDepth(to, rect) > overlapDepth(from, rect);
+    }) ?? null
+  );
+}
 const stateKey = (nodeId: string) => (nodeId === ANY_STATE_NODE_ID ? nodeId : nodeId.slice('s:'.length));
 const nameOf = (candidate: Node) => (candidate.type === 'state' ? (candidate.data as StateNodeData).name : 'Any state');
 
@@ -125,15 +144,14 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
       const others = live.current.nodes.filter((candidate) => candidate.id !== id);
       const step = key.alt ? 1 : GRID;
       const intended = { x: current.position.x + key.x * step, y: current.position.y + key.y * step };
-      const clamped = clampToAvoidOverlap(intended, size, others.map(rectOf), current.position);
-      if (clamped.x === current.position.x && clamped.y === current.position.y) {
-        const blocker = others.find((candidate) => rectsOverlap({ ...intended, ...size }, rectOf(candidate), NODE_GAP));
+      const blocker = nudgeBlocker({ ...current.position, ...size }, { ...intended, ...size }, others);
+      if (blocker) {
         // a repeated message is still a change to the region, so a screen reader says it again
-        if (blocker) setBlocked((message) => `Blocked by ${nameOf(blocker)}${message.endsWith('\u00a0') ? '' : '\u00a0'}`);
+        setBlocked((message) => `Blocked by ${nameOf(blocker)}${message.endsWith('\u00a0') ? '' : '\u00a0'}`);
         return resync(id);
       }
       setBlocked('');
-      store.actions.moveState(stateKey(id), clamped);
+      store.actions.moveState(stateKey(id), intended);
     },
     [resync, store],
   );
