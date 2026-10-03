@@ -202,7 +202,7 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
  *    grep, and every figure above is superseded by this one:** `git grep -n
  *    "LIVE_TICKET_WHERE" -- apps/server/src` finds **17** executable
  *    `${LIVE_TICKET_WHERE}` sites across 12 files (this file's own note-attachment
- *    arm included; the second hit in this file is this docblock), **6** array
+ *    arm included; the other two hits in this file are docblock text: the earlier paragraph above and this one), **6** array
  *    members written `LIVE_TICKET_WHERE,` across 5 files (`routes/home.ts`'s
  *    ticket SELECT is the sixth) and 16 import lines — **23 uses of the
  *    constant**. The longhand sweep (`deleted_at +IS +NULL`) was NOT re-run

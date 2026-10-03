@@ -59,9 +59,9 @@ afterAll(async () => {
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 /** A hand-built ULID-shaped id ordered by `index`; prefix `0HM` so nothing can mistake it for the shared world's. */
-function homeTicketId(index: number): string {
+function homeTicketId(index: number, prefix = '0HM'): string {
   const suffix = `${CROCKFORD[Math.floor(index / CROCKFORD.length)]}${CROCKFORD[index % CROCKFORD.length]}`;
-  return `0HM${'0'.repeat(21)}${suffix}`;
+  return `${prefix}${'0'.repeat(21)}${suffix}`;
 }
 
 type HomeFixtures = {
@@ -69,6 +69,16 @@ type HomeFixtures = {
   overdueYesterday: string;
   /** due 2026-08-18, open, and an id that sorts AFTER `overdueYesterday`'s → Past due, listed BEFORE it (day, then id) */
   overdueOlder: string;
+  /**
+   * due 2026-08-17, open, and the SMALLEST id of the Past due fixtures (prefix `0HE` < `0HM`) → Past due, listed
+   * AFTER the same-day pair and BEFORE `overdueOlder`: the one fixture on which id DESC (the SELECT's order, what a
+   * deleted sort leaves) and id ASC are both wrong (27.603)
+   */
+  overdueOldest: string;
+  /** due 2026-08-16, open, the LOWER id of a same-day pair → listed before `overdueTieHigh` (the tiebreak, 27.603) */
+  overdueTieLow: string;
+  /** due 2026-08-16, open, the HIGHER id of the same-day pair */
+  overdueTieHigh: string;
   /** due 2026-08-20, open → Due soon (today is NOT overdue) */
   dueToday: string;
   /** due 2026-08-23, open → Due soon at N = 3 */
@@ -87,6 +97,12 @@ type HomeFixtures = {
   /** Created after `liveNote`, so its `updated_at` is later → listed first (newest first) */
   liveNote2: string;
   deletedNote: string;
+  /** `scope: explicit` naming only the guest, by the owner: the guest's control that visibility, not absence, hid `liveNote` (27.616) */
+  guestNote: string;
+  /** `scope: explicit` naming only the owner: in the owner's Notes, in no member's and no guest's (27.609, 27.616) */
+  ownerOnlyNote: string;
+  /** In the NEIGHBOUR's workspace, by the neighbour, in its project — never in this workspace's answer (27.613) */
+  neighbourNote: string;
   /** A note homed in `doomedProject`: counted until the project is deleted (27.606) */
   doomedNote: string;
   /** In the NEIGHBOUR's workspace, due 2026-08-19 — never in this workspace's answer */
@@ -112,6 +128,12 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
   const doomedTickets: [string, string] = [homeTicketId(9), homeTicketId(10)];
   const doomedProject = newUlid();
   const overdueOlder = homeTicketId(11);
+  const overdueOldest = homeTicketId(0, '0HE');
+  const overdueTieLow = homeTicketId(12);
+  const overdueTieHigh = homeTicketId(13);
+  const guestNote = newUlid();
+  const ownerOnlyNote = newUlid();
+  const neighbourNote = newUlid();
   const liveNote = newUlid();
   const liveNote2 = newUlid();
   const deletedNote = newUlid();
@@ -131,12 +153,12 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
       type: 'ticket.field_set',
       payload: { fieldId: 'dueDate', value: date === null ? null : { date } },
     });
-  const note = (id: string, title: string, homeProjectId = projectId): LedgerEvent =>
+  const note = (id: string, title: string, homeProjectId = projectId, scope: object = { mode: 'workspace' }): LedgerEvent =>
     makeCommitted({
       ...ws,
       entity: { kind: 'note', id },
       type: 'note.created',
-      payload: { title, homeProjectId, scope: { mode: 'workspace' } },
+      payload: { title, homeProjectId, scope },
     });
 
   await applyCommitted(db.pool, [
@@ -144,6 +166,13 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     due(overdueYesterday, '2026-08-19'),
     created(overdueOlder, 'Overdue the day before'),
     due(overdueOlder, '2026-08-18'),
+    created(overdueOldest, 'Overdue three days, smallest id'),
+    due(overdueOldest, '2026-08-17'),
+    // The same-day pair is created HIGH id first, so only an explicit id sort lists the low one first.
+    created(overdueTieHigh, 'Overdue four days, higher id'),
+    due(overdueTieHigh, '2026-08-16'),
+    created(overdueTieLow, 'Overdue four days, lower id'),
+    due(overdueTieLow, '2026-08-16'),
     created(dueToday, 'Due today'),
     due(dueToday, '2026-08-20'),
     created(dueAtN, 'Due at N'),
@@ -197,11 +226,24 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     created(doomedTickets[0], 'Doomed one', doomedProject),
     created(doomedTickets[1], 'Doomed two', doomedProject),
     note(doomedNote, 'A note in the doomed project', doomedProject),
+
+    note(guestNote, 'A note for the guest', projectId, { mode: 'explicit', userIds: [read.userIds.guest] }),
+    note(ownerOnlyNote, 'A note for the owner alone', projectId, { mode: 'explicit', userIds: [owner] }),
+    makeCommitted({
+      workspaceId: read.neighbour.workspaceId,
+      actorId: read.userIds.neighbour,
+      entity: { kind: 'note', id: neighbourNote },
+      type: 'note.created',
+      payload: { title: 'A neighbour note', homeProjectId: read.neighbour.projectId, scope: { mode: 'workspace' } },
+    }),
   ]);
 
   return {
     overdueYesterday,
     overdueOlder,
+    overdueOldest,
+    overdueTieLow,
+    overdueTieHigh,
     dueToday,
     dueAtN,
     dueAtNPlus1,
@@ -213,6 +255,9 @@ async function seedHomeFixtures(): Promise<HomeFixtures> {
     liveNote2,
     deletedNote,
     doomedNote,
+    guestNote,
+    ownerOnlyNote,
+    neighbourNote,
     neighbourDue,
     doomedProject,
     doomedTickets,
@@ -270,6 +315,15 @@ async function attentionAs(role: ReadRole): Promise<AttentionResponse> {
 
 const sorted = (ids: readonly string[]): string[] => [...ids].sort();
 
+/** The ticket fixtures this file seeded, so an order is read off OUR ids and never off the shared world's due dates. */
+function ownTickets(ids: readonly string[]): string[] {
+  const own = new Set<string>([
+    fx.overdueYesterday, fx.overdueOlder, fx.overdueOldest, fx.overdueTieLow, fx.overdueTieHigh,
+    fx.dueToday, fx.dueAtN, fx.dueAtNPlus1, fx.doneOverdue, fx.closedOverdue, fx.clearedDue, fx.trashed,
+  ]);
+  return ids.filter((id) => own.has(id));
+}
+
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer’s own slice', () => {
@@ -298,17 +352,29 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(owner.counts.open).toBe(owner.ids.open.length);
   });
 
-  it('27.603 the IST boundary: yesterday is Past due, today is Due soon; and today turns Past due at 18:30:00.000Z exactly', async () => {
+  it('27.603 the IST boundary: yesterday is Past due, today is Due soon; and today turns Past due at 18:30:00.000Z exactly; both lists run by due day, then id', async () => {
     await claimSettings(7, 7);
     const now = await home('owner');
     expect(now.ids.pastDue).toContain(fx.overdueYesterday);
     expect(now.ids.pastDue).not.toContain(fx.dueToday);
     expect(now.ids.dueSoon).toContain(fx.dueToday);
     expect(now.ids.dueSoon).not.toContain(fx.overdueYesterday);
-    // Past due is listed by due day, then id: the older day first although its id sorts later.
-    expect(fx.overdueOlder > fx.overdueYesterday).toBe(true);
-    expect(now.ids.pastDue.indexOf(fx.overdueOlder)).toBeGreaterThanOrEqual(0);
-    expect(now.ids.pastDue.indexOf(fx.overdueOlder)).toBeLessThan(now.ids.pastDue.indexOf(fx.overdueYesterday));
+    // Past due is listed by due day ascending, then id ascending, read off our fixtures alone. The expected list is
+    // wrong for all three wrong orders at once: id DESC (the SELECT's order, what a deleted sort leaves) puts
+    // overdueOlder (id 11) before overdueYesterday (id 0) and overdueOldest (`0HE…`) last; id ASC puts overdueOldest
+    // first and overdueYesterday before overdueOlder; and a tiebreak of 0 keeps the SELECT's id DESC inside the
+    // same-day pair.
+    expect(fx.overdueOldest < fx.overdueYesterday && fx.overdueYesterday < fx.overdueOlder).toBe(true);
+    expect(fx.overdueTieLow < fx.overdueTieHigh).toBe(true);
+    expect(ownTickets(now.ids.pastDue)).toEqual([
+      fx.overdueTieLow, // 16th, lower id
+      fx.overdueTieHigh, // 16th, higher id
+      fx.overdueOldest, // 17th
+      fx.overdueOlder, // 18th
+      fx.overdueYesterday, // 19th
+    ]);
+    // Due soon is listed by due day ascending too: ids 1, 2, 3 run against the SELECT's id DESC.
+    expect(ownTickets(now.ids.dueSoon)).toEqual([fx.dueToday, fx.dueAtN, fx.dueAtNPlus1]);
 
     // The pair (copy of 21.243's): one millisecond apart, two Indian days.
     const before = await homeAt('owner', '2026-08-20T18:29:59.999Z');
@@ -391,6 +457,14 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     const ownerSet = new Set(owner.ids.tickets);
     expect(member.ids.tickets.every((id) => ownerSet.has(id))).toBe(true);
     expect(member.counts.tickets).toBe(member.ids.tickets.length);
+
+    // Notes: the same rule through `visibleNotesWhere`. A note naming only the owner is the owner's alone;
+    // control: the workspace-scoped note is the member's too.
+    expect(owner.ids.notes).toContain(fx.ownerOnlyNote);
+    expect(member.ids.notes).not.toContain(fx.ownerOnlyNote);
+    expect(member.ids.notes).toContain(fx.liveNote);
+    expect(member.counts.notes).toBe(member.ids.notes.length);
+    expect(member.counts.notes).toBeLessThan(owner.counts.notes);
   });
 
   it('27.610 capIds: 2,001 → 2,000 in the same order; 2,000 → 2,000; none → none (the count-before-cap is a mutation case)', () => {
@@ -459,6 +533,12 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     const theirs = await home('neighbour', read.neighbour.workspaceId);
     expect(theirs.ids.pastDue).toContain(fx.neighbourDue);
     expect(theirs.workspaceId).toBe(read.neighbour.workspaceId);
+
+    // Notes are tenant-scoped too: the neighbour's workspace-scoped note is not in this owner's Notes (the owner arm
+    // of `visibleNotesWhere` is TRUE, so only `n.workspace_id` keeps it out); control: it is in the neighbour's own.
+    expect(mine.ids.notes).not.toContain(fx.neighbourNote);
+    expect(theirs.ids.notes).toContain(fx.neighbourNote);
+    expect(theirs.ids.notes).not.toContain(fx.liveNote);
   });
 
   it('27.614 generatedAt is the route’s clock and workspaceId is echoed; control: a second app with another clock answers its own instant', async () => {
@@ -493,6 +573,16 @@ describe('GET /v1/workspaces/:workspaceId/home — six numbers over the viewer�
     expect(guest.ids.tickets).not.toContain(read.world.hiddenTaskId);
     expect(guest.counts.tickets).toBe(guest.ids.tickets.length);
     expect(typeof (await home('member')).counts.members).toBe('number');
+
+    // Notes: a guest is not told the id of a workspace-scoped note, and its count is its own list's length. Control,
+    // same `it`: a note that names the guest IS in their Notes, and the member holds the workspace-scoped one.
+    expect(guest.ids.notes).not.toContain(fx.liveNote);
+    expect(guest.ids.notes).not.toContain(fx.ownerOnlyNote);
+    expect(guest.ids.notes).toContain(fx.guestNote);
+    expect(guest.counts.notes).toBe(guest.ids.notes.length);
+    expect(guest.counts.notes).toBeGreaterThan(0);
+    expect((await home('member')).ids.notes).toContain(fx.liveNote);
+    expect((await home('member')).ids.notes).not.toContain(fx.guestNote);
   });
 
   // LAST in the file: it deletes a project, and every case above reads the shared workspace.
