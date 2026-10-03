@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { readWorkspaceId, seededProjectHref } from './helpers/board.js';
+import { openNoteFromList } from './helpers/notes.js';
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
@@ -462,11 +463,11 @@ for (const viewport of VIEWPORTS) {
         {
           name: 'note',
           reach: async () => {
-            await visit('/notes');
-            const link = page.locator('a[href^="/notes/"]').first();
-            await expect(link, 'no note exists on /notes to open').toBeVisible({ timeout: 15_000 });
-            const href = await link.getAttribute('href');
-            await visit(href!);
+            // A fresh database (the CI stack) has no note, and this spec sorts before notes.spec.ts: create one then.
+            const { href, created } = await openNoteFromList(page, () => visit('/notes'));
+            // A created note is already open (the dialog navigates there); an existing one is visited.
+            if (created) await page.waitForLoadState('networkidle');
+            else await visit(href);
           },
         },
         {
