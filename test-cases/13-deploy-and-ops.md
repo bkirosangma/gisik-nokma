@@ -735,7 +735,7 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1755 🧪 ANSI codes and turbo `pkg:task:` prefixes are stripped before parsing and printing.
 - 13.1756 🧪 A run with 400 failures still prints at most 30 lines, counts first; the digest script itself never prints more than the MAXLINES it is given.
 - 13.1757 🧪 A crash with no test summary keeps its exit code and shows the log tail — the cause text comes from a file, not from the command line, so only the digest's indented tail can satisfy the check; the log FILE holds the command's stderr and no raw line leaks to stdout.
-- 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s; a slot whose holder file names another pid is left alone when this run ends.
+- 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s; a slot whose holder file names another pid is left alone when this run ends, and so is a slot dir whose holder file has gone (another waiter's claim in progress), with no error line printed.
 - 13.1759 🧪 Both slots held: the third run waits (fake time) until one frees, runs, and names `slots` as the reason.
 - 13.1760 🧪 The slot count is configurable: a `slots` file in the sem dir, else `CTL_TEST_SLOTS`, else 2; the file wins.
 - 13.1761 🧪 Low free memory holds the slot back until it recovers, reason `pressure`.

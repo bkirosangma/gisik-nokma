@@ -135,12 +135,12 @@ ctl_sem_acquire() {
   printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$label" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$N" >> "$sem/waits.tsv"
   return 0
 }
-# Only while the holder file does not name ANOTHER pid: a slot that was wrongly reclaimed and re-claimed is somebody else's, and must survive our exit.
+# Only while the holder file names THIS run: a slot that was wrongly reclaimed and re-claimed is somebody else's, and a holder-less dir is a claim in progress (the grace rule) — both survive our exit.
 ctl_sem_release() {
   local d hp hrest
   if [ -n "${CTL_SEM_SLOT:-}" ]; then
-    d="$(ctl_sem_dir)/slot-$CTL_SEM_SLOT"; hp=""; IFS='|' read -r hp hrest < "$d/holder" 2>/dev/null || true
-    if [ -z "$hp" ] || [ "$hp" = "$$" ]; then rm -rf "$d"; fi
+    d="$(ctl_sem_dir)/slot-$CTL_SEM_SLOT"; hp=""; { IFS='|' read -r hp hrest < "$d/holder"; } 2>/dev/null || true
+    [ "$hp" = "$$" ] && rm -rf "$d"
   fi
   CTL_SEM_SLOT=""; return 0
 }
