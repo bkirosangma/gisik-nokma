@@ -34,6 +34,20 @@ export function redactedTicketCreatedPayload(
 }
 
 /**
+ * True exactly for a redacted `ticket.created`. Every replay reader of
+ * `ticket.created` asks this FIRST and produces no ticket from it — the payload
+ * no longer satisfies `ticketCreatedPayload` (no `typeId`, `parentId`, `title`).
+ * `=== true`, not truthiness: the flag is written by one SQL statement as a JSON
+ * boolean, and anything else is not that statement's row.
+ */
+export function isRedactedTicketCreated(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
+  if (env.type !== 'ticket.created') return false;
+  const payload = env.payload;
+  if (payload === null || typeof payload !== 'object') return false;
+  return (payload as { purged?: unknown }).purged === true;
+}
+
+/**
  * A purged ticket's `ticket.published` is KEPT, redacted (drafts T2): it is a numbering row, and deleting it
  * would shift every later key in the project down by one.
  */
@@ -48,20 +62,6 @@ export function redactedTicketPublishedPayload(projectId: string): { projectId: 
  */
 export function isRedactedTicketPublished(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
   if (env.type !== 'ticket.published') return false;
-  const payload = env.payload;
-  if (payload === null || typeof payload !== 'object') return false;
-  return (payload as { purged?: unknown }).purged === true;
-}
-
-/**
- * True exactly for a redacted `ticket.created`. Every replay reader of
- * `ticket.created` asks this FIRST and produces no ticket from it — the payload
- * no longer satisfies `ticketCreatedPayload` (no `typeId`, `parentId`, `title`).
- * `=== true`, not truthiness: the flag is written by one SQL statement as a JSON
- * boolean, and anything else is not that statement's row.
- */
-export function isRedactedTicketCreated(env: Pick<EventEnvelope, 'type' | 'payload'>): boolean {
-  if (env.type !== 'ticket.created') return false;
   const payload = env.payload;
   if (payload === null || typeof payload !== 'object') return false;
   return (payload as { purged?: unknown }).purged === true;
