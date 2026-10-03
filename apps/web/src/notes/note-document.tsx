@@ -745,7 +745,10 @@ function NoteDocumentBody({
         }}
         readingLabel={readingLabel(wordCount)}
         onCopyMarkdown={() => {
-          void exportMarkdown(draftRef.current ?? note.body).then((markdown) => navigator.clipboard.writeText(markdown));
+          // Written in the click's own task when the editor chunk is already in memory (Safari ties the clipboard to the gesture).
+          const markdown = exportMarkdown(draftRef.current ?? note.body);
+          if (typeof markdown === 'string') void navigator.clipboard.writeText(markdown);
+          else void markdown.then((text) => navigator.clipboard.writeText(text));
         }}
         onOpenHistory={() => setHistoryOpen(true)}
         {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}

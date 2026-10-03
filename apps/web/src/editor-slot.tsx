@@ -18,9 +18,13 @@ import { EditorSkeleton } from './skeletons/editor-skeleton.js';
 let Loaded: ComponentType<TicketEditorSlotProps> | null = null;
 // One load for every slot on the page (a sheet mounts a description and a comment composer, and prefetch may already be in flight).
 let loading: Promise<ComponentType<TicketEditorSlotProps>> | null = null;
+// The serializer comes from the same module, kept so a note's "Copy as Markdown" can run inside the click (see `exportMarkdown`).
+type Serializer = typeof import('@gisik-nokma/editor').exportMarkdown;
+let serialize: Serializer | null = null;
 const load = () =>
   (loading ??= import('@gisik-nokma/editor').then((module) => {
     Loaded = module.TicketEditorSlot;
+    serialize = module.exportMarkdown;
     return Loaded;
   }));
 
@@ -56,12 +60,13 @@ export { uploadAttachmentHttp } from '@gisik-nokma/editor/upload';
 
 /**
  * `exportMarkdown` (a note's "Copy as Markdown"), through the same load so the serializer's Tiptap/markdown-it code is not in the
- * route's static graph (smoothness T9, case 25.163). A page that has shown an editor, or called `prefetchEditor()`, has the chunk
- * already, so this settles in a microtask; the copy handler awaits it.
+ * route's static graph (smoothness T9, case 25.163). Synchronous once the chunk is in memory, which is the usual case (a note's page
+ * calls `prefetchEditor()` when it mounts): the clipboard write then still runs inside the click's own task, as Safari requires. A
+ * click before the chunk has arrived gets a promise instead, and the caller writes when it settles.
  */
-export async function exportMarkdown(body: Parameters<typeof import('@gisik-nokma/editor').exportMarkdown>[0]): Promise<string> {
-  const { exportMarkdown: serialize } = await import('@gisik-nokma/editor');
-  return serialize(body);
+export function exportMarkdown(body: Parameters<Serializer>[0]): string | Promise<string> {
+  if (serialize !== null) return serialize(body);
+  return load().then(() => serialize!(body));
 }
 
 /** Warm the editor chunk when a ticket or note is about to be shown. */

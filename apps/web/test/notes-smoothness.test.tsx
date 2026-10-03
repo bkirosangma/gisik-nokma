@@ -11,7 +11,6 @@ import type { NoteDetail, NoteSummary } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { clearReadCaches } from '../src/clear-read-caches.js';
 import { NotesPageShell } from '../src/skeletons/page-shells.js';
-import { EditorSkeleton } from '../src/skeletons/editor-skeleton.js';
 import { NoteEditorBand } from '../src/notes/note-skeletons.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -455,8 +454,10 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     expect(screen.queryByText('Loading the editor')).toBeNull();
   });
 
-  it('25.164 the notes list warms the editor chunk on the first sign of intent (hover, focus, click) before a note opens, and not before; CONTROL: a settled list with no pointer has asked for nothing', async () => {
-    render(page(world(), 'a'));
+  it('25.164 the notes list warms the editor chunk on the first sign of intent (hover, focus, click) before a note opens, and not before; a search result link does the same; CONTROL: a settled list with no pointer has asked for nothing', async () => {
+    const hit = { noteId: 'n2', title: 'Cold room audit', snippet: 'cold', homeProjectId: '', scopeMode: 'workspace', attachedTicketKeys: [], authorId: 'u_kiro', updatedAt: '2026-10-01T06:00:00.000Z', source: 'lexical' };
+    const searchNotes = vi.fn(async () => ({ notes: [hit], corrected: null }));
+    render(page(world({ searchNotes: searchNotes as never, getMyWorkspaces: async () => [ws('ws2')] }), 'a'));
     const row = await screen.findByTestId('note-row-n2');
     await act(() => tick(60));
     expect(prefetch.calls).toBe(0);
@@ -468,6 +469,19 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     prefetch.calls = 0;
     row.addEventListener('click', (event) => event.preventDefault(), { once: true }); // jsdom cannot navigate
     fireEvent.click(row);
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+    // The search result's own link: a different element, the same intent.
+    fireEvent.change(await screen.findByPlaceholderText('Search'), { target: { value: 'cold' } });
+    const link = await within(await screen.findByTestId('notes-result-n2')).findByRole('link', { name: 'Cold room audit' });
+    prefetch.calls = 0;
+    await userEvent.hover(link);
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+    prefetch.calls = 0;
+    act(() => link.focus());
+    expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+    prefetch.calls = 0;
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    fireEvent.click(link);
     expect(prefetch.calls).toBeGreaterThanOrEqual(1);
   });
 
@@ -485,16 +499,28 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     expect(prefetch.calls).toBeGreaterThanOrEqual(1);
   });
 
-  it('25.167 the band IS the editor slot\'s skeleton: same markup as T10\'s EditorSkeleton in note mode (read and edit), so band → slot skeleton → editor moves nothing; CONTROL: an editing band draws the formatting strip, a reading one none', () => {
+  it('25.167 the band IS the editor slot\'s skeleton: the lazy slot, chunk held, with the props NoteEditorPane passes, draws the same box as the band (read and edit), so band → slot skeleton → editor moves nothing; CONTROL: an editing band draws the formatting strip\'s place, a reading one none', async () => {
+    const { TicketEditorSlot: LazySlot } = await vi.importActual<typeof import('../src/editor-slot.js')>('../src/editor-slot.js');
+    // The seam this file mocks would hand back the loaded chunk; here the real wrapper must stay on its skeleton, so the chunk is held.
+    vi.resetModules();
+    vi.doMock('@gisik-nokma/editor', () => new Promise(() => {}));
+    const { TicketEditorSlot: HeldSlot } = await vi.importActual<typeof import('../src/editor-slot.js')>('../src/editor-slot.js');
+    expect(HeldSlot).not.toBe(LazySlot);
+    const box = (root: Element) => {
+      const region = root.firstElementChild!;
+      const shape = (element: Element): unknown => ({ cls: element.className.toString(), kids: [...element.children].map(shape) });
+      return shape(region);
+    };
     for (const readOnly of [true, false]) {
       const band = render(<NoteEditorBand label="Loading the editor" readOnly={readOnly} />);
-      const slot = render(<EditorSkeleton mode="note" readOnly={readOnly} label="Loading the editor" />);
-      expect(band.container.innerHTML, `readOnly=${readOnly}`).toBe(slot.container.innerHTML);
+      const slot = render(<HeldSlot mode="note" doc={null} readOnly={readOnly} workspaceId="ws2" ticketId="" noteId="n1" submitSlot="none" />);
+      expect(box(slot.container), `readOnly=${readOnly}`).toEqual(box(band.container));
       expect(band.container.querySelector('.editor-slot.editor-slot--note > .ticket-editor > .ticket-editor__content')).not.toBeNull();
       expect(band.container.querySelector('.editor-slot__footer'), 'the footer is part of the slot\'s box').not.toBeNull();
       expect(band.container.querySelector('.ticket-editor__toolbar') !== null, `strip, readOnly=${readOnly}`).toBe(!readOnly);
       band.unmount();
       slot.unmount();
     }
+    vi.doUnmock('@gisik-nokma/editor');
   });
 });
