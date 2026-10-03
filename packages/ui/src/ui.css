@@ -9536,3 +9536,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 @media (prefers-reduced-motion: reduce) {
   .gn-skeleton { animation: none; opacity: 0.8; }
 }
+
+/* ── KNOWLEDGE GRAPH (KG-C, 2026-10-03; spec C) ──
+   Four per-task regions, seeded empty by T1 so the parallel lanes write inside their own block and never insert at the
+   same point. Appended after every earlier rule ON PURPOSE (see LOADING PLACEHOLDERS above). */
+/* KG: T7 view+bar */
+/* KG: T8 inspector+list */
+/* KG: T9 tab+panel */
+/* KG: end */
