@@ -490,6 +490,40 @@ as `13.1501`–`13.1512` (arms in `scripts/ctl/test/lib.test.sh` under `pnpm che
 - 13.1642 🧪 `ctl dispatch <window> --submit-pending` on a box holding only a ghost suggestion is refused ("holds no
   real text") and sends no key at all.
 
+## `ctl seats`: one line per seat, read-only (`task/ctl-seats`, plan #3, owner-approved 2026-10-03)
+Why: the orchestrator's watch loop and the 300k-mid-step flag (plan #18) read raw `tmux capture-pane` dumps, which cost
+context on every check and miss a stranded input box or a dead watcher. `ctl seats` reads every window of `gisik` once
+(`has-session`, `list-windows` + `capture-pane`, never `send-keys`) and prints one line each. Block `13.1800`–`13.1824` (of the reserved
+`13.1800`–`13.1829`; `13.1820`–`13.1823` are FIX 1 and `13.1824` is FIX 2, 2026-10-03), 🧪 for the same reason as `13.1501`–`13.1512` (arms in `scripts/ctl/test/seats.test.sh` under
+`pnpm check:ctl`; the citation scanner reads only `apps/` and `packages/`). The pane fixtures in
+`scripts/ctl/test/fixtures/seats/` are real captures of the live session (address masked).
+
+- 13.1800 🧪 A spinner line above the box reads `busy` with its elapsed time (`3m59s`); Ctx, model and the 0/0 shell and monitor counts come from the status line and footer.
+- 13.1801 🧪 `4 shells, 1 monitor` in the footer parses to 4 and 1, and a `cutting it close` segment in the status line does not displace Ctx or the model.
+- 13.1802 🧪 A `done 1:54 AM` turn-end line reads `idle` with that time (and the footer's `2 shells, 1 monitor` on the real opus capture).
+- 13.1803 🧪 The singular `1 shell` parses; a seconds-only spinner is busy; CONTROL: `⎿  Running… (3s of output)` inside tool output is not a spinner.
+- 13.1804 🧪 The input box: real text is `text`; a dim ghost suggestion, closed or running to the line end, is empty; real text before a ghost tail keeps the real part; a `❯` in the transcript is not the box. The box is the one above the status line (13.1820). It agrees with `ctl_box_text` (13.1819).
+- 13.1805 🧪 `pane_in_mode=1` reads `copy_mode` true and the state `unknown` (a scrolled view hides the spinner).
+- 13.1806 🧪 The last DONE / CHECKPOINT line wins; its age is the checkpointed commit's time (a reviewer's and a FIX session's lines: 13.1821).
+- 13.1807 🧪 `needs fresh session at step N` is a signal; CONTROL: the brief's template text (`<branch> <sha40>`, `<n+1>`) and a DONE quoted inside a monitor-event line are not.
+- 13.1808 🧪 An unknown sha falls back to the next turn-end stamp for the age; with neither, the age is `?`.
+- 13.1809 🧪 Roles: `main` controller, `exec*` lane, `planner`, `reviewer*`, `dispatcher`, anything else `other`.
+- 13.1810 🧪 The text line (window, name, role | state | sh/mon | box | Ctx model | branch@head unpushed dirty | last), copy-mode (in the state field, `| unknown copy-mode |`) and box text visible on it, shells before monitors (`sh 2 mon 1` with different counts), one `OK seats` summary last; `--json` is one object per line with the summary on stderr.
+- 13.1811 🧪 `--flag` `idle-no-task`: a lane idle with no shell and no monitor, or idle after its DONE; CONTROLS: a shell running, or busy, is not.
+- 13.1812 🧪 `idle-no-watch`: a coordinator idle with nothing armed; CONTROL: with a monitor armed it is quiet.
+- 13.1813 🧪 `ctx>20%-at-boundary` (idle at a CHECKPOINT/DONE, or a coordinator's quiet point) and `ctx>30%-mid-step` (plan #18); CONTROLS: exactly 20% and exactly 30% are not flagged.
+- 13.1814 🧪 `box-text` (busy or not), `copy-mode`, `no-claude` (a bare shell), `needs-fresh-session`.
+- 13.1815 🧪 `--flag` prints only the flagged seats and `OK seats F flagged of N`; with nothing to flag, no seat lines and exit 0; `--flag --json` prints only the flagged objects.
+- 13.1816 🧪 Against a fake `tmux`: windows in numeric order (2 before 10), branch and short head; `unpushed` counts against `origin/<branch>` (not the release upstream of a task branch), else commits on no origin ref; `dirty`; a directory that is not a worktree has null branch facts.
+- 13.1817 🧪 Read-only: the verb called only `has-session`, `list-windows` and `capture-pane` (the set is asserted exactly; no `display-message`), and left the checkout unchanged.
+- 13.1818 🧪 `--dry-run` calls no `tmux` at all and exits OK.
+- 13.1819 🧪 13 windows in under 2 s through the fake `tmux` (live run, 2026-10-03: 0.82 s), and `seats.py` agrees with `ctl_box_text` on plain text, a closed ghost, an unclosed ghost, real+ghost, empty, and the agent-panel shape (empty box; typed text).
+- 13.1820 🧪 The background-agent panel opens BELOW the footer and puts `❯` on its selected row; that row is not the input box (live gisik:6 flagged `box-text` with `◯ general-purpose …`). The box is the `❯` above the status line (preferring the one above a `─` rule), read by `scripts/ctl/boxtext.py`, shared by `ctl seats` and `ctl_box_text`. Arms: the real capture (`fixtures/seats/agents-panel-ghost.pane`; its selection marker was placed by hand, the live panel was not focused) reads an empty box, no `box-text` flag and busy from the spinner; a ghost in the real box is empty; a spinner and an `esc to interrupt` footer are still read with 12 agent rows below; a box wrapped onto a second line is still read with the panel (a pipe in its last row) below it; with no status line the `❯` above a `─` rule wins, else the last `❯`; `ctl_box_text` on the same shapes (lib.test.sh). CONTROLS: typed text with the panel open is `text` and is the typed text; a panel alone leaves an idle seat idle and empty.
+- 13.1821 🧪 Protocol lines (MSG-no-midtask-seats): `CHECKPOINT reviewer idle after <branch> <hex sha>` is a CHECKPOINT signal (live gisik:9 read `last: none`); `needs fresh FIX session` is kind needs-fresh and raises `needs-fresh-session`; a lane's `CHECKPOINT task/<b> <sha> DONE` counts as DONE (`idle-no-task` with a monitor armed). CONTROLS: the reviewer template (`<branch> <sha8>`, no hex), a quoted `"needs fresh FIX session"`, and a step checkpoint (`step 2/3`, not DONE) are not signals / not DONE.
+- 13.1822 🧪 A turn-end stamp later than now is yesterday's (now 00:05, `done 11:58 PM` is 7 min); CONTROL: `done 12:03 AM` at 00:05 is 2 min.
+- 13.1823 🧪 `ctl selftest` prints the number of steps it ran: counted in `step()`, never a typed literal (both sides of a tip merge had bumped `16 steps` to `18 steps`; the merged tree ran 20).
+- 13.1824 🧪 A `ctl seats` text line in a pane's scrollback (`… | Ctx 11% sonnet-5-5 | …`, which matches `Ctx N%` + `|`) above the real transcript, box and status line (`Ctx 27% opus-5-5`) is not the status line: the LAST such line is, so ctx, model and the typed box text come from the real ones (both `seats.py` and `ctl_box_text`, which share `boxtext.py`); CONTROL: the same pane without the scrollback line reads the same.
+
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 
 Ids minted from the §13 tip: `13.1495` was the highest id on any remote branch (measured with `check-case-ids.mjs`'s own
