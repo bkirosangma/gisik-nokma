@@ -37,6 +37,8 @@ export type EventTypeRegistry = {
   register(registration: EventTypeRegistration): void;
   get(type: string, version: number): EventTypeRegistration | undefined;
   hasType(type: string): boolean;
+  /** Every registration, in registration order: what a census iterates instead of retyping a list. */
+  registrations(): readonly EventTypeRegistration[];
 };
 
 export function createEventTypeRegistry(): EventTypeRegistry {
@@ -56,6 +58,9 @@ export function createEventTypeRegistry(): EventTypeRegistry {
     },
     hasType(type) {
       return types.has(type);
+    },
+    registrations() {
+      return [...byKey.values()];
     },
   };
 }

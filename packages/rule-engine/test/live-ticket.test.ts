@@ -76,6 +76,10 @@ const GATED: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown]> 
   // against the ticket, so a deleted ticket refuses it `deleted-ticket`, exactly as it refuses `comment.added`.
   ['comment.edited', () => ({ commentId: COMMENT, body: plainTextToDoc('an edited comment') })],
   ['comment.deleted', () => ({ commentId: COMMENT })],
+  // Typed-links T1 (27.004's census sibling): a link is filed on the SOURCE's stream, so a deleted source refuses it
+  // `deleted-ticket`, the existing rule (spec A §2.3 rule 2); a deleted TARGET is T3's `link.target-deleted`.
+  ['ticket.link_added', () => ({ kind: 'blocks', targetId: '01J9GTKB000000000000000000' })],
+  ['ticket.link_removed', () => ({ kind: 'blocks', targetId: '01J9GTKB000000000000000000' })],
   ['attachment.added', () => ({ attachmentId: '01J9GATT000000000000000000', filename: 'a.txt', mime: 'text/plain', size: 1, sha256: 'ab' })],
   ['visibility.set', (id) => ({ ticketId: id, mode: 'explicit', userIds: [PEER] })],
 ];
