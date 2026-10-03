@@ -54,7 +54,7 @@ summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to o
 # packages/knowledge-graph-browser: test, typecheck) = 41. The match is anchored, so 141, 410 and mixed pairs fail (13.1840-13.1849).
 # TEMPORARY "41 or 46": Workflow and Timeline graphs Part 1 T1 adds packages/viewport (build, test, typecheck) and packages/flow-graph-browser
 # (test, typecheck), so its gate is 46, while the verb that runs is the PRIMARY checkout's (41-only). Both halves must match one graph: an anchored
-# two-alternative match, so 4146, 460/410 and mixed pairs fail. WTG Part 1 T1's LAST commit pins 46-ONLY here (and flips 13.2025 to a FAIL control);
+# two-alternative match, so 146, 460/410 and mixed pairs fail. WTG Part 1 T1's LAST commit pins 46-ONLY here (and flips 13.2025 to a FAIL control);
 # delete this comment with the 41 arm. Same shape as KG C T1's "36 or 41" (13.1844-13.1849).
 echo "$T" | grep -Eq '^Tasks: +(41 successful, 41|46 successful, 46) total *$' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
