@@ -307,6 +307,18 @@ Collision and snapping as pure modules (G-9 T2, owner 2026-10-03). Tests: `packa
 - ✅ **25.515 — Alt skips guides and grid; the clamp still applies.** Mutation: `alt` ignored → red.
 - ✅ **25.516 — `target` is the snapped pre-clamp point, for the dashed outline; unblocked, `target` equals `position` and `blocked` is false; a block on y alone (target 400,128 → position 400,92) is blocked too and keeps its x guide.** Mutation: `target` returned as the clamped position → red; `blocked` computed from x only → red.
 <!-- G-9 T3 -->
+Collision and snapping on the canvas (G-9 T3, owner 2026-10-03). Tests: `packages/workflow-canvas-browser/tests/collision.spec.ts` (real Chromium, Vite harness on :3190), `packages/app-core/test/workflow-builder/add-state-placement.test.ts`. Block 25.500–25.559 (G-9 only); 25.520–25.528 used here (25.529–25.534 stay unused).
+
+- ❌ **25.520 — a state dragged into another stops 8 flow px clear of it, with a dashed outline where the pointer wants it, and the drop lands where it stands.**
+- ❌ **25.521 — control, in 25.520's `it`: a free spot shows no outline and lands under the pointer.**
+- ❌ **25.522 — a state whose centre comes within a few screen px of another's snaps onto it and a guide line shows; control: far from every edge there is no guide.**
+- ❌ **25.523 — at zoom 0.25 a guide still triggers within 6 SCREEN px and the outline sits under the pointer.**
+- ❌ **25.524 — Alt drops the state wherever the pointer leaves it; control: without Alt it lands on the 16 px grid.**
+- ❌ **25.525 — an arrow moves the focused state one grid step, Alt+arrow one px; Escape during a drag clears the guides and the outline and the release commits nothing.**
+- ❌ **25.526 — an arrow into a neighbour changes nothing and announces `Blocked by <name>`; control: the arrows before it moved the state.**
+- ❌ **25.527 — Add state with a `near` point lands on the free grid point nearest it, clear of every state by the gap.**
+- ❌ **25.528 — control, in 25.527's `it`: `addState()` with no `near` keeps the old `nextFreePosition` result.**
+
 <!-- G-9 T4 -->
 <!-- G-9 T5 -->
 
