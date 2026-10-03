@@ -176,6 +176,24 @@ check "13.1842 task count: CONTROL — a short 36-task run (35 of 36) FAILS" 'ou
 check "13.1842 task count: CONTROL — 34 successful of 36 total FAILS (the pair must agree)" 'out=$(FIXTURE_OK=34 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 36 total"'
 check "13.1842 task count: CONTROL — 36 successful of 34 total FAILS" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 34 total"'
 check "13.1843 task count: CONTROL — a 34-task run (34/34) FAILS the verb on the 36-only tip, naming the Tasks line" 'out=$(FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 34 total"'
+# 13.1844-13.1848 (13.1849 is the pending 41-only flip): Knowledge Graph C T1 adds a package (41 tasks) while the verb that runs is the primary checkout's (36-only), so the verb accepts 36 OR 41 until
+# KG C T1's last commit pins 41-only. The pair must match one graph; 13.1840-13.1843 above still hold (36 passes, 34/35/37 and mixed pairs fail).
+check "13.1844 task count: a cached run of 41/41 passes the verb (KG C T1's graph)" 'FIXTURE_TASKS=41 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +41 successful, 41 total"'
+check "13.1844 task count: a fresh (main-kind) run of 41/41 passes too" 'FIXTURE_TASKS=41 gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · Tasks: +41 successful, 41 total"'
+check "13.1844 task count: CONTROL — 36/36 still passes on the same tip (both graphs, release-kind)" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
+check "13.1844 task count: CONTROL — 36/36 still passes main-kind" 'FIXTURE_TASKS=36 gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · Tasks: +36 successful, 36 total"'
+for n in 35 37 40 42; do
+  check "13.1845 task count: CONTROL — $n/$n FAILS, naming the Tasks line (accepted by value, not by range)" 'out=$(FIXTURE_TASKS='$n' gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *'$n' successful, '$n' total"'
+done
+check "13.1845 task count: CONTROL — 34/34 FAILS (13.1843's control stays valid with the 41 arm)" 'out=$(FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 34 total"'
+check "13.1846 task count: CONTROL — mixed pair 36 successful of 41 total FAILS" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS=41 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 41 total"'
+check "13.1846 task count: CONTROL — mixed pair 41 successful of 36 total FAILS" 'out=$(FIXTURE_OK=41 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *41 successful, 36 total"'
+check "13.1846 task count: CONTROL — a short 41-task run (40 of 41) FAILS" 'out=$(FIXTURE_OK=40 FIXTURE_TASKS=41 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *40 successful, 41 total"'
+check "13.1846 task count: CONTROL — a short 41-task run FAILS main-kind too" 'out=$(FIXTURE_OK=40 FIXTURE_TASKS=41 gbr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *40 successful, 41 total"'
+check "13.1847 task count: CONTROL — anchored on the left: 136 of 36 and 141 of 41 FAIL (an accepted count as the tail of a longer one)" '( for n in 36 41; do out=$(FIXTURE_OK=1$n FIXTURE_TASKS=$n gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *1$n successful, $n total" || exit 1; done )'
+check "13.1847 task count: CONTROL — 36 of 360 and 41 of 410 FAIL (an accepted count as the prefix of the total)" '( for n in 360 410; do out=$(FIXTURE_OK=${n%0} FIXTURE_TASKS=$n gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *${n%0} successful, $n total" || exit 1; done )'
+check "13.1847 task count: CONTROL — anchored on the right: text after 'total' FAILS (36/36 total total)" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS="36 total" gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 36 total total"'
+check "13.1848 task count: the TEMPORARY marker is greppable — gate.sh names the 36-or-41 pair and KG C T1's 41-only pin, so the removal is not forgotten" 'grep -q "TEMPORARY \"36 or 41\"" "$HERE/verbs/gate.sh" && grep -q "KG C T1.s LAST commit pins 41-ONLY" "$HERE/verbs/gate.sh"'
 ( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
@@ -271,6 +289,17 @@ p_mixed="$fk/pane-mixed.txt"; printf '\033[38;5;241m\xe2\x9d\xaf \033[39m\033[2m
 ghost() { FAKE_LOG="$fk/calls" FAKE_PANE="$1" PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; ctl_box_text gisik:7"; }
 check "13.1640 box_text: an UNCLOSED dim suggestion is not input" '[ -z "$(ghost "$p_ghost")" ]'
 check "13.1640 box_text: control — real text between a closed and an unclosed dim span is read" '[ "$(ghost "$p_mixed")" = "real words" ]'
+# 13.1820: the background-agent panel opens BELOW the footer and its selected row starts with ❯ — that row is not the box (live
+# gisik:6, 2026-10-03: `ctl dispatch` would refuse a seat whose box was empty). The box is the ❯ line above the status line.
+p_panel_real="$HERE/test/fixtures/seats/agents-panel-ghost.pane"
+p_panel_text="$fk/pane-panel-text.txt"; printf '\033[38;5;245m%s\n\033[38;5;241m\xe2\x9d\xaf\xc2\xa0\033[39mtyped words\n\033[38;5;245m%s\n  me | sonnet-5-5 | Ctx 12%% | x\n  -- INSERT -- bypass\n\n  \xe2\x8f\xba main\n  \xe2\x97\xaf general-purpose  Checking one\n\xe2\x9d\xaf \xe2\x97\xaf general-purpose  Checking route-shells\n' '────────────' '────────────' > "$p_panel_text"
+check "13.1820 box_text: the REAL capture with the agent panel open (selection on an agent row) holds an EMPTY box" '[ -z "$(ghost "$p_panel_real")" ]'
+p_panel_wrap="$fk/pane-panel-wrap.txt"; printf '\033[38;5;245m%s\n\033[38;5;241m\xe2\x9d\xaf\xc2\xa0\033[39mwrapped first line\n  second line\n\033[38;5;245m%s\n  me | sonnet-5-5 | Ctx 12%% | x\n  -- INSERT -- bypass\n\n  \xe2\x8f\xba main\n\xe2\x9d\xaf \xe2\x97\xaf general-purpose  Checking route-shells\n  \xe2\x97\xaf general-purpose  grep one | two\n' '────────────' '────────────' > "$p_panel_wrap"
+check "13.1820 box_text: a box wrapped onto a second line, panel open below (its last row holding a pipe), reads the box's own line" '[ "$(ghost "$p_panel_wrap")" = "wrapped first line" ]'
+check "13.1820 box_text: CONTROL — real text typed in the box with the panel open is read (and not the panel row)" '[ "$(ghost "$p_panel_text")" = "typed words" ]'
+# 13.1823: `ctl selftest` prints the number of steps it RAN. A typed literal collided in a tip merge (both sides bumped 16 -> 18, the merged
+# tree ran 20), so the count is incremented inside step() and printed from the counter.
+check "13.1823 selftest: the step count is counted inside step() and printed from the counter, never a typed literal" 'grep -q "^step() { n=\$((n+1));" "$HERE/verbs/selftest.sh" && grep -q "ctl_ok selftest \"\$n steps\"" "$HERE/verbs/selftest.sh" && ! grep -qE "ctl_ok selftest \"[0-9]+ steps\"" "$HERE/verbs/selftest.sh"'
 sp() { rm -f "$fk/calls" "$fk/enters"; CTL_DRY_RUN=0 FAKE_LOG="$fk/calls" FAKE_ENTERS="$fk/enters" FAKE_NEEDS="${2:-1}" FAKE_PANE="$1" PATH="$fk:$PATH" bash "$HERE/verbs/dispatch.sh" 7 --submit-pending --repo "$HERE/../.." 2>&1; }
 check "13.1641 dispatch --submit-pending: a pasted-but-unsent message is submitted by real Enters, never re-pasted" 'out=$(sp "" 2); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "^OK dispatch gisik:7 submitted its pending text (Enter ×2)" && ! grep -q paste-buffer "$fk/calls"'
 check "13.1642 dispatch --submit-pending: a box with only a ghost suggestion is refused and gets NO Enter" 'out=$(sp "$p_ghost"); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "holds no real text" && ! grep -q "send-keys" "$fk/calls"'
