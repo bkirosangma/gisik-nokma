@@ -20,6 +20,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * mention each, in three paragraphs — denser than a typical body, so the number errs high.
  */
 const ENABLED = process.env['REFS_PERF'] === '1';
+const BACKFILL_ONLY = process.env['REFS_PERF_BACKFILL_ONLY'] === '1'; // skip the two whole-ledger rebuilds (see the case)
 const BODY_EVENTS = Number(process.env['REFS_PERF_BODY_EVENTS'] ?? '100000');
 const OTHER_EVENTS = Number(process.env['REFS_PERF_OTHER_EVENTS'] ?? '400000');
 // The bar (planner ruling 2026-10-03 13:24, RULING A: the first 10 000 ms bar was set without measuring the
@@ -146,6 +147,17 @@ describe('27.118 the rebuild and the boot backfill at the size floor', () => {
   it('27.118 proj_references rebuilds and backfills within the bar; proj_search on the same ledger is the baseline', async () => {
     expect(BODY_EVENTS).toBeGreaterThan(0);
     const sourceCount = await seed(BODY_EVENTS, OTHER_EVENTS);
+    if (BACKFILL_ONLY) {
+      // Headroom run: `rebuildProjection` loads the WHOLE ledger (`readLedger`), which at 10x the floor exceeds
+      // node's default heap for ANY projection (proj_search too); the backfill, which walks entities, does not.
+      const only = await measureBackfill();
+      console.log(
+        `refs-perf: backfill-only ${BODY_EVENTS} body + ${OTHER_EVENTS} other events: ${only.entities} entities in ${only.ms.toFixed(0)} ms (+${only.rssMb.toFixed(0)} MB), ` +
+          `longest entity transaction ${only.maxEntityMs.toFixed(0)} ms (the ${sourceCount * 4} rows expected)`,
+      );
+      expect(only.rssMb).toBeLessThanOrEqual(BAR_RSS_MB);
+      return;
+    }
     const baseline = await measure('proj_search');
     const refs = await measure('proj_references');
     const { rows } = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM proj_references');
