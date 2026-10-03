@@ -4160,6 +4160,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .react-flow__node.dragging .gn-any-state-node { transform: scale(1.02); box-shadow: var(--gn-shadow-lift-drag); }
 
 /* G-9: T3 guides+outline */
+/* Drag feedback, drawn in flow coordinates inside the viewport (so it zooms with the board): a 1px accent line where the dragged state
+   aligns with another, and a dashed accent box where the pointer is aiming when a neighbour holds the state back. Neither takes the pointer. */
+.gn-canvas-guide { position: absolute; left: 0; top: 0; pointer-events: none; background: var(--gn-accent); }
+.gn-canvas-guide[data-axis="y"] { height: 1px; }
+.gn-canvas-guide[data-axis="x"] { width: 1px; }
+.gn-canvas-outline { position: absolute; left: 0; top: 0; box-sizing: border-box; pointer-events: none; border: 2px dashed var(--gn-accent); border-radius: var(--gn-radius-card); opacity: 0.4; }
 
 /* G-9: T4 tidy+add-transition */
 

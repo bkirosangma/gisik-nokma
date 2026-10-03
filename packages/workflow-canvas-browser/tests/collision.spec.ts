@@ -21,7 +21,8 @@ async function flowBox(page: Page, name: string): Promise<Flow> {
 }
 async function draftOf(page: Page, name: string) {
   const id = (await node(page, name).getAttribute('data-id'))!.slice('s:'.length);
-  return (await readDraftPositions(page) as Record<string, { x: number; y: number }>)[id]!;
+  // nothing is persisted before the first edit: NaN reads as "not moved" instead of a TypeError
+  return ((await readDraftPositions(page)) as Record<string, { x: number; y: number }> | undefined)?.[id] ?? { x: NaN, y: NaN };
 }
 const centreX = (b: Flow) => b.x + b.width / 2;
 const centreY = (b: Flow) => b.y + b.height / 2;
@@ -92,8 +93,8 @@ test('25.522 a state whose centre comes within a few screen px of another state\
   const b = await flowBox(page, B);
   const a0 = await flowBox(page, A);
   const p = await pickUp(page, A);
-  // control: 40 screen px down lines up with no edge of any state
-  await page.mouse.move(p.x, p.y + 40, { steps: 20 });
+  // control: 100 screen px down lines up with no edge of any state (40 put A's top on the Any state node's bottom edge)
+  await page.mouse.move(p.x, p.y + 100, { steps: 30 });
   await expect(page.locator('.gn-canvas-guide')).toHaveCount(0);
   // the case: A's centre 1.5 screen px below B's. (Closer to B's centre than to B's top or bottom, which sit 5.6 flow px off it.)
   await page.mouse.move(p.x, p.y + (centreY(b) - centreY(a0)) * zoom + 1.5, { steps: 20 });
@@ -150,9 +151,9 @@ test('25.523 at zoom 0.25 a guide still triggers within 6 SCREEN px, and the das
 test('25.524 holding Alt drops the state wherever the pointer leaves it, not on the 16 px grid; control: without Alt it lands on the grid', async ({ page }) => {
   await openHarness(page);
   const { zoom } = await viewport(page);
-  // control: two screen-distinct drags down into the free row below, no Alt
+  // control: down into the free row below, no Alt (90 flow px right: no edge of another state is within the guide threshold of it)
   let p = await pickUp(page, A);
-  await page.mouse.move(p.x + 37 * zoom, p.y + 250, { steps: 40 });
+  await page.mouse.move(p.x + 90 * zoom, p.y + 250, { steps: 40 });
   await page.mouse.up();
   const grid = await draftOf(page, A);
   expect(Math.abs(grid.x / 16 - Math.round(grid.x / 16))).toBeLessThan(0.01);

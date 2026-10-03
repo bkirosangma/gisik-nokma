@@ -1,6 +1,6 @@
 import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import type { WorkflowDraft } from '../draft-store.js';
-import { ANY_STATE_NODE_ID } from '../layout.js';
+import { ANY_STATE_NODE_ID, UNMEASURED_NODE } from '../layout.js';
 import { summarizeRules, type SummaryContext } from '../summaries.js';
 
 export type StateNodeData = {
@@ -74,9 +74,6 @@ export function connectionToTransition(connection: {
 
 /** F-5 (WF-03): the zoom a phone-width canvas opens at. High enough that a node's 13px checkbox is drawn near its CSS size. */
 export const PHONE_OPEN_ZOOM = 0.8;
-
-/** The start node's size before React Flow has measured it. It always carries the "start state always allows new tickets" reason, so it sits at `.gn-state-node`'s 13rem cap (208px); about 120px tall. */
-const UNMEASURED_NODE = { width: 208, height: 120 };
 
 /** Where a phone-width canvas opens: the centre of the START state at {@link PHONE_OPEN_ZOOM}, not the whole graph. */
 export function phoneOpeningView(
