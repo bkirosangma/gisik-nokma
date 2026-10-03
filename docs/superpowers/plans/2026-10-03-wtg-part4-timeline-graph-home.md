@@ -1,5 +1,7 @@
 # The Timeline graph and Home's Timeline (Workflow and Timeline graphs, Part 4) Implementation Plan
 
+> **Release branch (owner, 2026-10-04):** `release/workflow-graph`, cut from `origin/release/knowledge-graph` at f9e0cd18. Every task branch is cut from `origin/release/workflow-graph` and every PR goes `--base release/workflow-graph`. The Knowledge Graph release merges to `main` first; `main` is then merged INTO `release/workflow-graph`, never rebased.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE. UI tasks (T2, T4, T5, T6, T7) name **`frontend-design`** in the lane prompt and measure real geometry on the primary dev stack (rule #23: no lane runs its own Docker stack).
 
 **Goal:** the Timeline graph (the Workflow graph laid on a date axis, with work periods, passes, "Not taken", pruned ghosts, the paper pin, ✓ / ▶ marks, curved loop arrows and an undated tray) in the ticket sheet's Graph tab, and Home's Timeline: one scope (workspaces, projects, Me | Everyone) that drives both Home's six numbers and a continuously scrolling, row-packed, preloaded timeline over up to 10,000 intervals.
@@ -30,8 +32,8 @@
 ## Global Constraints
 
 **Release and identity**
-- **Release:** a NEW release branch `release/<next>`, cut after the Knowledge Graph release ships (one release branch at a time; the literal `<next>` is filled when the owner cuts it). Every task branch is `task/wtg4-<slug>` cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`.
-- **Land with** `ctl gate <sha> --base release/<next>` then `ctl land <pr> --base release/<next>`, with the same `--repo` for both.
+- **Release:** `release/workflow-graph`, cut 2026-10-04 from `origin/release/knowledge-graph` at f9e0cd18 (owner; the KG release merges to `main` first, then `main` is merged INTO it, never rebased). Every task branch is `task/wtg4-<slug>` cut from `origin/release/workflow-graph`, and its PR has `--base release/workflow-graph`. Never `main`.
+- **Land with** `ctl gate <sha> --base release/workflow-graph` then `ctl land <pr> --base release/workflow-graph`, with the same `--repo` for both.
 - **Plan id** (ledger and `check:tasks`): `wtg-part4-timeline-graph-home` (the file stem after the date, `scripts/check-task-ledger.mjs:263`).
 - **Prerequisites for T1:** Part 1's first task has landed (it creates `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md`), Part 2's model is on the branch, and the KG release's Home (spec E T1–T4) is on the branch.
 
@@ -65,7 +67,7 @@
 - **D-W4-8 Summary type.** `HomeResponse.dueSoonDays` is one number; HM-2 needs a per-workspace map. A new `HomeSummaryResponse` is added; `GET /v1/workspaces/:id/home`, `HomeResponse` and case 14.305 stay byte-identical. Members = distinct people across the readable workspaces in scope (not narrowed by Me or by projects); Notes = notes of the scope (a note with no home project follows its workspace, as C-scope's `inGraphScope` does).
 - **D-W4-9 The replica does not answer these.** Attachments (`ATTACHMENTS_ABSENCES`, `replica-data-source.ts:1242`), the roster (`:1236`) and a multi-workspace scope are not local, so `getTimelineIndex / Chunk / Tray / getHomeSummary` reject with a `ReplicaGapError` (the `ATTENTION_ABSENCES` pattern, `:679`, `:1337`). The spec says the replica builds the answers; it cannot build the pin counts or the roster, and a partial answer would be a wrong one. Reported.
 - **D-W4-10 State-changing live events refetch; input events patch.** `ticket.transitioned / closed / reopened / decided / workflow_rebound / published` move work periods, which derive from the event's `serverTime` and the workflow's categories through Part 2's reducer; the client holds neither. They mark the index stale and refetch it in the background (debounced 400 ms, stale-while-revalidate, rows glide per PK-6). Dates, estimate, wait-for-all and title of a flow MEMBER, and a new link inside one flow, patch the cache at once and re-plan that flow with `planFlow`; the same edits on a singleton (it has no plan inputs in the index), a removed link (it can split a flow), a new link between flows, an assignee or collaborator change (they move Me's scope) and every note or attachment event refetch like the state events. PR-6 says state events re-plan on the client; this is the narrower honest version.
-- **D-W4-11 "Not taken" draws nothing but its ghosts; one spec tension is reported.** TG-3's table (`spec:694`), TG-10 (`spec:712`) and PK-3 (`spec:212`) agree: a Not-taken ticket has no bar and is not in the packing union. So `segmentsFor` returns only ghost segments when `notTaken !== null` (Part 2's `FlowNode.notTaken`; the wire field is `resolution`), worked or not, and the packer and the painter share that rule (T5 `packItems` filters out ghosts only). The tension: PS-5 rule 2 (`spec:509`) says a terminal ticket that already worked and is not in the live set "keeps its periods" and shows a derived `Not taken (pass n)` chip. This plan reads that as data (the periods stay in the ticket's history), and those tickets carry no `resolution` here (it is Part 2's `resolutionOf`, derived from a `branch-not-taken` close and folded by `flowNodeOf` in T1 `load.ts`), so they keep their bars and no chip; a ticket closed Not taken after starting (`closeStarted`, PS-6) has the resolution and no bar. The derived chip for the rule-2 case is not built (the index has no field for it); the owner should confirm that reading. The ghost strip (TG-10) is where a Not-taken ticket appears, with the toggle on, and its tooltip carries `Not taken (pass n)`.
+- **D-W4-11 Not taken follows the approved mockups (owner ruling O3, 2026-10-04; spec TG-3, TG-10, PK-3 as amended).** A Not-taken ticket (`notTaken !== null`; the wire field is `resolution`) that did work keeps its work-period bars: `segmentsFor` returns its `actual` segments (no `planned`), the scene draws them in the `notTaken` style (muted fill `--gn-fill-tertiary`, dashed edge, text at full contrast) with the chip `Not taken (pass n)` (`Not taken` for pass 1) and the tooltip `<key> <title>, <start> to <end>, Not taken (pass n)`, and they are in the packing union. One that never started gets ONE `stub` segment on its close day (`closedDay`, the IST day of `TicketState.closed.at`): a 6 px mark with the tooltip `<key> <title>: Not taken, <day>`, in the packing union; with Planned vs actual ON and a pruned plan (`ghost` segments), the stub is not drawn and the ghost in the lane's Pruned strip stands in for it, while the stub's day stays in the union so no row moves. Pruned ghosts stay out of the union (PK-9). A rule-2 ticket (PS-5: terminal with work, not in the live set, no `branch-not-taken` close) carries no resolution here and keeps its ordinary bars. The legend gains `Not taken, after its work` and `Not taken, never started` when the scene holds either.
 - **D-W4-12 Mockup-only elements are not built** (the spec wins): the Past-due outline and "Past due, was due 2 Oct" pill; the dotted "through others' tickets" connector; the "10 dated, 1 undated, 1 draft" line; the "1 d early / 1 d late" chips; the legend's position and strings where TG-15 sets them; the tray at the right (TG-6 puts it at the foot); the "est." tag and the vertical "Revised 3 Oct 15:20" line (the spec asks for the diamond's `revised` mark only); the phone's "2 more above / 4 more below" counters.
 - **D-W4-13 Tray sentence.** TG-6 writes `Reached when GN-151 Client decides chooses Needs rework`, TG-12 `Reached when GN-145 chooses Needs rework`. One function, `reachedSentence`, builds the TG-6 form (key + title) and drops the title only when the Decision's title is not visible to the viewer.
 - **D-W4-14 Home's Knowledge view under a multi-workspace "Everyone"** is centred on the first selected workspace's node; "Me" centres the viewer's person node. The spec leaves this undefined (spec E's "Start from: This workspace | Me" becomes "Me | Everyone"). Reported.
@@ -167,7 +169,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 
 - [ ] **Step 0: Pre-flight, the catalogue, and the landed names**
 
-  1. `git fetch origin`; cut `task/wtg4-reads` from `origin/release/<next>`; `pnpm install` under Node 22.
+  1. `git fetch origin`; cut `task/wtg4-reads` from `origin/release/workflow-graph`; `pnpm install` under Node 22.
   2. **Re-read what this task calls** and write the landed signatures into the first lines of `HANDOFF-wtg4-reads.md`:
      - `grep -n "export function planFlow\|export function analyzeFlow\|export function flowNodeOf\|export function edgeKey\|export type FlowNode\|export type NodePlan\|export type PlannedInterval" packages/domain/src/flow/*.ts`;
      - `grep -n "periods\|passes\|rounds\|outcome\|closed_cause\|draft_author_id" apps/server/src/projections/tickets.ts` (the columns `rowToTicketState` reads; `load.ts` selects `t.*` and folds it exactly as Part 2 T12's `walkFlow` does, so a missing column means Part 2 or Drafts has not landed: STOP);
@@ -210,7 +212,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 - [ ] **Step 1: The read models and `segmentsFor`, test first (29.294)**
 
   Case line under `<!-- WTG4 T1 -->`:
-  - `- ❌ **29.294 — `segmentsFor` turns periods, plan and resolution into the segments the packer and the painter share:** an unworked ticket is its planned bar; an open period ends at `today`; a closed period does not move with `today`; two passes keep both periods; a Not-taken ticket has NO actual and NO planned segment, worked or not (TG-3, PK-3), and keeps only its pruned ghosts; control: the same input without the resolution gets its planned bar back. Mutation: end an open period at its planned end → the first half reds.`
+  - `- ❌ **29.294 — `segmentsFor` turns periods, plan and resolution into the segments the packer and the painter share:** an unworked ticket is its planned bar; an open period ends at `today`; a closed period does not move with `today`; two passes keep both periods; a Not-taken ticket that did work keeps its `actual` segments and has NO `planned` one; a never-started Not-taken ticket has exactly one `stub` segment on its close day (and no stub without a close day); pruned ghosts are kept either way (TG-3, TG-10, PK-3 as amended by owner ruling O3); control: the same input without the resolution gets its planned bar back and no stub. Mutation: end an open period at its planned end → the first half reds; drop the stub → the never-started assertion reds.`
 
   `packages/domain/test/flow/segments.test.ts`:
   ```ts
@@ -223,41 +225,43 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 
   describe('29.294 segmentsFor', () => {
     it('29.294 planned bar; open period grows to today; closed period stays; control: moving today moves only the open end', () => {
-      expect(segmentsFor({ periods: [], planned, notTaken: null, today: '2026-10-03' })).toEqual([
+      expect(segmentsFor({ periods: [], planned, notTaken: null, closedDay: null, today: '2026-10-03' })).toEqual([
         { start: '2026-10-05', end: '2026-10-07', pass: 1, type: 'planned' },
       ]);
       const open = (today: string) =>
-        segmentsFor({ periods: [{ start: '2026-10-01', end: null, pass: 1 }], planned, notTaken: null, today });
+        segmentsFor({ periods: [{ start: '2026-10-01', end: null, pass: 1 }], planned, notTaken: null, closedDay: null, today });
       expect(open('2026-10-03').find((s) => s.type === 'actual')).toEqual({ start: '2026-10-01', end: '2026-10-03', pass: 1, type: 'actual' });
       expect(open('2026-10-09').find((s) => s.type === 'actual')?.end).toBe('2026-10-09');
       const closed = (today: string) =>
-        segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [], notTaken: null, today });
+        segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [], notTaken: null, closedDay: null, today });
       expect(closed('2026-10-03')).toEqual(closed('2026-10-20')); // control
     });
 
     it('29.294 two passes keep both periods, in start order; a period opened today is one day, never negative', () => {
       const two = segmentsFor({
         periods: [{ start: '2026-10-06', end: null, pass: 2 }, { start: '2026-10-01', end: '2026-10-04', pass: 1 }],
-        planned: [], notTaken: null, today: '2026-10-06',
+        planned: [], notTaken: null, closedDay: null, today: '2026-10-06',
       });
       expect(two.map((s) => [s.pass, s.start, s.end])).toEqual([[1, '2026-10-01', '2026-10-04'], [2, '2026-10-06', '2026-10-06']]);
       // a clock that is a day behind the period's own serverTime never yields end < start
-      const skew = segmentsFor({ periods: [{ start: '2026-10-07', end: null, pass: 1 }], planned: [], notTaken: null, today: '2026-10-06' });
+      const skew = segmentsFor({ periods: [{ start: '2026-10-07', end: null, pass: 1 }], planned: [], notTaken: null, closedDay: null, today: '2026-10-06' });
       expect(skew[0]).toMatchObject({ start: '2026-10-07', end: '2026-10-07' });
     });
 
-    it('29.294 Not taken: only the ghost survives, worked or not; control: no resolution brings the planned bar and the period back', () => {
-      expect(segmentsFor({ periods: [], planned: [...planned, ...ghost], notTaken, today: '2026-10-03' })).toEqual([
+    it('29.294 Not taken: work stays as actual segments, a never-started ticket is one stub on its close day, ghosts stay; control: no resolution brings the planned bar back and no stub', () => {
+      const worked = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned, notTaken, closedDay: '2026-10-04', today: '2026-10-05' });
+      expect(worked).toEqual([{ start: '2026-10-01', end: '2026-10-02', pass: 1, type: 'actual' }]); // TG-10: the work stays drawn; no planned, no stub
+      const workedWithGhost = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [...planned, ...ghost], notTaken, closedDay: '2026-10-04', today: '2026-10-05' });
+      expect(workedWithGhost.map((s) => s.type)).toEqual(['actual', 'ghost']);
+      expect(segmentsFor({ periods: [], planned: [...planned, ...ghost], notTaken, closedDay: '2026-10-04', today: '2026-10-05' })).toEqual([
+        { start: '2026-10-04', end: '2026-10-04', pass: 1, type: 'stub' },
         { start: '2026-10-08', end: '2026-10-09', pass: 1, type: 'ghost' },
       ]);
-      const worked = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned, notTaken, today: '2026-10-03' });
-      expect(worked).toEqual([]); // the work stays in the ticket's history; it is not a bar (TG-3) and takes no row (PK-3)
-      const workedWithGhost = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned: [...planned, ...ghost], notTaken, today: '2026-10-03' });
-      expect(workedWithGhost.map((s) => s.type)).toEqual(['ghost']);
-      const freeWorked = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned, notTaken: null, today: '2026-10-03' });
+      expect(segmentsFor({ periods: [], planned, notTaken, closedDay: null, today: '2026-10-05' })).toEqual([]); // no close day, no stub
+      const freeWorked = segmentsFor({ periods: [{ start: '2026-10-01', end: '2026-10-02', pass: 1 }], planned, notTaken: null, closedDay: null, today: '2026-10-03' });
       expect(freeWorked.map((s) => s.type)).toEqual(['actual', 'planned']); // control
-      const free = segmentsFor({ periods: [], planned, notTaken: null, today: '2026-10-03' });
-      expect(free.map((s) => s.type)).toEqual(['planned']); // control
+      const free = segmentsFor({ periods: [], planned, notTaken: null, closedDay: '2026-10-04', today: '2026-10-03' });
+      expect(free.map((s) => s.type)).toEqual(['planned']); // control: a close day alone makes no stub
     });
   });
   ```
@@ -275,7 +279,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   export const TIMELINE_CHUNK_DAYS = 28;
   export const TIMELINE_PAGE_SIZE = 200;
 
-  export type TimelineSegmentType = 'actual' | 'planned' | 'ghost';
+  /** `stub`: a never-started Not-taken ticket's close day (TG-10, D-W4-11). */
+  export type TimelineSegmentType = 'actual' | 'planned' | 'ghost' | 'stub';
   /** Inclusive IST days (`YYYY-MM-DD`). `pass` is the ticket's round when the work or plan belongs to it. */
   export type TimelineSegment = { start: string; end: string; pass: number; type: TimelineSegmentType };
   /** D-W4-2: counts, not a boolean (TG-11's tooltip is "2 notes, 1 attachment"). */
@@ -372,28 +377,33 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     planned: readonly { pass: number; start: string; end: string; basis: 'explicit' | 'chained'; pruned?: boolean }[];
     /** Part 2's `FlowNode.notTaken`; Part 3's wire and the index call the same value `resolution`. */
     notTaken: TimelineResolution;
+    /** The IST day of the ticket's close (`TicketState.closed.at` through `istDayOf`), or null when unknown; read only for a never-started Not-taken ticket's stub (TG-10). */
+    closedDay: string | null;
     /** The IST day, injected: this module reads no clock. */
     today: string;
   };
 
-  const ORDER: Record<TimelineSegment['type'], number> = { actual: 0, planned: 1, ghost: 2 };
+  const ORDER: Record<TimelineSegment['type'], number> = { actual: 0, stub: 1, planned: 2, ghost: 3 };
   const later = (a: string, b: string): string => (a > b ? a : b);
 
   /**
    * One ticket's drawable intervals (spec PR-0, TG-3, TG-9, TG-10, PK-3).
-   * - actual: each work period; an open one runs to `today` (D-W4-6) and never ends before it starts; none for a Not-taken ticket (D-W4-11);
+   * - actual: each work period; an open one runs to `today` (D-W4-6) and never ends before it starts; a Not-taken ticket keeps them (D-W4-11, TG-10);
    * - planned: each pass's planned interval, unless the ticket is Not taken;
-   * - ghost: a pruned branch's planned interval (PL-6), kept on Not-taken tickets so the toggle can show it.
-   * A Not-taken ticket (`notTaken !== null`) has no `actual` and no `planned`, worked or not (TG-3, TG-10, PK-3): its ghosts are all it can show.
+   * - ghost: a pruned branch's planned interval (PL-6), kept on Not-taken tickets so the toggle can show it;
+   * - stub: ONE segment on the close day of a Not-taken ticket that never worked (no periods), when the close day is known (TG-10).
    */
   export function segmentsFor(input: SegmentInput): TimelineSegment[] {
     const out: TimelineSegment[] = [];
-    for (const p of input.notTaken === null ? input.periods : []) {
+    for (const p of input.periods) {
       out.push({ start: p.start, end: p.end ?? later(p.start, input.today), pass: p.pass, type: 'actual' });
     }
     for (const pl of input.planned) {
       if (pl.pruned === true) out.push({ start: pl.start, end: pl.end, pass: pl.pass, type: 'ghost' });
       else if (input.notTaken === null) out.push({ start: pl.start, end: pl.end, pass: pl.pass, type: 'planned' });
+    }
+    if (input.notTaken !== null && input.periods.length === 0 && input.closedDay !== null) {
+      out.push({ start: input.closedDay, end: input.closedDay, pass: input.notTaken.pass, type: 'stub' });
     }
     return out.sort(
       (a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : ORDER[a.type] - ORDER[b.type] || a.pass - b.pass),
@@ -407,7 +417,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
 - [ ] **Step 2: The pure assembler, test first (29.295, 29.298)**
 
   Case lines:
-  - `- ❌ **29.295 — the assembler plans each flow component once and turns it into index entries:** a chained successor starts the day after its predecessor's end; a singleton has `flowId: null`; a member hidden by Me is in `flows[].nodes` but not in `items`; a Not-taken ticket has no entry (unless it holds pruned ghosts, which are its only segments) and is not in the tray, worked or not; an undated ticket is in the tray with its reason (`no-dates`, and `no-estimate` when it has a ready day but no estimate); a Decision's labelled outcome target says `reachedBy`; control: the same ticket with an estimate is on the timeline. Mutation: treat a Not-taken ticket as undated → the tray assertion reds.`
+  - `- ❌ **29.295 — the assembler plans each flow component once and turns it into index entries:** a chained successor starts the day after its predecessor's end; a singleton has `flowId: null`; a member hidden by Me is in `flows[].nodes` but not in `items`; a Not-taken ticket is never in the tray; one that never started is an entry whose only drawn segment is a `stub` on its close day (D-W4-11), and one that worked is an entry with its `actual` segments; an undated ticket is in the tray with its reason (`no-dates`, and `no-estimate` when it has a ready day but no estimate); a Decision's labelled outcome target says `reachedBy`; control: the same ticket with an estimate is on the timeline. Mutation: treat a Not-taken ticket as undated → the tray assertion reds.`
   - `- ❌ **29.298 — the caps:** over `TIMELINE_INDEX_CAP` the entries that ended longest ago are dropped and `truncated` names the count and the earliest kept end; a flow over `TIMELINE_FLOW_CAP` is `truncated: true` with no `nodes` and its members are still planned; control: exactly at the cap nothing is cut. Mutation: drop the newest instead → the kept-set assertion reds.`
 
   `apps/server/test/timeline/assemble.test.ts` (pure: no database). Use the real `planFlow`:
@@ -426,7 +436,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   type Over = Partial<FlowNode> & Partial<Pick<LoadedTicket, 'workspaceId' | 'projectId' | 'stateName' | 'assigneeId' | 'title' | 'inScope'>>;
   function t(n: number, over: Over = {}): LoadedTicket {
     const { workspaceId = 'W', projectId = 'P1', stateName = 'To do', assigneeId = null, title = `T${n}`, inScope = true, ...node } = over;
-    return { id: id(n), workspaceId, projectId, stateName, assigneeId, title, inScope, node: fnode(id(n), { isDecision: node.typeId === DECISION_TYPE_ID, ...node }) };
+    return { id: id(n), workspaceId, projectId, stateName, assigneeId, title, inScope, closedDay: node.notTaken ? '2026-10-02' : null, node: fnode(id(n), { isDecision: node.typeId === DECISION_TYPE_ID, ...node }) };
   }
   const lead = (a: number, b: number, label: string | null = null): LoadedEdge =>
     ({ workspaceId: 'W', from: id(a), to: id(b), kind: 'leads_to', label });
@@ -435,7 +445,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   const TODAY = '2026-10-03';
 
   describe('29.295 assembleScope', () => {
-    it('29.295 chains a successor the day after; singleton has no flow; Me-hidden member rides flows[]; Not taken has no entry and no tray row', () => {
+    it('29.295 chains a successor the day after; singleton has no flow; Me-hidden member rides flows[]; a never-started Not taken is a stub entry, never a tray row', () => {
       const tickets = [
         t(1, { explicitStart: '2026-10-05', estimate: 3 }),                                   // [10-05, 10-07]
         t(2, { estimate: 2, inScope: false }),                                                // chained [10-08, 10-09], hidden by Me
@@ -452,8 +462,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
       expect(core.flows[0]?.nodes.map((n) => n.id)).toContain(id(2));                         // but its plan inputs ride along
       expect(core.entries.find((e) => e.id === id(4))?.flowId).toBeNull();
       expect(core.entries.find((e) => e.id === id(1))?.flowId).toBe(id(1));                   // named by the smallest member
-      expect(core.entries.find((e) => e.id === id(5))).toBeUndefined();
-      expect(core.tray.find((r) => r.id === id(5))).toBeUndefined();                          // Not taken is in neither
+      expect(core.entries.find((e) => e.id === id(5))?.segments).toEqual([{ start: '2026-10-02', end: '2026-10-02', pass: 1, type: 'stub' }]); // D-W4-11
+      expect(core.tray.find((r) => r.id === id(5))).toBeUndefined();                          // Not taken is never in the tray
     });
 
     it('29.295 tray reasons and reachedBy; control: an estimate puts the same ticket on the timeline', () => {
@@ -526,6 +536,8 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
     assigneeId: string | null; title: string;
     /** Passes the project / Me narrowing. Out-of-scope tickets are flow members only. */
     inScope: boolean;
+    /** IST day of `TicketState.closed.at` (null when open): the stub day of a never-started Not-taken ticket (D-W4-11). */
+    closedDay: string | null;
     /** Part 2's single flow input (type, state, category, draft, dates, estimates, wait-for-all, periods as instants, passes, rounds, `notTaken`), made in `load.ts` by `flowNodeOf(rowToTicketState(row), def, { draft })` and by nothing else (Part 2 T10). */
     node: FlowNode;
   };
@@ -602,7 +614,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
         if (np === undefined) continue;
         const key = i.keys.get(m) ?? null;
         const n = tk.node;
-        const segments = segmentsFor({ periods: dayPeriods(n.periods), planned: np.intervals, notTaken: n.notTaken, today: i.today });
+        const segments = segmentsFor({ periods: dayPeriods(n.periods), planned: np.intervals, notTaken: n.notTaken, closedDay: tk.closedDay, today: i.today });
         const firstPlanned = np.intervals.find((p) => p.pruned !== true);
         details.set(m, {
           id: m, title: tk.title, stateId: n.stateId, stateName: tk.stateName, assigneeId: tk.assigneeId,
@@ -897,7 +909,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   ```
   `apps/server/src/timeline/load.ts`:
   ```ts
-  import { flowNodeOf, statesWithBacklog, type TimelinePin } from '@gisik-nokma/domain';
+  import { flowNodeOf, istDayOf, statesWithBacklog, type TimelinePin } from '@gisik-nokma/domain';
   import type { Queryable } from '../db/queryable.js';
   import type { EffectiveRole } from '../permissions/effective-role.js';
   import { rowToTicketState } from '../projections/tickets.js';
@@ -917,10 +929,12 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   /** Part 2's one way to make a flow input: fold the row, then `flowNodeOf` against the ticket's own workflow version (Part 2 plan :5359-5384). */
   function loaded(row: Row, inScope: boolean, draft: boolean, def: Def, stateName: string): LoadedTicket {
     const title = row.fields['title']?.value;
+    const state = rowToTicketState(row);
     return {
       id: row.ticket_id, workspaceId: row.workspace_id, projectId: row.project_id, stateName,
       assigneeId: row.assignee_id, title: typeof title === 'string' ? title : '', inScope,
-      node: flowNodeOf(rowToTicketState(row), def, { draft }),
+      closedDay: state.closed?.at ? istDayOf(state.closed.at) : null,
+      node: flowNodeOf(state, def, { draft }),
     };
   }
 
@@ -1294,6 +1308,7 @@ Siblings copied: `apps/server/src/routes/home.ts` (KG Home T1) for the shape of 
   3. include hidden endpoints in `ids` → 29.296 (hole);
   4. drop `n.deleted = FALSE` in `loadPins` → 29.297;
   5. end an open period at its planned end in `segmentsFor` → 29.294;
+  5a. drop the `stub` push in `segmentsFor` → 29.294 (and 29.295's stub entry);
   6. `<` for `<=` in the chunk overlap → 29.299;
   7. count members per workspace instead of distinct in `readHomeSummary` → 29.293;
   8. give `reachedBy` to an unlabelled edge → 29.295.
@@ -1327,7 +1342,7 @@ Siblings copied: Part 1's `packages/flow-graph-browser/harness/*` stress page an
 
 - [ ] **Step 0: Pre-flight and the landed Part 1 names**
 
-  1. Cut `task/wtg4-painter` from `origin/release/<next>`; `pnpm install` under Node 22.
+  1. Cut `task/wtg4-painter` from `origin/release/workflow-graph`; `pnpm install` under Node 22.
   2. `grep -n "export" packages/viewport/src/index.ts` and write the landed signatures of `ScrollAdapter`, `ViewportDriver`, `pack`, `routeEdge`, `routeLoop`, `RangeCache` into `HANDOFF-wtg4-painter.md`. `ls packages/flow-graph-browser/harness packages/flow-graph-browser/tests`. `grep -n "Date.now\|new Date()" packages/app-core/test/helpers/clock-scan.ts` to learn what the clock-free scan flags (T4 adds `timeline-graph` to its roots; write nothing here that would trip it: `days.ts` uses `Date.UTC` with arguments only).
   3. If `@gisik-nokma/viewport` does not exist, STOP: Part 1 has not landed.
 
@@ -2023,7 +2038,7 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut the branch from `origin/release/<next>`; `pnpm install` under Node 22; `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut the branch from `origin/release/workflow-graph`; `pnpm install` under Node 22; `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. Find every implementer: `grep -rln "getAttention" --include=*.ts --include=*.tsx packages apps | grep -v node_modules` and list them in `HANDOFF-wtg4-client-data.md`. Each gets the four methods (a fake returns a canned value or `null`; the replica rejects).
   3. Confirm the stream behaviour the live gate depends on: `grep -n "workspaceSeq\|caught-up\|existing" packages/app-core/src/online/stream.ts` and read `:357-359, :409-410, :455-468`. Measured on the KG tip: rooms are shared per workspace; a FIRST subscriber to a room replays from its `afterSeq` (cursor 0 replays history) and gets one `caught-up`; a LATER subscriber to an existing room gets no replay and no `caught-up` (`stream.ts:455-468`); every `event` frame carries `envelope.workspaceSeq`. So `caught-up` cannot tell a hook that history is over, and the hook never waits for it: it compares each event's `workspaceSeq` with the `asOf` of the data it holds (D-W4-23). If the landed stream differs, STOP and report.
   4. `grep -n "export" packages/app-core/test/helpers/clock-scan.ts` and read `:31-60` so the new root's scan is understood; `hasUtc` calls with arguments (`Date.UTC(...)`) are the only date use in this directory.
@@ -2152,7 +2167,7 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
   import type { TimelineChunkResponse, TimelineEntry, TimelineIndexResponse, TimelineSegment, TimelineTrayItem, TimelineTrayResponse, HomeSummaryResponse, TimelineFlow } from '@gisik-nokma/domain';
   import { MappingError, asArray, asNumber, asRecord, asString, asStringOrNull } from '../wire-readers.js';
 
-  const SEGMENT_TYPES = ['actual', 'planned', 'ghost'] as const;
+  const SEGMENT_TYPES = ['actual', 'planned', 'ghost', 'stub'] as const;
   const CATEGORIES = ['open', 'active', 'terminal', 'backlog'] as const; // StateCategory: copy the domain's own list at Step 0
 
   function oneOf<T extends string>(value: unknown, allowed: readonly T[], path: string): T {
@@ -2421,7 +2436,8 @@ Siblings copied: `getAttention` end to end (`data-source.ts:419`, `online-data-s
       if (np === undefined) continue;
       const i = items.findIndex((e) => e.id === n.id);
       const periods = n.periods.map((p) => ({ start: istDayOf(p.start), end: p.end === null ? null : istDayOf(p.end), pass: p.pass })); // FlowNode periods are instants
-      const segments = segmentsFor({ periods, planned: np.intervals, notTaken: n.notTaken, today });
+      const prevStub = i === -1 ? undefined : (items[i] as TimelineEntry).segments.find((x) => x.type === 'stub'); // FlowNode has no close time: keep the server's stub day
+      const segments = segmentsFor({ periods, planned: np.intervals, notTaken: n.notTaken, closedDay: prevStub?.start ?? null, today });
       const wasDrawn = i !== -1;
       const nowDrawn = segments.length > 0;
       if (wasDrawn !== nowDrawn && n.notTaken === null) return null; // tray membership changed: a server page
@@ -2952,6 +2968,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     legendDone: 'Done (actual dates)', legendActive: 'In progress (actual start)', legendPlanned: 'Not started (planned dates)', legendWaitAll: 'Waits for all incoming',
     trayHeading: 'Not on the timeline yet', addDates: 'Add dates', addEstimate: 'Add an estimate',
     pruned: 'Pruned', ghost: 'pruned', revised: 'revised', notTaken: 'Not taken',
+    legendNotTakenWorked: 'Not taken, after its work', legendNotTakenStub: 'Not taken, never started',
     empty: 'Nothing scheduled in these projects', error: "Couldn't load the timeline.", retry: 'Retry',
   } as const;
 
@@ -2983,7 +3000,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
 
   `model.ts`:
   ```ts
-  import { segmentsFor, type TimelineTrayItem } from '@gisik-nokma/domain';
+  import { istDayOf, segmentsFor, type TimelineTrayItem } from '@gisik-nokma/domain';
   import type { FlowRead } from '@gisik-nokma/domain'; // Step 0: the landed module of FlowRead
   import type { SceneEdge, SceneEntry } from './scene.js';
 
@@ -2999,13 +3016,26 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     try { storage?.setItem(key, value ? '1' : '0'); } catch { /* blocked store: the setting lasts for this page only */ }
   }
 
+  /**
+   * The stub day of a never-started Not-taken node in the sheet view (D-W4-11). Part 3's `FlowNodeRead` carries no close time, so it is the day
+   * the closing Decision's pass was chosen (its latest revision when revised): the settle that closed it ran then (PS-5). `null` when the Decision
+   * is not in the viewer's flow, and then no stub is drawn (the index path uses the close itself).
+   */
+  export function notTakenDay(n: Pick<FlowRead['nodes'][number], 'resolution' | 'periods'>, byId: ReadonlyMap<string, FlowRead['nodes'][number]>): string | null {
+    if (n.resolution === null || n.periods.length > 0) return null;
+    const rec = byId.get(n.resolution.decisionTicketId)?.passes.find((p) => p.pass === n.resolution?.pass);
+    if (rec === undefined) return null;
+    const at = rec.revisions.length > 0 ? (rec.revisions[rec.revisions.length - 1] as { at: string }).at : rec.at;
+    return istDayOf(at);
+  }
+
   /** A sheet's flow as scene inputs. Periods and planned intervals arrive as IST days (Part 3); `segmentsFor` is the same function the index uses. */
   export function fromFlowRead(flow: FlowRead, today: string): { entries: SceneEntry[]; edges: SceneEdge[]; tray: TimelineTrayItem[] } {
     const byId = new Map(flow.nodes.map((n) => [n.id, n]));
     const entries: SceneEntry[] = [];
     const tray: TimelineTrayItem[] = [];
     for (const n of flow.nodes) {
-      const segments = segmentsFor({ periods: n.periods, planned: n.planned, notTaken: n.resolution, today }); // Part 3's wire name is `resolution`
+      const segments = segmentsFor({ periods: n.periods, planned: n.planned, notTaken: n.resolution, closedDay: notTakenDay(n, byId), today }); // Part 3's wire name is `resolution`
       if (segments.length > 0) {
         entries.push({
           id: n.id, key: n.key, title: n.title, draft: n.draft, kind: n.kind, lane: 'flow', segments,
@@ -3653,9 +3683,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `packages/domain/src/flow/segments.ts` (the 8-pass cap)
   - `packages/domain/test/flow/segments.test.ts`
   - `packages/app-core/src/online/map-timeline.ts` (the `earlier` field)
-  - `packages/app-core/src/timeline-graph/{draw-types,scene,labels,model,painter}.ts(x)`
+  - `packages/app-core/src/timeline-graph/{draw-types,scene,labels,model,painter,legend}.ts(x)`
   - `packages/ui/src/ui.css` (`/* WTG4 T6 */`)
-  - `packages/ui/src/tokens.ts` + `packages/ui/test/tokens.test.ts` (only if the ghost or Not-taken bindings miss 4.5:1)
+  - `packages/ui/src/tokens.ts` + `packages/ui/test/tokens.test.ts` (only if the ghost, Not-taken or stub bindings miss their bar: text 4.5:1, stub mark 3:1 against the canvas)
   - the tests of T5 (`scene.test.ts`, `scene-real-router.test.ts`, `labels.test.ts`)
   - `Features.md` §26 (`<!-- WTG4 bullet T6 -->`), `test-cases/29-workflow-timeline-graphs.md` (`<!-- WTG4 T6 -->`)
 
@@ -3679,7 +3709,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   - `- ❌ **29.328 — a reopened ticket with no period yet in the new pass shows that pass's planned bar in outline, labelled `↺2`, and its tooltip lists each period:** `Pass 1: 2 Oct → 5 Oct. Reopened by GN-145 (Needs rework), 6 Oct. Pass 2: 8 Oct →` where the cause line is present only when the Decision's pass record is held (sheet: always; Home: when the Decision's detail has been loaded); without it the sentence is `Pass 1: 2 Oct → 5 Oct. Pass 2: 8 Oct →`; periods are retroactive (a ticket reopened last month shows both today). Mutation: omit the open period's arrow → the sentence assertion reds.`
   - `- ❌ **29.329 — planned outlines per pass, and the 8-pass cap:** with Planned vs actual ON each pass's planned outline sits behind its own period (lower z, a pass-rank outline style: solid for pass 1, dashed for 2, dotted for 3 or more, so passes differ by more than colour); a ticket with more than 8 passes keeps its 8 most recent in the index and older ones are ONE `+N earlier` summary segment (`pass: 0`, `earlier: N`); control: 8 passes are all kept. Mutation: cap at 9 → the 10-pass assertion reds.`
   - `- ❌ **29.330 — a Decision is a diamond on the end day of each closed period:** two closed periods give two diamonds, the second labelled `GN-151 ↺2`; an open period gives a diamond at today with ▶; a finished one carries ✓ beside the key; a diamond is 28 px and never touches its neighbour's bar. Mutation: draw only the last period → the count reds.`
-  - `- ❌ **29.331 — Not taken:** a ticket with a Not-taken resolution draws NO bar, worked or not, takes no row and is NOT in the tray (TG-3, TG-10, PK-3); with Planned vs actual ON its pruned plan appears in the lane's strip as a ghost whose tooltip reads `Not taken` (`Not taken (pass 2)` from pass 2); the same ticket without a resolution has the done style and no tooltip; control: turning the toggle on moves no live row. Mutation: chip text from the wrong pass → the pass-2 assertion reds.`
+  - `- ❌ **29.331 — Not taken (owner ruling O3, the approved mockups):** a Not-taken ticket that did work keeps its work-period bars in the `notTaken` style (muted fill, dashed edge, never `opacity` below 1, text >= 4.5:1) with the chip `Not taken` (`Not taken (pass 2)` from pass 2) and the tooltip `<key> <title>, <start> to <end>, Not taken (pass n)`, and those bars take a row (packing union); a never-started one draws a 6 px stub at its close day with the tooltip `<key> <title>: Not taken, <day>`, which occupies that day in the union; with Planned vs actual ON and a pruned plan the stub is not drawn and its ghost sits in the Pruned strip, and no live row moves; neither is in the tray; the legend shows `Not taken, after its work` / `Not taken, never started` only when the scene holds one; control: the same worked ticket without a resolution has the done style and no chip. Mutation: draw the worked Not-taken bars in the done style → the style assertion reds; drop the stub → the stub assertion reds; chip text from the wrong pass → the pass-2 assertion reds.`
   - `- ❌ **29.332 — pruned ghosts:** with Planned vs actual ON a lane gains a strip headed `Pruned` under its rows holding the pruned branch's planned bars as ghosts (pale fill, dashed border, label `pruned`, text >= 4.5:1, no `opacity` below 1 on text); OFF the strip is absent; turning it on moves NO live row (PK-3, PK-9); a ghost has no arrows and no edge anchors; control: a lane with no ghosts has no strip. Mutation: include ghosts in the packing footprint → the row-equality assertion reds.`
   - `- ❌ **29.333 — the revised mark:** the diamond of a Decision whose current pass has a revision shows the mark `revised` whose tooltip is `Decision revised: Yes → No by Ama Rangsa, 2 Oct 18:04` (a clearing reads `Cleared the decision (was Yes)`); a Decision with no revisions shows none; control: an earlier pass's revision does not mark a diamond of a later pass. Mutation: mark every Decision with passes → the control reds.`
   - `- ❌ **29.334 — the paper pin:** a ticket with a note the viewer can see or any attachment shows a 12 px pin inside the bar's trailing edge 6 px in, or after the key on a bar too short to hold it (adding 14 px to `labelPx`); its tooltip and the bar's accessible description read `2 notes, 1 attachment` (singular `1 note`); it is not a button and not focusable; a ticket with neither shows none; control: the same ticket's pin is absent in a scope where the counts are zero. Measured in the browser: right inset 6 px, 12 px square.`
@@ -3688,11 +3718,11 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```ts
   it('29.329 keeps the 8 most recent passes and summarises older ones as one "+N earlier" segment; control: 8 are all kept', () => {
     const mk = (n: number) => Array.from({ length: n }, (_, i) => ({ start: `2026-09-${String(i * 2 + 1).padStart(2, '0')}`, end: `2026-09-${String(i * 2 + 2).padStart(2, '0')}`, pass: i + 1 }));
-    const ten = segmentsFor({ periods: mk(10), planned: [], notTaken: null, today: '2026-10-03' });
+    const ten = segmentsFor({ periods: mk(10), planned: [], notTaken: null, closedDay: null, today: '2026-10-03' });
     expect(ten.filter((s) => s.pass >= 3).length).toBe(8);
     const summary = ten.find((s) => s.pass === 0);
     expect(summary).toMatchObject({ type: 'actual', earlier: 2, start: '2026-09-01', end: '2026-09-04' });
-    const eight = segmentsFor({ periods: mk(8), planned: [], notTaken: null, today: '2026-10-03' });
+    const eight = segmentsFor({ periods: mk(8), planned: [], notTaken: null, closedDay: null, today: '2026-10-03' });
     expect(eight.find((s) => s.pass === 0)).toBeUndefined();
     expect(eight).toHaveLength(8);
   });
@@ -3710,6 +3740,10 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   export const dayLabel = (ymd: string): string => `${Number(ymd.slice(8, 10))} ${SHORT[Number(ymd.slice(5, 7)) - 1]}`;
 
   export const notTakenChip = (r: { pass: number } | null): string | null => (r === null ? null : r.pass > 1 ? `${COPY.notTaken} (pass ${r.pass})` : COPY.notTaken);
+  /** TG-10 tooltips (the mockup `Timeline-passes`): a worked Not-taken bar, and a never-started one's stub. */
+  export const notTakenBarTip = (key: string | null, title: string, start: string, end: string, chip: string): string =>
+    `${key ?? 'Draft'} ${title}, ${dayLabel(start)} to ${dayLabel(end)}, ${chip}`;
+  export const stubTip = (key: string | null, title: string, day: string): string => `${key ?? 'Draft'} ${title}: ${COPY.notTaken}, ${dayLabel(day)}`;
 
   type Rev = { from: string | null; to: string | null; by: string; at: string };
   /** PS-6, the History sentence. `name` null leaves "by …" out rather than printing an id. */
@@ -3737,11 +3771,11 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       .join(' ');
   }
   ```
-  `labels.test.ts` additions: the three sentences exactly (with the `formatIstInstant` form recorded in Step 0), `revisionOf` takes the LAST pass only (control: an earlier pass's revision gives `null`), `notTakenChip` for pass 1 and 2 and `null`, `passTooltip` with and without causes (`causes = { 2: 'GN-145 (Needs rework), 6 Oct' }`), `dayLabel('2026-10-02') === '2 Oct'`. Run: FAIL then PASS. Commit.
+  `labels.test.ts` additions: `notTakenBarTip('GN-163', 'Build page', '2026-09-26', '2026-09-28', 'Not taken (pass 2)')` is `GN-163 Build page, 26 Sep to 28 Sep, Not taken (pass 2)` and `stubTip('GN-165', 'Brief', '2026-09-25')` is `GN-165 Brief: Not taken, 25 Sep` (29.331, the mockup's words); the three sentences exactly (with the `formatIstInstant` form recorded in Step 0), `revisionOf` takes the LAST pass only (control: an earlier pass's revision gives `null`), `notTakenChip` for pass 1 and 2 and `null`, `passTooltip` with and without causes (`causes = { 2: 'GN-145 (Needs rework), 6 Oct' }`), `dayLabel('2026-10-02') === '2 Oct'`. Run: FAIL then PASS. Commit.
 
 - [ ] **Step 3: The scene: connectors, labels, per-period diamonds, Not taken, ghosts, revised, pin (29.327–29.334)**
 
-  Types (`draw-types.ts`): `BarStyle` is unchanged (`'done' | 'active' | 'planned' | 'ghost'`: a Not-taken ticket draws no bar of its own, D-W4-11); `DrawBar` gains `tooltip?: string | null`; `DrawDiamond.revised: string | null` (was `boolean`); T5's `revised: false` becomes `revised: null` and the painter test fixtures follow.
+  Types (`draw-types.ts`): `BarStyle` gains `'notTaken'` (`'done' | 'active' | 'planned' | 'ghost' | 'notTaken'`: a worked Not-taken ticket's bars, D-W4-11; `barAria`'s `style` widens the same way); a new `DrawStub = Base & { kind: 'stub'; ticketId: string; key: string | null; title: string; chip: string; tooltip: string; ariaLabel: string }` joins `Draw` (6 x 24 px, centred on its day, the key and chip printed after it as the mockup does); `DrawBar` gains `tooltip?: string | null`; `DrawDiamond.revised: string | null` (was `boolean`); T5's `revised: false` becomes `revised: null` and the painter test fixtures follow.
 
   Replace the per-entry `for (const e of entries) { … }` loop of `buildScene` (T5 Step 2) and the lane layout above it with the following. First the extra packing for the strip, before `laneExtent`:
   ```ts
@@ -3768,6 +3802,14 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
     draws.push({ kind: 'strip', id: `strip:${l.id}`, z: 1, text: COPY.pruned, b: portrait ? { x0: ext.start + rows * COL_PITCH, x1: ext.start + ext.size, y0: 0, y1: HEADING_H } : { x0: 0, x1: width, y0: top, y1: top + STRIP_HEAD } });
   }
   ```
+  Replace T5's `drawnSegments` (a stub is drawn unless its ghost stands in for it, D-W4-11):
+  ```ts
+  export function drawnSegments(e: Pick<SceneEntry, 'segments'>, plannedVsActual: boolean): TimelineSegment[] {
+    const worked = new Set(e.segments.filter((s) => s.type === 'actual').map((s) => s.pass));
+    const ghostShown = plannedVsActual && e.segments.some((s) => s.type === 'ghost');
+    return e.segments.filter((s) => s.type === 'actual' || (s.type === 'planned' && (plannedVsActual || !worked.has(s.pass))) || (s.type === 'stub' && !ghostShown));
+  }
+  ```
   Then the entry loop:
   ```ts
   const keyOf = (e: SceneEntry, pass: number): string | null => (e.key === null ? null : pass > 1 ? `${e.key} ↺${pass}` : e.key);
@@ -3779,14 +3821,27 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
       const segs = [...segsAll].sort((a, b) => (a.start < b.start ? -1 : 1));
       const lastActualIdx = segs.map((s) => s.type).lastIndexOf('actual');
       const hasPin = e.pin.notes + e.pin.attachments > 0;
+      const chip = notTakenChip(e.resolution); // D-W4-11: non-null only on a Not-taken ticket
       const bounds: Bounds[] = [];
       const actualBounds: Bounds[] = [];
       segs.forEach((seg, i) => {
         const u0 = dayX(seg.start, o), u1 = dayX(addDays(seg.end, 1), o);
         const isLast = i === segs.length - 1;
-        const active = seg.type === 'actual' && i === lastActualIdx && e.category === 'active' && seg.end >= o.today;
-        const style: BarStyle = seg.type === 'planned' ? 'planned' : active ? 'active' : 'done';
-        const mark = seg.type === 'planned' ? null : active ? 'active' : 'done';
+        if (seg.type === 'stub') {
+          // TG-10: a never-started Not-taken ticket is a 6 px mark centred on its close day (6 px wide in both orientations).
+          const c = (u0 + u1) / 2;
+          let b = place(c - 3, c + 3, v + 2, BAR_H - 4);
+          if (portrait) b = { x0: b.x0 + COL_W / 2 - 3, x1: b.x0 + COL_W / 2 + 3, y0: b.y0, y1: b.y0 + BAR_H - 4 };
+          const text = chip ?? COPY.notTaken;
+          draws.push({ kind: 'stub', id: `${e.id}:s`, ticketId: e.id, z: 3, b, key: e.key, title: e.title ?? '', chip: text, dim: dim(e.id),
+            tooltip: stubTip(e.key, e.title ?? '', seg.start), ariaLabel: `${stubTip(e.key, e.title ?? '', seg.start)}` });
+          bounds.push(b);
+          return;
+        }
+        const nt = chip !== null && seg.type === 'actual';
+        const active = !nt && seg.type === 'actual' && i === lastActualIdx && e.category === 'active' && seg.end >= o.today;
+        const style: BarStyle = seg.type === 'planned' ? 'planned' : nt ? 'notTaken' : active ? 'active' : 'done';
+        const mark = seg.type === 'planned' || nt ? null : active ? 'active' : 'done';
         if (e.kind === 'decision') {
           const centre = u1 - o.ppd / 2;
           let b = place(centre - DIAMOND / 2, centre + DIAMOND / 2, v + (BAR_H - DIAMOND) / 2, DIAMOND);
@@ -3807,8 +3862,9 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
           kind: 'bar', id: `${e.id}:${seg.type[0]}${seg.pass}:${i}`, ticketId: e.id, z: seg.type === 'planned' ? 2 : 3, b, style,
           key: keyOf(e, seg.pass), title: e.title ?? '', long: portrait || widthPx >= LONG_BAR_PX, mark, passRank: Math.min(2, Math.max(0, seg.pass - 1)) as 0 | 1 | 2,
           pass: seg.pass, pin: isLast && hasPin ? e.pin : null, chip: isLast ? chip : null, draft: e.draft, labelPx: kp.labelPx,
-          keyOutside: portrait ? false : kp.keyOutside, pinAt: portrait && isLast && hasPin ? 'inside' : kp.pinAt, dim: dim(e.id), tooltip: e.tooltip ?? null,
-          ariaLabel: barAria({ key: keyOf(e, seg.pass), title: e.title, draft: e.draft, style, pass: seg.pass, pin: isLast && hasPin ? e.pin : null, chip: null }),
+          keyOutside: portrait ? false : kp.keyOutside, pinAt: portrait && isLast && hasPin ? 'inside' : kp.pinAt, dim: dim(e.id),
+          tooltip: nt ? notTakenBarTip(keyOf(e, seg.pass), e.title ?? '', seg.start, seg.end, chip as string) : e.tooltip ?? null,
+          ariaLabel: barAria({ key: keyOf(e, seg.pass), title: e.title, draft: e.draft, style, pass: seg.pass, pin: isLast && hasPin ? e.pin : null, chip: nt ? chip : null }),
         });
         bounds.push(b);
         if (seg.type === 'actual') actualBounds.push(b);
@@ -3847,11 +3903,14 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   ```
   `SceneEntry` gains `revised?: string | null` and `tooltip?: string | null`; the tooltip string is built by the host with `passTooltip` and handed in. In `model.ts`'s `fromFlowRead` set, per node: `revised` from `revisionOf(n.passes)` through `revisedSentence(rev, nameOf(rev.by))` (`nameOf` is an injected argument defaulting to `() => null`), and `tooltip` from `passTooltip(n.periods, causes)` for a node with more than one period or a round above 1, where `causes[pass]` is built from the loop edges into the node: for each `taken` loop edge `D → node` labelled `L`, the Decision's pass records with outcome `L` give pass `k` whose `at` is the day of the reopening: `causes[k + 1] = ` `${D.key} (${L}), ${dayLabel(istDayOf(at))}`.
 
-  Painter: `DrawDiamond.revised` renders `<span className="gn-tlg-revised" title={d.revised}>revised</span>` when non-null; `DrawBar.tooltip` becomes the button's `title`; the pin span gets `title={pinText(d.pin)}` and stays `aria-hidden`; a ghost bar renders its chip. Painter test additions: the pin is a `span` (not a button, `tabIndex` absent) with the right `title`; the revised span carries the sentence.
+  Painter: a `DrawStub` renders a `button` (`className="gn-tlg-stub"`, `title={d.tooltip}`, `aria-label={d.ariaLabel}`, opening the ticket like a bar) and, after it, `<span className="gn-tlg-stub-label"><b>{key}</b> {chip}</span>`; a bar with `style='notTaken'` renders `data-style="notTaken"` and its chip. `legend.tsx` takes `notTaken: { worked: boolean; stub: boolean }` (the host derives both from the scene's draws) and appends `{ style: 'notTaken', text: COPY.legendNotTakenWorked }` and `{ style: 'stub', text: COPY.legendNotTakenStub }` only when each is true (29.324's rows are unchanged otherwise). `DrawDiamond.revised` renders `<span className="gn-tlg-revised" title={d.revised}>revised</span>` when non-null; `DrawBar.tooltip` becomes the button's `title`; the pin span gets `title={pinText(d.pin)}` and stays `aria-hidden`; a ghost bar renders its chip. Painter test additions: the pin is a `span` (not a button, `tabIndex` absent) with the right `title`; the revised span carries the sentence.
 
   CSS (`/* WTG4 T6 */`):
   ```css
   .gn-tlg-bar[data-style='ghost'] { background: var(--gn-fill-tertiary); color: var(--gn-text); border: 1px dashed var(--gn-border-strong); }
+  .gn-tlg-bar[data-style='notTaken'] { background: var(--gn-fill-tertiary); color: var(--gn-text); border: 1.3px dashed var(--gn-border-strong); }
+  .gn-tlg-stub { position: absolute; width: 6px; border-radius: 3px; background: var(--gn-border-strong); padding: 0; border: 0; }
+  .gn-tlg-stub-label { position: absolute; font-size: 11px; color: var(--gn-text); white-space: nowrap; }
   .gn-tlg-bar[data-style='planned'][data-pass-rank='1'] { outline-style: dashed; }
   .gn-tlg-bar[data-style='planned'][data-pass-rank='2'] { outline-style: dotted; }
   .gn-tlg-connector { border-top: 1px dashed var(--gn-text-muted); opacity: 0.6; }
@@ -3861,7 +3920,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   .gn-tlg-pin { background: currentColor; mask: var(--gn-tlg-pin-mask) center / contain no-repeat; }
   .gn-tlg-pin[data-at='after-key'] { position: absolute; left: calc(100% + 6px + 64px); top: 8px; }
   ```
-  `--gn-tlg-pin-mask` is a data-URI paperclip glyph defined once beside the block (a 12 x 12 SVG path; the lane draws it with the icons already in `packages/ui/src/icons`: read that folder first and reuse its paperclip or paper-pin icon if one exists, rendering it as the `span`'s child instead of a mask). Contrast: add to the T5 `describe('29.319 …')` in `tokens.test.ts` a `29.332 / 29.331` block: text (`--gn-text`) on `fillTertiary` >= 4.5 in light and dark for the three styles; if it misses, add a role. Assert in the scene test that no ghost CSS rule sets `opacity` below 1: read `UI_CSS` the way `components.test.tsx`'s `rule()` does and grep the two selectors' bodies for `opacity` (29.331, 29.332).
+  `--gn-tlg-pin-mask` is a data-URI paperclip glyph defined once beside the block (a 12 x 12 SVG path; the lane draws it with the icons already in `packages/ui/src/icons`: read that folder first and reuse its paperclip or paper-pin icon if one exists, rendering it as the `span`'s child instead of a mask). Contrast: add to the T5 `describe('29.319 …')` in `tokens.test.ts` a `29.332 / 29.331` block: text (`--gn-text`) on `fillTertiary` >= 4.5 in light and dark for the three styles (ghost and notTaken share it), and the stub mark (`borderStrong`) on the canvas (`surface`) >= 3; if one misses, add a role. Assert in the scene test that no ghost CSS rule sets `opacity` below 1: read `UI_CSS` the way `components.test.tsx`'s `rule()` does and grep the ghost, notTaken and stub selectors' bodies for `opacity` (29.331, 29.332).
 
   Scene tests (extend `scene.test.ts`; the 29.317-style real-pack cases extend `scene-real-router.test.ts`):
   ```ts
@@ -3893,18 +3952,32 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
   });
   describe('29.331 Not taken', () => {
     const nt = { kind: 'not-taken' as const, decisionTicketId: 'D', outcome: 'No', pass: 2 };
-    it('29.331 no bar and no row, worked or not; the ghost carries the pass-2 tooltip; control: no resolution, done style, no tooltip', () => {
-      const live = ent('L', [['2026-10-05', '2026-10-07', 'planned']]);
-      const ghostOnly = ent('N', [['2026-10-05', '2026-10-06', 'ghost' as never]], { resolution: nt });
-      const base = buildScene([live], [], { ...O, plannedVsActual: true }, greedy, straight);
-      const withNt = buildScene([live, ghostOnly], [], { ...O, plannedVsActual: true }, greedy, straight);
-      expect(withNt.draws.filter((d) => d.kind === 'bar' && (d as any).style !== 'ghost').length).toBe(1); // only the live bar
-      expect(withNt.rowOf.has('N')).toBe(false);
-      expect([...withNt.rowOf]).toEqual([...base.rowOf]); // takes no row
-      const ghost = withNt.draws.find((d) => d.kind === 'bar' && (d as any).style === 'ghost') as any;
-      expect(ghost.tooltip).toBe('Not taken (pass 2)');
+    it('29.331 worked: notTaken style, chip and tooltip, in a row; never started: a 6 px stub at the close day that holds its day; control: no resolution, done style, no chip', () => {
+      const worked = ent('W', [['2026-10-01', '2026-10-02', 'actual', 2]], { resolution: nt, category: 'terminal' });
+      const stubbed = ent('S', [['2026-10-02', '2026-10-02', 'stub' as never, 2]], { resolution: nt, category: 'terminal' });
+      const rival = ent('R', [['2026-10-02', '2026-10-03', 'planned']]);
+      const s = buildScene([worked, stubbed, rival], [], O, greedy, straight);
+      const bar = s.draws.find((d) => d.kind === 'bar' && (d as any).ticketId === 'W') as any;
+      expect([bar.style, bar.chip, bar.mark]).toEqual(['notTaken', 'Not taken (pass 2)', null]);
+      expect(bar.tooltip).toBe('GN-W ↺2 Title W, 1 Oct to 2 Oct, Not taken (pass 2)');
+      expect(s.rowOf.has('W')).toBe(true); // in the packing union
+      const stub = s.draws.find((d) => d.kind === 'stub') as any;
+      expect(stub.b.x1 - stub.b.x0).toBe(6);
+      expect(stub.tooltip).toBe('GN-S Title S: Not taken, 2 Oct');
+      expect(s.rowOf.get('S')).not.toBe(s.rowOf.get('R')); // the stub's day is occupied: the overlapping rival takes another row
       const free = buildScene([ent('F', [['2026-10-01', '2026-10-02', 'actual']], { category: 'terminal' })], [], O, greedy, straight).draws.find((d) => d.kind === 'bar') as any;
-      expect([free.style, free.chip, free.tooltip ?? null]).toEqual(['done', null, null]);
+      expect([free.style, free.chip, free.tooltip ?? null]).toEqual(['done', null, null]); // control
+    });
+    it('29.331 with the toggle ON a pruned never-started ticket shows its ghost instead of the stub, and no live row moves', () => {
+      const pruned = ent('P', [['2026-10-02', '2026-10-02', 'stub' as never, 1], ['2026-10-05', '2026-10-06', 'ghost' as never, 1]], { resolution: { ...nt, pass: 1 } });
+      const live = ent('L', [['2026-10-05', '2026-10-07', 'planned']]);
+      const off = buildScene([live, pruned], [], { ...O, plannedVsActual: false }, greedy, straight);
+      const on = buildScene([live, pruned], [], { ...O, plannedVsActual: true }, greedy, straight);
+      expect(off.draws.some((d) => d.kind === 'stub')).toBe(true);
+      expect(on.draws.some((d) => d.kind === 'stub')).toBe(false);
+      const ghost = on.draws.find((d) => d.kind === 'bar' && (d as any).style === 'ghost') as any;
+      expect(ghost.tooltip).toBe('Not taken');
+      expect([...on.rowOf]).toEqual([...off.rowOf]); // the stub's day stays in the union either way
     });
   });
   describe('29.332 ghosts', () => {
@@ -3947,7 +4020,7 @@ Siblings copied: Part 3's `FlowScene` wiring in the Workflow view for how a view
 
 - [ ] **Step 5: Mutations, Features, DONE**
 
-  Mutations: (1) drop the `↺` suffix → 29.327; (2) omit the open period's arrow → 29.328; (3) cap 9 → 29.329; (4) draw only the last diamond → 29.330; (5) chip from the wrong pass → 29.331; (6) ghosts in the pack footprint → 29.332; (7) mark every Decision with passes → 29.333; (8) 12 px → 14 px pin → 29.334 (browser). Run `packages/domain`, `packages/app-core`, `packages/ui`, `apps/web` suites WHOLE (domain change: the mobile editor bundle is not affected, since no event or registry entry changed; say so). Features bullet under `<!-- WTG4 bullet T6 -->`: *"Periods, passes and ghosts on the timeline (✅): reopened tickets draw each work period joined by a dashed connector (`GN-143 ↺2`), Decisions draw a diamond per closed period with a `revised` mark, Not-taken tickets keep their work with a chip, pruned branches appear as ghosts in a Pruned strip with the toggle on, and tickets with notes or attachments carry a paper pin. `packages/app-core/src/timeline-graph/scene.ts`."*
+  Mutations: (1) drop the `↺` suffix → 29.327; (2) omit the open period's arrow → 29.328; (3) cap 9 → 29.329; (4) draw only the last diamond → 29.330; (5) chip from the wrong pass → 29.331; (5a) draw a worked Not-taken bar in the done style → 29.331; (5b) drop the stub branch → 29.331; (5c) draw the stub even when its ghost is shown → 29.331 (toggle case); (6) ghosts in the pack footprint → 29.332; (7) mark every Decision with passes → 29.333; (8) 12 px → 14 px pin → 29.334 (browser). Run `packages/domain`, `packages/app-core`, `packages/ui`, `apps/web` suites WHOLE (domain change: the mobile editor bundle is not affected, since no event or registry entry changed; say so). Features bullet under `<!-- WTG4 bullet T6 -->`: *"Periods, passes and ghosts on the timeline (✅): reopened tickets draw each work period joined by a dashed connector (`GN-143 ↺2`), Decisions draw a diamond per closed period with a `revised` mark, Not-taken tickets keep their work as muted, dashed bars with a `Not taken (pass n)` chip and a never-started one is a 6 px stub at its close day (both in the packing union; legend `Not taken, after its work` / `Not taken, never started`), pruned branches appear as ghosts in a Pruned strip with the toggle on (standing in for a pruned ticket's stub), and tickets with notes or attachments carry a paper pin. `packages/app-core/src/timeline-graph/scene.ts`."*
 
   Commit; DONE.
 

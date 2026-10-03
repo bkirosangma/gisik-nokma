@@ -1,5 +1,7 @@
 # The Workflow graph (Workflow and Timeline graphs, Part 3) Implementation Plan
 
+> **Release branch (owner, 2026-10-04):** `release/workflow-graph`, cut from `origin/release/knowledge-graph` at f9e0cd18. Every task branch is cut from `origin/release/workflow-graph` and every PR goes `--base release/workflow-graph`. The Knowledge Graph release merges to `main` first; `main` is then merged INTO `release/workflow-graph`, never rebased.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE. UI tasks (T5 to T10, T12) name **`frontend-design`** in the lane prompt and measure real geometry by painting the worktree on a lane port (`next dev -p <port>` against the running API, no compose: rule #23; the recipe is `memory/browser-measurement.md`; kill that server when done).
 
 **Goal:** the Graph tab of the ticket sheet at `min(1240px, 94vw)` with a Knowledge | Workflow | Timeline switch, and in it the Workflow graph: a ticket's whole flow drawn as boxes, diamonds, labelled branches, loops and dotted note blocks, with an inspector, the Decide control with its confirmation, "Not taken" / alternates / pass display, creating draft steps from a "+" handle, and Publish flow.
@@ -31,8 +33,8 @@
 ## Global Constraints
 
 **Release and identity**
-- **Release:** a NEW release branch `release/<next>`, cut after the Knowledge Graph release ships (one release branch at a time; the literal `<next>` is filled when the owner cuts it). Every task branch is `task/wtg3-<slug>` cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`.
-- **Land with** `ctl gate <sha> --base release/<next>` then `ctl land <pr> --base release/<next>`, with the same `--repo` for both.
+- **Release:** `release/workflow-graph`, cut 2026-10-04 from `origin/release/knowledge-graph` at f9e0cd18 (owner; the KG release merges to `main` first, then `main` is merged INTO it, never rebased). Every task branch is `task/wtg3-<slug>` cut from `origin/release/workflow-graph`, and its PR has `--base release/workflow-graph`. Never `main`.
+- **Land with** `ctl gate <sha> --base release/workflow-graph` then `ctl land <pr> --base release/workflow-graph`, with the same `--repo` for both.
 - **Plan id** (ledger and `check:tasks`): `wtg-part3-workflow-graph` (the file stem after the date, `scripts/check-task-ledger.mjs:263`).
 - **Prerequisites for T1:** Part 1's first task has landed (it creates `Features.md` §26 and `test-cases/29-workflow-timeline-graphs.md` and the Playwright package `packages/flow-graph-browser`), and the KG release is on the branch.
 
@@ -161,7 +163,7 @@ Names this plan calls but does not write. "Per plan X" means that plan's text; *
 
 ### Task 1: Measure first: the package, the seam, ELK's graph, the findings, the Worker bars (cases 29.230–29.233)
 
-**Branches:** `task/wtg3-gate-widen` (PR A, the gate widening: lands FIRST and alone) and `task/wtg3-measure` (PR B, everything else), both cut from `origin/release/<next>`, both `--base release/<next>`; PR B is cut AFTER PR A is merged so its last commit applies on top of it. **NEEDS:** the owner's pull of the primary checkout after PR A (the gate verb that runs is the primary's). **Files:**
+**Branches:** `task/wtg3-gate-widen` (PR A, the gate widening: lands FIRST and alone) and `task/wtg3-measure` (PR B, everything else), both cut from `origin/release/workflow-graph`, both `--base release/workflow-graph`; PR B is cut AFTER PR A is merged so its last commit applies on top of it. **NEEDS:** the owner's pull of the primary checkout after PR A (the gate verb that runs is the primary's). **Files:**
 - Create:
   - `packages/flow-graph/package.json`, `tsconfig.json`, `tsconfig.typecheck.json`, `vitest.config.ts`, `test/setup.ts`
   - `packages/flow-graph/src/index.ts`, `src/types.ts`
@@ -189,7 +191,7 @@ Siblings copied: `packages/ui/{package.json,tsconfig.json,tsconfig.typecheck.jso
 
 - [ ] **Step 0: Pre-flight, the landed names, and the catalogue anchors**
 
-  1. **Step 0a (PR A) runs FIRST and merges before this.** Then `git fetch origin`; cut `task/wtg3-measure` (PR B) from `origin/release/<next>`, which now holds PR A; `pnpm install` under Node 22.
+  1. **Step 0a (PR A) runs FIRST and merges before this.** Then `git fetch origin`; cut `task/wtg3-measure` (PR B) from `origin/release/workflow-graph`, which now holds PR A; `pnpm install` under Node 22.
   2. **Re-read what this task relies on** and write the landed facts into the first lines of `HANDOFF-wtg3-measure.md`:
      - `ls packages/flow-graph-browser && sed -n 1,80p packages/flow-graph-browser/playwright.config.ts` (Part 1's package: its Vite root, `webServer` command and port, where harness pages live; put this task's three files where its own harness pages and specs are, and keep the URL below `/harness/elk-bars.html` in step with that layout);
      - `grep -n "isTestPath" -A12 scripts/check-case-citations.mjs` (the KG C T1 line for `knowledge-graph-browser` and Part 1's line for `flow-graph-browser` are both there);
@@ -238,11 +240,11 @@ Siblings copied: `packages/ui/{package.json,tsconfig.json,tsconfig.typecheck.jso
 - [ ] **Step 0a: PR A, widen the gate to `N or M` (its own PR, small, runs BEFORE Step 0 and lands first; planner ruling P6)**
 
   The verb that runs is the primary checkout's, which accepts N only; PR B's gate would fail there. Graph Part 1 T1 (its PR A, Steps 1-4) and KG C T1 (`36 or 41`) solved this the same way; mirror Part 1 T1's PR A step for step, with this task's numbers:
-  1. **Measure both counts** on `task/wtg3-gate-widen` (cut from `origin/release/<next>`): N is the `pnpm turbo run build test typecheck --dry=json` task count on the base; M is the same count with a `packages/flow-graph` that carries Step 2's `package.json` (its `build`, `test` and `typecheck` scripts), measured in a scratch copy and NOT committed (expected M = N + 3). Never copy a number from this plan or from Part 1's.
+  1. **Measure both counts** on `task/wtg3-gate-widen` (cut from `origin/release/workflow-graph`): N is the `pnpm turbo run build test typecheck --dry=json` task count on the base; M is the same count with a `packages/flow-graph` that carries Step 2's `package.json` (its `build`, `test` and `typecheck` scripts), measured in a scratch copy and NOT committed (expected M = N + 3). Never copy a number from this plan or from Part 1's.
   2. **Fixtures first (RED):** in `scripts/ctl/lib.test.sh`, add the block Part 1 T1's PR A added for its `41 or 46`, with `N or M`: both counts accepted, `M-1 of M` and `N+1` refused, the anchors kept (`^` and ` *$`). Case lines: the next free run of 13.xxxx ids after re-grepping every live tip (the Global Constraints command), the transitional arm written ❌ and its M-only pin written PENDING for PR B.
   3. **The verb:** the anchored `Tasks:` line in `scripts/ctl/verbs/gate.sh` accepts `N` or `M`, the SAME count on both sides of `successful, … total`; `scripts/ctl/README.md` and `docs/lanes/gate-lock/README.md` say "transitional, until WTG3 T1 PR B pins M".
   4. **Verify (LOCAL):** `pnpm check:ctl` and `pnpm check:citations`. Mutation: make the alternation M-only → the N arms go RED; drop `^` or ` *$` → the anchor arms go RED. Record both in the HANDOFF.
-  5. `ctl pr open --repo <worktree> --base release/<next> --title "gate: accept N or M (WTG Part 3 T1, transitional)" --body <ABSOLUTE path>`; `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  5. `ctl pr open --repo <worktree> --base release/workflow-graph --title "gate: accept N or M (WTG Part 3 T1, transitional)" --body <ABSOLUTE path>`; `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
   6. **Report to the controller: `NEEDS: owner pulls the primary checkout`**, with the merge sha. Do not wait: PR B's work needs no gate until Step 11.
   7. **OWNER ACTION:** the owner pulls the primary checkout (on the release branch it stands on) after PR A merges, so the verb that runs accepts `N or M`. PR B's gate waits for it.
 
@@ -1043,7 +1045,7 @@ export { createElkEngine, engineFromInstance, type LayoutEngine, type WorkerFact
 
 ### Task 2: Layout: measured blocks, the band fold, lone-leaf placement, the move diff, orientation, note-stack ports (cases 29.234–29.239)
 
-**Branch** `task/wtg3-layout` (from `origin/release/<next>` after T1 is merged). **Files:**
+**Branch** `task/wtg3-layout` (from `origin/release/workflow-graph` after T1 is merged). **Files:**
 - Create:
   - `packages/flow-graph/src/layout/{measure,orientation,fold,incremental,diff}.ts`
   - `packages/flow-graph/test/layout/{helpers.ts,measure.test.ts,fold.test.ts,layout.test.ts}`
@@ -2131,7 +2133,7 @@ export { BLOCK, decisionBlock, layoutNode, ticketBlock, wrapLines, type TextMeas
   3. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`, then `pnpm turbo run build test typecheck --filter=@gisik-nokma/flow-graph`.
   4. Run the package suite three times in a row. Expected: green each time (the 30-flow case is seeded, so a flake is a finding).
 
-  Commit `wtg3 T2: measured blocks, the band fold, leaf placement and note ports`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-layout.md` written.
+  Commit `wtg3 T2: measured blocks, the band fold, leaf placement and note ports`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-layout.md` written.
 
 
 ---
@@ -3050,7 +3052,7 @@ export function buildFlowRead(input: FlowReadInput): FlowRead {
 
   1. **Prose is a claim.** `grep -rn "12.185" test-cases Features.md packages/app-core/test packages/app-core/src` and the `ELEVEN` in the test title (the list already has more than eleven entries on the tip, so the word is stale): rewrite the title and the case line to say the methods are enumerated by id and not counted, and add `getFlow` where the line lists them.
   2. **App-core online change ⇒ server integration files WHOLE:** `pnpm --filter @gisik-nokma/server exec vitest run --maxWorkers=2 test/integration > /tmp/wtg3-t3i.log 2>&1; tail -n 30 /tmp/wtg3-t3i.log`. Add a `getFlow` agreement case beside the `getAttention` one in `test/integration/client-contract.test.ts` (copy it: real route body through `mapFlow` is `toEqual` to the body).
-  3. **No new event, notification kind or cause** in this task: `git diff --stat origin/release/<next> -- packages/domain/src/events apps/server/src/projections apps/server/test/census` is empty (say so in the handoff).
+  3. **No new event, notification kind or cause** in this task: `git diff --stat origin/release/workflow-graph -- packages/domain/src/events apps/server/src/projections apps/server/test/census` is empty (say so in the handoff).
   4. **Mutations (the reviewer re-runs these):**
 
      | Case | Mutation | Expected red |
@@ -3067,7 +3069,7 @@ export function buildFlowRead(input: FlowReadInput): FlowRead {
   5. Flip 29.240 to 29.245 to ✅. `Features.md`, under `<!-- wtg-part3-workflow-graph T3 bullet -->`: `- ⚙️ **Flow read** — \`GET /v1/workspaces/:ws/tickets/:id/flow\` returns one \`FlowRead\` for the viewer: nodes in flow order with title, key, state, alternates, passes, IST-day periods, planned intervals, tray reason, visible notes and pin counts; edges with taken passes and the chosen branch; the flow actor's latest automatic moves. \`apps/server/src/flow/\`, \`packages/domain/src/flow-read.ts\`; online only (\`getFlow\`), the replica refuses with a named gap.`
   6. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build test typecheck --filter=@gisik-nokma/domain --filter=@gisik-nokma/server --filter=@gisik-nokma/app-core` (LOCAL).
 
-  Commit `wtg3 T3: the flow read, its route and getFlow`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-flow-read.md` written.
+  Commit `wtg3 T3: the flow read, its route and getFlow`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-flow-read.md` written.
 
 
 ---
@@ -3566,7 +3568,7 @@ export function buildScene(input: SceneInput, layout: FlowLayout, ctx: SceneCont
   3. A new role can change a stylesheet a snapshot reads: `grep -rn "themeStylesheet" apps/web/test packages/app-core/test` and run those files; then `pnpm turbo run build --filter=@gisik-nokma/web...` and the web and app-core suites WHOLE.
   4. `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`.
 
-  Commit `wtg3 T4: the scene and the seven flow colours`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-scene.md` written.
+  Commit `wtg3 T4: the scene and the seven flow colours`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-scene.md` written.
 
 
 ---
@@ -4834,7 +4836,7 @@ export class FlowStage {
   2. `Features.md`, under `<!-- wtg-part3-workflow-graph T5 bullet -->`: `- ⚙️ **Flow stage** — \`FlowStage\` draws a scene as DOM boxes and SVG edges in one transformed layer that the shared camera moves; elements are reused across scenes, moved nodes glide for 240 ms, taps are resolved by geometry, a "+" handle drag links two tickets, and a 300-node flow pans at 60 fps on a desktop. \`packages/flow-graph/src/render/\`, \`packages/ui/src/ui.css\` (\`.gn-flow*\`)`
   3. Sweeps: `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build test typecheck --filter=@gisik-nokma/flow-graph --filter=@gisik-nokma/ui` (LOCAL).
 
-  Commit `wtg3 T5: the stage, picks, the link drag, fit and the pan bars`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-stage.md` written.
+  Commit `wtg3 T5: the stage, picks, the link drag, fit and the pan bars`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-stage.md` written.
 
 
 ---
@@ -5360,7 +5362,7 @@ Siblings copied: KG C T9 (`docs/superpowers/plans/2026-10-03-knowledge-graph-vie
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T6 bullet -->`: `- ✅ **Graph tab** — the ticket sheet's fourth tab is **Graph**: it opens a wide panel (\`min(1240px, 94vw)\`) holding a Knowledge | Workflow | Timeline switch for the views mounted, remembered per browser; the Workflow view loads as its own chunk. \`packages/app-core/src/views/graph-tab.tsx\`, \`graph-slots.ts\`, \`packages/ui/src/components/sheet.tsx\` (\`wide\`), \`apps/web/src/workflow-graph/\``
   4. Sweeps: `ui`, `app-core` and `web` suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL).
 
-  Commit `wtg3 T6: the Graph tab, the wide sheet and the Workflow slot`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-graph-tab.md` written (route table before and after, the landed KG C T9 form, the three contradictions D-W3-16 to D-W3-18).
+  Commit `wtg3 T6: the Graph tab, the wide sheet and the Workflow slot`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-graph-tab.md` written (route table before and after, the landed KG C T9 form, the three contradictions D-W3-16 to D-W3-18).
 
 ---
 
@@ -5398,7 +5400,7 @@ Siblings copied: `apps/web/src/notes/note-comments.tsx` (`useAppServices`, `useL
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-workflow-view` from `origin/release/<next>`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-workflow-view` from `origin/release/workflow-graph`; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. **Read what landed** and write it into the handoff: `grep -n "export" packages/flow-graph/src/index.ts` (T2/T4/T5 names as in Interfaces; if one landed under another name, change THIS task's call sites, not theirs); `grep -n "getFlow" packages/app-core/src/data-source.ts`; `grep -n "export class CameraAdapter" -A30 packages/viewport/src/dom/camera-adapter.ts` (the constructor's option names: T5's harness passes `{ el, layer }`; use the landed names in `runtime.ts`); `sed -n 1,60p apps/web/src/workflow-graph/ticket-workflow-tab.tsx`.
   3. **Baselines before touching anything:** `pnpm --filter @gisik-nokma/web build > /tmp/wtg3-t7-before.log 2>&1` and save the `/my-work`, `/w/[workspaceId]/p/[projectId]` and `/notes` First Load JS lines to the handoff (the bar: unchanged after this task).
   4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T7" Features.md test-cases/29-workflow-timeline-graphs.md`.
@@ -6967,7 +6969,7 @@ export function WorkflowPanel(props: GraphSlotProps) {
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T7 bullet -->`: `- ✅ **Workflow view** — the Graph tab's Workflow view draws the ticket's whole flow (boxes, diamonds, labelled branches, loops, Start and End), with a header of link counts, a legend of this flow's states, the list "This flow, in order", an empty state, a retry on a failed read, and live updates (a new step is placed without moving the rest; a changed card is ringed). Online only. \`apps/web/src/workflow-graph/\`, \`packages/app-core/src/workflow-graph/\`, \`packages/flow-graph/src/scene/pipeline.ts\`` and `- ⚙️ **Scene pipeline** — \`nextScene\` reuses the previous layout when only a status changed, places a lone new leaf beside its source, and otherwise lays out and glides what moved. \`packages/flow-graph/src/scene/pipeline.ts\``.
   4. Sweeps: flow-graph, app-core, ui and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). App-core's `online/` is untouched, so no server integration run is owed.
 
-  Commit `wtg3 T7: the Workflow view`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-workflow-view.md` written (the route table before and after, the Worker form that shipped, the screenshot paths, the landed names Step 0 found, D-W3-19 to D-W3-24).
+  Commit `wtg3 T7: the Workflow view`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-workflow-view.md` written (the route table before and after, the Worker form that shipped, the screenshot paths, the landed names Step 0 found, D-W3-19 to D-W3-24).
 
 ---
 
@@ -7004,7 +7006,7 @@ Siblings copied: `ticket-sheet.tsx:2047-2072` (`make({ ... type: 'ticket.field_s
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-inspector` from `origin/release/<next>` (T7 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-inspector` from `origin/release/workflow-graph` (T7 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. Read what landed and write the names into the handoff: `grep -n "export" packages/app-core/src/workflow-graph/index.ts` (T7's names); `grep -n "waitForAll\|reworkEstimate" packages/domain/src/ticket-types.ts packages/domain/src/events/ticket-events.ts` (Part 2's field ids: if the landed ids differ from `waitForAll` and `reworkEstimate`, change `inspector-events.ts` and its test, nothing else); `grep -n "link_added\|from" packages/domain/src/events/ticket-events.ts` (the `from` member of R42 and the `label` of LK-2: if the Drafts plan named the draft-side member differently, change `link-events.ts` only); `sed -n 1,40p packages/ui/src/components/toast.tsx`.
   3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T8" Features.md test-cases/29-workflow-timeline-graphs.md`.
 
@@ -8312,14 +8314,14 @@ function ReworkEstimate({ value, onSave }: { value: number | null; onSave: (days
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T8 bullet -->`: `- ✅ **Workflow inspector** — selecting a ticket in the Workflow view shows its key, state, assignee and due day, a plain sentence about where it moves next, the Wait for all incoming switch, Comes after and Leads to (rename a branch, remove a link with Undo), the Rework estimate for loop steps, the flow's latest automatic moves and Open ticket; a refused edit says why. \`apps/web/src/workflow-graph/flow-inspector.tsx\`, \`packages/app-core/src/workflow-graph/inspector-model.ts\``.
   4. Sweeps: app-core, ui and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). The domain and server are untouched, so no server run is owed; app-core's `online/` is untouched.
 
-  Commit `wtg3 T8: the inspector`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-inspector.md` (the landed names Step 0 found, the screenshot paths, D-W3-25 to D-W3-31). **T9, T10 and T12 edit `workflow-view.tsx`, `workflow-panel.tsx`, `use-flow-actions.ts` and `support.tsx` too, each by a few lines: rebase on whichever landed first and re-run the web suite; never merge by hand.**
+  Commit `wtg3 T8: the inspector`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-inspector.md` (the landed names Step 0 found, the screenshot paths, D-W3-25 to D-W3-31). **T9, T10 and T12 edit `workflow-view.tsx`, `workflow-panel.tsx`, `use-flow-actions.ts` and `support.tsx` too, each by a few lines: rebase on whichever landed first and re-run the web suite; never merge by hand.**
 
 
 ---
 
 ### Task 9: Creating draft steps and publishing the flow: the "+" handle, the New draft form, link drag, the Publish banner and the `publishFlow` door (cases 29.267–29.269)
 
-**Branch** `task/wtg3-create-publish` (needs T7 and T8; the Drafts plan's `ticket.created {draft:true}`, `ticket.discarded`, the draft-side `from` on `ticket.link_added` and `POST …/drafts/publish` must be on `origin/release/<next>`). **NEEDS: browser** for Step 8. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Workflow-create.png` (the "+" handle, the New draft form, the banner "3 drafts in this flow" with Publish flow, dashed draft cards). **Files:**
+**Branch** `task/wtg3-create-publish` (needs T7 and T8; the Drafts plan's `ticket.created {draft:true}`, `ticket.discarded`, the draft-side `from` on `ticket.link_added` and `POST …/drafts/publish` must be on `origin/release/workflow-graph`). **NEEDS: browser** for Step 8. **Frontend:** invoke **`frontend-design`** in the lane prompt; the visual bar is `wtg-preview/Workflow-create.png` (the "+" handle, the New draft form, the banner "3 drafts in this flow" with Publish flow, dashed draft cards). **Files:**
 - Create:
   - `packages/app-core/src/workflow-graph/step-events.ts`, `packages/app-core/test/workflow-graph/step-events.test.ts`
   - `packages/app-core/test/online/publish-flow.test.ts`
@@ -8350,7 +8352,7 @@ Siblings copied: `apps/web/src/components/create-ticket-flow.tsx` (the birth pri
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-create-publish` from `origin/release/<next>` (T7 and T8 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-create-publish` from `origin/release/workflow-graph` (T7 and T8 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. **Read what landed** and put the names in the handoff: `grep -n "draft\b\|draft:" packages/domain/src/events/ticket-events.ts` (the `ticket.created` payload's `draft` member and `ticket.discarded`); `grep -n "link_added" -B2 -A12 packages/domain/src/events/ticket-events.ts` (the draft-side `from` member, R42); `grep -rn "drafts/publish" apps/server/src` (the route and its 409 body); `grep -rn "publishDrafts\|publishFlow\|publish_draft" packages/app-core/src` (if the Drafts plan already shipped a client door, use it and delete Step 6.1 to 6.3; say so in the handoff). If a name differs from this task's, change `step-events.ts` and the mapper only, never a test's assertion.
   3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T9" Features.md test-cases/29-workflow-timeline-graphs.md`.
 
@@ -9715,7 +9717,7 @@ export function PublishFlowBanner({ read, onPublish }: { read: FlowRead; onPubli
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T9 bullet -->`: `- ✅ **Create and publish from the Workflow view** — a "+" handle on the selected step (or the \`N\` key, or the inspector's Add next step) opens "New draft after GN-150" and creates a draft that leads from it; dragging from the handle onto another step links them (a Decision asks the branch name); a banner counts the flow's drafts and "Publish flow" publishes all of them, parents first, or none, naming the draft that stopped it. Publishing needs a connection. \`apps/web/src/workflow-graph/\`, \`packages/app-core/src/workflow-graph/step-events.ts\`` and `- ⚙️ **\`publishFlow\` client door** — \`DataSourceQuery.publishFlow\` posts the ordered ids to \`POST /v1/workspaces/:ws/drafts/publish\`, answers a \`draft.publish-refused\` 409 as data and rethrows everything else; the replica refuses with a named gap. \`packages/app-core/src/online/online-data-source.ts\``.
   4. Sweeps: app-core, ui and web suites WHOLE, the server integration files WHOLE (Step 4.6); `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server` (LOCAL).
 
-  Commit `wtg3 T9: create draft steps and publish the flow`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-create-publish.md` written (the landed names Step 0 found, whether the Drafts plan already had a client door, the screenshot paths, D-W3-32 to D-W3-35).
+  Commit `wtg3 T9: create draft steps and publish the flow`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-create-publish.md` written (the landed names Step 0 found, whether the Drafts plan already had a client door, the screenshot paths, D-W3-32 to D-W3-35).
 
 
 ---
@@ -9752,7 +9754,7 @@ Siblings copied: `apps/web/src/notes/workspace-notes-section.tsx:219` (`/notes/$
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-notes` from `origin/release/<next>` (T7, T8 and T9 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-notes` from `origin/release/workflow-graph` (T7, T8 and T9 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. Read what landed: `grep -n "export" packages/flow-graph/src/index.ts`; `grep -n "notes" packages/flow-graph/src/scene/types.ts packages/flow-graph/src/types.ts` (T2/T4 names: `NoteStack`, `NOTE_GAP`, `SceneNoteIn`, `DrawnNote`, `NoteConnector`); `grep -n "kind: 'note'" packages/flow-graph/src/render/pick.ts`; `grep -n "notes" packages/domain/src/flow-read.ts` (T3: `{id, title}`). If a name differs, change THIS task's call sites, not theirs.
   3. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T10" Features.md test-cases/29-workflow-timeline-graphs.md`.
 
@@ -10780,7 +10782,7 @@ export function NoteInspector({ read, focus, placement, onSelectNote, onSelectTi
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T10 bullet -->`: `- ✅ **Note blocks in the Workflow view** — a ticket's visible notes are drawn as dotted blocks under it (to its right on a phone), at most three then "+N notes"; the header counts them (\`Notes N\`) and a Show notes switch hides them, remembered per browser. A note takes no part in the flow. Selecting one shows its title, the tickets it is on and Open note. \`packages/flow-graph/src/scene/notes.ts\`, \`apps/web/src/workflow-graph/note-inspector.tsx\``.
   4. Sweeps: flow-graph, app-core and web suites WHOLE; `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). No `ui.css` change, so no ui suite is owed.
 
-  Commit `wtg3 T10: note blocks`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-notes.md` written (the landed names Step 0 found, the screenshot paths, D-W3-36 to D-W3-40, and the findings: no note excerpt on the wire, no stage-level Enter on a note, no trail or Back).
+  Commit `wtg3 T10: note blocks`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-notes.md` written (the landed names Step 0 found, the screenshot paths, D-W3-36 to D-W3-40, and the findings: no note excerpt on the wire, no stage-level Enter on a note, no trail or Back).
 
 ---
 
@@ -10820,7 +10822,7 @@ Siblings copied: `routes/workspaces.ts:50-130` (`SubmittedEvent` built in the ro
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-decide-door` from `origin/release/<next>` (T3 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/server... --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-decide-door` from `origin/release/workflow-graph` (T3 merged); `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/server... --filter=@gisik-nokma/web...`.
   2. **Read what landed** and put the names in `HANDOFF-wtg3-decide-door.md`: `git grep -n "ingestClientAtomic\|AtomicOutcome" apps/server/src packages` (the name and result shape; if the Drafts plan called it something else, change the one call in Step 4 and nothing else); `git grep -n "export" packages/domain/src/flow/index.ts` (is `SettlePlan` exported? if not, import it from the file that defines it); `git grep -n "decision.cascade-blocked\|decision.bad-close-started" apps/server/src` (the two gates; **confirm they run on the ingest path** for `ticket.decided`: if `ingestClientAtomic` does not call the server gates, call them from the route before the batch and say so); `git grep -n "firstTerminalStateId" packages/domain/src/flow`; `grep -n "to:" packages/domain/src/workflow.ts` near `ticketTransitionedPayload` (the real field is `to`, `workflow.ts:201`; Part 2's plan files `to` too (`settleEvents` maps its internal `SettleStep.toStateId` onto `to`), and `toStateId` is right only on Part 2's internal step types and on `ticket.workflow_rebound` (`ticket-events.ts:309`)).
   3. **Look at the fixtures the DB test needs** and decide, before Step 3: (a) does `readFlow` admit hierarchy children (a child under an epic on a branch)? The blocker case in `flow-decide.test.ts` (flow 4) relies on it; if it does not, build the blocker the way Part 2's cases 29.364 to 29.367 do and keep the assertions; (b) which column holds the outcome on `proj_tickets` (the test avoids it on purpose and reads the ledger; do not add it).
   4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T11" Features.md test-cases/29-workflow-timeline-graphs.md`.
@@ -11810,7 +11812,7 @@ decide: async () => ds.decide(workspaceId, '01J9GNODECIDE000000000000X', { outco
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T11 bullet -->`: `- ⚙️ **Decide door** — \`POST /v1/workspaces/:ws/tickets/:id/decide\`: with \`dryRun\` it answers the plan a choice would make, named only for tickets the caller can see (\`hiddenMoves\` for the rest); without it, it files the outcome and the finishing transition as one atomic batch as the caller (\`finishStateId\`: omitted = the first finished state, \`null\` = record the outcome only, a named finished state), answers the pass and the revision it made, and says why a choice is refused (a blocked choice in the engine's own sentence). \`DataSourceQuery.previewDecide\` / \`decide\` return a refusal as data and the replica refuses with a named gap. \`apps/server/src/routes/flow.ts\`, \`apps/server/src/flow/decide-preview.ts\`, \`packages/app-core/src/online/decide-door.ts\``.
   4. Sweeps: app-core, ui and web suites WHOLE, the server integration files WHOLE (Step 6), `security-middleware.test.ts`, then `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web... --filter=@gisik-nokma/server` (LOCAL).
 
-  Commit `wtg3 T11: the Decide door`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-decide-door.md` written (the landed names Step 0 found, the gates' place, the blocker fixture's result, whether the finishing transition reached the terminal state, D-W3-41 to D-W3-45 and D-W3-53 to D-W3-55).
+  Commit `wtg3 T11: the Decide door`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-decide-door.md` written (the landed names Step 0 found, the gates' place, the blocker fixture's result, whether the finishing transition reached the terminal state, D-W3-41 to D-W3-45 and D-W3-53 to D-W3-55).
 
 ---
 
@@ -11846,7 +11848,7 @@ Siblings copied: `packages/ui/src/components/dialog.tsx` (`initialFocusRef`, foc
 
 - [ ] **Step 0: Pre-flight**
 
-  1. Cut `task/wtg3-decide-ui` from `origin/release/<next>` with T8, T9, T10 and T11 merged; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
+  1. Cut `task/wtg3-decide-ui` from `origin/release/workflow-graph` with T8, T9, T10 and T11 merged; `pnpm install` (Node 22); `pnpm turbo run build --filter=@gisik-nokma/web...`.
   2. **The diffs below are against T10's end state.** `git apply --check` each (`flow-inspector`, `use-flow-actions`, `workflow-view`, `workflow-panel`, `flow-actions`, `support`, `workflow-panel-test`); a hunk that does not apply means a task above it changed those lines: re-read the file and apply the same edit by hand, never skip it.
   3. **Read what landed** and put the names in the handoff: `grep -n "previewDecide\|decide(" packages/app-core/src/data-source.ts` (T11's signatures); `grep -n "initialFocusRef\|footer" packages/ui/src/components/dialog.tsx`; `grep -n "busy" packages/ui/src/components/button.tsx`; `grep -n "export function useActorLabels" apps/web/src/use-actor-labels.ts`; `grep -n "previewDecide\|decide:" apps/web/test/helpers/stub-services.ts` (T11 added them; if not, add `previewDecide: unstubbed('previewDecide'), decide: unstubbed('decide')` beside `getFlow`); `grep -n "gn-flow-node__status" packages/ui/src/ui.css` (T5's rule: the scan in Step 4 needs it).
   4. Catalogue anchors exist: `grep -n "wtg-part3-workflow-graph T12" Features.md test-cases/29-workflow-timeline-graphs.md`.
@@ -13271,7 +13273,7 @@ export function DecideControl({ read, model, actions }: DecideControlProps) {
   3. `Features.md`, under `<!-- wtg-part3-workflow-graph T12 bullet -->`: `- ✅ **Decide from the Workflow view** — a Decision's inspector has one button per branch (the chosen one checked), Clear, and its Passes; a choice that moves other tickets asks first (\"This closes GN-152 and GN-153 as Not taken.\", \"Some steps you can't see will also move.\"), asks about each started ticket on the branch being left (Keep going or Close as Not taken, neither chosen for you) and says why a choice that cannot be made writes nothing. A ticket on one branch shows \"Alternate of …\" and a Not-taken ticket says which Decision chose what. \`apps/web/src/workflow-graph/decide-control.tsx\`, \`decide-dialog.tsx\`, \`flow-inspector.tsx\`` and `- ⚙️ **Decide model** — pure: the choices, the confirmation (sentences, started questions, blockers, \`closeStarted\`), the pass, alternate and resolution lines. \`packages/app-core/src/workflow-graph/decide-model.ts\`; \`apps/web/src/workflow-graph/decide-actions.ts\` asks T11's door.`
   4. Sweeps: app-core, ui and web suites WHOLE (Step 6); `node scripts/check-case-ids.mjs && pnpm check:citations && pnpm check:tasks`; `pnpm turbo run build typecheck --filter=@gisik-nokma/web...` (LOCAL). The domain, the server and app-core's `online/` are untouched, so no server run is owed.
 
-  Commit `wtg3 T12: deciding on the graph`. **DONE**: PR `--base release/<next>`, LOCAL battery named, `HANDOFF-wtg3-decide-ui.md` written (the landed names Step 0 found, whether every diff applied, the screenshot paths, D-W3-46 to D-W3-52, the "Flow changes waiting" finding).
+  Commit `wtg3 T12: deciding on the graph`. **DONE**: PR `--base release/workflow-graph`, LOCAL battery named, `HANDOFF-wtg3-decide-ui.md` written (the landed names Step 0 found, whether every diff applied, the screenshot paths, D-W3-46 to D-W3-52, the "Flow changes waiting" finding).
 
 
 ---

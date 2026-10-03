@@ -1,5 +1,7 @@
 # Workflow and Timeline graphs, Part 2: the model, Implementation Plan
 
+> **Release branch (owner, 2026-10-04):** `release/workflow-graph`, cut from `origin/release/knowledge-graph` at f9e0cd18. Every task branch is cut from `origin/release/workflow-graph` and every PR goes `--base release/workflow-graph`. The Knowledge Graph release merges to `main` first; `main` is then merged INTO `release/workflow-graph`, never rebased.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE.
 
 **Goal:** the data model under the Workflow and Timeline graphs: a `leads_to` link with an outcome label, a Decision ticket type with recorded passes, an estimate / rework estimate / wait-for-all trio of built-in fields, work periods and derived actual dates, a pure flow analysis and planner, auto-promotion of Backlog tickets (server listener plus a reconciling sweep), the loop / Not-taken / revision cascade (`planSettle`, a server settler, two gates), two new notification kinds, and the History copy. No graph is drawn here; Parts 3 to 5 consume it.
@@ -44,7 +46,7 @@ Decided by the planner; each is also in the task that applies it.
 ## Global Constraints
 
 **Release and identity**
-- **Release:** a NEW release branch `release/<next>`, cut from `origin/main` after the Knowledge Graph release ships (one release branch at a time; the literal `<next>` is filled when the branch is cut, the first Graph part's lane names it). Every task branch is `task/wtg2-<slug>`, cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`. A merge to `main` is the release and happens on the owner's word.
+- **Release:** `release/workflow-graph`, cut 2026-10-04 from `origin/release/knowledge-graph` at f9e0cd18 (owner; the KG release merges to `main` first, then `main` is merged INTO it, never rebased). Every task branch is `task/wtg2-<slug>`, cut from `origin/release/workflow-graph`, and its PR has `--base release/workflow-graph`. Never `main`. A merge to `main` is the release and happens on the owner's word.
 - **Order:** Part 1 first, then Drafts, then this plan. Inside the plan, see each task's **Needs** line and the Parallelism notes.
 - **Catalogue:** Features.md §26 "Workflow and Timeline graphs" ↔ `test-cases/29-workflow-timeline-graphs.md`, both opened by Part 1's first task. This plan owns, exactly: `29.120`-`29.127` (T2), `29.128`-`29.133` (T3), `29.134`-`29.137` and `29.356`-`29.358` (T5), `29.138`-`29.142` (T6), `29.143`-`29.144` (T7), `29.145`-`29.146` (T19), `29.147`-`29.152` (T1), `29.153`-`29.166` (T4), `29.167`-`29.170`, `29.350`-`29.355` and `29.359`-`29.360` (T9), `29.180`-`29.186` (T10), `29.187`-`29.189` (T12), `29.190`-`29.199` (T11), `29.200`-`29.209` and `29.361`-`29.363` (T8), `29.210`-`29.221` (T13), `29.222`-`29.229` (T14), `29.364`-`29.367` (T15), `29.368`-`29.370` (T16), `29.371`-`29.374` (T17), `29.390`-`29.399` (T18). `29.171`-`29.179` stay free. Part 1 owns `29.001`-`29.119`; Parts 3 to 5 own the rest.
 - **Case lines are id lines:** `- ❌ **29.120 — …**`. Each starts ❌ and flips ✅ in the same commit as its test. Test names or comments carry the id. `node scripts/check-case-ids.mjs` and `pnpm check:citations` must pass.
@@ -281,7 +283,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 1: Pre-flight: shadow ids, existing `decision` type, terminal-initial workflows, terminal-category readers (cases 29.147-29.152)
 
-**Branch:** `task/wtg2-preflight` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** nothing. **T4 and T5 are blocked on this task's RECORDED prod result (Step 8), not only on its merge** (a lane has no prod access; the owner runs the script).
+**Branch:** `task/wtg2-preflight` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** nothing. **T4 and T5 are blocked on this task's RECORDED prod result (Step 8), not only on its merge** (a lane has no prod access; the owner runs the script).
 
 **Files:**
 - Create:
@@ -760,7 +762,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 2: `leads_to` and its label: events, engine rules, permission, projection, History, redaction (cases 29.120-29.127)
 
-**Branch:** `task/wtg2-leads-to` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** typed-links T1-T4 merged (T2-T4 are plan text only on the knowledge-graph tip: this task is written as the DELTA on their shapes, cited as "typed-links T<n> `symbol`"); the Drafts task that adds the `from` member to both link payloads (R42-R44; no Drafts plan file exists at drafting time, so re-read the merged `ticket-events.ts` and `checks/links.ts` first and keep every Drafts line).
+**Branch:** `task/wtg2-leads-to` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** typed-links T1-T4 merged (T2-T4 are plan text only on the knowledge-graph tip: this task is written as the DELTA on their shapes, cited as "typed-links T<n> `symbol`"); the Drafts task that adds the `from` member to both link payloads (R42-R44; no Drafts plan file exists at drafting time, so re-read the merged `ticket-events.ts` and `checks/links.ts` first and keep every Drafts line).
 
 **Files:**
 - Create: `packages/domain/src/link-label.ts`; `packages/domain/test/link-label.test.ts`; `apps/server/migrations/1792100000000_proj-ticket-links-leads-to.sql` (re-check it still sorts after the highest applied migration; `pnpm check:migrations`); `packages/rule-engine/test/links-leads-to.test.ts` (copy typed-links T3 `test/links.test.ts` helpers); `apps/server/test/permissions/check-leads-to-permission.test.ts` (copy typed-links T3 `check-link-permission.test.ts`); `packages/app-core/test/precheck-leads-to.test.ts` (copy typed-links T3 `precheck-links.test.ts`); `apps/server/test/projections/ticket-links-leads-to.test.ts` (copy typed-links T2 `ticket-links.test.ts` setup).
@@ -788,7 +790,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `- ❌ **29.123 — a `leads_to` whose SOURCE is a Decision needs a label (`link.label-required`) and a label no sibling branch already has after trim and case folding (`link.label-duplicate`, naming only the label); a relabel (remove then add) may reuse the freed label but not a sibling's; a draft-side `from` form is judged on `from`;** control: the same unlabeled link from a Task, and the same label on a second Decision or a second Task, are accepted. Mutation: compare labels without `normaliseLinkLabel` → " yes " is accepted.`
   - `- ❌ **29.124 — the permission gate and the client precheck treat `leads_to` like the other kinds: a member who cannot see the target is refused `permission.visibility` with the one sentence, and the precheck predicts `link.label-required` word for word from the cache;** control: a visible target passes the gate and a labelled link passes the precheck. Mutation: skip the target `canSee` for `leads_to` → the hidden target passes.`
   - `- ❌ **29.125 — `proj_ticket_links` accepts kind `leads_to` and stores `label` (NULL for other kinds); the Postgres CHECK refuses an unknown kind and a label on a non-`leads_to` row; a relabel batch rewrites the row; `proj_tickets.links` reads back through `rowToTicketState` with the label; a rebuild equals the live tables;** control: a `blocks` row keeps `label` NULL. Mutation: omit `label` from the INSERT → the stored label is NULL.`
-  - `- ❌ **29.126 — the label shows everywhere the link does: `describeEvent` reads `Linked: leads to GN-147 (Yes)` (withheld target: `Linked: leads to a ticket you can't see (Yes)`), the History route keeps `label` when it withholds a target, `redactedPayload` keeps it, `GET …/links` / `getTicketLinks` (online and replica) / `get_ticket.links` carry it, and `link_tickets` still refuses kind `leads_to` until Part 5;** control: a label-free link reads exactly as before. Mutation: drop `label` from the withheld payload → the hidden-target sentence loses `(Yes)`.`
+  - `- ❌ **29.126 — the label shows everywhere the link does: `describeEvent` reads `Linked: leads to GN-147 (Yes)` (withheld target: `Linked: leads to a ticket you can't see (Yes)`), the History route keeps `label` when it withholds a target, `redactedPayload` keeps it, `GET …/links` / `getTicketLinks` (online and replica) / `get_ticket.links` carry it, and `link_tickets` still refuses kind `leads_to` until Part 5; and a non-author NEVER sees a `leads_to` edge whose end is someone else's draft (planner ruling B): the published ticket's `GET …/links`, its `ticketState.links` (so `get_ticket.links`) and its History carry neither the edge nor a count of it (the list length and the History length are what they were before the draft linked);** control: a label-free link reads exactly as before, and in the SAME `it()` the draft's author, on the draft's own sheet, sees the edge with its label. Mutation: drop `label` from the withheld payload → the hidden-target sentence loses `(Yes)`; let the label select bypass Drafts T6's `ends` filter (or skip the `ticketState` link filter for `leads_to`) → the stranger's read lists the edge.`
   - `- ❌ **29.127 — THE CENSUS (link label): `payloadIds` names only the target of a labelled link (a label that looks like a ULID is not an id), every kind in `TICKET_LINK_KINDS` has both readings, `describeEvent` and `redactedPayload` handle every kind, and the regenerated mobile bundle knows `leads_to`;** control: the planted-registration control of 27.004 still fires. Mutation: scan every string member in `payloadIds` → the ULID-shaped label is reported.`
 
   `packages/domain/test/link-label.test.ts` (imports as `ticket-link-events.test.ts:1-18`; `bornState`, `deps`, `link` helpers copied from that file with a `label` parameter):
@@ -1038,12 +1040,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `routes/ticket-history.ts` (typed-links T4 withheld branch): `e.payload = { kind: p.kind, targetId: null, ...(p.label === undefined ? {} : { label: p.label }) };` with `p` typed `{ kind: string; targetId: string; label?: string }`.
   - `ticket-tools.ts:42-44`: `{ kind: payload['kind'], target: "a ticket you can't see", ...(payload['label'] === undefined ? {} : { label: payload['label'] }) }`.
   - Wire: `read/ticket-links.ts` selects `l.label` and spreads `...(r.label === null ? {} : { label: r.label })` onto the wire row (`TicketLinkWire.label?: string`); `view-types.ts` `TicketLinkView.label?: string`; `mappers.ts` `mapTicketLinks` reads `label` with `asString` when present and `mapTicketState` keeps `label` on each `links` entry (validate with `asString`, leave the key absent otherwise); `replica-data-source.ts` `getTicketLinks` passes `l.label` into `view(...)` (add a `label?: string` argument, spread when defined); `read-tools.ts` `get_ticket.links` map adds the same spread.
+  - **No edge to someone else's draft (planner ruling B, case 29.126).** The `l.label` select goes into the SAME statement as Drafts T6's `ends` filter (`read/ticket-links.ts`, Drafts plan T6 Step 5: other end `LIVE_TICKET_WHERE AND visibleTicketsWhere`, own drafts only on the draft's own sheet), never a second statement or a count that skips it; the `ticketState` link filter in `routes/tickets.ts` (Drafts T6) runs BEFORE the label spread, so `get_ticket.links` (via `read-tools.ts`) inherits it; the History withheld branch above changes no visibility (a draft's edge is on the draft's stream, Drafts R42 and owner ruling O1, so the published ticket's History holds no event naming it). No path counts links separately from the filtered list.
   - `link_tickets` (typed-links T4) must NOT start accepting `leads_to` (it has no label argument; Part 5 owns it): replace `z.enum(TICKET_LINK_KINDS)` in both schemas by a local `const LINK_TICKETS_KINDS = TICKET_LINK_KINDS.filter((k) => k !== 'leads_to') as ['blocks', 'relates', 'duplicates']` and `z.enum(LINK_TICKETS_KINDS)`, with a comment naming Part 5.
 
   Tests, ids in the names:
   - `history-copy.test.ts`, inside the 27.005 describe: `describe('29.126 …')` with `linkEvent` extended by a `label` member: `expect(describeEvent(…('ticket.link_added','leads_to',{key:'GN-147'},'Yes'))).toBe('Linked: leads to GN-147 (Yes)')`; withheld `"Linked: leads to a ticket you can't see (Yes)"`; no label `'Linked: leads to GN-147'`; census loop `for (const kind of TICKET_LINK_KINDS) expect(describeEvent(linkEvent('ticket.link_added', kind, { key: 'GN-1' }))).not.toBe('ticket.link_added')` (29.127).
   - `redacted-payload.test.ts`: `redactedPayload('ticket.link_added','e1',{ kind:'leads_to', targetId:null, label:'Yes' })` equals `{ kind:'leads_to', target:"a ticket you can't see", label:'Yes' }` (29.126); census loop over every kind (29.127); in `ticket-tools.test.ts` a `link_tickets` call with `kind: 'leads_to'` rejects at the input schema before anything is sent (29.126).
   - `apps/server/test/routes/ticket-links.test.ts` (typed-links T4): a `leads_to` row with label `Yes` appears on `GET …/links` with `label: 'Yes'` in both directions and a label-free row has no `label` key; the History route's hidden-target event keeps `payload.label`. Replica/mapper cases: extend typed-links 27.061 and 27.063 with a labelled link (`mapTicketLinks` keeps it; `getTicketLinks` returns it for `out` and `in`). All named 29.126.
+  - Ruling B, same file (`ticket-links.test.ts`), ONE `it('29.126 a stranger never sees a leads_to edge to someone else\'s draft; the author does')` (Drafts' draft helpers, as Drafts 28.117 builds them): published S, the member's draft D, a from-form `{kind:'leads_to', targetId: D, from: S, label: 'Yes'}` on D's stream. As another member AND as the owner: `GET …/tickets/S/links` has no row naming D and its length equals the length read before the link was filed; `GET …/tickets/S` `ticketState.links` has no entry naming D; `GET …/tickets/S/history` has no event naming D or `Yes`, same length as before. CONTROL in the same `it()`: the author's `GET …/tickets/D/links` lists S as `in` with `label: 'Yes'`. Then publish D: the owner's S read lists D as `out` with `label: 'Yes'` (the R44 re-file).
   - Census, `ticket-vocabulary-census.test.ts` (append inside the 27.004 file, new `describe('29.127 …')`):
     ```ts
     it('29.127 payloadIds names only the target of a labelled link; every kind reads both ways', () => {
@@ -1074,6 +1078,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     | 29.124 | skip the target `canSee` for `leads_to` | hidden target passes |
     | 29.125 | omit `label` from the INSERT | stored label NULL |
     | 29.126 | drop `label` from the withheld payload | sentence loses `(Yes)` |
+    | 29.126 | select the label in a second statement without Drafts T6's `ends` filter | the stranger's S read lists D (ruling B) |
     | 29.127 | `payloadIds` scans every string member | lookalike label reported |
 
   Push. DONE + REVIEW (NEEDS: none; the Links UI is T3).
@@ -1084,7 +1089,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Lane prompt names `frontend-design`.** Geometry (the 44px rows, the 390px layout) is measured only on the primary stack (rule #23), never in a lane worktree.
 
-**Branch:** `task/wtg2-leads-to-ui` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T2 (the label on `TicketLinkView`, the engine rules); typed-links T5 (`ticket-links-section.tsx` is plan text only on the knowledge-graph tip: this task is the DELTA on its symbols `CHOICES`, `GROUP_ORDER`, `readingOf`, `eventFor`, `file`, the row markup and the picker body; re-read the merged file first).
+**Branch:** `task/wtg2-leads-to-ui` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T2 (the label on `TicketLinkView`, the engine rules); typed-links T5 (`ticket-links-section.tsx` is plan text only on the knowledge-graph tip: this task is the DELTA on its symbols `CHOICES`, `GROUP_ORDER`, `readingOf`, `eventFor`, `file`, the row markup and the picker body; re-read the merged file first).
 
 **Files:**
 - Modify: `packages/app-core/src/views/ticket-links-section.tsx` (typed-links T5); `packages/app-core/src/views/ticket-sheet.tsx` (the `<TicketLinksSection …/>` mount typed-links T5 placed between the `{phone ? descriptionSection : null}` block and the rollup line; `state.typeId` is in scope there, read at `:2429`); `packages/ui/src/ui.css` (inside the `/* Knowledge Graph A: ticket links */` block typed-links T5 opened); `docs/manual.md` §5 (typed-links T5's "Linking tickets" paragraph).
@@ -1092,8 +1097,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 - Test (sheet): the file typed-links T5 step 3 put 27.074 in (`packages/app-core/test/views/ticket-sheet*.test.tsx`).
 
 **Interfaces:**
-- Consumes: T2's `TicketLinkView.label?: string`, `LINK_LABEL_MAX`, `normaliseLinkLabel`, `DECISION_TYPE_ID` (all `@gisik-nokma/domain`); typed-links T5's `TicketLinksSectionProps`, `MakeSubmitted`, `PrecheckResult`.
-- Produces: `TicketLinksSectionProps.isDecision: boolean` (is THIS ticket a Decision; the sheet passes `state.typeId === DECISION_TYPE_ID`). No other prop changes. The toast state becomes `{ label: string; undo: () => Promise<void> }` (it held a `SubmittedEvent`): a relabel's Undo is two events, not one.
+- Consumes: T2's `TicketLinkView.label?: string`, `LINK_LABEL_MAX`, `normaliseLinkLabel`, `DECISION_TYPE_ID` (all `@gisik-nokma/domain`); typed-links T5's `TicketLinksSectionProps`, `MakeSubmitted`, `PrecheckResult`; **Drafts T8's draft routing (planner ruling A, 2026-10-04): on a draft's sheet Drafts T8 makes the EXISTING Links section (and the parent/child controls) file through the draft-side `from` form of Drafts T6 (adding a link, removing one, setting a parent); this task builds the "Leads to" UI on that path and owns no routing of its own** (re-read the merged section for the draft flag's prop name and the routing helper; if they are absent, STOP `NEEDS: Drafts T8`).
+- Produces: `TicketLinksSectionProps.isDecision: boolean` (is THIS ticket a Decision; the sheet passes `state.typeId === DECISION_TYPE_ID`) (the draft flag is Drafts T8's prop, consumed, not produced here). No other prop changes. The toast state becomes `{ label: string; undo: () => Promise<void> }` (it held a `SubmittedEvent`): a relabel's Undo is two events, not one.
 
 **What the section can and cannot know.** `queryTickets` results carry `{ticketId, projectId, key, title}` and no `typeId` (typed-links T5 props), so the type of the OTHER ticket is unknown. Choice table delta, in the style of typed-links T5's:
 
@@ -1101,13 +1106,16 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 |---|---|---|---|
 | Leads to | this | `{kind:'leads_to', targetId: other, label?}` | required when `isDecision`, else optional |
 | Comes after | other | `{kind:'leads_to', targetId: this, label?}` | optional here; the engine refuses `link.label-required` when the OTHER ticket is a Decision, and that sentence shows beside Add (typed-links 27.067 path) |
+| Comes after, THIS ticket a draft | this (the draft) | `{kind:'leads_to', targetId: this, from: other, label?}` (Drafts R42 from-form, through Drafts T8's routing) | as the row above |
+
+**Why a draft's links never touch the other stream (owner ruling O1, 2026-10-04: "everything about a draft is not solid yet. a discard removes everything, even a connection or a link").** A `leads_to` or Decision edge touching a draft lives ONLY on the draft's stream: the published ticket shows nothing of it until publish (the R44 re-file makes it real), and a discard erases it with the draft (Drafts 28.102). Drafts R43 refuses a plain `ticket.link_added` on a public stream naming a draft (`draft.link-form`), so a "Comes after" from a draft's sheet that went to the other stream would be refused, never filed. Every choice that would file on the OTHER stream (`onOther`) therefore files, on a draft's sheet, the from-form on THIS draft's stream, and so do its removal, its relabel pair and their Undo (`ticket.link_removed` carries the same `from`). **The routing is Drafts T8's (planner ruling A): this task only puts `leads_to` and its label on that path.** From a published ticket's sheet a draft is never offered (the picker's search reads `LIVE_TICKET_WHERE`, which excludes drafts), so no other row changes.
 
 **Why relabel compensates instead of trusting one batch.** LK-4 calls a relabel "one batch", but `ingestBatch` commits each event on its own and "never rolls back its neighbours" (`apps/server/src/ingest/ingest-service.ts:56-58`), and Drafts T5b's `ingestClientAtomic` is reachable only through `POST …/drafts/publish`, not through a generic route. A removal that commits followed by an add the engine refuses (a sibling's label) would LOSE the branch. So the section (a) checks the new label against this Decision's other outgoing labels locally with `normaliseLinkLabel`, (b) sends `[link_removed, link_added]` in one `ingest` call, and (c) when the second event is not committed, files the original `link_added` again and shows the refusal. The client precheck is not used for the add: the cache still holds the pair, so it would answer `link.duplicate`.
 
 - [ ] **Step 1: Case lines, then the RED tests (29.128-29.133)**
 
   Under `<!-- wtg-part2-model T3 -->`, all ❌:
-  - `- ❌ **29.128 — the Add link picker offers "Leads to" and "Comes after"; with a label typed, "Leads to" files ONE `ticket.link_added {kind:'leads_to', targetId, label}` on THIS ticket's stream (label trimmed) and "Comes after" files it on the OTHER ticket's stream with `targetId` = this ticket;** control: with no label the payload has no `label` member at all. Mutation: file "Comes after" on this stream → the stream assertion fails.`
+  - `- ❌ **29.128 — the Add link picker offers "Leads to" and "Comes after"; with a label typed, "Leads to" files ONE `ticket.link_added {kind:'leads_to', targetId, label}` on THIS ticket's stream (label trimmed) and "Comes after" files it on the OTHER ticket's stream with `targetId` = this ticket; on a DRAFT's sheet "Comes after" files the Drafts from-form `{kind:'leads_to', targetId: this, from: other, label}` on the draft's OWN stream and nothing reaches the published ticket's stream (owner ruling O1);** control: with no label the payload has no `label` member at all. Mutation: file "Comes after" on this stream → the stream assertion fails; send `leads_to` around Drafts T8's draft routing → the draft case files on the other stream.`
   - `- ❌ **29.129 — leads-to rows are grouped under "Leads to" and "Comes after", each row shows its label as a chip, Remove is named with the label, and Undo of a removal re-adds the link WITH its label;** control: a label-free row has no chip. Mutation: build the Undo event without the label → the re-added payload lacks `label`.`
   - `- ❌ **29.130 — on a Decision, "Leads to" cannot be added until the label is non-blank (the result buttons are disabled and a hint says why; nothing is sent), and the ticket sheet passes `isDecision` from the ticket's type;** control: on a Task the same add is enabled with no label, and "Comes after" is enabled on a Decision, where an engine `link.label-required` refusal shows beside Add. Mutation: ignore `isDecision` → the Decision add is enabled.`
   - `- ❌ **29.131 — "Edit label" on a leads-to row files `[ticket.link_removed, ticket.link_added]` in ONE ingest call, in that order, on the stored source's stream, shows "Relabelled: leads to GN-147 (Maybe)" with an Undo that restores the old label the same way, and a double click on Save files it once;** control: Save with the label unchanged files nothing. Mutation: file the add before the removal → the order assertion fails.`
@@ -1141,6 +1149,16 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
     const second = source.ingested.flat()[1]!;
     expect([second.entity.id, second.payload]).toEqual([OTHER, { kind: 'leads_to', targetId: TICKET }]);
     expect('label' in (second.payload as object)).toBe(false);
+  });
+  it('29.128 on a draft\'s sheet Comes after files the from-form on the DRAFT\'s stream, never on the published ticket\'s (owner ruling O1)', async () => {
+    const source = createFakeDataSource({ getTicketLinks: async () => [] }, COMMIT);
+    render(<Harness dataSource={source} workspaceId={WS} ticketId={TICKET} canEdit isDecision={false} isDraft make={make} queryTickets={async () => [PICK]} />); // `isDraft`: Drafts T8's prop name; re-read the merged section and rename here if it differs
+    await userEvent.click(await screen.findByRole('button', { name: 'Add link' }));
+    await chooseKind('Comes after');
+    await userEvent.type(screen.getByLabelText('Link label'), 'Yes');
+    await userEvent.click(await screen.findByRole('button', { name: 'GN-133 Chiller' }));
+    expect(flat(source)).toEqual([['ticket.link_added', TICKET, { kind: 'leads_to', targetId: TICKET, from: OTHER, label: 'Yes' }]]);
+    expect(source.ingested.flat().some((e) => e.entity.id === OTHER)).toBe(false); // nothing reaches the published ticket's stream
   });
   it('29.131 relabel is one remove+add call, ordered, undoable, once per double click; unchanged files nothing', async () => {
     let stored = [row('leads_to', 'out', 'GN-147', 'Yes')];
@@ -1206,7 +1224,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   const isLeads = (c: Choice) => c === 'leads-to' || c === 'comes-after';
   const withLabel = (l: { reading: string; key: string; label?: string }) => `${l.reading} ${l.key}${l.label === undefined ? '' : ` (${l.label})`}`;
   ```
-  `eventFor` takes a trailing `label?: string` and adds `...(label === undefined || type === 'ticket.link_removed' ? {} : { label })` to the payload. State: `label: string` (picker), `editing: { key: string; value: string } | null`. In the component body:
+  `eventFor` takes a trailing `label?: string` and adds `...(label === undefined || type === 'ticket.link_removed' ? {} : { label })` to the payload, and nothing else about streams: Drafts T8 (planner ruling A) already routes every `onOther` choice and every incoming-row removal on a draft's sheet to THIS ticket's stream as `{kind, targetId: ticketId, from: other, …}` (O1; Drafts R42). `leads_to`, its label, the relabel pair and their Undo go through that same routing; add no `isDraft` branch of your own. State: `label: string` (picker), `editing: { key: string; value: string } | null`. In the component body:
   ```tsx
   const labelNeeded = isDecision && choice === 'leads-to';
   const rowKey = (l: TicketLinkView) => `${l.kind}:${l.direction}:${l.ticket.id}`;
@@ -1265,7 +1283,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   </p>
   ```
   Each result button gets `disabled={labelNeeded && label.trim() === ''}`; `add(r)` calls `eventFor(…, 'ticket.link_added', isLeads(choice) && label.trim() !== '' ? label.trim() : undefined)`, puts the same label on the pending row, and clears `label` after the call. Changing `choice` to a non-leads kind never sends the typed label. `TicketLinksSectionProps` gains `isDecision: boolean`; the toast render calls `toast.undo()`; the existing remove path wraps its event as `undo: () => file(addEvent, key)`.
-  `ticket-sheet.tsx`: add `isDecision={state.typeId === DECISION_TYPE_ID}` to the mount (import the constant from `@gisik-nokma/domain`).
+  `ticket-sheet.tsx`: add `isDecision={state.typeId === DECISION_TYPE_ID}` to the mount (import the constant from `@gisik-nokma/domain`); the draft flag is already passed by Drafts T8.
   `ui.css`, inside the links block (tokens read in this file: `--gn-text-muted` `:87`, `--gn-surface-raised` `:243`, `--gn-radius-card` `:287`):
   ```css
   .gn-ticket-sheet__link-row { flex-wrap: wrap; }
@@ -1288,6 +1306,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | Case | Mutation | Expected red |
   |---|---|---|
   | 29.128 | file "Comes after" with `onOther: false` | stream assertion |
+  | 29.128 | send `leads_to` around Drafts T8's draft routing | the draft case files on `OTHER`'s stream |
   | 29.129 | build the Undo `link_added` without `l.label` | re-added payload lacks `label` |
   | 29.130 | `labelNeeded = false` | Decision add enabled |
   | 29.131 | swap the two events in the `ingest` array | order assertion |
@@ -1303,7 +1322,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 4: Built-ins `estimate`, `reworkEstimate`, `waitForAll` (the ES-1a census) (cases 29.153-29.166)
 
-**Branch:** `task/wtg2-estimate-fields` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T1 merged AND **its recorded prod result pasted in `HANDOFF-task-wtg2-preflight.md` with `shadowing custom fields: none`** (T1 Step 8). Step 0 below re-reads that file; if it is absent or lists a `ledger-definition` or `field-claim` line, STOP and ask the owner (a rename event cannot repair a historical definition that `ticketTypeDefSchema.parse` re-reads on every rebuild and replica bootstrap).
+**Branch:** `task/wtg2-estimate-fields` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T1 merged AND **its recorded prod result pasted in `HANDOFF-task-wtg2-preflight.md` with `shadowing custom fields: none`** (T1 Step 8). Step 0 below re-reads that file; if it is absent or lists a `ledger-definition` or `field-claim` line, STOP and ask the owner (a rename event cannot repair a historical definition that `ticketTypeDefSchema.parse` re-reads on every rebuild and replica bootstrap).
 
 **Files:**
 - Modify (domain): `packages/domain/src/ticket-types.ts:8` and after `:207`; `packages/domain/src/events/ticket-events.ts:149-152` (+ the `ticketFieldSetPayload` docblock `:195-198`); `packages/domain/src/ticket-state.ts:221-222`.
@@ -1706,7 +1725,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 5: The Decision type and `ticket.decided`: seed, event, fold of outcome and passes, census (cases 29.134-29.137, 29.356-29.358)
 
-**Branch:** `task/wtg2-decision` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T1 merged AND its recorded prod/dev result (no workspace holds a custom type with id `decision` at another rank, ES-3/Q3: a seed id that collides is adopted by DC-3, and its rank would be locked by `type.builtin-rank`); T2 merged (`DECISION_TYPE_ID` in `ticket-types.ts`, `linkLabelSchema` in `link-label.ts`, `TicketState.links`, the `links` column that makes the next two columns `$21`/`$22`). **Scope (contract decision 15):** type, event, fold, projection columns, census. The checks, the close rule and the sweep mirror are T6; the loop reset is T8 (this task leaves the named seam `releaseOutcome`).
+**Branch:** `task/wtg2-decision` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T1 merged AND its recorded prod/dev result (no workspace holds a custom type with id `decision` at another rank, ES-3/Q3: a seed id that collides is adopted by DC-3, and its rank would be locked by `type.builtin-rank`); T2 merged (`DECISION_TYPE_ID` in `ticket-types.ts`, `linkLabelSchema` in `link-label.ts`, `TicketState.links`, the `links` column that makes the next two columns `$21`/`$22`). **Scope (contract decision 15):** type, event, fold, projection columns, census. The checks, the close rule and the sweep mirror are T6; the loop reset is T8 (this task leaves the named seam `releaseOutcome`).
 
 **Files:**
 - Create: `apps/server/migrations/1792100100000_proj-tickets-decision.sql`; `packages/domain/test/decision-event.test.ts`; `apps/server/test/projections/tickets-decision.test.ts`; `packages/sync-client/test/replica-decision.test.ts`; `packages/app-core/test/views/decision-type-defaults.test.ts`.
@@ -2086,7 +2105,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 6: Decision rules: the engine checks, the close rule (DC-5), the client mirror and the auto-close sweep mirror (cases 29.138-29.142)
 
-**Branch:** `task/wtg2-decision-rules` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T5 merged (`ticket.decided`, `TicketState.outcome`, the `proj_tickets.outcome` column); T2 merged (`TicketState.links` with `label`, `normaliseLinkLabel`, `DECISION_TYPE_ID`, the `proj_tickets.links` jsonb column the sweep reads). **Independent of T8** (it carries the `branchNotTaken` parameter at its default; T8 Step 7 passes the real value once this task is on the tip).
+**Branch:** `task/wtg2-decision-rules` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T5 merged (`ticket.decided`, `TicketState.outcome`, the `proj_tickets.outcome` column); T2 merged (`TicketState.links` with `label`, `normaliseLinkLabel`, `DECISION_TYPE_ID`, the `proj_tickets.links` jsonb column the sweep reads). **Independent of T8** (it carries the `branchNotTaken` parameter at its default; T8 Step 7 passes the real value once this task is on the tip).
 
 **Files:**
 - Create: `packages/rule-engine/src/checks/decision.ts`; `packages/rule-engine/test/decision.test.ts`; `packages/app-core/test/precheck-decision.test.ts`; `apps/server/test/decision/decision-door.test.ts`.
@@ -2423,7 +2442,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 7: The Decision type in existing and new workspaces (the DC-3 backfill, founding, seed readers) (cases 29.143-29.144)
 
-**Branch:** `task/wtg2-decision-backfill` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T6 merged (the engine knows the Decision type) and T8 merged (`SYSTEM_ACTOR_FLOW`); T5 (the seed) and T2 (`DECISION_TYPE_ID`) come with them. T1's recorded prod result decides one thing here: if it lists an existing `decision` type, the backfill ADOPTS it (DC-3, open question 3) and this task changes nothing for that workspace.
+**Branch:** `task/wtg2-decision-backfill` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T6 merged (the engine knows the Decision type) and T8 merged (`SYSTEM_ACTOR_FLOW`); T5 (the seed) and T2 (`DECISION_TYPE_ID`) come with them. T1's recorded prod result decides one thing here: if it lists an existing `decision` type, the backfill ADOPTS it (DC-3, open question 3) and this task changes nothing for that workspace.
 
 **Files:**
 - Create: `apps/server/src/flow/decision-backfill.ts`; `apps/server/src/tools/backfill-decision-type.ts` (CLI); `apps/server/test/flow/decision-backfill.test.ts`; `packages/app-core/test/views/subtask-type-for.test.ts`.
@@ -2814,7 +2833,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 8: Flow causes, the flow actor, the forgery guard and the engine exemption (cases 29.200-29.209, 29.361-29.363)
 
-**Branch:** `task/wtg2-flow-causes` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T5 merged (`releaseOutcome`, `TicketState.outcome`). **Step 7 (the DC-5 exemption) needs T6 merged** (it passes `branchNotTaken` to `decisionOutcomeRequired`, which T6 adds with the parameter at its default); Steps 1-6 and 8 do not. If T6 is not yet on the tip when the executor reaches Step 7, stop after Step 6, push, and report `DONE (Step 7 waits for T6)`.
+**Branch:** `task/wtg2-flow-causes` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T5 merged (`releaseOutcome`, `TicketState.outcome`). **Step 7 (the DC-5 exemption) needs T6 merged** (it passes `branchNotTaken` to `decisionOutcomeRequired`, which T6 adds with the parameter at its default); Steps 1-6 and 8 do not. If T6 is not yet on the tip when the executor reaches Step 7, stop after Step 6, push, and report `DONE (Step 7 waits for T6)`.
 
 **Files:**
 - Create: `packages/domain/src/flow/causes.ts`; `packages/rule-engine/src/checks/flow-cause.ts`; `packages/domain/test/flow-causes.test.ts`; `packages/rule-engine/test/flow-cause.test.ts`; `apps/server/test/read/flow-cause-serving.test.ts`.
@@ -3154,7 +3173,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 9: Work periods, rounds, resolution, actual dates (cases 29.167-29.170, 29.350-29.355, 29.359-29.360)
 
-**Branch:** `task/wtg2-work-periods` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T8 merged (the `cause` union on `ticket.transitioned`, `ticket.closed` and `ticket.reopened`, `TicketState.closed.cause`, `isFlowCause` in `packages/domain/src/flow/causes.ts`). Independent of T2-T7. **Deploy step (owner, recorded in HANDOFF):** right after the migration runs, `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets` (the precedent is the 2026-09-22 priority change, `apps/server/src/tools/rebuild-projection.ts:6-11`); without it every pre-existing ticket has `periods = '[]'` and its next live fold would invent a zero-length period.
+**Branch:** `task/wtg2-work-periods` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T8 merged (the `cause` union on `ticket.transitioned`, `ticket.closed` and `ticket.reopened`, `TicketState.closed.cause`, `isFlowCause` in `packages/domain/src/flow/causes.ts`). Independent of T2-T7. **Deploy step (owner, recorded in HANDOFF):** right after the migration runs, `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets` (the precedent is the 2026-09-22 priority change, `apps/server/src/tools/rebuild-projection.ts:6-11`); without it every pre-existing ticket has `periods = '[]'` and its next live fold would invent a zero-length period.
 
 **Files:**
 - Create: `packages/domain/src/flow/derive.ts`, `packages/domain/src/flow/periods.ts`, `apps/server/migrations/1792100200000_proj-tickets-periods.sql`.
@@ -3546,7 +3565,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 10: Flow analysis: Start/End, back edges, order, the effective graph, `FlowNode` (cases 29.180-29.186)
 
-**Branch:** `task/wtg2-flow-analysis` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T2 (`normaliseLinkLabel`, `DECISION_TYPE_ID`), T4 (`claimedEstimate`, `claimedWaitForAll`), T5 (`TicketState.outcome`, `TicketState.passes`, `PassRecord`), T9 (`flow/derive.ts`, `TicketState.periods`, `TicketState.rounds`) and T8 (`TicketState.closed.cause`, which T9's `resolutionOf` reads) merged. This task is pure domain code: no server, no database, no clock.
+**Branch:** `task/wtg2-flow-analysis` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T2 (`normaliseLinkLabel`, `DECISION_TYPE_ID`), T4 (`claimedEstimate`, `claimedWaitForAll`), T5 (`TicketState.outcome`, `TicketState.passes`, `PassRecord`), T9 (`flow/derive.ts`, `TicketState.periods`, `TicketState.rounds`) and T8 (`TicketState.closed.cause`, which T9's `resolutionOf` reads) merged. This task is pure domain code: no server, no database, no clock.
 
 **Files:**
 - Create: `packages/domain/src/flow/types.ts`, `analysis.ts`, `graph.ts`, `node.ts`, `index.ts`; `packages/domain/test/flow/fixtures.ts`, `analysis.test.ts`, `graph.test.ts`, `node.test.ts`, `clock-free.test.ts`
@@ -4379,7 +4398,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 11: The planner `planFlow` (cases 29.190-29.199)
 
-**Branch:** `task/wtg2-planner` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T10 merged (`FlowNode`, `analyzeFlow`, `effectiveEdges`, `liveSet`, `forwardEdges`, `sameLabel`, `test/flow/fixtures.ts`) and, through it, T4 (estimates) and T9 (periods, rounds). Pure domain code.
+**Branch:** `task/wtg2-planner` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T10 merged (`FlowNode`, `analyzeFlow`, `effectiveEdges`, `liveSet`, `forwardEdges`, `sameLabel`, `test/flow/fixtures.ts`) and, through it, T4 (estimates) and T9 (periods, rounds). Pure domain code.
 
 **Files:**
 - Create: `packages/domain/src/flow/plan.ts`; `packages/domain/test/flow/plan.test.ts`
@@ -4960,7 +4979,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 12: The flow read: ring-by-ring walk, visibility, cap, drafts, route (cases 29.187-29.189)
 
-**Branch:** `task/wtg2-flow-read` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T10 (`FlowNode`, `FlowEdge`, `flowNodeOf`); typed-links T2/T3 (`proj_ticket_links`, the `ticket.link_added` projection) and wtg T2 (the `label` column and the `leads_to` kind); and the **Drafts tasks** that add (a) `listMyDrafts(db, userId, workspaceId)` in `apps/server/src/read/drafts.ts` (Drafts R55, the spec's need D-8), (b) `proj_tickets.draft_author_id` / `proj_visibility.draft_author_id` and the `draft_author_id IS NULL` clause inside `visibleTicketsWhere` and `LIVE_TICKET_WHERE` (R19, A3/A4), and (c) `ticket.created {draft: true}` and the `from` member of `ticket.link_added` (R42). **Do not stub any of these:** T12 cannot compile before (a) merges, and the draft cases are meaningless before (b) and (c). T13, T14 and T16 call `readFlow` and nothing else of this task.
+**Branch:** `task/wtg2-flow-read` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T10 (`FlowNode`, `FlowEdge`, `flowNodeOf`); typed-links T2/T3 (`proj_ticket_links`, the `ticket.link_added` projection) and wtg T2 (the `label` column and the `leads_to` kind); and the **Drafts tasks** that add (a) `listMyDrafts(db, userId, workspaceId)` in `apps/server/src/read/drafts.ts` (Drafts R55, the spec's need D-8), (b) `proj_tickets.draft_author_id` / `proj_visibility.draft_author_id` and the `draft_author_id IS NULL` clause inside `visibleTicketsWhere` and `LIVE_TICKET_WHERE` (R19, A3/A4), and (c) `ticket.created {draft: true}` and the `from` member of `ticket.link_added` (R42). **Do not stub any of these:** T12 cannot compile before (a) merges, and the draft cases are meaningless before (b) and (c). T13, T14 and T16 call `readFlow` and nothing else of this task.
 
 **Files:**
 - Create: `apps/server/src/flow/read-flow.ts`; `apps/server/src/routes/flow.ts`; `apps/server/test/flow/read-flow.test.ts`
@@ -4977,6 +4996,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 **Why the own-draft arm is separate from the visibility test (Drafts R17-R19).** After the Drafts tasks, `LIVE_TICKET_WHERE` and `visibleTicketsWhere` both AND `draft_author_id IS NULL`, even for the owner and in the constant-`TRUE` branch, so a draft can never pass them. The viewer's own drafts therefore come in through an OR arm: `t.ticket_id = ANY(<the ids listMyDrafts returned>) AND t.deleted_at IS NULL`. The ids come from the helper (R55) and not from `t.draft_author_id = viewer` because R18 says an author demoted to guest or removed from the project no longer reaches their drafts, and that rule lives in the helper. Draft-held links in both directions need no extra SQL: R42 stores them in `proj_ticket_links` as `source_id = from ?? entity id`, so the same link scan finds a draft as source and as target.
 
+**No edge to someone else's draft (planner ruling B, 2026-10-04).** The viewer-facing read follows the rule T2 pins for the links read (case 29.126, `ticket-links.test.ts`): a non-author never sees an edge whose end is someone else's draft, nor a count of it. It holds by construction: such a draft fails the admission test (the `draft_author_id IS NULL` clause of `visibleTicketsWhere` / `LIVE_TICKET_WHERE`, and it is not in the viewer's `listMyDrafts`), so it is never `seen`, `reached` never counts it, and the closing statement keeps only links with BOTH ends kept. Case 29.188 asserts it for the owner and another member; the author's read is the control.
+
 **Why `viewerId: null` skips the draft list but keeps `LIVE_TICKET_WHERE` (spec AP-3, cases 29.188).** The system read (promoter, settler, sweep) must not ask who is looking: a hidden source still counts (spec line "a hidden source still counts (the rule ignores visibility)"). But a trashed source "is not in I(T)" and nobody else's draft may be promoted or settled (Drafts R6-R9), so liveness and the draft clause stay. `listMyDrafts` is not called for `null` (there is no user whose drafts they are).
 
 **Why the 31st ring is queried and `reached` is a count of what the walk admitted.** `truncated` must be true when more tickets exist than the answer holds, and a flow whose 31st ring is empty must NOT be marked truncated. So after ring 30 the walk asks the ring statement once more and sets `truncated` only when it returns rows, without adding them. `reached` is the number of tickets admitted before the walk stopped (it stops after the ring in which the count first passes `cap`), which is what the surfaces print as "Showing 300 of the first N reached" (FL-2). The `nodes` are the first `cap` in walk order: the seed, then ring by ring, ascending id inside a ring.
@@ -4987,7 +5008,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   Under `<!-- wtg-part2-model T12 -->`, all ❌:
   - `- ❌ **29.187 — a hidden ticket is a hole: the flow read returns no node, no edge, no placeholder and no count for it, does not walk through it (a readable ticket behind it is reached only from its own side), and the route answers a hidden seed with the same 404 as a missing one;** control: the owner, who can read the middle ticket, gets the whole chain with its label, and opens the hidden seed with a 200. Mutation: skip the visibility test in the ring statement, or count the hole in reached → the member's read contains the hidden ticket or reports 2.`
-  - `- ❌ **29.188 — the viewer's own draft joins the flow as the source AND as the target of a link, nobody else's does (the owner and the system read see a hole), a deleted ticket and a blocks-only neighbour are not in the flow although their links exist, and viewerId null ignores visibility but never reads a draft;** control: the author's read of the same flow has all three tickets with the draft flagged, and the system read of the chain still includes the ticket only the owner can read. Mutation: read the author's drafts for a null viewer, drop LIVE_TICKET_WHERE from the ring statement, or let a blocks link extend the walk → the draft, the deleted ticket or the neighbour appears.`
+  - `- ❌ **29.188 — the viewer's own draft joins the flow as the source AND as the target of a link, nobody else's does (the owner and the system read see a hole), a deleted ticket and a blocks-only neighbour are not in the flow although their links exist, and viewerId null ignores visibility but never reads a draft; a non-author's read never shows an edge whose end is someone else's draft, nor counts it in `reached` (planner ruling B, the same rule as T2's links read, case 29.126);** control: the author's read of the same flow has all three tickets with the draft flagged, and the system read of the chain still includes the ticket only the owner can read. Mutation: read the author's drafts for a null viewer, drop LIVE_TICKET_WHERE from the ring statement, or let a blocks link extend the walk → the draft, the deleted ticket or the neighbour appears.`
   - `- ❌ **29.189 — the walk goes at most 30 rings out (a 31st that is not empty sets truncated, an empty one does not), past the cap the first cap tickets in ring order are returned with reached counting the ring and no edge to a cut ticket, and the route's wire carries titles, state names, the node, leads_to with its label and blocks between members, and no key for a draft;** control: the same chain seeded in the middle reads all 33 tickets untruncated, and a cap of 6 reads the whole six-ticket star. Mutation: walk a 32nd ring, count reached after the cut, or keep edges whose other end was cut → the chain, the cap or the edge row fails.`
 
   Commit: `wtg2 T12: case lines for the flow read`.
@@ -5154,6 +5175,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
       const owner = await readFlow(db.pool, { workspaceId: WS, seedId: FA, viewerId: OWNER });
       expect(nodeIds(owner)).toEqual([FA]);
       expect(owner.edges).toEqual([]);
+      expect(owner.reached).toBe(1); // ruling B: no edge to someone else's draft and no count of it (T2's 29.126 is the links-read twin)
       expect((await readFlow(db.pool, { workspaceId: WS, seedId: FD, viewerId: OWNER })).nodes).toEqual([]);
       // the system read (viewerId null: the promoter, the settler, the sweep) ignores visibility but never reads a draft
       expect(nodeIds(await readFlow(db.pool, { workspaceId: WS, seedId: FA, viewerId: null }))).toEqual([FA]);
@@ -5550,7 +5572,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 13: Auto-promotion: `promotionsFor`, the promoter listener (cases 29.210-29.221)
 
-**Branch:** `task/wtg2-promotion` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T8 (flow causes, `SYSTEM_ACTOR_FLOW`, `isFlowCause`), T10 (`FlowNode`, `analyzeFlow`, `effectiveEdges`, `sameLabel`), T12 (`readFlow`), T2/T5/T9 transitively (the `leads_to` kind and `proj_ticket_links`, `ticket.decided`, `closed_cause`); Drafts (spec `2026-10-03-drafts-design.md` R55: a committed `ticket.published` event; R39: promotion skips drafts). There is no Drafts plan on any tip yet, so the one Drafts-dependent arm (AP-4's "a draft published") is tested with a hand-built `ticket.published` envelope, and the executor re-reads the Drafts plan's event name before merging.
+**Branch:** `task/wtg2-promotion` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T8 (flow causes, `SYSTEM_ACTOR_FLOW`, `isFlowCause`), T10 (`FlowNode`, `analyzeFlow`, `effectiveEdges`, `sameLabel`), T12 (`readFlow`), T2/T5/T9 transitively (the `leads_to` kind and `proj_ticket_links`, `ticket.decided`, `closed_cause`); Drafts (spec `2026-10-03-drafts-design.md` R55: a committed `ticket.published` event; R39: promotion skips drafts). There is no Drafts plan on any tip yet, so the one Drafts-dependent arm (AP-4's "a draft published") is tested with a hand-built `ticket.published` envelope, and the executor re-reads the Drafts plan's event name before merging.
 
 **Files:**
 - Create: `packages/domain/src/flow/promotion.ts`; `packages/domain/test/flow-promotion.test.ts`; `apps/server/src/flow/promote.ts`; `apps/server/test/flow/flow-world.ts` (the shared test world; T14, T16 import it); `apps/server/test/flow/promote.test.ts`; `packages/rule-engine/test/led-to-promotion.test.ts`
@@ -6071,7 +6093,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 14: The reconciling flow sweep and the daemon wiring (cases 29.222-29.229)
 
-**Branch:** `task/wtg2-flow-sweep` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T13 (`promoteTargets`, `FlowIngest`, `flow-world.ts`).
+**Branch:** `task/wtg2-flow-sweep` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T13 (`promoteTargets`, `FlowIngest`, `flow-world.ts`).
 
 **Files:**
 - Create: `apps/server/src/flow/sweep.ts`; `apps/server/src/ops/daemon-listeners.ts`; `apps/server/test/flow/sweep.test.ts`; `apps/server/test/ops/daemon-listeners.test.ts`
@@ -6283,7 +6305,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 15: `planSettle`, pure (cases 29.364-29.367)
 
-**Branch:** `task/wtg2-plan-settle` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T5 (Decision type, `outcome`, `passes`), T8 (`flowCauseSchema`, `FlowCause`, `SYSTEM_ACTOR_FLOW`, the `cause` members on `ticket.transitioned` / `ticket.closed` / `ticket.reopened`), T9 (`periods`, `rounds`, `closed.cause`) and T10 (`FlowNode`, `analyzeFlow`, `liveSet`, `loopBody`, `branchOf`, `sameLabel`, `test/flow/fixtures.ts`) merged. Pure domain code: no server, no database, no clock. T16 files the events this task builds.
+**Branch:** `task/wtg2-plan-settle` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T5 (Decision type, `outcome`, `passes`), T8 (`flowCauseSchema`, `FlowCause`, `SYSTEM_ACTOR_FLOW`, the `cause` members on `ticket.transitioned` / `ticket.closed` / `ticket.reopened`), T9 (`periods`, `rounds`, `closed.cause`) and T10 (`FlowNode`, `analyzeFlow`, `liveSet`, `loopBody`, `branchOf`, `sameLabel`, `test/flow/fixtures.ts`) merged. Pure domain code: no server, no database, no clock. T16 files the events this task builds.
 
 **Files:**
 - Create: `packages/domain/src/flow/settle.ts`; `packages/domain/test/flow/settle.test.ts`
@@ -6891,7 +6913,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 16: The settle listener, the two server gates, the sweep's settle half (cases 29.368-29.370)
 
-**Branch:** `task/wtg2-settle-server` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T15 (`planSettle`, `settleEvents`), T13 (`flow-world.ts`, the promoter), T14 (`sweep.ts` with the `settleHalf` seam), T12 (`readFlow`), T8 (`SYSTEM_ACTOR_FLOW`, `flowCauseSchema`) and **Drafts T5b, which adds `ingestAtomic(rawEvents: unknown[]): Promise<AtomicOutcome>` on `IngestService` (Drafts R47, case 28.099; `AtomicOutcome = { status: 'committed'; results: IngestResult[] } | { status: 'rolled-back'; index: number; result: IngestResult }`, exported from `apps/server/src/ingest/ingest-service.ts`)**. `ingestAtomic` is not on the tip (`grep -rn ingestAtomic apps/server/src` returns nothing at `160ac75c`); if that task is not merged this task does not start (contract decision 11).
+**Branch:** `task/wtg2-settle-server` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T15 (`planSettle`, `settleEvents`), T13 (`flow-world.ts`, the promoter), T14 (`sweep.ts` with the `settleHalf` seam), T12 (`readFlow`), T8 (`SYSTEM_ACTOR_FLOW`, `flowCauseSchema`) and **Drafts T5b, which adds `ingestAtomic(rawEvents: unknown[]): Promise<AtomicOutcome>` on `IngestService` (Drafts R47, case 28.099; `AtomicOutcome = { status: 'committed'; results: IngestResult[] } | { status: 'rolled-back'; index: number; result: IngestResult }`, exported from `apps/server/src/ingest/ingest-service.ts`)**. `ingestAtomic` is not on the tip (`grep -rn ingestAtomic apps/server/src` returns nothing at `160ac75c`); if that task is not merged this task does not start (contract decision 11).
 
 **Files:**
 - Create: `apps/server/src/flow/settle.ts`; `apps/server/src/gates/decision-gates.ts`; `apps/server/test/flow/settle.test.ts`; `apps/server/test/gates/decision-gates.test.ts`
@@ -7217,7 +7239,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 17: History rounds and flow sentences; "Not taken is closed, never done" in every reader (cases 29.371-29.374)
 
-**Branch:** `task/wtg2-history-readers` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T5 (`ticket.decided`, `Decision` seed), T8 (`flowCauseSchema`, `isFlowCause`, `closed.cause`, the causes on three payloads), T9 (`notTakenOf`, `proj_tickets.closed_cause`, `rounds`), and typed-links T4 (the `linkTarget` History annotation this task copies). No migration, no new event type: the 3.183 census count is unchanged by this task.
+**Branch:** `task/wtg2-history-readers` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T5 (`ticket.decided`, `Decision` seed), T8 (`flowCauseSchema`, `isFlowCause`, `closed.cause`, the causes on three payloads), T9 (`notTakenOf`, `proj_tickets.closed_cause`, `rounds`), and typed-links T4 (the `linkTarget` History annotation this task copies). No migration, no new event type: the 3.183 census count is unchanged by this task.
 
 **Files:**
 - Create: `apps/server/src/read/history-causes.ts`; `apps/server/test/routes/ticket-history-causes.test.ts`.
@@ -7688,7 +7710,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 18: Notifications `flow-ready` and `flow-reopened` (cases 29.390-29.399)
 
-**Branch:** `task/wtg2-notifications` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** T8 (`flowCauseSchema`, `SYSTEM_ACTOR_FLOW`), T13 (the `led-to` promotion this announces; `flow-world.ts`), T14 (the daemon fan-out, for the daemon-path case 29.392(c)). The cascade that produces `reopened-by-flow` (T16) is NOT needed: the tests file the transition directly.
+**Branch:** `task/wtg2-notifications` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** T8 (`flowCauseSchema`, `SYSTEM_ACTOR_FLOW`), T13 (the `led-to` promotion this announces; `flow-world.ts`), T14 (the daemon fan-out, for the daemon-path case 29.392(c)). The cascade that produces `reopened-by-flow` (T16) is NOT needed: the tests file the transition directly.
 
 **Files:**
 - Create: `apps/server/migrations/1792100300000_notification-kinds-flow.sql`; `apps/server/test/notifications/flow-fanout.test.ts`
@@ -7697,12 +7719,14 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 - Catalogue: `test-cases/29-workflow-timeline-graphs.md` under `<!-- wtg-part2-model T18 -->`; `Features.md` §26 under `<!-- wtg-part2-model T18 bullet -->`
 
 **Interfaces:**
-- **Consumes:** `flowCauseSchema` / `FlowCause` (T8: `led-to {sourceTicketId, label?, triggeredBy}`, `reopened-by-flow {decisionTicketId, outcome, pass, decidedBy, decisionEventId}`); `BACKLOG_STATE_ID`; `getTicketStateFromDb` (`projections/tickets.ts:245`); `canSeeTicket: CanSeeFn` already in the fan-out deps; `titleOf` (fan-out local, `:~107`); `registerDaemonListeners` (T14); `runFlowSweep` (T14).
+- **Consumes:** `flowCauseSchema` / `FlowCause` (T8: `led-to {sourceTicketId, label?, triggeredBy}`, `reopened-by-flow {decisionTicketId, outcome, pass, decidedBy, decisionEventId}`); `BACKLOG_STATE_ID`; `getTicketStateFromDb` (`projections/tickets.ts:245`); `canSeeTicket: CanSeeFn` already in the fan-out deps; `titleOf` (fan-out local, `:~107`); `registerDaemonListeners` (T14); `runFlowSweep` (T14). Drafts T1/T3 `TicketState.draft` (ABSENT on every non-draft, `2026-10-03-drafts.md:40`; rebuilt from `proj_tickets.draft_author_id` by `rowToTicketState`, Drafts T3 `:1535`).
 - **Produces:** `NOTIFICATION_KINDS` with `'flow-ready'` and `'flow-reopened'` appended; `flowReadyNotificationPayloadSchema`, `flowReopenedNotificationPayloadSchema` and their types; the migration; two rendered kinds.
 
 **Why this is a payload with titles, not keys (NT-2 meets the code).** The spec's sentences name keys ("Ready to start: PRJ-12 was closed"), but no inbox path resolves a key: every existing payload carries `ticketTitle` and nothing else (`notifications.ts:62-72`), and `format.ts` has no ticket lookup. A key resolver is a read path of its own, so the rows render titles (`becauseTitle`, `decisionTitle`), the same way an assignment does. FINDING for the owner: if keys are wanted in the inbox it is a separate change that touches every kind.
 
 **Why visibility is decided once, at delivery, and stored as null (NT-1).** The spec says "stored but redacted on read". `notifications/store.ts:12-16` and `fanout.ts:23` rule the opposite: the decision is made ONCE at delivery and a row is never redacted on read (a letter delivered is the recipient's). The two are reconciled the only way both hold: when the recipient cannot see the SOURCE ticket (`flow-ready`) or the DECISION (`flow-reopened`), the fan-out writes `null` into those members at delivery. Hence the nullable members in the schemas below, and a hidden step reads "a step you can't see" in the inbox.
+
+**Why the flow arms test for a draft (owner ruling O2, 2026-10-04: "there should not be any notification till the ticket is published").** No notification of any kind is produced by or about a draft. `canSeeTicket` alone does not give that: a draft IS visible to its author, so the author's own draft, moved by the flow, would tell them, and a published ticket moved because of a draft source or a draft Decision would name a step that is not yet a ticket. Both arms therefore return before the recipient is chosen when the moved ticket, the `led-to` source or the `reopened-by-flow` Decision has `draft` in its state (a discarded draft keeps `draft` with `discarded: true`, so it is covered). By construction the promoter and the settler never move a draft or act for one (T12's system read never reads a draft and drops its links, 29.188), so the guard is the second line, pinned by 29.396's draft clause. Assignment and mention on a draft are the Drafts plan's (28.094: drafting events notify nobody; the notices are sent at publish).
 
 **Why `flow-reopened` is keyed on the transition and skips the Decision itself (NT-4).** A cascade files a `ticket.transitioned` (with `cause: reopened-by-flow`) and a paired `ticket.reopened` for the same ticket. Keying on the transition gives one row per moved ticket; the paired event is a no-op arm. When the moved ticket IS the cause's Decision (its own reset, PS-2) nobody is told: the person chose, and the Decision's assignee is told by the choice, not by the reset.
 
@@ -7715,7 +7739,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - `- ❌ **29.393 — flow-ready addresses nobody for an unassigned target, for the person who triggered it, or for an assignee who cannot see the target, and an assignee who cannot see the SOURCE gets the row with becauseTicketId, becauseTitle and label null;** control: a visible source carries all three. Mutation: skip the source visibility test → the hidden title is stored.`
   - `- ❌ **29.394 — each ticket moved by reopened-by-flow notifies its own assignee once ("flow-reopened", key flow-reopened:<transition id>) with decision title, outcome, pass and toBacklog taken from the cause and the destination;** control: two moved tickets give two rows to two assignees, one each. Mutation: key on the Decision event → the second moved ticket of one assignee is swallowed by the dedupe key.`
   - `- ❌ **29.395 — flow-reopened skips the Decision's own reset (NT-4), the person who made the choice, an unassigned ticket and an assignee who cannot see the ticket, and a recipient who cannot see the Decision gets decisionTicketId, decisionTitle and outcome null;** control: a visible Decision names itself. Mutation: drop the own-reset skip → the chooser's own reset notifies.`
-  - `- ❌ **29.396 — the events that make no notification: a branch-not-taken transition, a branch-not-taken close, ticket.decided, the paired ticket.reopened, and a plain person transition;** control: the same ticket's led-to transition does notify. Mutation: add an arm for ticket.reopened → the pair double-notifies.`
+  - `- ❌ **29.396 — the events that make no notification: a branch-not-taken transition, a branch-not-taken close, ticket.decided, the paired ticket.reopened, and a plain person transition; and nothing is produced by or about a DRAFT (owner ruling O2, 2026-10-04): a led-to or reopened-by-flow move whose moved ticket, source or Decision is a draft notifies nobody, its own author included, and the flow's notices start only after publish;** control: the same ticket's led-to transition does notify, and the same draft flow, once every member is published, gives one flow-ready and one flow-reopened row (same `it()`). Mutation: add an arm for ticket.reopened → the pair double-notifies; drop the moved-ticket draft guard → the draft-only flow notifies its author; drop the source/Decision draft guard → a published ticket moved by a draft step notifies.`
   - `- ❌ **29.397 — the preferences list shows a switch per kind (seven), muting a new kind hides its rows from the inbox list and the unread count, and a person with no preferences row receives both;** control: muting mention leaves a flow-ready row visible. Mutation: drop the kind from LABELS' source list → the switch count is five.`
   - `- ❌ **29.398 — the inbox renders every new row: the headline for visible, hidden, chose and toBacklog shapes, the body (the moved ticket's title), the open target (the moved ticket), and two icons distinct from each other and from the five older ones;** control: the five older headlines are unchanged. Mutation: reuse the assignment glyph for flow-ready → the distinct-icons case fails.`
   - `- ❌ **29.399 — the notification-kind census: every kind in NOTIFICATION_KINDS has a payload schema, is accepted by both database CHECKs, has a headline, body, icon and label, and a planted eighth kind is reported by each check;** control: the planted kind is reported. Mutation: remove the kind from one CHECK → the census names it.`
@@ -7839,7 +7863,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 - [ ] **Step 4: RED, the fan-out (29.392-29.396)**
 
-  `apps/server/test/notifications/flow-fanout.test.ts`. Copy the harness of `fanout.test.ts` (`:1-150`: the imports, `db`, `visible`, `canSeeTicket`, `fanout()`, `recordingTransport`, `rowsFor`) with these differences: **valid ULIDs** (the existing `KIRO = '01J9GUKR…'` contains `U`, which `ULID_REGEX` refuses, and `flowCauseSchema` parses ids): `const PERSON = '01J9GPRS000000000000000000'; const ASSIGNEE = '01J9GASN000000000000000000'; const OTHER = '01J9GOTH000000000000000000'; const SRC = '01J9GSRC000000000000000000'; const T1 = '01J9GTK1000000000000000000'; const T2 = '01J9GTK2000000000000000000'; const DEC = '01J9GDEC000000000000000000';` and a `seedTicket(ticketId, assigneeId, title, typeId = 'task')` whose INSERT is the copied one with `$6` for `type_id`. A helper builds the events with the real envelope maker:
+  `apps/server/test/notifications/flow-fanout.test.ts`. Copy the harness of `fanout.test.ts` (`:1-150`: the imports, `db`, `visible`, `canSeeTicket`, `fanout()`, `recordingTransport`, `rowsFor`) with these differences: **valid ULIDs** (the existing `KIRO = '01J9GUKR…'` contains `U`, which `ULID_REGEX` refuses, and `flowCauseSchema` parses ids): `const PERSON = '01J9GPRS000000000000000000'; const ASSIGNEE = '01J9GASN000000000000000000'; const OTHER = '01J9GOTH000000000000000000'; const SRC = '01J9GSRC000000000000000000'; const T1 = '01J9GTK1000000000000000000'; const T2 = '01J9GTK2000000000000000000'; const DEC = '01J9GDEC000000000000000000';` and a `seedTicket(ticketId, assigneeId, title, typeId = 'task', draftAuthorId: string | null = null)` whose INSERT is the copied one with `$6` for `type_id`, `$7` for `draft_author_id` and `draft_at = CASE WHEN $7 IS NULL THEN NULL ELSE now() END` (the Drafts T2 columns, `2026-10-03-drafts.md:1138-1149`; Drafts T3's `rowToTicketState` turns a non-null author into `TicketState.draft`, `2026-10-03-drafts.md:1532`, and leaves `draft` ABSENT otherwise, `:38`), plus `publishRow(ticketId)`: `UPDATE proj_tickets SET draft_author_id = NULL, draft_at = NULL WHERE ticket_id = $1`, which is what the `ticket.published` projection does to the row (Drafts 28.045). A helper builds the events with the real envelope maker:
   ```ts
   const cause = {
     led: (over = {}) => ({ kind: 'led-to', sourceTicketId: SRC, triggeredBy: PERSON, ...over }),
@@ -7854,6 +7878,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   - **29.394:** `seedTicket(T1, ASSIGNEE, 'Write the copy')`, `seedTicket(T2, OTHER, 'Review the copy')`, `seedTicket(DEC, null, 'Ship or redo', 'decision')`; `visible` for both assignees on their ticket and on `DEC`. `const a = moved(T1, 'todo', cause.reopened()); const b = moved(T2, 'backlog', cause.reopened({ decisionEventId: a.payload.cause.decisionEventId }))` (the SAME decision event): `onCommitted(a)`, `onCommitted(b)`. `rowsFor(ASSIGNEE)` has one row `payload: { ticketId: T1, ticketTitle: 'Write the copy', decisionTicketId: DEC, decisionTitle: 'Ship or redo', outcome: 'Redo', pass: 2, toBacklog: false, eventId: a.id, ... }`, `dedupe_key` `flow-reopened:${a.id}`; `rowsFor(OTHER)` has one row with `toBacklog: true`. (Different keys although the Decision event is the same; this is the mutation's red.)
   - **29.395:** moving `DEC` itself with `cause.reopened()` (`moved(DEC, 'todo', ...)`, `DEC` assigned to `ASSIGNEE`) → nothing for anyone (NT-4). `decidedBy: ASSIGNEE` on a move of `T1` → empty (the chooser is not told). Unassigned → empty. Assignee without `T1` visibility → empty. Assignee who sees `T1` but not `DEC` → one row with `decisionTicketId: null, decisionTitle: null, outcome: null` and `pass: 2` (serialise: it contains neither `'Ship or redo'` nor `'Redo'`). Control: with `DEC` visible the three are present.
   - **29.396:** with a visible assignee on `T1`, none of these produce a row: `moved(T1, 'done', cause.notTaken())` (a transition carrying `branch-not-taken`); `makeEnvelope({ type: 'ticket.closed', ..., payload: { cause: cause.notTaken() } })`; `ticket.decided` (`payload: { outcome: 'Redo' }`); `ticket.reopened` (`payload: { cause: cause.reopened() }`); a person's plain `ticket.transitioned` (`payload: { to: 'doing' }`) and one carrying the existing `reopened-for-child` cause. Control: `moved(T1, 'todo', cause.led())` gives one row.
+  - **29.396, the draft clause (owner ruling O2: "there should not be any notification till the ticket is published"),** one `it('29.396 a draft flow notifies nobody, its author included; once published the same moves notify')`: `visible` gets `ASSIGNEE` on `T1`, `SRC` and `DEC` (so only the new guards can stop a row); `seedTicket(T1, ASSIGNEE, 'Write the copy', 'task', ASSIGNEE)` (the assignee's OWN draft, the one person `canSee` would let through), `seedTicket(SRC, null, 'Draft the brief', 'task', ASSIGNEE)`, `seedTicket(DEC, null, 'Ship or redo', 'decision', ASSIGNEE)`. `onCommitted(moved(T1, 'todo', cause.led()))` and `onCommitted(moved(T1, 'backlog', cause.reopened()))` → `rowsFor(ASSIGNEE)` is `[]`. Then `publishRow(T1)` only, and the same two moves (new envelopes) → still `[]` (the moved ticket is published but its source and Decision are drafts). CONTROL, same `it()`: `publishRow(SRC); publishRow(DEC)` and the same two moves → `rowsFor(ASSIGNEE).map((row) => row.kind).sort()` is `['flow-ready', 'flow-reopened']`.
 
   Run: `slot-run.sh wtg2-t18c -- pnpm --filter @gisik-nokma/server exec vitest run test/notifications/flow-fanout.test.ts --maxWorkers=2 > /tmp/wtg2-t18c.log 2>&1; tail -40 /tmp/wtg2-t18c.log`. Expected: FAIL (no arm; no rows).
 
@@ -7861,9 +7886,17 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
   `fanout.ts`: add `import { BACKLOG_STATE_ID, flowCauseSchema, type FlowCause } from '@gisik-nokma/domain';` to the existing domain import. Beside `handleAssigned`:
   ```ts
+  /** A draft (or a discarded one, whose `draft` stays with `discarded: true`) is not a ticket to anyone but its author, and makes no notice (O2). */
+  async function isDraft(workspaceId: string, ticketId: string): Promise<boolean> {
+    return (await getTicketStateFromDb(deps.pool, workspaceId, ticketId))?.draft !== undefined;
+  }
+
   /** `led-to`: the target is ready (NT-1). The assignee, unless nobody is, or it is the person whose finish triggered this. */
   async function handleFlowReady(env: EventEnvelope, cause: Extract<FlowCause, { kind: 'led-to' }>): Promise<void> {
     const ticket = await getTicketStateFromDb(deps.pool, env.workspaceId, env.entity.id);
+    // O2 (owner, 2026-10-04): nothing is produced by or about a draft, not even for its author; the flow's
+    // notices start after publish. `draft` is ABSENT on every non-draft (Drafts T1/T3).
+    if (ticket?.draft !== undefined || (await isDraft(env.workspaceId, cause.sourceTicketId))) return;
     const assigneeId = ticket?.assigneeId ?? null;
     if (assigneeId === null || assigneeId === cause.triggeredBy) return;
     if (!(await canSeeTicket(deps.pool, assigneeId, env.entity.id))) return;
@@ -7889,6 +7922,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   async function handleFlowReopened(env: EventEnvelope, cause: Extract<FlowCause, { kind: 'reopened-by-flow' }>, to: unknown): Promise<void> {
     if (cause.decisionTicketId === env.entity.id) return; // NT-4: a Decision's own reset tells nobody
     const ticket = await getTicketStateFromDb(deps.pool, env.workspaceId, env.entity.id);
+    if (ticket?.draft !== undefined || (await isDraft(env.workspaceId, cause.decisionTicketId))) return; // O2, as handleFlowReady
     const assigneeId = ticket?.assigneeId ?? null;
     if (assigneeId === null || assigneeId === cause.decidedBy) return;
     if (!(await canSeeTicket(deps.pool, assigneeId, env.entity.id))) return;
@@ -8033,6 +8067,8 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
   | 29.394 | key on `cause.decisionEventId` | `rowsFor(OTHER)` is empty |
   | 29.395 | drop the `decisionTicketId === env.entity.id` return | the Decision's own reset notifies |
   | 29.396 | add `ticket.reopened` to the arm | the paired reopen double-notifies |
+  | 29.396 | drop `ticket?.draft !== undefined` in both handlers | the draft-only flow notifies its author |
+  | 29.396 | drop the `isDraft(source / decision)` half | a published ticket moved by a draft step notifies |
   | 29.398 | reuse the `assignment` paths for `flow-ready` | the distinct-interiors case fails |
   | 29.399 | drop `'flow-reopened'` from the Up's `muted_kinds` CHECK | the census names it |
 
@@ -8042,7 +8078,7 @@ One row per file; the rightmost column lists the tasks that touch it, in landing
 
 ### Task 19: The Part 2 vocabulary census (cross-check) and the closing sweep (cases 29.145-29.146)
 
-**Branch:** `task/wtg2-census` from `origin/release/<next>`; PR `--base release/<next>`. **Needs:** every other task of this plan merged (T1-T18). This task adds NO production code: it is the cross-check spec §8.4 asks for ("the plan's last Part-2 task greps the registry against each"), a catalogue guard, and the sweep that must pass before the release PR. Each earlier task already updated the rows for its own additions (contract, "Census timing"); this test fails if any of them regressed or if one was never added.
+**Branch:** `task/wtg2-census` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. **Needs:** every other task of this plan merged (T1-T18). This task adds NO production code: it is the cross-check spec §8.4 asks for ("the plan's last Part-2 task greps the registry against each"), a catalogue guard, and the sweep that must pass before the release PR. Each earlier task already updated the rows for its own additions (contract, "Census timing"); this test fails if any of them regressed or if one was never added.
 
 **Files:**
 - Create: `apps/server/test/census/wtg-part2-census.test.ts` (header and fixtures copy `apps/server/test/census/ticket-vocabulary-census.test.ts:1-30` for the registry imports; `createTestDatabase` as `apps/server/test/helpers/db.ts:31`; `REPO_ROOT` and the file-reading style as `apps/server/test/ci/ci-trigger.test.ts:13`); `apps/server/test/tooling/wtg-part2-catalogue.test.ts` (same `REPO_ROOT` pattern as `tooling/check-runbook-commands.test.ts:19`).
@@ -8386,7 +8422,7 @@ No gaps. DC-6 and PS-7 are display and belong to the later Parts.
 
 ## Execution handoff
 
-Execution: the gisik-nokma lanes (one task = one session), per the planner. Each lane dispatches from the ledger, with reviewers and `ctl gate <sha> --base release/<next>`, landing into `release/<next>`.
+Execution: the gisik-nokma lanes (one task = one session), per the planner. Each lane dispatches from the ledger, with reviewers and `ctl gate <sha> --base release/workflow-graph`, landing into `release/workflow-graph`.
 - **Order:** the waves under Parallelism.
 - **Pointers:** T3 and T18 name `frontend-design` and carry `NEEDS: browser` on the primary stack. T1 carries the owner's prod step.
 - I recommend **subagent-driven**: nineteen tasks with hard interface hand-offs (T8's causes feed T9, T13, T15, T17, T18; T10's `FlowNode` feeds T11 to T16), a reducer change that rewrites periods retroactively (T9), and a shipped mistake in the cascade moves people's tickets.

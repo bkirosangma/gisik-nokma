@@ -1,5 +1,7 @@
 # Workflow and Timeline graphs, Part 1: the viewport engine, packing and the continuous Timeline view Implementation Plan
 
+> **Release branch (owner, 2026-10-04):** `release/workflow-graph`, cut from `origin/release/knowledge-graph` at f9e0cd18. Every task branch is cut from `origin/release/workflow-graph` and every PR goes `--base release/workflow-graph`. The Knowledge Graph release merges to `main` first; `main` is then merged INTO `release/workflow-graph`, never rebased.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE.
 
 **Goal:** the existing project Timeline stops being a paged, eight-week grid and becomes one continuous, packed canvas that pans, glides and zooms smoothly, on a new shared engine (`packages/viewport`) that Parts 3 to 5 reuse, measured first in a real browser against the spec's pan bars.
@@ -17,7 +19,7 @@
 
 | Needs | Why | Status |
 |---|---|---|
-| The Knowledge Graph release shipped and a new release branch cut (`release/<next>`) | one release branch at a time; Part 1 ships FIRST and ALONE on the next one | the planner fills `<next>` when it is cut |
+| The Knowledge Graph release shipped and a new release branch cut (`release/workflow-graph`) | one release branch at a time; Part 1 ships FIRST and ALONE on the next one | cut 2026-10-04 from KG f9e0cd18 (owner) |
 | Nothing else | Part 1 needs neither Drafts nor `leads_to`; it builds no route and no event | |
 
 | Is needed by | What it takes from this plan |
@@ -32,7 +34,7 @@
 ## Global Constraints
 
 **Release and identity**
-- **Release:** `release/<next>` is a literal until the planner cuts it (one release branch at a time; never a second). Every task branch is `task/wtg1-<slug>` cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`.
+- **Release:** `release/workflow-graph` is a literal until the planner cuts it (one release branch at a time; never a second). Every task branch is `task/wtg1-<slug>` cut from `origin/release/workflow-graph`, and its PR has `--base release/workflow-graph`. Never `main`.
 - **Catalogue:** Features.md §26 "Workflow and Timeline graphs" ↔ `test-cases/29-workflow-timeline-graphs.md` (the bucket number is 29, the Features number is 26; §25 and file 28 are Drafts'). T1 creates both, with the block table of spec 16.1, one anchor per task for Part 1 (T1..T13), and ONE Part anchor for each of Parts 2 to 5 in each file (`<!-- wtg-part2-model -->`, `<!-- wtg-part3-workflow-graph -->`, `<!-- WTG4 -->`, `<!-- wtg-part5-mcp -->` in file 29; the same names with ` bullets` in Features §26). The first task of each later Part writes its sub-heading and its own per-task anchors below its Part anchor, so parallel tasks never append to the same line and this plan never guesses another Part's task list. This plan owns `29.001`–`29.119`: T1 `29.001–29.007`, `29.014`, `29.016` · T2 `29.008–29.013`, `29.015` · T3 `29.020–29.025` · T4 `29.050–29.054` · T5 `29.065–29.067` · T6 `29.030–29.036`, `29.039` · T7 `29.037`, `29.038`, `29.045–29.049` · T8 `29.080–29.086` · T9 `29.093–29.107` · T10 `29.040–29.044` · T11 `29.108–29.112` · T12 `29.113–29.117` · T13 `29.118`, `29.119`. Unused ids in the block (`29.017–29.019`, `29.026–29.029`, `29.055–29.064`, `29.068–29.079`, `29.087–29.092`) stay free for follow-ups.
 - **Case lines are id lines:** `- ❌ **29.001 — …**`. Each starts ❌ and flips ✅ in the same commit as its test (🧪 for a manual record, 🚫 for a retired pin with its reason). Test names or comments carry the id. `pnpm check:citations` must pass.
 - **Before allocating,** re-grep every live tip: `for b in $(git for-each-ref refs/remotes/origin --format='%(refname:short)'); do git grep -qE '^## 2[56]\. ' "$b" -- Features.md && echo "FEAT $b"; git ls-tree --name-only "$b" test-cases/ | grep -qE 'test-cases/(28|29)-' && echo "FILE $b"; done`. On 2026-10-03 none of 877 refs printed anything. If Drafts landed first, §25 and `28-drafts.md` exist: put §26 after §25 and keep 29.
@@ -120,7 +122,7 @@
 
 ### Task 1: Measure first, the viewport package, the browser harness, the registration and the catalogue (cases 29.001–29.007, 29.014, 29.016)
 
-**Branches:** `task/wtg1-gate-widen` (PR A, the gate widening, lands FIRST and alone) and `task/wtg1-measure` (PR B, everything else), both cut from `origin/release/<next>`, both `--base release/<next>`. PR B is cut AFTER PR A is merged so its last commit applies on top of it. **NEEDS:** the owner's pull of the primary checkout after PR A (the gate verb that runs is the primary's), and the owner's phone for step 15.
+**Branches:** `task/wtg1-gate-widen` (PR A, the gate widening, lands FIRST and alone) and `task/wtg1-measure` (PR B, everything else), both cut from `origin/release/workflow-graph`, both `--base release/workflow-graph`. PR B is cut AFTER PR A is merged so its last commit applies on top of it. **NEEDS:** the owner's pull of the primary checkout after PR A (the gate verb that runs is the primary's), and the owner's phone for step 15.
 
 **Files:**
 - Create: `packages/viewport/{package.json,tsconfig.json,tsconfig.typecheck.json,vitest.config.ts}`, `packages/viewport/src/{calendar-days.ts,index.ts}`, `packages/viewport/test/calendar-days.test.ts`
@@ -261,7 +263,7 @@ the verb also fails any run that is not `41 successful, 41 total` or `46 success
 - [ ] **Step 4: Verify, open PR A, hand off**
   - `slot-run.sh ctl -- scripts/ctl/ctl selftest > /tmp/ctl.log 2>&1; tail -n 30 /tmp/ctl.log` (the whole ctl battery, `pnpm check:ctl`) and `pnpm check:citations`; name the run LOCAL.
   - Mutation: change the alternation to `46` only → the 13.1840 arms and the 13.2020 control go RED; remove the leading `^` or the trailing ` *$` → the 13.2023 arms go RED. Record both in the HANDOFF.
-  - `ctl pr open --repo <worktree> --base release/<next> --title "gate: accept 41 or 46 (WTG Part 1 T1, transitional)" --body <ABSOLUTE path>`; `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - `ctl pr open --repo <worktree> --base release/workflow-graph --title "gate: accept 41 or 46 (WTG Part 1 T1, transitional)" --body <ABSOLUTE path>`; `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
   - **Report to the controller: `NEEDS: owner pulls the primary checkout`**, with the merge sha. Do not wait; PR B's work needs no gate until step 17.
   - **OWNER ACTION:** the owner pulls the primary checkout (on the release branch it stands on) after PR A merges, so the verb that runs accepts 41 or 46. PR B's step 17 gate waits for it.
 
@@ -1917,7 +1919,7 @@ the verb also fails any run that is not `46 successful, 46 total` — an anchore
 ```
 
   Run the ctl battery (`slot-run.sh ctl -- scripts/ctl/ctl selftest`; every arm green), `grep -n "TEMPORARY" scripts/ctl/verbs/gate.sh` (no output) and the count one-liner (the measured count, 46 when written).
-  - `ctl gate <sha> --base release/<next>` (LOCAL; the verb must be the pulled primary's), then `ctl land <pr> --base release/<next>` with the same `--repo`.
+  - `ctl gate <sha> --base release/workflow-graph` (LOCAL; the verb must be the pulled primary's), then `ctl land <pr> --base release/workflow-graph` with the same `--repo`.
 
   - **OWNER ACTION:** after PR B lands, the owner pulls the primary checkout again, so the verb that runs is the pinned 46-only one (until then it is the transitional `41 or 46`, which still passes later gates but is not the pin).
 
@@ -1928,7 +1930,7 @@ the verb also fails any run that is not `46 successful, 46 total` — an anchore
 
 ### Task 2: The motion core: spring, momentum, rubber band, anchored zoom, wheel (cases 29.008–29.013, 29.015)
 
-**Branch:** `task/wtg1-motion` from `origin/release/<next>` (after T1 has landed). **NEEDS:** nothing.
+**Branch:** `task/wtg1-motion` from `origin/release/workflow-graph` (after T1 has landed). **NEEDS:** nothing.
 
 **Files:**
 - Create: `packages/viewport/src/{spring,momentum,rubber-band,anchored-zoom,wheel,driver}.ts`
@@ -2539,12 +2541,12 @@ export * from './driver.js';
 - ⚙️ **The motion core** (Workflow and Timeline graphs Part 1 T2; cases 29.008–29.013, 29.015; `packages/viewport/src/{spring,momentum,rubber-band,anchored-zoom,wheel,driver}.ts`) — a critically damped spring (τ 85 ms, dt clamped at 100 ms, `tauFor` so any glide lands inside 450 ms), flick momentum (τ 240 ms, least-squares velocity over 80 ms, stop below 2 px/s), a rubber band (power 0.3, 160 ms spring-back), zoom about an anchor (4–96 px per day; presets Day 56 / Week 24 / Month 8; `packScale` is the power-of-two bucket), `wheelIntent` (the Knowledge Graph's classifier, byte for byte) and `wheelZoomFactor` (Ctrl + wheel only), and the `ViewportDriver` / `RangeSource` interfaces both adapters implement. Pure: no `Date`, `performance`, timer or DOM outside `src/dom/` (29.015 scans for it).
 ```
 
-  - Run the package suite WHOLE, `pnpm turbo run typecheck build --filter=@gisik-nokma/viewport...`, then `ctl gate <sha> --base release/<next>` and `ctl land <pr> --base release/<next>`. HANDOFF carries the mutation table and the survivors.
+  - Run the package suite WHOLE, `pnpm turbo run typecheck build --filter=@gisik-nokma/viewport...`, then `ctl gate <sha> --base release/workflow-graph` and `ctl land <pr> --base release/workflow-graph`. HANDOFF carries the mutation table and the survivors.
 
 
 ### Task 3: Preloading: chunks, the fetch and widen plans, the range cache (cases 29.020–29.025)
 
-**Branch:** `task/wtg1-range` from `origin/release/<next>` (after T2). Independent of T4 and T5; may run beside them. **NEEDS:** nothing.
+**Branch:** `task/wtg1-range` from `origin/release/workflow-graph` (after T2). Independent of T4 and T5; may run beside them. **NEEDS:** nothing.
 
 **Files:**
 - Create: `packages/viewport/src/{range-plan,range-cache}.ts`, `packages/viewport/test/range.test.ts`
@@ -3108,12 +3110,12 @@ export * from './driver.js';
 - ⚙️ **The range planner and cache** (Workflow and Timeline graphs Part 1 T3; cases 29.020–29.025; `packages/viewport/src/{range-plan,range-cache}.ts`) — chunks of 28 days from a Monday; `planFetches` (one viewport either side when still, ahead by `max(V, 1.5 s of travel)` and half a viewport behind when moving; at most two in flight; low-priority fetches behind the travel are cancelled on a reversal), `planWiden` (idle widening alternating sides to 40 chunks or 10,000 entries), `chunksToEvict` (farthest first, never within a viewport of the view), the zoom helpers (`nextCoarserPpd`, `rangeAtPpd`, `neighbourScales`, `mountRange`, `panLimits`), and `RangeCache` / `ScopeCaches` (a live patch changes one entry without a refetch; a stale chunk stays drawn until its replacement lands; a return to a scope reuses its chunks). Pure and unused by a screen until a later Part: Part 1 builds no route.
 ```
 
-  - Package suite WHOLE, typecheck, build; `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - Package suite WHOLE, typecheck, build; `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
 ### Task 4: Row packing (cases 29.050–29.054)
 
-**Branch:** `task/wtg1-pack` from `origin/release/<next>` (after T2). Independent of T3 and T5. **NEEDS:** nothing.
+**Branch:** `task/wtg1-pack` from `origin/release/workflow-graph` (after T2). Independent of T3 and T5. **NEEDS:** nothing.
 
 **Files:**
 - Create: `packages/viewport/src/pack.ts`, `packages/viewport/test/pack.test.ts`
@@ -3562,7 +3564,7 @@ export * from './driver.js';
 
 ### Task 5: Edge and loop routing (cases 29.065–29.067)
 
-**Branch:** `task/wtg1-route` from `origin/release/<next>` (after T2). Independent of T3 and T4. **NEEDS:** nothing.
+**Branch:** `task/wtg1-route` from `origin/release/workflow-graph` (after T2). Independent of T3 and T4. **NEEDS:** nothing.
 
 **Files:**
 - Create: `packages/viewport/src/route.ts`, `packages/viewport/test/route.test.ts`
@@ -3951,7 +3953,7 @@ export * from './driver.js';
 
 ### Task 6: `ScrollAdapter`: smooth movement on a native scroller (cases 29.030–29.036, 29.039)
 
-**Branch:** `task/wtg1-scroll` from `origin/release/<next>` (after T2). **NEEDS:** nothing (jsdom tests with a fake clock; the real-browser proof is T10).
+**Branch:** `task/wtg1-scroll` from `origin/release/workflow-graph` (after T2). **NEEDS:** nothing (jsdom tests with a fake clock; the real-browser proof is T10).
 
 **Files:**
 - Create: `packages/viewport/src/dom/clock.ts`, `packages/viewport/src/dom/scroll-adapter.ts`, `packages/viewport/test/fake-clock.ts`, `packages/viewport/test/scroll-adapter.test.ts`
@@ -4860,7 +4862,7 @@ export * from './dom/scroll-adapter.js';
 
 ### Task 7: `CameraAdapter`: the free 2D camera for graphs (cases 29.037, 29.038, 29.045–29.049)
 
-**Branch:** `task/wtg1-camera` from `origin/release/<next>` (after T6; it reuses T6's clock and fake clock). **NEEDS:** nothing; the five real-browser cases run headless Chromium on the lane's machine (a camera transform is not a frame-rate claim, so a headless run IS a pass here, named `LOCAL, headless`).
+**Branch:** `task/wtg1-camera` from `origin/release/workflow-graph` (after T6; it reuses T6's clock and fake clock). **NEEDS:** nothing; the five real-browser cases run headless Chromium on the lane's machine (a camera transform is not a frame-rate claim, so a headless run IS a pass here, named `LOCAL, headless`).
 
 **Files:**
 - Create: `packages/viewport/src/dom/camera-adapter.ts`, `packages/viewport/test/camera-adapter.test.ts`
@@ -5549,7 +5551,7 @@ const camera = new CameraAdapter({
 
 ### Task 8: Day numbers and lane layout in app-core (cases 29.080–29.086)
 
-**Branch:** `task/wtg1-layout` from `origin/release/<next>` (after T4 has landed; T1 already added the app-core dependency on `@gisik-nokma/viewport`). **NEEDS:** nothing.
+**Branch:** `task/wtg1-layout` from `origin/release/workflow-graph` (after T4 has landed; T1 already added the app-core dependency on `@gisik-nokma/viewport`). **NEEDS:** nothing.
 
 **Files:**
 - Create: `packages/app-core/src/timeline/timeline-days.ts`, `packages/app-core/src/timeline/timeline-layout.ts`
@@ -5870,7 +5872,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 
 ### Task 9: The continuous Timeline: model, view, stylesheet, token, retirements, the radio variant (cases 29.087, 29.093–29.107)
 
-**Branch:** `task/wtg1-cutover` from `origin/release/<next>` (after T6 and T8 have landed; it also needs T2's wheel constants through the adapter). **NEEDS:** `frontend-design` named in the lane prompt (UI work). The real-browser proof of this task is T10; this task looks at the page through the T1 harness (step 9).
+**Branch:** `task/wtg1-cutover` from `origin/release/workflow-graph` (after T6 and T8 have landed; it also needs T2's wheel constants through the adapter). **NEEDS:** `frontend-design` named in the lane prompt (UI work). The real-browser proof of this task is T10; this task looks at the page through the T1 harness (step 9).
 
 **Files:**
 - Modify: `packages/app-core/src/timeline/timeline-model.ts` (rewrite of the placement: day numbers, no window), `packages/app-core/src/timeline/timeline-view.tsx` (rewrite: one scroller), `packages/app-core/src/claims/claim-labels.ts` (drop `TIMELINE_OUT_OF_WINDOW_COPY`, reword `TIMELINE_EMPTY_COPY`), `packages/app-core/src/index.ts` (drop `TIMELINE_OUT_OF_WINDOW_COPY`, `TimelineBarSpan`, `TimelineWeekCol`)
@@ -5925,7 +5927,7 @@ export function barsInRange(lane: PlacedLane, range: { start: number; end: numbe
 
   **The radio variant (29.087; planner ruling P5).** `grep -n "radiogroup" -r packages/ui/src packages/app-core/src apps/web/src` must print nothing on the base (else consume it and say so). Test first in `packages/ui/test/segmented-control-radio.test.tsx`: render `SegmentedControl` with `variant="radio"` and three options, assert `radiogroup` / `radio` / `aria-checked`, ArrowRight moves focus and selects; in the SAME `it()`, the control: the default variant renders `tablist` / `tab` / `aria-selected`. Then add `variant?: 'tabs' | 'radio'` (default `'tabs'`, so every existing render site is byte-identical) to `packages/ui/src/components/segmented-control.tsx` (it renders `role="tablist"` at `:130` and `role="tab"` at `:147` on the KG tip; re-read it): when `'radio'` the root is `role="radiogroup"`, each button `role="radio"` with `aria-checked={on}` instead of `aria-selected`, the roving tabindex and arrow keys unchanged, the same classes. Run the `packages/ui` and `apps/web` suites whole (a role change can move an accessible-name ratchet). Flip 29.087 in the commit that lands the test and the variant.
 
-  The test diffs are unified diffs against the files at `origin/release/<next>`; apply each with `patch -p1` from the repo root (save the fenced text, `patch -p1 --no-backup-if-mismatch < file`) or by hand. Controls live in the same `it()` as the case.
+  The test diffs are unified diffs against the files at `origin/release/workflow-graph`; apply each with `patch -p1` from the repo root (save the fenced text, `patch -p1 --no-backup-if-mismatch < file`) or by hand. Controls live in the same `it()` as the case.
 
 `packages/app-core/test/timeline/timeline-model.test.ts`:
 
@@ -8616,7 +8618,7 @@ export function TimelineView(props: TimelineViewProps) {
    { fg: 'textMuted', bg: 'surfaceWell', minimum: 4.5 },
 ```
 
-  `ui.css`: the whole `.gn-timeline*` section is replaced (the old week-column grid, header, zebra, clipped edges and the phone arm go). Find it with `grep -n "gn-timeline" packages/ui/src/ui.css`. Apply the diff (it is against the file at `origin/release/<next>`; a hunk that does not apply because the tip moved is re-applied by hand, the intent is stated in each rule's comment). Nothing outside `.gn-timeline*` and one mention in the comment of the first zebra rule changes.
+  `ui.css`: the whole `.gn-timeline*` section is replaced (the old week-column grid, header, zebra, clipped edges and the phone arm go). Find it with `grep -n "gn-timeline" packages/ui/src/ui.css`. Apply the diff (it is against the file at `origin/release/workflow-graph`; a hunk that does not apply because the tip moved is re-applied by hand, the intent is stated in each rule's comment). Nothing outside `.gn-timeline*` and one mention in the comment of the first zebra rule changes.
 
 `packages/ui/src/ui.css`:
 
@@ -9190,7 +9192,7 @@ export function TimelineView(props: TimelineViewProps) {
      const open = ruleExactly(ui, '.gn-timeline__open');
 ```
 
-  Then the catalogue. Each line below is retired in place (the id stays, the marker becomes 🚫, the reason names the Part 1 id that replaced it; ids are never reused and never renumbered). The `Features.md` / case diffs are against the files at `origin/release/<next>`: apply by id, not by line number.
+  Then the catalogue. Each line below is retired in place (the id stays, the marker becomes 🚫, the reason names the Part 1 id that replaced it; ids are never reused and never renumbered). The `Features.md` / case diffs are against the files at `origin/release/workflow-graph`: apply by id, not by line number.
 
 `test-cases/11-calendar-notifications.md`:
 
@@ -9428,12 +9430,12 @@ export function TimelineView(props: TimelineViewProps) {
 - [ ] **Step 12: Flip and gate**
   - Flip ❌ to ✅ on 29.093–29.107; `pnpm check:citations` (the retired ids are not checked: only ✅ ids are).
   - Whole suites named LOCAL: ui, app-core, web (`ui.css` changed). `pnpm check:help`, `pnpm check:citations`, `pnpm check:env`, `pnpm check:tasks`.
-  - `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`. HANDOFF: the mutation table, the survivors, and the line "T11 turns the phone portrait; until then a phone shows the landscape chart (21.113 is retired, 29.109 lands in T11)".
+  - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`. HANDOFF: the mutation table, the survivors, and the line "T11 turns the phone portrait; until then a phone shows the landscape chart (21.113 is retired, 29.109 lands in T11)".
 
 
 ### Task 10: The continuous Timeline in a real browser (cases 29.040–29.044)
 
-**Branch:** `task/wtg1-browser` from `origin/release/<next>` (after T9). **NEEDS:** nothing (headless Chromium is a pass for behaviour; these cases make no frame-rate claim). A headed run is welcome for a second look.
+**Branch:** `task/wtg1-browser` from `origin/release/workflow-graph` (after T9). **NEEDS:** nothing (headless Chromium is a pass for behaviour; these cases make no frame-rate claim). A headed run is welcome for a second look.
 
 **Files:**
 - Create: `packages/flow-graph-browser/harness/timeline.html`, `packages/flow-graph-browser/harness/timeline-main.tsx`, `packages/flow-graph-browser/tests/timeline.spec.ts`
@@ -9754,12 +9756,12 @@ createRoot(document.getElementById('root') as HTMLElement).render(
 - ✅ **The continuous Timeline in a real browser** (Workflow and Timeline graphs Part 1 T10; cases 29.040–29.044; `packages/flow-graph-browser/tests/timeline.spec.ts`, `harness/timeline.html`) — the panel fills the height under its filters at a 28 px bar on a 40 px pitch with the axis fixed while lanes scroll; Ctrl + wheel zooms about the pointer (under half a pixel of drift per event, the page never scrolls); a mouse drag pans with momentum while a touch swipe stays the platform's; arrow keys glide 7 days; Today and Home centre today; reduced motion lands at once; a scripted fast pan of 10 viewports in 10 seconds leaves no frame with an empty mounted band; a custom date claim opens on hover and on focus.
 ```
 
-  - The flow-graph-browser suite WHOLE, then `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - The flow-graph-browser suite WHOLE, then `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
 ### Task 11: The phone: portrait orientation and "Nothing in view" (cases 29.108–29.112)
 
-**Branch:** `task/wtg1-portrait` from `origin/release/<next>` (after T10; it extends the T10 harness page and the T9 view). **NEEDS:** `frontend-design` named in the lane prompt (UI work). The real-browser cases emulate a 390 px phone; the owner's real phone is read in T13.
+**Branch:** `task/wtg1-portrait` from `origin/release/workflow-graph` (after T10; it extends the T10 harness page and the T9 view). **NEEDS:** `frontend-design` named in the lane prompt (UI work). The real-browser cases emulate a 390 px phone; the owner's real phone is read in T13.
 
 **Files:**
 - Modify: `packages/app-core/src/timeline/timeline-view.tsx` (orientation, the pill, the jumps), `packages/ui/src/ui.css` (`.gn-timeline[data-orientation='portrait']`, `.gn-timeline__nothing`)
@@ -10418,12 +10420,12 @@ test('29.111 a rotation re-builds the adapter on the other axis: resized from a 
 
 - [ ] **Step 9: Flip, gate**
   - Flip ❌ to ✅ on 29.108–29.112; `pnpm check:citations`, `pnpm check:help`.
-  - `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
 ### Task 12: The paper pin (cases 29.113–29.117)
 
-**Branch:** `task/wtg1-pin` from `origin/release/<next>` (after T11). **NEEDS:** `frontend-design` named in the lane prompt (the glyph and its placement); a database for the server cases (the shared TEST Postgres on 54329 through `createTestDatabase`, which the lane's slot already provides; the DEV database is 54330 and is never used by a test).
+**Branch:** `task/wtg1-pin` from `origin/release/workflow-graph` (after T11). **NEEDS:** `frontend-design` named in the lane prompt (the glyph and its placement); a database for the server cases (the shared TEST Postgres on 54329 through `createTestDatabase`, which the lane's slot already provides; the DEV database is 54330 and is never used by a test).
 
 **Files:**
 - Create: `apps/server/src/read/pin-counts.ts`, `packages/ui/src/icons/paper-pin-icon.tsx`
@@ -11411,12 +11413,12 @@ export function PaperPinIcon({ size = 12 }: { size?: number }) {
 
 - [ ] **Step 11: Flip, gate**
   - Flip ❌ to ✅ on 29.113–29.117; `pnpm check:citations`, `pnpm check:help`, `pnpm check:env`, `pnpm check:tasks`.
-  - `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
 
 
 ### Task 13: Re-measure after the lift, and close the Part 1 catalogue (cases 29.118, 29.119)
 
-**Branch:** `task/wtg1-close` from `origin/release/<next>` (after T12; it is the last Part 1 task). **NEEDS: the owner's real phone, and a headed desktop Chrome on the owner's machine** (the same two devices as T1 steps 14 and 15; a headless number is a floor and never the bar). T1 step 15 already made the phone a standing blocker for T13 only: **this task opens its PR only when both records exist**, because the catalogue test below fails on a 29.118 that is still pending. The lane may write and run the test beforehand (it is red exactly where Step 2 says) and reports `NEEDS: owner phone` until the figures arrive; Part 1 is not called finished before that.
+**Branch:** `task/wtg1-close` from `origin/release/workflow-graph` (after T12; it is the last Part 1 task). **NEEDS: the owner's real phone, and a headed desktop Chrome on the owner's machine** (the same two devices as T1 steps 14 and 15; a headless number is a floor and never the bar). T1 step 15 already made the phone a standing blocker for T13 only: **this task opens its PR only when both records exist**, because the catalogue test below fails on a 29.118 that is still pending. The lane may write and run the test beforehand (it is red exactly where Step 2 says) and reports `NEEDS: owner phone` until the figures arrive; Part 1 is not called finished before that.
 
 **Files:**
 - Create: `apps/server/test/tooling/wtg-part1-catalogue.test.ts`
@@ -11630,7 +11632,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
   Mutation pass (own), on the catalogue test: a different threshold than 80 on the count (set 90, expect RED), `notClosed` admitting ❌ (expect the planted-pending control to fail), `unretired` without the `replaced by` clause (expect the reopened control or the real lines to fail), `emptyAnchors` for `bullet` returning filled (expect the planted anchor control to fail), the fps count `>= 2` to `>= 1` (expected SURVIVOR: the real lines each carry two or more figures and no control plants a one-figure record; record it as a known gap of the guard). Record survivors.
 
   - `pnpm check:citations` (29.119 is ✅ with its covering test; 29.118 is 🧪).
-  - `ctl gate <sha> --base release/<next>`; `ctl land <pr> --base release/<next>`.
+  - `ctl gate <sha> --base release/workflow-graph`; `ctl land <pr> --base release/workflow-graph`.
   - HANDOFF: the 13 tasks' landed shas, the two records, every mutation survivor recorded across Part 1, and "Part 1 ships first and alone: the release branch is ready for the owner's word to merge to `main`" (the merge is the owner's, per merge, every time).
 
 
@@ -11654,7 +11656,7 @@ describe('29.119 the Part 1 catalogue is closed', () => {
 
 Gaps: none left for Part 1. Open question 5 (does the Knowledge Graph's engine exist to share?) is answered by reading `origin/release/knowledge-graph` at `a03cc486`: it does not, so the motion core is written here, and T2 step 8 adds a parity test that runs only if the Knowledge Graph's file appears later.
 
-**2. Placeholder scan.** No step says to fill something in later. Where a figure must come from a device (T1 steps 14 and 15, T13 steps 3 and 4) the plan names the device, the command and the record form, and says what the line does if the device is not available. `<next>` is the release branch's literal, filled by the planner when it is cut.
+**2. Placeholder scan.** No step says to fill something in later. Where a figure must come from a device (T1 steps 14 and 15, T13 steps 3 and 4) the plan names the device, the command and the record form, and says what the line does if the device is not available. The release branch is `release/workflow-graph` (cut 2026-10-04).
 
 **3. Type consistency.** Names are used as defined: `View { offsetDay, ppd }`, `packLane(items, {ppd, labelPx}) -> {rows, rowOf, strategy}`, `packScale`, `layoutLanes(lanes, {ppd, measure, orientation})`, `PIN_PX`, `pinned?` on layout items (T8) and `TimelineRow.pin` (T12), `TicketPin` / `PinCounts` / `timelinePinLabel`, `ScrollAdapter({axis})`, `Orientation`, `KeyMeasure`. The staged per-task states (viewport `index.ts` per task, app-core T9 / T11 / T12) were typechecked and run before they were embedded; the per-task diffs are applied in order, so a lane that takes a task out of order breaks a diff context, not a name. One known mismatch is deliberate: T12's view-test diff adds a second `it` to 29.102, a T9 case, because the render counter needs the pin (T9 says the same).
 
@@ -11683,7 +11685,7 @@ Gaps: none left for Part 1. Open question 5 (does the Knowledge Graph's engine e
 | T12 | T11 | `frontend-design`; the test Postgres | none |
 | T13 | T12 | the owner's phone, a headed desktop; the PR waits for both records | the phone run |
 
-Execution: the gisik-nokma lanes (one task = one session), per the planner. Reviews and merges into `release/<next>` are autonomous with a LOCAL battery named as local; the merge of `release/<next>` to `main` is the owner's word, per merge. I recommend subagent-driven execution: T1's catalogue, package registration and gate dance feed every later task, T9 is a view cutover with retirements across five catalogue files, and a shipped mistake in T12 would leak that a hidden note exists.
+Execution: the gisik-nokma lanes (one task = one session), per the planner. Reviews and merges into `release/workflow-graph` are autonomous with a LOCAL battery named as local; the merge of `release/workflow-graph` to `main` is the owner's word, per merge. I recommend subagent-driven execution: T1's catalogue, package registration and gate dance feed every later task, T9 is a view cutover with retirements across five catalogue files, and a shipped mistake in T12 would leak that a hidden note exists.
 
 ## Ledger rows
 

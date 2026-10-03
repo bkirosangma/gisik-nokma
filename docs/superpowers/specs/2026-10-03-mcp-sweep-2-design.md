@@ -6,7 +6,7 @@
 |---|---|
 | **Status** | Owner-reviewed 2026-10-03. The owner answered "yes" to the five capabilities, deferred two more (§10), and ruled on the open questions (ruling 11 and the planner defaults, §13). Every requirement below is drafted from the code; what is still open is in §13. |
 | **Base** | `origin/release/knowledge-graph` @ `4cc486ca`, where every citation was read. The plan re-reads each one. |
-| **Target** | A NEW release branch after the Knowledge Graph release (not that one). One release branch at a time, so this spec lands as a docs file in `release/knowledge-graph` and the code waits for the next release branch, which the owner cuts. |
+| **Target** | `release/workflow-graph`, cut 2026-10-04 from `release/knowledge-graph` at f9e0cd18 (owner). One release branch at a time: the Knowledge Graph release merges to `main` first, and `main` is then merged INTO `release/workflow-graph`, never rebased. |
 | **Depends on** | Nothing. It is independent of the drafts spec and the workflow/timeline spec, and of the Knowledge Graph series (specs A–E). It shares test pins with them (§8.5). |
 | **Owner rulings** | The five capabilities (§2); `assignee_email` "WITH a confirmation step" (§7); ruling 11: `assignee_email` on `create_ticket` too, `close_tickets` previews first, the confirmation says when a person is ADDED AS A GUEST, and `list_saved_filters` (§6.6); contests and `update_profile` deferred (§10); rule D2, restated in the Knowledge Graph series: every MCP write is visible in the app, attributed, and removable by a member (§9). |
 | **Catalogue** | `test-cases/14-mcp-server.md`, **14.600–14.659** (§12.1). `Features.md` §14. |

@@ -1,5 +1,7 @@
 # Workflow and Timeline graphs, Part 5: MCP Implementation Plan
 
+> **Release branch (owner, 2026-10-04):** `release/workflow-graph`, cut from `origin/release/knowledge-graph` at f9e0cd18. Every task branch is cut from `origin/release/workflow-graph` and every PR goes `--base release/workflow-graph`. The Knowledge Graph release merges to `main` first; `main` is then merged INTO `release/workflow-graph`, never rebased.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. In the gisik orchestration, every task is ONE lane session. Follow `gisik-nokma-lanes/STEPS-common-2026-10-03.md`: numbered steps, each ending with a pushed commit + `CHECKPOINT task/<branch> <sha40> step <n>/<N>` + `HANDOFF-<branch>.md`; the sweep list + your own mutation pass before DONE.
 
 **Goal:** an assistant can build, run and read a flow and a timeline through MCP: `link_tickets` takes `leads_to` with a label and relabels it (draft-aware), `set_wait_for_all`, `estimate` / `reworkEstimate` on create and update, `get_flow`, `get_timeline`, `resolve_decision` (records the pass, revises, previews the cascade) and `publish_flow`; `get_ticket` reads passes, rounds, periods and the Not-taken resolution. Every write is visible, attributed and removable (rule D2).
@@ -28,7 +30,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 ## Global Constraints
 
 **Release and identity**
-- **Release:** the release branch cut after the Knowledge Graph release ships, written `release/<next>`; the literal `<next>` is filled when it is cut. Every task branch is `task/wtg-part5-t<n>-<slug>` cut from `origin/release/<next>`, and its PR has `--base release/<next>`. Never `main`.
+- **Release:** `release/workflow-graph`, cut 2026-10-04 from `origin/release/knowledge-graph` at f9e0cd18 (owner). Every task branch is `task/wtg-part5-t<n>-<slug>` cut from `origin/release/workflow-graph`, and its PR has `--base release/workflow-graph`. Never `main`.
 - **Catalogue:** `Features.md` §26 "Workflow and Timeline graphs" ↔ `test-cases/29-workflow-timeline-graphs.md`, both created by Graph Part 1 T1. This plan owns `29.375`–`29.389`: T1 `29.375–29.378`, T2 `29.379–29.381`, T3 `29.382–29.383`, T4 `29.384–29.386`, T5 `29.387–29.389`. Nothing else is free: `29.390` onward is Part 2's notification block.
 - **Case lines are id lines:** `- ❌ **29.375 — …**`. Each starts ❌ and flips ✅ in the same commit as its test. Test names or comments carry the id. `pnpm check:citations` must pass.
 - **Anchors:** Part 1 T1 seeds ONE Part 5 anchor in each file (`<!-- wtg-part5-mcp -->` in `test-cases/29-…`, `<!-- wtg-part5-mcp bullets -->` in `Features.md` §26). T1 writes this plan's sub-section directly below them, keeping the Part anchor lines, and pre-seeds `<!-- wtg-part5-mcp T1 -->` … `<!-- wtg-part5-mcp T5 -->` in `test-cases/29-…` and `<!-- wtg-part5-mcp T1 bullet -->` … `T5 bullet` in `Features.md` §26, so parallel tasks never append to the same line. Each task writes only below its own anchors.
@@ -141,7 +143,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 
 ### Task 1: `link_tickets` (leads_to, label, relabel, draft ends), `set_wait_for_all`, `estimate` (cases 29.375–29.378)
 
-**Branch:** `task/wtg-part5-t1-simple-writes` from `origin/release/<next>`; PR `--base release/<next>`.
+**Branch:** `task/wtg-part5-t1-simple-writes` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`.
 
 **Files:**
 - Create:
@@ -871,7 +873,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 
 ### Task 2: `get_flow` and the flow facts on `get_ticket` (cases 29.379–29.381)
 
-**Branch:** `task/wtg-part5-t2-get-flow` from `origin/release/<next>`; PR `--base release/<next>`. Starts after T1 has landed.
+**Branch:** `task/wtg-part5-t2-get-flow` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. Starts after T1 has landed.
 
 **Files:**
 - Create:
@@ -1321,7 +1323,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 
 ### Task 3: `get_timeline` (cases 29.382–29.383)
 
-**Branch:** `task/wtg-part5-t3-get-timeline` from `origin/release/<next>`; PR `--base release/<next>`. Starts after T2 has landed (it appends to the same module, seam file and pin lines).
+**Branch:** `task/wtg-part5-t3-get-timeline` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. Starts after T2 has landed (it appends to the same module, seam file and pin lines).
 
 **Files:**
 - Create:
@@ -1550,7 +1552,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
   }
 
   const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-  const timelineSegment = z.object({ start: day, end: day, pass: z.number().int().nullable(), type: z.enum(['actual', 'planned', 'ghost']) });
+  const timelineSegment = z.object({ start: day, end: day, pass: z.number().int().nullable(), type: z.enum(['actual', 'planned', 'ghost', 'stub']) }); // 'stub': a never-started Not-taken ticket's close day (owner ruling O3, TG-10)
   export const timelineIndexSchema = z.object({
     today: day,
     /** Part 4's PR-0 cut: `null`, or how many older items were dropped and before which day. */
@@ -1707,7 +1709,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
         name: 'get_timeline',
         description:
           'Read the timeline: who works on what, and when. Give workspaceId (one workspace) OR workspaceIds (several), optionally projectIds, and mine: true for only your own work (default: everything you can see). ' +
-          'Window: from / to as YYYY-MM-DD, default 14 days back to 60 days ahead, at most 180 days; call again with the next window for more. Each item has its `segments` (real work periods, planned intervals, and the ghosts of branches a Decision left), ' +
+          'Window: from / to as YYYY-MM-DD, default 14 days back to 60 days ahead, at most 180 days; call again with the next window for more. Each item has its `segments` (real work periods, including those of a Not-taken ticket that was worked, planned intervals, the ghosts of branches a Decision left, and a one-day stub for a Not-taken ticket that never started), ' +
           '`basis` (explicit dates or chained from a predecessor), `state`, `pin` (how many notes and attachments it has), and a "Not taken" `resolution`. `flows` lists which items are connected. Items are ordered by start, then key; ' +
           'limit (default 200, at most 500) and cursor page them. includeTray: true also lists up to 200 tickets with no dates or estimate ("not on the timeline yet") with the reason; `trayCount` always says how many there are. Your own drafts are included, other people\'s never are.',
         inputSchema: timelineShape,
@@ -1798,7 +1800,7 @@ Order inside the series: Graph Part 1 first, Drafts next, Part 2 after Drafts T1
 
 ### Task 4: `resolve_decision` (cases 29.384–29.386)
 
-**Branch:** `task/wtg-part5-t4-resolve-decision` from `origin/release/<next>`; PR `--base release/<next>`. Starts after T3 has landed (strict order: the pin lines name the tool before). Code-level it needs T1's module, fixtures and world helpers and T2's `readFlow`, `flowNode`, `flowWire`.
+**Branch:** `task/wtg-part5-t4-resolve-decision` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. Starts after T3 has landed (strict order: the pin lines name the tool before). Code-level it needs T1's module, fixtures and world helpers and T2's `readFlow`, `flowNode`, `flowWire`.
 
 **Files:**
 - Create:
@@ -2367,7 +2369,7 @@ POST /v1/workspaces/:workspaceId/tickets/:ticketId/decide
 
 ### Task 5: `publish_flow`, the rule-D2 round trip, the door rows, the registry audit and the manual (cases 29.387–29.389)
 
-**Branch:** `task/wtg-part5-t5-publish-flow` from `origin/release/<next>`; PR `--base release/<next>`. Starts after T4 has landed (strict order); lands last, so it also closes the registry (the final audit below) and the manual. Code-level it needs T1's module and T2's `readFlow`.
+**Branch:** `task/wtg-part5-t5-publish-flow` from `origin/release/workflow-graph`; PR `--base release/workflow-graph`. Starts after T4 has landed (strict order); lands last, so it also closes the registry (the final audit below) and the manual. Code-level it needs T1's module and T2's `readFlow`.
 
 **Files:**
 - Create:
