@@ -15,6 +15,7 @@ import type { GroupRow } from '@gisik-nokma/domain';
 import { useScrollEdges } from '@gisik-nokma/ui';
 import { AppNav } from '../../src/app-nav.js';
 import { ListPageShell } from '../../src/skeletons/page-shells.js';
+import { GroupsTreeSkeleton, SettingsFormSkeleton } from '../../src/skeletons/screen-skeletons.js';
 import { WiringNotReady, useBuilderWiring } from '../../src/authoring/builder-wiring.js';
 import { useAppServices } from '../../src/providers.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
@@ -295,7 +296,7 @@ function WorkspaceGroups({ workspaceId }: { workspaceId: string }) {
       </p>
     );
   }
-  if (groups.data === null) return <p>Loading groups…</p>;
+  if (groups.data === null) return <GroupsTreeSkeleton />;
   if (groups.data === 'hidden') return <p className="gn-groups__empty">Groups are shown to workspace members.</p>;
 
   const make = makeSubmittedFactory({ actorId: wiring.session.userId, origin: 'web' });
@@ -391,7 +392,7 @@ function WorkspaceSettingsTab({ workspaceId }: { workspaceId: string }) {
       </p>
     );
   }
-  if (settings.data === null) return <p>Loading settings…</p>;
+  if (settings.data === null) return <SettingsFormSkeleton />;
 
   return (
     <WorkspaceSettingsForm

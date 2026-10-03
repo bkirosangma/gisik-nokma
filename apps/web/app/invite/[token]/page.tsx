@@ -11,6 +11,7 @@ import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core
 import { istToday } from '../../../src/ist-today.js';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
 import { bumpProjectsVersion } from '../../../src/projects-version.js';
+import { InviteCheckSkeleton } from '../../../src/skeletons/screen-skeletons.js';
 
 /**
  * `/invite/[token]` — where a link somebody was sent turns into a membership.
@@ -71,6 +72,8 @@ export default function InvitePage() {
   const [refusal, setRefusal] = useState<string | null>(null);
   /** Bumped by "Try again" — the effect below is keyed on it (V9). */
   const [attempt, setAttempt] = useState(0);
+  /** The accept is in flight: Join is a busy button and a second click sends nothing (smoothness T8, case 25.148). */
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -98,7 +101,9 @@ export default function InvitePage() {
     };
   }, [invites, token, attempt]);
 
-  const accept = (): void =>
+  const accept = (): void => {
+    if (joining) return;
+    setJoining(true);
     void invites.acceptInvite(token).then(
       ({ workspaceId }) => {
         // The workspace JOINED the person's list: the shared read behind the nav asks again before the push (25.049).
@@ -106,6 +111,7 @@ export default function InvitePage() {
         router.push(`/w/${workspaceId}/my-work`);
       },
       (cause: unknown) => {
+        setJoining(false);
         setRefusal(
           cause instanceof InviteAcceptanceError && cause.serverMessage !== null
             ? cause.serverMessage
@@ -113,6 +119,7 @@ export default function InvitePage() {
         );
       },
     );
+  };
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -125,7 +132,7 @@ export default function InvitePage() {
       )}
       <Card className="gn-invite">
         {invite === 'loading' ? (
-          <p>Checking the invitation…</p>
+          <InviteCheckSkeleton label="Checking the invitation" />
         ) : invite === 'unreachable' ? (
           <>
             {/*
@@ -193,7 +200,7 @@ export default function InvitePage() {
               </p>
             )}
             {session.kind === 'loading' || session.kind === 'error' ? (
-              <p role="status">Checking whether you are signed in…</p>
+              <InviteCheckSkeleton label="Checking whether you are signed in" action />
             ) : session.kind === 'signed-out' ? (
               <p>
                 <Link href={`/sign-in?next=${encodeURIComponent(`/invite/${token}`)}`}>
@@ -202,7 +209,7 @@ export default function InvitePage() {
                 {'. '}Any of the four sign-in methods works; you land back here.
               </p>
             ) : (
-              <Button variant="primary" onClick={accept}>
+              <Button variant="primary" onClick={accept} busy={joining} busyLabel="Joining…">
                 Join {invite.workspaceName}
               </Button>
             )}

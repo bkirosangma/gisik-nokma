@@ -11,7 +11,7 @@ import {
   useMyWork,
   type MyWorkView,
 } from '@gisik-nokma/app-core';
-import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
+import { TicketEditorSlot, uploadAttachmentHttp } from '../../../../src/editor-slot.js';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ListPageShell } from '../../../../src/skeletons/page-shells.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
@@ -21,6 +21,7 @@ import { useActorLabels } from '../../../../src/use-actor-labels.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
 import { useCanModerateComments } from '../../../../src/use-can-moderate-comments.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
+import { AttentionBandSkeleton, MyWorkSkeleton } from '../../../../src/skeletons/screen-skeletons.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
 import {
   ExpiredSessionNotice,
@@ -320,7 +321,7 @@ function MyWorkBoard() {
             has its own falsehood if the plan's rendering is kept:
             `items={attention.data ?? []}` makes `AttentionStrip` return null,
             which reads as "nothing needs your attention", and My work's
-            `data !== null ? … : <p>Loading…</p>` spins forever. */}
+            `data !== null ? … : <skeleton>` spins forever. */}
         {expired ? (
           // ONE notice for the page, not one per failed read: two "your session
           // has ended" panels would describe two events where there was one.
@@ -342,14 +343,16 @@ function MyWorkBoard() {
               <ShellRefusal what="What needs your attention" message={attention.error} />
             ) : attention.data !== null ? (
               <AttentionStrip items={attention.data} onOpenTicket={openTicket} />
-            ) : null}
+            ) : (
+              <AttentionBandSkeleton />
+            )}
 
             {myWork.error !== null ? (
               <ShellRefusal what="My work" message={myWork.error} />
             ) : myWork.data !== null ? (
               <MyWork view={myWork.data} onOpenTicket={openTicket} actorLabelOf={actorLabelOf} />
             ) : (
-              <p>Loading…</p>
+              <MyWorkSkeleton />
             )}
           </>
         )}

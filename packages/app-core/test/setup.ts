@@ -1,6 +1,7 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import { clearLiveQueryCache } from '../src/views/live-query-cache.js';
 
 /**
  * Same wiring as packages/ui's setup, and for the same reason: Testing Library
@@ -8,6 +9,12 @@ import '@testing-library/jest-dom/vitest';
  * suite does not use. Without it every render leaks into the next test.
  */
 afterEach(cleanup);
+
+/**
+ * The read cache is session state (smoothness T3, `live-query-cache.ts`): a key named by a view (`ticket:<id>`) would
+ * serve one case's answer as the next case's first paint. Every case starts with the cache empty.
+ */
+afterEach(clearLiveQueryCache);
 
 /**
  * React 19 gates `act` behind this flag and warns on every call made without

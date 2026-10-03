@@ -207,6 +207,8 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     expect(texts[1]).toContain('WorkItem.stateName');
 
     // The half that makes the two above a test: neither falsehood is also here.
+    // No wait is drawn over a refusal: no busy region (the skeletons since smoothness T8, 25.135), and no sentence.
+    expect(document.querySelector('.gn-skeleton-region')).toBeNull();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Needs your attention' })).not.toBeInTheDocument();
   });
@@ -219,6 +221,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     );
 
     expect(await screen.findByText(/Your workspaces could not be loaded/)).toBeInTheDocument();
+    expect(document.querySelector('.gn-skeleton-region')).toBeNull();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     expect(
       screen.queryByText('No workspaces yet. Ask an admin for an invite link.'),
@@ -256,6 +259,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // Not a spinner either. With the refusal suppressed the page falls through
     // to `workspaces === null`, which without the notice is `Loading…` over a
     // read that has already failed.
+    expect(document.querySelector('.gn-skeleton-region')).toBeNull();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 

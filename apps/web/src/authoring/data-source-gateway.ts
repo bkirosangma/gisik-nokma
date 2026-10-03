@@ -1,6 +1,6 @@
-import type { DataSource } from '@gisik-nokma/app-core';
-import { AuthoringReadRefused } from '@gisik-nokma/app-core';
-import type { MigrationOutcome, MigrationRequest, WorkflowAuthoringGateway } from '@gisik-nokma/app-core';
+import type { DataSource } from '@gisik-nokma/app-core/data';
+import { AuthoringReadRefused } from '@gisik-nokma/app-core/data';
+import type { MigrationOutcome, MigrationRequest, WorkflowAuthoringGateway } from '@gisik-nokma/app-core/data';
 import { HttpError, type HttpClient } from '@gisik-nokma/app-core/online';
 import type {
   MemberListResponse,

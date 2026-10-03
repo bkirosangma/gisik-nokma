@@ -12,6 +12,7 @@ case "$verb" in
 usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   checks                          the eight checks + two non-zero controls
   gate <sha> [--base B]           forced gate at HEAD=<sha>; writes the gate marker (B = main | release/<name>)
+  tipmerge <branch> --base B --expect <sha>  clean tip merge of origin/B into <branch> with no checkout (exit 3 = conflicted)
   pr open <branch> --title T --body FILE [--require-checked]
   land <pr> [--base B]            comment gate, merge head-gated, verify, ff primary (PR base must equal B)
   anchor <N> --title T --body FILE

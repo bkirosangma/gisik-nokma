@@ -1,6 +1,7 @@
 import { SegmentedControl, useScrollEdges } from '@gisik-nokma/ui';
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -799,7 +800,10 @@ export function HelpBrowser() {
   const [query, setQuery] = useState('');
   const [documentId, setDocumentId] = useState<HelpDocument['id']>('manual');
   const [panelOpen, setPanelOpen] = useState(false);
-  const result = useMemo(() => searchHelp(HELP_CONTENT, query), [query]);
+  // The input shows every keystroke at once; the results list follows a render behind (smoothness T10, case 25.176), so typing never
+  // waits on a search of the whole manual.
+  const deferredQuery = useDeferredValue(query);
+  const result = useMemo(() => searchHelp(HELP_CONTENT, deferredQuery), [deferredQuery]);
   const active = HELP_CONTENT.find((d) => d.id === documentId) ?? HELP_CONTENT[0];
   const fragment = useUrlFragment();
   const visibleSection = useVisibleSection(active);

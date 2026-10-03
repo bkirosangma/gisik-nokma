@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import type { BoardCard, BoardColumn, BoardGroup, BoardView } from '../view-types.js';
+import type { BoardCard, BoardColumn, BoardGroup, BoardView, Priority } from '../view-types.js';
 
 /**
  * Optimistic board moves (owner, 2026-10-01) — the state a move keeps while its write is in flight.
@@ -33,6 +33,15 @@ export type PendingMove = {
   phase: PendingPhase;
   /** `Date.now()` when the server committed; the clock `retireAgreed`'s TTL reads. */
   settledAt?: number;
+  /**
+   * A CLOSE, not a move (smoothness T7; spec `:66`: "optimistic through `beginPending` with the card dimmed"). The
+   * card sits in a terminal column and closing it takes it off the board (the server's `getBoard` excludes closed
+   * tickets, spec §3.2), so the overlay never relocates it: while the write is open (`awaiting` / `writing`) the card
+   * STAYS where it is and the slot dims it (`BoardCardSlot`); once the server has committed (`committed`) the overlay
+   * HIDES it, and the entry retires when the read no longer holds the card (or after the TTL). A refusal drops the
+   * entry, which undims the card. `toStateId` is the card's own state, so nothing that reads it as a target sees a move.
+   */
+  closes?: true;
 };
 
 export type PendingMoves = Readonly<Record<string, PendingMove>>;
@@ -85,6 +94,20 @@ export function applyPendingMoves(view: BoardView, pending: PendingMoves): Board
     if (groupIndex === -1) continue;
     const group = current[groupIndex]!;
     const source = group.columns.find((column) => column.cards.some((candidate) => candidate.ticketId === entry.ticketId))!;
+    if (entry.closes === true) {
+      // Open: the card stays, dimmed by its slot. Only a COMMITTED close takes it off the board.
+      if (entry.phase !== 'committed') continue;
+      const columns = group.columns.map(
+        (column): BoardColumn =>
+          column.stateId === source.stateId
+            ? { ...column, cards: column.cards.filter((candidate) => candidate.ticketId !== entry.ticketId) }
+            : column,
+      );
+      const next = [...current];
+      next[groupIndex] = { ...group, columns };
+      groups = next;
+      continue;
+    }
     const target = group.columns.find((column) => column.stateId === entry.toStateId);
     if (target === undefined || target.stateId === source.stateId) continue;
     const moved = source.cards.find((candidate) => candidate.ticketId === entry.ticketId)!;
@@ -119,7 +142,8 @@ export function retireAgreed(view: BoardView, pending: PendingMoves, now: number
       .filter((group) => group.workflowId === entry.workflowId)
       .flatMap((group) => group.columns)
       .find((column) => column.cards.some((candidate) => candidate.ticketId === entry.ticketId))?.stateId;
-    const agreed = stateNow === entry.toStateId;
+    // A close agrees when the read no longer holds the card at all; a move, when it shows the card in its target.
+    const agreed = entry.closes === true ? stateNow === undefined : stateNow === entry.toStateId;
     const expired = entry.phase === 'committed' && entry.settledAt !== undefined && now - entry.settledAt >= ttlMs;
     if (agreed || expired) {
       kept ??= { ...pending };
@@ -127,6 +151,111 @@ export function retireAgreed(view: BoardView, pending: PendingMoves, now: number
     }
   }
   return kept ?? pending;
+}
+
+/**
+ * A ticket whose `ticket.created` is in flight (smoothness T7, spec S5, audit SM-03): drawn on the board at once as
+ * a dimmed ghost card, with the key `…` (the real key is composed by the server), at the END of its state's column.
+ * The page holds the list; an entry retires when the read shows the id (`applyPendingCreates` ignores it then) or
+ * when the write is refused. `priority` is the level the person chose in the dialog, so the ghost's badge says
+ * what they asked for; the ghost has no assignee, no provenance and no arrows.
+ */
+export type PendingCreate = { ticketId: string; workflowId: string; stateId: string; title: string; typeId: string; priority: Priority };
+
+const GHOST_KEY = '…';
+
+function ghostCard(create: PendingCreate): BoardCard {
+  const none = { actorId: '', actorName: null, clientTime: '', serverTime: '' };
+  return {
+    ticketId: create.ticketId,
+    title: create.title,
+    typeId: create.typeId,
+    assignee: null,
+    stateProvenance: none,
+    cause: null,
+    rollup: null,
+    dueDate: null,
+    priority: { value: create.priority, claim: none },
+    key: GHOST_KEY,
+    pending: false,
+    parent: null,
+    epic: null,
+    pendingCreate: true,
+  };
+}
+
+/**
+ * The view with every in-flight create laid over it. An entry is ignored (not an error) when its workflow is not
+ * drawn, its column is not in that group, or the read ALREADY shows the ticket (it landed: the real card wins).
+ * Returns the SAME `view` when nothing applies.
+ */
+export function applyPendingCreates(view: BoardView, creates: readonly PendingCreate[]): BoardView {
+  if (creates.length === 0) return view;
+  let changed = false;
+  const groups = view.groups.map((group) => {
+    const mine = creates.filter(
+      (create) =>
+        create.workflowId === group.workflowId &&
+        !view.groups.some((other) => other.columns.some((column) => column.cards.some((card) => card.ticketId === create.ticketId))),
+    );
+    if (mine.length === 0) return group;
+    let touched = false;
+    const columns = group.columns.map((column): BoardColumn => {
+      const here = mine.filter((create) => create.stateId === column.stateId);
+      if (here.length === 0) return column;
+      touched = true;
+      return { ...column, cards: [...column.cards, ...here.map(ghostCard)] };
+    });
+    if (!touched) return group;
+    changed = true;
+    return { ...group, columns };
+  });
+  return changed ? { ...view, groups } : view;
+}
+
+/** How long a COMMITTED create may wait for a read that shows its id before its ghost is withdrawn (`PENDING_TTL_MS`'s sibling). */
+export const CREATE_TTL_MS = 20_000;
+
+type HeldCreate = PendingCreate & { settledAt?: number };
+
+/**
+ * The shell's list of creates in flight. `add` when the write goes out, `settle` when the server commits it (the
+ * ghost stays until a read SHOWS the id, so the card never blinks out between the answer and the reload),
+ * `remove` when it is refused. `realView` is the UN-narrowed read: an entry retires when it holds the id, and a
+ * committed entry the read never shows (the ticket sits behind a filter the shell applies, or someone moved it
+ * out of sight) is withdrawn after `CREATE_TTL_MS` so a ghost can never outlive its write.
+ */
+export function usePendingCreates(realView: BoardView | null) {
+  const [held, setHeld] = useState<readonly HeldCreate[]>([]);
+
+  const add = useCallback((create: PendingCreate) => {
+    setHeld((current) => [...current.filter((entry) => entry.ticketId !== create.ticketId), create]);
+  }, []);
+  const settle = useCallback((ticketId: string) => {
+    setHeld((current) => current.map((entry) => (entry.ticketId === ticketId ? { ...entry, settledAt: Date.now() } : entry)));
+  }, []);
+  const remove = useCallback((ticketId: string) => {
+    setHeld((current) => (current.some((entry) => entry.ticketId === ticketId) ? current.filter((entry) => entry.ticketId !== ticketId) : current));
+  }, []);
+
+  useEffect(() => {
+    if (realView === null) return;
+    const shown = new Set(realView.groups.flatMap((group) => group.columns.flatMap((column) => column.cards.map((card) => card.ticketId))));
+    setHeld((current) => (current.some((entry) => shown.has(entry.ticketId)) ? current.filter((entry) => !shown.has(entry.ticketId)) : current));
+  }, [realView]);
+
+  useEffect(() => {
+    const settled = held.flatMap((entry) => (entry.settledAt === undefined ? [] : [entry.settledAt]));
+    if (settled.length === 0) return;
+    const wait = Math.max(0, Math.min(...settled) + CREATE_TTL_MS - Date.now());
+    const timer = setTimeout(() => {
+      const now = Date.now();
+      setHeld((current) => current.filter((entry) => entry.settledAt === undefined || now - entry.settledAt < CREATE_TTL_MS));
+    }, wait);
+    return () => clearTimeout(timer);
+  }, [held]);
+
+  return { creates: held as readonly PendingCreate[], add, settle, remove };
 }
 
 /** What one card's move has accumulated while it is (or was) being attempted — formerly `MoveArrows`' own state. */
@@ -232,7 +361,7 @@ export function useMoveState(realView: BoardView): MoveState {
       }
       // The target column is remembered for BOTH gestures, so a release can close its slot smoothly. Only an ARROW move
       // notes the cards below the landing slot now: a drag's drop placeholder had already opened it.
-      const section = source !== undefined ? targetSectionOf(source, move.toStateId) : null;
+      const section = source !== undefined && move.closes !== true ? targetSectionOf(source, move.toStateId) : null;
       if (section !== null) {
         targetSections.current.set(move.ticketId, section);
         if (byArrow) recordBelow(slots.current, flights.current, section, move.ticketId);

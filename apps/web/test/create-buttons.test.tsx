@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ts from 'typescript';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
@@ -134,7 +134,13 @@ describe('22.150 the project page’s Create ticket is a primary icon button', (
         <ProjectPage />
       </Providers>,
     );
-    const create = await screen.findByRole('button', { name: 'Create ticket' });
+    // Enabled, not merely present (smoothness T6, 25.074): while the walk is open the header's control is this same button, busy and
+    // disabled, and it is REPLACED by the live one when the walk answers — a reference taken early is a detached node.
+    const create = await waitFor(() => {
+      const button = screen.getByRole('button', { name: 'Create ticket' });
+      expect(button).toBeEnabled();
+      return button;
+    });
     expect(create).toHaveClass('gn-button--primary');
     expect(iconsIn(create)).toHaveLength(1);
     const header = document.querySelector('.gn-project__header');
