@@ -4,6 +4,8 @@ set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib.sh"
 fails=0
+# `ctl gate` writes a priority marker into the machine-wide semaphore dir: every fixture gate below must write into a temp one.
+export CTL_SEM_DIR="$(mktemp -d)"
 check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
 # node 22
 check "node22 on PATH" '[ "$(ctl_node22 >/dev/null; node --version | cut -c1-4)" = "v22." ]'
@@ -269,6 +271,17 @@ p_mixed="$fk/pane-mixed.txt"; printf '\033[38;5;241m\xe2\x9d\xaf \033[39m\033[2m
 ghost() { FAKE_LOG="$fk/calls" FAKE_PANE="$1" PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; ctl_box_text gisik:7"; }
 check "13.1640 box_text: an UNCLOSED dim suggestion is not input" '[ -z "$(ghost "$p_ghost")" ]'
 check "13.1640 box_text: control — real text between a closed and an unclosed dim span is read" '[ "$(ghost "$p_mixed")" = "real words" ]'
+# 13.1820: the background-agent panel opens BELOW the footer and its selected row starts with ❯ — that row is not the box (live
+# gisik:6, 2026-10-03: `ctl dispatch` would refuse a seat whose box was empty). The box is the ❯ line above the status line.
+p_panel_real="$HERE/test/fixtures/seats/agents-panel-ghost.pane"
+p_panel_text="$fk/pane-panel-text.txt"; printf '\033[38;5;245m%s\n\033[38;5;241m\xe2\x9d\xaf\xc2\xa0\033[39mtyped words\n\033[38;5;245m%s\n  me | sonnet-5-5 | Ctx 12%% | x\n  -- INSERT -- bypass\n\n  \xe2\x8f\xba main\n  \xe2\x97\xaf general-purpose  Checking one\n\xe2\x9d\xaf \xe2\x97\xaf general-purpose  Checking route-shells\n' '────────────' '────────────' > "$p_panel_text"
+check "13.1820 box_text: the REAL capture with the agent panel open (selection on an agent row) holds an EMPTY box" '[ -z "$(ghost "$p_panel_real")" ]'
+p_panel_wrap="$fk/pane-panel-wrap.txt"; printf '\033[38;5;245m%s\n\033[38;5;241m\xe2\x9d\xaf\xc2\xa0\033[39mwrapped first line\n  second line\n\033[38;5;245m%s\n  me | sonnet-5-5 | Ctx 12%% | x\n  -- INSERT -- bypass\n\n  \xe2\x8f\xba main\n\xe2\x9d\xaf \xe2\x97\xaf general-purpose  Checking route-shells\n  \xe2\x97\xaf general-purpose  grep one | two\n' '────────────' '────────────' > "$p_panel_wrap"
+check "13.1820 box_text: a box wrapped onto a second line, panel open below (its last row holding a pipe), reads the box's own line" '[ "$(ghost "$p_panel_wrap")" = "wrapped first line" ]'
+check "13.1820 box_text: CONTROL — real text typed in the box with the panel open is read (and not the panel row)" '[ "$(ghost "$p_panel_text")" = "typed words" ]'
+# 13.1823: `ctl selftest` prints the number of steps it RAN. A typed literal collided in a tip merge (both sides bumped 16 -> 18, the merged
+# tree ran 20), so the count is incremented inside step() and printed from the counter.
+check "13.1823 selftest: the step count is counted inside step() and printed from the counter, never a typed literal" 'grep -q "^step() { n=\$((n+1));" "$HERE/verbs/selftest.sh" && grep -q "ctl_ok selftest \"\$n steps\"" "$HERE/verbs/selftest.sh" && ! grep -qE "ctl_ok selftest \"[0-9]+ steps\"" "$HERE/verbs/selftest.sh"'
 sp() { rm -f "$fk/calls" "$fk/enters"; CTL_DRY_RUN=0 FAKE_LOG="$fk/calls" FAKE_ENTERS="$fk/enters" FAKE_NEEDS="${2:-1}" FAKE_PANE="$1" PATH="$fk:$PATH" bash "$HERE/verbs/dispatch.sh" 7 --submit-pending --repo "$HERE/../.." 2>&1; }
 check "13.1641 dispatch --submit-pending: a pasted-but-unsent message is submitted by real Enters, never re-pasted" 'out=$(sp "" 2); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "^OK dispatch gisik:7 submitted its pending text (Enter ×2)" && ! grep -q paste-buffer "$fk/calls"'
 check "13.1642 dispatch --submit-pending: a box with only a ghost suggestion is refused and gets NO Enter" 'out=$(sp "$p_ghost"); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "holds no real text" && ! grep -q "send-keys" "$fk/calls"'

@@ -9522,6 +9522,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   position: relative;
   z-index: 1;
 }
+/* The same strip reaches back over the workflow heading above the rail: its toggle's foot (the bottom 2 px of the drawn box, and the
+   hit-slop below it) lay under the rail whenever the rail wears the scroll-fade mask (content past an edge), because the mask makes the
+   rail a stacking context later in the DOM than the toggle's `position: relative`, which a bare level ties with and loses to. Measured
+   with `elementFromPoint` on the CI seed's "Errand with waits" group (23 tickets, the rail overflows) at 1440: the toggle's bottom
+   edge answered `div.gn-board__rail.gn-scroll-fade` (25.320/25.327); a rail with no overflow, and so no mask, answered the button. */
+[data-style="neo"] .gn-board__workflow-toggle {
+  z-index: 1;
+}
 
 /* ── LOADING PLACEHOLDERS (smoothness release, 2026-10-02; spec §4, amendment S-R1) ──
    Appended after every earlier rule ON PURPOSE: a block inserted earlier would move every line range the plans cite.

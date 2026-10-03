@@ -19,11 +19,13 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   check-pr <branch> [--plan FILE] [--base B]  mechanical batch-PR verification; writes the checked marker
   reconcile                       ledger vs report headings by membership + plan coverage
   lanes [--watch]                 one line per gisik: window
+  seats [--json] [--flag]         one line per seat: busy/idle, shells+monitors, input box, Ctx, branch, last DONE/CHECKPOINT (read-only; --flag = only seats needing action)
   restart <window> <worktree> <brief> [--override FILE]
   close <window>                  close an idle lane whose worktree is clean and pushed
   dispatch <window> <file>        two pastes + proof of delivery
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
+  run-tests [--label L] -- <cmd…>  run a test/tsc/build command through the machine-wide slot semaphore; output to a log, ≤ 30-line summary
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;
