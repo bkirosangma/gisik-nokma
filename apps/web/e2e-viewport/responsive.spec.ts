@@ -1614,23 +1614,27 @@ for (const route of UNAUTHED_ROUTES) {
 }
 
 /**
- * `/` — a redirect assertion and nothing more.
- *
- * `app/page.tsx` is four lines whose entire body is `redirect('/workspaces')`.
- * Measured: `GET /` answers 307 with `Location: /workspaces`. `/workspaces` is
- * one of the thirteen routes that need an authed stack, so this test asserts
- * where `/` GOES and stops. Measuring `/workspaces`'s unauthenticated layout and
- * filing the numbers under `/` would be reporting coverage this suite does not
- * have.
+ * `/` — Home since Knowledge Graph spec E (27.629). This suite has no API, so the page renders its frame (the nav,
+ * the h1) and its workspaces read fails; what is asserted is that `/` is no longer a redirect, and that the brand
+ * is the keyboard's way there from a signed-out page.
  */
-test('/ redirects to /workspaces and renders no layout of its own', async ({ page }, testInfo) => {
+test('27.629 / renders Home (no redirect), and the brand reached by Tab + Enter from /help lands on /', async ({ page }, testInfo) => {
   const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
-  expect(response, 'no response for /').toBeTruthy();
-  expect(new URL(page.url()).pathname).toBe('/workspaces');
-  // The viewport gate still runs — a redirect measured at the wrong width would
-  // be just as untrustworthy, and this proves the gate is reachable on a route
-  // that renders no `.gn-shell` of its own.
+  expect(response?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).not.toBe('/workspaces');
   await assertViewportTookEffect(page, testInfo);
+  await page.goto('/help', { waitUntil: 'networkidle' });
+  const brand = page.getByRole('link', { name: 'Gisik Nokma, Home' });
+  await expect(brand).toBeVisible();
+  // The skip link (`SkipLink`) is the first stop; the brand must follow within three presses.
+  let focused = false;
+  for (let presses = 0; presses < 3 && !focused; presses += 1) {
+    await page.keyboard.press('Tab');
+    focused = await brand.evaluate((el) => el === document.activeElement);
+  }
+  await expect(brand).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/sign-in');
 });
 
 /**

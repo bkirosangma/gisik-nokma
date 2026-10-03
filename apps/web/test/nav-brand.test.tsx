@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { ruleFor } from './helpers/css-rule-scan.js';
 import { NavBrand } from '../src/nav-brand.js';
 import { LegalNav } from '../src/legal-nav.js';
+import { AppNavSkeleton } from '../src/skeletons/app-nav-skeleton.js';
 
 /**
  * `legal-nav.tsx` imports `AccountMenu`, which reads `usePathname`/`useRouter`
@@ -239,6 +240,12 @@ describe('27.623 the skeleton\'s brand is not a link', () => {
     expect(container.querySelector('a, button, [tabindex]')).toBeNull();
     expect(container.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
     expect(container.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
+    // the mount: the nav skeleton's brand is that non-link brand (25.057 asserts the whole skeleton holds no `a`)
+    cleanup();
+    const { container: skeleton } = render(<AppNavSkeleton />);
+    expect(skeleton.querySelector('.gn-nav__brand')).not.toBeNull();
+    expect(skeleton.querySelector('.gn-nav__brand a')).toBeNull();
+    expect(skeleton.querySelector('.gn-nav__brand')?.tagName).toBe('SPAN');
     cleanup();
     const { container: linked } = render(<NavBrand />);
     expect(linked.querySelectorAll('a')).toHaveLength(1);
