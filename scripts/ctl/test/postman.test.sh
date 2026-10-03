@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1979. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1980. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -27,7 +27,8 @@ rec_has() { grep -qF -- "$2" "$T/rec-$1"; }
 status_of() { pm postman status 2>&1 | grep "^$1 " | head -1; }
 hb() { python3 -c 'import os,sys; open(sys.argv[1],"a").close(); os.utime(sys.argv[1],(int(sys.argv[2]),int(sys.argv[2])))' "$L/inbox-watch-$1.hb" "$2"; }
 body() { printf 'Do the brief.\n' > "$T/BRIEF-$1.md"; echo "$T/BRIEF-$1.md"; }
-post() { pm post "$@" 2>&1; }          # post <to> --kind K ... ; prints the summary line
+post() { pm post "$@" 2>&1; }
+pm_noage() { CTL_POSTMAN_PAGE_AGE=999999 pm "$@"; }          # post <to> --kind K ... ; prints the summary line
 
 # ───────────────────────────── ledger / post ─────────────────────────────
 reset; b1="$(body a)"
@@ -148,16 +149,19 @@ check "13.1945 ack stops redelivery: nothing more is pasted after the ack, howev
 reset; mkseat exec3 idle; pm post exec3 --kind next --text "first" --from main >/dev/null 2>&1; pm post exec3 --kind fix --text "second" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1946 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked" \
   '[ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ] && rec_has exec3 "#1 next" && ! rec_has exec3 "#2"; pm ack 1 --seat exec3 >/dev/null 2>&1; sleep 3; NOW=$((NOW+5)); pm postman once >/dev/null 2>&1; [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 2 ] && rec_has exec3 "#2 fix"'
-reset; mkseat exec3 mute; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
-for dt in 200 620 1220; do NOW=$((NOW+dt)); pm postman once >/dev/null 2>&1; done
+reset; mkseat exec3 mute; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
+for dt in 200 620 1220; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done
 check "13.1947 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try" \
   '[ "$(rec_n exec3)" = 4 ] && [ "$(count_kind page main)" = 1 ] && jget 2 body | xargs grep -q "#1"'
-NOW=$((NOW+1300)); pm postman once >/dev/null 2>&1
+NOW=$((NOW+1300)); pm_noage postman once >/dev/null 2>&1
 check "13.1972 …the page is not repeated while the message stays open" '[ "$(rec_n exec3)" = 5 ] && [ "$(count_kind page main)" = 1 ]'
-reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/null 2>&1; pm postman once >/dev/null 2>&1
-for dt in 200 620 1220; do NOW=$((NOW+dt)); pm postman once >/dev/null 2>&1; done
+reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/null 2>&1; pm_noage postman once >/dev/null 2>&1
+for dt in 200 620 1220; do NOW=$((NOW+dt)); pm_noage postman once >/dev/null 2>&1; done
 check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file" \
   '[ "$(count_kind page planner)" = 1 ] && grep -q "⚑ POSTMAN" "$N" && grep -q "#1" "$N"'
+reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 4
+NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1; sleep 4; p1="$(count_kind page main)"; NOW=$((NOW+1000)); pm postman once >/dev/null 2>&1
+check "13.1980 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min" '[ "$p1" = 0 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat planner idle; pm post planner --kind question --text "which way?" --from exec3 >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
 check "13.1954 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line" \
@@ -199,8 +203,8 @@ reset; QR="$R/QUEUE-review.md"; : > "$QR"; pm postman once >/dev/null 2>&1
 printf '05:53 DONE 05:45 FIX task/foo-bar c28ca5cf (F1) reviewer A\n' >> "$QR"; pm postman once >/dev/null 2>&1
 printf 'x\n' > "$T/BRIEF-f.md"; pm post exec3 --kind fix --body "$T/BRIEF-f.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1; NOW=$((NOW+900)); pm postman once >/dev/null 2>&1
 check "13.1977 audit: a delivered FIX (a fix message with that ref) satisfies it — no note" '[ "$(count_kind note main)" = 0 ]'
-check "13.1978 ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none" \
-  'reset; QR="$R/QUEUE-review.md"; printf "05:53 DONE 05:45 FIX task/lost c28ca5cf (F1) reviewer A\n" > "$QR"; o="$(pm postman audit 2>&1)"; rc=$?; [ $rc = 1 ] && printf "%s" "$o" | grep -q "task/lost"; : > "$QR"; pm postman audit >/dev/null 2>&1'
+check "13.1978 ctl postman audit (on demand) exits 1 and names the unmatched line; CONTROL: exit 0 once a fix message with that ref exists, and on an empty queue" \
+  'reset; QR="$R/QUEUE-review.md"; printf "05:53 DONE 05:45 FIX task/lost c28ca5cf (F1) reviewer A\n" > "$QR"; o="$(pm postman audit 2>&1)"; rc=$?; [ $rc = 1 ] && printf "%s" "$o" | grep -q "task/lost" && { printf x > "$T/BRIEF-l.md"; pm post exec3 --kind fix --body "$T/BRIEF-l.md" --ref task/lost --from reviewerA >/dev/null 2>&1; pm postman audit >/dev/null 2>&1; } && { : > "$QR"; pm postman audit >/dev/null 2>&1; }'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
