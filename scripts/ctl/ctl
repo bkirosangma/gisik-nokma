@@ -21,6 +21,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   lanes [--watch]                 one line per gisik: window
   restart <window> <worktree> <brief> [--override FILE]
   close <window>                  close an idle lane whose worktree is clean and pushed
+  archive [--apply] [--list]      move stale lanes-dir working files to archive/<date>/ + roll the notes (dry-run by default; refuses while a landing is in flight)
   dispatch <window> <file>        two pastes + proof of delivery
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
