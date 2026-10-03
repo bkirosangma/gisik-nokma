@@ -30,3 +30,54 @@ Legend: ✅ covered by a test · ❌ not yet · 🟡 partial · 🧪 manual · �
 <!-- A T3 -->
 <!-- A T4 -->
 <!-- A T5 -->
+
+## 27.2 Reference index and "Linked from" (spec B, 27.100–27.179)
+
+Plan `docs/superpowers/plans/2026-10-03-reference-index.md`; spec `docs/superpowers/specs/2026-10-03-reference-index-design.md`. Blocks: T1 27.100–27.124, T2 27.125–27.139, T3 27.140–27.164, T4 27.165–27.179.
+
+<!-- KG-B T1 -->
+<!-- KG-B T2 -->
+<!-- KG-B T3 -->
+<!-- KG-B T4 -->
+
+## 27.3 Knowledge Graph view (spec C, 27.200–27.349)
+
+Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/superpowers/specs/2026-10-03-knowledge-graph-view-design.md`. Each task writes its cases directly below its own anchor.
+
+<!-- KG-C T1 -->
+<!-- KG-C T2 -->
+<!-- KG-C T3 -->
+<!-- KG-C T4 -->
+<!-- KG-C T5 -->
+<!-- KG-C T6 -->
+<!-- KG-C T7 -->
+<!-- KG-C T8 -->
+<!-- KG-C T9 -->
+
+## 27.4 MCP graph query and semantic layer (spec D, 27.400–27.549)
+
+Plan `docs/superpowers/plans/2026-10-03-mcp-graph-semantic-layer.md`; spec `docs/superpowers/specs/2026-10-03-mcp-graph-semantic-layer-design.md`. Each task writes its cases directly below its own anchor.
+
+<!-- D T1 -->
+<!-- D T2 -->
+<!-- D T3 -->
+<!-- D T4 -->
+<!-- D T5 -->
+<!-- D T6 -->
+<!-- D T7 -->
+<!-- D T8 -->
+<!-- D T9 -->
+
+## 27.5 Home (spec E, 27.600–27.659)
+
+Plan `docs/superpowers/plans/2026-10-03-home.md`; spec `docs/superpowers/specs/2026-10-03-home-design.md`.
+
+<!-- KG-E T1 -->
+
+<!-- KG-E T2 -->
+
+<!-- KG-E T3 -->
+
+<!-- KG-E T4 -->
+
+<!-- KG-E end -->
