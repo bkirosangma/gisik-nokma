@@ -1614,9 +1614,12 @@ for (const route of UNAUTHED_ROUTES) {
 }
 
 /**
- * `/` — Home since Knowledge Graph spec E (27.629). This suite has no API, so the page renders its frame (the nav,
- * the h1) and its workspaces read fails; what is asserted is that `/` is no longer a redirect, and that the brand
- * is the keyboard's way there from a signed-out page.
+ * `/` — Home since Knowledge Graph spec E (27.629). This suite has no API and no session, so the page renders its
+ * frame (the nav, the h1) and then sends the signed-out reader to `/sign-in?next=/` (27.626) — measured on all four
+ * projects: Enter on the brand passes through `/` and settles there. What is asserted is that `/` is no longer a
+ * redirect to `/workspaces`, and that the brand is the keyboard's way to `/` from a signed-out page: the settled
+ * `next` must be exactly `/`, since ANY signed-out target bounces to `/sign-in` (a brand pointing at `/workspaces`
+ * settles on `next=/workspaces`).
  */
 test('27.629 / renders Home (no redirect), and the brand reached by Tab + Enter from /help lands on /', async ({ page }, testInfo) => {
   const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -1634,7 +1637,10 @@ test('27.629 / renders Home (no redirect), and the brand reached by Tab + Enter 
   }
   await expect(brand).toBeFocused();
   await page.keyboard.press('Enter');
-  await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/sign-in');
+  await page.waitForURL((url) => url.pathname === '/sign-in');
+  const landed = new URL(page.url());
+  expect(landed.pathname).toBe('/sign-in');
+  expect(landed.searchParams.get('next')).toBe('/');
 });
 
 /**
