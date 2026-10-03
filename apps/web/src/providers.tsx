@@ -11,7 +11,7 @@ import {
   type NotificationPreferencesGateway,
   type NotificationsGateway,
   type WorkflowAuthoringGateway,
-} from '@gisik-nokma/app-core';
+} from '@gisik-nokma/app-core/data';
 import {
   createHttpClient,
   createHttpFoundingGateway,
@@ -334,10 +334,15 @@ function resolveSession(session: ReturnType<typeof authClient.useSession>): Reso
 
 export function useSessionStatus(): SessionStatus {
   const resolved = resolveSession(authClient.useSession());
-  if (resolved.kind === 'signed-in') {
-    return { kind: 'signed-in', user: { id: resolved.user.id, name: resolved.user.displayName } };
-  }
-  return resolved;
+  const kind = resolved.kind;
+  const id = resolved.kind === 'signed-in' ? resolved.user.id : '';
+  const name = resolved.kind === 'signed-in' ? resolved.user.displayName : '';
+  // ONE object per (kind, id, name), not one per render (smoothness T12, audit SM-10): the answer is read by a
+  // dozen consumers, and a session refetch that changes nothing a consumer can see must not hand each a new object.
+  return useMemo<SessionStatus>(
+    () => (kind === 'signed-in' ? { kind, user: { id, name } } : { kind }),
+    [kind, id, name],
+  );
 }
 
 /**

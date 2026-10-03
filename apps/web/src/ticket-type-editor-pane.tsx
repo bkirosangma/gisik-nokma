@@ -12,6 +12,7 @@ import {
   type WorkflowAuthoringGateway,
 } from '@gisik-nokma/app-core';
 import { ShellRefusal } from './shell-refusal.js';
+import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 
 /**
  * `TicketTypeEditorPane` / `NewTicketTypePane` — extracted from
@@ -96,7 +97,13 @@ export function TicketTypeEditorPane({
     };
   }, [gateway, workspaceId, typeId]);
 
-  if (read.kind === 'loading') return <p role="status">Loading this ticket type…</p>;
+  if (read.kind === 'loading') {
+    return (
+      <SkeletonRegion label="Loading this ticket type">
+        <Skeleton shape="block" height="3rem" rows={4} />
+      </SkeletonRegion>
+    );
+  }
   if (read.kind === 'missing') return <p>No ticket type has this id in this workspace.</p>;
   if (read.kind === 'failed') return <ShellRefusal what="This workspace’s ticket types" message={read.why} />;
 

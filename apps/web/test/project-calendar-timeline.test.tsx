@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListRow, RosterMember, TicketListView } from '@gisik-nokma/app-core';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
+import { AnnounceRegion } from '../src/announce-region.js';
 import { Providers } from '../src/providers.js';
 import { istToday } from '../src/ist-today.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -303,7 +304,7 @@ describe('the project page mounts four views over one list read', () => {
    * page is in WHILE a tab's read is in flight, and a resolving read would race
    * the assertion for the state it replaces.
    */
-  it('13.1056 the board tab\'s loading arm renders with role="status"', async () => {
+  it('13.1056 / 25.071 the board tab\'s loading arm is a named skeleton region and is ANNOUNCED through the shell\'s one status region', async () => {
     render(
       <Providers
         services={stubServices({
@@ -313,23 +314,23 @@ describe('the project page mounts four views over one list read', () => {
           getTickets: async (): Promise<TicketListView> => ({ projectId: 'p_1', rows: [row()] }),
         })}
       >
+        <AnnounceRegion />
         <ProjectPage />
       </Providers>,
     );
 
-    // POSITIVE CONTROL: the arm itself is on screen. Without this, a red below
-    // could mean "the board never entered its loading state", which is a
-    // different fault from "the loading state has no role".
-    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    // POSITIVE CONTROL: the arm itself is on screen, named, with no sentence in its place (smoothness T6: the bare
+    // `<p role="status">Loading…</p>` became a skeleton, so the announcement moved to the shell's one polite region).
+    const arm = await screen.findByTestId('project-tab-skeleton');
+    expect(arm.closest('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByText('Loading…')).toBeNull();
 
-    // THE WITNESS. Scoped to the arms whose TEXT is the loading words rather
-    // than `getByRole('status')` alone: this page has other `status` regions in
-    // its create area, and a bare role query would pass against one of those
-    // with the arm still bare.
-    const announcing = (await screen.findAllByRole('status')).filter(
-      (el) => el.textContent === 'Loading…',
-    );
-    expect(announcing, 'the Loading… arm carries no role="status"').toHaveLength(1);
+    // THE WITNESS: a screen reader gets the words, which is what 13.1056 was about. The status element is the shell's region
+    // (the arm itself carries no role), and it reads the tab's name.
+    await waitFor(() => {
+      const announcing = screen.getAllByRole('status').filter((el) => el.textContent === 'Loading the board');
+      expect(announcing, 'the loading arm was not announced').toHaveLength(1);
+    });
   });
 
   /**
@@ -820,7 +821,8 @@ describe('the roster is a convenience, never a gate', () => {
     );
     await openTab('Calendar');
 
-    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    // A named skeleton region (smoothness T6, 25.071), not a sentence: the arm is still a WAIT, said in words to a screen reader.
+    expect(await screen.findByText('Loading the calendar')).toBeInTheDocument();
     // The grid is not merely empty — it is not drawn at all.
     expect(document.querySelector('.gn-calendar')).toBeNull();
     // And the claim about claims is not made.
@@ -844,7 +846,7 @@ describe('the roster is a convenience, never a gate', () => {
     );
     await openTab('Timeline');
 
-    expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the timeline')).toBeInTheDocument();
     expect(document.querySelector('.gn-timeline')).toBeNull();
     expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();

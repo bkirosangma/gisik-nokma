@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { formatIstInstant, type DeletedItem, type LifecycleKind } from '@gisik-nokma/domain';
-import { Button } from '@gisik-nokma/ui';
+import { Button, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { cachedDeletedItemsOf } from '../deleted-items-from-cache.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
@@ -11,7 +11,6 @@ import {
   DELETED_BY_YOU,
   DELETED_ITEMS_EMPTY,
   DELETED_ITEMS_HEADING,
-  DELETED_ITEMS_LOADING,
   DELETED_ITEMS_OFFLINE,
   KIND_LABEL,
   MARK_LABEL,
@@ -142,7 +141,11 @@ export function DeletedItemsSection({
       <h2 className="gn-account__section-title" id={headingId}>
         {DELETED_ITEMS_HEADING}
       </h2>
-      {load.at === 'loading' ? <p className="gn-account__note">{DELETED_ITEMS_LOADING}</p> : null}
+      {load.at === 'loading' ? (
+        <SkeletonRegion label="Loading deleted items">
+          <Skeleton shape="block" height="3rem" rows={2} />
+        </SkeletonRegion>
+      ) : null}
       {load.at === 'offline' ? <p className="gn-account__note">{DELETED_ITEMS_OFFLINE}</p> : null}
       {load.at === 'cached' ? <p className="gn-account__note">{deletedItemsAsOf(formatIstInstant(load.fetchedAt))}</p> : null}
       {load.at === 'failed' ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * The phone breakpoint, as the query string `matchMedia` takes. It is the SAME `40rem` as the
@@ -21,21 +21,19 @@ export const PHONE_QUERY = '(max-width: 40rem)';
  * AMENDED 2026-10-02 (neo F-2, 23.330): the project page also reads it, to move the workflow picker and "Only tickets in
  * progress" into the Filters sheet on a phone (the header keeps them inline above 40rem).
  *
- * `false` on the server, on the first client render and wherever `matchMedia` does not exist, so the
- * markup the server sent is what hydrates; the real answer arrives in an effect and follows a
+ * `false` on the server and wherever `matchMedia` does not exist. It is a `useSyncExternalStore` (smoothness T8, case 25.141/25.144,
+ * audit SM-08): the server snapshot is `false`, so on a HARD LOAD the server markup paints and hydrates first (the CSS belt keeps the
+ * corner links hidden in that frame) and the client answer follows the hydration commit. On every CLIENT mount (each route hop
+ * remounts `AppNav`) the first render already has the answer, with no effect and no flash of the wrong shell; it follows a
  * foldable opening or a window resize through the `change` event.
  */
 export function useIsPhone(): boolean {
-  const [phone, setPhone] = useState(false);
+  return useSyncExternalStore(subscribePhone, () => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches, () => false);
+}
 
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const query = window.matchMedia(PHONE_QUERY);
-    const update = (): void => setPhone(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
-  return phone;
+function subscribePhone(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
 }

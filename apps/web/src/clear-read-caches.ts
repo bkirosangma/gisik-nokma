@@ -1,4 +1,4 @@
-import { clearLiveQueryCache } from '@gisik-nokma/app-core';
+import { clearLiveQueryCache } from '@gisik-nokma/app-core/data';
 import { clearNoteHomes } from './notes/note-homes.js';
 import { clearMyWorkspacesCache } from './use-my-workspaces.js';
 

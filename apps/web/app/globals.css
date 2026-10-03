@@ -1955,10 +1955,8 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
-/* Loading and the empty roster are one muted register, and both are `<p>`s
-   whose UA `margin-block: 1em` would otherwise reappear on top of the shell's
-   own flow. */
-.gn-members__loading,
+/* The empty roster is a muted `<p>` whose UA `margin-block: 1em` would otherwise reappear on top of the shell's
+   own flow. (The loading line is gone: the roster draws its own skeleton, smoothness T8.) */
 .gn-members__empty {
   margin: 1.25rem 0 0;
   color: var(--gn-text-muted);
@@ -5885,4 +5883,24 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__pending[data-pending="true"] { animation: gnPulse 1600ms var(--gn-motion-ease-out) 100ms infinite; }
 @media (prefers-reduced-motion: reduce) {
   .gn-nav__pending[data-pending="true"] { animation: none; opacity: 0.8; }
+}
+
+/* ── THE PROJECT PAGE'S TAB ARMS (smoothness T6, S1). `ProjectTabSkeleton` names the wait and holds the board / list shape, but adds no
+   box of its own: the shape inside it is the real view's container (`.gn-board__rail`, `.gn-list`), and a wrapper that took a box of its
+   own would move it relative to the page's other children. Layout only. */
+.gn-project__tab-skeleton, .gn-project__tab-skeleton-body { display: contents; }
+
+/* ── SECONDARY SCREEN SKELETONS (smoothness T8; spec S1, §4.3; amendment S-R1). Appended after every earlier rule. Like the route-shell
+   block above, these only LAY OUT: none names a fill, a border, a shadow, a colour or a style, so the skeletons stay style-neutral. */
+/* The sign-in methods row reserves the control's height before /auth/methods answers, so the form below never shifts (25.132). The
+   slot is always the card's first child; `ready` is the answered state (the segmented control, or nothing when the answer was a refusal). */
+.gn-sign-in__methods-slot { display: block; }
+.gn-sign-in__methods-slot[data-state="pending"] { min-height: 2.5rem; }
+/* Answered with nothing to show (no phone, or the read was refused): the slot leaves no empty flex item behind it, so the card's gap does not double. */
+.gn-sign-in__methods-slot[data-state="ready"]:empty { display: none; }
+/* The Notes and Inbox links in the top bar's corner are the bottom bar's at ≤64rem (`useTabletBar`'s own query): hidden by CSS too,
+   the belt behind the script gate, so even the pre-script paint is right (25.146). */
+@media (max-width: 64rem) {
+  .gn-nav__corner > .gn-nav__notes,
+  .gn-nav__corner > .gn-nav__inbox { display: none; }
 }

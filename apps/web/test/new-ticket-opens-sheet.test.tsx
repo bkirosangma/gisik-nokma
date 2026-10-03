@@ -158,12 +158,15 @@ beforeEach(() => {
 });
 
 /** The page header's primary "Create ticket"; an empty board draws a second one (the banner's). */
-const headerCreateTicket = async (): Promise<HTMLElement> => {
-  const all = await screen.findAllByRole('button', { name: 'Create ticket' });
-  const header = all.find((el) => el.classList.contains('gn-button--primary'));
-  if (header === undefined) throw new Error('no primary Create ticket button');
-  return header;
-};
+const headerCreateTicket = async (): Promise<HTMLElement> =>
+  // Smoothness T6 (25.074): while the session or the list walk is open the header's control is the same primary button, busy and
+  // DISABLED, so it is found at once; wait for the one that can be pressed.
+  waitFor(() => {
+    const header = screen.getAllByRole('button', { name: 'Create ticket' }).find((el) => el.classList.contains('gn-button--primary'));
+    if (header === undefined) throw new Error('no primary Create ticket button');
+    expect(header).toBeEnabled();
+    return header;
+  });
 
 describe('13.1369 creating a ticket opens it', () => {
   it('13.1369 a committed create pushes the NEW TICKET’S OWN ID as ?ticket=, and the sheet opens on it', async () => {

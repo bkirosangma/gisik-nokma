@@ -425,7 +425,6 @@ describe('13.767 every class the builder screen renders is a class ui.css styles
     // hole this case exists to close, at a smaller radius.
     const expected: [selector: string, declaration: string][] = [
       ['.workflow-builder-screen', 'display: flex'],
-      ['.workflow-builder-screen__loading', 'color: var(--gn-text-muted)'],
       ['.workflow-builder-screen__load-error', 'color: var(--gn-text)'],
       ['.workflow-builder-screen__header', 'flex-direction: column'],
       ['.workflow-builder-screen__title-row', 'justify-content: space-between'],

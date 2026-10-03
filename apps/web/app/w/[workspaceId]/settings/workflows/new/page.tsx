@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ReadOnlyBanner,
   TemplateGallery,
-  WorkflowBuilderScreen,
   canAuthorRole,
   draftFromTemplate,
   newDraft,
@@ -13,6 +12,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
+import { WorkflowBuilderScreen } from '../../../../../../src/authoring/workflow-builder-dynamic.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/new` — pick a template, then author.

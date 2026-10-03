@@ -92,7 +92,6 @@ export const DELETED_ITEMS_HEADING = 'Deleted items';
 export const DELETED_ITEMS_EMPTY = 'Nothing deleted.';
 /** D13, narrowed by trash Plan 3: this device has never read the list online (nothing is cached); never shown as "Nothing deleted." */
 export const DELETED_ITEMS_OFFLINE = 'Deleted items needs a connection.';
-export const DELETED_ITEMS_LOADING = 'Loading…';
 /** Trash Plan 3 (D9): the saved copy, offline — when it was read, and why nothing can be pressed. */
 export function deletedItemsAsOf(when: string): string {
   return `Deleted items as of ${when}, saved on this device. Restoring and marking need a connection.`;

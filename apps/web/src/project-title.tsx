@@ -1,15 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { Button, PencilIcon } from '@gisik-nokma/ui';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
 import { newUlid } from '@gisik-nokma/domain';
 import { ProjectEditForm, refusalField, type EditRefusal, type ProjectEditValues } from './project-edit-form.js';
 import { useWorkspaceGroups } from './use-workspace-groups.js';
+import { useOptimisticName } from './use-optimistic-name.js';
 import { updateSeeds } from './project-update-seeds.js';
-import { bumpProjectsVersion, useProjectsVersion } from './projects-version.js';
+import { bumpProjectsVersion } from './projects-version.js';
 import { useAppServices, useSessionStatus } from './providers.js';
+import { useMyWorkspaces } from './use-my-workspaces.js';
 import { mayAdminister } from './workspace-viewer.js';
 
 /**
@@ -17,7 +19,7 @@ import { mayAdminister } from './workspace-viewer.js';
  * plan Task 2, owner ruling M1) — the same form, the same people and the same
  * `project.updated` as the card on the workspace home.
  *
- * **It reads its own row** (`getMyWorkspaces`, the one shared read) for the two
+ * **It reads its own row** out of the shared `useMyWorkspaces` read (smoothness T6: one request for the nav, the names and this) for the two
  * facts the page does not otherwise hold: the caller's role in this workspace
  * and the project's description. While that read is pending or refused both are
  * `null`, and a `null` role offers NO Edit — the absence claims nothing, where
@@ -43,53 +45,38 @@ export function ProjectTitle({
   const { dataSource } = useAppServices();
   const session = useSessionStatus();
   const userId = session.kind === 'signed-in' ? session.user.id : null;
-  const version = useProjectsVersion();
-  const [row, setRow] = useState<{
-    role: string;
-    description: string | null;
-    prefix: string;
-    groupId: string | null;
-    workspacePrefix: string;
-  } | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   /** A prefix or group refusal, handed to the form to show under its field (22.181, 22.184, 22.187). */
   const [fieldRefusal, setFieldRefusal] = useState<EditRefusal | null>(null);
+  // The caller's role here and the project's description, out of the SAME shared read the nav and the name hooks ride
+  // (`useMyWorkspaces`; smoothness T6, audit SM-05): a remount within its freshness window paints from memory with no new request,
+  // and a write that bumps `projects-version` re-reads for it exactly as it did for its own effect.
+  const mine = useMyWorkspaces();
+  const row = useMemo(() => {
+    const workspace = mine.rows?.find((entry) => entry.id === workspaceId);
+    const project = workspace?.projects.find((entry) => entry.id === projectId);
+    return workspace === undefined || project === undefined
+      ? null
+      : {
+          role: workspace.role,
+          description: project.description ?? null,
+          prefix: project.prefix,
+          groupId: project.groupId ?? null,
+          workspacePrefix: workspace.prefix,
+        };
+  }, [mine.rows, workspaceId, projectId]);
+
   const { groups, reread } = useWorkspaceGroups(workspaceId, row !== null && mayAdminister(row.role) && editing);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (userId === null) {
-      setRow(null);
-      return;
-    }
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        const workspace = rows.find((entry) => entry.id === workspaceId);
-        const project = workspace?.projects.find((entry) => entry.id === projectId);
-        setRow(
-          workspace === undefined || project === undefined
-            ? null
-            : {
-                role: workspace.role,
-                description: project.description ?? null,
-                prefix: project.prefix,
-                groupId: project.groupId ?? null,
-                workspacePrefix: workspace.prefix,
-              },
-        );
-      },
-      () => {
-        if (!cancelled) setRow(null);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, workspaceId, projectId, userId, version]);
+  /**
+   * The name the `<h1>` draws (smoothness T7, spec S5). The form stays open for the write — it carries four fields, a
+   * re-key confirmation and field-level refusals that need it — so the gap this closes is the one AFTER the commit:
+   * the form leaves, and until the re-read lands the heading would show the OLD name. The typed name is held from Save,
+   * drawn from the commit until a read carries it, and dropped on any refusal.
+   */
+  const shownName = useOptimisticName(projectName);
 
   const save = useCallback(
     (values: ProjectEditValues): void => {
@@ -110,11 +97,13 @@ export function ProjectTitle({
         return;
       }
       const make = makeSubmittedFactory({ actorId: userId, origin: 'web' });
+      if (values.name.trim() !== projectName) shownName.begin(values.name.trim());
       setBusy(true);
       void dataSource.ingest(seeds.map(make)).then(
         (results: IngestResult[]) => {
           setBusy(false);
           if (results.length !== seeds.length) {
+            shownName.drop();
             setRefusal(
               `The server answered ${results.length} of ${seeds.length} claims, so what happened is not known.`,
             );
@@ -123,6 +112,7 @@ export function ProjectTitle({
           }
           const bad = results.find((result) => result.status !== 'committed');
           if (bad === undefined) {
+            shownName.settle();
             setEditing(false);
           } else if (bad.status === 'refused' && refusalField(bad.rule) !== null) {
             setFieldRefusal({ rule: bad.rule, reason: bad.reason });
@@ -133,16 +123,18 @@ export function ProjectTitle({
               bad.status === 'refused' ? `${bad.rule}: ${bad.reason}` : `${bad.code}: ${bad.message}`,
             );
           }
+          if (bad !== undefined) shownName.drop();
           // Re-read on a refusal too, for the reason the workspace home gives.
           bumpProjectsVersion();
         },
         (cause: unknown) => {
           setBusy(false);
+          shownName.drop();
           setRefusal(cause instanceof Error ? cause.message : String(cause));
         },
       );
     },
-    [dataSource, groups, projectId, projectName, reread, row, userId, workspaceId],
+    [dataSource, groups, projectId, projectName, reread, row, shownName, userId, workspaceId],
   );
 
   const canEdit = row !== null && mayAdminister(row.role);
@@ -167,13 +159,13 @@ export function ProjectTitle({
         />
       ) : (
         <div className="gn-project__title-row">
-          <h1 className="gn-project__title">{projectName}</h1>
+          <h1 className="gn-project__title">{shownName.name}</h1>
           {canEdit ? (
             <Button
               ref={trigger}
               type="button"
               className="gn-project__edit"
-              aria-label={`Edit ${projectName}`}
+              aria-label={`Edit ${shownName.name}`}
               onClick={() => setEditing(true)}
             >
               {/* Neo follow-up F-2 (case 23.331): on a phone the word gives way to the glyph so Edit stays on the title's row
