@@ -22,7 +22,7 @@ import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
  * (a workspace-scoped note) matches no `proj_projects` row, so `NOT EXISTS` is
  * trivially true for it and this clause is a no-op there.
  */
-const NOTE_PROJECT_LIVE_WHERE =
+export const NOTE_PROJECT_LIVE_WHERE =
   'NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = n.home_project_id AND dp.deleted_at IS NOT NULL)';
 
 /**
