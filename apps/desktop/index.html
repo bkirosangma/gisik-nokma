@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gisik Nokma</title>
+    <!--
+      The window is never white before React (smoothness T13, audit SM-12). These two colours are `tokens.ts`'s hig `surface` — the desktop
+      shell sets no `data-style`, so `themeStylesheet()`'s bare `:root` block is the one it renders — and they must follow a change to that
+      role: `src/index-html.test.ts` (25.211) reads them from `colorOf`. `color-scheme` flips the default text colour with the ground, so
+      the dark ground never carries black text before the stylesheet lands. This is the `html` element only; the `body` background and
+      colour are still unset (15.32).
+    -->
+    <style data-gn-ground>
+      html { background: #efe7df; color-scheme: light; }
+      @media (prefers-color-scheme: dark) { html { background: #141a2e; color-scheme: dark; } }
+      html[data-theme="light"] { background: #efe7df; color-scheme: light; }
+      html[data-theme="dark"] { background: #141a2e; color-scheme: dark; }
+    </style>
+    <script>try{var t=localStorage.getItem('gn-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;}}catch(e){}</script>
   </head>
   <body>
     <div id="root"></div>
