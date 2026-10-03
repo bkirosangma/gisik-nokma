@@ -22,7 +22,7 @@ function refuse(reason: string): Refusal {
  * `noteMovedPayload`, `noteAttachedPayload`). Read defensively: the payload
  * has already parsed, but this must never throw on a shape it does not know.
  */
-function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<[kind: string, id: string]> {
+export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<[kind: string, id: string]> {
   const payload = (typeof rawPayload === 'object' && rawPayload !== null ? rawPayload : {}) as Record<
     string,
     unknown
@@ -48,6 +48,11 @@ function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<[kind: 
       break;
     case 'note.attached':
       add('ticket', payload['ticketId']);
+      break;
+    case 'ticket.link_added':
+    case 'ticket.link_removed':
+      // Spec A: the TARGET is the second ticket a link names; a purged one refuses the claim.
+      add('ticket', payload['targetId']);
       break;
     case 'claim.contested': {
       // Trash Plan 3 (D10). A refused ticket claim comes back as a contest on

@@ -387,6 +387,8 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
           ) {
             await handleMentions(env, parsed.data.value, 'description');
           }
+        } else if (env.type === 'ticket.link_added' || env.type === 'ticket.link_removed') {
+          // Spec A §7: links notify nobody. An explicit arm writes the decision where the next reader of this chain looks; case 27.007 pins that nobody is notified.
         } else if (env.type === 'claim.contested') {
           await handleContested(env);
         }
