@@ -17,6 +17,7 @@ import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './build
 import { usePhoneBoard } from '../../views/use-phone-board.js';
 import { connectionToTransition, phoneOpeningView, toFlowGraph } from './flow-graph.js';
 import { StateNode } from './state-node.js';
+import { TidyControl } from './tidy-control.js';
 import { TransitionEdge } from './transition-edge.js';
 import { useDragEscape, useWorkingNodes } from './use-working-nodes.js';
 
@@ -114,13 +115,17 @@ function CanvasInner() {
       >
         <Background />
         <Panel position="bottom-left">
-          <button
-            type="button"
-            className="gn-workflow-canvas__fit"
-            onClick={() => void fitView({ ...FIT_OPTIONS, duration: 200 })}
-          >
-            Fit to screen
-          </button>
+          {/* G-9 T4: Tidy sits beside Fit to screen; it renders nothing for a viewer. */}
+          <div className="gn-workflow-canvas__corner">
+            <button
+              type="button"
+              className="gn-workflow-canvas__fit"
+              onClick={() => void fitView({ ...FIT_OPTIONS, duration: 200 })}
+            >
+              Fit to screen
+            </button>
+            <TidyControl />
+          </div>
         </Panel>
       </ReactFlow>
     </div>

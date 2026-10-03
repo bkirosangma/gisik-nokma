@@ -13,11 +13,13 @@ import {
   type BuilderEnvironment,
   type BuilderSession,
 } from './builder-context.js';
+import { AddTransitionForm } from './add-transition-form.js';
 import { BuilderPanels } from './builder-panels.js';
 import { IssuesPanel } from './issues-panel.js';
 import { PublishControls } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
+import { TidyControl } from './tidy-control.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
 
 /**
@@ -213,6 +215,8 @@ export function WorkflowBuilderScreen(props: {
             <WorkflowNameField />
             <div className="workflow-builder-screen__actions">
               <AddStateButton />
+              <AddTransitionForm />
+              <TidyControl />
               <Button
                 ref={panelsButtonRef}
                 className="workflow-builder-screen__panels"
