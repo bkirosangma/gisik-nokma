@@ -493,8 +493,8 @@ as `13.1501`–`13.1512` (arms in `scripts/ctl/test/lib.test.sh` under `pnpm che
 ## `ctl seats`: one line per seat, read-only (`task/ctl-seats`, plan #3, owner-approved 2026-10-03)
 Why: the orchestrator's watch loop and the 300k-mid-step flag (plan #18) read raw `tmux capture-pane` dumps, which cost
 context on every check and miss a stranded input box or a dead watcher. `ctl seats` reads every window of `gisik` once
-(`has-session`, `list-windows` + `capture-pane`, never `send-keys`) and prints one line each. Block `13.1800`–`13.1823` (of the reserved
-`13.1800`–`13.1829`; `13.1820`–`13.1823` are FIX 1, 2026-10-03), 🧪 for the same reason as `13.1501`–`13.1512` (arms in `scripts/ctl/test/seats.test.sh` under
+(`has-session`, `list-windows` + `capture-pane`, never `send-keys`) and prints one line each. Block `13.1800`–`13.1824` (of the reserved
+`13.1800`–`13.1829`; `13.1820`–`13.1823` are FIX 1 and `13.1824` is FIX 2, 2026-10-03), 🧪 for the same reason as `13.1501`–`13.1512` (arms in `scripts/ctl/test/seats.test.sh` under
 `pnpm check:ctl`; the citation scanner reads only `apps/` and `packages/`). The pane fixtures in
 `scripts/ctl/test/fixtures/seats/` are real captures of the live session (address masked).
 
@@ -522,6 +522,7 @@ context on every check and miss a stranded input box or a dead watcher. `ctl sea
 - 13.1821 🧪 Protocol lines (MSG-no-midtask-seats): `CHECKPOINT reviewer idle after <branch> <hex sha>` is a CHECKPOINT signal (live gisik:9 read `last: none`); `needs fresh FIX session` is kind needs-fresh and raises `needs-fresh-session`; a lane's `CHECKPOINT task/<b> <sha> DONE` counts as DONE (`idle-no-task` with a monitor armed). CONTROLS: the reviewer template (`<branch> <sha8>`, no hex), a quoted `"needs fresh FIX session"`, and a step checkpoint (`step 2/3`, not DONE) are not signals / not DONE.
 - 13.1822 🧪 A turn-end stamp later than now is yesterday's (now 00:05, `done 11:58 PM` is 7 min); CONTROL: `done 12:03 AM` at 00:05 is 2 min.
 - 13.1823 🧪 `ctl selftest` prints the number of steps it ran: counted in `step()`, never a typed literal (both sides of a tip merge had bumped `16 steps` to `18 steps`; the merged tree ran 20).
+- 13.1824 🧪 A `ctl seats` text line in a pane's scrollback (`… | Ctx 11% sonnet-5-5 | …`, which matches `Ctx N%` + `|`) above the real transcript, box and status line (`Ctx 27% opus-5-5`) is not the status line: the LAST such line is, so ctx, model and the typed box text come from the real ones (both `seats.py` and `ctl_box_text`, which share `boxtext.py`); CONTROL: the same pane without the scrollback line reads the same.
 
 ## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
 

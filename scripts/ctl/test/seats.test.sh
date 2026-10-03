@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1823 for `ctl seats`; run by `ctl selftest`.
+# scripts/ctl/test/seats.test.sh — cases 13.1800-13.1824 for `ctl seats`; run by `ctl selftest`.
 # Two layers: seats.py is driven over a directory of captured panes (+ their git facts), and the whole verb is driven
 # against a fake `tmux` on PATH that serves those panes and logs every call (so "capture-pane only, never send-keys" is
 # a measured fact, not a promise). Real captures live in fixtures/seats/ (taken from the live gisik session 2026-10-03
@@ -104,6 +104,15 @@ d=$(fixture); mkpane "$d/6.pane" "⏺ x" 'a long wrapped first line\n  and its s
 check "13.1820 panel: a box that wraps onto a second line (no rule right under its ❯) with 12 agent rows below, the last holding a \" | \", still reads the box's own line" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "a long wrapped first line" ]'
 d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
 check "13.1820 CONTROL: a panel alone makes an idle seat neither busy nor box-text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"],d[\"box\"]")" = "idle empty" ]'
+
+# ---- a `ctl seats` text line in the scrollback (13.1824): the status line is the LAST one that looks like it ----
+# The controller runs `ctl seats` in its own pane, so a line `gisik:2 exec2 lane | idle … | Ctx 11% sonnet-5-5 | …` sits ABOVE the real
+# transcript, box and status line, and matches `Ctx N%` + `|`. Taking the first match would read ctx 11 / sonnet and bound the box search above the box.
+SCROLL='gisik:2 exec2 lane | idle | sh 0 mon 0 | box empty | Ctx 11% sonnet-5-5 | task/x clean | last: none'
+d=$(fixture); mkpane "$d/6.pane" "$SCROLL
+⏺ working on it" "typed words" 27 opus-5-5 ""; meta "$d" 6 planner 0
+d2=$(fixture); mkpane "$d2/6.pane" "⏺ working on it" "typed words" 27 opus-5-5 ""; meta "$d2" 6 planner 0
+check "13.1824 scrollback: a ctl-seats line (Ctx 11% sonnet) above the real status line (Ctx 27% opus) — ctx, model and the typed box text come from the REAL ones; CONTROL: the same pane without that line reads the same" '[ "$(jv "$(run "$d" --json)" 6 "d[\"ctx\"],d[\"model\"],d[\"box\"],d[\"box_text\"]")" = "27 opus-5-5 text typed words" ] && [ "$(jv "$(run "$d2" --json)" 6 "d[\"ctx\"],d[\"model\"],d[\"box\"],d[\"box_text\"]")" = "27 opus-5-5 text typed words" ]'
 
 # ============ 3. last DONE / CHECKPOINT / needs fresh session ============
 repo="$T/repo"; mkdir -p "$repo"; ( cd "$repo" && git init -q . && GIT_AUTHOR_DATE=2026-10-03T01:48:00Z GIT_COMMITTER_DATE=2026-10-03T01:48:00Z git -c user.name=t -c user.email=t@t commit -q --allow-empty -m one )
@@ -242,7 +251,7 @@ s=$(python3 -c 'import time;print(time.time())'); n13=$(vrun --json 2>/dev/null 
 check "13.1816 verb: windows print in NUMERIC order (2 before 10, 10-13 after 9 — a text sort puts 10 before 2)" '[ "$(vrun --json 2>/dev/null | python3 -c "import sys,json; print(\" \".join(str(json.loads(l)[\"window\"]) for l in sys.stdin if l.startswith(\"{\")))")" = "1 2 3 4 5 6 7 8 9 10 11 12 13" ] && [ "$(vrun 2>/dev/null | grep -o "^gisik:[0-9]*" | tr "\n" " ")" = "gisik:1 gisik:2 gisik:3 gisik:4 gisik:5 gisik:6 gisik:7 gisik:8 gisik:9 gisik:10 gisik:11 gisik:12 gisik:13 " ]'
 check "13.1819 speed: 13 windows in under 2 s through the fake tmux" '[ "$n13" = 13 ] && python3 -c "import sys; sys.exit(0 if $e - $s < 2.0 else 1)"'
 # parity with lib.sh: the box this verb reads is the box ctl_box_text reads, on every box variant used above.
-check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed ghost, an unclosed ghost, real+ghost, and the agent-panel shape (empty box; typed text)" 'ok=1
+check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed ghost, an unclosed ghost, real+ghost, the agent-panel shape (empty box; typed text) and a ctl-seats line in the scrollback" 'ok=1
   for variant in "plain words" "\\033[2mghost\\033[0m" "\\033[2munclosed ghost" "real \\033[2mghost\\033[0m" ""; do
     pd=$(fixture); mkpane "$pd/1.pane" "⏺ x" "$variant" 12 sonnet-5-5 ""; meta "$pd" 1 exec1 0
     want=$(FAKE_DIR="$fd" FAKE_PANES="$pd" FAKE_WINDOWS="$fd/windows" PATH="$fk:$PATH" bash -c ". \"$HERE/lib.sh\"; ctl_box_text gisik:1")
@@ -251,7 +260,9 @@ check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed gh
   done
   pd=$(fixture); cp "$FX/agents-panel-ghost.pane" "$pd/1.pane"; meta "$pd" 1 exec1 0
   pd2=$(fixture); mkpane "$pd2/1.pane" "⏺ x" "typed words" 12 sonnet-5-5 ""; addpanel "$pd2/1.pane" 12; meta "$pd2" 1 exec1 0
-  for pdir in "$pd" "$pd2"; do   # the panel shape: the selected agent row below the footer is not the box
+  pd3=$(fixture); mkpane "$pd3/1.pane" "gisik:2 exec2 lane | idle | Ctx 11% sonnet-5-5 | x
+⏺ x" "typed words" 27 opus-5-5 ""; meta "$pd3" 1 exec1 0   # a ctl-seats line in the scrollback (13.1824)
+  for pdir in "$pd" "$pd2" "$pd3"; do   # the panel shape: the selected agent row below the footer is not the box; the scrollback shape: the last status line is
     want=$(FAKE_DIR="$fd" FAKE_PANES="$pdir" FAKE_WINDOWS="$fd/windows" PATH="$fk:$PATH" bash -c ". \"$HERE/lib.sh\"; ctl_box_text gisik:1")
     got=$(jv "$(run "$pdir" --json)" 1 "d[\"box_text\"]")
     [ "$want" = "$got" ] || { ok=0; echo "    panel [$pdir]: ctl_box_text=[$want] seats=[$got]"; }
