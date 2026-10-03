@@ -18,6 +18,8 @@ test('29.005 parseResult accepts a run record and refuses everything else; contr
     { ...good, pan: { ...pan, fps: Number.NaN } },
     { ...good, pan: { ...pan, worstMs: '18' } },
     { ...good, clickToSettleMs: 'fast' },
+    // a missing click-to-settle is not `null`: a record that never said is refused (a JSON body drops an undefined key)
+    { ...good, clickToSettleMs: undefined },
   ]) {
     expect(parseResult(bad).ok, JSON.stringify(bad)).toBe(false);
   }
