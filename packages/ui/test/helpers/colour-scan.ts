@@ -26,6 +26,7 @@ export const CLIENT_SOURCE_ROOTS = [
   'packages/app-core/src',
   'packages/editor/src',
   'packages/knowledge-graph/src',
+  'packages/viewport/src',
   'apps/web/src',
   'apps/web/app',
   'apps/desktop/src',

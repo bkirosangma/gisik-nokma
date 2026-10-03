@@ -123,6 +123,7 @@
         "$TURBO_ROOT$/apps/desktop/src/**",
         "$TURBO_ROOT$/apps/mobile/src/**",
         "$TURBO_ROOT$/packages/knowledge-graph/src/**",
+        "$TURBO_ROOT$/packages/viewport/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/packages/*/test/**",
         "$TURBO_ROOT$/apps/*/package.json",
@@ -133,6 +134,11 @@
     "@gisik-nokma/knowledge-graph-browser#test": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/knowledge-graph/src/**", "$TURBO_ROOT$/packages/ui/src/ui.css"]
+    },
+    // WTG Part 1 T1: the browser suite drives Chromium against the BUILT app-core, viewport and ui packages and reads the stylesheet the view ships.
+    "@gisik-nokma/flow-graph-browser#test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/viewport/src/**", "$TURBO_ROOT$/packages/app-core/src/**", "$TURBO_ROOT$/packages/ui/src/ui.css"]
     },
     // `reporting-scope-guard.test.ts` walks SEVEN trees (its own `SCANNED_ROOTS`),
     // and three CSS-binding suites read `packages/ui/src/ui.css` — the stylesheet
