@@ -17,7 +17,7 @@ import { useBuilderEnv, useBuilderStore, useDraft, useSummaryCtx } from './build
 import { usePhoneBoard } from '../../views/use-phone-board.js';
 import { connectionToTransition, phoneOpeningView, toFlowGraph } from './flow-graph.js';
 import { StateNode } from './state-node.js';
-import { TidyControl } from './tidy-control.js';
+import { measuredSizes, TidyControl } from './tidy-control.js';
 import { TransitionEdge } from './transition-edge.js';
 import { useDragEscape, useWorkingNodes } from './use-working-nodes.js';
 
@@ -38,7 +38,7 @@ function CanvasInner() {
   const { canAuthor } = useBuilderEnv();
   const draft = useDraft();
   const summaryCtx = useSummaryCtx();
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes } = useReactFlow();
   const phone = usePhoneBoard();
   const graph = useMemo(() => toFlowGraph(draft, summaryCtx), [draft, summaryCtx]);
   const working = useWorkingNodes(graph.nodes);
@@ -124,7 +124,7 @@ function CanvasInner() {
             >
               Fit to screen
             </button>
-            <TidyControl />
+            <TidyControl sizes={() => measuredSizes(getNodes())} />
           </div>
         </Panel>
       </ReactFlow>

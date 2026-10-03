@@ -9,9 +9,18 @@ const corner = (page: Page) => page.locator('.gn-workflow-canvas__corner');
 async function boxes(page: Page) {
   return Promise.all(NAMES.map((name) => nodeBox(page, name)));
 }
+/** Every rendered state box, whatever the seed (rect in client px). */
+async function allBoxes(page: Page) {
+  return page.locator('.react-flow__node').evaluateAll((els) =>
+    els.map((el) => {
+      const { x, y, width, height } = el.getBoundingClientRect();
+      return { x, y, width, height };
+    }),
+  );
+}
 const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) =>
   a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-function anyOverlap(list: Awaited<ReturnType<typeof boxes>>) {
+function anyOverlap(list: Awaited<ReturnType<typeof allBoxes>>) {
   return list.some((a, i) => list.some((b, j) => i < j && overlaps(a, b)));
 }
 
@@ -44,6 +53,14 @@ test('25.541 Tidy lays the states out with no two boxes overlapping, and Undo ti
   });
   expect(await readDraftPositions(page)).toEqual(draftBefore);
   await expect(header(page).getByRole('button', { name: 'Undo tidy' })).toHaveCount(0);
+
+  // F1: Tidy clears the boxes React Flow MEASURED (a state is ~200 flow px tall, rows 140 apart). errand-with-waits
+  // stacks four states in one column; the kanban above has one per column, so it never could have failed.
+  await openHarness(page, { seed: 'errand-with-waits' });
+  // control: the seeded layout HAS overlapping boxes, so "none overlap" below is not vacuous
+  expect(anyOverlap(await allBoxes(page))).toBe(true);
+  await corner(page).getByRole('button', { name: 'Tidy' }).click();
+  expect(anyOverlap(await allBoxes(page))).toBe(false);
 });
 
 async function openAddTransition(page: Page) {

@@ -1,83 +1,145 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import type { Node } from '@xyflow/react';
 import { Button } from '@gisik-nokma/ui';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { clampToAvoidOverlap, type Rect } from '../collision.js';
-import { layoutDraft, type StatePosition } from '../layout.js';
+import type { DraftStore } from '../draft-store.js';
+import { ANY_STATE_NODE_ID, layoutDraft, type StatePosition } from '../layout.js';
 import { useBuilderEnv, useBuilderStore } from './builder-context.js';
 import { UNMEASURED_NODE } from './flow-graph.js';
 
 /** How long "Undo tidy" stays on offer (spec §3.5). */
 export const TIDY_UNDO_MS = 10_000;
 
+/** Node sizes by position key, as the draft keys positions: a state's id, or `any-state`. */
+export type NodeSizes = Record<string, { width: number; height: number }>;
+
+/** React Flow's measured nodes as {@link NodeSizes}: `s:<id>` becomes `<id>`, `any-state` stays. A node React Flow has not measured yet has no entry. */
+export function measuredSizes(nodes: readonly Node[]): NodeSizes {
+  const sizes: NodeSizes = {};
+  for (const node of nodes) {
+    const { width, height } = node.measured ?? {};
+    if (width !== undefined && height !== undefined) {
+      sizes[node.id === ANY_STATE_NODE_ID ? node.id : node.id.slice('s:'.length)] = { width, height };
+    }
+  }
+  return sizes;
+}
+
 /**
- * `layoutDraft`, each position then passed through the collision check against those already placed (spec §3.5): a
- * state wider than `COLUMN_WIDTH` or taller than `ROW_HEIGHT` would otherwise sit on its neighbour. The store holds no
- * measured sizes (React Flow does), and this runs outside the canvas too (the header's Tidy), so every box is the
- * unmeasured size the phone opening view already uses.
+ * `layoutDraft`, each position then passed through the collision check against those already placed (spec §3.1, §3.5):
+ * a state taller than `ROW_HEIGHT` or wider than `COLUMN_WIDTH` would otherwise sit on its neighbour. Every box, the
+ * one being placed and the ones already placed, is its measured size from `sizes` (keyed like the draft's positions);
+ * `UNMEASURED_NODE` stands in only for a key `sizes` has no entry for. A neo state measures about 200 flow px tall
+ * against rows 140 apart, so a caller that has measurements must pass them: without, only the fallback box is cleared.
  */
-export function tidyPositions(def: WorkflowDef): Record<string, StatePosition> {
+export function tidyPositions(def: WorkflowDef, sizes: NodeSizes = {}): Record<string, StatePosition> {
   const placed: Rect[] = [];
   const tidied: Record<string, StatePosition> = {};
   for (const [id, target] of Object.entries(layoutDraft(def))) {
-    const position = clampToAvoidOverlap(target, UNMEASURED_NODE, placed, target);
+    const size = sizes[id] ?? UNMEASURED_NODE;
+    const position = clampToAvoidOverlap(target, size, placed, target);
     tidied[id] = position;
-    placed.push({ ...position, ...UNMEASURED_NODE });
+    placed.push({ ...position, ...size });
   }
   return tidied;
 }
 
+type TidyOffer = { prev: Record<string, StatePosition>; tidied: Record<string, StatePosition>; owner: object };
+
 /**
- * Tidy re-lays out every state in one store action, and "Undo tidy" puts the previous positions back for 10 s. The
- * button goes on the first position change that is not the tidy itself (a drag, a nudge, an add): it would otherwise
- * restore a layout the author has since moved away from. No other undo exists (spec §3.5).
+ * The "Undo tidy" offer of ONE draft store, shared by every {@link TidyControl} on it (the header's and the canvas
+ * corner's): it was per instance, so a second Tidy re-armed a fresh offer whose `prev` was the first TIDIED layout
+ * and the first instance's still-live subscription cleared it. Here a Tidy while an offer is open keeps the original
+ * `prev` and restarts the 10 s; any write that is not a Tidy or an Undo drops the offer at once.
  */
-export function TidyControl() {
+function createTidyUndo(store: DraftStore) {
+  let offer: TidyOffer | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let unwatch: (() => void) | null = null;
+  const listeners = new Set<() => void>();
+
+  const clear = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    unwatch?.();
+    unwatch = null;
+    if (offer === null) return;
+    offer = null;
+    for (const listener of [...listeners]) listener();
+  };
+
+  return {
+    get: () => offer,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    tidy(owner: object, sizes: NodeSizes) {
+      const state = store.getState();
+      const tidied = tidyPositions(state.def, sizes);
+      const prev = offer?.prev ?? state.positions;
+      // armed BEFORE the write, so the watcher sees `positions === offer.tidied` on the write's own notify and a re-Tidy keeps the offer
+      offer = { prev, tidied, owner };
+      unwatch ??= store.subscribe(() => {
+        if (store.getState().positions !== offer?.tidied) clear();
+      });
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(clear, TIDY_UNDO_MS);
+      store.actions.setPositions(tidied);
+      for (const listener of [...listeners]) listener();
+    },
+    undo() {
+      if (offer === null) return;
+      const { prev } = offer;
+      store.actions.setPositions(prev);
+      clear();
+    },
+    /** A control that offered the Undo is gone: take the offer with it. */
+    release(owner: object) {
+      if (offer?.owner === owner) clear();
+    },
+  };
+}
+
+type TidyUndo = ReturnType<typeof createTidyUndo>;
+const undoByStore = new WeakMap<DraftStore, TidyUndo>();
+function tidyUndoOf(store: DraftStore): TidyUndo {
+  let undo = undoByStore.get(store);
+  if (undo === undefined) {
+    undo = createTidyUndo(store);
+    undoByStore.set(store, undo);
+  }
+  return undo;
+}
+
+/**
+ * Tidy re-lays out every state in one store action, and "Undo tidy" puts the pre-Tidy positions back for 10 s. The
+ * button goes on the first position change that is not a Tidy (a drag, a nudge, an add): it would otherwise restore
+ * a layout the author has since moved away from. `sizes` is the caller's measured node sizes, read when Tidy is
+ * pressed (the canvas corner passes React Flow's, the header the screen's canvas api); omitted, every box is the
+ * unmeasured fallback. Only the control that was pressed shows "Undo tidy". No other undo exists (spec §3.5).
+ */
+export function TidyControl(props: { sizes?: () => NodeSizes }) {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
-  const [undo, setUndo] = useState<{ prev: Record<string, StatePosition>; tidied: Record<string, StatePosition> } | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearTimer = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = null;
-  }, []);
-  useEffect(() => clearTimer, [clearTimer]);
-
+  const tidyUndo = tidyUndoOf(store);
+  const offer = useSyncExternalStore(tidyUndo.subscribe, tidyUndo.get, tidyUndo.get);
+  const self = useRef({});
   useEffect(() => {
-    if (undo === null) return;
-    return store.subscribe(() => {
-      if (store.getState().positions !== undo.tidied) {
-        clearTimer();
-        setUndo(null);
-      }
-    });
-  }, [store, undo, clearTimer]);
+    const owner = self.current;
+    return () => tidyUndo.release(owner);
+  }, [tidyUndo]);
 
   if (!canAuthor) return null;
 
-  const tidy = () => {
-    const state = store.getState();
-    const tidied = tidyPositions(state.def);
-    clearTimer();
-    // armed BEFORE the write: the subscription above checks `positions` against `tidied` on the write's own notify
-    setUndo({ prev: state.positions, tidied });
-    timer.current = setTimeout(() => setUndo(null), TIDY_UNDO_MS);
-    store.actions.setPositions(tidied);
-  };
-  const undoTidy = () => {
-    if (undo === null) return;
-    clearTimer();
-    store.actions.setPositions(undo.prev);
-    setUndo(null);
-  };
-
   return (
     <span className="gn-tidy">
-      <Button className="gn-tidy__tidy" onClick={tidy}>
+      <Button className="gn-tidy__tidy" onClick={() => tidyUndo.tidy(self.current, props.sizes?.() ?? {})}>
         Tidy
       </Button>
-      {undo === null ? null : (
-        <Button className="gn-tidy__undo" onClick={undoTidy}>
+      {offer?.owner !== self.current ? null : (
+        <Button className="gn-tidy__undo" onClick={tidyUndo.undo}>
           Undo tidy
         </Button>
       )}

@@ -1,16 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { newUlid } from '@gisik-nokma/domain';
+import { newUlid, type WorkflowDef } from '@gisik-nokma/domain';
 import { createDraftStore, type DraftStore } from '../../src/workflow-builder/draft-store.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
-import { layoutDraft } from '../../src/workflow-builder/layout.js';
+import { layoutDraft, type StatePosition } from '../../src/workflow-builder/layout.js';
 import { NODE_GAP, rectsOverlap } from '../../src/workflow-builder/collision.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { AddTransitionForm, transitionExists } from '../../src/workflow-builder/ui/add-transition-form.js';
 import { UNMEASURED_NODE } from '../../src/workflow-builder/ui/flow-graph.js';
-import { TidyControl } from '../../src/workflow-builder/ui/tidy-control.js';
+import { TidyControl, tidyPositions } from '../../src/workflow-builder/ui/tidy-control.js';
 import { WorkflowBuilderScreen } from '../../src/workflow-builder/ui/workflow-builder-screen.js';
 import { WorkflowCanvas } from '../../src/workflow-builder/ui/workflow-canvas.js';
 
@@ -38,6 +38,25 @@ function scatteredStore(): DraftStore {
   store.actions.moveState('later', { x: 500, y: 20 });
   store.actions.moveState('next', { x: 503, y: 25 });
   return store;
+}
+
+type Box = { width: number; height: number };
+/** One box size for every position key the layout holds (the states, and any-state when the def has from-any transitions). */
+function sizesOf(def: WorkflowDef, box: Box): Record<string, Box> {
+  return Object.fromEntries(Object.keys(layoutDraft(def)).map((key) => [key, box]));
+}
+/** Every pair of boxes, each at ITS size from `sizes`, that sits within NODE_GAP of the other. */
+function overlappingPairs(positions: Record<string, StatePosition>, sizes: Record<string, Box>): string[] {
+  const keys = Object.keys(positions);
+  const pairs: string[] = [];
+  for (let a = 0; a < keys.length; a += 1) {
+    for (let b = a + 1; b < keys.length; b += 1) {
+      const first = { ...positions[keys[a]!]!, ...sizes[keys[a]!]! };
+      const second = { ...positions[keys[b]!]!, ...sizes[keys[b]!]! };
+      if (rectsOverlap(first, second, NODE_GAP)) pairs.push(`${keys[a]}/${keys[b]}`);
+    }
+  }
+  return pairs;
 }
 
 afterEach(() => {
@@ -73,14 +92,25 @@ describe('G-9 T4: Tidy and Undo tidy', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tidy' }));
     const tidied = store.getState().positions;
     expect(tidied).toEqual(layoutDraft(store.getState().def));
-    const rects = Object.values(tidied).map((position) => ({ ...position, ...UNMEASURED_NODE }));
-    for (let a = 0; a < rects.length; a += 1) {
-      for (let b = a + 1; b < rects.length; b += 1) expect(rectsOverlap(rects[a]!, rects[b]!, NODE_GAP)).toBe(false);
-    }
+    expect(overlappingPairs(tidied, sizesOf(store.getState().def, UNMEASURED_NODE))).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Undo tidy' }));
     expect(store.getState().positions).toEqual(before);
     // the button goes once it has been used
     expect(screen.queryByRole('button', { name: 'Undo tidy' })).toBeNull();
+
+    // F1: Tidy clears the MEASURED boxes. A neo state is about 200 flow px tall against rows 140 apart.
+    const def = store.getState().def;
+    const layout = layoutDraft(def);
+    const tall = sizesOf(def, { width: 208, height: 200 });
+    // control: the plain grid DOES overlap at that size, so the assertion below can fail
+    expect(overlappingPairs(layout, tall).length).toBeGreaterThan(0);
+    expect(overlappingPairs(tidyPositions(def, tall), tall)).toEqual([]);
+    // control: at the unmeasured box the grid already clears, so Tidy leaves it as it is
+    expect(tidyPositions(def, sizesOf(def, UNMEASURED_NODE))).toEqual(layout);
+    expect(tidyPositions(def)).toEqual(layout);
+    // a key with no measurement falls back to the unmeasured box; the rest keep their own
+    const partial = tidyPositions(def, { next: { width: 208, height: 200 } });
+    expect(overlappingPairs(partial, { ...sizesOf(def, UNMEASURED_NODE), next: { width: 208, height: 200 } })).toEqual([]);
   });
 
   /** 25.537 */
@@ -101,6 +131,39 @@ describe('G-9 T4: Tidy and Undo tidy', () => {
     expect(screen.queryByRole('button', { name: 'Undo tidy' })).toBeNull();
     // and a stale undo cannot clobber the move: nothing to click, the position stays
     expect(store.getState().positions.later).toEqual({ x: 1, y: 1 });
+
+    // F2 (a): a second Tidy inside the window keeps the ORIGINAL layout as the undo and restarts the 10 s
+    cleanup();
+    const twice = scatteredStore();
+    const original = twice.getState().positions;
+    renderWith(twice, <TidyControl />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }));
+    act(() => void vi.advanceTimersByTime(5_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }));
+    act(() => void vi.advanceTimersByTime(9_999)); // 14.999 s after the first Tidy
+    fireEvent.click(screen.getByRole('button', { name: 'Undo tidy' }));
+    expect(twice.getState().positions).toEqual(original);
+
+    // F2 (b): the header's and the canvas corner's controls share ONE offer: Tidy on one, Tidy on the other, Undo
+    cleanup();
+    const shared = scatteredStore();
+    const pristine = shared.getState().positions;
+    renderWith(shared, <><TidyControl /><TidyControl /></>);
+    const [header, corner] = screen.getAllByRole('button', { name: 'Tidy' });
+    fireEvent.click(header!);
+    fireEvent.click(corner!);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo tidy' })); // one offer, on the control last pressed
+    expect(shared.getState().positions).toEqual(pristine);
+
+    // control: after a double Tidy a move still removes the offer at once
+    cleanup();
+    const moved = scatteredStore();
+    renderWith(moved, <TidyControl />);
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tidy' }));
+    expect(screen.getByRole('button', { name: 'Undo tidy' })).toBeInTheDocument();
+    act(() => moved.actions.moveState('later', { x: 1, y: 1 }));
+    expect(screen.queryByRole('button', { name: 'Undo tidy' })).toBeNull();
   });
 
   /** 25.538 */
@@ -204,6 +267,14 @@ describe('G-9 T4: Add transition', () => {
     expect(add).toBeEnabled();
     expect(transitionExists(store.getState().def, '*', existing.from)).toBe(false);
     expect(transitionExists(store.getState().def, existing.from, existing.to)).toBe(true);
+    // F3 reverse pair: one transition per direction is allowed, so the opposite of an existing pair is a fresh pair
+    const { def } = store.getState();
+    expect(transitionExists(def, 'later', 'next')).toBe(true);
+    expect(transitionExists(def, 'next', 'later')).toBe(false);
+    await pick(user, dialog, 'From', nameOf('next'));
+    await pick(user, dialog, 'To', nameOf('later'));
+    expect(add).toBeEnabled();
+    expect(within(dialog).queryByRole('status')).toBeNull();
     // never reaches the store
     const count = store.getState().def.transitions.length;
     await pick(user, dialog, 'From', nameOf(existing.from));
