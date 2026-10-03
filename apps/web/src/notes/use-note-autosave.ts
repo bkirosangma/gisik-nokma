@@ -222,7 +222,7 @@ export function useNoteAutosave({
     }
     // `initial`/`draftKey` are fixed for the life of this instance — see the
     // docblock's remount argument. Re-running this on every render would risk
-    // deleting a key an `onDraft` just legitimately wrote.
+    // deleting a key `flush` just legitimately wrote.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -9,6 +9,7 @@ import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { clearLiveQueryCache } from '@gisik-nokma/app-core';
 import type { NoteDetail, NoteSummary } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
+import { rememberNoteHome } from '../src/notes/note-homes.js';
 import { clearReadCaches } from '../src/clear-read-caches.js';
 import { NotesPageShell } from '../src/skeletons/page-shells.js';
 import { NoteEditorBand } from '../src/notes/note-skeletons.js';
@@ -437,6 +438,58 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     expect(screen.queryByText('Loading…')).toBeNull();
   });
 
+  it('25.168 a note opened on this device and then lost (purged, or the scope changed) says it is no longer shared on the next mount, never the band forever; the remembered home is only a start: every workspace is asked again, and a note found elsewhere opens; CONTROL: the re-ask reached ws1, ws2 and ws3', async () => {
+    const lost = { on: false };
+    const getNote = vi.fn(async (workspaceId: string, id: string) => (!lost.on && workspaceId === 'ws2' && id === 'n1' ? noteDetail() : null));
+    const services = world({ getNote });
+    currentPath = '/notes/n1';
+    const view = render(page(services, 'a', 'n1'));
+    expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+    await act(() => tick(60));
+
+    lost.on = true;
+    getNote.mockClear();
+    view.rerender(page(services, 'b', 'n1'));
+    expect(await screen.findByText('That note is no longer shared with you.')).toBeInTheDocument();
+    expect(document.querySelector('.gn-notes__editor')).toBeNull();
+    // CONTROL: the remembered workspace was asked first, then the re-ask went to every workspace (the effect under test).
+    expect(new Set(getNote.mock.calls.map(([workspaceId]) => workspaceId))).toEqual(new Set(['ws1', 'ws2', 'ws3']));
+
+    // A wrong remembered home costs one read and the note still opens from the workspace that holds it.
+    cleanup();
+    clearReadCaches();
+    clearLiveQueryCache();
+    rememberNoteHome('n1', 'ws1');
+    render(page(world(), 'c', 'n1'));
+    expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+    expect(screen.queryByText('That note is no longer shared with you.')).toBeNull();
+  });
+
+  it('25.169 sign-out forgets which workspace holds which note: after clearReadCaches the next mount asks every workspace, not only the remembered one; CONTROL: without the clear the next mount asks only the remembered workspace', async () => {
+    const getNote = vi.fn(async (workspaceId: string, id: string) => (workspaceId === 'ws2' && id === 'n1' ? noteDetail() : null));
+    const services = world({ getNote });
+    currentPath = '/notes/n1';
+    const view = render(page(services, 'a', 'n1'));
+    expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+    await act(() => tick(60));
+    const askedBy = () => new Set(getNote.mock.calls.map(([workspaceId]) => workspaceId));
+
+    // CONTROL: the home is remembered, so the second mount asks ws2 alone.
+    getNote.mockClear();
+    view.rerender(page(services, 'b', 'n1'));
+    expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+    await act(() => tick(60));
+    expect(askedBy()).toEqual(new Set(['ws2']));
+
+    // Sign-out's one call: the next mount knows no home, so every workspace is asked.
+    act(() => clearReadCaches());
+    getNote.mockClear();
+    view.rerender(page(services, 'c', 'n1'));
+    expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+    await act(() => tick(60));
+    expect(askedBy()).toEqual(new Set(['ws1', 'ws2', 'ws3']));
+  });
+
   it('25.165 the editor band stays reserved while the purged-chip read is pending: the slot\'s own box, then the editor; no gap between', async () => {
     const held = deferred<Array<{ kind: 'ticket' | 'note'; id: string }>>();
     const chip = { type: 'ticketRef', attrs: { ticketId: 't1', projectId: 'p1', key: 'CC-1', title: 'A ticket' } };
@@ -497,6 +550,18 @@ describe('25.15 Notes — cheap remount, parallel resolve, the reserved band, a 
     await act(() => tick(20));
     expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(0);
     expect(prefetch.calls).toBeGreaterThanOrEqual(1);
+
+    // Once the chunk has loaded (the page's own prefetch brought it), Copy as Markdown writes the clipboard INSIDE the click's task
+    // (Safari ties the write to the gesture): the spy is read right after the click, before any await.
+    cleanup();
+    const writeText = vi.fn(async (_text: string) => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(page(world(), 'c', 'n1'));
+    await waitFor(() => expect(document.querySelectorAll('.gn-notes__editor .ProseMirror')).toHaveLength(1));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy as Markdown' }));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    // CONTROL: what it wrote is the note's Markdown.
+    expect(writeText.mock.calls[0]![0]).toContain('Compressor stopped in the cold room');
   });
 
   it('25.167 the band IS the editor slot\'s skeleton: the lazy slot, chunk held, with the props NoteEditorPane passes, draws the same box as the band (read and edit), so band → slot skeleton → editor moves nothing; CONTROL: an editing band draws the formatting strip\'s place, a reading one none', async () => {

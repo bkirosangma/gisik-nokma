@@ -67,6 +67,9 @@ type Placement = { ticketId: string; projectId: string | null; notice: string | 
  * it — a module-level set, the same device as `pendingLostAccessToast` in `notes-page.tsx`.
  */
 const newNoteIds = new Set<string>();
+
+/** The empty-list fallback for the roster, the names and the tree while their reads answer: one array for every render. */
+const NONE: never[] = [];
 export function markNoteAsNew(noteId: string): void {
   newNoteIds.add(noteId);
 }
@@ -386,7 +389,6 @@ function NoteDocumentBody({
 
   // The roster, the names-only read and the note list ride the read cache, so a remount paints them at once (25.152). Held
   // by the workspace the note resolved to; with none yet they ask nothing.
-  const NONE: never[] = [];
   const membersRead = useLiveQuery<RosterMember[]>(
     dataSource,
     readWorkspaceId,
