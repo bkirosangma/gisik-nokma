@@ -92,6 +92,12 @@ describe('27.208–27.209 the ring read, smoke', () => {
     const req = { center: { kind: 'ticket' as const, id: world.hidden }, hops: 1, workspaceIds: [world.ws], projectIds: [], groups: all, offset: 0 };
     expect(await readGraphRing(db.pool, world.member, req)).toBeNull();
     expect(await readGraphRing(db.pool, world.owner, req)).not.toBeNull();
+    // a user who is no member of the workspace gets the same null (a workspace the viewer is not in does not exist for them)
+    const stranger = newUlid();
+    await insertUser(stranger, 'Sam Stranger');
+    expect(await readGraphRing(db.pool, stranger, { ...req, center: { kind: 'ticket' as const, id: world.parent } })).toBeNull();
+    // the chosen workspaces are checked too: asking for one the viewer is not in is the same null, even with a visible centre
+    expect(await readGraphRing(db.pool, world.owner, { ...req, workspaceIds: [world.ws, newUlid()] })).toBeNull();
   });
 });
 

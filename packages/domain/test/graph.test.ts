@@ -7,7 +7,9 @@ describe('27.200 the graph wire vocabulary', () => {
     expect(parseGraphRef(graphRef('ticket', '01JABC'))).toEqual({ kind: 'ticket', id: '01JABC' });
     expect(parseGraphRef('ticket:a:b')).toEqual({ kind: 'ticket', id: 'a:b' });
     // spec §2.2: typed links first, then structure, then references, then people
-    expect(GROUP_RANK.blocks).toBeLessThan(GROUP_RANK.structure);
+    expect(GROUP_RANK.blocks).toBeLessThan(GROUP_RANK.relates);
+    expect(GROUP_RANK.relates).toBeLessThan(GROUP_RANK.dup);
+    expect(GROUP_RANK.dup).toBeLessThan(GROUP_RANK.structure);
     expect(GROUP_RANK.structure).toBeLessThan(GROUP_RANK.ref);
     expect(GROUP_RANK.ref).toBeLessThan(GROUP_RANK.people);
     const sorted = [
@@ -20,6 +22,9 @@ describe('27.200 the graph wire vocabulary', () => {
     expect(parseGraphRef('widget:01A')).toBeNull();
     expect(parseGraphRef('ticket:')).toBeNull();
     expect(parseGraphRef('01A')).toBeNull();
+    expect(parseGraphRef(':01A')).toBeNull();
+    expect(GROUP_OF_EDGE_KIND.assignee).toBe('people');
+    expect(GROUP_OF_EDGE_KIND.mention).toBe('people');
   });
 });
 
