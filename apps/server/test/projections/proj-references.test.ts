@@ -134,6 +134,13 @@ describe('27.112 the rebuild equals the live table', () => {
   it('27.112 rebuildProjection reproduces every row, and verifyProjections is clean', async () => {
     const before = (await db.pool.query('SELECT * FROM proj_references ORDER BY source_kind, source_id, ordinal')).rows;
     expect(before.length).toBeGreaterThan(0); // CONTROL: the cases above wrote rows
+    // A row no ledger event wrote: only `reset` (TRUNCATE) removes it, so a rebuild whose reset does nothing is caught here.
+    await db.pool.query(
+      `INSERT INTO proj_references (workspace_id, source_kind, source_id, source_parent_kind, source_parent_id, target_kind, target_id, ordinal, snippet, updated_by, updated_at, seq)
+       VALUES ($1, 'note', $2, 'note', $2, 'ticket', $3, 0, 'ghost', $4, now(), 1)`,
+      [WS, newUlid(), newUlid(), ACTOR],
+    );
+    expect((await db.pool.query('SELECT 1 FROM proj_references')).rowCount).toBe(before.length + 1); // CONTROL: the ghost is there
     await rebuildProjection('proj_references', { pool: db.pool, projections: buildProjectionRegistry() });
     const after = (await db.pool.query('SELECT * FROM proj_references ORDER BY source_kind, source_id, ordinal')).rows;
     expect(after).toEqual(before);
