@@ -19,6 +19,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   check-pr <branch> [--plan FILE] [--base B]  mechanical batch-PR verification; writes the checked marker
   reconcile                       ledger vs report headings by membership + plan coverage
   lanes [--watch]                 one line per gisik: window
+  seats [--json] [--flag]         one line per seat: busy/idle, shells+monitors, input box, Ctx, branch, last DONE/CHECKPOINT (read-only; --flag = only seats needing action)
   restart <window> <worktree> <brief> [--override FILE]
   close <window>                  close an idle lane whose worktree is clean and pushed
   dispatch <window> <file>        two pastes + proof of delivery
