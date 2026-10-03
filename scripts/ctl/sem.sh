@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/ctl/sem.sh — the machine-wide test semaphore (`ctl run-tests`) and the gate's priority marker. Sourced, never executed.
 # State lives in CTL_SEM_DIR (default ~/.cache/gisik-ctl/sem): MACHINE-wide, not ctl_marker_dir (that one is per checkout).
-#   slot-<n>/holder   one directory per held slot, made by an atomic `mkdir`; holder = `pid|lstart|label|epoch`, lstart = `ps -o lstart=` of
+#   slot-<n>/holder   one directory per held slot, made by an atomic `mkdir`; holder = `pid|lstart|label|epoch`, lstart = `ps -o lstart=` (LC_ALL=C TZ=UTC0) of
 #                     the pid, so a REUSED pid cannot impersonate the holder (stale = pid dead, or alive with another start time)
 #   gate-<pid>        a running `ctl gate` (same fields). While any live one exists no NEW slot is granted; running slots finish.
 #   slots             optional: the slot count (read before CTL_TEST_SLOTS so two callers cannot disagree on N)
@@ -22,8 +22,9 @@ ctl_sem_sleep() {
   elif [ "$n" -gt 0 ]; then sleep "$n"; fi
   return 0
 }
-# `Thu Oct  3 00:46:12 2026`, whitespace squeezed; empty when the pid does not exist.
-ctl_sem_lstart() { ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//; s/  */ /g'; }
+# `Thu Oct  3 00:46:12 2026`, whitespace squeezed; empty when the pid does not exist. Rendered with LC_ALL=C TZ=UTC0: `ps -o lstart=` follows the CALLER's
+# TZ and locale, and a waiter in another zone would read a LIVE holder as "another start time" (a reused pid) and reclaim its slot or gate marker.
+ctl_sem_lstart() { LC_ALL=C TZ=UTC0 ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//; s/  */ /g'; }
 ctl_sem_slots() {
   local n; n="$(cat "$(ctl_sem_dir)/slots" 2>/dev/null)"
   case "$n" in ''|*[!0-9]*) n="${CTL_TEST_SLOTS:-2}";; esac
@@ -134,4 +135,12 @@ ctl_sem_acquire() {
   printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$label" "$CTL_SEM_WAITED" "$CTL_SEM_REASONS" "$N" >> "$sem/waits.tsv"
   return 0
 }
-ctl_sem_release() { [ -n "${CTL_SEM_SLOT:-}" ] && rm -rf "$(ctl_sem_dir)/slot-$CTL_SEM_SLOT"; CTL_SEM_SLOT=""; return 0; }
+# Only while the holder file does not name ANOTHER pid: a slot that was wrongly reclaimed and re-claimed is somebody else's, and must survive our exit.
+ctl_sem_release() {
+  local d hp hrest
+  if [ -n "${CTL_SEM_SLOT:-}" ]; then
+    d="$(ctl_sem_dir)/slot-$CTL_SEM_SLOT"; hp=""; IFS='|' read -r hp hrest < "$d/holder" 2>/dev/null || true
+    if [ -z "$hp" ] || [ "$hp" = "$$" ]; then rm -rf "$d"; fi
+  fi
+  CTL_SEM_SLOT=""; return 0
+}

@@ -730,21 +730,22 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1754 🧪 A tsc run shows the error count and the first error.
 - 13.1755 🧪 ANSI codes and turbo `pkg:task:` prefixes are stripped before parsing and printing.
 - 13.1756 🧪 A run with 400 failures still prints at most 30 lines, counts first; the digest script itself never prints more than the MAXLINES it is given.
-- 13.1757 🧪 A crash with no test summary keeps its exit code and shows the log tail.
-- 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s.
+- 13.1757 🧪 A crash with no test summary keeps its exit code and shows the log tail — the cause text comes from a file, not from the command line, so only the digest's indented tail can satisfy the check; the log FILE holds the command's stderr and no raw line leaks to stdout.
+- 13.1758 🧪 Uncontended: the slot exists while the command runs, is gone after, and the queue wait is 0 s; a slot whose holder file names another pid is left alone when this run ends.
 - 13.1759 🧪 Both slots held: the third run waits (fake time) until one frees, runs, and names `slots` as the reason.
 - 13.1760 🧪 The slot count is configurable: a `slots` file in the sem dir, else `CTL_TEST_SLOTS`, else 2; the file wins.
 - 13.1761 🧪 Low free memory holds the slot back until it recovers, reason `pressure`.
 - 13.1762 🧪 The kernel pressure level gates too (2 and 4 wait, 1 does not), and the probe never passes a simulate flag to `memory_pressure`.
 - 13.1763 🧪 A sustained swap-in rate at or over the threshold holds the slot back, reason `swap`; one high window is a blip and does not; a rate under the threshold does not.
 - 13.1764 🧪 A running gate has priority: no slot is granted while its marker is live, held slots are untouched, a gate that starts between the claim and the run makes the verb give the slot back and wait.
-- 13.1765 🧪 A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed.
-- 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed; a dead pid whose recorded start time is empty is stale too.
+- 13.1765 🧪 A stale gate marker (dead pid, or a live pid with another start time) is ignored and removed; a LIVE gate's marker is never reclaimed because the waiter runs under another `TZ` (the start time is read as `LC_ALL=C TZ=UTC0`).
+- 13.1766 🧪 Stale slots (dead pid; reused pid) are reclaimed at once; a fresh holder-less slot dir is a claim in progress and is waited for; an old holder-less one is reclaimed; a dead pid whose recorded start time is empty is stale too. A live pid with another start time is the ONLY stale slot in one arm (slot-1 genuinely live: the run starts at once, slot-2 becomes the verb's, slot-1 is untouched; control: both live → waits), and a LIVE holder is never reclaimed because the waiter's `TZ` / locale renders its start time differently.
 - 13.1767 🧪 Two real processes racing for one slot, with a stale slot to reclaim, never overlap.
-- 13.1768 🧪 The slot is released when the command fails and when the verb is terminated, and the wrapped command AND what it spawned die with the verb (a process-group stop — no orphaned vitest workers).
+- 13.1768 🧪 The slot is released when the command fails and when the verb is terminated (the verb exits within 12 s of a SIGTERM, not when a 300 s command ends), and the wrapped command AND what it spawned die with the verb (a process-group stop — no orphaned vitest workers).
 - 13.1769 🧪 Every run appends its queue wait to `waits.tsv` (time, label, seconds, reason, slots).
 - 13.1770 🧪 A queue wait past `CTL_SEM_MAX_WAIT` exits 75, runs nothing and says `no slot after`.
 - 13.1771 🧪 `--dry-run` prints the plan, takes no slot, runs nothing, exits 0.
 - 13.1772 🧪 `ctl gate` writes its priority marker only around the real gate run (not on `--dry-run`), removes it on green, red and exit, and does it from `verbs/gate.sh` (the gate-lock scripts are untouched).
 - 13.1773 🧪 `ctl help` lists `run-tests`, and `ctl selftest` runs the suite and a `run-tests --dry-run` step.
 - 13.1774 🧪 The real thing: two parallel runs overlap and a third waits at least 2 s for one of them to finish and logs that wait.
+- 13.1850 🧪 The wrapped command runs in the caller's directory — from a subdirectory with no `--repo`, `pwd -P` is that subdirectory; with `--repo W` it is `W` — and the summary's first line, the log header and the `--dry-run` line name it. (Minted 2026-10-03 for FIX 1 outside the full `13.1750`–`13.1774` block and tipmerge's `13.1775`–`13.1799`: the §13 high-water was `13.1843` (`release/smoothness`), across every `origin/*` head and local branch updated in the last 4 days. 🧪 for the same reason as the block.)

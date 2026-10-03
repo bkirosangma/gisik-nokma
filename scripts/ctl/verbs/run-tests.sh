@@ -14,6 +14,10 @@ for a in "$@"; do
   elif [ "$seen" = 0 ]; then left+=("$a")
   else cmd+=("$a"); fi
 done
+# Where the command runs: the CALLER's directory, or --repo W's when given. Every other verb cd's to CTL_REPO, but this one wraps a command whose meaning depends on
+# its directory (`pnpm exec vitest run test/x` from a package dir; `pnpm test` there is NOT the root's whole-monorepo `turbo run test`). CTL_REPO is derived from $PWD,
+# so the caller's directory is always inside it.
+explicit_repo=0; for a in ${left[@]+"${left[@]}"}; do [ "$a" = --repo ] && explicit_repo=1; done
 usage() { echo "FAIL run-tests $1 — usage: ctl run-tests [--repo W] [--label L] -- <command…>"; exit 64; }
 ctl_parse_common ${left[@]+"${left[@]}"} || exit 64
 label=""
@@ -23,9 +27,10 @@ while [ $# -gt 0 ]; do case "$1" in --label) [ $# -ge 2 ] || usage "--label need
 [ -n "$label" ] || label="${cmd[0]##*/}"
 ctl_node22 || exit 1
 [ -d "$CTL_REPO" ] || { echo "FAIL run-tests no such worktree $CTL_REPO"; exit 64; }
+if [ "$explicit_repo" = 1 ]; then rundir="$CTL_REPO"; else rundir="$PWD"; fi
 shown="${cmd[*]}"; [ "${#shown}" -le 120 ] || shown="${shown:0:119}…"
 if [ "$CTL_DRY_RUN" = 1 ]; then
-  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs, memory pressure is not normal, or swap-in is high), then in $CTL_REPO: $shown > $(ctl_log run-tests)"
+  echo "DRY: acquire a slot (1..$(ctl_sem_slots) in $(ctl_sem_dir); waits while a gate runs, memory pressure is not normal, or swap-in is high), then in $rundir: $shown > $(ctl_log run-tests)"
   ctl_ok run-tests "dry-run"
 fi
 log="$(ctl_log run-tests)"
@@ -51,8 +56,8 @@ if [ "$arc" -ne 0 ]; then
   echo "FAIL run-tests $label no slot after ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS) — nothing was run"; exit 75
 fi
 if [ "$CTL_SEM_REASONS" = "-" ]; then waitline="queue wait: ${CTL_SEM_WAITED}s (slot $CTL_SEM_SLOT/$CTL_SEM_SLOTS)"; else waitline="queue wait: ${CTL_SEM_WAITED}s (waited for: $CTL_SEM_REASONS)"; fi
-{ echo "# ctl run-tests: $shown"; echo "# $waitline; repo $CTL_REPO"; } > "$log"
-cd "$CTL_REPO" || exit 1
+{ echo "# ctl run-tests: $shown"; echo "# $waitline; in $rundir"; } > "$log"
+cd "$rundir" || exit 1
 # The command runs as a background job with `wait`, in its OWN process group (set -m): a TERM to the verb is handled at once (bash defers a trap
 # behind a foreground child) and the whole group can be stopped; no pipe, so rc is the command's own. A job killed by a signal makes bash print
 # "Terminated" — silenced. stdin is /dev/null: a background group that read the terminal would be stopped.
@@ -62,7 +67,7 @@ child=$!
 { wait "$child"; } 2>/dev/null; rc=$?
 child=""
 ctl_sem_release
-echo "run-tests: $label — $shown"
+echo "run-tests: $label — $shown (in $rundir)"
 echo "$waitline"
 python3 "$HERE/verbs/run-tests-summary.py" "$log" 22 "$rc"
 echo "log: $log"

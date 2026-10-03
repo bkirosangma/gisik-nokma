@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774, test-cases/13-deploy-and-ops.md);
+# scripts/ctl/test/run-tests.test.sh — `ctl run-tests` and the machine-wide test semaphore (13.1750-13.1774 and 13.1850, test-cases/13-deploy-and-ops.md);
 # run by `ctl selftest`. Every case id starts its check's name. No real load is needed: `memory_pressure`, `sysctl` and `vm_stat` are PATH
 # stubs that read files, the clock is a file (CTL_SEM_CLOCK_FILE: a sleep advances it and runs CTL_SEM_SLEEP_HOOK, so a wait of minutes costs
 # no real time), and a slot is "held" by planting its directory with a live pid. Two cases (13.1767, 13.1774) use the REAL clock and real
@@ -16,7 +16,7 @@ trap cleanup EXIT
 st="$fx/state"; FB="$fx/bin"; mkdir -p "$st" "$FB" "$fx/logs"
 export CTL_SEM_DIR="$fx/sem" CTL_LOG_DIR="$fx/logs" FX_STATE="$st"   # NEVER the machine's real semaphore
 unset CTL_TEST_SLOTS CTL_SEM_MAX_WAIT
-repo="$fx/repo"; mkdir -p "$repo"; ( cd "$repo" && /usr/bin/git init -q . )
+repo="$fx/repo"; mkdir -p "$repo/sub"; ( cd "$repo" && /usr/bin/git init -q . )
 
 # --- stubs (bare names, found first on PATH — the way the docker stub in lib.test.sh works) ---
 cat > "$FB/memory_pressure" <<'STUB'
@@ -56,11 +56,12 @@ reset() {   # a clean machine: nothing held, healthy memory, no swap-in, clock a
 }
 live_pid() { sleep 600 >/dev/null 2>&1 & echo $! >> "$fx/pids"; echo $!; }   # stdout closed: a $(...) caller must not wait for the sleeper
 dead_pid() { sh -c 'exit 0' & local p=$!; wait "$p" 2>/dev/null; echo "$p"; }
-lstart() { ps -o lstart= -p "$1" | sed 's/^ *//; s/  */ /g'; }
+lstart() { LC_ALL=C TZ=UTC0 ps -o lstart= -p "$1" | sed 's/^ *//; s/  */ /g'; }   # the SAME pinned rendering as ctl_sem_lstart (sem.sh): a holder file written here must read as live to the verb whatever TZ/locale it runs in
 # plant a held slot / a running gate (the on-disk contract: slot-<n>/holder and gate-<pid> hold `pid|lstart|label|epoch`)
 hold() { mkdir -p "$CTL_SEM_DIR/slot-$1"; printf '%s|%s|planted|0\n' "${2:-$(live_pid)}" "${3:-}" > "$CTL_SEM_DIR/slot-$1/holder"; if [ -z "${3:-}" ]; then printf '%s|%s|planted|0\n' "$(sed 's/|.*//' "$CTL_SEM_DIR/slot-$1/holder")" "$(lstart "$(sed 's/|.*//' "$CTL_SEM_DIR/slot-$1/holder")")" > "$CTL_SEM_DIR/slot-$1/holder"; fi; }
 plant_gate() { local p="${1:-$(live_pid)}"; printf '%s|%s|gate|0\n' "$p" "${2-$(lstart "$p")}" > "$CTL_SEM_DIR/gate-$p"; echo "$p"; }
 rt() { ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_CLOCK_FILE="$st/clock" CTL_SEM_SLEEP_HOOK="$fx/hook.sh" CTL_SEM_POLL_SECS=5 CTL_SEM_SAMPLE_SECS=1 CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" "$@" 2>&1 ); }
+rt_sub() { ( cd "$repo/sub" && PATH="$FB:$PATH" CTL_SEM_CLOCK_FILE="$st/clock" CTL_SEM_SLEEP_HOOK="$fx/hook.sh" CTL_SEM_POLL_SECS=5 CTL_SEM_SAMPLE_SECS=1 CTL_DRY_RUN=0 "$HERE/ctl" run-tests "$@" 2>&1 ); }   # called FROM a subdirectory, no --repo unless the caller passes one
 rt_real() { ( cd "$repo" && PATH="$FB:$PATH" CTL_SEM_POLL_SECS=1 CTL_SEM_SAMPLE_SECS=1 CTL_DRY_RUN=0 "$HERE/ctl" run-tests --repo "$repo" "$@" 2>&1 ); }
 script_line() { echo "$1" >> "$st/script"; }
 nlines() { printf '%s\n' "$1" | wc -l | tr -d ' '; }
@@ -113,12 +114,15 @@ check "13.1755 ANSI codes and turbo pkg:task: prefixes are stripped before parsi
 reset; out=$(rt -- cat "$VHUGE"); rc=$?
 check "13.1756 a run with 400 failures still prints at most 30 lines, counts first" '[ "$(nlines "$out")" -le 30 ] && printf "%s" "$out" | grep -q "Tests  400 failed | 5 passed (405)" && printf "%s" "$out" | grep -q "first failure: test/f0.test.ts"'
 check "13.1756 the digest's own cap holds whatever the caller asks for: MAXLINES 1 on the 400-failure log prints 1 line" '[ "$(python3 "$HERE/verbs/run-tests-summary.py" "$VHUGE" 1 | wc -l | tr -d " ")" -le 1 ]'
-reset; out=$(rt -- sh -c 'echo started; echo "boom: could not open the db" >&2; exit 2'); rc=$?
-check "13.1757 a crash with no test summary: rc kept, and the log tail shows the cause" '[ $rc -eq 2 ] && printf "%s" "$out" | grep -q "no test summary found" && printf "%s" "$out" | grep -q "boom: could not open the db" && printf "%s" "$out" | grep -q "exit code: 2"'
+# The cause text lives in a FILE the command cats to stderr: it must not be in argv, or the `run-tests: <label> — <cmd>` line would satisfy the needle.
+reset; printf 'boom: could not open the db\n' > "$fx/crash-cause.txt"; out=$(rt -- sh -c 'echo started; cat "$1" >&2; exit 2' x "$fx/crash-cause.txt"); rc=$?; lg=$(printf "%s\n" "$out" | sed -n "s/^log: //p" | head -1)
+check "13.1757 a crash with no test summary: rc kept, the digest's indented tail shows the cause (not the command line), and the log FILE holds the command's stderr" '[ $rc -eq 2 ] && printf "%s" "$out" | grep -q "no test summary found" && printf "%s" "$out" | grep -q "^  boom: could not open the db" && ! printf "%s\n" "$out" | sed -n 1p | grep -q boom && [ "$(printf "%s\n" "$out" | grep -c boom)" -eq 1 ] && [ -f "$lg" ] && grep -q "boom: could not open the db" "$lg" && printf "%s" "$out" | grep -q "exit code: 2"'
 
 # ---------------- the semaphore ----------------
 reset; : > "$fx/seen"; out=$(rt -- sh -c 'ls "$CTL_SEM_DIR" | grep "^slot-" > "$1"' x "$fx/seen"); rc=$?
 check "13.1758 uncontended: the slot is taken for the run, released after, and the queue wait is 0s" '[ $rc -eq 0 ] && printf "%s" "$out" | grep -q "^queue wait: 0s" && [ "$(wc -l < "$fx/seen" | tr -d " ")" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
+reset; lp=$(live_pid); out=$(rt -- sh -c 'printf "%s|x|other|0\n" "$1" > "$CTL_SEM_DIR/slot-1/holder"' x "$lp"); rc=$?
+check "13.1758 a slot whose holder file now names ANOTHER pid is not removed when this run ends (a wrongly reclaimed slot cannot take another run's claim with it)" '[ $rc -eq 0 ] && [ -d "$CTL_SEM_DIR/slot-1" ] && [ "$(sed "s/|.*//" "$CTL_SEM_DIR/slot-1/holder")" = "$lp" ]'
 reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""
 out=$(rt --label third -- sh -c 'exit 0'); rc=$?
 check "13.1759 both slots held: the third run waits in fake time until one frees (20 s, 5 s polls), runs, and names why it waited" '[ $rc -eq 0 ] && printf "%s" "$out" | grep -q "^queue wait: 20s (waited for: slots)"'
@@ -149,7 +153,7 @@ cat > "$GATE_AFTER_CLAIM" <<'HOOKEOF'
 : > "$FX_STATE/planted"
 sleep 600 >/dev/null 2>&1 & p=$!
 echo $p > "$FX_STATE/gatepid"; echo $p >> "$FX_STATE/../pids"
-printf '%s|%s|gate|0\n' "$p" "$(ps -o lstart= -p $p | sed 's/^ *//; s/  */ /g')" > "$CTL_SEM_DIR/gate-$p"
+printf '%s|%s|gate|0\n' "$p" "$(LC_ALL=C TZ=UTC0 ps -o lstart= -p $p | sed 's/^ *//; s/  */ /g')" > "$CTL_SEM_DIR/gate-$p"
 echo "1010 ls \"$CTL_SEM_DIR\" | grep -c '^slot-' > \"$FX_STATE/slots-while-gate\"; rm -f \"$CTL_SEM_DIR/gate-$p\"" >> "$FX_STATE/script"
 HOOKEOF
 chmod +x "$GATE_AFTER_CLAIM"; rm -f "$st/planted" "$st/slots-while-gate"
@@ -158,9 +162,20 @@ check "13.1764 a gate that starts between the slot being claimed and the run is 
 reset; d=$(dead_pid); plant_gate "$d" "Thu Jan  1 00:00:00 1970" >/dev/null; lp=$(live_pid); plant_gate "$lp" "Mon Jan  1 00:00:00 2001" >/dev/null
 out=$(rt -- true)
 check "13.1765 a stale gate marker is ignored and removed: a dead pid, and a live pid whose start time differs (pid reuse)" 'printf "%s" "$out" | grep -q "^queue wait: 0s" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^gate-")" ]'
+reset; gp=$(plant_gate); script_line "1040 [ -f \"$CTL_SEM_DIR/gate-$gp\" ] && : > \"$st/gate-alive\"; rm -f \"$CTL_SEM_DIR/gate-$gp\""; rm -f "$st/gate-alive"; out=$(TZ=America/New_York rt -- true)   # not TZ=UTC: the pinned helper reads UTC0, so a UTC waiter would read the same string even on the old code
+check "13.1765 a LIVE gate's marker is never reclaimed, whatever TZ the waiter runs in: TZ=America/New_York waits the same 40 s (reason gate) and the marker still existed when the gate ended" 'printf "%s" "$out" | grep -q "^queue wait: 40s (waited for: gate)" && [ -f "$st/gate-alive" ]'
 reset; d=$(dead_pid); hold 1 "$d" "Thu Jan  1 00:00:00 1970"; lp=$(live_pid); hold 2 "$lp" "Mon Jan  1 00:00:00 2001"
 out=$(rt -- true)
 check "13.1766 stale slots are reclaimed: a dead pid and a reused pid (live, other start time) both free their slot at once" 'printf "%s" "$out" | grep -q "^queue wait: 0s"'
+# The reused pid ALONE: slot-1 is genuinely live, so a free slot exists only if the reused pid in slot-2 is detected (a dead pid would free one by itself).
+reset; hold 1; lp=$(live_pid); hold 2 "$lp" "Mon Jan  1 00:00:00 2001"
+out=$(rt --label reused -- sh -c 'sed "s/|.*//" "$CTL_SEM_DIR/slot-2/holder" > "$1"; echo $PPID > "$2"' x "$fx/s2-holder" "$fx/s2-verb"); rc=$?; left=$(ls "$CTL_SEM_DIR" | grep '^slot-' | tr '\n' ' ')   # the dir as THIS run left it (the control below resets it)
+reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outc=$(rt -- true)
+check "13.1766 a live pid with ANOTHER start time (reuse) is the only stale slot: the run starts at once, slot-2 was the verb's own while it ran, slot-1 (genuinely live) is untouched. Control: both genuinely live → the run waits for slots" '[ $rc -eq 0 ] && printf "%s" "$out" | grep -q "^queue wait: 0s" && [ -n "$(cat "$fx/s2-holder")" ] && [ "$(cat "$fx/s2-holder")" = "$(cat "$fx/s2-verb")" ] && [ "$left" = "slot-1 " ] && printf "%s" "$outc" | grep -q "^queue wait: 20s (waited for: slots)"'
+# A LIVE holder is never reclaimed because the waiter renders the start time differently: TZ and locale change `ps -o lstart=`.
+reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outz=$(TZ=America/New_York LC_ALL=de_DE.UTF-8 rt -- true)
+reset; hold 1; hold 2; script_line "1020 rm -rf \"$CTL_SEM_DIR/slot-1\""; outd=$(rt -- true)
+check "13.1766 a LIVE holder is never reclaimed because the waiter's TZ or locale renders its start time differently: TZ=America/New_York LC_ALL=de_DE.UTF-8 waits the same 20 s as the default environment" 'printf "%s" "$outz" | grep -q "^queue wait: 20s (waited for: slots)" && printf "%s" "$outd" | grep -q "^queue wait: 20s (waited for: slots)"'
 reset; d1=$(dead_pid); d2=$(dead_pid); hold 1 "$d1" ""; hold 2 "$d2" ""
 out=$(rt -- true)
 check "13.1766 a dead pid whose recorded start time is EMPTY (ps had failed at claim time) is still stale: the pid check decides, not only the start-time compare" 'printf "%s" "$out" | grep -q "^queue wait: 0s"'
@@ -178,19 +193,27 @@ check "13.1767 two real processes racing for ONE slot (one stale slot to reclaim
 reset
 out=$(rt -- sh -c 'exit 5'); rc=$?
 check "13.1768 the slot is released when the command fails (and the run did happen: rc 5)" '[ $rc -eq 5 ] && printf "%s" "$out" | grep -q "exit code: 5" && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
-# exec: $rp is then the verb's own pid, so the TERM reaches its trap. The sleep is a GRANDCHILD (sh forks it): only a group-wide stop reaches it. SAMPLE 1 s and generous polls: this arm runs under load in the mutation pass.
-reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sh -c 'sleep 30 & echo $! > "$1"; wait' x "$fx/grandchild.pid" >/dev/null 2>&1 ) & rp=$!
+# exec: $rp is then the verb's own pid, so the TERM reaches its trap. The sleep is a GRANDCHILD (sh forks it) and sleeps 300 s: it can never end inside this test, so "dead"
+# means the verb killed it. The verb must exit within ~12 s of the TERM (the 5 s TERM→KILL ladder + slack): a verb that only finishes when the command does is red.
+reset; ( cd "$repo" && exec env PATH="$FB:$PATH" CTL_DRY_RUN=0 CTL_SEM_SAMPLE_SECS=1 "$HERE/ctl" run-tests --repo "$repo" -- sh -c 'sleep 300 & echo $! > "$1"; wait' x "$fx/grandchild.pid" >/dev/null 2>&1 ) & rp=$!
 i=0; while [ $i -lt 120 ] && [ -z "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
-held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null; wait "$rp" 2>/dev/null
-i=0; while [ $i -lt 40 ] && [ -n "$(ls "$CTL_SEM_DIR" 2>/dev/null | grep '^slot-')" ]; do sleep 0.25; i=$((i+1)); done
-gc=$(cat "$fx/grandchild.pid" 2>/dev/null); child_left=0; if [ -n "$gc" ] && kill -0 "$gc" 2>/dev/null; then child_left=1; kill "$gc" 2>/dev/null; fi   # EXACT pid only (never pkill): a TERM-ed verb must take the wrapped command's child down with it
-check "13.1768 the slot is released when the verb is terminated (SIGTERM), was held while it ran, and the wrapped command and what it spawned did not outlive it" '[ "$held" -eq 1 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ] && [ "$child_left" -eq 0 ]'
+held=$(ls "$CTL_SEM_DIR" | grep -c '^slot-'); kill -TERM "$rp" 2>/dev/null
+i=0; while [ $i -lt 48 ] && kill -0 "$rp" 2>/dev/null; do sleep 0.25; i=$((i+1)); done
+verb_gone=1; if kill -0 "$rp" 2>/dev/null; then verb_gone=0; kill -KILL "$rp" 2>/dev/null; fi   # EXACT pid only (never pkill)
+wait "$rp" 2>/dev/null
+gc=$(cat "$fx/grandchild.pid" 2>/dev/null); child_left=0; if [ -n "$gc" ] && kill -0 "$gc" 2>/dev/null; then child_left=1; kill "$gc" 2>/dev/null; fi
+check "13.1768 the verb terminated by SIGTERM exits within 12 s (not when the command ends), releases its slot (held while it ran), and the 300 s grandchild it spawned is dead" '[ "$held" -eq 1 ] && [ "$verb_gone" -eq 1 ] && [ -n "$gc" ] && [ "$child_left" -eq 0 ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ]'
 reset; rt --label first -- true >/dev/null; hold 1; hold 2; script_line "1030 rm -rf \"$CTL_SEM_DIR/slot-1\""; rt --label second -- true >/dev/null
 check "13.1769 every run appends its queue wait to a tally in the sem dir (time, label, seconds, reason, slots) — the history the slot count is tuned from" 'f="$CTL_SEM_DIR/waits.tsv"; [ "$(wc -l < "$f" | tr -d " ")" -eq 2 ] && awk -F"\t" "NR==1 && \$2==\"first\" && \$3==0 && \$4==\"-\" && \$5==2 {a=1} NR==2 && \$2==\"second\" && \$3==30 && \$4==\"slots\" && \$5==2 {b=1} END{exit !(a&&b)}" "$f"'
 reset; hold 1; hold 2; rm -f "$fx/ran"; out=$(CTL_SEM_MAX_WAIT=30 rt -- sh -c ': > "$1"' x "$fx/ran"); rc=$?
 check "13.1770 a queue wait past CTL_SEM_MAX_WAIT gives up with exit 75, runs nothing, and says so" '[ $rc -eq 75 ] && [ ! -e "$fx/ran" ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL run-tests .*no slot after"'
 reset; rm -f "$fx/ran"; out=$(rt --dry-run -- sh -c ': > "$1"' x "$fx/ran"); rc=$?
 check "13.1771 --dry-run prints the plan, takes no slot, runs nothing, exits 0" '[ $rc -eq 0 ] && [ ! -e "$fx/ran" ] && [ -z "$(ls "$CTL_SEM_DIR" | grep "^slot-")" ] && printf "%s" "$out" | grep -q "^DRY: " && printf "%s" "$out" | tail -1 | grep -q "^OK run-tests dry-run"'
+
+# F1: where the command runs. `ctl run-tests` is the one verb that wraps a command whose meaning depends on its directory (pnpm exec vitest run test/x from a package dir).
+reset; out=$(rt_sub --label here -- sh -c 'pwd -P > "$1"' x "$fx/cwd-here"); lgh=$(printf "%s\n" "$out" | sed -n "s/^log: //p" | head -1); hdr=$(sed -n 2p "$lgh")   # read before the next reset wipes the logs
+reset; outr=$(rt_sub --repo "$repo" --label there -- sh -c 'pwd -P > "$1"' x "$fx/cwd-there"); dry=$(rt_sub --dry-run -- true); dryr=$(rt_sub --dry-run --repo "$repo" -- true)
+check "13.1850 the command runs in the CALLER's directory (a subdirectory, no --repo), and in --repo when that is given; the summary's first line, the log header and the --dry-run line name the directory" '[ "$(cat "$fx/cwd-here")" = "$repo/sub" ] && [ "$(cat "$fx/cwd-there")" = "$repo" ] && printf "%s\n" "$out" | sed -n 1p | grep -q "(in $repo/sub)\$" && printf "%s\n" "$outr" | sed -n 1p | grep -q "(in $repo)\$" && printf "%s\n" "$hdr" | grep -q "in $repo/sub\$" && printf "%s" "$dry" | grep -q "in $repo/sub: " && printf "%s" "$dryr" | grep -q "in $repo: "'
 
 # gate priority marker: written by verbs/gate.sh around the REAL gate run only
 bare=$(mktemp -d); /usr/bin/git init -q --bare "$bare"
