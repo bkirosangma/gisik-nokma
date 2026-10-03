@@ -3784,3 +3784,18 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- KG-E bullet T2 -->
 <!-- KG-E bullet T3 -->
 <!-- KG-E bullet T4 -->
+
+## 25. Drafts
+
+*Private tickets with no key until published: the Drafts page, publish and discard, MCP draft tools. Spec `docs/superpowers/specs/2026-10-03-drafts-design.md`; mirrored by `test-cases/28-drafts.md`.*
+
+<!-- drafts T1 bullet -->
+<!-- drafts T2 bullet -->
+<!-- drafts T3 bullet -->
+<!-- drafts T4 bullet -->
+<!-- drafts T5 bullet -->
+<!-- drafts T5b bullet -->
+<!-- drafts T6 bullet -->
+<!-- drafts T7 bullet -->
+<!-- drafts T8 bullet -->
+<!-- drafts T9 bullet -->
