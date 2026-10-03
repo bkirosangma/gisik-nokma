@@ -6,12 +6,15 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { applyCommitted, makeCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
+import { noteCreated, projectCreated, seedWorkspace, ticketCreated } from '../purge/world.js';
 
 let db: TestDatabase;
-const WS = newUlid();
-const ACTOR = newUlid();
+let late: LedgerEvent;
+let WS = '';
+let ACTOR = '';
+const PID = newUlid();
 const T1 = newUlid(), T2 = newUlid(), N1 = newUlid(), X = newUlid();
-const chip = (ticketId: string) => ({ type: 'ticketRef', attrs: { ticketId, projectId: 'P1', key: 'GN-1', title: 'Chiller' } });
+const chip = (ticketId: string) => ({ type: 'ticketRef', attrs: { ticketId, projectId: PID, key: 'GN-1', title: 'Chiller' } });
 const body = (...inline: unknown[]) => ({ type: 'doc', content: [{ type: 'paragraph', content: inline }] });
 const ev = (kind: 'ticket' | 'note', id: string, type: string, payload: unknown): LedgerEvent =>
   makeCommitted({ workspaceId: WS, actorId: ACTOR, entity: { kind, id }, type, payload });
@@ -48,12 +51,21 @@ async function ingestLike(envelope: LedgerEvent): Promise<void> {
 beforeAll(async () => {
   db = await createTestDatabase();
   resetEntitySeqs();
+  // `proj_tickets` refuses a claim on a ticket that was never created: seed a workspace, a project and the two tickets.
+  const base = await seedWorkspace(db.pool);
+  WS = base.WS;
+  ACTOR = base.OWNER;
   await applyCommitted(db.pool, [
+    projectCreated(base, PID, 'Refs', 'RF'),
+    ticketCreated(base, T1, PID, 'one'),
+    ticketCreated(base, T2, PID, 'two'),
     ev('ticket', T1, 'ticket.field_set', { fieldId: 'description', value: body(chip(X)) }),
     ev('ticket', T1, 'comment.added', { body: body(chip(T2)) }),
     ev('ticket', T2, 'ticket.field_set', { fieldId: 'description', value: body(chip(T1)) }),
-    ev('note', N1, 'note.body_set', { body: body(chip(T1)) }),
+    noteCreated(base, N1, { title: 'n', homeProjectId: '', scope: { mode: 'workspace' }, body: body(chip(T1)) }),
   ]);
+  // Minted LAST so its seq follows every committed event (it enters the ledger only in 27.122).
+  late = ev('ticket', T1, 'comment.added', { body: body(chip(N1)) });
 });
 afterAll(async () => {
   await db.drop();
@@ -68,7 +80,7 @@ describe('27.119 first boot: the backfill fills the table from the ledger and re
     const result = await backfillReferences(db.pool, deps());
     expect(result).toMatchObject({ ran: true, entities: 3 });
     expect(await snapshot()).toEqual(live);
-    expect((await db.pool.query('SELECT name, entities FROM projection_backfills')).rows).toEqual([{ name: 'proj_references', entities: '3' }]);
+    expect((await db.pool.query('SELECT name, entities FROM projection_backfills')).rows).toEqual([{ name: 'proj_references', entities: 3 }]);
     expect(await verifyProjections({ pool: db.pool, projections: buildProjectionRegistry() })).toEqual({ clean: true, diffs: [] });
   });
 });
@@ -102,7 +114,7 @@ describe('27.121 a crash mid-run leaves no marker, and the next boot re-runs to 
 
 describe('27.122 an event committed DURING the backfill is in the table afterwards', () => {
   // One envelope for both its: the control runs FIRST, before the event exists in the ledger.
-  const late = ev('ticket', T1, 'comment.added', { body: body(chip(N1)) });
+  // `late` is built in beforeAll (the workspace exists only then); control first, the event enters the ledger in the second it.
   const lateRow = async () => (await db.pool.query('SELECT 1 FROM proj_references WHERE source_kind = $1 AND source_id = $2', ['comment', late.id])).rowCount;
 
   it('27.122 control: the same run, the same probe point, no concurrent event: no such row, four rows', async () => {

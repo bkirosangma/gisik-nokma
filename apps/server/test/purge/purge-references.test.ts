@@ -6,7 +6,8 @@ import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { applyCommitted, resetEntitySeqs } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { scan } from './scan.js';
-import { buildReferenceWorld, doc, dueAt, ev, noteCreated, recordingStore, text, ticketRef } from './world.js';
+import { makeCommitted } from '../helpers/apply.js';
+import { buildReferenceWorld, buildWorkspacePair, doc, dueAt, ev, noteCreated, recordingStore, text, ticketRef } from './world.js';
 
 let db: TestDatabase;
 beforeAll(async () => {
@@ -79,8 +80,18 @@ describe('27.115 a body written AFTER the purge that still chips the purged id',
     await purgeItem(db.pool, { kind: 'ticket', id: w.T }, deps(await dueAt(db.pool, 'ticket', w.T)));
     const LATE = newUlid();
     const Y = newUlid();
+    // The purge wrote its own events straight to the ledger, past `makeCommitted`'s process-local
+    // workspace counter: number this one from the database, as ingest's `nextWorkspaceSeq` does.
+    const { rows: top } = await db.pool.query<{ n: number }>('SELECT max(workspace_seq)::int AS n FROM events WHERE workspace_id = $1', [w.WS]);
     await applyCommitted(db.pool, [
-      noteCreated(w, LATE, { title: 'Late', homeProjectId: '', scope: { mode: 'workspace' }, body: doc(ticketRef(w.T, w.P, 'PG-1', 'stale'), text(' then '), ticketRef(Y, w.P, 'PG-3', 'Y')) }),
+      makeCommitted({
+        workspaceId: w.WS,
+        actorId: w.OWNER,
+        entity: { kind: 'note', id: LATE },
+        type: 'note.created',
+        workspaceSeq: (top[0]?.n ?? 0) + 1,
+        payload: { title: 'Late', homeProjectId: '', scope: { mode: 'workspace' }, body: doc(ticketRef(w.T, w.P, 'PG-1', 'stale'), text(' then '), ticketRef(Y, w.P, 'PG-3', 'Y')) },
+      }),
     ]);
     const rows = (await db.pool.query<{ target_id: string; ordinal: number }>('SELECT target_id, ordinal FROM proj_references WHERE source_id = $1', [LATE])).rows;
     expect(rows).toEqual([{ target_id: Y, ordinal: 1 }]);
@@ -90,10 +101,17 @@ describe('27.115 a body written AFTER the purge that still chips the purged id',
 
 describe('27.116 a workspace purge empties the workspace’s rows', () => {
   it('27.116 every row of the purged workspace goes; another workspace’s rows stay (control)', async () => {
-    const keep = await buildReferenceWorld(db.pool);
-    const gone = await buildReferenceWorld(db.pool);
-    await purgeItem(db.pool, { kind: 'workspace', id: gone.WS }, deps(await dueAt(db.pool, 'workspace', gone.WS)));
-    expect(await refRows('workspace_id = $1', [gone.WS])).toEqual([]);
-    expect((await refRows('workspace_id = $1', [keep.WS])).length).toBeGreaterThan(0);
+    const pair = await buildWorkspacePair(db.pool);
+    const X = newUlid();
+    const [gone, keep] = [newUlid(), newUlid()];
+    await applyCommitted(db.pool, [
+      noteCreated(pair.W1, gone, { title: 'Gone', homeProjectId: '', scope: { mode: 'workspace' }, body: doc(ticketRef(pair.T1, pair.P1, 'GN-1', 'Doomed'), text(' and '), ticketRef(X, pair.P1, 'GN-2', 'X')) }),
+      noteCreated(pair.W2, keep, { title: 'Keep', homeProjectId: '', scope: { mode: 'workspace' }, body: doc(ticketRef(X, pair.P1, 'GN-2', 'X')) }),
+    ]);
+    expect((await refRows('workspace_id = $1', [pair.W1.WS])).length).toBe(2); // CONTROL
+    await purgeItem(db.pool, { kind: 'workspace', id: pair.W1.WS }, deps(await dueAt(db.pool, 'workspace', pair.W1.WS)));
+    expect(await refRows('workspace_id = $1', [pair.W1.WS])).toEqual([]);
+    expect((await refRows('workspace_id = $1', [pair.W2.WS])).length).toBe(1);
+    await clean();
   });
 });
