@@ -7,7 +7,10 @@ import {
   type StateCategory,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
+import { NODE_GAP, rectsOverlap, type Rect } from './collision.js';
 import { layoutDraft, nextFreePosition, type StatePosition } from './layout.js';
+import { GRID } from './snap.js';
+import { UNMEASURED_NODE } from './ui/flow-graph.js';
 
 export type BuilderSelection =
   | { kind: 'none' }
@@ -24,7 +27,17 @@ export type WorkflowDraft = {
 
 export type DraftActions = {
   setWorkflowName(name: string): void;
-  addState(input?: { name?: string; category?: StateCategory }): string;
+  /**
+   * `near` (flow coordinates; the canvas passes the centre of what the author is looking at) places the new state on the free grid point nearest it,
+   * clear of every state by `NODE_GAP`; `sizes` (by position key) are the measured node sizes, `UNMEASURED_NODE` otherwise. The new state's own box is the largest measured state's (`UNMEASURED_NODE` when none is measured). Without `near`, or with
+   * no free point inside 40 grid steps, the old `nextFreePosition` stands, so templates are unchanged.
+   */
+  addState(input?: {
+    name?: string;
+    category?: StateCategory;
+    near?: StatePosition;
+    sizes?: Record<string, { width: number; height: number }>;
+  }): string;
   renameState(stateId: string, name: string): void;
   setStateCategory(stateId: string, category: StateCategory): void;
   setStateBlocked(stateId: string, blocked: boolean): void;
@@ -109,6 +122,9 @@ export function selectInboundTargetIds(def: WorkflowDef): string[] {
   return targets;
 }
 
+/** How far from `near` Add state looks for a free grid point, in grid steps. */
+const FREE_PLACEMENT_RADIUS = 40;
+
 export function createDraftStore(initial: WorkflowDraft): DraftStore {
   let state = initial;
   const listeners = new Set<() => void>();
@@ -142,6 +158,30 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
     });
   }
 
+  /** A fresh state renders as big as the biggest state React Flow has measured (sizes differ per style and theme); the unmeasured guess only when none is. */
+  function largestMeasured(measured: Array<{ width: number; height: number } | undefined>): { width: number; height: number } {
+    const found = measured.filter((size) => size !== undefined);
+    if (found.length === 0) return UNMEASURED_NODE;
+    return { width: Math.max(...found.map((size) => size.width)), height: Math.max(...found.map((size) => size.height)) };
+  }
+
+  /** Spec §3.4: the free grid point nearest `near`, searched out to `FREE_PLACEMENT_RADIUS` grid steps. */
+  function freePositionNear(
+    near: StatePosition,
+    sizes: Record<string, { width: number; height: number }>,
+  ): StatePosition | null {
+    const placed: Rect[] = Object.entries(state.positions).map(([key, position]) => ({ ...position, ...(sizes[key] ?? UNMEASURED_NODE) }));
+    const box = largestMeasured(state.def.states.map((found) => sizes[found.id]));
+    const centre = { x: Math.round(near.x / GRID) * GRID, y: Math.round(near.y / GRID) * GRID };
+    const candidates: StatePosition[] = [];
+    for (let i = -FREE_PLACEMENT_RADIUS; i <= FREE_PLACEMENT_RADIUS; i++) {
+      for (let j = -FREE_PLACEMENT_RADIUS; j <= FREE_PLACEMENT_RADIUS; j++) candidates.push({ x: centre.x + i * GRID, y: centre.y + j * GRID });
+    }
+    const distance = (p: StatePosition) => (p.x - near.x) ** 2 + (p.y - near.y) ** 2;
+    candidates.sort((a, b) => distance(a) - distance(b) || a.y - b.y || a.x - b.x);
+    return candidates.find((p) => placed.every((o) => !rectsOverlap({ ...p, ...box }, o, NODE_GAP))) ?? null;
+  }
+
   const actions: DraftActions = {
     setWorkflowName(name) {
       setDef({ ...state.def, name });
@@ -159,7 +199,10 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
       set({
         ...state,
         def,
-        positions: { ...state.positions, [id]: nextFreePosition(state.positions) },
+        positions: {
+          ...state.positions,
+          [id]: (input.near && freePositionNear(input.near, input.sizes ?? {})) || nextFreePosition(state.positions),
+        },
         selection: { kind: 'state', stateId: id },
       });
       return id;

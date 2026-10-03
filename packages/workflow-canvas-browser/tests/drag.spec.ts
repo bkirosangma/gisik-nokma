@@ -78,14 +78,14 @@ test('25.517 Escape during a drag puts the state back at its start, keeps it the
   const name = await page.locator('.gn-state-node__name').first().innerText();
   const before = await nodeBox(page, name);
   const positionsBefore = await readDraftPositions(page);
-  await dragBy(page, name, 150, 0, { steps: 75, release: false });
-  expect((await nodeBox(page, name)).x - before.x).toBeGreaterThan(142);
+  await dragBy(page, name, 0, 150, { steps: 75, release: false }); // down: G-9 T3's collision would stop a drag into the next column
+  expect((await nodeBox(page, name)).y - before.y).toBeGreaterThan(132); // the 16 px grid (G-9 T3) rounds the live position by up to 8 flow px
   await page.keyboard.press('Escape');
-  expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
+  expect(Math.abs((await nodeBox(page, name)).y - before.y)).toBeLessThan(1);
   // React Flow is still tracking the pointer; the working copy drops its moves
-  await page.mouse.move(before.x + before.width / 2 + 230, before.y + 12, { steps: 6 });
-  expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
+  await page.mouse.move(before.x + before.width / 2, before.y + 12 + 230, { steps: 6 });
+  expect(Math.abs((await nodeBox(page, name)).y - before.y)).toBeLessThan(1);
   await page.mouse.up();
-  expect(Math.abs((await nodeBox(page, name)).x - before.x)).toBeLessThan(1);
+  expect(Math.abs((await nodeBox(page, name)).y - before.y)).toBeLessThan(1);
   expect(await readDraftPositions(page)).toEqual(positionsBefore);
 });

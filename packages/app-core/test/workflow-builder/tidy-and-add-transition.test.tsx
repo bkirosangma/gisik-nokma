@@ -10,6 +10,7 @@ import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builde
 import { BuilderProvider, type BuilderEnvironment } from '../../src/workflow-builder/ui/builder-context.js';
 import { AddTransitionForm, transitionExists } from '../../src/workflow-builder/ui/add-transition-form.js';
 import { UNMEASURED_NODE } from '../../src/workflow-builder/ui/flow-graph.js';
+import { measuredSizes } from '../../src/workflow-builder/ui/use-canvas-api.js';
 import { TidyControl, tidyPositions } from '../../src/workflow-builder/ui/tidy-control.js';
 import { WorkflowBuilderScreen } from '../../src/workflow-builder/ui/workflow-builder-screen.js';
 import { WorkflowCanvas } from '../../src/workflow-builder/ui/workflow-canvas.js';
@@ -109,6 +110,11 @@ describe('G-9 T4: Tidy and Undo tidy', () => {
     const wide = sizesOf(def, { width: 300, height: 120 });
     expect(overlappingPairs(layout, wide).length).toBeGreaterThan(0);
     expect(overlappingPairs(tidyPositions(def, wide), wide)).toEqual([]);
+    // the one mapping both Tidy buttons read (the corner's React Flow nodes, the header's CanvasApi.sizes()): by position key
+    const flowNode = (id: string, measured?: { width: number; height: number }) => ({ id, position: { x: 0, y: 0 }, data: {}, measured });
+    expect(
+      measuredSizes([flowNode('s:next', { width: 210, height: 200 }), flowNode('any-state', { width: 231, height: 52 }), flowNode('s:later')]),
+    ).toEqual({ next: { width: 210, height: 200 }, 'any-state': { width: 231, height: 52 } });
     // control: at the unmeasured box the grid already clears, so Tidy leaves it as it is
     expect(tidyPositions(def, sizesOf(def, UNMEASURED_NODE))).toEqual(layout);
     expect(tidyPositions(def)).toEqual(layout);

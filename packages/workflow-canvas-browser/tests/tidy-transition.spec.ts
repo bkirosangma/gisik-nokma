@@ -54,10 +54,15 @@ test('25.541 Tidy lays the states out with no two boxes overlapping, and Undo ti
   expect(await readDraftPositions(page)).toEqual(draftBefore);
   await expect(header(page).getByRole('button', { name: 'Undo tidy' })).toHaveCount(0);
 
-  // F1: Tidy clears the boxes React Flow MEASURED (a state is ~200 flow px tall, rows 140 apart). errand-with-waits
+  // F1: Tidy (header and corner) clears the boxes React Flow MEASURED (a state is ~200 flow px tall, rows 140 apart). errand-with-waits
   // stacks four states in one column; the kanban above has one per column, so it never could have failed.
   await openHarness(page, { seed: 'errand-with-waits' });
   // control: the seeded layout HAS overlapping boxes, so "none overlap" below is not vacuous
+  expect(anyOverlap(await allBoxes(page))).toBe(true);
+  await header(page).getByRole('button', { name: 'Tidy' }).click();
+  expect(anyOverlap(await allBoxes(page))).toBe(false);
+  // the canvas corner's Tidy, from a fresh seeded layout, clears them too
+  await openHarness(page, { seed: 'errand-with-waits' });
   expect(anyOverlap(await allBoxes(page))).toBe(true);
   await corner(page).getByRole('button', { name: 'Tidy' }).click();
   expect(anyOverlap(await allBoxes(page))).toBe(false);

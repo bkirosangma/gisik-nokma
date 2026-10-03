@@ -1,10 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import type { Node } from '@xyflow/react';
 import { Button } from '@gisik-nokma/ui';
 import type { WorkflowDef } from '@gisik-nokma/domain';
 import { clampToAvoidOverlap, type Rect } from '../collision.js';
 import type { DraftStore } from '../draft-store.js';
-import { ANY_STATE_NODE_ID, layoutDraft, type StatePosition } from '../layout.js';
+import { layoutDraft, type StatePosition } from '../layout.js';
 import { useBuilderEnv, useBuilderStore } from './builder-context.js';
 import { UNMEASURED_NODE } from './flow-graph.js';
 
@@ -13,18 +12,6 @@ export const TIDY_UNDO_MS = 10_000;
 
 /** Node sizes by position key, as the draft keys positions: a state's id, or `any-state`. */
 export type NodeSizes = Record<string, { width: number; height: number }>;
-
-/** React Flow's measured nodes as {@link NodeSizes}: `s:<id>` becomes `<id>`, `any-state` stays. A node React Flow has not measured yet has no entry. */
-export function measuredSizes(nodes: readonly Node[]): NodeSizes {
-  const sizes: NodeSizes = {};
-  for (const node of nodes) {
-    const { width, height } = node.measured ?? {};
-    if (width !== undefined && height !== undefined) {
-      sizes[node.id === ANY_STATE_NODE_ID ? node.id : node.id.slice('s:'.length)] = { width, height };
-    }
-  }
-  return sizes;
-}
 
 /**
  * `layoutDraft`, each position then passed through the collision check against those already placed (spec §3.1, §3.5):
