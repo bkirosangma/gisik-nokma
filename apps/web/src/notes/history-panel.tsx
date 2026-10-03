@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TicketEditorSlot } from '@gisik-nokma/editor';
+import { TicketEditorSlot } from '../editor-slot.js';
 import { Button, Sheet, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import type { NoteVersion } from '@gisik-nokma/domain';
 import { useAppServices } from '../providers.js';

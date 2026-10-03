@@ -2328,6 +2328,13 @@ input, textarea, select { font-family: inherit; }
 }
 
 :root { --app-nav-offset: 4.35rem; }
+/* The notes editor band's floor, written ONCE (smoothness T9, 25.156): the taller of 40dvh and what is left of the screen under
+   the page's own chrome. The note editor's field reads it (`.gn-notes__editor .ticket-editor .ticket-editor__content`, 23.162's
+   rule) and so does the document skeleton in the route shell, so the band the reader sees while the note loads is the band the
+   editor then fills. On `:root` beside `--app-nav-offset`, whose value it reads (the phone arm below re-declares that on the same
+   element, so the floor follows it); `20rem` is the chrome above AND below the field (nav, title, byline, toolbar, hint,
+   "Saved"), a minimum and not a pixel-exact fit. */
+:root { --gn-notes-editor-min: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem)); }
 /* The chrome around the workflow builder's wide screen, each number published ONCE (polish 2, 2026-10-01, case 10.164).
    `packages/ui/src/ui.css` bounds `.workflow-builder-screen` to `100dvh - app bar - crumb margin - crumb line - shell
    bottom padding`, and these are the rules that draw the last three: `.gn-shell`'s bottom padding, and the breadcrumb
@@ -4405,6 +4412,11 @@ input, textarea, select { font-family: inherit; }
   white-space: nowrap;
 }
 
+.gn-notes__add-comment {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 .gn-notes__keys {
   flex: none;
   display: inline-flex;
@@ -4517,11 +4529,11 @@ input, textarea, select { font-family: inherit; }
   padding: 0.125rem 0.375rem;
 }
 
-/* The four sentences the tree can say about a READ rather than about notes:
-   loading, refused, empty, and your-session-is-not-here. Muted because every
+/* The sentences the tree can say about a READ rather than about notes:
+   empty, and your-session-is-not-here (and the document's hint). Muted because every
    one of them is the page telling the reader something in passing, and none is
-   the page's subject. */
-.gn-notes__loading,
+   the page's subject. Loading is no longer a sentence: it is the list item's own
+   skeleton (T9, 25.159). */
 .gn-notes__empty,
 .gn-notes__session,
 .gn-notes__hint {
@@ -4671,13 +4683,11 @@ input, textarea, select { font-family: inherit; }
   min-width: 0;
   cursor: text;
 }
-/* The visible editing field is the floor (23.162): the taller of 40dvh and what is left of the screen under the
-   page's own chrome. Reuses `--app-nav-offset` (`:root`) with its `0px` fallback; `20rem` is the chrome above
-   AND below the field (nav, title, byline, toolbar, hint, "Saved") — a minimum, not a pixel-exact fit. Three
-   classes, so it beats the editor sheet's `.editor-slot .ticket-editor__content` (8.375rem) without leaning on
-   source order. */
+/* The visible editing field is the floor (23.162), and its number is `--gn-notes-editor-min`, declared once on `:root`
+   (above, 18.483) (T9, 25.156). Three classes, so it beats the editor sheet's `.editor-slot .ticket-editor__content` (8.375rem) without
+   leaning on source order. */
 .gn-notes__editor .ticket-editor .ticket-editor__content {
-  min-height: max(40dvh, calc(100dvh - var(--app-nav-offset, 0px) - 20rem));
+  min-height: var(--gn-notes-editor-min);
 }
 
 /* ── The notes screen on a phone (mobile-web plan Task 9, cases 21.130–21.131) ───────────────
