@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-type Stress = { cards: number; fog: number; edges: number; fps: number; worstMs: number; renderer: string };
+type Sweep = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
+type Stress = Sweep & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: Sweep };
 async function stress(page: import('@playwright/test').Page): Promise<Stress> {
   await page.goto('/stress.html?auto=1');
   await page.waitForFunction(() => (window as unknown as { __stress?: unknown }).__stress !== undefined, null, { timeout: 60_000 });

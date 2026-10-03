@@ -5,7 +5,9 @@ import { iconUri } from './icons.js';
 import { initialsOf } from '../initials.js';
 import { createSigma } from './program.js';
 
-export type StressResult = { cards: number; fog: number; edges: number; fps: number; worstMs: number; renderer: string };
+export type SweepStats = { frames: number; fps: number; worstMs: number; p99Ms: number; over167: number; overAt: number[] };
+/** `fps`/`worstMs` and the rest describe the FIRST sweep (what the spec §7 bar reads); `pass2` is an identical second sweep, warm. */
+export type StressResult = SweepStats & { cards: number; fog: number; edges: number; renderer: string; firstMs: number; pass2: SweepStats };
 
 /** 500 clear + 2,000 fog + 3,000 edges (spec §7), moved for `durationMs` while every frame is timed. */
 export async function runStress(
@@ -39,21 +41,38 @@ export async function runStress(
   const sigma = createSigma(graph, container, () => palette, { nodeHovered: () => false, highlightOn: () => false });
   await new Promise((resolve) => setTimeout(resolve, 300));
   const camera = sigma.getCamera();
-  let frames = 0, worst = 0, last = performance.now();
-  const t0 = last;
-  await new Promise<void>((done) => {
-    const frame = (now: number) => {
-      frames += 1; worst = Math.max(worst, now - last); last = now;
-      const t = (now - t0) / durationMs;
-      camera.setState({ x: 0.5 + 0.15 * Math.sin(t * 6.28), y: 0.5 + 0.1 * Math.cos(t * 6.28), ratio: 0.6 + 0.4 * Math.abs(Math.sin(t * 3.14)), angle: 0 });
-      if (now - t0 < durationMs) requestAnimationFrame(frame); else done();
+  /** One timed camera sweep: every frame's delta, from a fresh `last`. */
+  const sweep = () =>
+    new Promise<number[]>((done) => {
+      const deltas: number[] = [];
+      let last = performance.now();
+      const t0 = last;
+      const frame = (now: number) => {
+        deltas.push(now - last);
+        last = now;
+        const t = (now - t0) / durationMs;
+        camera.setState({ x: 0.5 + 0.15 * Math.sin(t * 6.28), y: 0.5 + 0.1 * Math.cos(t * 6.28), ratio: 0.6 + 0.4 * Math.abs(Math.sin(t * 3.14)), angle: 0 });
+        if (now - t0 < durationMs) requestAnimationFrame(frame); else done(deltas);
+      };
+      requestAnimationFrame(frame);
+    });
+  const summary = (deltas: number[]) => {
+    const sorted = [...deltas].sort((a, b) => a - b);
+    return {
+      frames: deltas.length,
+      fps: +(deltas.length / (durationMs / 1000)).toFixed(1),
+      worstMs: +Math.max(0, ...deltas).toFixed(1),
+      p99Ms: +(sorted[Math.min(sorted.length - 1, Math.ceil(0.99 * sorted.length) - 1)] ?? 0).toFixed(1),
+      over167: deltas.filter((d) => d > 16.7).length,
+      overAt: deltas.flatMap((d, i) => (d > 16.7 ? [i] : [])),
     };
-    requestAnimationFrame(frame);
-  });
+  };
+  const first = await sweep();
+  const second = await sweep(); // a second identical sweep: whatever is one-time work (texture uploads, shader compiles) is paid by now
   const gl = container.querySelector('canvas')?.getContext('webgl2');
   const info = gl?.getExtension('WEBGL_debug_renderer_info');
   const renderer = gl && info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : 'unknown';
-  const result = { cards, fog, edges: graph.size, fps: +(frames / (durationMs / 1000)).toFixed(1), worstMs: +worst.toFixed(1), renderer };
+  const result: StressResult = { cards, fog, edges: graph.size, renderer, ...summary(first), firstMs: +(first[0] ?? 0).toFixed(1), pass2: summary(second) };
   sigma.kill();
   return result;
 }
