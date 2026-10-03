@@ -24,6 +24,11 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   dispatch <window> <file>        two pastes + proof of delivery
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify
+  post <to> --kind K (--body FILE | --text STR) [--from SEAT] [--reply-to ID]
+                                  append a message to roles/LEDGER.jsonl (the postman delivers it)
+  inbox [--seat S] [--all] [--watch]  my unacked messages; --watch = the ONE cursor watcher for the seat's Monitor
+  ack <id> [--seat S] [--cancel]  receipt for a message (idempotent); stops redelivery
+  postman run|once|status|audit|restarted <seat>  the delivery daemon (tmux window `postman`) and its admin
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;

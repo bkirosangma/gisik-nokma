@@ -10,11 +10,12 @@
 mode="${1:-idle}"; rec="${2:-/dev/null}"; pre="${3:-}"
 case "$mode" in
   idle)
-    while true; do printf '❯ '; IFS= read -r line || exit 0; printf '%s\n' "$line" >> "$rec"
-      printf '\n● %s\n✳ Working… (3s · ↓ 10 tokens)\n' "$line"; sleep 3; done;;
+    printf '❯ '
+    while true; do IFS= read -r line || exit 0; printf '%s\n' "$line" >> "$rec"
+      printf '● %s\n✳ Working… (3s · ↓ 10 tokens)\n❯ ' "$line"; sleep 3; done;;
   prefill)
-    while true; do IFS= read -r -e -i "$pre" -p '❯ ' line || exit 0; printf '%s\n' "$line" >> "$rec"
-      printf '\n● %s\n✳ Working… (3s · ↓ 10 tokens)\n' "$line"; sleep 3; pre=""; done;;
+    IFS= read -r -e -i "$pre" -p '❯ ' line || exit 0
+    while true; do printf '%s\n' "$line" >> "$rec"; printf '● %s\n✳ Working… (3s · ↓ 10 tokens)\n❯ ' "$line"; sleep 3; IFS= read -r line || exit 0; done;;
   busy)
     printf '✳ Working… (125s · ↓ 4000 tokens)\n'
     while true; do printf '❯ '; IFS= read -r line || exit 0; printf '%s\n' "$line" >> "$rec"

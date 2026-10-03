@@ -21,8 +21,8 @@ reset() { rm -rf "$R"/* "$L"/*; : > "$N"; NOW=1790000000; for w in $(tmux list-w
 jget() { python3 -c 'import json,sys; [print(json.loads(l).get(sys.argv[2],"")) for l in open(sys.argv[3]) if json.loads(l)["id"]==int(sys.argv[1])]' "$1" "$2" "$R/LEDGER.jsonl"; }
 ledger_n() { [ -f "$R/LEDGER.jsonl" ] && wc -l < "$R/LEDGER.jsonl" | tr -d ' ' || echo 0; }
 count_kind() { python3 -c 'import json,sys; print(sum(1 for l in open(sys.argv[2]) if json.loads(l)["kind"]==sys.argv[1] and (len(sys.argv)<4 or json.loads(l)["to"]==sys.argv[3])))' "$1" "$R/LEDGER.jsonl" ${2:+"$2"} 2>/dev/null || echo 0; }
-mkseat() { : > "$T/rec-$1"; tmux new-window -d -t "$S:" -n "$1" "bash '$HERE/test/fakeseat.sh' $2 '$T/rec-$1' '${3:-}'"; sleep 0.7; }
-rec_n() { grep -c . "$T/rec-$1" 2>/dev/null || echo 0; }
+mkseat() { : > "$T/rec-$1"; tmux new-window -d -t "$S:${IDX:-}" -n "$1" "bash '$HERE/test/fakeseat.sh' $2 '$T/rec-$1' '${3:-}'"; sleep 0.7; }
+rec_n() { local n; n="$(grep -c . "$T/rec-$1" 2>/dev/null)"; echo "${n:-0}"; }
 rec_has() { grep -qF -- "$2" "$T/rec-$1"; }
 status_of() { pm postman status 2>&1 | grep "^$1 " | head -1; }
 hb() { python3 -c 'import os,sys; open(sys.argv[1],"a").close(); os.utime(sys.argv[1],(int(sys.argv[2]),int(sys.argv[2])))' "$L/inbox-watch-$1.hb" "$2"; }
@@ -47,10 +47,10 @@ reset; pm post exec2 --kind next --text "go on" --from main >/dev/null 2>&1
 check "13.1902 post --text: the body is a spooled file holding the text" \
   '[ "$(jget 1 body)" = "$R/postman/spool/1.txt" ] && [ "$(cat "$R/postman/spool/1.txt")" = "go on" ]'
 reset
-check "13.1903 post: a missing --body file, no body and both body forms are refused, nothing appended" \
-  '! pm post exec2 --kind fix --body "$T/nope.md" --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --body "$b1" --text x --from main >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
-check "13.1904 post: a bad seat name, a bad kind and a missing --from are refused" \
-  '! pm post "exec 3;rm" --kind fix --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind shout --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind fix --body "$b1" >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
+check "13.1903 post: a missing --body file, no body and both body forms are refused, nothing appended; CONTROL: a valid post is accepted" \
+  'pm post exec2 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && ! pm post exec2 --kind fix --body "$T/nope.md" --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --body "$b1" --text x --from main >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
+check "13.1904 post: a bad seat name, a bad kind and a missing --from are refused; CONTROL: a valid post is accepted" \
+  'pm post exec3 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && ! pm post "exec 3;rm" --kind fix --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind shout --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind fix --body "$b1" >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
 reset; mkseat exec4 idle
 check "13.1905 post: a bare window number resolves to the window NAME; orch aliases main" \
   'idx=$(tmux list-windows -t "$S" -F "#{window_index} #{window_name}" | awk "\$2==\"exec4\"{print \$1}"); pm post "$idx" --kind note --text hi --from main >/dev/null 2>&1; pm post orch --kind note --text hi --from exec4 >/dev/null 2>&1; [ "$(jget 1 to)" = exec4 ] && [ "$(jget 2 to)" = main ]'
@@ -102,18 +102,18 @@ reset; rm -f "$L/inbox-watch-exec3.hb"; watch_once exec3 >/dev/null
 check "13.1924 watch: the heartbeat file is touched on every poll" '[ -f "$L/inbox-watch-exec3.hb" ] && [ $(( $(date +%s) - $(stat -f %m "$L/inbox-watch-exec3.hb") )) -lt 10 ]'
 
 # ───────────────────────────── the QUEUE-dispatch bridge ─────────────────────────────
-bridge_reset() { reset; mkdir -p "$T/lanes"; Q="$R/QUEUE-dispatch.md"; : > "$Q"; for n in 1 2 3 4 5; do mkseat exec$n idle; done; mkseat reviewerA idle; echo "$T/BRIEF-b.md" > /dev/null; printf 'branch task/foo-bar\n' > "$T/BRIEF-b.md"; }
+bridge_reset() { reset; mkdir -p "$T/lanes"; Q="$R/QUEUE-dispatch.md"; : > "$Q"; for n in 1 2 3 4 5; do IDX=$n mkseat exec$n idle; done; IDX=6 mkseat reviewerA idle; echo "$T/BRIEF-b.md" > /dev/null; printf 'branch task/foo-bar\n' > "$T/BRIEF-b.md"; }
 bridge_reset; echo "05:55 FIX 4 $T/BRIEF-old.md (history, never reposted)" >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1931 bridge: the first run starts at EOF — history is never reposted" '[ "$(ledger_n)" = 0 ] && [ -f "$R/postman/cursor-queue-dispatch" ]'
 printf '06:01 FIX 4 %s (task/foo-bar abcdef12; reviewer B)\n06:02 NEXT 2 %s\n06:03 MERGETIP 5 task/foo-bar base=release/smoothness\n06:04 FIX lane3 %s\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1930 bridge: FIX/NEXT/MERGETIP lines become messages to the right exec seat (laneN accepted); ref from the line or the brief" \
-  '[ "$(count_kind fix exec4)" = 1 ] && [ "$(count_kind next exec2)" = 1 ] && [ "$(count_kind mergetip exec5)" = 1 ] && [ "$(count_kind fix exec3)" = 1 ] && [ "$(jget 1 body)" = "$T/BRIEF-b.md" ] && [ "$(jget 1 ref)" = task/foo-bar ] && [ "$(jget 4 ref)" = task/foo-bar ] && jget 3 body | grep -q "branch task/foo-bar, base release/smoothness"'
-before="$(ledger_n)"; pm postman once >/dev/null 2>&1; rm -f "$R/postman/cursor-queue-dispatch"; echo "06:09 NOTE x" >> "$Q"; pm postman once >/dev/null 2>&1
+  '[ "$(count_kind fix exec4)" = 1 ] && [ "$(count_kind next exec2)" = 1 ] && [ "$(count_kind mergetip exec5)" = 1 ] && [ "$(count_kind fix exec3)" = 1 ] && [ "$(jget 1 body)" = "$T/BRIEF-b.md" ] && [ "$(jget 1 ref)" = task/foo-bar ] && [ "$(jget 4 ref)" = task/foo-bar ] && grep -q "branch task/foo-bar, base release/smoothness" "$(jget 3 body)"'
+before="$(ledger_n)"; pm postman once >/dev/null 2>&1; echo 0 > "$R/postman/cursor-queue-dispatch"; echo "06:09 NOTE x" >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1932 bridge: the same line seen twice (a reset cursor) makes ONE message (src dedupe)" '[ "$(count_kind fix exec4)" = 1 ] && [ "$(count_kind next exec2)" = 1 ]'
 bridge_reset; pm postman once >/dev/null 2>&1
-printf '06:11 FIX 4 %s/missing-brief.md\n06:12 FIX 7 %s\n06:13 FIX orchestrator %s\n06:14 NEXT task/x %s\n06:15 MERGETIP 4 task/foo base=main\n' "$T" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
-check "13.1933 bridge: an unparsable line is never dropped — one note to main quoting it each, nothing sent to a lane" \
-  '[ "$(count_kind note main)" = 5 ] && [ "$(count_kind fix)" = 0 ] && [ "$(count_kind mergetip)" = 0 ]'
+printf '06:11 FIX 4 %s/missing-brief.md\n06:12 FIX 7 %s\n06:13 FIX orchestrator %s\n06:14 NEXT task/x %s\n06:15 MERGETIP 4 task/foo base=main\n06:16 FIX 6 %s\n' "$T" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
+check "13.1933 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane" \
+  '[ "$(count_kind note main)" = 6 ] && [ "$(count_kind fix)" = 0 ] && [ "$(count_kind mergetip)" = 0 ]'
 check "13.1934 bridge: a number whose window is not exec* (7 = reviewerA here) and orchestrator/planner targets are refused, never routed" \
   '[ "$(count_kind fix reviewerA)" = 0 ] && [ "$(count_kind fix main)" = 0 ] && python3 -c "
 import json,sys
@@ -139,7 +139,7 @@ check "13.1942 watched + BUSY: no pane paste at all (the Monitor line is already
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1943 unwatched seat (every lane): the pane pointer goes at once, one line, carrying the id and the ack command" \
   '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix ← main]" && rec_has exec3 "ctl ack 1" && [ "$(wc -c < "$T/rec-exec3")" -lt 450 ]'
-NOW=$((NOW+60)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
+sleep 4; NOW=$((NOW+60)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
 check "13.1944 a PROVEN delivery is not re-pasted before 15 min (the seat has it, it is busy)" '[ "$(rec_n exec3)" = 1 ]'
 NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; sleep 4
 check "13.1944b …and is re-pointed after 15 min of silence" '[ "$(rec_n exec3)" = 2 ]'
@@ -207,17 +207,17 @@ check "13.1955e ctl postman audit (on demand) exits 1 and names the unmatched li
 pane_case() { # name mode [pretext]  → runs once at +0 against a fresh seat; prints nothing; sets rec file
   reset; mkseat exec3 "$@"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; }
 check "13.1960 pane_state menu: a permission/option menu is refused (a pasted Enter would pick option 1); CONTROL in the same check: an idle pane is pasted" \
-  'pane_case idle; [ "$(rec_n exec3)" = 1 ] || exit 1; pane_case menu; [ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=menu"'
+  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case menu; [ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=menu"; }'
 check "13.1961 pane_state text: a box holding foreign text is never cleared or pasted over; CONTROL in the same check: an idle pane is pasted" \
-  'pane_case idle; [ "$(rec_n exec3)" = 1 ] || exit 1; pane_case text "half a thought"; [ ! -s "$T/rec-exec3" ] && tmux capture-pane -p -t "$S:=exec3" | grep -q "half a thought" && status_of exec3 | grep -q "last=text"'
+  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case text "half a thought"; [ ! -s "$T/rec-exec3" ] && tmux capture-pane -p -t "$S:=exec3" | grep -q "half a thought" && status_of exec3 | grep -q "last=text"; }'
 copy_case() { reset; mkseat exec3 idle; tmux copy-mode -t "$S:=exec3"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; }
 check "13.1962 pane_state copy-mode: nothing typed while in copy mode; after 180 s cancelled once and delivered; CONTROL in the same check: an idle (not copy-mode) pane is pasted at once" \
-  'pane_case idle; [ "$(rec_n exec3)" = 1 ] || exit 1; copy_case; [ "$(rec_n exec3)" = 0 ] && status_of exec3 | grep -q "last=copy-mode" || exit 1; NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; sleep 4; [ "$(rec_n exec3)" = 1 ] && [ "$(tmux display-message -p -t "$S:=exec3" "#{pane_in_mode}")" = 0 ]'
+  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { copy_case; [ "$(rec_n exec3)" = 0 ] && status_of exec3 | grep -q "last=copy-mode" && { NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; sleep 4; [ "$(rec_n exec3)" = 1 ] && [ "$(tmux display-message -p -t "$S:=exec3" "#{pane_in_mode}")" = 0 ]; }; }'
 reset; mkseat exec3 idle
 pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; CTL_POSTMAN_CMD_RE='^([0-9]+\.[0-9]+\.[0-9]+|claude|node)$' pm postman once >/dev/null 2>&1
 check "13.1963 pane_state not-claude: with the DEFAULT allowlist a bash pane is never typed into; CONTROL: the same pane under a regex that allows bash is pasted" \
   '[ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=not-claude" && { NOW=$((NOW+200)); pm postman once >/dev/null 2>&1; [ "$(rec_n exec3)" = 1 ]; }'
-check "13.1964 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted" 'pane_case idle; [ "$(rec_n exec3)" = 1 ] || exit 1; reset; tmux new-window -d -t "$S:" -n exec3 "less /etc/hosts"; sleep 0.5; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; ! tmux capture-pane -p -t "$S:=exec3" | grep -q "postman" && status_of exec3 | grep -q "last=not-claude"'
+check "13.1964 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted" 'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { reset; tmux new-window -d -t "$S:" -n exec3 "less /etc/hosts"; sleep 0.5; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; ! tmux capture-pane -p -t "$S:=exec3" | grep -q "postman" && status_of exec3 | grep -q "last=not-claude"; }'
 reset; mkseat exec3 prefill "[postman #1 fix ← main] Read the WHOLE file x"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; sleep 1
 check "13.1965 pane_state ours: our own unsubmitted pointer in the box is SUBMITTED, not pasted a second time (exactly one copy reaches the seat)" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix"'
 reset; mkseat exec3 busy; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
@@ -229,6 +229,6 @@ reset; mkseat exec3 idle; pm post exec3 --kind note --text "fyi" --from main >/d
 check "13.1968 kind note: delivered to the inbox only, never pasted into a pane, never blocks the head of the queue" \
   '[ "$(rec_n exec3)" = 0 ] && [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ]'
 check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail" \
-  'for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done'
+  '( unset CTL_POSTMAN_CMD_RE; for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done )'
 
 [ "$fails" -eq 0 ] && { echo "postman tests: all ok"; exit 0; } || { echo "postman tests: $fails FAILED"; exit 1; }
