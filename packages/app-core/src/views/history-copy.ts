@@ -129,8 +129,15 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       // No `typeId` at all is a payload this file cannot read — the raw type is
       // then the honest headline, and the fallthrough says so rather than
       // printing "Created as undefined".
-      return typeId === null ? event.type : `Created as ${typeName(typeId)}`;
+      if (typeId === null) return event.type;
+      // Drafts spec §13: a draft's birth reads as drafting. The key is the ONE spelling of "draft".
+      return payload['draft'] === true ? `Drafted as ${typeName(typeId)}` : `Created as ${typeName(typeId)}`;
     }
+    case 'ticket.published':
+      return 'Published';
+    case 'ticket.discarded':
+      // Never shown: a discard erases the stream. Narrated so the census (3.183) holds for every type.
+      return 'Discarded';
     case 'ticket.field_set': {
       const fieldId = str(payload, 'fieldId');
       if (fieldId === null) return event.type;

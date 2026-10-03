@@ -38,3 +38,20 @@ describe('27.004 ticket vocabulary census', () => {
     }
   });
 });
+
+describe('28.005 the census covers the draft pair', () => {
+  it('28.005 both fold; published names its project, discarded names nothing', () => {
+    for (const type of ['ticket.published', 'ticket.discarded']) {
+      expect((TICKET_EVENT_TYPES as readonly string[]).includes(type), type).toBe(true);
+    }
+    const PROJECT = '01J9GPRJ000000000000000000';
+    expect(payloadIds('ticket.published', { projectId: PROJECT })).toEqual([['project', PROJECT]]);
+    expect(payloadIds('ticket.discarded', {})).toEqual([]);
+    // control: the creation still names project and parent
+    expect(payloadIds('ticket.created', { projectId: PROJECT, parentId: null })).toEqual([['project', PROJECT]]);
+    // the 27.004 census must be empty over the real registry, and report a planted type
+    const planted = { type: 'ticket.planted_for_census', version: 1, entityKind: 'ticket', payloadSchema: undefined as never } as EventTypeRegistration;
+    expect(unaccounted([...domainRegistry.registrations(), planted])).toEqual(['ticket.planted_for_census']);
+    expect(unaccounted(domainRegistry.registrations())).toEqual([]);
+  });
+});

@@ -3784,3 +3784,19 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 <!-- KG-E bullet T2 -->
 <!-- KG-E bullet T3 -->
 <!-- KG-E bullet T4 -->
+
+## 25. Drafts
+
+*Private tickets with no key until published: the Drafts page, publish and discard, MCP draft tools. Spec `docs/superpowers/specs/2026-10-03-drafts-design.md`; mirrored by `test-cases/28-drafts.md`.*
+
+- ⚙️ **Drafts: the events and the state** (drafts T1; `packages/domain/src/events/ticket-events.ts`, `vocabulary.ts`, `ticket-state.ts`, `draft.ts`) — `ticket.created` gains `draft: true` (born in the Backlog, no `stateId`), new `ticket.published {projectId}` and `ticket.discarded {}`; `TicketState.draft = {authorId, at, discarded?}` is absent on every non-draft, `published` removes it and re-pins the workflow to the type's current binding. `draftAllows` / `draftNotAllowedReason` are the author's allowlist (T5 enforces it). History narrates `Drafted as`, `Published`; a registry census (`apps/server/test/census/ticket-vocabulary-census.test.ts`, `packages/domain/test/ticket-draft-events.test.ts`) fails when a ticket type picks no side. Both are classified in the reference index's census (`apps/server/src/projections/references.ts`, 27.111). A discard notifies nobody (owner ruling 2026-10-04: a draft leaves no trace outside its author's view until publish). Cases 28.001–28.009.
+<!-- drafts T1 bullet -->
+<!-- drafts T2 bullet -->
+<!-- drafts T3 bullet -->
+<!-- drafts T4 bullet -->
+<!-- drafts T5 bullet -->
+<!-- drafts T5b bullet -->
+<!-- drafts T6 bullet -->
+<!-- drafts T7 bullet -->
+<!-- drafts T8 bullet -->
+<!-- drafts T9 bullet -->

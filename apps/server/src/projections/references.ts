@@ -71,6 +71,8 @@ export const NOT_A_REFERENCE_BODY: Readonly<Record<string, string>> = {
   'ticket.closed': 'no body',
   'ticket.reopened': 'no body',
   'ticket.ranked': 'a rank string',
+  'ticket.published': 'the draft becomes a ticket: carries only its project, no document (drafts spec §2.2)',
+  'ticket.discarded': 'the author\'s intent to erase a draft: empty, no document (drafts spec §2.2)',
   'ticket.deleted': 'trash: rows stay, reads hide them',
   'ticket.restored': 'trash: rows were never removed',
   'attachment.added': 'a file, not a document',

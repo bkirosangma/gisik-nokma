@@ -149,6 +149,15 @@ export const ticketCreatedPayload = z
      */
     startDate: dueDateValueSchema.optional(),
     dueDate: dueDateValueSchema.optional(),
+    /**
+     * Drafts (spec `2026-10-03-drafts-design.md` §2.2): this ticket is born PRIVATE, with no key.
+     * OPTIONAL, AND ABSENT MEANS PUBLISHED AT BIRTH — what every stored `ticket.created` meant, so the
+     * additive-field rule `start`, `priority` and the rest follow holds. `z.literal(true)`, never a
+     * boolean: `draft: false` would be a second spelling of "absent", and a reader that tested
+     * `payload.draft !== undefined` would then count a published ticket as a draft. The key query
+     * (`read/ticket-numbers.ts`) reads this member from JSON, so its ONE spelling is also its safety.
+     */
+    draft: z.literal(true).optional(),
   })
   .refine((p) => !(p.start === 'backlog' && p.stateId !== undefined), {
     // The owner's ruling (starting-status design): a backlog ticket has no
@@ -157,6 +166,13 @@ export const ticketCreatedPayload = z
     // is the domain's own door for a payload built some other way.
     message: 'a backlog ticket has no starting status, so a ticket.created cannot carry both start: "backlog" and stateId',
     path: ['stateId'],
+  })
+  .refine((p) => p.draft !== true || (p.start === 'backlog' && p.stateId === undefined), {
+    // Owner ruling 2026-10-03 (drafts D5): a draft is born in the Backlog and publishes as a Backlog
+    // ticket ("Publishing makes every draft a Backlog ticket"). Neither `start: 'focus'` nor an absent
+    // `start` (= focus) nor a starting status is a thing a draft can mean.
+    message: 'a draft is born in the backlog: send start: "backlog" and no stateId',
+    path: ['start'],
   });
 
 export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });
@@ -338,6 +354,23 @@ export const ticketReopenedPayload = z.object({}).strict();
 export const ticketDeletedPayload = z.object({}).strict();
 /** `ticket.restored` — the UNDO of `ticket.deleted`. Same empty, strict payload. */
 export const ticketRestoredPayload = z.object({}).strict();
+
+/**
+ * `ticket.published` (drafts spec §2.2): the draft becomes an ordinary Backlog ticket, and its KEY is
+ * its position among the project's numbering rows (`read/ticket-numbers.ts`). It carries the ticket's
+ * project so the key query is ledger-only and a purge can redact it to the same shape as a creation
+ * (`{projectId, purged: true}`). The engine refuses a `projectId` that is not the draft's project
+ * (`draft.project-mismatch`, T5). Strict: a redacted row (`purged: true`) no longer parses, which is why
+ * every replay reader asks `isRedactedTicketPublished` first (T2).
+ */
+export const ticketPublishedPayload = z.object({ projectId: ulidString }).strict();
+
+/**
+ * `ticket.discarded` (drafts spec §2.2): the author's intent to erase a draft. Empty and strict. The
+ * server erases the stream after it commits (`purge/discard-draft.ts`, T5); it is an EVENT only so an
+ * offline device can queue it in its outbox.
+ */
+export const ticketDiscardedPayload = z.object({}).strict();
 
 /**
  * `ticket.ranked` (spec §8.1) — one reorder is one event carrying the new key,

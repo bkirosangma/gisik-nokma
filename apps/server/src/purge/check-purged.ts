@@ -54,6 +54,10 @@ export function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<
       // Spec A: the TARGET is the second ticket a link names; a purged one refuses the claim.
       add('ticket', payload['targetId']);
       break;
+    case 'ticket.published':
+      // Drafts T1: the publish names its project (the key query needs it); a purged project refuses it.
+      add('project', payload['projectId']);
+      break;
     case 'claim.contested': {
       // Trash Plan 3 (D10). A refused ticket claim comes back as a contest on
       // the claim's OWN entity (`sync/sync-service.ts`'s `contest()`), and for a

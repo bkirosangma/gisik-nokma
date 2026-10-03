@@ -124,10 +124,21 @@ export type TicketState = {
    * reducer drops the key with the last link, so the two shapes agree.
    */
   links?: TicketLink[];
+  /**
+   * Present ONLY while the ticket is a DRAFT (drafts spec §2.3): private to `authorId`, with no key.
+   * ABSENT on every other ticket, on the reducer and on `rowToTicketState` alike (the rule `links` follows:
+   * the dual-client rig's `toEqual` needs both producers to agree on shape). `ticket.published` removes it;
+   * `ticket.discarded` sets `discarded: true`, so every door treats the draft as gone between the commit
+   * and the erasure (`purge/discard-draft.ts`).
+   */
+  draft?: TicketDraft;
 };
 
 /** One OUTBOUND typed link (spec A §2.2). Inbound links live on the other ticket's state. */
 export type TicketLink = { kind: TicketLinkKind; targetId: string };
+
+/** A draft's head state: who drafted it, when, and whether they have discarded it. */
+export type TicketDraft = { authorId: string; at: string; discarded?: true };
 
 export type MembershipState = {
   kind: 'membership';

@@ -80,6 +80,10 @@ const GATED: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown]> 
   // `deleted-ticket`, the existing rule (spec A §2.3 rule 2); a deleted TARGET is T3's `link.target-deleted`.
   ['ticket.link_added', () => ({ kind: 'blocks', targetId: '01J9GTKB000000000000000000' })],
   ['ticket.link_removed', () => ({ kind: 'blocks', targetId: '01J9GTKB000000000000000000' })],
+  // Drafts T1 (28.008): both are acts on a ticket. A draft cannot be deleted (R7), so a deleted ticket
+  // refuses them like the rest; the draft gate (T5) is a different, earlier question.
+  ['ticket.published', () => ({ projectId: PROJECT })],
+  ['ticket.discarded', () => ({})],
   ['attachment.added', () => ({ attachmentId: '01J9GATT000000000000000000', filename: 'a.txt', mime: 'text/plain', size: 1, sha256: 'ab' })],
   ['visibility.set', (id) => ({ ticketId: id, mode: 'explicit', userIds: [PEER] })],
 ];
@@ -102,7 +106,7 @@ const EXEMPT: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown, 
 ];
 
 describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write against a soft-deleted ticket', () => {
-  it('E6-2: the two tables together are the WHOLE ticket-scoped vocabulary — a new type must pick a side', () => {
+  it('E6-2 (28.008 covers the draft pair): the two tables together are the WHOLE ticket-scoped vocabulary — a new type must pick a side', () => {
     // The registry exposes no enumeration, so the universe is the source that
     // REGISTERS it, read as text — the same set-difference the finding ran by
     // hand. Each `domainRegistry.register({ … })` block yields its `type` and
