@@ -105,10 +105,9 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
             AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, viewerId, params)}`,
         params.toArray(),
       );
-      const keys = await cardKeysFor(db, rows);
       for (const row of rows) {
         const ref = graphRef('ticket', row.ticket_id);
-        out.set(ref, { ref, kind: 'ticket', id: row.ticket_id, workspaceId: row.workspace_id, projectId: row.project_id, label: keys.get(row.ticket_id) ?? row.title ?? '', title: row.title, category: row.state_category, suggested: false });
+        out.set(ref, { ref, kind: 'ticket', id: row.ticket_id, workspaceId: row.workspace_id, projectId: row.project_id, label: row.title ?? '', title: row.title, category: row.state_category, suggested: false });
       }
     }
 
@@ -154,13 +153,21 @@ export function createGraphVisibility(db: Queryable, viewerId: string) {
     return out; // concepts: spec D adds a resolver; until then none resolve
   }
 
-  return { roleIn, resolve, nameOf };
+  /** The card keys of the tickets a response returns: ONE `cardKeysFor` call per read. */
+  async function keysFor(items: readonly Resolved[]): Promise<Map<string, string | null>> {
+    return cardKeysFor(
+      db,
+      items.filter((item) => item.kind === 'ticket' && item.workspaceId !== null && item.projectId !== null).map((item) => ({ ticket_id: item.id, workspace_id: item.workspaceId as string, project_id: item.projectId as string })),
+    );
+  }
+
+  return { roleIn, resolve, nameOf, keysFor };
 }
 
 const edgeId = (kind: GraphEdgeKind, from: string, to: string) => `${kind}|${from}|${to}`;
 
 /** Every edge touching `frontier` in the enabled groups, UNFILTERED by visibility: the caller keeps an edge only when both ends resolved. */
-async function expand(db: Queryable, frontier: readonly string[], groups: ReadonlySet<GraphGroup>): Promise<RawEdge[]> {
+async function expand(db: Queryable, frontier: readonly string[], groups: ReadonlySet<GraphGroup>, within = false): Promise<RawEdge[]> {
   const ids: Record<GraphItemKind, string[]> = { ticket: [], note: [], person: [], project: [], workspace: [], concept: [] };
   for (const ref of frontier) {
     const parsed = parseGraphRef(ref);
@@ -178,19 +185,19 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
 
   if (groups.has('structure') && t.length > 0) {
     const { rows } = await db.query<{ ticket_id: string; parent_id: string }>(
-      `SELECT ticket_id, parent_id FROM proj_tickets WHERE parent_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) OR parent_id = ANY ($1::text[]))`, [t]);
+      `SELECT ticket_id, parent_id FROM proj_tickets WHERE parent_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} parent_id = ANY ($1::text[]))`, [t]);
     for (const r of rows) add('parent', graphRef('ticket', r.parent_id), graphRef('ticket', r.ticket_id));
   }
   const linkKinds = (['blocks', 'relates', 'duplicates'] as const).filter((kind) => groups.has(GROUP_OF_EDGE_KIND[kind]));
   if (linkKinds.length > 0 && t.length > 0) {
     const { rows } = await db.query<{ source_id: string; target_id: string; kind: 'blocks' | 'relates' | 'duplicates'; created_by: string; created_at: Date; origin: string }>(
       `SELECT source_id, target_id, kind, created_by, created_at, origin FROM proj_ticket_links
-        WHERE kind = ANY ($2::text[]) AND (source_id = ANY ($1::text[]) OR target_id = ANY ($1::text[]))`, [t, linkKinds]);
+        WHERE kind = ANY ($2::text[]) AND (source_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} target_id = ANY ($1::text[]))`, [t, linkKinds]);
     for (const r of rows) add(r.kind, graphRef('ticket', r.source_id), graphRef('ticket', r.target_id), { addedById: r.created_by, addedAt: r.created_at, origin: r.origin });
   }
   if (groups.has('attached') && (t.length > 0 || n.length > 0)) {
     const { rows } = await db.query<{ note_id: string; ticket_id: string; attached_at: Date }>(
-      `SELECT note_id, ticket_id, attached_at FROM proj_note_attachments WHERE note_id = ANY ($1::text[]) OR ticket_id = ANY ($2::text[])`, [n, t]);
+      `SELECT note_id, ticket_id, attached_at FROM proj_note_attachments WHERE note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} ticket_id = ANY ($2::text[])`, [n, t]);
     for (const r of rows) add('attached', graphRef('note', r.note_id), graphRef('ticket', r.ticket_id), { addedAt: r.attached_at });
   }
   type RefRow = {
@@ -200,11 +207,16 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
   const refRows = async (targetKinds: string[], extraTarget: string[]) =>
     (await db.query<RefRow>(
       `SELECT source_kind, source_id, source_parent_kind, source_parent_id, target_kind, target_id, snippet, updated_by, updated_at FROM proj_references
-        WHERE target_kind = ANY ($4::text[]) AND (
+        WHERE target_kind = ANY ($4::text[]) AND ${
+          within
+            ? `((source_parent_kind = 'ticket' AND source_parent_id = ANY ($1::text[])) OR (source_parent_kind = 'note' AND source_parent_id = ANY ($2::text[])))
+           AND ((target_kind = 'ticket' AND target_id = ANY ($1::text[])) OR (target_kind = 'note' AND target_id = ANY ($2::text[])) OR (target_kind = 'person' AND target_id = ANY ($3::text[])))`
+            : `(
               (target_kind = 'ticket' AND target_id = ANY ($1::text[])) OR (target_kind = 'note' AND target_id = ANY ($2::text[]))
            OR (target_kind = 'person' AND target_id = ANY ($3::text[]))
            OR (source_parent_kind = 'ticket' AND source_parent_id = ANY ($1::text[]))
-           OR (source_parent_kind = 'note' AND source_parent_id = ANY ($2::text[])))
+           OR (source_parent_kind = 'note' AND source_parent_id = ANY ($2::text[])))`
+        }
         ORDER BY source_kind, source_id, ordinal`, [t, n, extraTarget, targetKinds])).rows;
   if (groups.has('ref') && (t.length > 0 || n.length > 0)) {
     for (const r of await refRows(['ticket', 'note'], [])) add('ref', sourceRef(r), graphRef(r.target_kind, r.target_id), { snippet: r.snippet, addedById: r.updated_by, addedAt: r.updated_at });
@@ -212,7 +224,7 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
   if (groups.has('people')) {
     if (t.length > 0 || p.length > 0) {
       const { rows } = await db.query<{ ticket_id: string; assignee_id: string }>(
-        `SELECT ticket_id, assignee_id FROM proj_tickets WHERE assignee_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) OR assignee_id = ANY ($2::text[]))`, [t, p]);
+        `SELECT ticket_id, assignee_id FROM proj_tickets WHERE assignee_id IS NOT NULL AND (ticket_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} assignee_id = ANY ($2::text[]))`, [t, p]);
       for (const r of rows) add('assignee', graphRef('person', r.assignee_id), graphRef('ticket', r.ticket_id));
     }
     if (t.length > 0 || n.length > 0 || p.length > 0) {
@@ -222,17 +234,17 @@ async function expand(db: Queryable, frontier: readonly string[], groups: Readon
   if (groups.has('projects')) {
     if (t.length > 0 || pr.length > 0) {
       const { rows } = await db.query<{ ticket_id: string; project_id: string }>(
-        `SELECT ticket_id, project_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[]) OR project_id = ANY ($2::text[])`, [t, pr]);
+        `SELECT ticket_id, project_id FROM proj_tickets WHERE ticket_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} project_id = ANY ($2::text[])`, [t, pr]);
       for (const r of rows) add('in', graphRef('project', r.project_id), graphRef('ticket', r.ticket_id));
     }
     if (n.length > 0 || pr.length > 0) {
       const { rows } = await db.query<{ note_id: string; home_project_id: string }>(
-        `SELECT note_id, home_project_id FROM proj_notes WHERE home_project_id <> '' AND (note_id = ANY ($1::text[]) OR home_project_id = ANY ($2::text[]))`, [n, pr]);
+        `SELECT note_id, home_project_id FROM proj_notes WHERE home_project_id <> '' AND (note_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} home_project_id = ANY ($2::text[]))`, [n, pr]);
       for (const r of rows) add('in', graphRef('project', r.home_project_id), graphRef('note', r.note_id));
     }
     if (pr.length > 0 || w.length > 0) {
       const { rows } = await db.query<{ project_id: string; workspace_id: string }>(
-        `SELECT project_id, workspace_id FROM proj_projects WHERE project_id = ANY ($1::text[]) OR workspace_id = ANY ($2::text[])`, [pr, w]);
+        `SELECT project_id, workspace_id FROM proj_projects WHERE project_id = ANY ($1::text[]) ${within ? 'AND' : 'OR'} workspace_id = ANY ($2::text[])`, [pr, w]);
       for (const r of rows) add('in', graphRef('workspace', r.workspace_id), graphRef('project', r.project_id));
     }
   }
@@ -284,7 +296,7 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
   const upTo = new Set(ordered.slice(0, req.offset + size));
   const page = ordered.slice(req.offset, req.offset + size);
   const onPage = new Set(page);
-  const among = (await expand(db, ring, req.groups)).filter((edge) => upTo.has(edge.from) && upTo.has(edge.to) && (onPage.has(edge.from) || onPage.has(edge.to)));
+  const among = (await expand(db, ring, req.groups, true)).filter((edge) => upTo.has(edge.from) && upTo.has(edge.to) && (onPage.has(edge.from) || onPage.has(edge.to)));
   const raw = [...intoRing.filter((edge) => onPage.has(edge.from) || onPage.has(edge.to)), ...among];
 
   const edges: GraphEdgeView[] = [];
@@ -300,7 +312,13 @@ export async function readGraphRing(db: Queryable, viewerId: string, req: GraphR
     });
   }
   edges.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const items: GraphItemView[] = page.map((ref) => ({ ...known.get(ref)!, hop: req.hops, out: !inGraphScope(known.get(ref)!, req) }));
+  // A ticket's card key is only DISPLAYED for the page that is returned, and `cardKeysFor` scans the workspace's creations per call, so the walk's
+  // resolves skip it (label = title) and the page asks ONCE (27.210).
+  const pageKeys = await vis.keysFor(page.map((ref) => known.get(ref)!));
+  const items: GraphItemView[] = page.map((ref) => {
+    const item = known.get(ref)!;
+    return { ...item, label: pageKeys.get(item.id) ?? item.label, hop: req.hops, out: !inGraphScope(item, req) };
+  });
   const truncated = ordered.length > req.offset + size;
   return {
     hop: req.hops,
