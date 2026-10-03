@@ -716,3 +716,71 @@ Block `13.1720`–`13.1729`, taken whole (the tip across every remote branch was
 - 13.1731 ✅ `passkey-registration.spec.ts` hung to the 90 s test timeout on CI (run 36972594038) and passes in seconds locally. DIAGNOSTICS, gated by `GISIK_E2E_DIAG=1` (set on the CI e2e step only): the spec logs, stamped in seconds, the CDP `WebAuthn.enable`, the `addVirtualAuthenticator` options and returned id, browser console, page errors, failed requests, passkey/auth responses, navigations and credential events, and on failure the URL, the authenticator's credentials and a body-text snippet; every action in the spec has a 20 s budget so the failure names the stalled step; the cleanup no longer replaces the real failure with "Target page, context or browser has been closed". `ci.yml` keeps the server log's passkey/webauthn lines and uploads `apps/web/test-results` (Playwright trace, `retain-on-failure`) on failure. CAUSE (run 36976174333, the first with the trail): NOT WebAuthn. The virtual authenticator, the registration (`credentialAdded`, `verify-registration` 200, rpId `localhost`) and the passkey row all worked in CI; the 20 s budget then named the stalled step, `getByRole('menuitem', { name: /^Sign out .+/ })`. The e2e owner signs up by email with `name: ''`, so the menu item's label is `Sign out ` and its accessible name is `Sign out`, which `.+` after the space never matches; a dev machine's owner had been given a name. The spec now matches `/^Sign out/` (role `menuitem` already excludes the Sessions rows' buttons). The spec also waits for the post-sign-out `/sign-in` before the passkey click (one local run timed out in `waitForURL` after the sign-out click returned immediately; not reproduced in 4 reruns, so the race with the in-flight sign-out is a suspected, unproven cause). PROVEN by the `e2e` job in run 36977866115 (8c8e79dc), all 17 specs passing.
 - 13.1732 ❌ The browser-smoke specs in `apps/web/e2e/` (`smoke.spec.ts`, `workflow-builder.spec.ts`) quote the copy U-T11 (#910) shipped. CI runs only `test:e2e:stack` and `test:e2e:viewport`, so no green run vouches for this directory; re-pinned by reading the product source, NOT by running it (it needs its own `pnpm dev` on :3001, which the primary dev stack occupies). Sweep 2026-10-02: 33 getBy/toHave strings checked, 4 fixed: `No issues. This workflow can be published.` (×2, `issues-panel.tsx`), `You can look, but not change anything. Only a workspace owner or admin can change workflows and ticket types.` (`read-only-banner.tsx`), `5 of 8 done, 2 restricted` (`views/rollup-text.ts`). The four absent-control assertions (`toHaveCount(0)`) pass whether or not the string exists. `apps/web/e2e/`.
 - 13.1733 ✅ Every `vitest.config.ts` in the repo gives tests a 20 s budget and hooks a 30 s one (`testTimeout` ≥ 20000, `hookTimeout` ≥ 30000; housekeeping HK-7, owner 2026-10-02 "go it", parallel runs kept). Only `apps/server` set 30 000; the other ten ran on vitest's 5 s / 10 s default and ordinary jsdom tests crossed 5 s under load (#898, #918, #923, #937 CI run 37019480109, 3.991/3.992). The per-test literal `20_000` arguments those fixes added are removed (the config gives the same). Control, same `it`: the sweep finds ≥ 11 configs including `apps/server/vitest.config.ts`, and the reader reads `7_000` as 7000 and an unset key as null. Mutation: delete `testTimeout` from one config → red, naming it. `apps/server/test/ci/vitest-timeouts.test.ts`.
+
+## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
+
+Why: inter-seat messages were `tmux send-keys` pastes and regex-filtered `tail -n0 -F` monitors, which lose lines at every 30-minute expiry, are eaten by copy mode, pick option 1 of a permission prompt, and leave a FIX written to QUEUE-gate but never delivered (mechanisms a–g of `PLAN-efficiency-robustness-2026-10-03.md`); a Claude seat (the dispatcher, $89/week) did the relaying. Design: `docs/superpowers/specs/2026-10-03-ctl-postman-design.md` (planner ack 2026-10-03 06:37 with amendments A–C: shadow mode ≥ 20 deliveries AND one gate cycle with zero misses; `postman audit` and the planner-target page → ⚑ notes line are part of the MVP; `pane_state` refuses a menu, copy-mode and non-empty box text, each with its control in the same check).
+
+Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.1843` — `task/ctl-run-tests` owns `13.1751`–`13.1773`, `task/ctl-seats` `13.1800`–`13.1829` — across every `origin/*` head of the last 36 h, `13.9999` being the plan sentinel). Run by `scripts/ctl/test/postman.test.sh`, a `pnpm check:ctl` step; every case runs on a SCRATCH tmux session (`ctlpm-<pid>`) with fake panes (`scripts/ctl/test/fakeseat.sh`), a scratch ledger root, a scratch notes file and a fake clock (`CTL_POSTMAN_NOW`) — it can never reach a live seat, and `13.1952` proves the daemon refuses a live/scratch mismatch.
+
+- 13.1900 🧪 post: one ledger line with exactly the schema fields; summary names the id
+- 13.1901 🧪 post: 20 parallel posts → ids 1..20 unique, every line valid JSON
+- 13.1902 🧪 post --text: the body is a spooled file holding the text
+- 13.1903 🧪 post: a missing --body file, no body and both body forms are refused, nothing appended; CONTROL: a valid post is accepted
+- 13.1904 🧪 post: a bad seat name, a bad kind and a missing --from are refused; CONTROL: a valid post is accepted
+- 13.1905 🧪 post: a bare window number resolves to the window NAME; orch aliases main
+- 13.1906 🧪 post --reply-to: replying acks the replied-to id for the poster
+- 13.1907 🧪 post --dry-run: appends nothing, prints a DRY line
+- 13.1910 🧪 ack: a second ack is OK 'already acked', exit 0, the ack file is untouched
+- 13.1911 🧪 ack: the wrong seat is refused (exit 1, no ack file); the addressee succeeds
+- 13.1912 🧪 ack: an unknown id exits 1
+- 13.1913 🧪 ack --cancel: any seat can close a message; the ack records cancelled and the note
+- 13.1914 🧪 inbox: lists only MY unacked messages, oldest first; --all adds acked
+- 13.1920 🧪 watch: a kill between reading and emitting loses nothing — the line is replayed, the cursor moves only after the emit
+- 13.1921 🧪 watch: a MISSING cursor starts at 0 and prints only the still-unacked ids
+- 13.1922 🧪 watch: starting a second watcher for the seat stops the old one by its exact pid and takes over
+- 13.1923 🧪 watch: a file that shrinks below the cursor restarts at 0 (acked ids skipped, new ones shown)
+- 13.1924 🧪 watch: the heartbeat file is touched on every poll
+- 13.1930 🧪 bridge: FIX/NEXT/MERGETIP lines become messages to the right exec seat (laneN accepted); ref from the line or the brief
+- 13.1931 🧪 bridge: the first run starts at EOF — history is never reposted
+- 13.1932 🧪 bridge: the same line seen twice (a reset cursor) makes ONE message (src dedupe)
+- 13.1933 🧪 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane
+- 13.1934 🧪 bridge: a number whose window is not exec* (7 = reviewerA here) and orchestrator/planner targets are refused, never routed
+- 13.1935 🧪 bridge: TOOK/DONE/NOTE/HOLD are ignored by name; CLOSE sends no lane message, only a note to main
+- 13.1936 🧪 bridge: a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message
+- 13.1940 🧪 deliver: the message reaches the inbox file first (one line) and the state records the time; no window → nothing else
+- 13.1941 🧪 watched + idle: no pane paste inside the 120 s grace
+- 13.1942 🧪 watched + BUSY: no pane paste at all (the Monitor line is already queued in the session)
+- 13.1943 🧪 unwatched seat (every lane): the pane pointer goes at once, one line, carrying the id and the ack command
+- 13.1944 🧪 a PROVEN delivery is not re-pasted before 15 min (the seat has it, it is busy)
+- 13.1945 🧪 ack stops redelivery: nothing more is pasted after the ack, however late
+- 13.1946 🧪 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked
+- 13.1947 🧪 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try
+- 13.1948 🧪 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file
+- 13.1949 🧪 lost body: bounced — a bounce message goes back to the sender, nothing is delivered
+- 13.1950 🧪 crash between writing the attempt and the paste: nothing typed, ledger intact
+- 13.1951 🧪 a second daemon is refused while the first pid is alive
+- 13.1952 🧪 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs
+- 13.1953 🧪 restart supersedes: a message posted BEFORE the restart is cancelled-by-restart with ONE note to main listing its id; one posted AFTER is kept
+- 13.1954 🧪 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line
+- 13.1955 🧪 audit: inside the grace nothing is reported (the FIX may still be coming)
+- 13.1960 🧪 pane_state menu: a permission/option menu is refused (a pasted Enter would pick option 1); CONTROL in the same check: an idle pane is pasted
+- 13.1961 🧪 pane_state text: a box holding foreign text is never cleared or pasted over; CONTROL in the same check: an idle pane is pasted
+- 13.1962 🧪 pane_state copy-mode: nothing typed while in copy mode; after 180 s cancelled once and delivered; CONTROL in the same check: an idle (not copy-mode) pane is pasted at once
+- 13.1963 🧪 pane_state not-claude: with the DEFAULT allowlist a bash pane is never typed into; CONTROL: the same pane under a regex that allows bash is pasted
+- 13.1964 🧪 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted
+- 13.1965 🧪 pane_state ours: our own unsubmitted pointer in the box is SUBMITTED, not pasted a second time (exactly one copy reaches the seat)
+- 13.1966 🧪 busy seat: the pointer is pasted once (it queues) and not again inside 15 min
+- 13.1967 🧪 no window: exec1 absent while exec11 exists — the prefix is NOT matched (exact name), nothing typed into exec11, the message stays open
+- 13.1968 🧪 kind note: delivered to the inbox only, never pasted into a pane, never blocks the head of the queue
+- 13.1969 🧪 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail
+- 13.1970 🧪 watched + idle: after 120 s without an ack the pane pointer is pasted ONCE
+- 13.1971 🧪 …and is re-pointed after 15 min of silence
+- 13.1972 🧪 …the page is not repeated while the message stays open
+- 13.1973 🧪 …the attempt repeats after the backoff (at-least-once) with the SAME id, once
+- 13.1974 🧪 …but a stale pidfile (dead pid) is taken over
+- 13.1975 🧪 audit: after the grace an undelivered FIX and an undelivered needs-tip each get ONE note to main; READY lines are not audited
+- 13.1976 🧪 audit: not reported twice
+- 13.1977 🧪 audit: a delivered FIX (a fix message with that ref) satisfies it — no note
+- 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none
+- 13.1979 🧪 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled

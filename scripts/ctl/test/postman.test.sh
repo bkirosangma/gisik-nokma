@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1968. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1979. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -94,7 +94,7 @@ check "13.1922 watch: starting a second watcher for the seat stops the old one b
   '! kill -0 $old 2>/dev/null; [ "$(cat "$L/inbox-watch-exec3.pid" 2>/dev/null)" != "$old" ] || [ ! -s "$L/inbox-watch-exec3.pid" ]'
 reset; sleep 300 & unrelated=$!; echo $unrelated > "$L/inbox-watch-exec3.pid"
 CTL_WATCH_ONCE=1 pm inbox --watch --seat exec3 >/dev/null 2>&1
-check "13.1922b watch: a pidfile whose pid is NOT a watcher for that seat is never signalled" 'kill -0 $unrelated 2>/dev/null; r=$?; kill $unrelated 2>/dev/null; [ $r = 0 ]'
+check "13.1979 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled" 'kill -0 $unrelated 2>/dev/null; r=$?; kill $unrelated 2>/dev/null; [ $r = 0 ]'
 reset; pm post exec3 --kind fix --text "w1" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; watch_once exec3 >/dev/null
 : > "$R/postman/inbox/exec3.jsonl"; pm post exec3 --kind note --text "w2" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1923 watch: a file that shrinks below the cursor restarts at 0 (acked ids skipped, new ones shown)" 'watch_once exec3 | grep -q "#2 "'
@@ -133,7 +133,7 @@ check "13.1940 deliver: the message reaches the inbox file first (one line) and 
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; hb exec3 "$NOW"; pm postman once >/dev/null 2>&1
 check "13.1941 watched + idle: no pane paste inside the 120 s grace" '[ "$(rec_n exec3)" = 0 ]'
 NOW=$((NOW+130)); hb exec3 "$NOW"; pm postman once >/dev/null 2>&1
-check "13.1941b watched + idle: after 120 s without an ack the pane pointer is pasted ONCE" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix"'
+check "13.1970 watched + idle: after 120 s without an ack the pane pointer is pasted ONCE" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix"'
 reset; mkseat exec3 busy; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; hb exec3 "$NOW"; NOW=$((NOW+130)); hb exec3 "$NOW"; pm postman once >/dev/null 2>&1
 check "13.1942 watched + BUSY: no pane paste at all (the Monitor line is already queued in the session)" '[ "$(rec_n exec3)" = 0 ]'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
@@ -142,7 +142,7 @@ check "13.1943 unwatched seat (every lane): the pane pointer goes at once, one l
 sleep 4; NOW=$((NOW+60)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
 check "13.1944 a PROVEN delivery is not re-pasted before 15 min (the seat has it, it is busy)" '[ "$(rec_n exec3)" = 1 ]'
 NOW=$((NOW+600)); pm postman once >/dev/null 2>&1; sleep 4
-check "13.1944b …and is re-pointed after 15 min of silence" '[ "$(rec_n exec3)" = 2 ]'
+check "13.1971 …and is re-pointed after 15 min of silence" '[ "$(rec_n exec3)" = 2 ]'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; pm ack 1 --seat exec3 >/dev/null 2>&1; NOW=$((NOW+3000)); pm postman once >/dev/null 2>&1
 check "13.1945 ack stops redelivery: nothing more is pasted after the ack, however late" '[ "$(rec_n exec3)" = 1 ] && ! status_of exec3 | grep -q "head=#1"'
 reset; mkseat exec3 idle; pm post exec3 --kind next --text "first" --from main >/dev/null 2>&1; pm post exec3 --kind fix --text "second" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
@@ -153,7 +153,7 @@ for dt in 200 620 1220; do NOW=$((NOW+dt)); pm postman once >/dev/null 2>&1; don
 check "13.1947 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try" \
   '[ "$(rec_n exec3)" = 4 ] && [ "$(count_kind page main)" = 1 ] && jget 2 body | xargs grep -q "#1"'
 NOW=$((NOW+1300)); pm postman once >/dev/null 2>&1
-check "13.1947b …the page is not repeated while the message stays open" '[ "$(rec_n exec3)" = 5 ] && [ "$(count_kind page main)" = 1 ]'
+check "13.1972 …the page is not repeated while the message stays open" '[ "$(rec_n exec3)" = 5 ] && [ "$(count_kind page main)" = 1 ]'
 reset; mkseat main mute; pm post main --kind fix --text "go" --from exec3 >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 for dt in 200 620 1220; do NOW=$((NOW+dt)); pm postman once >/dev/null 2>&1; done
 check "13.1948 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file" \
@@ -169,12 +169,12 @@ reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev
 CTL_TEST_CRASH_AFTER_ATTEMPT=1 pm postman once >/dev/null 2>&1; rc=$?
 check "13.1950 crash between writing the attempt and the paste: nothing typed, ledger intact" '[ "$rc" != 0 ] && [ "$(rec_n exec3)" = 0 ] && [ "$(ledger_n)" = 1 ]'
 NOW=$((NOW+200)); pm postman once >/dev/null 2>&1
-check "13.1950b …the attempt repeats after the backoff (at-least-once) with the SAME id, once" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix"'
+check "13.1973 …the attempt repeats after the backoff (at-least-once) with the SAME id, once" '[ "$(rec_n exec3)" = 1 ] && rec_has exec3 "[postman #1 fix"'
 reset; sleep 60 & live=$!; mkdir -p "$R/postman"; echo $live > "$R/postman/daemon.pid"
 out="$(CTL_POSTMAN_MAX_PASSES=1 pm postman run 2>&1)"; rc=$?; kill $live 2>/dev/null
 check "13.1951 a second daemon is refused while the first pid is alive" '[ "$rc" = 1 ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL postman.*already running"'
 echo 999999 > "$R/postman/daemon.pid"; out="$(CTL_POSTMAN_MAX_PASSES=1 pm postman run 2>&1)"; rc=$?
-check "13.1951b …but a stale pidfile (dead pid) is taken over" '[ "$rc" = 0 ] && printf "%s" "$out" | tail -1 | grep -q "^OK postman"'
+check "13.1974 …but a stale pidfile (dead pid) is taken over" '[ "$rc" = 0 ] && printf "%s" "$out" | tail -1 | grep -q "^OK postman"'
 reset; out1="$(CTL_TMUX_SESSION=gisik pm postman once 2>&1)"; rc1=$?; out2="$(env -u CTL_POSTMAN_ROOT CTL_POSTMAN_NOW=$NOW "$CTL" postman once 2>&1)"; rc2=$?
 check "13.1952 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs" \
   '[ "$rc1" = 1 ] && printf "%s" "$out1" | tail -1 | grep -q "refus" && [ "$rc2" = 1 ] && printf "%s" "$out2" | tail -1 | grep -q "refus"'
@@ -188,18 +188,18 @@ printf '05:53 DONE 05:45 FIX task/foo-bar c28ca5cf (F1) reviewer A\n05:54 DONE 0
 pm postman once >/dev/null 2>&1; NOW=$((NOW+300)); pm postman once >/dev/null 2>&1
 check "13.1955 audit: inside the grace nothing is reported (the FIX may still be coming)" '[ "$(count_kind note main)" = 0 ]'
 NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
-check "13.1955b audit: after the grace an undelivered FIX and an undelivered needs-tip each get ONE note to main; READY lines are not audited" \
+check "13.1975 audit: after the grace an undelivered FIX and an undelivered needs-tip each get ONE note to main; READY lines are not audited" \
   '[ "$(count_kind note main)" = 2 ] && python3 -c "
 import json,sys
 b=[open(json.loads(l)[\"body\"]).read() for l in open(sys.argv[1]) if json.loads(l)[\"kind\"]==\"note\"]
 assert any(\"task/foo-bar\" in x for x in b) and any(\"task/baz\" in x for x in b) and not any(\"task/ok\" in x for x in b)" "$R/LEDGER.jsonl"'
 NOW=$((NOW+400)); pm postman once >/dev/null 2>&1
-check "13.1955c audit: not reported twice" '[ "$(count_kind note main)" = 2 ]'
+check "13.1976 audit: not reported twice" '[ "$(count_kind note main)" = 2 ]'
 reset; QR="$R/QUEUE-review.md"; : > "$QR"; pm postman once >/dev/null 2>&1
 printf '05:53 DONE 05:45 FIX task/foo-bar c28ca5cf (F1) reviewer A\n' >> "$QR"; pm postman once >/dev/null 2>&1
 printf 'x\n' > "$T/BRIEF-f.md"; pm post exec3 --kind fix --body "$T/BRIEF-f.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1; NOW=$((NOW+900)); pm postman once >/dev/null 2>&1
-check "13.1955d audit: a delivered FIX (a fix message with that ref) satisfies it — no note" '[ "$(count_kind note main)" = 0 ]'
-check "13.1955e ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none" \
+check "13.1977 audit: a delivered FIX (a fix message with that ref) satisfies it — no note" '[ "$(count_kind note main)" = 0 ]'
+check "13.1978 ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none" \
   'reset; QR="$R/QUEUE-review.md"; printf "05:53 DONE 05:45 FIX task/lost c28ca5cf (F1) reviewer A\n" > "$QR"; o="$(pm postman audit 2>&1)"; rc=$?; [ $rc = 1 ] && printf "%s" "$o" | grep -q "task/lost"; : > "$QR"; pm postman audit >/dev/null 2>&1'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────

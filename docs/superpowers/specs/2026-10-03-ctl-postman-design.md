@@ -1,6 +1,6 @@
 # ctl postman — design (efficiency plan #1 + #2 + B2 + B6)
 
-Status: **DESIGN ONLY, awaiting the planner's ack** (lane 1, task/ctl-postman, 2026-10-03). Nothing in this file is built. Plan: `gisik-nokma-lanes/PLAN-efficiency-robustness-2026-10-03.md` (moves 1–2, rows 1–2, B2, B6). Brief: `MSG-planner-lean-build-2026-10-03.md` item 4.
+Status: **APPROVED by the planner 2026-10-03 06:37 with amendments A–C and BUILT** (lane 1, task/ctl-postman); §11 lists what changed between this design and the build. Plan: `gisik-nokma-lanes/PLAN-efficiency-robustness-2026-10-03.md` (moves 1–2, rows 1–2, B2, B6). Brief: `MSG-planner-lean-build-2026-10-03.md` item 4.
 
 ## 0. Basis (measured 2026-10-03 06:30 IST, read from the files)
 
@@ -31,9 +31,9 @@ roles/postman/daemon.pid  daemon.log  cursor-queue-dispatch
 Ledger line (all fields always present):
 
 ```json
-{"id":42,"ts":"2026-10-03T01:02:03Z","from":"main","to":"exec3","kind":"fix","ack":true,
+{"id":42,"ts":"2026-10-03T01:02:03Z","from":"main","to":"exec3","kind":"fix",
  "body":"/Users/kiro/my_projects/gisik-nokma-lanes/BRIEF-x-fix-1.md","body_sha":"<sha256>","body_bytes":4120,
- "reply_to":null,"src":null}
+ "reply_to":null,"src":null,"ref":"task/x"}
 ```
 
 - `id`: integer, allocated under an `mkdir` lock as `last id + 1` (read from the last ledger line), so concurrent posters never collide and ids follow ledger order. Seats type `ack 42`.
@@ -181,3 +181,11 @@ Everything runs against a temp `CTL_POSTMAN_ROOT`, a scratch tmux session `ctlpm
 4. **Cost.** The dispatcher is $89/week (one session + MCP stack, ~0.4 GB). The postman adds one daemon process (bash, no model) and ~one batched tool call per message; the 141 MERGETIPs are being removed by ctl tipmerge anyway.
 5. **Shadow run** before cutover (§8.2): recommend one gate cycle, not a week, given the owner's speed ruling.
 6. **Not in scope:** pushing REVIEW lines to a named reviewer (they stay a pulled queue); a launchd plist (§10.1).
+
+## 11. As built — amendments and deviations (step 2–3, 2026-10-03)
+
+Planner amendments (06:37): **A** the shadow run lasts until ≥ 20 deliveries AND one full gate cycle with zero misses or duplicates against the dispatcher's log; **B** `postman audit` and the planner-target page → `⚑` notes line moved from the follow-up into the MVP (both built: `audit` runs every pass and on demand, the page chain is `page` → `main`, `main` → `planner` + `⚑ POSTMAN` line, `planner` → `⚑ POSTMAN` line); **C** `pane_state` refuses a permission/option menu, copy mode and non-empty box text, one test per state with the idle-pane control in the same check (13.1960–13.1962; 13.1963/13.1964 do the same for the not-claude allowlist).
+
+Deviations: (1) the ledger line has no `ack` field and gained `ref` (the branch a FIX/MERGETIP is about, from the queue line or the brief, or `--ref`; `audit` matches on it): a `note`, and every message to `planner`, is inbox-only and still ackable; (2) the pointer inlines a single-line `--text` of ≤ 280 chars and the whole line stays < 450 chars (the §3 "≤ 240" did not fit a MERGETIP); (3) `page` and `bounce` messages never page (they are the paging); (4) the restart marker is `now + 2 s`, so a message posted in the second before the restart counts as the old session's; (5) the bridge writes `DONE <line-time> postman #<id>` back into QUEUE-dispatch.md (a refused line gets `postman refused #<id>: <why>`); (6) `audit` first sees a verdict at its first scan, waits 10 min (`CTL_POSTMAN_AUDIT_GRACE`) for a fix message with that `ref` posted since an hour before, then posts ONE note to `main`; (7) `--shadow` is not built: `CTL_POSTMAN_PANE=0` runs the daemon with the pane tier off (inbox + bridge + audit only), which is the shadow run; (8) a cursor that is not on a line boundary restarts the watcher at 0 (an inbox file rewritten shorter than the cursor but longer than its old self); (9) the suite uses `CTL_POSTMAN_CMD_RE` to let bash-hosted fake panes through the allowlist, and 13.1963 runs the DEFAULT allowlist against a bash pane.
+
+Still follow-up: `rebuild-inbox`, the pane-pid restart detector, the daily ledger copy, the launchd plist.
