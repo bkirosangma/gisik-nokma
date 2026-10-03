@@ -138,14 +138,14 @@ async function openForm(user: ReturnType<typeof userEvent.setup>) {
   return screen.findByRole('dialog', { name: 'Add transition' });
 }
 async function optionsOf(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, label: string) {
-  await user.click(within(dialog).getByRole('button', { name: new RegExp(label) }));
+  await user.click(within(dialog).getByRole('button', { name: new RegExp(`${label}$`) }));
   const listbox = await screen.findByRole('listbox');
   const names = within(listbox).getAllByRole('option').map((option) => option.textContent);
   await user.keyboard('{Escape}');
   return names;
 }
 async function pick(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, label: string, option: string) {
-  await user.click(within(dialog).getByRole('button', { name: new RegExp(label) }));
+  await user.click(within(dialog).getByRole('button', { name: new RegExp(`${label}$`) }));
   const listbox = await screen.findByRole('listbox');
   await user.click(within(listbox).getByRole('option', { name: option }));
 }
