@@ -339,6 +339,7 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
     expect(sameFixture(undefined, f), 'a json with no _fixture is never the same data').toBe(false);
     for (const field of ['notes', 'deletedNotes', 'tickets', 'workflows', 'members'] as const) {
       expect(sameFixture(f, { ...f, [field]: f[field] + 1 }), `one more ${field} is other data`).toBe(false);
+      expect(sameFixture(f, { ...f, [field]: f[field] - 1 }), `one fewer ${field} is other data`).toBe(false);
     }
     // On other data a row that IS present and over its baseline on all four numbers is not compared; on the same data it is.
     expect(ratchetFailures('390|/a', row, over, ctx, false), 'other data: no per-key comparison').toEqual([]);
