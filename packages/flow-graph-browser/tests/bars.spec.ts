@@ -3,7 +3,7 @@ import { BARS, barFor, judge } from '../harness/bars.js';
 import type { StressRecord } from '../harness/results.js';
 
 const pan = { frames: 240, fps: 60, worstMs: 20, p95Ms: 16.7, over167: 2, over20: 0, over50: 0 };
-const record = (over: Partial<StressRecord> & { pan?: Partial<StressRecord['pan']> }): StressRecord => ({
+const record = (over: Omit<Partial<StressRecord>, 'pan'> & { pan?: Partial<StressRecord['pan']> }): StressRecord => ({
   scene: 'time',
   count: 1200,
   device: 'test',
