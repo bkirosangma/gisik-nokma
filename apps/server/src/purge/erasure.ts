@@ -146,9 +146,11 @@ export async function recordPurged(db: PoolClient, set: ErasureSet, purgedAt: st
 
 /**
  * The set's rows that REMAIN in the ledger — a ticket purge's redacted
- * creations — replayed through every projection, in canonical replay order. A
- * rebuild derives a `proj_entity_heads` row from each; every other projection
- * skips a redacted creation (Task 3). Live must equal rebuild.
+ * creations and, since drafts T2, its redacted publishes — replayed through
+ * every projection, in canonical replay order. A rebuild derives a
+ * `proj_entity_heads` row from each; every other projection skips a redacted
+ * creation (Task 3) and a redacted publish (drafts T2:
+ * `isRedactedTicketPublished`). Live must equal rebuild.
  */
 export async function replayRemaining(
   db: PoolClient,
