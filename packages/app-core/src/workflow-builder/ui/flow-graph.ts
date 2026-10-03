@@ -76,7 +76,7 @@ export function connectionToTransition(connection: {
 export const PHONE_OPEN_ZOOM = 0.8;
 
 /** The start node's size before React Flow has measured it. It always carries the "start state always allows new tickets" reason, so it sits at `.gn-state-node`'s 13rem cap (208px); about 120px tall. */
-const UNMEASURED_NODE = { width: 208, height: 120 };
+export const UNMEASURED_NODE = { width: 208, height: 120 };
 
 /** Where a phone-width canvas opens: the centre of the START state at {@link PHONE_OPEN_ZOOM}, not the whole graph. */
 export function phoneOpeningView(
