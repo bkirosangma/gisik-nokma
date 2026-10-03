@@ -694,7 +694,9 @@ describe('TICKET_EVENT_TYPES', () => {
     // ticket: a type's workflow binding changes what NEW tickets get, never
     // where an existing one sits.
     expect((TICKET_EVENT_TYPES as readonly string[]).includes('ticket-type.defined')).toBe(false);
-    // FIFTEEN of the EIGHTEEN registered against entityKind 'ticket' (backlog/closed
+    // SEVENTEEN of the TWENTY-TWO registered against entityKind 'ticket' (typed-links T1, 2026-10-03:
+    // 'ticket.link_added' and 'ticket.link_removed' joined the list — both fold into `links`).
+    // The earlier arithmetic read FIFTEEN of EIGHTEEN (backlog/closed
     // spec, 2026-09-17: 'ticket.closed' and 'ticket.reopened' joined the list —
     // both move `closed`, so both belong here even though neither moves stateId;
     // spec §8.1, 2026-09-18: 'ticket.ranked' joined it for the same reason — it
@@ -707,7 +709,7 @@ describe('TICKET_EVENT_TYPES', () => {
     // iterates. A pair added to the registry but not to this list would parse at
     // the door and then be skipped by every fold that iterates it — the two would
     // disagree with no error anywhere, which is why the count is asserted at all.
-    expect(TICKET_EVENT_TYPES).toHaveLength(15);
+    expect(TICKET_EVENT_TYPES).toHaveLength(17);
   });
 });
 

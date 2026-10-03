@@ -11,6 +11,8 @@ import {
   ticketCreatedPayload,
   ticketDeletedPayload,
   ticketFieldSetPayload,
+  ticketLinkAddedPayload,
+  ticketLinkRemovedPayload,
   ticketRankedPayload,
   ticketReopenedPayload,
   ticketReparentedPayload,
@@ -58,7 +60,7 @@ export type TicketStateDeps = {
 };
 
 /**
- * The event types this reducer folds — FIFTEEN of the EIGHTEEN registered against
+ * The event types this reducer folds — SEVENTEEN of the TWENTY-TWO registered against
  * `entityKind: 'ticket'`, not all of them. **This is not the ticket-entity
  * set**, and reading it as one has already cost a defect: `visibility.set`,
  * `claim.contested` and `claim.contested_resolved` are filed against a ticket
@@ -69,12 +71,15 @@ export type TicketStateDeps = {
  * exhaustive dropped `visibility.set` from a replica's payload and the omission
  * was invisible for a whole task.
  *
- * The count is FIFTEEN of EIGHTEEN because the soft-delete pair moved both
+ * The count was FIFTEEN of EIGHTEEN because the soft-delete pair moved both
  * numbers together: `ticket.deleted` and `ticket.restored` are registered
  * against `entityKind: 'ticket'` and are folded below, so they belong here.
  * It is stated as a count rather than left implicit because this docblock's
  * whole job is to stop a reader mistaking the list for the entity set, and a
- * stale count is the first half of that mistake.
+ * stale count is the first half of that mistake. The link pair (spec A) moved both
+ * numbers again, to seventeen and twenty-two: they fold into `links`, so they belong here
+ * too. (`comment.edited` and `comment.deleted` are the other two absent from this list;
+ * `sync-routes.ts` backfills them with the three above.)
  *
  * `ticket-type.defined` is deliberately absent for a different reason: it is
  * about a ticket TYPE, has its own entity kind and its own stream, and changing
@@ -95,6 +100,8 @@ export const TICKET_EVENT_TYPES = [
   'ticket.ranked',
   'ticket.deleted',
   'ticket.restored',
+  'ticket.link_added',
+  'ticket.link_removed',
   'comment.added',
   'attachment.added',
 ] as const;
@@ -452,6 +459,20 @@ export function applyTicketEvent(
       // says the ticket left the views, and a claim's own clock is the claim's.
       ticketRestoredPayload.parse(env.payload);
       return { ...state, deleted: null };
+    }
+    case 'ticket.link_added': {
+      const p = ticketLinkAddedPayload.parse(env.payload);
+      const links = state.links ?? [];
+      if (links.some((l) => l.kind === p.kind && l.targetId === p.targetId)) return state;
+      return { ...state, links: [...links, { kind: p.kind, targetId: p.targetId }] };
+    }
+    case 'ticket.link_removed': {
+      const p = ticketLinkRemovedPayload.parse(env.payload);
+      const rest = (state.links ?? []).filter((l) => !(l.kind === p.kind && l.targetId === p.targetId));
+      if (rest.length > 0) return { ...state, links: rest };
+      // Absent, never `[]`: the shape `rowToTicketState` reads back (T1 "Why links is absent").
+      const { links: _dropped, ...without } = state;
+      return without;
     }
     case 'comment.added':
     case 'attachment.added':
