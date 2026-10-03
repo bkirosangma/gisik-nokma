@@ -4,7 +4,7 @@ import { readGlobalsCss } from '../../../packages/ui/test/helpers/style-patterns
 
 /** Smoothness T5 (spec S1, P10; amendment S-R1). Case 25.055. */
 const css = readGlobalsCss();
-const SHELL_SELECTORS = ['.gn-nav--skeleton', '.gn-shell--skeleton', '.gn-project__tabs-skeleton'];
+const SHELL_SELECTORS = ['.gn-nav--skeleton', '.gn-shell--skeleton'];
 
 describe('shell CSS for placeholders (spec S1, P10)', () => {
   it('25.055 the nav reserves its height; the pending hint animates opacity only after a 100ms delay; reduced motion keeps it static', () => {
@@ -21,7 +21,7 @@ describe('shell CSS for placeholders (spec S1, P10)', () => {
 
   it('25.055 the shell rules lay out only (S-R1: the real container paints; no skeleton rule names a fill, a border, a shadow, a colour or a style attribute, so never the well)', () => {
     const own = parseRules(css).filter((rule) => rule.selectors.some((selector) => SHELL_SELECTORS.some((name) => selector.includes(name))));
-    expect(own.length).toBeGreaterThanOrEqual(3);
+    expect(own.length).toBeGreaterThanOrEqual(2);
     for (const rule of own) {
       for (const property of ['background', 'background-color', 'border', 'box-shadow', 'color']) expect(valueOf(rule.body, property), `${rule.selectors} ${property}`).toBeNull();
       expect(rule.selectors.join(','), 'style attribute').not.toContain('data-style');

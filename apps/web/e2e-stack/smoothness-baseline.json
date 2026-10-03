@@ -19,10 +19,10 @@
     "swapShiftCls": 0.0079
   },
   "1440|/notes": {
-    "cls": 0.0722,
-    "requests": 12,
-    "duplicates": 4,
-    "swapShiftCls": 0.0722
+    "cls": 0.0401,
+    "requests": 8,
+    "duplicates": 0,
+    "swapShiftCls": 0.0401
   },
   "1440|/settings": {
     "cls": 0.0009,
@@ -31,40 +31,40 @@
     "swapShiftCls": 0.0009
   },
   "1440|/w/<id>": {
-    "cls": 0.0059,
+    "cls": 0.0055,
     "requests": 2,
     "duplicates": 0,
-    "swapShiftCls": 0.0059
+    "swapShiftCls": 0.0055
   },
   "1440|/w/<id>/members": {
-    "cls": 0.0124,
+    "cls": 0.0055,
     "requests": 4,
     "duplicates": 0,
-    "swapShiftCls": 0.0124
+    "swapShiftCls": 0.0055
   },
   "1440|/w/<id>/my-work": {
-    "cls": 0.1787,
-    "requests": 14,
-    "duplicates": 7,
-    "swapShiftCls": 0.1787
+    "cls": 0.1247,
+    "requests": 9,
+    "duplicates": 2,
+    "swapShiftCls": 0.1247
   },
   "1440|/w/<id>/p/<id>": {
-    "cls": 0.2115,
-    "requests": 26,
-    "duplicates": 14,
-    "swapShiftCls": 0.2115
+    "cls": 0.0071,
+    "requests": 16,
+    "duplicates": 4,
+    "swapShiftCls": 0.0071
   },
   "1440|/workspaces": {
-    "cls": 0.001,
+    "cls": 0.0001,
     "requests": 3,
     "duplicates": 0,
-    "swapShiftCls": 0.001
+    "swapShiftCls": 0.0001
   },
   "390|/account": {
-    "cls": 0.5153,
+    "cls": 0.2805,
     "requests": 9,
     "duplicates": 0,
-    "swapShiftCls": 0.5153
+    "swapShiftCls": 0.2805
   },
   "390|/inbox": {
     "cls": 0.168,
@@ -74,8 +74,8 @@
   },
   "390|/notes": {
     "cls": 1.1653,
-    "requests": 12,
-    "duplicates": 4,
+    "requests": 8,
+    "duplicates": 0,
     "swapShiftCls": 1.1653
   },
   "390|/settings": {
@@ -98,15 +98,15 @@
   },
   "390|/w/<id>/my-work": {
     "cls": 0.635,
-    "requests": 14,
-    "duplicates": 7,
+    "requests": 9,
+    "duplicates": 2,
     "swapShiftCls": 0.635
   },
   "390|/w/<id>/p/<id>": {
-    "cls": 0.031,
-    "requests": 26,
-    "duplicates": 14,
-    "swapShiftCls": 0.031
+    "cls": 0,
+    "requests": 16,
+    "duplicates": 4,
+    "swapShiftCls": 0
   },
   "390|/workspaces": {
     "cls": 0.0338,
@@ -128,8 +128,8 @@
   },
   "768|/notes": {
     "cls": 0.3454,
-    "requests": 12,
-    "duplicates": 4,
+    "requests": 8,
+    "duplicates": 0,
     "swapShiftCls": 0.3454
   },
   "768|/settings": {
@@ -145,27 +145,27 @@
     "swapShiftCls": 0
   },
   "768|/w/<id>/members": {
-    "cls": 0.0575,
+    "cls": 0.0179,
     "requests": 4,
     "duplicates": 0,
-    "swapShiftCls": 0.0575
+    "swapShiftCls": 0.0179
   },
   "768|/w/<id>/my-work": {
     "cls": 0.2896,
-    "requests": 14,
-    "duplicates": 7,
+    "requests": 9,
+    "duplicates": 2,
     "swapShiftCls": 0.2896
   },
   "768|/w/<id>/p/<id>": {
-    "cls": 0.0387,
-    "requests": 26,
-    "duplicates": 14,
-    "swapShiftCls": 0.0387
+    "cls": 0.0147,
+    "requests": 16,
+    "duplicates": 4,
+    "swapShiftCls": 0.0147
   },
   "768|/workspaces": {
-    "cls": 0.0631,
+    "cls": 0.0244,
     "requests": 3,
     "duplicates": 0,
-    "swapShiftCls": 0.0631
+    "swapShiftCls": 0.0244
   }
 }
