@@ -815,3 +815,83 @@ Block `13.1750`–`13.1774` (measured 2026-10-03: the §13 high-water was `13.17
 - 13.1773 🧪 `ctl help` lists `run-tests`, and `ctl selftest` runs the suite and a `run-tests --dry-run` step.
 - 13.1774 🧪 The real thing: two parallel runs overlap and a third waits at least 2 s for one of them to finish and logs that wait.
 - 13.1850 🧪 The wrapped command runs in the caller's directory — from a subdirectory with no `--repo`, `pwd -P` is that subdirectory; with `--repo W` it is `W` — and the summary's first line, the log header and the `--dry-run` line name it. (Minted 2026-10-03 for FIX 1 outside the full `13.1750`–`13.1774` block and tipmerge's `13.1775`–`13.1799`: the §13 high-water was `13.1843` (`release/smoothness`), across every `origin/*` head and local branch updated in the last 4 days. 🧪 for the same reason as the block.)
+
+## `ctl post` / `inbox` / `ack` / `postman` — the postman: ledger, inbox files, ack/redelivery, the QUEUE-dispatch bridge (`task/ctl-postman`, owner-approved 2026-10-03, plan #1 + #2 + B2 + B6)
+
+Why: inter-seat messages were `tmux send-keys` pastes and regex-filtered `tail -n0 -F` monitors, which lose lines at every 30-minute expiry, are eaten by copy mode, pick option 1 of a permission prompt, and leave a FIX written to QUEUE-gate but never delivered (mechanisms a–g of `PLAN-efficiency-robustness-2026-10-03.md`); a Claude seat (the dispatcher, $89/week) did the relaying. Design: `docs/superpowers/specs/2026-10-03-ctl-postman-design.md` (planner ack 2026-10-03 06:37 with amendments A–C: shadow mode ≥ 20 deliveries AND one gate cycle with zero misses; `postman audit` and the planner-target page → ⚑ notes line are part of the MVP; `pane_state` refuses a menu, copy-mode and non-empty box text, each with its control in the same check).
+
+Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.1843` — `task/ctl-run-tests` owns `13.1751`–`13.1773`, `task/ctl-seats` `13.1800`–`13.1829` — across every `origin/*` head of the last 36 h, `13.9999` being the plan sentinel). Run by `scripts/ctl/test/postman.test.sh`, a `pnpm check:ctl` step; every case runs on a SCRATCH tmux session (`ctlpm-<pid>`) with fake panes (`scripts/ctl/test/fakeseat.sh`), a scratch ledger root, a scratch notes file and a fake clock (`CTL_POSTMAN_NOW`) — it can never reach a live seat, and `13.1952` proves the daemon refuses a live/scratch mismatch. `13.1981`–`13.1987` are FIX 1 of reviewer B's review; `13.1988`–`13.1991` are FIX 2 (the on-demand audit's same-branch bound, its midnight rollover and its needs-tip key, and `ctl restart`'s three barriers: the cases reach it only through a PATH-front tmux shim that logs every write, `CTL_DRY_RUN=1` next to `--dry-run`, and `restart.sh`'s own guard that refuses a live restart while `CTL_TMUX_SESSION` is not `gisik`; the windows sit at indices 91–98, which no live session has).
+
+- 13.1900 🧪 post: one ledger line with exactly the schema fields; summary names the id
+- 13.1901 🧪 post: 20 parallel posts → ids 1..20 unique, every line valid JSON
+- 13.1902 🧪 post --text: the body is a spooled file holding the text
+- 13.1903 🧪 post: a missing --body file, no body and both body forms are refused, nothing appended; CONTROL: a valid post is accepted
+- 13.1904 🧪 post: a bad seat name, a bad kind and a missing --from are refused; CONTROL: a valid post is accepted
+- 13.1905 🧪 post: a bare window number resolves to the window NAME; orch aliases main
+- 13.1906 🧪 post --reply-to: replying acks the replied-to id for the poster
+- 13.1907 🧪 post --dry-run: appends nothing, prints a DRY line
+- 13.1910 🧪 ack: a second ack is OK 'already acked', exit 0, the ack file is untouched
+- 13.1911 🧪 ack: the wrong seat is refused (exit 1, no ack file); the addressee succeeds
+- 13.1912 🧪 ack: an unknown id exits 1
+- 13.1913 🧪 ack --cancel: any seat can close a message; the ack records cancelled and the note
+- 13.1914 🧪 inbox: lists only MY unacked messages, oldest first; --all adds acked
+- 13.1920 🧪 watch: a kill between reading and emitting loses nothing — the line is replayed, the cursor moves only after the emit
+- 13.1921 🧪 watch: a MISSING cursor starts at 0 and prints only the still-unacked ids
+- 13.1922 🧪 watch: starting a second watcher for the seat stops the old one by its exact pid and takes over
+- 13.1923 🧪 watch: a file that shrinks below the cursor restarts at 0 (acked ids skipped, new ones shown)
+- 13.1924 🧪 watch: the heartbeat file is touched on every poll
+- 13.1930 🧪 bridge: FIX/NEXT/MERGETIP lines become messages to the right exec seat (laneN accepted); ref from the line or the brief
+- 13.1931 🧪 bridge: the first run starts at EOF — history is never reposted
+- 13.1932 🧪 bridge: the same line seen twice (a reset cursor) makes ONE message (src dedupe)
+- 13.1933 🧪 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane
+- 13.1934 🧪 bridge: a number INSIDE 1–5 whose window is not exec* (3 = reviewerA here) and orchestrator/planner targets are refused, never routed; CONTROL in the same check: FIX 2 reaches exec2
+- 13.1935 🧪 bridge: TOOK/DONE/NOTE/HOLD are ignored by name; CLOSE sends no lane message, only a note to main
+- 13.1936 🧪 bridge: with the pane tier ON a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message (13.1981: never in the shadow run)
+- 13.1940 🧪 deliver: the message reaches the inbox file first (one line) and the state records the time; no window → nothing else
+- 13.1941 🧪 watched + idle: no pane paste inside the 120 s grace
+- 13.1942 🧪 watched + BUSY: no pane paste at all (the Monitor line is already queued in the session)
+- 13.1943 🧪 unwatched seat (every lane): the pane pointer goes at once, one line, carrying the id and the ack command
+- 13.1944 🧪 a PROVEN delivery is not re-pasted before 15 min (the seat has it, it is busy)
+- 13.1945 🧪 ack stops redelivery: nothing more is pasted after the ack, however late
+- 13.1946 🧪 one open message per seat, in id order: the second waits; its inbox line appears only after the first is acked
+- 13.1947 🧪 backoff ladder: an unproven seat is re-pointed at +3, +10, +20 min and paged (once) after the 4th try
+- 13.1948 🧪 page chain: an unreachable main pages the planner (inbox) AND appends a ⚑ line to the notes file
+- 13.1949 🧪 lost body: bounced — a bounce message goes back to the sender, nothing is delivered
+- 13.1950 🧪 crash between writing the attempt and the paste: nothing typed, ledger intact
+- 13.1951 🧪 a second daemon is refused while the first pid is alive
+- 13.1952 🧪 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs (both halves run `postman once --dry-run`: the guard precedes the dry-run exit, and a guard-removal mutant only prints DRY)
+- 13.1953 🧪 restart supersedes: a message posted BEFORE the restart is cancelled-by-restart with ONE note to main listing its id; one posted AFTER is kept
+- 13.1954 🧪 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line
+- 13.1955 🧪 audit: inside the grace nothing is reported (the FIX may still be coming)
+- 13.1960 🧪 pane_state menu: a permission/option menu is refused (a pasted Enter would pick option 1); CONTROL in the same check: an idle pane is pasted
+- 13.1961 🧪 pane_state text: a box holding foreign text is never cleared or pasted over; CONTROL in the same check: an idle pane is pasted
+- 13.1962 🧪 pane_state copy-mode: nothing typed while in copy mode; after 180 s cancelled once and delivered; CONTROL in the same check: an idle (not copy-mode) pane is pasted at once
+- 13.1963 🧪 pane_state not-claude: with the DEFAULT allowlist a bash pane is never typed into; CONTROL: the same pane under a regex that allows bash is pasted
+- 13.1964 🧪 pane_state not-claude: a less pane (not a shell, still not claude) is refused — the guard is an allowlist; CONTROL: an idle pane is pasted
+- 13.1965 🧪 pane_state ours: our own unsubmitted pointer in the box is SUBMITTED, not pasted a second time (exactly one copy reaches the seat)
+- 13.1966 🧪 busy seat: the pointer is pasted once (it queues) and not again inside 15 min
+- 13.1967 🧪 no window: exec1 absent while exec11 exists — the prefix is NOT matched (exact name), nothing typed into exec11, the message stays open
+- 13.1968 🧪 kind note: delivered to the inbox only, never pasted into a pane, never blocks the head of the queue
+- 13.1969 🧪 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail
+- 13.1970 🧪 watched + idle: after 120 s without an ack the pane pointer is pasted ONCE
+- 13.1971 🧪 …and is re-pointed after 15 min of silence
+- 13.1972 🧪 …the page is not repeated while the message stays open
+- 13.1973 🧪 …the attempt repeats after the backoff (at-least-once) with the SAME id, once
+- 13.1974 🧪 …but a stale pidfile (dead pid) is taken over
+- 13.1975 🧪 audit: after the grace an undelivered FIX and an undelivered needs-tip each get ONE note to main; READY lines are not audited
+- 13.1976 🧪 audit: not reported twice
+- 13.1977 🧪 audit: a delivered FIX (a fix message with that ref) satisfies it — no note
+- 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line; CONTROL: exit 0 once a fix message with that ref exists, and on an empty queue
+- 13.1979 🧪 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled
+- 13.1980 🧪 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min
+- 13.1981 🧪 shadow run (CTL_POSTMAN_PANE=0): the bridge posts the message but writes NO DONE line into QUEUE-dispatch.md — the dispatcher's open line stays open; CONTROL in the same check: pane tier on → a DONE line for the handled AND for the refused line
+- 13.1982 🧪 audit matches THIS verdict: FIX 1's message 35 min before a FIX 2 verdict does not satisfy it — exactly ONE note after the grace; CONTROL in the same check: a FIX 2 message posted after the verdict → no note
+- 13.1983 🧪 ctl postman audit (on demand) applies the same window: FIX 1's message does not satisfy a FIX 2 verdict 35 min later (exit 1, names it); a FIX 2 message after it does (exit 0); with a FIX 1 and a FIX 2 verdict and only FIX 2's message, exactly the FIX 1 verdict is named
+- 13.1984 🧪 ack re-check: a seat that acks between pane_state and the paste is never typed into; CONTROL in the same check: without that ack the pointer is pasted
+- 13.1985 🧪 ctl restart --dry-run: the window keeps its NAME and the supersede marker is called for it (window 91 = reviewerB → -n reviewerB, never exec91); CONTROL in the same check: window 94 = exec4 and an absent window falls back to exec<N>; nothing is written and the tmux shim logged no write
+- 13.1986 🧪 ctl restart: a supersede marker that cannot be written prints a WARN (not silent) and the restart still proceeds; CONTROL in the same check: a valid seat name prints no WARN; the tmux shim logged no write
+- 13.1987 🧪 pane_state no prompt: a screen with NO ❯ at all (a dialog, a full-screen view) is refused as menu and nothing is typed; CONTROL in the same check: an idle pane is pasted
+- 13.1988 🧪 `ctl postman audit` (on demand): a verdict's window ends at the next verdict of the SAME branch, not of any branch — task/a's message posted after task/b's verdict still satisfies task/a (task/b is named); CONTROL in the same check: with no task/a message, task/a IS named
+- 13.1989 🧪 `ctl postman audit` (on demand) across midnight: a 23:50 verdict followed by a 00:10 line, read at 00:20 the next day, is dated yesterday, so task/m's 23:55 message satisfies it (exit 0); CONTROL in the same check: with no message task/m is named (exit 1)
+- 13.1990 🧪 `ctl postman audit` (on demand): a `needs-tip` verdict is satisfied by a `mergetip` message with that ref; CONTROL in the same check: a `fix` message with that ref does not (exit 1, named)
+- 13.1991 🧪 `ctl restart` whose dry-run exit is REMOVED (a stripped copy of the ctl tree) reaches no tmux write: the `CTL_TMUX_SESSION` guard refuses it (rc ≠ 0, "a live restart refuses it"), the tmux shim log is empty and `tmux list-panes -a` (names and pids) is identical before and after; CONTROL in the same check: the shim logs a write it is handed (a forward-everything shim is red), still forwards `list-windows`, and the unmodified `restart --dry-run` prints `DRY: mark … restarted` and `OK restart`
