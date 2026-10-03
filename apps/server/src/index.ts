@@ -11,6 +11,7 @@ import { createPool } from './db.js';
 import { buildServerGates } from './gates/index.js';
 import { signInMaxFor } from './http/rate-limit.js';
 import { createIngestService } from './ingest/ingest-service.js';
+import { startReferencesBackfill } from './projections/backfill-references.js';
 import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
@@ -336,6 +337,19 @@ async function main(): Promise<void> {
     embedWorker?.stop();
   });
 
+  // Knowledge Graph B: the one-shot proj_references backfill. Started AFTER listen and
+  // never awaited, so boot and health checks never wait for it; stopped on onClose
+  // so a SIGTERM mid-run ends it between entities (no marker: the next boot re-runs it).
+  const referencesBackfill = startReferencesBackfill(pool, {
+    projections,
+    log: (msg) => {
+      app.log.warn(msg);
+    },
+  });
+  app.addHook('onClose', async () => {
+    await referencesBackfill.stop();
+  });
+
   // BEFORE `listen`, so there is no window in which this process is alive and
   // ignoring SIGTERM — on PID 1 that window is not a race with a default
   // disposition, it is a window with NO disposition at all. See `shutdown.ts`
@@ -343,6 +357,7 @@ async function main(): Promise<void> {
   installShutdownHandlers(app, pool);
 
   await app.listen({ port: config.port, host: config.host });
+  referencesBackfill.run();
 }
 
 main().catch((error: unknown) => {

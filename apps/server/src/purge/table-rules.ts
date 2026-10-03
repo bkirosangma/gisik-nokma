@@ -155,6 +155,15 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
     by: ['workspace_id', 'note_id', 'home_project_id'],
     why: 'Erased for the set; a surviving note is re-indexed (Task 7).',
   },
+  proj_references: {
+    rule: 'rederive',
+    by: ['workspace_id'],
+    why: 'Knowledge Graph spec B: rows whose source parent OR target is in the set are deleted (erasure.ts); a survivor that chipped a purged item is replayed so its snippets read Deleted item (survivors.ts).',
+  },
+  projection_backfills: {
+    rule: 'not-entity-bearing',
+    why: 'Knowledge Graph spec B: one marker row per completed one-shot backfill (a projection name, a time, a count); it names no ticket, note, project or person.',
+  },
   proj_note_lexemes: {
     rule: 'rederive',
     by: ['workspace_id'],
