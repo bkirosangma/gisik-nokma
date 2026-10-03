@@ -6,7 +6,7 @@
 
 **Target branch:** a NEW release branch cut after the Knowledge Graph release ships (owner, 2026-10-03). One release branch at a time: this spec lands as a doc in `release/knowledge-graph`; no code starts before the next release branch exists.
 
-**Status:** the owner approved the design in conversation on 2026-10-03 (mockups: "looks good"). This file is the written spec for review. The design is decided; where the code makes a decision hard, §16 says so with `file:line`.
+**Status:** the owner reviewed this spec on 2026-10-03 and ruled on it; the rulings are applied below (list under "Owner's words and rulings"). The design is decided; where the code makes a decision hard, §16 says so with `file:line`. Open-question numbers are stable: the resolved ones are gone from §16 and listed as rulings here.
 
 **Series** (this series; the Knowledge Graph series A–E is separate):
 
@@ -24,20 +24,31 @@ Plans go in the order 1 → 2. Spec 2 builds on the primitives in this spec (§7
 - Tickets created inside the Workflow or Timeline graph are drafts; the graph has "Publish flow" (spec 2).
 - MCP: `create_ticket` gains a draft flag; new `list_my_drafts`, `publish_draft`, `discard_draft`. Spec 2 owns `publish_flow`.
 - Rule D2 (owner): every MCP write is visible in the app, attributed, and removable by a member.
+- **Owner rulings on review (2026-10-03):**
+  1. A draft appears only on a **Drafts page (nav entry)**, the sheet and the graphs, not on boards or lists.
+  2. A draft is invisible to everyone but its author, **including the workspace owner and the assignee**.
+  3. "They can attach on draft (but permanently removed on discard, if they were uploaded from the draft)." A draft **can take attachments**. On discard, attachments uploaded FROM the draft are permanently erased (object and rows); anything that existed before (for example a note linked to the draft) is only unlinked, never erased. **Comments still open only after publish.**
+  4. Discard **erases now**, after a confirm dialog (not the 15-day Deleted items).
+  5. After publish the **full history**, drafting edits included, is the ticket's history.
+  6. A published draft lands at the **END of the Backlog** (publish writes a rank).
+  - Planner reconciliation (the blockquote in §1): links that touch a draft live on the DRAFT's stream until an atomic publish; `ingestAtomic` is accepted.
 - Mockup copy (approved): "3 drafts in this flow. Only you can see them. Publishing makes every draft a Backlog ticket." Legend: "Draft, only you see it". A dashed outline and a "Draft" pill mark a draft.
 
-**Decisions taken in this spec** (the owner's words above leave them open; correct them at review). Each is in §16 as a question if it could reasonably go the other way.
+**Decisions taken in this spec** (the rulings above settle D4, D6, D9 and D10; the rest follow from them). Each that could reasonably go the other way is in §16.
 
 | # | Decision |
 |---|---|
 | D1 | A draft is a **ticket** with a flag, not a new entity kind. It has a ticket stream, so edits, links and the graph work unchanged. |
 | D2 | **Events:** `ticket.created` gains an optional `draft: true`; new `ticket.published {projectId}`; new `ticket.discarded {}`. |
 | D3 | **The key is counted from the publish event** (§6). A draft's `ticket.created` is not a numbering row. |
-| D4 | **A draft is invisible to everyone but its author, including the workspace owner and the assignee** (§4). This overrides two existing grants and is the first thing in §16. |
+| D4 | **A draft is invisible to everyone but its author, including the workspace owner and the assignee** (§4; owner ruling 2). This overrides two existing grants. |
 | D5 | **A draft is always born in Backlog** and publishes as a Backlog ticket (the approved copy). |
-| D6 | **Discard erases.** A draft has no key and has never been shared, so unlike a trashed ticket its events can be truly erased (§8). |
+| D6 | **Discard erases, after a confirm** (owner ruling 4). A draft has no key and has never been shared, so unlike a trashed ticket its events can be truly erased, and the attachments uploaded from it with them (§8). |
 | D7 | **A single publish is one event. A set of drafts publishes atomically through one new online route and one new ingest primitive, `ingestAtomic`** (§7.4); a failure commits nothing. Spec 2's need D-4 is met this way. |
 | D8 | **Drafts reach other places only through named "doors"** (§4.2, group D). Every other read path stays closed without being edited, because the shared predicates close it. |
+| D9 | **A draft takes attachments** (owner ruling 3, R56-R63); comments and collaborators wait for publish. |
+| D10 | **Publish writes a rank** so the ticket lands at the end of the Backlog (owner ruling 6, R64-R65). |
+| D11 | **Links that touch a draft are filed on the draft's stream** through one additive `from` member on spec A's link payloads, and re-filed on the source's stream at publish inside the same transaction (planner reconciliation; §10). |
 
 > **Planner reconciliation (2026-10-03), drafts Q4 ↔ graphs D-3 / open question 7:** a link that touches a draft lives on the DRAFT's stream while the draft exists (the structural fix, not a per-viewer filter). Spec A's `ticket.link_added` gains an optional, additive direction member (`from`) so the draft can carry an outgoing OR incoming link; the published ticket's stream gets nothing until publish. At publish the link is re-filed on its source's stream inside the same atomic publish (drafts §7.4). This lands in the Drafts plan as an additive payload change; spec A's T1 (`origin/task/kg-a-t1-events`) is not reopened. Atomic publish (`ingestAtomic`, drafts Q13) is accepted by the planner as the only way to meet D-4.
 
@@ -111,7 +122,7 @@ draft?: { authorId: string; at: string; discarded?: true }
 
 Reducer (`packages/domain/src/ticket-state.ts:118-258`, `applyTicketEvent`):
 - `ticket.created` with `draft:true` sets `draft = { authorId: env.actorId, at: env.serverTime }`; everything else as today (`stateId` = Backlog, `rank: null`).
-- `ticket.published` removes `draft` and **re-pins the workflow to the ticket type's CURRENT binding** (`workflowId`, `workflowVersion`; `stateId` stays Backlog, whose category is `open` in every workflow). Why: a draft may sit for weeks, and `migrate_ticket_type` cannot touch it (§4.2 C-9); a published draft is "created" under the workflow in force at publish, which is the owner's rule that a ticket pins the workflow it was created under (2026-08-26, quoted at `projections/tickets.ts:31,47`).
+- `ticket.published` removes `draft` and **re-pins the workflow to the ticket type's CURRENT binding** (`workflowId`, `workflowVersion`; `stateId` stays Backlog, whose category is `open` in every workflow). Why: a draft may sit for weeks, and `migrate_ticket_type` cannot touch it (§4.2 C5); a published draft is "created" under the workflow in force at publish, which is the owner's rule that a ticket pins the workflow it was created under (2026-08-26, quoted at `projections/tickets.ts:31,47`).
 - `ticket.discarded` sets `draft.discarded = true` (so every draft door treats it as gone between the commit and the erasure).
 - A `published`/`discarded` event on a ticket with no `draft` throws, like the other reducer arms: the engine refuses it first (§3.3).
 - `TICKET_EVENT_TYPES` (`ticket-state.ts:84`) gains `ticket.published` and `ticket.discarded` (they fold).
@@ -132,9 +143,9 @@ R5. The deepest rank still needs a parent (`hierarchy.ts:132`): a graph-made dra
 
 ### 3.3 What an author may do to a draft (the allowlist)
 
-R6. On a draft, only its author may submit these events: `ticket.field_set` (title, description, priority, start and due date, and any later field such as the Estimate of spec 2), `ticket.assigned`, `ticket.reparented`, `ticket.link_added` / `ticket.link_removed` (spec A; spec 2's kinds), `ticket.published`, `ticket.discarded`.
-R7. Everything else is refused with rule `draft.not-allowed` and a sentence that names the way out: transition, close, reopen, rank, delete/restore, `workflow_rebound`, collaborators, comments, attachments, `visibility.set`, contests. Examples of the text: "A draft cannot be closed. Publish it first, or discard it." and, for `ticket.deleted`, "A draft cannot be deleted. Discard it instead."
-   - Rank is not written at publish. A published draft sorts among the unranked Backlog rows by ticket id (`packages/app-core/src/views/backlog-rank.ts:70` documents the unranked order), which is its drafting time. Question Q11.
+R6. On a draft, only its author may submit these events: `ticket.field_set` (title, description, priority, start and due date, and any later field such as the Estimate of spec 2), `ticket.assigned`, `ticket.reparented`, `ticket.link_added` / `ticket.link_removed` (spec A; spec 2's kinds; filed on the draft's stream, R42), `attachment.added` (R56), `note.attached` / `note.detached` naming the draft (R66), `ticket.published`, `ticket.discarded`.
+R7. Everything else is refused with rule `draft.not-allowed` and a sentence that names the way out: transition, close, reopen, rank, delete/restore, `workflow_rebound`, collaborators, comments, `visibility.set`, contests. (Attachments are allowed, owner ruling 3; comments open after publish.) Examples of the text: "A draft cannot be closed. Publish it first, or discard it." and, for `ticket.deleted`, "A draft cannot be deleted. Discard it instead."
+   - Rank is written by the publish (R64), not by the author while drafting: `ticket.ranked` on a draft is refused like the rest.
 R8. **Assigning a draft** is allowed to existing members only. It gives the assignee no sight (the assignee arm is closed, §4.1) and sends no notice until publish (§9). The outsider door is closed for drafts: `POST /v1/workspaces/:id/assign-outsider` (`routes/people.ts:161-177`) refuses a draft event or a draft target with `draft.no-outsiders` ("Publish the ticket before inviting someone from outside"), because that door would grant a guest membership as a side effect of a private act.
 R9. **Anyone else** who names a draft (any event on its stream, any read of it) gets the same answer as for a ticket that does not exist: `permission.visibility`, `TICKET_NOT_VISIBLE_REASON` (`check-permission.ts:1639-1641`). The workspace owner and admins are included.
 
@@ -144,18 +155,30 @@ R10. `ticket.published {projectId}` is accepted only if the ticket is a draft th
 R11. A draft whose parent is itself an unpublished draft is refused `draft.parent-unpublished` ("Publish the parent first"). In a flow, the parent must be published before the child (§7.4).
 R12. A published or non-draft ticket gets `draft.not-a-draft`. A discarded one gets `ticket.unknown` (it is gone).
 R13. **Authority:** the author alone. The project's admins and the owner cannot publish someone else's draft (they cannot see it).
-R14. **Result:** the ticket becomes an ordinary Backlog ticket. Its key is the next number in its project (§6). All of its pre-publish events become part of its history (Q3).
+R14. **Result:** the ticket becomes an ordinary Backlog ticket. Its key is the next number in its project (§6). All of its pre-publish events become part of its history (owner ruling 5), and it is ranked at the end of its project's Backlog (R64).
 
 ### 3.5 Discarding a draft
 
 R15. `ticket.discarded {}` is accepted only for a draft, from its author. It then runs the erasure of §8.
 R16. There is no Undo after a discard. The app asks first (§12.3). The MCP tool asks the same way (§13).
 
+### 3.6 Attachments and notes on a draft (owner ruling 3)
+
+R56. **A draft takes attachments.** The author uploads with `POST /v1/attachments` naming the draft's `ticketId` (`routes/attachments.ts:325`); the gate at `:412` asks `canOpen` instead of `canSee` (G10), and the file is filed as for any ticket under the object key `w/<workspaceId>/a/<attachmentId>` (`routes/attachments.ts:484`) with a row in `attachments` (`ticket_id` = the draft; `attachments/attachment-repo.ts:49`). The author records it with `attachment.added` (allowlisted, R6). Listing (`routes/tickets.ts:864`) and download (`routes/attachments.ts:627`) are G10 too. Everyone else gets the not-found answer (R9). An upload is an HTTP request, so it needs a connection exactly as for a published ticket.
+R57. **Publish keeps them.** The rows and objects do not change; the attachments become visible to whoever can see the ticket, and their `attachment.added` events are part of the history (owner ruling 5).
+R58. **Discard erases the attachments uploaded from the draft, objects and rows.** This needs no new erase code: `purgeItem`'s transaction reads the keys with `objectKeysOf` (`purge/erasure.ts:40-52`: every `attachments` row whose `ticket_id` is in the erasure set), deletes the rows (`erasure.ts:85`), queues the object keys in `purge_pending_objects` (`purge/pending-objects.ts:11-20`, inside the transaction), and after the commit `deletePendingObjects` deletes each object from the store (`pending-objects.ts:29-56`; `purge-item.ts:155,160`). A failed delete leaves the key queued with its error and the scheduled sweep drains it (`pending-objects.ts:44-50`; `purge/sweep.ts`), so no object is left without a record. A sub-draft's attachments are in the set too. An attachment row exists from the upload, so one whose `attachment.added` never arrived is erased as well.
+R59. **Only what came from the draft is erased.** A note linked to the draft survives with all its content and its own attachments (`attachments.note_id` rows are not in a ticket's set; notes are survivors, `purge/survivors.ts:32`). The link goes: `proj_note_attachments` is `rederive` (`purge/table-rules.ts:147-151`: "a link to a purged ticket goes; the note is replayed so a rebuild agrees") and the note's replay skips tickets in `purged_entities` (`projections/notes.ts:222-241`, `:234`). The same holds for anything else that pointed at the draft and existed before it.
+R60. **The confirm says it.** The discard dialog and the MCP preview state the number: "N attachments uploaded to this draft will be permanently deleted" (R16). The draft read (`GET …/drafts`) carries `attachmentCount`.
+R61. **Comments** stay closed until publish (`comment.added` refused `draft.not-allowed`), and collaborators too (R7).
+R62. **Dev and test stores.** `discardDraft` deletes through the store the server was started with; the scheduled worker already refuses to run without an explicit `OBJECT_STORE` (`purge/sweep.ts:79-86`), which is also what drains leftovers from a discard.
+R63. **Verification.** After a discard no row of `attachments` names the draft, `purge_pending_objects` is empty once drained, and the object store holds none of its keys (case 28.183).
+R66. **A note linked to a draft.** `note.attached` / `note.detached` naming a draft are allowed to the draft's author (G11) on a note they may edit; the note-side gate (`check-permission.ts:1577-1581`) is unchanged. The event sits on the NOTE's stream, so it cannot live on the draft's: `noteEventVisibleTo(db, viewer, event)` (in `visibility/can-open.ts`) withholds a `note.attached` / `note.detached` whose `ticketId` is another person's draft from the note's stream arm (`visible-events-for.ts:714` area), the note history and events reads, and the note bootstrap tail; publish names the linked notes in the `reach-granted` notice (R21) so their readers pull the events. A note whose visibility is `inherit` widens to the ticket's audience at publish, as attaching it to a ticket does today (`check-permission.ts:1577-1581`: "Attaching is how a note's audience is widened"); until then a draft widens nothing, because `LIVE_TICKET_WHERE` excludes it from the inherit arm (`visible-where.ts:303`). See Q16.
+
 ## 4. Privacy
 
 ### 4.1 The rule
 
-R17. **A draft's audience is exactly its author.** Not the owner, not an admin, not the assignee, not a project admin. This overrides the owner's disclosed power (`can-see.ts:127`) and the assignee arm (`visible-where.ts:138-139`, `assignee-arm.ts:36,63`); the visibility controls' disclosure text must say that drafts are the exception (Q2).
+R17. **A draft's audience is exactly its author.** Not the owner, not an admin, not the assignee, not a project admin. This overrides the owner's disclosed power (`can-see.ts:127`) and the assignee arm (`visible-where.ts:138-139`, `assignee-arm.ts:36,63`); the visibility controls' disclosure text must say that drafts are the exception (owner ruling 2).
 R18. **The author is the only person who can open it, and only while they could still create in its project:** a workspace role of owner/admin/member and the project in `eff.projects`. An author demoted to guest, removed from the project or from the workspace no longer reaches their drafts (they stay, closed; Q7).
 R19. **The mechanism is one flag, closed in the shared places** rather than a clause per route:
    - `proj_visibility.draft_author_id text NULL` and `proj_tickets.draft_author_id text NULL`, both folded from the same events (the first is the audience mirror every `v`-joined read already has; the second is the head state the engine and the `t`-joined reads have). They are written by the projections in §11 and diffed by `verify-projections`.
@@ -192,16 +215,16 @@ This is the list the plan builds from. It is grouped by what the path needs. The
 | Notes attached to a ticket | `read/notes.ts:133`; note inherit arm `visible-where.ts:303` |
 | Guest actor names | `routes/builder-reads.ts:368` |
 | State occupancy; type population (admin counts) | `routes/builder-reads.ts:459,535` |
-| Single ticket: detail, events, ancestors, attachments, comments | `routes/tickets.ts:372,426,674,725,864,952` |
+| Single ticket: detail, events, ancestors, comments | `routes/tickets.ts:372,426,674,725,952` (detail `:372` is door G7; the attachment list `:864` is door G10) |
 | Ticket history (MCP `get_ticket_history`) | `routes/ticket-history.ts:281` |
-| Attachment download and upload gates | `routes/attachments.ts:412,627` |
+| Attachment upload and download gates | `routes/attachments.ts:412,627` — **also doors** (G10) |
 | The ticket list used by bootstrap and `GET /tickets` | `visibility/visible-tickets.ts:56,68` → `routes/tickets.ts:345`, `sync/sync-routes.ts:495`, `visibility/grant-backfill.ts:647` |
 | Single-ticket live read | `read/live-ticket.ts:58` |
 | Notification recipients | `notifications/fanout.ts:85` (every recipient is gated by `canSeeTicket`, so no draft assignment or mention notice leaves the author's hands) |
 | Date-approaching and stale sweeps | `notifications/sweep.ts:125,187,265` |
 | Auto-close sweep | `auto-close/sweep.ts:197` |
 | Note indexing from attached tickets | `projections/note-search.ts:259` |
-| Note attach, note create-with-ticket | `check-permission.ts:1556,1585` |
+| Note attach, note create-with-ticket | `check-permission.ts:1556,1585` — **also a door** (G11) |
 | Contests roster | `sync/contests-route.ts:293` — **also a door** (G6) |
 | Knowledge Graph neighbours; Home | spec C §2.2 and spec E §2.4 use `visibleTicketsWhere` / `visibleNotesWhere`: closed with no edit. Drafts appear in graphs only through spec 2's doors |
 | Reference index "Linked from" | spec B §2.2 asks `canSee` of the source: closed |
@@ -241,6 +264,8 @@ This is the list the plan builds from. It is grouped by what the path needs. The
 | G7 | ticket detail | `routes/tickets.ts:372`: `canOpen`; the response carries `draft: true` and `key: null` |
 | G8 | the Drafts list | new `GET /v1/workspaces/:id/drafts` and `GET /v1/me/drafts` (§12.2, §13) |
 | G9 | spec 2's graph reads | `canOpen` / `listMyDrafts` (spec 2 owns the route; §7.4) |
+| G10 | attachments of a draft | upload `routes/attachments.ts:412`, download `:627`, list `routes/tickets.ts:864`: `canOpen` (R56) |
+| G11 | a note linked to a draft | `check-permission.ts:1585` (the `note.attached` / `note.detached` gate): `canOpen` for the draft, the note-side gate (`:1577-1581`) unchanged (R66) |
 
 Everything else the author does to a draft goes through G1 and the allowlist.
 
@@ -256,7 +281,8 @@ Everything else the author does to a draft goes through G1 and the allowlist.
 | Workflow graph, Timeline graph, Home Timeline (spec 2) | **yes**, with the Draft pill | no |
 | Drafts page and `list_my_drafts` | **yes** | n/a |
 | The draft's sheet by URL; MCP `get_ticket` of it | **yes** | 404 |
-| The draft's History tab | not shown (History starts at publish; Q3) | 404 |
+| The draft's History tab | not shown while a draft; after publish it shows the whole stream, drafting included (ruling 5) | 404 |
+| The draft's Attachments tab; downloads | **yes** (R56) | 404 |
 | Sub-ticket list and progress of its parent | no | no |
 | Links to or from it | on the author's own sheets and graphs | not shown, not counted (§10) |
 | Trash | n/a (a discard erases) | n/a |
@@ -265,7 +291,7 @@ Everything else the author does to a draft goes through G1 and the allowlist.
 ## 5. Delivery: stream, bootstrap, offline
 
 R20. **Live stream and catch-up** use door G2: the author's devices receive the draft's events; no other reader does. A reader who was offline across a publish is handed the draft's whole history in the ordinary catch-up, because `canSee` is evaluated now.
-R21. **Publish is a grant.** `'ticket.published'` is added to `GRANT_BACKFILL_TRIGGERS` (`grant-backfill.ts:153`). Every reader who can see the ticket after the publish gets a `reach-granted` notice naming it (and its inheriting children), and their device pulls `/v1/sync/bootstrap/ticket`. This is how a reader who was online during the drafting gets a ticket their cursor had already passed.
+R21. **Publish is a grant.** `'ticket.published'` is added to `GRANT_BACKFILL_TRIGGERS` (`grant-backfill.ts:153`). Every reader who can see the ticket after the publish gets a `reach-granted` notice naming it (its inheriting children, and the notes linked to the draft, R66), and their device pulls `/v1/sync/bootstrap/ticket`. This is how a reader who was online during the drafting gets a ticket their cursor had already passed.
 R22. **The author's replica** holds its drafts (G4, G3) and must keep them out of every offline read. In `packages/app-core/src/replica/replica-data-source.ts`, the places that skip `deleted` also skip `draft`: `listTicketSummaries` (`:1003-1008`), `isLive` in `boardHierarchyOf` (`:1066`), the board and list loops (`:1386`, `:1419`), offline search (`:1810`); and `outbox.pendingCreatedTickets` (`sync-client/src/outbox/outbox.ts:527`) skips a pending `ticket.created` with `draft: true` (an offline-born draft must not flash on the board). The replica adds `listDrafts(workspaceId)` for the Drafts page.
 R23. **Events delivered to others never name a draft** (links: §10).
 R24. **The offline key.** Unchanged: the replica has no key for any ticket (`replica-data-source.ts:896,1054` returns `key: null` and the sheet falls back to the title). A draft shows the Draft pill in that slot. A key appears only after the server publishes and the device pulls.
@@ -340,7 +366,7 @@ R31. `onCommitted` (`fanout.ts:352`) gains an arm for `ticket.published`, read f
 
 Spec 2 needs "a transactional publish of an ordered set of drafts, every key assigned in the given order, all or nothing" (its need D-4). The ledger cannot do this today: `ingestAll` commits each event in its OWN transaction (`ingest-service.ts:432`, `commitOne` at `:166`, which opens its own `BEGIN`). This spec adds the primitive.
 
-R47. **`ingestAtomic(events, door)`** in `apps/server/src/ingest/ingest-service.ts`. `commitOne`'s body is factored into `commitInTx(client, submitted, door)`, which does everything `commitOne` does up to and including projections but neither `BEGIN` nor `COMMIT`. `commitOne` becomes `BEGIN` + `commitInTx` + `COMMIT`; `ingestAtomic` is one `BEGIN`, `lockWorkspace` once, then `commitInTx` for each event in the given order, then `COMMIT`. Any refusal or throw rolls the whole transaction back. Every gate already reads through the transaction's `client`, never `deps.pool` (purge check `ingest-service.ts:225`, the door gate with `db: client` `:265`, the engine `deps.evaluate(envelope, createEngineContext(client))` `:310`, the server gates `gate.check(submitted, client)` `:343`, projections `:376`), which is what lets a later event in the batch see an earlier one's writes under READ COMMITTED; the factoring must keep that and a case pins it (28.103). The `onEventCommitted` listeners (fanout, grant-backfill) fire from `notifyCommitted` at `:379`, inside `commitOne` after its `COMMIT`; the factoring moves that call to the caller, so `ingestAtomic` calls it for each event, in order, only after its single `COMMIT`. Entity locks are taken in the order the events are given; the workspace lock first (the existing global order, `ingest-service.ts:171-174`) means two atomic calls on one workspace cannot deadlock on each other.
+R47. **`ingestAtomic(events, door)`** in `apps/server/src/ingest/ingest-service.ts`. `commitOne`'s body is factored into `commitInTx(client, submitted, door)`, which does everything `commitOne` does up to and including projections but neither `BEGIN` nor `COMMIT`. `commitOne` becomes `BEGIN` + `commitInTx` + `COMMIT`; `commitInTx` is also what lets a `ticket.published` append its re-filed link events and its rank events (R44, R64) inside the one transaction; `ingestAtomic` is one `BEGIN`, `lockWorkspace` once, then `commitInTx` for each event in the given order, then `COMMIT`. Any refusal or throw rolls the whole transaction back. Every gate already reads through the transaction's `client`, never `deps.pool` (purge check `ingest-service.ts:225`, the door gate with `db: client` `:265`, the engine `deps.evaluate(envelope, createEngineContext(client))` `:310`, the server gates `gate.check(submitted, client)` `:343`, projections `:376`), which is what lets a later event in the batch see an earlier one's writes under READ COMMITTED; the factoring must keep that and a case pins it (28.103). The `onEventCommitted` listeners (fanout, grant-backfill) fire from `notifyCommitted` at `:379`, inside `commitOne` after its `COMMIT`; the factoring moves that call to the caller, so `ingestAtomic` calls it for each event, in order, only after its single `COMMIT`. Entity locks are taken in the order the events are given; the workspace lock first (the existing global order, `ingest-service.ts:171-174`) means two atomic calls on one workspace cannot deadlock on each other.
 R48. **The route:** `POST /v1/workspaces/:workspaceId/drafts/publish`, body `{ ticketIds: string[] }` (1 to 200 ids, ordered, no repeats). Online only (an offline device queues single `ticket.published` events instead, and the app disables "Publish flow" while offline). For each id the server builds one `ticket.published {projectId}` (the actor is the session user, the origin is the door) and calls `ingestAtomic`.
 R49. **Response:** success `{ results: [{ ticketId, key }] }` in the given order. Refusal `409 { rule: 'draft.publish-refused', ticketId, cause: { rule, reason } }` naming the FIRST failing ticket and its underlying rule (`draft.parent-unpublished`, `hierarchy.parent-terminal`, `permission.visibility`, …); nothing is committed.
 R50. **Keys:** the workspace lock is held for the whole transaction, so no other writer's creation lands between the publishes. Within one project the keys are consecutive and follow the given order (the key is the position among numbering rows, R25). Across projects each project's keys are consecutive in the given order.
@@ -348,7 +374,15 @@ R51. **Order is the caller's.** The route does not sort. A child listed before i
 R52. **Rules applied:** every event goes through the same gates as a single publish (R10-R13), judged against the state the earlier events in the batch left, not the state at the start.
 R53. **Idempotence:** a retry after a lost response sees `draft.not-a-draft` for the first id and the batch refuses; the caller (spec 2's `publish_flow`) reads the drafts first, drops ids that are no longer drafts and retries with the rest.
 R54. **Tickets in the batch that cannot be seen by the caller** (another author's draft) refuse with the not-found answer (R9) naming that ticket id as `ticketId`; the response reveals only that the id is not the caller's, as for any unknown id.
-R55. **Everything else spec 2 may rely on:** a single `ticket.published` commits atomically on its own; the committed `ticket.published` events are what its auto-promotion listens to (its need D-5); a draft cannot be decided, transitioned, promoted or counted by anyone else (R6-R9, its need D-7); `listMyDrafts(db, userId, workspaceId)` is exported from `apps/server/src/read/drafts.ts` for its flow and timeline reads (its need D-8). Its need D-3 is met only in its observable half (the link is not shown or narrated to anyone but the author, §10); its storage half ("lives in draft-private storage") is Q4 and unresolved.
+R55. **Everything else spec 2 may rely on:** a single `ticket.published` commits atomically on its own; the committed `ticket.published` events are what its auto-promotion listens to (its need D-5); a draft cannot be decided, transitioned, promoted or counted by anyone else (R6-R9, its need D-7); `listMyDrafts(db, userId, workspaceId)` is exported from `apps/server/src/read/drafts.ts` for its flow and timeline reads (its need D-8). Its need D-3 is met by §10: a link that touches a draft lives in the draft's own stream until publish, then is re-filed atomically (R44).
+
+### 7.5 Rank on publish (owner ruling 6)
+
+R64. **A publish lands the ticket at the END of its project's Backlog.** Ranked rows draw above unranked rows, and unranked rows draw by ticket id (`packages/domain/src/rank.ts:85` `compareByRank`; `backlog-rank.ts:70`), so one new key on its own lands above every unranked row. The published ticket is therefore ranked the way a drag to the end is today: `planRankMove` (`packages/app-core/src/views/backlog-rank.ts:214`) backfills the unranked rows, in their drawn order, with ascending keys (`rankBetween`, `rank.ts:54`) and then gives the moved ticket the next key. The owner accepted that cost for drags ("one ingest, N+1 events", `backlog-rank.ts:195-199`).
+- The algorithm moves into `packages/domain/src/rank.ts` as `planTailRank(rows)` (pure; `planRankMove` calls it for its end-of-list case, with no change to its behaviour), so the server and the client share it.
+- Publishing is `ticket.published` followed by `ticket.ranked` (the rank needs the ticket to be in the Backlog, `refusal-rules.ts:40` `rank-requires-backlog`, so the rank cannot precede the publish). The backfill `ticket.ranked` events come first. Through `POST …/drafts/publish` and `publish_draft` the server builds all of them and commits them in the one transaction (R47/R48); through the app's single publish and offline, the client sends the batch and `submitRank`'s partial-application rule applies (`backlog-rank.ts:209-218`).
+- For a set (R48), the backfill runs once per project, then each published ticket takes the next key in the given order.
+R65. **Whose rows.** The backfill ranks the Backlog rows the PUBLISHER can see (`visibleTicketsWhere`), as a drag does. Rows they cannot see stay unranked and so draw below the new ticket for people who can see them (Q15).
 
 ## 8. Discard
 
@@ -356,7 +390,7 @@ R55. **Everything else spec 2 may rely on:** a single `ticket.published` commits
 
 R32. **Discard erases.** After `ticket.discarded` commits, the server erases the draft's whole stream.
 
-Why this and not the trash: the trash rule ("ticket keys are counted, redact never delete", `ticket-numbers.ts` docblock: "a number is NEVER REUSED") protects numbers. A draft has none, so nothing is owed to the numbering and nothing else cites the draft (no comment, no notification, no attachment: R7). It was never shared. "Discard" means the author wants it gone; the owner's own trash decision T1 reads "truly erased" (`docs/superpowers/specs/2026-09-23-trash-and-purge-design.md` §2). Routing it through Deleted items would also put a private draft's title in front of every project admin (T3 shows deleted tickets to whoever could delete them). The cost is no Undo; the app asks first (R16). The cheaper alternative (soft delete plus mark, 15 days in the author's own Deleted items) is Q5.
+Why this and not the trash: the trash rule ("ticket keys are counted, redact never delete", `ticket-numbers.ts` docblock: "a number is NEVER REUSED") protects numbers. A draft has none, so nothing is owed to the numbering and nothing else cites the draft (no comment, no notification; the attachments uploaded to it go with it, R58). It was never shared. "Discard" means the author wants it gone; the owner's own trash decision T1 reads "truly erased" (`docs/superpowers/specs/2026-09-23-trash-and-purge-design.md` §2). Routing it through Deleted items would also put a private draft's title in front of every project admin (T3 shows deleted tickets to whoever could delete them). The cost is no Undo; the app asks first (R16). This is owner ruling 4.
 
 ### 8.2 Mechanism
 
@@ -365,10 +399,12 @@ R33. `apps/server/src/purge/discard-draft.ts` exports `discardDraft(pool, ticket
 - Inside the one transaction, as `purgeItem` already does: allocate `workspaceSeq` and `seq` BEFORE deleting (so the stream position is not reissued; `purge-item.ts:114-115`), call `purge_ledger('ticket', id)`, erase the projection rows (`purge/erasure.ts` `eraseRows`: `proj_tickets`, `proj_visibility`, `proj_rollups`, `proj_search`, …), record the id in `purged_entities`, re-derive survivors, and append the content-free tombstone `purge.completed`. The tombstone is an event on a ticket that no longer exists, so no reader is handed it (the stream gates tickets by `canSee`, `visible-events-for.ts:493`).
 - `markedBy` / `markedAt` in the tombstone are the author and the discard instant.
 - A draft's child drafts are in `purge_erasure_set('ticket', id)` already (a ticket's sub-tree); the author is told the count in the confirm dialog.
+- The attachment objects are handled by the same path (R58): `objectKeysOf` reads them before the rows go, they are queued in `purge_pending_objects` inside the transaction and deleted after the commit.
+- `deps` for `discardDraft` carries the object store the uploads used (`routes/attachments.ts:495` `deps.store.put`), so the delete reaches the same store.
 
 R34. **Trigger.** After a `ticket.discarded` commits (the `onEventCommitted` hook, `ingest-service.ts:102,496`), the server runs `discardDraft`. It also runs from `purge/sweep.ts` for any draft whose `draft.discarded` is set and which still exists (a crash between the two). Idempotent: an erased draft is skipped (`purge-item.ts:103`, `already-purged`).
 
-R35. **Order of work, to leave nothing dangling.** Before the erase, `discardDraft` removes every link whose TARGET is the draft and whose source stream is someone else's, by appending `ticket.link_removed` (spec A) to that source's stream, actor = the author, origin `server`, through `serverAppend` (the pattern of `routes/people.ts:195-200`). Links whose SOURCE is the draft sit on the draft's own stream and go with it. A removal that is refused leaves the draft in place and is retried by the sweep. Why: spec A folds links into the source's head state (`TicketState.links`, A's `ticket-state.ts`), so a surviving `link_added` naming an erased id would live forever in the source's state and in the rebuild.
+R35. **Links need no compensation.** Every link that touches a draft is filed on the draft's own stream (R42), so the erase removes it with the stream. No event is appended to any other ticket's stream, and `proj_ticket_links` rows touching the erased id go with the purge (spec A §2.5: purge deletes every row that touches the ticket). Discard therefore never depends on another ticket's permissions.
 
 R36. **Offline.** A change queued for a draft that was erased is refused `purge.erased` at the door (`purge/check-purged.ts`) and the device shows the existing notice, `PURGED_OUTBOX_NOTICE` (`packages/domain/src/purge.ts`), and drops it.
 
@@ -382,14 +418,19 @@ R40. A workflow republish (`workflow.defined`) folds drafts forward with every o
 
 ## 10. Links that touch a draft
 
-Spec A files `ticket.link_added` on the SOURCE ticket's stream and folds links into the source's head state (`typed-links §2.2`; `origin/task/kg-a-t1-events`: `ticket-state.ts` `links`). The graph's "+ after GN-150" creates a draft AND links the published GN-150 to it, so the event lands on a public stream and names a private ticket. The rules below are the default; Q4 asks the owner and spec A to choose the structural fix.
+Spec A files `ticket.link_added` on the SOURCE ticket's stream and folds links into the source's head state (`typed-links §2.2`; `origin/task/kg-a-t1-events`: `ticket-state.ts` `links`). The graph's "+ after GN-150" creates a draft AND links the published GN-150 to it; filed in the usual place the event would land on a public stream and name a private ticket. The planner's reconciliation (block in §1) fixes this structurally: **while the draft exists, every link that touches it lives on the draft's own stream.**
 
-R41. **Reads:** a link is shown only when the viewer can see both ends (A §2.4). Since `canSee` is false for a draft, a link to a draft is hidden from everyone but the author, with no count. No edit: A's reads already ask `canSee`.
-R42. **Every event reader withholds it.** One helper, `linkEventVisibleTo(db, viewerId, event)` (in `visibility/can-open.ts`), returns false for a `ticket.link_added` / `link_removed` whose `targetId` is another person's draft. It is applied in `visibleEventsFor`'s ticket arm (`visible-events-for.ts:493`), the ticket History route (`routes/ticket-history.ts:281`, which backs MCP `get_ticket_history`), and the ticket events route (`routes/tickets.ts:725`). Without the last two a published ticket's History would narrate "linked … a ticket you can't see" from the ledger. (The generic version, withholding any link to a ticket the reader cannot see, is spec A's open decision and is not taken here.)
-R43. **Snapshots and bootstrap are filtered per viewer.** `bootstrapTicket` (`sync-routes.ts:199`) gains a `viewerId`; links to another person's draft are removed from `snapshot.state.links` and from the tail events. (The state rides the snapshot, which is why the stream rule alone is not enough.)
-R44. **Publish re-delivers.** The `reach-granted` notice of R21 also names the sources of links that target the published ticket and that the reader can see, so their devices pull the link events they were denied.
-R45. **MCP:** spec A's `get_ticket.links` already lists visible ends only (A §4); `redactedPayload` (`mcp-server/src/tools/ticket-tools.ts:41`) already turns a withheld target into "a ticket you can't see". No new MCP edit.
-R46. **Discard** removes links as R35 says. **Publish** adds none and removes none.
+R41. **Reads:** a link is shown only to a viewer who can see both ends (A §2.4). A draft is seen by no one through `canSee`, so another person sees no trace of the link and no count. The author sees it on the draft's sheet and, via the doors, on their own graphs: spec A's link reads accept an allowance for the viewer's own draft ids (obligation in §14).
+R42. **Draft-side filing (additive `from`).** Spec A's two payloads gain one optional member, `from: ulidString` (still `.strict()`, `from` must differ from `targetId`):
+- a link whose SOURCE is the draft: filed as A defines it, on the draft's stream, no `from`;
+- a link whose TARGET is the draft and whose source is another ticket S: filed on the DRAFT's stream with `targetId = <draft id>` and `from = S`. Its meaning is "S `kind` the draft"; the stream it sits on is the draft's.
+- `proj_ticket_links` takes `source_id = from ?? entity id`, `target_id = targetId`. The reducer keeps such entries in the draft's `TicketState.links` marked with their `from`.
+R43. **Permission and engine.** A `from`-form event: the actor must be the draft's author (the draft door, G1) AND be allowed to edit `from` (A's rule 6 applied to S); a plain-form event (no `from`) on S's stream that names a draft as `targetId` is refused `draft.link-form` ("Link to a draft from the draft's side"), so no event on a public stream ever names a draft. A's other rules (self-link, same workspace, duplicates, direct reverse) are judged on the (source, target) pair.
+R44. **Publish re-files the incoming links, inside the publish transaction.** On `ticket.published` the server, in the same transaction (`commitInTx`, R47), takes each `from`-form link of the draft whose source S is not itself an unpublished draft and appends a plain `ticket.link_added {kind, targetId}` on S's stream (actor the publisher, origin `server`, through the same gates, so A's rule 6 is checked against S again). The reducer's `ticket.published` arm drops the `from` entries from the ticket's `links` (they now live on S). If the re-file is refused (the publisher can no longer edit S, S was deleted), the publish is refused `draft.link-refile-refused` naming S, and nothing commits. Outgoing links of the draft need nothing: they already sit on its stream and become visible when both ends are visible.
+R45. **MCP:** spec A's `get_ticket.links` lists visible ends only (A §4); on the author's own draft it includes the draft-side links. `redactedPayload` (`mcp-server/src/tools/ticket-tools.ts:41`) is unchanged.
+R46. **Discard** removes them with the stream (R35). **Publish** otherwise adds none and removes none.
+
+No stream reader, snapshot or History route needs a per-viewer filter for links: the events are on a stream only the author may open.
 
 ## 11. Projections, in order
 
@@ -413,7 +454,7 @@ The registry order is unchanged. `tools/verify-projections.ts` must stay clean w
 
 ### 12.2 The Drafts page
 
-- Route `apps/web/app/w/[workspaceId]/drafts/page.tsx`; a **Drafts** entry in the nav (`apps/web/src/app-nav.tsx:201`) with a count badge of the viewer's own drafts in this workspace (Q8).
+- Route `apps/web/app/w/[workspaceId]/drafts/page.tsx`; a **Drafts** entry in the nav (`apps/web/src/app-nav.tsx:201`) with a count badge of the viewer's own drafts in this workspace (owner ruling 1).
 - Server read `GET /v1/workspaces/:id/drafts` → `{ items: [{ ticketId, projectId, projectName, typeId, title, parentId, updatedAt }] }`, the viewer's own, newest first, read from `proj_tickets` where `draft_author_id = viewer` and not discarded and `canOpen`'s role test holds. It never contains a key.
 - Each row: the type chip, the title, the project, the parent title if any, **Publish**, **Discard**, and the row opens the sheet.
 - Empty state: "No drafts. A draft is a ticket only you can see, until you publish it."
@@ -423,9 +464,9 @@ The registry order is unchanged. `tools/verify-projections.ts` must stay clean w
 
 - A draft opens in the ordinary ticket sheet. **No key**: the crumb and header show a **Draft** pill where the key goes (`ticket-sheet.tsx:3033` `lastCrumb = ticketRead.key ?? ticketRead.title` already falls back to the title; the pill is added). The pill is the mockup's: a dashed outline in the draft colour.
 - A banner under the header: "Only you can see this draft." with **Publish** (primary) and **Discard**.
-- Tabs: **Details** and, once spec 2 lands, **Graph**. **History** and **Attachments** are hidden for a draft, and comments are not offered. Hidden controls for the refused events of R7 are disabled with the reason ("Available after you publish"), not removed, so the layout does not move on publish.
-- **Publish** confirms nothing. It submits `ticket.published`; on commit the pill is replaced by the key the server returns on the next read.
-- **Discard** opens a confirmation: "Discard this draft? It is erased and can't be recovered." plus "N sub-drafts will be erased too" when there are any. Button **Discard draft**.
+- Tabs: **Details** and, once spec 2 lands, **Graph**. **Attachments** is shown (R56) and the Notes section works (R66); **History** is hidden while it is a draft (it shows the whole stream after publish), and comments are not offered. Hidden controls for the refused events of R7 are disabled with the reason ("Available after you publish"), not removed, so the layout does not move on publish.
+- **Publish** confirms nothing. It submits `ticket.published` plus the rank events (R64); on commit the pill is replaced by the key the server returns on the next read, and the ticket appears last in the project's Backlog.
+- **Discard** opens a confirmation: "Discard this draft? It is erased and can't be recovered." plus "N sub-drafts will be erased too" when there are any, and "N attachments uploaded to this draft will be permanently deleted" when there are any (R60). Notes linked to the draft are not deleted; the dialog says "Linked notes are kept and unlinked." Button **Discard draft**.
 - The wire view `TicketRead` (`packages/app-core/src/view-types.ts:639`) gains `draft?: true`; `TicketSummary`, `BoardCard` and list rows never carry a draft (the server never returns one there).
 
 ### 12.4 Offline
@@ -443,11 +484,11 @@ All tools register in `packages/mcp-server/src/tools/` and are added to `test/fi
 
 **`list_my_drafts`** `{ workspaceId?, projectId?, cursor?, limit? }` → `{ items: [{ workspaceId, ticketId, projectId, projectName, title, typeId, parentId, updatedAt }], nextCursor }`. Reads `GET /v1/me/drafts` (all the caller's workspaces, optionally narrowed), like `list_deleted` reads `/v1/me/deleted-items` (`trash-tools.ts`). Pages with `pageArgs`.
 
-**`publish_draft`** `{ workspaceId, ticketId }` → submits `ticket.published {projectId}` (the tool reads the draft first for `projectId`), then reads the ticket and returns `{ ticketId, key, published: true }`. Refusals pass through with the server's rule and sentence (`packages/mcp-server/src/tools/submit.ts:30`): `draft.not-a-draft`, `draft.parent-unpublished`, `hierarchy.parent-terminal`, …
+**`publish_draft`** `{ workspaceId, ticketId }` → submits `ticket.published {projectId}` (the tool reads the draft first for `projectId`), then writes the rank events of R64 and reads the ticket, returning `{ ticketId, key, published: true }`. Refusals pass through with the server's rule and sentence (`packages/mcp-server/src/tools/submit.ts:30`): `draft.not-a-draft`, `draft.parent-unpublished`, `hierarchy.parent-terminal`, …
 
-**`discard_draft`** `{ workspaceId, ticketId, confirm_name? }` → `confirm_name` must be the draft's exact title; without it the tool returns a `Preview` (`preview.ts`, as `delete_ticket` does with the key) "Erases the draft "<title>" and N sub-drafts. This cannot be undone." and nothing changes.
+**`discard_draft`** `{ workspaceId, ticketId, confirm_name? }` → `confirm_name` must be the draft's exact title; without it the tool returns a `Preview` (`preview.ts`, as `delete_ticket` does with the key) "Erases the draft "<title>", N sub-drafts and M attachments uploaded to them (permanently deleted). Linked notes are kept. This cannot be undone." and nothing changes.
 
-**Existing tools on a draft** (the author's own session): `get_ticket` returns it with `draft: true`, `key: null`; `update_ticket`, `assign_ticket` and `link_tickets` (spec A) work; `transition_ticket`, `close_ticket`, `reopen_ticket`, `rank_ticket`, `delete_ticket`, `restore_ticket`, `add_comment`, `add_attachment`, `link_note`, `set_visibility`, `migrate_ticket_type` refuse (R7) with the pointer to publish or discard. For anyone else every tool answers "not found".
+**Existing tools on a draft** (the author's own session): `get_ticket` returns it with `draft: true`, `key: null`; `update_ticket`, `assign_ticket`, `link_tickets` (spec A), `add_attachment` and `link_note` work; `transition_ticket`, `close_ticket`, `reopen_ticket`, `rank_ticket`, `delete_ticket`, `restore_ticket`, `add_comment`, `set_visibility`, `migrate_ticket_type` refuse (R7) with the pointer to publish or discard. For anyone else every tool answers "not found".
 
 **Rule D2** (restated): a draft made by MCP appears on the author's Drafts page, is attributed (`origin: 'mcp'`, "via Claude" in the history copy once published), and its author removes it with Discard.
 
@@ -457,7 +498,7 @@ All tools register in `packages/mcp-server/src/tools/` and are added to `test/fi
 
 | Spec | Obligation |
 |---|---|
-| A (typed links) | (a) its link reads keep asking `canSee` for both ends (they do); (b) its projection `proj_ticket_links` skips a row whose either end is in `purged_entities`, so a rebuild equals live after a discard (R35 removes the links first, so this is belt and braces); (c) `link_*` events join the delivery filter of R42-R43; (d) Q4 |
+| A (typed links) | (a) its link reads keep asking `canSee` for both ends, with an allowance for the viewer's own draft ids (R41); (b) both payloads gain the optional `from` member (R42; additive, `origin/task/kg-a-t1-events` is not reopened, the Drafts plan adds it) and its projection reads `source_id = from ?? entity id`; (c) its purge rule deletes every `proj_ticket_links` row touching an erased ticket (§2.5), which is what makes a discard leave no link; (d) its link permission accepts the `from` form (R43) |
 | 2 (graphs, owns `publish_flow`) | reads drafts only through door G9; shows the Draft pill; creates drafts with `draft: true` and a `leads_to` link; `publish_flow` obeys §7.4; auto-promotion skips drafts (R39); the "Publish flow" copy reads "Publishing makes every draft a Backlog ticket" |
 | B (reference index) | none: its sources are gated by `canSee` |
 | C (graph view), E (Home) | none: they use `visibleTicketsWhere` |
@@ -480,7 +521,8 @@ All tools register in `packages/mcp-server/src/tools/` and are added to `test/fi
 | 28.110–28.129 | T6 links touching a draft (R41-R46) |
 | 28.130–28.149 | T7 MCP |
 | 28.150–28.179 | T8 app: dialog, Drafts page, sheet, phone, offline |
-| 28.180–28.199 | free, for follow-ups |
+| 28.180–28.194 | T9 attachments on drafts, notes, rank on publish (R56-R66) |
+| 28.195–28.199 | free, for follow-ups |
 
 ### 15.2 Cases (RED first; each has its control in the same `it`)
 
@@ -501,10 +543,16 @@ All tools register in `packages/mcp-server/src/tools/` and are added to `test/fi
 15. **28.092** publish: success; each refusal of R10-R12; the project mismatch; a publish by an admin who is not the author. 28.093 publish by the author after the type's workflow moved → the published ticket is on the new workflow.
 16. **28.094** fanout: drafting events notify nobody (assignment, a mention, a due date); publish notifies the assignee once and each mentioned person once; redelivering the event adds no row (the dedupe key).
 17. **28.095** `reach-granted` on publish reaches a member who was online during the drafting and their device pulls the ticket; a member offline across the publish gets the ticket in the ordinary catch-up.
-18. **28.100** discard: after `ticket.discarded` the draft's events and projection rows are gone, `purged_entities` holds the id, one redacted `ticket.created {…, draft:true}` remains, a later event for it is refused `purge.erased`. Control: a published ticket is not erased by a `ticket.discarded` (refused `draft.not-a-draft`). 28.101 the sweep erases a draft whose hook never ran. 28.102 a discard with a link from a published source appends a `link_removed` first and the source's `links` is clean afterwards. **28.103** the atomic route: three drafts (parent first) publish with consecutive keys in the given order and a concurrent creation cannot land between them (workspace lock); with the third draft's parent terminal NOTHING commits (no `ticket.published` row, no key consumed, no notification) and the response names that ticket. Control: the same three published one by one succeed. Mutation: commit per event inside `ingestAtomic` → the rollback arm reds. A child listed before its parent refuses `draft.parent-unpublished` and rolls back. **28.104** `commitOne` parity: the existing ingest suites run unchanged against the factored `commitInTx`, and a thrown projection error still rolls back one event only. 28.105 `GET .../events` and History hide a link to another person's draft from a viewer of the published source (R42), and show it after publish.
-19. **28.110–28.119** links (R41-R46): a published source linking to a draft: another member's stream, snapshot, bootstrap and `get_ticket` show no trace of it; after publish they do (R44).
+18. **28.100** discard: after `ticket.discarded` the draft's events and projection rows are gone, `purged_entities` holds the id, one redacted `ticket.created {…, draft:true}` remains, a later event for it is refused `purge.erased`. Control: a published ticket is not erased by a `ticket.discarded` (refused `draft.not-a-draft`). 28.101 the sweep erases a draft whose hook never ran. 28.102 a discard with an incoming draft-side link (R42) leaves the published source's stream and state untouched and `proj_ticket_links` has no row touching the erased id. **28.103** the atomic route: three drafts (parent first) publish with consecutive keys in the given order and a concurrent creation cannot land between them (workspace lock); with the third draft's parent terminal NOTHING commits (no `ticket.published` row, no key consumed, no notification) and the response names that ticket. Control: the same three published one by one succeed. Mutation: commit per event inside `ingestAtomic` → the rollback arm reds. A child listed before its parent refuses `draft.parent-unpublished` and rolls back. **28.104** `commitOne` parity: the existing ingest suites run unchanged against the factored `commitInTx`, and a thrown projection error still rolls back one event only. 28.105 `GET .../events` and History hide a link to another person's draft from a viewer of the published source (R42), and show it after publish.
+19. **28.110–28.119** links (R41-R46): a link from a published ticket S to a draft is filed on the draft's stream with `from = S`; no event on S's stream, S's state, S's History, `get_ticket(S)`, another member's snapshot or stream carries it, and a plain-form `link_added` on S naming the draft is refused `draft.link-form` (control: the same link to a published target is accepted). Publish re-files it: S's stream gains the plain `link_added`, the ticket's `links` lose the `from` entry, `proj_ticket_links` equals a rebuild; with S no longer editable by the publisher the publish is refused `draft.link-refile-refused` and nothing commits (no `ticket.published` row, no key consumed). Mutation: file the re-file after the `COMMIT` → the rollback arm reds.
 20. **28.130–28.149** MCP: `create_ticket {draft:true}`, `list_my_drafts`, `publish_draft` (returns the key), `discard_draft` (preview, then erase), the refusal text of each refused tool, and `tool-names.ts`.
 21. **28.150–28.179** app: Save as draft, the Drafts page, the sheet's pill/banner/disabled controls, Publish, Discard confirm; phone; offline create+publish; a11y names.
+
+22. **28.180** attachments on a draft: the author uploads (201), lists and downloads; another member, an admin and the owner get 404 on upload, list and download. Control: the same three on a published ticket succeed. **28.181** `attachment.added` by the author commits; by anyone else `permission.visibility`; `comment.added` on the draft is refused `draft.not-allowed`. **28.182** publish keeps the rows and object keys unchanged and the attachment becomes visible to a reader; History shows `attachment.added`.
+23. **28.183** discard erases what came from the draft: each `attachments` row gone, each object key `w/<ws>/a/<id>` deleted from the store, `purge_pending_objects` empty after the drain; a sub-draft's attachment too. Controls: an attachment on another ticket and a note's own attachment (`note_id`) remain, objects included. Mutation: drop the `ticket_id = ANY(...)` arm of `objectKeysOf` → the object survives and the case reds. **28.184** a store that throws on delete: the draft and its rows are gone, the key stays queued with `attempts` incremented, the sweep drain deletes it later.
+24. **28.185** a note linked to the draft survives the discard with its content; the link row is gone; `verify-projections` is clean. **28.186** a `note.attached` naming another person's draft reaches no other reader of the note (stream, history, bootstrap); after publish the readers get it through the `reach-granted` notice (control: a note attached to a published ticket is delivered as before).
+25. **28.187** publish rank: a project Backlog with ranked and unranked rows; after publish the ticket draws LAST and the backfilled rows draw in their old order. Mutation: skip the backfill → the ticket draws above the unranked rows and the case reds. **28.188** a set publish: three tickets draw last in the given order, one backfill per project. **28.189** rows the publisher cannot see are not touched and the publish does not fail (Q15).
+26. **28.190** discard confirm and preview state the attachment count (app dialog, MCP preview).
 
 ### 15.3 Mutation targets (named for the reviewer)
 
@@ -516,33 +564,27 @@ Unit and integration suites only; the gate's task count is unchanged. The new mi
 
 ## 16. Open questions (for the owner; each with its anchor)
 
-**Q1. Does the author see their own drafts on the Backlog list and board?** Default: no — only on the Drafts page, the sheet and (spec 2) the graphs, because the owner listed boards and lists as places a draft is not, and a single exclusion (`visible-where.ts:136,231`) is safe. The mockups show drafts only in graphs. If yes, the Backlog list needs a viewer-aware predicate and a Draft pill on cards.
+> **Planner rulings (2026-10-03), technical — no owner call needed:** **Q15** accepted: "end of the Backlog" is the end as the publisher sees it (a fractional rank after the last row the publisher can see; a row the publisher cannot see keeps its own place). **Q16** accepted: a `note.attached`/`note.detached` that names a draft is withheld per viewer (only the draft's author sees it) until publish, then delivered as-is. **Q17** accepted: a refused re-file refuses the WHOLE publish (all-or-nothing, D7), with the refusal naming the link and the reason.
 
-**Q2. Drafts beat the owner's "can always see" and the assignee arm.** `can-see.ts:127` ("owner decision 2026-08-27, disclosed") and `visible-where.ts:138-139` both grant sight; D4 removes both for drafts, from the owner's words "PRIVATE to its author". Confirm. The visibility controls' disclosure text must then carry the exception (§4.1 R17).
-
-**Q3. After publish, does the History show the drafting events?** Default: the whole stream becomes the ticket's history (the history routes `ticket-history.ts:281` and `tickets.ts:725` serve the ledger filtered by `canSee`; `history-copy.ts:109`). Drafting edits (including a description typed and removed) are then visible. The alternative — history starts at publish — needs the publish event to carry the full birth state and every history route and the replica to cut at it. Not built unless asked.
-
-**Q4. A link from a PUBLISHED ticket to a DRAFT (the graph's "+ after GN-150").** Spec A files `link_added` on the source's stream (A §2.2) and folds it into the source's head state. This spec withholds it per viewer (R42-R43) and re-delivers at publish (R44). The structural fix is for the link to live on the draft's stream while the draft exists, which needs an optional `from` (or direction) member on A's payload (additive; A's T1 is already on `origin/task/kg-a-t1-events`). Decide with spec 2.
-
-**Q5. Discard: erase now (default) or the 15-day Deleted items?** The cheaper path reuses `ticket.deleted` + `purge.marked` narrowed to the author (`check-permission.ts:1751-1765`, `ticket.deleted` is a project-admin act; `read/deleted-items.ts:154-175` lists to admins; trash spec T3/T9). It needs the same purge-migration change (§6.3), adds an Undo, and keeps a draft's title for 15 days. The default needs `purgeItem` to take a gate (`purge-item.ts:101-111`).
+Q-numbers are stable. Resolved by the owner's review and removed: Q1 (Drafts page only, ruling 1), Q2 (owner and assignee excluded, ruling 2), Q3 (full history, ruling 5), Q4 (draft-side link storage, planner reconciliation), Q5 (erase now, ruling 4), Q8 (nav entry, ruling 1), Q10 (attachments allowed, comments after publish, ruling 3), Q11 (publish writes a rank, ruling 6), Q13 (`ingestAtomic` accepted).
 
 **Q6. A draft is always born in Backlog.** From the approved copy ("Publishing makes every draft a Backlog ticket"). The dialog's switch (`new-ticket-dialog.tsx:1032`) is disabled ON for drafts. If drafts may carry a starting status, `publish` would have to set it, and the domain refine (§2.2) changes.
 
 **Q7. A draft whose author loses access.** Default: it stays, closed to everyone, and returns if the author regains the role (R18). A project or workspace delete erases it with the rest (a project's erasure set includes its tickets). Alternative: auto-discard on `membership.revoked`; not built.
 
-**Q8. Where the Drafts page lives.** Default: a nav entry (`app-nav.tsx:201`). The mockups do not show it.
-
 **Q9. `migrate_ticket_type` leaves drafts alone** (`builder-reads.ts:1076`); a published draft re-pins on publish (§2.3), so nothing is stranded. Confirm that an admin's bulk act should not touch private work.
-
-**Q10. A draft cannot have collaborators, comments or attachments** (R7). Say if any is wanted before publish; each needs its own door (`routes/attachments.ts:412,627`, comment projection).
-
-**Q11. A published draft sorts into Backlog by its id** (drafting time), not by publish time, because no rank is written (`backlog-rank.ts:70`). If it should land at the tail, publish must write a `ticket.ranked`.
 
 **Q12. The mockups put a key on draft nodes** (`Timeline.dc.html`, "GN-148 Ready for client?" with the Draft pill). The owner's ruling is no key; the graph spec must show the pill in the key's place. Flagged because the approved image contradicts the ruling.
 
-**Q13. Atomic publish needs a new ingest primitive** (R47: `commitOne` at `ingest-service.ts:166` opens its own `BEGIN`; `ingestAll` at `:432` loops over it). This is the one structural change in the series' server write path. Confirm it, or accept per-event commit with a partial publish (keys still in order, but not contiguous and not all-or-nothing, and spec 2's D-4 fails).
-
 **Q14. `ticket.published` carries `projectId`** (redundant with the creation; engine-checked). The alternative is a join in the key query; chosen against because the purge then needs the creation row to keep its project AND its draft marker, and the query gets a self-join.
+
+
+
+**Q15. "End of the Backlog" is the end as the publisher sees it.** Ranked rows draw above unranked rows (`packages/domain/src/rank.ts:85`), and a backfill can only rank rows the publisher can see: a `ticket.ranked` on a restricted ticket is refused by the permission gate (`check-permission.ts:1639`). Rows the publisher cannot see stay unranked and draw below the new ticket for people who can see them (the same limit a drag has today, `backlog-rank.ts:96-101`). Accept, or make publish refuse when the project's Backlog has rows the publisher cannot see.
+
+**Q16. A note linked to a draft is the one claim that cannot live on the draft's stream.** `note.attached` is an event on the NOTE's stream (`check-permission.ts:1577-1585`), so it needs per-viewer withholding (R66, `visible-events-for.ts:714` area) and a re-delivery at publish. Default: supported as written. Alternative: refuse `note.attached` naming a draft until publish and drop R66 (the note section on a draft sheet is then disabled), which removes the only per-viewer event filter in this spec.
+
+**Q17. A re-file can refuse a publish** (R44): if the publisher lost edit right on the source of an incoming link, or it was deleted, the whole publish is refused `draft.link-refile-refused`. Default: refuse (nothing half-public). Alternative: publish and drop that one link with a notice.
 
 ## 17. Files (expected)
 
@@ -556,6 +598,8 @@ Unit and integration suites only; the gate's task count is unchanged. The new mi
 - `apps/server/src/sync/sync-routes.ts`, `reconcile-route.ts`, `contests-route.ts`, `snapshot-writer.ts`
 - `apps/server/src/routes/tickets.ts`, `builder-reads.ts`, `people.ts`, a new `routes/drafts.ts`
 - `apps/server/src/ingest/ingest-service.ts` (`commitInTx`, `ingestAtomic`), a new `routes/drafts-publish.ts`
+- `apps/server/src/routes/attachments.ts` (G10), `routes/tickets.ts` (attachment list)
+- `packages/domain/src/rank.ts` (`planTailRank`), `packages/app-core/src/views/backlog-rank.ts`
 - `apps/server/src/purge/purge-item.ts`, `sweep.ts`, a new `discard-draft.ts`; `notifications/fanout.ts`, `sweep.ts`; `auto-close/sweep.ts`
 - `packages/app-core/src/views/new-ticket-dialog.tsx`, `create-ticket-flow.tsx`, `ticket-sheet.tsx`, `history-copy.ts`, a new `drafts-page.tsx`; `view-types.ts`; `replica/replica-data-source.ts`; `precheck.ts`
 - `packages/sync-client/src/outbox/outbox.ts`, `replica/replica.ts`
@@ -568,8 +612,8 @@ Unit and integration suites only; the gate's task count is unchanged. The new mi
 - The Workflow and Timeline graphs, "leads to", Decision, auto-promotion, `publish_flow` (spec 2).
 - Sharing a draft with a named person ("draft for review").
 - Publishing someone else's draft; handing a draft to another author.
-- Collaborators, comments, attachments on a draft (Q10).
-- Undo of a discard (Q5).
+- Collaborators and comments on a draft (comments open after publish, owner ruling 3).
+- Undo of a discard (owner ruling 4).
 - An atomic multi-publish of ANY events other than `ticket.published` (R47 is general in shape, but only this route uses it).
 - Encrypting drafts at rest.
 
@@ -580,5 +624,6 @@ Unit and integration suites only; the gate's task count is unchanged. The new mi
 - **`reconcile` is the quiet one.** A draft not named by door G5 is purged from its author's device at the next catch-up, and looks like data loss.
 - **`ingestAtomic` holds the workspace lock for up to 200 events**, which stalls every other write in that workspace while it runs; the route caps the set at 200 and the plan measures a 200-event publish.
 - **`ingestAtomic` touches the hot path.** `commitOne` is the only writer; the factoring (R47) must leave single-event behaviour byte-identical (case 28.104). 
-- **Spec A's head-state `links`** carries a draft id to the source's readers through the snapshot unless R43 is built; Q4 is the structural answer.
+- **The `from` member** is a payload change to spec A's events; if the Drafts plan lands before A's T1 does, the member joins A's first version instead (no migration either way, absent = old meaning).
+- **Discard deletes objects.** A bug in `objectKeysOf` scoping would delete another ticket's attachment; case 28.183 holds both controls.
 - **Naming:** `NewTicketDraft` (form values) and Draft (state) share a word; §3.1.
