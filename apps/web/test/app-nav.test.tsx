@@ -262,7 +262,8 @@ describe('AppNav — the mounts, not the components', () => {
       // oversight: an `<a role="menuitem">` has the menuitem role, not `link`,
       // so `getAllByRole('link')` cannot see them by design. Their reachability
       // is asserted where it now lives — the account-menu block below.
-      expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
+      // 27.620: the brand is a link to Home since spec E
+      expect(hrefs).toEqual(['/', '/workspaces', '/notes', '/inbox']);
     });
 
     it('WITH a workspace, no project: the served name, My work and Members join, Board does not', async () => {
@@ -274,7 +275,9 @@ describe('AppNav — the mounts, not the components', () => {
       );
       await screen.findByRole('link', { name: 'Convenience Corner' });
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
@@ -332,7 +335,9 @@ describe('AppNav — the mounts, not the components', () => {
       // is the only form of this case that can tell that from anywhere else in
       // the bar. `/w/ws_1` is the workspace-name link; `/w/ws_1/p/p_beta` is
       // the remembered-or-first project, and nothing sits between them.
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/p/p_beta',
@@ -355,7 +360,9 @@ describe('AppNav — the mounts, not the components', () => {
       );
       await screen.findByRole('link', { name: 'Convenience Corner' });
       const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+      // 27.620: the brand is a link to Home since spec E
       expect(hrefs).toEqual([
+        '/',
         '/workspaces',
         '/w/ws_1',
         '/w/ws_1/my-work',
@@ -1163,6 +1170,8 @@ describe('Round 24 the inbox indicator', () => {
  */
 describe('13.392 every nav target resolves to a real page.tsx', () => {
   const ROUTES: Array<[string, string]> = [
+    // 27.620: the brand is a link to Home since spec E
+    ['/', 'app/page.tsx'],
     ['/workspaces', 'app/workspaces/page.tsx'],
     ['/w/ws_1', 'app/w/[workspaceId]/page.tsx'],
     // `/w/ws_1/p/p_1` left this table in Round 23 with the Board item. This
