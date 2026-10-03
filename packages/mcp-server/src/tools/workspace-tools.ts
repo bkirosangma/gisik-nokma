@@ -66,7 +66,9 @@ export function workspaceTools(session: Session): ToolDefinition[] {
       name: 'get_workspace',
       description:
         'Read one workspace: its name, prefix, your role, whether it is archived and how many projects ' +
-        'you can see in it. For a workspace in Deleted items it says so and names undelete_workspace. ' +
+        'you can see in it. It also carries "home": the numbers on the workspace\'s Home page (tickets, open, ' +
+        'past due, due soon, members, notes) as you may see them. ' +
+        'For a workspace in Deleted items it says so and names undelete_workspace. ' +
         'Use this to read the exact current name before archive_workspace or delete_workspace.',
       inputSchema: { workspaceId },
       handler: async (args) => {
@@ -74,6 +76,10 @@ export function workspaceTools(session: Session): ToolDefinition[] {
         const found = (await readDirectory(session)).find((w) => w.workspaceId === id);
         if (found !== undefined) {
           const { projects, ...rest } = found;
+          const home = (await session.get(`/v1/workspaces/${encodeURIComponent(id)}/home`)) as {
+            counts: unknown;
+            dueSoonDays: unknown;
+          };
           return {
             workspaceId: rest.workspaceId,
             name: rest.name,
@@ -82,6 +88,8 @@ export function workspaceTools(session: Session): ToolDefinition[] {
             archived: rest.archived,
             projectCount: projects.filter((p) => !p.archived).length,
             archivedProjectCount: projects.filter((p) => p.archived).length,
+            // Home's numbers (spec E §2.4), read only. Counts, not ids: list_tickets / list_notes name items (D-E9).
+            home: { counts: home.counts, dueSoonDays: home.dueSoonDays },
           };
         }
         const gone = (await readDeleted(session)).find((d) => d.kind === 'workspace' && d.id === id);
