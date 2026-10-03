@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PublishedWorkflowDef, StateCategory } from '@gisik-nokma/domain';
-import { Button, Card } from '@gisik-nokma/ui';
+import { Button, Card, Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { CATEGORY_LABEL } from '../category-label.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from './builder-context.js';
@@ -198,7 +198,15 @@ export function WorkflowListScreen(props: {
   if (loadFailed) {
     return <p className="workflow-list__load-error">Could not load workflows. Reload to try again.</p>;
   }
-  if (workflows === null) return <p className="workflow-list__loading">Loading workflows…</p>;
+  if (workflows === null) {
+    return (
+      <section className="workflow-list">
+        <SkeletonRegion label="Loading workflows">
+          <Skeleton shape="block" height="4.5rem" rows={3} />
+        </SkeletonRegion>
+      </section>
+    );
+  }
   const canAuthor = canAuthorRole(props.session.role);
   return (
     <section className="workflow-list">

@@ -8,6 +8,7 @@ import type { BuilderSession, WorkflowAuthoringGateway } from '@gisik-nokma/app-
 import { useAppServices, useSessionStatus } from '../providers.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { AuthoringReadRefused } from './data-source-gateway.js';
+import { WiringCheckSkeleton } from '../skeletons/screen-skeletons.js';
 
 /**
  * # Everything the six authoring routes need, and the four answers they can get
@@ -159,7 +160,7 @@ export function WiringNotReady({
 }) {
   const pathname = usePathname();
   if (wiring.kind === 'loading') {
-    return <p role="status">Checking what you may change in this workspace…</p>;
+    return <WiringCheckSkeleton />;
   }
   if (wiring.kind === 'signed-out') {
     return (

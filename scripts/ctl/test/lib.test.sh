@@ -163,6 +163,17 @@ check "13.1716 task count: a cached run of 33/33 FAILS the verb, naming the Task
 check "13.1716 task count: a fresh (main-kind) run of 33/33 FAILS too" 'out=$(FIXTURE_TASKS=33 gbr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *33 successful, 33 total"'
 check "13.1716 task count: a run that is 35 of 36 (a task failed) FAILS" 'out=$(FIXTURE_OK=35 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *35 successful, 36 total"'
 check "13.1716 task count: CONTROL — the same fixture at 36/36 passes, so the failure arms fail on the count and nothing else" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
+# 13.1840-13.1843: G-9 adds packages/workflow-canvas-browser, so its gate runs 36 tasks. #954 let the tip accept either graph until G-9 landed; the G-9 tip merge
+# took G-9's 36-only line of gate.sh, so 13.1843 is now the control "34/34 FAILS" (it was "34/34 still passes"). Ids are unchanged.
+check "13.1840 task count: a cached run of 36/36 passes the verb (G-9's graph)" 'FIXTURE_TASKS=36 gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=cached · Tasks: +36 successful, 36 total"'
+check "13.1840 task count: a fresh (main-kind) run of 36/36 passes too" 'FIXTURE_TASKS=36 gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0 · mode=fresh · Tasks: +36 successful, 36 total"'
+check "13.1841 task count: CONTROL — 35/35 still FAILS, so 36 is accepted by value and not by any count" 'out=$(FIXTURE_TASKS=35 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *35 successful, 35 total"'
+check "13.1841 task count: CONTROL — 37/37 still FAILS" 'out=$(FIXTURE_TASKS=37 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *37 successful, 37 total"'
+check "13.1841 task count: CONTROL — a 34-task run that is 34 of 33 FAILS" 'out=$(FIXTURE_OK=34 FIXTURE_TASKS=33 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 33 total"'
+check "13.1842 task count: CONTROL — a short 36-task run (35 of 36) FAILS" 'out=$(FIXTURE_OK=35 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *35 successful, 36 total"'
+check "13.1842 task count: CONTROL — 34 successful of 36 total FAILS (the pair must agree)" 'out=$(FIXTURE_OK=34 FIXTURE_TASKS=36 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 36 total"'
+check "13.1842 task count: CONTROL — 36 successful of 34 total FAILS" 'out=$(FIXTURE_OK=36 FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *36 successful, 34 total"'
+check "13.1843 task count: CONTROL — a 34-task run (34/34) FAILS the verb on the 36-only tip, naming the Tasks line" 'out=$(FIXTURE_TASKS=34 gbr --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*Tasks: *34 successful, 34 total"'
 ( cd "$br" && $G reset -q --hard HEAD~1 )
 # ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
 fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import type { PurgedPredicate } from '@gisik-nokma/domain';
+import { Skeleton, SkeletonRegion } from '@gisik-nokma/ui';
 import { formatDateTime } from '../provenance.js';
 import { renderCommentBody } from './comment-body.js';
 
@@ -444,14 +445,20 @@ export function CommentsThread({
         </p>
       ) : comments === null ? (
         /*
-          V4 — the wait arm. The same word the History tab three arms away uses
-          for the same state, so the two tabs do not describe one read's progress
-          two different ways. Nothing about the ticket is claimed here: an empty
+          V4 — the wait arm (smoothness T8, case 25.131: a skeleton, no sentence). Rows in the thread's own list
+          classes, named once for assistive tech. Nothing about the ticket is claimed here: an empty
           thread is a fact, and this is not one yet.
         */
-        <p className="gn-comments__loading" data-testid="sheet-comments-loading">
-          Loading…
-        </p>
+        <SkeletonRegion label="Loading comments">
+          <ul className="gn-comments__list">
+            {[0, 1].map((row) => (
+              <li key={row} className="gn-comment">
+                <Skeleton width="30%" height="0.875rem" />
+                <Skeleton width="90%" height="1rem" />
+              </li>
+            ))}
+          </ul>
+        </SkeletonRegion>
       ) : comments.length === 0 ? (
         <p className="gn-comments__empty">No comments yet.</p>
       ) : (
