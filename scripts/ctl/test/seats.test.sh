@@ -271,10 +271,11 @@ check "13.1819 parity: seats.py and ctl_box_text agree on real text, a closed gh
   [ $ok = 1 ]'
 # ============ 13.2032-13.2034: the effort the status line shows (`ctl restart --effort`, owner 2026-10-04) ============
 # statusline-command.sh writes an "effort: <level>" segment; the real captures all carry "effort: high", so every other level is built here.
+levels_ok() { local e d2; for e in xhigh max medium low; do d2=$(fixture); mkpane "$d2/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" "$e"; meta "$d2" 2 exec2 0; [ "$(effort_of "$d2" 2)" = "$e" ] || return 1; done; }
 effort_of() { jv "$(run "$1" --json)" "$2" 'd["effort"]'; }
 d=$(fixture); cp "$FX/busy-sonnet.pane" "$d/2.pane"; meta "$d" 2 exec2 0
 check "13.2032 effort: read from the status line's own \"effort: <level>\" segment — high from the real capture; xhigh, max, medium, low from built panes (a parser fixed on \"high\" is red); CONTROL in the same check: the model beside it is still read (sonnet-5-5)" \
-  '[ "$(effort_of "$d" 2)" = high ] && [ "$(jv "$(run "$d" --json)" 2 "d[\"model\"]")" = sonnet-5-5 ] && for e in xhigh max medium low; do d2=$(fixture); mkpane "$d2/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" "$e"; meta "$d2" 2 exec2 0; [ "$(effort_of "$d2" 2)" = "$e" ] || exit 1; done'
+  '[ "$(effort_of "$d" 2)" = high ] && [ "$(jv "$(run "$d" --json)" 2 "d[\"model\"]")" = sonnet-5-5 ] && levels_ok'
 d=$(fixture); mkpane "$d/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" none; meta "$d" 2 exec2 0 task/x abc1234 0 0
 d2=$(fixture); mkpane "$d2/2.pane" "⏺ ok" "" 12 sonnet-5-5 "" medium; meta "$d2" 2 exec2 0 task/x abc1234 0 0
 check "13.2033 no effort segment (the DeepSeek backend sends none): effort is null in --json and the text line reads \"sonnet-5-5/?\" — never a guessed level; CONTROL in the same check: the same pane with \"effort: medium\" reads \"sonnet-5-5/medium\"" \
