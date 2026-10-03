@@ -1,0 +1,164 @@
+{
+  "1440|/account": {
+    "cls": 0.1997,
+    "requests": 9,
+    "duplicates": 0,
+    "swapShiftCls": 0.1997
+  },
+  "1440|/inbox": {
+    "cls": 0.0079,
+    "requests": 5,
+    "duplicates": 0,
+    "swapShiftCls": 0.0079
+  },
+  "1440|/notes": {
+    "cls": 0.0263,
+    "requests": 12,
+    "duplicates": 4,
+    "swapShiftCls": 0.0263
+  },
+  "1440|/settings": {
+    "cls": 0.0009,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0.0009
+  },
+  "1440|/w/<id>": {
+    "cls": 0.0055,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0.0055
+  },
+  "1440|/w/<id>/members": {
+    "cls": 0.0124,
+    "requests": 4,
+    "duplicates": 0,
+    "swapShiftCls": 0.0124
+  },
+  "1440|/w/<id>/my-work": {
+    "cls": 0.1787,
+    "requests": 14,
+    "duplicates": 7,
+    "swapShiftCls": 0.1787
+  },
+  "1440|/w/<id>/p/<id>": {
+    "cls": 0.2115,
+    "requests": 26,
+    "duplicates": 14,
+    "swapShiftCls": 0.2115
+  },
+  "1440|/workspaces": {
+    "cls": 0.001,
+    "requests": 3,
+    "duplicates": 0,
+    "swapShiftCls": 0.001
+  },
+  "390|/account": {
+    "cls": 0.2805,
+    "requests": 9,
+    "duplicates": 0,
+    "swapShiftCls": 0.2805
+  },
+  "390|/inbox": {
+    "cls": 0.168,
+    "requests": 5,
+    "duplicates": 0,
+    "swapShiftCls": 0.168
+  },
+  "390|/notes": {
+    "cls": 1.1653,
+    "requests": 12,
+    "duplicates": 4,
+    "swapShiftCls": 1.1653
+  },
+  "390|/settings": {
+    "cls": 0.012,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0.012
+  },
+  "390|/w/<id>": {
+    "cls": 0,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0
+  },
+  "390|/w/<id>/members": {
+    "cls": 0.0639,
+    "requests": 4,
+    "duplicates": 0,
+    "swapShiftCls": 0.0639
+  },
+  "390|/w/<id>/my-work": {
+    "cls": 0.635,
+    "requests": 14,
+    "duplicates": 7,
+    "swapShiftCls": 0.635
+  },
+  "390|/w/<id>/p/<id>": {
+    "cls": 0.0326,
+    "requests": 26,
+    "duplicates": 14,
+    "swapShiftCls": 0.0326
+  },
+  "390|/workspaces": {
+    "cls": 0.0338,
+    "requests": 3,
+    "duplicates": 0,
+    "swapShiftCls": 0.0338
+  },
+  "768|/account": {
+    "cls": 0.5599,
+    "requests": 9,
+    "duplicates": 0,
+    "swapShiftCls": 0.5599
+  },
+  "768|/inbox": {
+    "cls": 0.0242,
+    "requests": 5,
+    "duplicates": 0,
+    "swapShiftCls": 0.0242
+  },
+  "768|/notes": {
+    "cls": 0.4381,
+    "requests": 12,
+    "duplicates": 4,
+    "swapShiftCls": 0.4381
+  },
+  "768|/settings": {
+    "cls": 0.0161,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0.0161
+  },
+  "768|/w/<id>": {
+    "cls": 0,
+    "requests": 2,
+    "duplicates": 0,
+    "swapShiftCls": 0
+  },
+  "768|/w/<id>/members": {
+    "cls": 0.0575,
+    "requests": 4,
+    "duplicates": 0,
+    "swapShiftCls": 0.0575
+  },
+  "768|/w/<id>/my-work": {
+    "cls": 0.2896,
+    "requests": 14,
+    "duplicates": 7,
+    "swapShiftCls": 0.2896
+  },
+  "768|/w/<id>/p/<id>": {
+    "cls": 0.0917,
+    "requests": 26,
+    "duplicates": 14,
+    "swapShiftCls": 0.0917
+  },
+  "768|/workspaces": {
+    "cls": 0.0244,
+    "requests": 3,
+    "duplicates": 0,
+    "swapShiftCls": 0.0244
+  }
+}
