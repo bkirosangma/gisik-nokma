@@ -116,6 +116,8 @@ async function bothEditors(container: HTMLElement): Promise<{ body: Editor; comm
   // appearance is the signal the roster has loaded — typing before it would ask
   // the picker for people the page does not know yet.
   await screen.findByText('Kiro');
+  // The composer's editor mounts on click (smoothness T9, 25.153).
+  fireEvent.click(await screen.findByRole('button', { name: /Add a comment/ }));
   await waitFor(() => expect(container.querySelectorAll('.ProseMirror').length).toBeGreaterThanOrEqual(2));
   const [body, comment] = [...container.querySelectorAll('.ProseMirror')];
   return { body: editorOf(body!), comment: editorOf(comment!) };

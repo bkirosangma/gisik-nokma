@@ -2,9 +2,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
-import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearLiveQueryCache, type ProjectRef, type WorkspaceRef } from '@gisik-nokma/app-core';
 import { documentTitleFor } from '../src/page-title.js';
+import { clearReadCaches } from '../src/clear-read-caches.js';
 import { Providers } from '../src/providers.js';
 import { shellRefusalCopy } from '../src/shell-refusal.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -94,6 +95,9 @@ function renderNotes() {
     </Providers>,
   );
 }
+
+// The shell's per-person reads are module state (smoothness T3/T4/T9): each case starts with none, as a first visit does.
+beforeEach(() => clearReadCaches());
 
 describe('18.11 The Notes page — the shell', () => {
   /**
@@ -222,6 +226,7 @@ describe('18.11 The Notes page — the shell', () => {
     expect(screen.getByRole('button', { name: 'Create note' })).toBeInTheDocument();
     // ...and NOT while loading, where the read has not answered at all.
     empty.unmount();
+    clearReadCaches(); // the next arm is a FIRST visit: the shared read would otherwise carry the rows this one just read (T4)
 
     // The read never answers: `workspaces` stays null and NEITHER of the two
     // settled arms may be drawn. MUTATION TARGET — rendering "No notes yet"
@@ -236,7 +241,8 @@ describe('18.11 The Notes page — the shell', () => {
         <NotesPage />
       </Providers>,
     );
-    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    // The loading arm is the notes list item's skeleton region (smoothness T9, 25.159), named once; never the empty copy.
+    expect(await screen.findByText('Loading your notes')).toBeInTheDocument();
     expect(screen.queryByText('No notes yet')).toBeNull();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Create note' })).toBeNull();
@@ -278,7 +284,9 @@ describe('18.11 The Notes page — the shell', () => {
         </Providers>,
       );
       // Nothing has answered yet (the tree says so), and the observer is watching.
-      expect((await screen.findAllByText('Loading…')).length).toBeGreaterThanOrEqual(1);
+      // Nothing has answered yet: the tree and the document each say so as a skeleton region (smoothness T9, 25.152, 25.159).
+      expect(await screen.findByText('Loading your notes')).toBeInTheDocument();
+      expect(await screen.findByText('Loading the note')).toBeInTheDocument();
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(screen.queryByText(LOST)).toBeNull();
       expect(flashed).toBe(false);
@@ -403,6 +411,10 @@ describe('18.11 The Notes page — the shell', () => {
       fireEvent.scroll(first);
       expect(first.scrollTop).toBe(800);
 
+      // COLD remount: the read cache is empty (a first visit to this workspace's notes on this device), so the new tree's rows
+      // are still loading and the clamp reads 0. (Smoothness T9, 25.152: a WARM remount paints the rows from the cache on its
+      // first frame — the third remount below — so this case empties the cache to keep the observer path under test.)
+      clearLiveQueryCache();
       rerender(view('01J9NOTEBBBBBBBBBBBBBBBBBB')); // what Next does: a new page, a new tree
       const second = treeOf();
       expect(second).not.toBe(first); // a remount IS a new node; the offset has to be carried

@@ -118,7 +118,9 @@ describe('23.162 the note editor has no dead band (audit NP-04)', () => {
     const wrapper = ruleExactly(globals, '.gn-notes__editor');
     expect(valueOf(wrapper, 'min-height')).toBeNull();
     const field = ruleExactly(globals, '.gn-notes__editor .ticket-editor .ticket-editor__content');
-    const floor = valueOf(field, 'min-height') ?? '';
+    // AMENDED by smoothness T9 (25.156): the field's floor is the one variable, whose declaration carries the number.
+    expect(valueOf(field, 'min-height')).toBe('var(--gn-notes-editor-min)');
+    const floor = globals.match(/--gn-notes-editor-min:\s*([^;]+);/)?.[1] ?? '';
     expect(floor).toMatch(/^max\(40dvh,/);
     expect(floor).toContain('var(--app-nav-offset, 0px)');
     // CONTROL: the wrapper's own padding is still a click-to-focus surface (13.1488)

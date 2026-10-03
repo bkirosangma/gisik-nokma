@@ -10,15 +10,13 @@ import { describe, expect, it } from 'vitest';
  * (1) the pattern is ANY `Loading …` / `Checking …` line, not six spellings — the six missed the five workflow-builder
  * sentences and the "Checking …" waits; (2) the sweep is the whole product MINUS the files other tasks still own, named
  * below. Each exclusion is itself checked: a file that no longer carries a sentence must leave the list, so the list can
- * only shrink (T9 the notes surfaces, T7/T12 the ticket sheet, the MCP entry pages).
+ * only shrink (T7/T12 the ticket sheet, the MCP entry pages; the notes surfaces left the list with T9).
  */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const SENTENCE = /(Loading|Checking)[^<'"`]*…/;
 const COMMENT_LINE = /^\S+:\d+:\s*(\*|\/\/|\/\*)/;
 
 const OWNED_BY_OTHER_TASKS = [
-  'apps/web/src/notes/note-document.tsx', // T9
-  'apps/web/src/notes/notes-page.tsx', // T9
   'apps/web/app/mcp/authorize/page.tsx', // MCP entry pages
   'apps/web/app/mcp/connect/page.tsx',
   'packages/app-core/src/views/ticket-sheet.tsx', // T7 / ticket sheet
