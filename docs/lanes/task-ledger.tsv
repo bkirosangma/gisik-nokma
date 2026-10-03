@@ -574,22 +574,22 @@ mcp-everything	11	in-flight	-	-	landed in release/mcp-everything as #929; reache
 mcp-everything	12	in-flight	-	-	landed in release/mcp-everything as #929; reaches main with that release
 mcp-everything	13	in-flight	-	-	landed in release/mcp-everything as #935; reaches main with that release
 mcp-everything	14	done	937	f27485e	owner step: the real claude.ai check against production at f27485e (the merge of release/mcp-everything, #937) was reported SUCCESSFUL by the owner (2026-10-02 21:3x, relayed by the planner 21:33); case 14.298 is the record
-smoothness	1	in-flight	-	-	ready on task/smoothness-docs (spec, plan, bucket 25, Features §22); its PR into release/smoothness is not open yet; reaches main with that release
-smoothness	2	todo	-	-	not started
-smoothness	3	todo	-	-	not started
-smoothness	4	todo	-	-	not started
-smoothness	5	todo	-	-	not started
-smoothness	6	todo	-	-	not started
-smoothness	7	todo	-	-	not started
-smoothness	8	todo	-	-	not started
-smoothness	9	todo	-	-	not started
-smoothness	10	todo	-	-	not started
-smoothness	11	todo	-	-	not started
-smoothness	12	todo	-	-	not started
-smoothness	13	todo	-	-	not started
+smoothness	1	done	938	7bff22be	T1 catalogue and docs: landed in release/smoothness as #938; reached main in #961 (66c46fdd)
+smoothness	2	done	942	4d418760	T2 loading primitives: landed as #942 (batch 1); reached main in #961
+smoothness	3	done	942	4d418760	T3 read cache: landed as #942 (batch 1); reached main in #961
+smoothness	4	done	946	dfe7afe3	T4 one workspaces read: landed as #946; reached main in #961
+smoothness	5	done	945	25eac7fe	T5 route shells and link pending hints: landed as #945; reached main in #961
+smoothness	6	done	953	df63f256	T6: landed as #953 (batch 6); reached main in #961
+smoothness	7	done	949	153982f9	T7 optimistic writes: landed as #949 (batch 5); reached main in #961
+smoothness	8	done	953	df63f256	T8: landed as #953 (batch 6); reached main in #961
+smoothness	9	done	958	b550492d	T9 notes page onto the lazy editor slot: landed as #958; reached main in #961
+smoothness	10	done	949	153982f9	T10 bundles: landed as #949 (batch 5); reached main in #961
+smoothness	11	done	942	4d418760	T11 server rollups and compression: landed as #942 (batch 1); reached main in #961
+smoothness	12	done	953	df63f256	T12: landed as #953 (batch 6); reached main in #961
+smoothness	13	done	950	eab56e1b	T13 desktop and phone loading states: landed as #950; reached main in #961
 smoothness	14	todo	-	-	not started
-workflow-canvas	1	in-flight	-	-	G-9 T1 on task/g9-t1-live-drag (lane 7); not merged into release/smoothness yet
-workflow-canvas	2	in-flight	-	-	G-9 T2 on task/g9-t2-collision-snap (98e73a78, in review); not merged into release/smoothness yet
+workflow-canvas	1	done	957	de3b699b	G-9 T1 live drag: landed as #957 (union with T2); reached main in #961
+workflow-canvas	2	done	957	de3b699b	G-9 T2 collision and snap: landed as #957 (union with T1); reached main in #961
 workflow-canvas	3	todo	-	-	not started (waits for T1 + T2)
 workflow-canvas	4	todo	-	-	not started (waits for T1)
 workflow-canvas	5	todo	-	-	not started (waits for T3 + T4)
