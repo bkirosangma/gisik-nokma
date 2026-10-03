@@ -536,6 +536,40 @@ importers:
         specifier: ^3.1.0
         version: 3.2.7(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0)
 
+  packages/knowledge-graph-browser:
+    dependencies:
+      '@gisik-nokma/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@gisik-nokma/knowledge-graph':
+        specifier: workspace:*
+        version: link:../knowledge-graph
+      '@gisik-nokma/ui':
+        specifier: workspace:*
+        version: link:../ui
+      react:
+        specifier: ^19.0.0
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.50.0
+        version: 1.62.1
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.1.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.5(@types/react@19.1.17)
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@22.20.1)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.23.12)(yaml@2.9.0)
+
   packages/mcp-server:
     dependencies:
       '@gisik-nokma/domain':
