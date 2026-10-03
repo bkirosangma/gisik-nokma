@@ -168,11 +168,12 @@ function CanvasInner(props: { onReady?: (api: CanvasApi | null) => void }) {
           nudge(change.id);
         } else {
           passed.push(change); // a cancelled gesture's, or another id's, mid-drag: the hook drops it
+          if (arrow.current) resync(change.id); // ...and an arrow key's own 5 px step must not stay in React Flow's store
         }
       }
       if (passed.length > 0) working.onNodesChange(passed);
     },
-    [working.onNodesChange, working.draggingId, nudge, getViewport, store],
+    [working.onNodesChange, working.draggingId, nudge, resync, getViewport, store],
   );
 
   // The commit is the working copy's position, never the handler's `node.position`: React Flow's drag-end position is

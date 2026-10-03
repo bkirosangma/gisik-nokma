@@ -210,6 +210,9 @@ test('25.525 an arrow moves the focused state one grid step and Alt+arrow one px
   await page.mouse.move(p.x + 300, p.y + (centreY(b) - centreY(start)) * zoom + 1.5, { steps: 20 });
   await expect(page.locator('.gn-canvas-outline')).toHaveCount(0);
   await expect(page.locator('.gn-canvas-guide')).toHaveCount(0);
+  // an arrow key during the cancelled gesture: the gesture is still ACTIVE (cancelled, not ended), so neither this key nor React Flow's
+  // drag-end change on release is a nudge. (A hook that forgot the gesture on Escape would read both as one and commit +16.)
+  await page.keyboard.press('ArrowRight');
   await page.mouse.up();
   // React Flow's drag-end change (dragging: false) must not be read as a nudge either
   expect(await readDraftPositions(page)).toEqual(before);
@@ -239,6 +242,20 @@ test('25.526 an arrow that would push the state into its neighbour changes nothi
     const now = await flowBox(page, A);
     expect(Math.abs(now.x - box.x) + Math.abs(now.y - box.y)).toBeLessThan(0.6);
   }
+  // React Flow's own 5 px steps were dropped, not kept in its store: it starts the next drag from ITS position of the node. Alt keeps the
+  // grid and guides out of the way, so a straight drag down must leave x exactly where the blocked state stood.
+  const { zoom } = await viewport(page);
+  await page.keyboard.down('Alt');
+  const n = (await node(page, A).locator('.gn-state-node__name').boundingBox())!;
+  await page.mouse.move(n.x + n.width / 2, n.y + n.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(n.x + n.width / 2 + 5, n.y + n.height / 2, { steps: 5 });
+  await page.mouse.move(n.x + n.width / 2 + 5, n.y + n.height / 2 + 100 * zoom, { steps: 20 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  const dragged = await flowBox(page, A);
+  expect(Math.abs(dragged.x - box.x)).toBeLessThan(0.6);
+  expect(dragged.y - box.y).toBeGreaterThan(90);
 });
 
 test('25.527 the Add state button drops the new state clear of every other state, inside the part of the board the author is looking at', async ({ page }) => {
