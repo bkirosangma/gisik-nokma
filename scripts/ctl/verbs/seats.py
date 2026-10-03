@@ -19,6 +19,7 @@ from boxtext import ANSI, box_index, box_text, plain_of, status_index   # the bo
 SPINNER = re.compile(r"^[^\s\w⏺⎿❯|─-]\s+\S+…\s+\((?:(\d+h) )?(?:(\d+m) )?(\d+s)")   # "✢ Misting… (1m 26s · ↓ 8.0k tokens)", at column 0
 DONE_STAMP = re.compile(r"done (\d{1,2}):(\d{2})(?: ?([AaPp])[Mm])?")                  # "✻ Sautéed for 1s · done 1:53 AM · …"
 CTX = re.compile(r"Ctx (\d+)%")
+EFFORT = re.compile(r"effort: (\w+)")
 SHELLS = re.compile(r"(\d+) shells?\b")
 MONITORS = re.compile(r"(\d+) monitors?\b")
 PREFIX = r"^[\s⏺⎿·•-]*"
@@ -104,12 +105,14 @@ def parse_seat(idx, pane, meta, now):
     plain = [plain_of(l) for l in lines]
     name = meta.get("name", f"w{idx}")
     status = status_index(plain)
-    ctx = model = None
+    ctx = model = effort = None
     shells = monitors = 0
     if status is not None:
         ctx = int(CTX.search(plain[status]).group(1))
         for seg in (s.strip() for s in plain[status].split(" | ")):
-            if re.fullmatch(r"(?:opus|sonnet|haiku|fable)[\w.-]*", seg): model = seg; break
+            if model is None and re.fullmatch(r"(?:opus|sonnet|haiku|fable)[\w.-]*", seg): model = seg
+            m = EFFORT.fullmatch(seg)   # the status line's own "effort: high" segment (statusline-command.sh); absent on the DeepSeek backend
+            if effort is None and m: effort = m.group(1)
         foot = " ".join(plain[status + 1:status + 4])
         m = SHELLS.search(foot); shells = int(m.group(1)) if m else 0
         m = MONITORS.search(foot); monitors = int(m.group(1)) if m else 0
@@ -132,7 +135,7 @@ def parse_seat(idx, pane, meta, now):
     seat = {"window": idx, "name": name, "role": role_of(name), "state": state,
             "elapsed": elapsed if state == "busy" else None, "done_at": done_at if state == "idle" else None,
             "shells": shells, "monitors": monitors, "box": "text" if text else "empty", "box_text": text[:120], "copy_mode": copy_mode,
-            "ctx": ctx, "model": model, "worktree": meta.get("wt") or None, "branch": meta.get("branch") or None,
+            "ctx": ctx, "model": model, "effort": effort, "worktree": meta.get("wt") or None, "branch": meta.get("branch") or None,
             "head": meta.get("head") or None, "unpushed": num("unpushed"), "dirty": num("dirty"),
             "last": last_signal(plain, meta.get("wt"), now)}
     seat["flags"] = flags_of(seat)
@@ -162,7 +165,7 @@ def text_line(s):
     state = {"busy": f"busy {s['elapsed']}" if s["elapsed"] else "busy", "idle": f"idle (done {s['done_at']})" if s["done_at"] else "idle"}.get(s["state"], "unknown")
     if s["copy_mode"]: state += " copy-mode"
     box = f"box text: {s['box_text']}" if s["box"] == "text" else "box empty"
-    ctx = f"Ctx {s['ctx']}% {s['model'] or '?'}" if s["ctx"] is not None else "Ctx ?"
+    ctx = f"Ctx {s['ctx']}% {s['model'] or '?'}/{s['effort'] or '?'}" if s["ctx"] is not None else "Ctx ?"
     if s["branch"]:
         git = f"{s['branch']}@{s['head'] or '?'} unpushed {'?' if s['unpushed'] is None else s['unpushed']} dirty {'?' if s['dirty'] is None else s['dirty']}"
     else:
