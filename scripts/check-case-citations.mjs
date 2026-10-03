@@ -168,6 +168,8 @@ function isTestPath(relPath) {
   if (/^apps\/web\/e2e[^/]*\//.test(relPath)) return true;
   // G-9 T1: the canvas browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
   if (/^packages\/workflow-canvas-browser\/tests\//.test(relPath)) return true;
+  // KG-C T1: the Knowledge Graph browser suite is a package of its own (Playwright against a Vite harness, on the gate), its specs live in `tests/`.
+  if (/^packages\/knowledge-graph-browser\/tests\//.test(relPath)) return true;
   return false;
 }
 
