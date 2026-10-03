@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { EMBEDDING_DIM } from '../../src/search/embedding.js';
 import { knnEdges } from '../../src/semantic/knn.js';
 import { communities } from '../../src/semantic/louvain.js';
 import { topTerms } from '../../src/semantic/terms.js';
 import { changedByMoreThanHalf, itemHash, itemKey, signatureOf } from '../../src/semantic/signature.js';
+import { meanUnit } from '../../src/semantic/vectors.js';
 import { noteAudienceKey, ticketAudienceKey } from '../../src/semantic/partition.js';
 import { suggestAll, suggestForPartition, type PipelineItem } from '../../src/semantic/pipeline.js';
 
@@ -134,5 +136,28 @@ describe('27.407 sizes 3–12, and a community already ≥ 50% in one concept is
     const one = new Map([['ticket:T0', ['C1']]]);
     expect(suggestAll(four, { ...BASE, conceptsOf: (k) => one.get(k) ?? [] })).toHaveLength(1); // control
     expect(suggestAll(four, BASE)[0]?.label).toMatch(/·|^\w+$/);
+  });
+});
+
+// `meanUnit` has no case id of its own in the plan (27.415–27.419 are reserved); it is the item-vector step 1
+// (spec D §4.1), so it is pinned here rather than left untested.
+describe('meanUnit: the mean of unit vectors, re-normalised', () => {
+  it('averages then renormalises to unit length; control: opposite vectors (zero norm), no vectors and a wrong width all throw', () => {
+    const axis = (index: number): Float32Array => {
+      const v = new Float32Array(EMBEDDING_DIM);
+      v[index] = 1;
+      return v;
+    };
+    const mean = meanUnit([axis(0), axis(1)]);
+    expect(mean[0]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(mean[1]).toBeCloseTo(Math.SQRT1_2, 6);
+    expect(Math.hypot(...mean)).toBeCloseTo(1, 6);
+    const single = meanUnit([axis(2)]);
+    expect(single[2]).toBeCloseTo(1, 6);
+    const negative = new Float32Array(EMBEDDING_DIM);
+    negative[0] = -1;
+    expect(() => meanUnit([axis(0), negative])).toThrow(/zero norm/);
+    expect(() => meanUnit([])).toThrow(/no vectors/);
+    expect(() => meanUnit([new Float32Array(8)])).toThrow(/dims/);
   });
 });

@@ -87,5 +87,13 @@ describe('27.411 hiddenItems: live minus visible, fail-closed, trash ignored', (
     ]);
     expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nProject), n(fx.NOTES.nWorkspace)]));
     expect(await hiddenFor('owner', mixed)).toEqual([]);
+
+    // A deleted NOTE is ignored the same way. nProject is hidden from the guest (above); once its author
+    // deletes it, the guest's hidden set drops it, and the owner's stays empty.
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: fx.WS, actorId: fx.ids.author, entity: { kind: 'note', id: fx.NOTES.nProject }, type: 'note.deleted', payload: {} }),
+    ]);
+    expect(key(await hiddenFor('guestListed', mixed))).toEqual(key([n(fx.NOTES.nWorkspace)]));
+    expect(await hiddenFor('owner', mixed)).toEqual([]);
   });
 });

@@ -67,6 +67,9 @@ describe('27.413–27.414 run time and D4 cost', () => {
     );
     expect(big.ms).toBeLessThanOrEqual(60_000);
     expect(small.ms).toBeLessThan(big.ms); // control: a timer that measured nothing would fail this
+    // Control: 10 000 × 512 is 5·10⁷ dot products of 512 terms; no run of the real kNN finishes inside a second
+    // (measured 20 s), so a pipeline that returned early would show here, where `small < big` is noise at 0 ms.
+    expect(big.ms).toBeGreaterThan(1_000);
   }, 3_600_000);
 
   it('27.414 hiddenItems over 500 items has p95 ≤ 150 ms; control: it found exactly the 10 hidden', async () => {
