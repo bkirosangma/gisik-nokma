@@ -6,7 +6,7 @@ import { openSeededBoard, readWorkspaceId, seededProjectHref } from './helpers/b
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
- * Smoothness T14 (cases 25.231, 25.232, 25.235, 25.236; spec §6, §7): the CLS / request-count ratchet, read from the deployed stack.
+ * Smoothness T14 (cases 25.231, 25.232, 25.235, 25.236, 25.237; spec §6, §7): the CLS / request-count ratchet, read from the deployed stack.
  *
  * ## What 25.231 measures, per `${viewport}|${route}`
  *
@@ -164,7 +164,7 @@ async function readFixture(page: Page, ws: string): Promise<Fixture> {
   };
 }
 
-test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25.236)', () => {
+test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25.237)', () => {
   test('25.231 every route paints a skeleton first and holds its CLS, skeleton-swap shift, /v1 requests and duplicate URLs at or under the recorded baseline', async ({ page }) => {
     test.setTimeout(60_000 + 27 * SAMPLES * 9_000);
     const baseline = readBaseline();
@@ -327,5 +327,21 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
     // Control: an absent key takes the run's worst, and the explicit act overwrites.
     expect(recordRow(undefined, regressed, false)).toEqual(regressed);
     expect(recordRow(stored, regressed, true)).toEqual(regressed);
+  });
+
+  test('25.237 a run is compared with the baseline only when its data is the baseline\'s', () => {
+    const f: Fixture = { notes: 117, deletedNotes: 1, tickets: 364, workflows: 3, members: 3 };
+    const row: Row = { cls: 0.2, requests: 10, duplicates: 2, swapShiftCls: 0.2 };
+    const over: Row = { cls: 0.3, requests: 11, duplicates: 3, swapShiftCls: 0.3 };
+    const ctx = { worstShifts: '', lastRequests: '[]', lastDupes: '[]' };
+    // Control: the same data is the same fixture (a gate that always said "other data" would switch the ratchet off in silence).
+    expect(sameFixture(f, { ...f }), 'identical fixtures must compare').toBe(true);
+    expect(sameFixture(undefined, f), 'a json with no _fixture is never the same data').toBe(false);
+    for (const field of ['notes', 'deletedNotes', 'tickets', 'workflows', 'members'] as const) {
+      expect(sameFixture(f, { ...f, [field]: f[field] + 1 }), `one more ${field} is other data`).toBe(false);
+    }
+    // On other data a row that IS present and over its baseline on all four numbers is not compared; on the same data it is.
+    expect(ratchetFailures('390|/a', row, over, ctx, false), 'other data: no per-key comparison').toEqual([]);
+    expect(ratchetFailures('390|/a', row, over, ctx, true).length, 'control: the same row on the same data fails on all four').toBe(4);
   });
 });
