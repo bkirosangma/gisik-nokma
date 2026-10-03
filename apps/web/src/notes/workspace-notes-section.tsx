@@ -109,8 +109,11 @@ export const WorkspaceNotesSection = memo(function WorkspaceNotesSection({
     cacheKey: 'deleted-notes',
   });
 
-  // `hasAnswered` as well as `data`: a refetch may blank `data` for a moment, and the page must not put its skeleton back over a
-  // list that was already drawn. A refusal is an answer (the page draws the empty groups, as it always did). A layout effect, so the
+  // `hasAnswered` as well as `data`: it is a guard against a future KEY change. `hasAnswered` is lifetime, not per key, and a key
+  // change nulls `data` until the new key's read answers (`useLiveQuery`'s key effect), so with it the page would not put its skeleton
+  // back over a list that was already drawn. Today it never decides anything: both keys are constants ('notes', 'deleted-notes'),
+  // `reload()` never blanks `data`, and a refusal that withdraws a cached answer sets `error` in the same update. A refusal is an
+  // answer (the page draws the empty groups, as it always did). A layout effect, so the
   // cached lists the page remounts with (25.152) are reported before the first paint and are never hidden behind a skeleton.
   const settled =
     (notes.data !== null || notes.hasAnswered || notes.error !== null) && (deleted.data !== null || deleted.hasAnswered || deleted.error !== null);

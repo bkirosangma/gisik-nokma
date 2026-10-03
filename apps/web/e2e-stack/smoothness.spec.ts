@@ -332,7 +332,7 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
         const v = await settleAndRead(page);
         // The instrument asserts itself: the read meant to be last really ended last, by most of the delay.
         const ends = await page.evaluate(() => {
-          const end = (re: RegExp): number => Math.max(0, ...performance.getEntriesByType('resource').filter((e) => re.test(new URL(e.name).pathname)).map((e) => e.responseEnd));
+          const end = (re: RegExp): number => Math.max(0, ...(performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter((e) => re.test(new URL(e.name).pathname)).map((e) => e.responseEnd));
           return { strip: end(/\/v1\/workspaces\/[^/]+\/attention$/), body: end(/\/v1\/me\/work$/) };
         });
         const gap = slow === 'strip' ? ends.strip - ends.body : ends.body - ends.strip;

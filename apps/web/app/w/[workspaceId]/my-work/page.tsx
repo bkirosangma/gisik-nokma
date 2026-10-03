@@ -154,7 +154,9 @@ function MyWorkBoard() {
    * Both are held behind their skeletons while BOTH were still pending at this page's first render, and shown together once both
    * have settled (an answer or a refusal): the swap replaces nodes, and a new node is not a shift. A region that was ALREADY
    * present at first render (an answer served from a cache) is not held: it is there from the first frame, and it must not wait
-   * for the slow read (SM-01).
+   * for the slow read (SM-01). That rule is FORWARD-COMPATIBLE ONLY: neither `useAttention` nor `useMyWork` passes a `cacheKey`,
+   * so both reads are pending at every first render today and it cannot fire. Its residual, were one of them given a cache: a
+   * cached body with a cold strip is not held, so the strip arriving later would still push the body down by the strip's height.
    */
   const settled = (read: { data: unknown; error: string | null }): boolean => read.data !== null || read.error !== null;
   const heldFromFirstRender = useRef(!settled(attention) && !settled(myWork));

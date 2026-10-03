@@ -196,7 +196,7 @@ export function useNotesPanelBehaviour({
       if (current === null) return false;
       const within = nav.getBoundingClientRect();
       const at = current.getBoundingClientRect();
-      // A row inside the page's hidden lists (the lists show together once every workspace has answered, smoothness-2 G1) has no box yet.
+      // A row inside the page's hidden lists (the lists show together once every workspace has answered, smoothness-2 G1, 25.254) has no box yet.
       if (at.height === 0) return false;
       // A row already inside the list stays where it is; one above or below the fold is centred (25.354).
       if (at.top >= within.top && at.bottom <= within.bottom) return true;

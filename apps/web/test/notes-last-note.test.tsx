@@ -78,7 +78,7 @@ function summaryOf(note: NoteDetail) {
   return rest;
 }
 
-function world() {
+function world(overrides: Partial<DataSourceQuery> = {}) {
   return stubServices(
     {
       getMyWorkspaces: async () => [ws(WS_A, 'Garo Hills Logistics'), ws(WS_B, 'Quiet Corner')],
@@ -96,14 +96,15 @@ function world() {
       getDeletedNotes: async () => [],
       getNoteComments: async () => [],
       getActorNames: async () => [],
+      ...overrides,
     } as Partial<DataSourceQuery>,
     { notifications: { unreadCount: async () => 0, list: async () => ({ notifications: [], nextCursor: null }) } },
   );
 }
 
-function renderPage(noteId?: string) {
+function renderPage(noteId?: string, overrides: Partial<DataSourceQuery> = {}) {
   return render(
-    <Providers services={world()}>
+    <Providers services={world(overrides)}>
       <NotesPage {...(noteId === undefined ? {} : { noteId })} />
     </Providers>,
   );
@@ -323,6 +324,66 @@ describe('G-3 addendum: the last note opened, per device', () => {
     // CONTROL, same it(): a row already in view (top 20, bottom 60 inside 0..200, not at the centre) leaves the list
     // exactly where it was — centring it would have moved the list to 40.
     expect(await scrollInto(20, 100)).toBe(100);
+  });
+
+  it('25.254 on a phone the remembered note is centred when the lists SHOW, not while they are hidden behind a slower workspace\'s read (smoothness-2 G1)', async () => {
+    // The lists of every workspace show together (25.247): the remembered row is in the DOM, marked current, inside the hidden
+    // wrapper while the other workspace's read is open, and a row with no box must not count as "already in view". jsdom lays
+    // nothing out, so the rects are a laid-out page's: no box at all (zeros, as `display: none` gives) inside `[hidden]`; once
+    // shown, the list is 200px tall at the top of the page and the row sits 600px down, below the fold.
+    const rect = (top: number, height: number): DOMRect =>
+      ({ top, height, bottom: top + height, left: 0, right: height === 0 ? 0 : 300, width: height === 0 ? 0 : 300, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const original = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.closest('.gn-notes__sections[hidden]') !== null) return rect(0, 0);
+      if (this.classList.contains('gn-help__nav')) return rect(0, 200);
+      const list = this.getAttribute('aria-current') === 'page' ? this.closest<HTMLElement>('.gn-help__nav') : null;
+      if (list !== null) return rect(600 - list.scrollTop, 40);
+      return original.call(this);
+    });
+    const scrolled = new WeakMap<Element, number>();
+    const own = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      configurable: true,
+      get(this: Element) {
+        return scrolled.get(this) ?? 0;
+      },
+      set(this: Element, value: number) {
+        scrolled.set(this, value);
+      },
+    });
+    try {
+      stubPhone(true);
+      window.localStorage.setItem(lastNoteKey('u_kiro', WS_A), NOTE_A);
+      let answerB!: () => void;
+      const late = new Promise<void>((done) => (answerB = done));
+      renderPage(undefined, {
+        getNotes: async (workspaceId: string) => {
+          if (workspaceId === WS_B) await late;
+          return Object.values(NOTES)
+            .filter((note) => note.workspaceId === workspaceId && !note.deleted)
+            .map(summaryOf);
+        },
+      });
+      const panel = await screen.findByTestId('notes-panel');
+      const nav = panel.querySelector<HTMLElement>('.gn-help__nav')!;
+      const row = await within(panel).findByTestId(`note-row-${NOTE_A}`);
+      await waitFor(() => expect(row).toHaveAttribute('aria-current', 'page'));
+      // The haystack holds its subject: the current row IS inside the hidden lists, with no box, and the reveal has run over it.
+      expect(row.closest('.gn-notes__sections')).toHaveAttribute('hidden');
+      expect(row.getBoundingClientRect().height).toBe(0);
+      await settle();
+      expect(nav.scrollTop, 'a hidden row was taken for one already in view, or scrolled to from no box').toBe(0);
+      // The slower workspace answers: the lists show, and the remembered row is centred: 600 - 0 - (200 - 40) / 2 = 520.
+      answerB();
+      await waitFor(() => expect(row.closest('.gn-notes__sections')).not.toHaveAttribute('hidden'));
+      await settle();
+      expect(nav.scrollTop).toBe(520);
+    } finally {
+      vi.restoreAllMocks();
+      if (own === undefined) Reflect.deleteProperty(Element.prototype, 'scrollTop');
+      else Object.defineProperty(Element.prototype, 'scrollTop', own);
+    }
   });
 
   it('25.356 the note opened LAST is the one resumed, across workspaces; with the pointer missing or unreadable, list order decides', async () => {

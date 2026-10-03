@@ -100,6 +100,11 @@ describe('the phone layout is the first frame (G1 §2 A, D)', () => {
     expect(valueOf(ruleExactly(globals, '.gn-notes__bar--reserved'), 'min-height')).toBe('2.75rem');
     expect(valueOf(ruleExactly(globals, '.gn-notes__panel-head--reserved'), 'min-height')).toBe('6rem');
     expect(valueOf(ruleExactly(globals, '.gn-notes__search'), 'gap')).toBe('0.5rem');
+    // At 48rem and up the search is in the page's own header row, which holds the input's 2.75rem (the field's own `min-height`) before
+    // the input arrives; the h1's 41px line alone would leave the row 3px short.
+    const header = valueOf(ruleExactly(globals, '.gn-notes__header', '@media (min-width: 48rem)'), 'min-height');
+    expect(header).toBe('2.75rem');
+    expect(header).toBe(valueOf(ruleExactly(ui, '.gn-field__input'), 'min-height'));
   });
 
   it('25.246 the panel and its launcher are not drawn until the session answers, so the bottom bar\'s lift is in place when they first appear; control: once it answers both are there', async () => {
@@ -150,6 +155,32 @@ describe('the lists arrive together (G1 §2 C)', () => {
     // Control: the wrapper adds no box (`display: contents`), and its hidden state is the only thing that hides it.
     expect(valueOf(ruleExactly(globals, '.gn-notes__sections'), 'display')).toBe('contents');
     expect(valueOf(ruleExactly(globals, '.gn-notes__sections[hidden]'), 'display')).toBe('none');
+  });
+
+  it('25.247 the deleted-notes read is half of "settled": with every list answered and one workspace\'s deleted read still open, no list is shown; when it answers, all are', async () => {
+    // A section's deleted group arriving after the lists showed would land inside them and move them.
+    const lateDeleted = deferred<NoteSummary[]>();
+    const services = world({
+      getNotes: async (workspaceId: string) => [note(workspaceId, `n_${workspaceId}`, workspaceId === 'wsa' ? 'Alpha note' : 'Beta note')],
+      getDeletedNotes: (workspaceId: string) => (workspaceId === 'wsb' ? lateDeleted.promise : Promise.resolve([])),
+    });
+    render(page(services));
+    const sections = await waitFor(() => {
+      const el = document.querySelector('.gn-notes__sections');
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    // Both note lists have answered (their rows are in the DOM, inside the hidden wrapper); only wsb's deleted read is open.
+    await waitFor(() => expect(sections.querySelectorAll('[data-testid^="note-row-"]')).toHaveLength(2));
+    await new Promise((settle) => setTimeout(settle, 30));
+    expect(sections).toHaveAttribute('hidden');
+    expect(document.querySelectorAll('.gn-notes__tree [aria-busy="true"]')).toHaveLength(1);
+    // It answers: the lists show, and the skeleton goes, together.
+    lateDeleted.resolve([]);
+    await waitFor(() => expect(sections).not.toHaveAttribute('hidden'));
+    expect(document.querySelectorAll('.gn-notes__tree [aria-busy="true"]')).toHaveLength(0);
+    expect(screen.getByText('Alpha note')).toBeInTheDocument();
+    expect(screen.getByText('Beta note')).toBeInTheDocument();
   });
 });
 

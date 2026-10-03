@@ -7,7 +7,8 @@ import type { BoardView, WorkspaceRef } from '@gisik-nokma/app-core';
 import { themeStylesheet } from '../../../packages/ui/src/tokens.js';
 import { Providers } from '../src/providers.js';
 import { clearReadCaches } from '../src/clear-read-caches.js';
-import { ProjectPageSkeleton, ListPageShell } from '../src/skeletons/page-shells.js';
+import { FormPageShell, ListPageShell, NotesPageShell, ProjectPageSkeleton } from '../src/skeletons/page-shells.js';
+import { NoteDocumentSkeleton } from '../src/notes/note-skeletons.js';
 import { stubServices } from './helpers/stub-services.js';
 import { REPO_ROOT } from '../../../packages/ui/test/helpers/colour-scan.js';
 import { parseRules, ruleExactly, valueOf } from '../../../packages/ui/test/helpers/css-rules.js';
@@ -112,9 +113,30 @@ describe('a title skeleton is the title (G1 §0; board 1440 CLS 0.2115 -> 0.0071
     expect(declarations).toMatch(/--gn-title-page:/);
     expect(declarations).toMatch(/--gn-title-page-phone:/);
     expect(declarations).not.toMatch(/--gn-title-page-size\s*:/);
-    // Every title placeholder uses the class (five in the route shells, one each on the workspace home, the note document, the board).
-    const shells = renderToStaticMarkup(<ListPageShell title="Inbox" />);
-    expect(shells).toContain('gn-skeleton--title');
+    // Every title placeholder uses the class: a site that drops it falls back to 1em (16px), the defect this case pins. Eight sites.
+    // The six that render on their own are rendered, and each must draw exactly its own count of `.gn-skeleton--title` elements.
+    const titlesIn = (markup: string): number => {
+      const host = document.createElement('div');
+      host.innerHTML = markup;
+      return host.querySelectorAll('.gn-skeleton--title').length;
+    };
+    expect(titlesIn(renderToStaticMarkup(<ListPageShell title="Inbox" />)), 'ListPageShell').toBe(1);
+    expect(titlesIn(renderToStaticMarkup(<FormPageShell title="Account" />)), 'FormPageShell').toBe(1);
+    expect(titlesIn(renderToStaticMarkup(<NotesPageShell />)), 'NotesPageShell (the page title and the document title)').toBe(2);
+    expect(titlesIn(renderToStaticMarkup(<ProjectPageSkeleton />)), 'ProjectPageSkeleton').toBe(1);
+    expect(titlesIn(renderToStaticMarkup(<NoteDocumentSkeleton />)), 'NoteDocumentSkeleton').toBe(1);
+    // The other two are pending branches of whole pages (the workspace home's title, the board's identity; 25.243 mounts the board's),
+    // so every site is also counted where it is written: a `className` attribute naming the class, pinned per file (5 + 1 + 1 + 1).
+    // CONTROL (last two lines): the counter counts a class attribute, never a mention in prose or a longer class name.
+    const classAttributes = (source: string): number => [...source.matchAll(/className="[^"]*(?<![\w-])gn-skeleton--title(?![\w-])[^"]*"/g)].length;
+    expect(Object.fromEntries(sites.map((site) => [site, classAttributes(read(site))]))).toEqual({
+      'apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx': 1,
+      'apps/web/app/w/[workspaceId]/page.tsx': 1,
+      'apps/web/src/notes/note-skeletons.tsx': 1,
+      'apps/web/src/skeletons/page-shells.tsx': 5,
+    });
+    expect(classAttributes('<Skeleton className="gn-skeleton--title" />')).toBe(1);
+    expect(classAttributes('// the eight sites use gn-skeleton--title; <Skeleton className="gn-skeleton--titles" />')).toBe(0);
   });
 
   it('25.243 the identity block reserves the real block\'s heights: breadcrumb at its line height, the title row at the Edit button\'s 2.75rem, for every role', async () => {
