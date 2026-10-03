@@ -5,7 +5,7 @@ LEDGER.jsonl is the source of truth (append-only, one object per message). Every
 postman/inbox/<seat>.jsonl (delivered lines), postman/acks/<id> (one file per ack, created exclusively), postman/state/<id>.json.
 Contract (scripts/ctl/lib.sh): one summary line last, `OK <verb> …` / `FAIL <verb> …`, exit 0 only when every condition held.
 """
-import calendar, hashlib, json, os, re, signal, subprocess, sys, tempfile, time
+import calendar, datetime, hashlib, json, os, re, signal, subprocess, sys, tempfile, time
 
 DEFAULT_ROOT = "/Users/kiro/my_projects/gisik-nokma-lanes/roles"
 ROOT = os.environ.get("CTL_POSTMAN_ROOT") or DEFAULT_ROOT
@@ -32,6 +32,9 @@ PAGE_AGE = int(os.environ.get("CTL_POSTMAN_PAGE_AGE", "1800"))
 CM_CANCEL = int(os.environ.get("CTL_POSTMAN_CM_CANCEL", "180"))
 AUDIT_GRACE = int(os.environ.get("CTL_POSTMAN_AUDIT_GRACE", "600"))
 UNREACH = {"no-window": 120, "not-claude": 120, "menu": 300, "text": 300, "copy-mode": 300}
+
+
+def pane_on(): return os.environ.get("CTL_POSTMAN_PANE", "1") != "0"      # off = the shadow run: inbox + bridge + audit only
 
 
 def now():
@@ -397,6 +400,7 @@ def pane_tier(m, st, stats):
         if lim and t - st["unreach_since"] >= lim: page(m, "unreachable (%s) for %d s" % (reason, t - st["unreach_since"]))
     if wid is None: return defer("no-window")
     state = sh("ctl_pane_state", wid)
+    if os.environ.get("CTL_TEST_ACK_BEFORE_PASTE"): ack_create(m["id"], seat, "test hook: acked between pane_state and the paste")
     w = watched(seat)
     if w:
         if state == "busy": st["last"] = "busy-watched"; write_state(m["id"], st); return
@@ -408,6 +412,7 @@ def pane_tier(m, st, stats):
         tmux("send-keys", "-t", wid, "-X", "cancel"); st.pop("cm_since", None); state = sh("ctl_pane_state", wid)
     else: st.pop("cm_since", None)
     if state not in ("ok", "busy", "ours"): return defer(state or "no-window")
+    if os.path.exists(p("acks", str(m["id"]))): return        # acked while pane_state ran (the seat's own ack, or a cancel): never type a second pointer
     st["tries"] = st.get("tries", 0) + 1; st["last_try"] = t; st["attempt_pending"] = t; write_state(m["id"], st)
     if os.environ.get("CTL_TEST_CRASH_AFTER_ATTEMPT"): os._exit(137)
     if state == "ours": res = sh("ctl_pane_submit_pending", wid) or "unsubmitted"
@@ -422,7 +427,6 @@ def deliver(stats):
     for m in ledger:
         if m["id"] in acked or read_state(m["id"]).get("bounced"): continue
         by_seat.setdefault(m["to"], []).append(m)
-    pane_on = os.environ.get("CTL_POSTMAN_PANE", "1") != "0"
     for seat, msgs in sorted(by_seat.items()):
         inbox_only = seat == "planner"
         gated = [] if inbox_only else [m for m in msgs if m["kind"] in GATED]
@@ -435,7 +439,7 @@ def deliver(stats):
         for m in gated:                                    # head of the queue only
             st = read_state(m["id"])
             if not st.get("inboxed_ts") and not to_inbox(m, st, stats): continue   # bounced: the next one is the head
-            if pane_on: pane_tier(m, st, stats)
+            if pane_on(): pane_tier(m, st, stats)
             st = read_state(m["id"])
             if st.get("tries", 0) >= PAGE_TRIES: page(m, "%d tries, last: %s" % (st["tries"], st.get("last")))
             elif now() - st.get("inboxed_ts", now()) >= PAGE_AGE: page(m, "open %d min, last: %s" % ((now() - st["inboxed_ts"]) // 60, st.get("last")))
@@ -518,16 +522,39 @@ def handle_queue_line(line, lt, verb, toks, src, stats):
 
 
 def queue_done(lt, result):
+    if not pane_on(): return          # shadow run: a DONE line CLOSES the dispatcher's open line — the dispatcher must still deliver it
     with open(os.path.join(ROOT, "QUEUE-dispatch.md"), "a") as f: f.write("%s DONE %s %s\n" % (hhmm(now()), lt, result))
 
 
 AUDIT_RE = re.compile(r"^\d\d:\d\d DONE \d\d:\d\d (FIX|needs-tip) (task/\S+) ([0-9a-f]{7,40})")
 
 
-def audit_matched(kind, branch, since=None):
+AUDIT_LEAD = 600     # a message may predate the verdict line's first sighting by this much (a scan that lagged), never more: an EARLIER round's message must not satisfy this verdict
+
+
+def audit_matched(kind, branch, since, until=None):
     for m in load_ledger():
-        if m["kind"] == kind and m.get("ref") == branch and (since is None or epoch(m["ts"]) >= since): return True
+        if m["kind"] == kind and m.get("ref") == branch and epoch(m["ts"]) >= since and (until is None or epoch(m["ts"]) < until): return True
     return False
+
+
+def verdict_times(lines):
+    """Epoch of each QUEUE-review line (they carry HH:MM only). The date is rebuilt backwards from now: a line whose time is more
+    than 12 h later than the following line's belongs to the previous day (a small out-of-order is not a midnight)."""
+    out, day, prev = [None] * len(lines), datetime.date.fromtimestamp(now()), None
+    for i in range(len(lines) - 1, -1, -1):
+        mt = re.match(r"^(\d\d):(\d\d) ", lines[i])
+        if not mt: continue
+        h, mi = int(mt.group(1)), int(mt.group(2)); sod = h * 3600 + mi * 60
+        at = lambda d: time.mktime(datetime.datetime(d.year, d.month, d.day, h, mi).timetuple())
+        if (prev is None and at(day) > now()) or (prev is not None and sod - prev > 43200): day -= datetime.timedelta(days=1)
+        out[i] = at(day); prev = sod
+    return out
+
+
+def verdict_key(line):
+    mt = AUDIT_RE.match(line)
+    return ("fix" if mt.group(1) == "FIX" else "mergetip", mt.group(2)) if mt else None
 
 
 def audit_scan(stats):
@@ -553,7 +580,7 @@ def audit_scan(stats):
         f_ = os.path.join(d, fn)
         with open(f_) as jf: a = json.load(jf)
         if a.get("reported"): continue
-        if audit_matched(a["kind"], a["branch"], a["first_seen"] - 3600): os.remove(f_); continue
+        if audit_matched(a["kind"], a["branch"], a["first_seen"] - AUDIT_LEAD): os.remove(f_); continue
         if now() - a["first_seen"] >= AUDIT_GRACE:
             append_message("postman", "main", "note", text="audit: the verdict \"%s\" has no %s message for %s in the ledger after %d min (mechanism g) — post it: ctl post exec<N> --kind %s --body <brief> --ref %s" % (a["line"][:160], a["kind"], a["branch"], (now() - a["first_seen"]) // 60, a["kind"], a["branch"]))
             a["reported"] = now(); stats["audited"] += 1
@@ -563,10 +590,11 @@ def audit_scan(stats):
 def cmd_audit():
     q = os.path.join(ROOT, "QUEUE-review.md")
     lines = open(q, errors="replace").read().splitlines()[-300:] if os.path.exists(q) else []
-    bad = []
-    for line in lines:
-        mt = AUDIT_RE.match(line)
-        if mt and not audit_matched("fix" if mt.group(1) == "FIX" else "mergetip", mt.group(2)): bad.append(line)
+    ts, keys, bad = verdict_times(lines), [verdict_key(l) for l in lines], []
+    for i, key in enumerate(keys):
+        if not key: continue
+        nxt = next((ts[j] for j in range(i + 1, len(lines)) if keys[j] == key and ts[j] is not None), None)
+        if not audit_matched(key[0], key[1], ts[i] - AUDIT_LEAD, nxt): bad.append(lines[i])   # THIS verdict's window: [its time - lead, the next verdict of the same branch)
     for b in bad: print("UNMATCHED: " + b[:200])
     if bad: fail("postman", "audit: %d reviewer verdict(s) in the last 300 QUEUE-review lines have no delivered message (mechanism g)" % len(bad))
     ok("postman", "audit: every FIX / needs-tip verdict in the last 300 lines has a message")

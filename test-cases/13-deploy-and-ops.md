@@ -725,7 +725,7 @@ Block `13.1720`–`13.1729`, taken whole (the tip across every remote branch was
 
 Why: inter-seat messages were `tmux send-keys` pastes and regex-filtered `tail -n0 -F` monitors, which lose lines at every 30-minute expiry, are eaten by copy mode, pick option 1 of a permission prompt, and leave a FIX written to QUEUE-gate but never delivered (mechanisms a–g of `PLAN-efficiency-robustness-2026-10-03.md`); a Claude seat (the dispatcher, $89/week) did the relaying. Design: `docs/superpowers/specs/2026-10-03-ctl-postman-design.md` (planner ack 2026-10-03 06:37 with amendments A–C: shadow mode ≥ 20 deliveries AND one gate cycle with zero misses; `postman audit` and the planner-target page → ⚑ notes line are part of the MVP; `pane_state` refuses a menu, copy-mode and non-empty box text, each with its control in the same check).
 
-Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.1843` — `task/ctl-run-tests` owns `13.1751`–`13.1773`, `task/ctl-seats` `13.1800`–`13.1829` — across every `origin/*` head of the last 36 h, `13.9999` being the plan sentinel). Run by `scripts/ctl/test/postman.test.sh`, a `pnpm check:ctl` step; every case runs on a SCRATCH tmux session (`ctlpm-<pid>`) with fake panes (`scripts/ctl/test/fakeseat.sh`), a scratch ledger root, a scratch notes file and a fake clock (`CTL_POSTMAN_NOW`) — it can never reach a live seat, and `13.1952` proves the daemon refuses a live/scratch mismatch.
+Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.1843` — `task/ctl-run-tests` owns `13.1751`–`13.1773`, `task/ctl-seats` `13.1800`–`13.1829` — across every `origin/*` head of the last 36 h, `13.9999` being the plan sentinel). Run by `scripts/ctl/test/postman.test.sh`, a `pnpm check:ctl` step; every case runs on a SCRATCH tmux session (`ctlpm-<pid>`) with fake panes (`scripts/ctl/test/fakeseat.sh`), a scratch ledger root, a scratch notes file and a fake clock (`CTL_POSTMAN_NOW`) — it can never reach a live seat, and `13.1952` proves the daemon refuses a live/scratch mismatch. `13.1981`–`13.1987` are FIX 1 of reviewer B's review.
 
 - 13.1900 🧪 post: one ledger line with exactly the schema fields; summary names the id
 - 13.1901 🧪 post: 20 parallel posts → ids 1..20 unique, every line valid JSON
@@ -749,9 +749,9 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1931 🧪 bridge: the first run starts at EOF — history is never reposted
 - 13.1932 🧪 bridge: the same line seen twice (a reset cursor) makes ONE message (src dedupe)
 - 13.1933 🧪 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane
-- 13.1934 🧪 bridge: a number whose window is not exec* (7 = reviewerA here) and orchestrator/planner targets are refused, never routed
+- 13.1934 🧪 bridge: a number INSIDE 1–5 whose window is not exec* (3 = reviewerA here) and orchestrator/planner targets are refused, never routed; CONTROL in the same check: FIX 2 reaches exec2
 - 13.1935 🧪 bridge: TOOK/DONE/NOTE/HOLD are ignored by name; CLOSE sends no lane message, only a note to main
-- 13.1936 🧪 bridge: a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message
+- 13.1936 🧪 bridge: with the pane tier ON a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message (13.1981: never in the shadow run)
 - 13.1940 🧪 deliver: the message reaches the inbox file first (one line) and the state records the time; no window → nothing else
 - 13.1941 🧪 watched + idle: no pane paste inside the 120 s grace
 - 13.1942 🧪 watched + BUSY: no pane paste at all (the Monitor line is already queued in the session)
@@ -764,7 +764,7 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1949 🧪 lost body: bounced — a bounce message goes back to the sender, nothing is delivered
 - 13.1950 🧪 crash between writing the attempt and the paste: nothing typed, ledger intact
 - 13.1951 🧪 a second daemon is refused while the first pid is alive
-- 13.1952 🧪 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs
+- 13.1952 🧪 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs (both halves run `postman once --dry-run`: the guard precedes the dry-run exit, and a guard-removal mutant only prints DRY)
 - 13.1953 🧪 restart supersedes: a message posted BEFORE the restart is cancelled-by-restart with ONE note to main listing its id; one posted AFTER is kept
 - 13.1954 🧪 planner seat: never a pane paste (inbox only); unacked 30 min → exactly one ⚑ notes line
 - 13.1955 🧪 audit: inside the grace nothing is reported (the FIX may still be coming)
@@ -786,6 +786,13 @@ Block `13.1900`–`13.1999` (measured 2026-10-03: the §13 high-water was `13.18
 - 13.1975 🧪 audit: after the grace an undelivered FIX and an undelivered needs-tip each get ONE note to main; READY lines are not audited
 - 13.1976 🧪 audit: not reported twice
 - 13.1977 🧪 audit: a delivered FIX (a fix message with that ref) satisfies it — no note
-- 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line when one exists, 0 when none
+- 13.1978 🧪 ctl postman audit (on demand) exits 1 and names the unmatched line; CONTROL: exit 0 once a fix message with that ref exists, and on an empty queue
 - 13.1979 🧪 watch: a pidfile whose pid is NOT a watcher for that seat is never signalled
 - 13.1980 🧪 page by AGE: a seat that has the pointer (proven) but never acks is not paged at 17 min and is paged once at 33 min
+- 13.1981 🧪 shadow run (CTL_POSTMAN_PANE=0): the bridge posts the message but writes NO DONE line into QUEUE-dispatch.md — the dispatcher's open line stays open; CONTROL in the same check: pane tier on → a DONE line for the handled AND for the refused line
+- 13.1982 🧪 audit matches THIS verdict: FIX 1's message 35 min before a FIX 2 verdict does not satisfy it — exactly ONE note after the grace; CONTROL in the same check: a FIX 2 message posted after the verdict → no note
+- 13.1983 🧪 ctl postman audit (on demand) applies the same window: FIX 1's message does not satisfy a FIX 2 verdict 35 min later (exit 1, names it); a FIX 2 message after it does (exit 0); with a FIX 1 and a FIX 2 verdict and only FIX 2's message, exactly the FIX 1 verdict is named
+- 13.1984 🧪 ack re-check: a seat that acks between pane_state and the paste is never typed into; CONTROL in the same check: without that ack the pointer is pasted
+- 13.1985 🧪 ctl restart --dry-run: the window keeps its NAME and the supersede marker is called for it (window 9 = reviewerB → -n reviewerB, never exec9); CONTROL in the same check: window 4 = exec4 and an absent window falls back to exec<N>; nothing is written
+- 13.1986 🧪 ctl restart: a supersede marker that cannot be written prints a WARN (not silent) and the restart still proceeds; CONTROL in the same check: a valid seat name prints no WARN
+- 13.1987 🧪 pane_state no prompt: a screen with NO ❯ at all (a dialog, a full-screen view) is refused as menu and nothing is typed; CONTROL in the same check: an idle pane is pasted

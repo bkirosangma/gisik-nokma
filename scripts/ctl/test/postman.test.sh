@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1980. Run by `ctl selftest`.
+# scripts/ctl/test/postman.test.sh — the postman (ctl post / inbox / ack / postman), cases 13.1900–13.1987. Run by `ctl selftest`.
 # Everything runs on a SCRATCH tmux session (ctlpm-<pid>), a scratch ledger root and a scratch notes file, with a fake
 # clock (CTL_POSTMAN_NOW). It can never touch a live seat: the daemon refuses a scratch/live mismatch (13.1952).
 set -u
@@ -51,9 +51,9 @@ check "13.1902 post --text: the body is a spooled file holding the text" \
   '[ "$(jget 1 body)" = "$R/postman/spool/1.txt" ] && [ "$(cat "$R/postman/spool/1.txt")" = "go on" ]'
 reset
 check "13.1903 post: a missing --body file, no body and both body forms are refused, nothing appended; CONTROL: a valid post is accepted" \
-  'pm post exec2 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && ! pm post exec2 --kind fix --body "$T/nope.md" --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --from main >/dev/null 2>&1; ! pm post exec2 --kind fix --body "$b1" --text x --from main >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
+  'pm post exec2 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && { pm post exec2 --kind fix --body "$T/nope.md" --from main >/dev/null 2>&1; [ $? = 1 ]; } && { pm post exec2 --kind fix --from main >/dev/null 2>&1; [ $? = 1 ]; } && { pm post exec2 --kind fix --body "$b1" --text x --from main >/dev/null 2>&1; [ $? = 1 ]; } && [ "$(ledger_n)" = 0 ]'
 check "13.1904 post: a bad seat name, a bad kind and a missing --from are refused; CONTROL: a valid post is accepted" \
-  'pm post exec3 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && ! pm post "exec 3;rm" --kind fix --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind shout --body "$b1" --from main >/dev/null 2>&1; ! pm post exec3 --kind fix --body "$b1" >/dev/null 2>&1; [ "$(ledger_n)" = 0 ]'
+  'pm post exec3 --kind fix --body "$b1" --from main >/dev/null 2>&1 && rm -rf "$R"/* && { pm post "exec 3;rm" --kind fix --body "$b1" --from main >/dev/null 2>&1; [ $? = 1 ]; } && { pm post exec3 --kind shout --body "$b1" --from main >/dev/null 2>&1; [ $? = 1 ]; } && { pm post exec3 --kind fix --body "$b1" >/dev/null 2>&1; [ $? = 1 ]; } && [ "$(ledger_n)" = 0 ]'
 reset; mkseat exec4 idle
 check "13.1905 post: a bare window number resolves to the window NAME; orch aliases main" \
   'idx=$(tmux list-windows -t "$S" -F "#{window_index} #{window_name}" | awk "\$2==\"exec4\"{print \$1}"); pm post "$idx" --kind note --text hi --from main >/dev/null 2>&1; pm post orch --kind note --text hi --from exec4 >/dev/null 2>&1; [ "$(jget 1 to)" = exec4 ] && [ "$(jget 2 to)" = main ]'
@@ -117,17 +117,25 @@ bridge_reset; pm postman once >/dev/null 2>&1
 printf '06:11 FIX 4 %s/missing-brief.md\n06:12 FIX 7 %s\n06:13 FIX orchestrator %s\n06:14 NEXT task/x %s\n06:15 MERGETIP 4 task/foo base=main\n06:16 FIX 6 %s\n' "$T" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1933 bridge: an unparsable line is never dropped — one note to main quoting it each (incl. FIX 6 = a reviewerA window), nothing sent to a lane" \
   '[ "$(count_kind note main)" = 6 ] && [ "$(count_kind fix)" = 0 ] && [ "$(count_kind mergetip)" = 0 ]'
-check "13.1934 bridge: a number whose window is not exec* (7 = reviewerA here) and orchestrator/planner targets are refused, never routed" \
-  '[ "$(count_kind fix reviewerA)" = 0 ] && [ "$(count_kind fix main)" = 0 ] && python3 -c "
+# 13.1934 gets its OWN setup: window 3 is reviewerA (inside 1–5, so only the exec* rule can refuse it), 2 is exec2
+reset; mkdir -p "$T/lanes"; Q="$R/QUEUE-dispatch.md"; : > "$Q"; for n in 1 2 4 5; do IDX=$n mkseat exec$n idle; done; IDX=3 mkseat reviewerA idle; pm postman once >/dev/null 2>&1
+printf '06:40 FIX 3 %s\n06:41 FIX orchestrator %s\n06:42 FIX planner %s\n06:43 FIX 2 %s\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
+check "13.1934 bridge: a number INSIDE 1–5 whose window is not exec* (3 = reviewerA here) and orchestrator/planner targets are refused, never routed; CONTROL in the same check: FIX 2 reaches exec2" \
+  '[ "$(count_kind fix reviewerA)" = 0 ] && [ "$(count_kind fix main)" = 0 ] && [ "$(count_kind fix planner)" = 0 ] && [ "$(count_kind fix exec2)" = 1 ] && [ "$(count_kind fix)" = 1 ] && python3 -c "
 import json,sys
 t=[json.loads(l) for l in open(sys.argv[1])]
-assert any(\"FIX 7\" in open(m[\"body\"]).read() for m in t if m[\"kind\"]==\"note\")
-assert any(\"orchestrator\" in open(m[\"body\"]).read() for m in t if m[\"kind\"]==\"note\")" "$R/LEDGER.jsonl"'
+n=[open(m[\"body\"]).read() for m in t if m[\"kind\"]==\"note\"]
+assert any(\"FIX 3\" in x and \"reviewerA\" in x for x in n) and any(\"orchestrator\" in x for x in n) and any(\"FIX planner\" in x for x in n) and len(n)==3, n" "$R/LEDGER.jsonl"'
 bridge_reset; pm postman once >/dev/null 2>&1
 printf '06:20 TOOK 06:19 x\n06:21 DONE 06:19 y\n06:22 NOTE z\n06:23 HOLD q\n06:24 CLOSE 5\n' >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1935 bridge: TOOK/DONE/NOTE/HOLD are ignored by name; CLOSE sends no lane message, only a note to main" '[ "$(ledger_n)" = 1 ] && [ "$(count_kind note main)" = 1 ] && jget 1 body | xargs grep -q "ctl close 5"'
 bridge_reset; pm postman once >/dev/null 2>&1; printf '06:30 FIX 2 %s\n' "$T/BRIEF-b.md" >> "$Q"; pm postman once >/dev/null 2>&1
 check "13.1936 bridge: a handled line gets a DONE line written back into QUEUE-dispatch.md naming the message" 'grep -qE "^[0-9]{2}:[0-9]{2} DONE 06:30 postman #1" "$Q"'
+shadow_case() { # PANE → a bridged FIX 2 and a refused FIX 7 handled in one pass with CTL_POSTMAN_PANE=PANE
+  bridge_reset; CTL_POSTMAN_PANE="$1" pm postman once >/dev/null 2>&1
+  printf '06:40 FIX 2 %s\n06:41 FIX 7 %s\n' "$T/BRIEF-b.md" "$T/BRIEF-b.md" >> "$Q"; CTL_POSTMAN_PANE="$1" pm postman once >/dev/null 2>&1; }
+check "13.1981 shadow run (CTL_POSTMAN_PANE=0): the bridge posts the message but writes NO DONE line into QUEUE-dispatch.md — the dispatcher's open line stays open; CONTROL in the same check: pane tier on → a DONE line for the handled AND for the refused line" \
+  'shadow_case 0 && [ "$(count_kind fix exec2)" = 1 ] && [ "$(count_kind note main)" = 1 ] && ! grep -q " DONE " "$Q" && shadow_case 1 && [ "$(grep -cE "^[0-9]{2}:[0-9]{2} DONE 06:4[01] postman" "$Q")" = 2 ] && grep -q "DONE 06:41 postman refused" "$Q"'
 
 # ───────────────────────────── delivery state machine ─────────────────────────────
 reset; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
@@ -181,7 +189,8 @@ out="$(CTL_POSTMAN_MAX_PASSES=1 pm postman run 2>&1)"; rc=$?; kill $live 2>/dev/
 check "13.1951 a second daemon is refused while the first pid is alive" '[ "$rc" = 1 ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL postman.*already running"'
 echo 999999 > "$R/postman/daemon.pid"; out="$(CTL_POSTMAN_MAX_PASSES=1 pm postman run 2>&1)"; rc=$?
 check "13.1974 …but a stale pidfile (dead pid) is taken over" '[ "$rc" = 0 ] && printf "%s" "$out" | tail -1 | grep -q "^OK postman"'
-reset; out1="$(CTL_TMUX_SESSION=gisik pm postman once 2>&1)"; rc1=$?; out2="$(env -u CTL_POSTMAN_ROOT CTL_POSTMAN_NOW=$NOW "$CTL" postman once 2>&1)"; rc2=$?
+reset; # BOTH halves run --dry-run: guard() runs before the dry-run exit, so the refusal is still proven, and a mutant that removes the guard only prints DRY (it never runs a pass on the live root or the live session)
+out1="$(CTL_TMUX_SESSION=gisik pm postman once --dry-run 2>&1)"; rc1=$?; out2="$(env -u CTL_POSTMAN_ROOT CTL_POSTMAN_NOW=$NOW "$CTL" postman once --dry-run 2>&1)"; rc2=$?
 check "13.1952 live/scratch guard: the live session with a scratch root, and a scratch session with the live root, are both refused before anything runs" \
   '[ "$rc1" = 1 ] && printf "%s" "$out1" | tail -1 | grep -q "refus" && [ "$rc2" = 1 ] && printf "%s" "$out2" | tail -1 | grep -q "refus"'
 reset; mkseat exec3 idle; pm post exec3 --kind fix --text "old" --from main >/dev/null 2>&1; NOW=$((NOW+10)); pm postman restarted exec3 >/dev/null 2>&1; NOW=$((NOW+10)); pm post exec3 --kind next --text "fresh" --from main >/dev/null 2>&1; NOW=$((NOW+10)); pm postman once >/dev/null 2>&1
@@ -207,6 +216,23 @@ printf 'x\n' > "$T/BRIEF-f.md"; pm post exec3 --kind fix --body "$T/BRIEF-f.md" 
 check "13.1977 audit: a delivered FIX (a fix message with that ref) satisfies it — no note" '[ "$(count_kind note main)" = 0 ]'
 check "13.1978 ctl postman audit (on demand) exits 1 and names the unmatched line; CONTROL: exit 0 once a fix message with that ref exists, and on an empty queue" \
   'reset; QR="$R/QUEUE-review.md"; printf "05:53 DONE 05:45 FIX task/lost c28ca5cf (F1) reviewer A\n" > "$QR"; o="$(pm postman audit 2>&1)"; rc=$?; [ $rc = 1 ] && printf "%s" "$o" | grep -q "task/lost" && { printf x > "$T/BRIEF-l.md"; pm post exec3 --kind fix --body "$T/BRIEF-l.md" --ref task/lost --from reviewerA >/dev/null 2>&1; pm postman audit >/dev/null 2>&1; } && { : > "$QR"; pm postman audit >/dev/null 2>&1; }'
+audit_round() { # SECOND → FIX 1's message at T0; the FIX 2 verdict is first seen 35 min later; SECOND=1 also posts FIX 2's message; two passes after the grace
+  reset; QR="$R/QUEUE-review.md"; : > "$QR"; pm postman once >/dev/null 2>&1
+  printf 'x\n' > "$T/BRIEF-r.md"; pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1
+  NOW=$((NOW+2100)); printf '05:53 DONE 05:45 FIX task/foo-bar c28ca5cf (FIX 2) reviewer A\n' >> "$QR"; pm postman once >/dev/null 2>&1
+  [ "$1" = 1 ] && { NOW=$((NOW+60)); pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1; }
+  NOW=$((NOW+700)); pm postman once >/dev/null 2>&1; NOW=$((NOW+400)); pm postman once >/dev/null 2>&1; }
+check "13.1982 audit matches THIS verdict: FIX 1's message 35 min before a FIX 2 verdict does not satisfy it — exactly ONE note after the grace; CONTROL in the same check: a FIX 2 message posted after the verdict → no note" \
+  'audit_round 0; [ "$(count_kind note main)" = 1 ] && grep -q "(FIX 2)" $(grep -l "audit:" "$R"/postman/spool/*.txt) && audit_round 1 && [ "$(count_kind note main)" = 0 ]'
+od_round() { # MODE 0 = FIX 1 message only; 1 = + a FIX 2 message after the verdict; 2 = a FIX 1 verdict and a FIX 2 verdict, only a message after the FIX 2 verdict
+  reset; QR="$R/QUEUE-review.md"; T0=$NOW; printf 'x\n' > "$T/BRIEF-r.md"
+  vline() { local t; t="$(date -r $((T0+$1)) +%H:%M)"; printf '%s DONE %s FIX task/foo-bar c28ca5cf (FIX %s) reviewer A\n' "$t" "$t" "$2"; }
+  if [ "$1" = 2 ]; then { vline 60 1; vline 2100 2; } > "$QR"; else
+    pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1; vline 2100 2 > "$QR"; fi
+  NOW=$((T0+2160)); if [ "$1" != 0 ]; then pm post exec3 --kind fix --body "$T/BRIEF-r.md" --ref task/foo-bar --from reviewerA >/dev/null 2>&1; fi
+  pm postman audit 2>&1; }
+check "13.1983 ctl postman audit (on demand) applies the same window: FIX 1's message does not satisfy a FIX 2 verdict 35 min later (exit 1, names it); a FIX 2 message after it does (exit 0); with a FIX 1 and a FIX 2 verdict and only FIX 2's message, exactly the FIX 1 verdict is named" \
+  '{ o="$(od_round 0)"; [ $? = 1 ]; } && printf "%s" "$o" | grep -q "UNMATCHED.*(FIX 2)" && od_round 1 >/dev/null && { o="$(od_round 2)"; [ $? = 1 ]; } && [ "$(printf "%s" "$o" | grep -c "^UNMATCHED")" = 1 ] && printf "%s" "$o" | grep "^UNMATCHED" | grep -q "(FIX 1)"'
 
 # ───────────────────────────── pane safety (pane_state) — each refusal has its control in the SAME check ─────────────────────────────
 # A refusal is "nothing typed AND the message still open"; the control is an idle pane that IS pasted into.
@@ -214,6 +240,8 @@ pane_case() { # name mode [pretext]  → runs once at +0 against a fresh seat; p
   reset; mkseat exec3 "$@"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; }
 check "13.1960 pane_state menu: a permission/option menu is refused (a pasted Enter would pick option 1); CONTROL in the same check: an idle pane is pasted" \
   'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case menu; [ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=menu"; }'
+check "13.1987 pane_state no prompt: a screen with NO ❯ at all (a dialog, a full-screen view) is refused as menu and nothing is typed; CONTROL in the same check: an idle pane is pasted" \
+  'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case dialog; [ ! -s "$T/rec-exec3" ] && status_of exec3 | grep -q "last=menu"; }'
 check "13.1961 pane_state text: a box holding foreign text is never cleared or pasted over; CONTROL in the same check: an idle pane is pasted" \
   'pane_case idle; [ "$(rec_n exec3)" = 1 ] && { pane_case text "half a thought"; [ ! -s "$T/rec-exec3" ] && tmux capture-pane -p -t "$S:=exec3" | grep -q "half a thought" && status_of exec3 | grep -q "last=text"; }'
 copy_case() { reset; mkseat exec3 idle; tmux copy-mode -t "$S:=exec3"; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1; }
@@ -234,6 +262,18 @@ check "13.1967 no window: exec1 absent while exec11 exists — the prefix is NOT
 reset; mkseat exec3 idle; pm post exec3 --kind note --text "fyi" --from main >/dev/null 2>&1; pm postman once >/dev/null 2>&1
 check "13.1968 kind note: delivered to the inbox only, never pasted into a pane, never blocks the head of the queue" \
   '[ "$(rec_n exec3)" = 0 ] && [ "$(wc -l < "$R/postman/inbox/exec3.jsonl" | tr -d " ")" = 1 ]'
+ackrace_case() { reset; mkseat exec3 idle; pm post exec3 --kind fix --text "go" --from main >/dev/null 2>&1; CTL_TEST_ACK_BEFORE_PASTE=1 pm postman once >/dev/null 2>&1; }
+check "13.1984 ack re-check: a seat that acks between pane_state and the paste is never typed into; CONTROL in the same check: without that ack the pointer is pasted" \
+  'ackrace_case; [ ! -s "$T/rec-exec3" ] && [ -e "$R/postman/acks/1" ] && pane_case idle && [ "$(rec_n exec3)" = 1 ] && [ ! -e "$R/postman/acks/1" ]'
+# ctl restart is ONLY ever run with --dry-run here: a non-dry restart behind a session seam is `tmux kill-window -t gisik:N` on a live seat the day a mutant reverts the seam
+rs_wt="$T/wt"; mkdir -p "$rs_wt"; /usr/bin/git -C "$rs_wt" init -q; printf 'brief\n' > "$T/BRIEF-rs.md"
+rs_dry() { "$CTL" restart "$1" "$rs_wt" "$T/BRIEF-rs.md" --dry-run 2>&1; }
+reset; IDX=9 mkseat reviewerB idle; IDX=4 mkseat exec4 idle
+check "13.1985 ctl restart --dry-run: the window keeps its NAME and the supersede marker is called for it (window 9 = reviewerB → -n reviewerB, never exec9); CONTROL in the same check: window 4 = exec4 and an absent window falls back to exec<N>; nothing is written" \
+  'o="$(rs_dry 9)" && printf "%s" "$o" | grep -q "^DRY: mark reviewerB restarted" && printf "%s" "$o" | grep -q -- "-n reviewerB " && ! printf "%s" "$o" | grep -q "exec9" && o4="$(rs_dry 4)" && printf "%s" "$o4" | grep -q "^DRY: mark exec4 restarted" && printf "%s" "$o4" | grep -q -- "-n exec4 " && o8="$(rs_dry 8)" && printf "%s" "$o8" | grep -q "^DRY: mark exec8 restarted" && [ ! -e "$R/postman/restarts" ]'
+reset; tmux new-window -d -t "$S:6" -n "Bad Name" "sleep 600"; tmux new-window -d -t "$S:5" -n exec5 "sleep 600"
+check "13.1986 ctl restart: a supersede marker that cannot be written prints a WARN (not silent) and the restart still proceeds; CONTROL in the same check: a valid seat name prints no WARN" \
+  'o="$(rs_dry 6)" && printf "%s" "$o" | grep -q "^WARN restart: postman marker not written" && printf "%s" "$o" | tail -1 | grep -q "^OK restart" && o5="$(rs_dry 5)" && ! printf "%s" "$o5" | grep -q "^WARN" && printf "%s" "$o5" | grep -q "^DRY: mark exec5 restarted"'
 check "13.1969 lib ctl_cmd_is_claude: the version string, claude and node pass; zsh bash less vim python3 ssh fail" \
   '( unset CTL_POSTMAN_CMD_RE; for c in 2.1.288 claude node; do ctl_cmd_is_claude "$c" || exit 1; done; for c in zsh bash sh fish less vim python3 ssh ""; do ! ctl_cmd_is_claude "$c" || exit 1; done )'
 

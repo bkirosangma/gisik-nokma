@@ -5,8 +5,8 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 . "$HERE/lib.sh"
 export CTL_IN_SELFTEST=1
 repo="$(ctl_repo "$PWD")" || exit 1
-fails=0
-step() { if bash -c "$2" > /dev/null 2>&1; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+fails=0; n=0
+step() { n=$((n+1)); if bash -c "$2" > /dev/null 2>&1; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
 step "hook self-test"        "python3 '$HERE/hooks/ctl-scripts-only.py' --self-test"
 step "lib tests"             "bash '$HERE/test/lib.test.sh'"
 # The cached gate is only as sound as turbo.json's inputs: a changed cross-package reader must change the task hash (a MISS).
@@ -33,4 +33,4 @@ step "restart --dry-run refuses window 0" "! '$HERE/ctl' restart 0 '$repo' '$HER
 step "rebuild --dry-run"     "'$HERE/ctl' rebuild --dry-run"
 step "tipmerge refuses main as the branch" "out=\$('$HERE/ctl' tipmerge main --base release/x --expect abcdef0 --repo '$repo' --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'not a task branch'"
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
-[ "$fails" -eq 0 ] && ctl_ok selftest "21 steps" || ctl_fail selftest "$fails steps red"
+[ "$fails" -eq 0 ] && ctl_ok selftest "$n steps" || ctl_fail selftest "$fails steps red"

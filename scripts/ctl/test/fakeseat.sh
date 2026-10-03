@@ -7,6 +7,7 @@
 #   prefill  like idle, but the box starts holding PRETEXT (an unsubmitted paste or someone's draft)
 #   menu   a permission menu: `❯ 1. Yes` — a pasted Enter would pick option 1
 #   text   a prompt whose box holds PRETEXT and never submits (someone typing)
+#   dialog a full-screen question with NO `❯` anywhere (a dialog that is not a prompt); records any input
 mode="${1:-idle}"; rec="${2:-/dev/null}"; pre="${3:-}"
 case "$mode" in
   idle)
@@ -24,6 +25,8 @@ case "$mode" in
     printf '❯ '; stty -echo -icanon min 1; cat >> "$rec";;
   menu)
     printf 'Do you want to proceed?\n❯ 1. Yes\n  2. No\n'; stty -echo -icanon min 1; cat >> "$rec";;
+  dialog)
+    printf 'Do you want to proceed?\n  1. Yes\n  2. No\n'; stty -echo -icanon min 1; cat >> "$rec";;
   text)
     printf '❯ %s' "$pre"; stty -echo -icanon min 1; cat >> "$rec";;
 esac
