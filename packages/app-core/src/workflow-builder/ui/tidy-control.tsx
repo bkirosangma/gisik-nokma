@@ -92,8 +92,8 @@ function createTidyUndo(store: DraftStore) {
     undo() {
       if (offer === null) return;
       const { prev } = offer;
+      // the write is not a Tidy, so the watcher drops the offer
       store.actions.setPositions(prev);
-      clear();
     },
     /** A control that offered the Undo is gone: take the offer with it. */
     release(owner: object) {

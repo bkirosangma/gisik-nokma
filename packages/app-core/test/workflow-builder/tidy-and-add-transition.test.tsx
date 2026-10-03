@@ -105,6 +105,10 @@ describe('G-9 T4: Tidy and Undo tidy', () => {
     // control: the plain grid DOES overlap at that size, so the assertion below can fail
     expect(overlappingPairs(layout, tall).length).toBeGreaterThan(0);
     expect(overlappingPairs(tidyPositions(def, tall), tall)).toEqual([]);
+    // wider than a column, too: the box being placed matters as well as the ones already placed
+    const wide = sizesOf(def, { width: 300, height: 120 });
+    expect(overlappingPairs(layout, wide).length).toBeGreaterThan(0);
+    expect(overlappingPairs(tidyPositions(def, wide), wide)).toEqual([]);
     // control: at the unmeasured box the grid already clears, so Tidy leaves it as it is
     expect(tidyPositions(def, sizesOf(def, UNMEASURED_NODE))).toEqual(layout);
     expect(tidyPositions(def)).toEqual(layout);
