@@ -168,6 +168,25 @@ export async function visibleMemberCount(
 }
 
 /**
+ * The ids `visibleMemberCount` counts — the SAME clause (`ROSTER_VISIBLE_CLAUSE`, `isWorkspaceAdmin`), so the
+ * home Members number and the people it lights cannot disagree with the roster. `null` for a guest, as there.
+ */
+export async function visibleMemberIds(db: Queryable, eff: EffectiveRole, workspaceId: string): Promise<string[] | null> {
+  if (eff.workspaceRole === null || eff.workspaceRole === 'guest') return null;
+  const { rows } = await db.query<{ user_id: string }>(
+    `SELECT m.user_id
+       FROM proj_memberships m
+       JOIN "user" u ON u."id" = m.user_id
+      WHERE m.workspace_id = $1
+        AND m.scope_kind = 'workspace'
+        AND ${ROSTER_VISIBLE_CLAUSE}
+      ORDER BY m.user_id`,
+    [workspaceId, isWorkspaceAdmin(eff)],
+  );
+  return rows.map((row) => row.user_id);
+}
+
+/**
  * The projects this caller can see at least one TICKET in, as a set of ids
  * (Task 18, owner ruling of 2026-09-09 — "option 2").
  *
