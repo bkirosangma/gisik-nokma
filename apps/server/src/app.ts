@@ -19,6 +19,7 @@ import { createInAppTransport } from './notifications/transport.js';
 import type { ObjectStore } from './attachments/object-store.js';
 import { registerAttachmentRoutes } from './routes/attachments.js';
 import { registerAttentionRoutes } from './routes/attention.js';
+import { registerHomeRoutes } from './routes/home.js';
 import { registerBoardRoutes } from './routes/board.js';
 import { registerBuilderReadRoutes } from './routes/builder-reads.js';
 import { registerEventRoutes } from './routes/events.js';
@@ -1034,12 +1035,14 @@ export function buildApp(
   // the workspace's own `workspace.settings_set` claim rather than from
   // constants. `deps.now` is threaded through UNDEFAULTED on purpose — the
   // default lives in `registerAttentionRoutes` — but NOT only there: Task 15's
-  // `registerStreamRoute` defaults it too, for the heartbeat deadline. Both get
-  // this same optional field, so pinning it pins both. There is not one definition of
-  // the real clock. Same preHandler by parameter, same reason as every route
+  // `registerStreamRoute` defaults it too, for the heartbeat deadline, and so does
+  // spec E's `registerHomeRoutes`. All three get this same optional field, so
+  // pinning it pins all three. There is not one definition of the real clock. Same preHandler by parameter, same reason as every route
   // above it: the handler reads `request.currentUserId` and resolves its whole
   // tenancy gate from it.
   registerAttentionRoutes(app, { pool: deps.pool, now: deps.now }, requireSession);
+  // Home (Knowledge Graph spec E): six numbers over the viewer's visible items, IST due days from `deps.now`.
+  registerHomeRoutes(app, { pool: deps.pool, now: deps.now }, requireSession);
   // View preferences (Plan 5 Task 13) — the FIRST WRITE surface among these
   // routes, and the one thing this server stores that is NOT an attributed
   // claim: preferences arrange the record rather than say anything about it

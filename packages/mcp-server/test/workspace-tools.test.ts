@@ -21,6 +21,15 @@ const OWNER_ONLY = {
 
 type Dir = { name: string; archived?: boolean };
 
+/** What `GET /v1/workspaces/:id/home` answers (27.615): `members: null` is a guest's, and ids are never forwarded. */
+const HOME = {
+  workspaceId: WS,
+  generatedAt: 't',
+  dueSoonDays: 7,
+  counts: { tickets: 4, open: 3, pastDue: 1, dueSoon: 1, members: null, notes: 2 },
+  ids: { tickets: ['x'], open: [], pastDue: [], dueSoon: [], members: [], notes: [] },
+};
+
 function fake(dir: Dir[] = [{ name: 'Convenience Corner' }], deleted: unknown[] = [], answer: unknown = COMMITTED) {
   const sent: unknown[][] = [];
   const posts: Array<[string, unknown]> = [];
@@ -41,7 +50,13 @@ function fake(dir: Dir[] = [{ name: 'Convenience Corner' }], deleted: unknown[] 
     userId: () => USER,
     get: async (path) => {
       gets.push(path);
-      return path === '/v1/me/workspaces' ? { workspaces } : path === '/v1/me/deleted-items' ? { items: deleted } : {};
+      return path === '/v1/me/workspaces'
+        ? { workspaces }
+        : path === '/v1/me/deleted-items'
+          ? { items: deleted }
+          : path === `/v1/workspaces/${WS}/home`
+            ? HOME
+            : {};
     },
     post: async (path, body) => {
       posts.push([path, body]);
@@ -83,6 +98,25 @@ describe('14.304–14.312 workspace tools', () => {
     await expect(tool('create_workspace', f.session).handler({ name: 'X' })).rejects.toThrow('refused by permission.role: Not allowed.');
   });
 
+  it('27.615 get_workspace carries home: one GET per live call, counts only (no ids), null passed through; a deleted workspace makes no home GET', async () => {
+    const f = fake([{ name: 'Convenience Corner' }], [
+      { kind: 'workspace', id: 'D', workspaceId: 'D', label: 'Gone', deletedAt: '2026-09-30T00:00:00Z' },
+    ]);
+    const homePath = `/v1/workspaces/${WS}/home`;
+    const answer = (await tool('get_workspace', f.session).handler({ workspaceId: WS })) as { home: { counts: { members: unknown } } };
+    expect(f.gets.filter((p) => p === homePath)).toHaveLength(1);
+    expect(JSON.stringify(answer)).not.toContain('"ids"');
+    // Control: a guest's `members: null` is passed through as null, not 0.
+    expect(answer.home.counts.members).toBeNull();
+
+    f.gets.length = 0;
+    await tool('get_workspace', f.session).handler({ workspaceId: 'D' });
+    expect(f.gets.some((p) => p.endsWith('/home'))).toBe(false);
+    // Control: the live call above did read it.
+    await tool('get_workspace', f.session).handler({ workspaceId: WS });
+    expect(f.gets).toContain(homePath);
+  });
+
   it('14.305 get_workspace answers from the directory; a deleted one says so and names undelete_workspace; an unknown id is not found', async () => {
     const f = fake([{ name: 'Convenience Corner' }], [
       { kind: 'workspace', id: 'D', workspaceId: 'D', label: 'Gone', deletedAt: '2026-09-30T00:00:00Z' },
@@ -96,6 +130,8 @@ describe('14.304–14.312 workspace tools', () => {
       archived: false,
       projectCount: 1,
       archivedProjectCount: 1,
+      // 27.615 widened this shape (spec E, D-E9)
+      home: { counts: HOME.counts, dueSoonDays: 7 },
     });
     // Read at call time, never remembered: the same id after a rename answers the new name.
     f.workspaces[0]!.name = 'Corner Shop';

@@ -3781,7 +3781,7 @@ The owner's ten rulings on the neo style (2026-10-02; spec `docs/superpowers/spe
 
 ### Home (spec E)
 
-<!-- KG-E bullet T1 -->
+- ⚙️ **Home endpoint `GET /v1/workspaces/:id/home`** (KG-E T1; `apps/server/src/routes/home.ts`, `HomeResponse` in `packages/domain/src/read-models.ts`) — six counts (Tickets, Open, Past due, Due soon, Members, Notes) and their ids, capped at 2,000 per number (a count is never capped), over the viewer's own visibility: ONE light ticket SELECT, a notes SELECT and the roster ids (`visibleMemberIds`, the roster's own clause). Open = not terminal and not closed; Past due / Due soon are `classifyDue` over the claimed due day in IST with the workspace's `dueSoonDays`, so they equal the attention strip's buckets; a guest gets `members: null`. p95 measured before the route was built: owner 59.8 ms, member 47.5 ms at 10 000 tickets / 2 000 notes (`HOME_PERF=1`). MCP `get_workspace` carries `home: { counts, dueSoonDays }`. Cases 27.600–27.616.
 <!-- KG-E bullet T2 -->
 <!-- KG-E bullet T3 -->
 <!-- KG-E bullet T4 -->
