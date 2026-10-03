@@ -47,7 +47,12 @@ export async function readHome(
   const horizon = addIstDays(today, settings.dueSoonDays);
 
   const params = new SqlParams();
-  const where = [`t.workspace_id = ${params.add(workspaceId)}`, visibleTicketsWhere(eff, viewerId, params), LIVE_TICKET_WHERE];
+  const where = [
+    `t.workspace_id = ${params.add(workspaceId)}`,
+    visibleTicketsWhere(eff, viewerId, params),
+    // The trash: beside the other two conjuncts, never folded into the visibility predicate (as attention does).
+    LIVE_TICKET_WHERE,
+  ];
   const { rows } = await db.query<HomeTicketRow>(
     `SELECT t.ticket_id, t.state_category, (t.closed_at IS NOT NULL) AS closed, t.fields -> 'dueDate' AS due_claim
        FROM proj_tickets t
