@@ -448,7 +448,12 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
       </Providers>,
     );
     await screen.findByTestId('note-document');
-    const launcher = await screen.findByRole('button', { name: 'On this page' });
+    // 2026-10-03 (HK-7, CI run 37101308000 on #961): the launcher waits on the headings the EDITOR reports, and the editor slot is lazy
+    // (smoothness T9/T10: `editor-slot.tsx` imports `@gisik-nokma/editor` on first render). This is the first arm in the file to mount it, so a
+    // cold runner pays the Tiptap/ProseMirror import here, and findByRole's own 1000 ms budget (not the test's 20 s) is what ran out in CI
+    // (test 1505 ms there). Measured here, from note-document to the launcher: 236-283 ms quiet (3 runs), 461-642 ms with 8 bounded CPU spinners
+    // on 10 cores (load average 7-17, 10 runs); CI ran the whole test 3.6x slower than this machine. 10 s is more than 15x the loaded worst case.
+    const launcher = await screen.findByRole('button', { name: 'On this page' }, { timeout: 10_000 });
     await user.click(launcher);
     await waitFor(() => expect(screen.getAllByRole('link', { name: /Overview|Readings|Actions/ })).toHaveLength(3));
     first.unmount();
@@ -474,6 +479,9 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
       </Providers>,
     );
     await screen.findAllByTestId('note-document');
+    // The editor's own ready signal FIRST (its ProseMirror root exists once the lazy slot has loaded and mounted), so the absence below is
+    // asked of an editor that has had its chance to report, never of a skeleton still waiting for the chunk.
+    await waitFor(() => expect(screen.getByTestId('note-editor').querySelector('.ProseMirror')).not.toBeNull(), { timeout: 10_000 });
     // A settling window equal to the one the positive arm needed, so the
     // control is not merely "asked before the effect could have run".
     await act(async () => {

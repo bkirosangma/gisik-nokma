@@ -5418,6 +5418,13 @@ input, textarea, select { font-family: inherit; }
     overscroll-behavior: contain;
     padding-bottom: 3rem;
   }
+  /* Smoothness G-2 (25.320): the open note scrolls here and its Edit/Done button sits at the very top, so the button's raised shadow lost its
+     top edge to this clip. The recipe the Notes tree uses below: the padding is the reach, the equal negative margin hands the box back, so
+     the title and body stay where they were. Inside this block, not a block of its own: 18.224/18.483 pin the notes page to ONE breakpoint. */
+  [data-style="neo"] .gn-notes__document {
+    padding-top: var(--gn-shadow-reach);
+    margin-top: calc(-1 * var(--gn-shadow-reach));
+  }
   .gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
     scroll-margin-top: 1rem;
   }
