@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/restart.test.sh — `ctl restart --model / --effort`, cases 13.2026-13.2031. Run by `ctl selftest`.
+# scripts/ctl/test/restart.test.sh — `ctl restart --model / --effort`, cases 13.2026-13.2031 and 13.2036. Run by `ctl selftest`.
 # restart is ONLY ever run --dry-run here (13.2030 runs without it, but behind the same barriers and a refusal that comes first): a
 # PATH-front tmux SHIM that forwards list-windows and logs (then fails) every other subcommand, CTL_DRY_RUN=1 next to --dry-run, a scratch
 # CTL_TMUX_SESSION / CTL_POSTMAN_ROOT / CTL_LOG_DIR, and restart.sh's own guard. The windows used are index 91, which no live session has.
@@ -70,5 +70,30 @@ wiring() {
   local h; h="$("$CTL" help | grep '^  restart ')"; printf '%s' "$h" | grep -q -- '--model M' && printf '%s' "$h" | grep -q -- '--effort E' || return 1
   PATH="$T/shim:$PATH" "$CTL" restart 91 /nonexistent "$T/BRIEF.md" --dry-run 2>&1 | grep -q -- '\[--model M\] \[--effort E\]'; }
 check "13.2031 wiring: selftest runs this suite as a live (uncommented) step; CONTROL — the pattern rejects a commented-out step; \`ctl help\` and the usage line show --model and --effort" 'wiring'
+
+# one_launch FILE — the structure behind "the line a test reads is the line that runs": the live paste cannot run in a test, so pin it.
+# Over FILE with comment lines stripped: exactly one assignment to cmd (cmd= or cmd+=), the dry-run echo prints `paste: $cmd;`, the
+# only load-buffer is `printf '%s' "$cmd" | tmux load-buffer`, and --permission-mode appears on the cmd= line and nowhere else.
+one_launch() { python3 - "$1" <<'PY'
+import re, sys
+lines = [l for l in open(sys.argv[1]).read().split("\n") if not re.match(r"\s*#", l)]
+ok = (sum(len(re.findall(r"(?<![A-Za-z0-9_])cmd\+?=", l)) for l in lines) == 1
+      and any("DRY: tmux kill-window" in l and "paste: $cmd;" in l for l in lines)
+      and [l for l in lines if "load-buffer" in l] == [l for l in lines if "printf '%s' \"$cmd\" | tmux load-buffer" in l] != []
+      and [l for l in lines if "--permission-mode" in l] == [l for l in lines if re.match(r"cmd=", l)] != []
+      and len([l for l in lines if "--permission-mode" in l]) == 1)
+sys.exit(0 if ok else 1)
+PY
+}
+# mutant SRC DST OLD NEW — DST is SRC with OLD (which must occur exactly once, or the control would be vacuous) replaced by NEW
+mutant() { python3 -c 'import sys; s=open(sys.argv[1]).read(); assert s.count(sys.argv[3])==1, "anchor not found once"; open(sys.argv[2],"w").write(s.replace(sys.argv[3],sys.argv[4]))' "$@"; }
+R12='cmd="$launcher --permission-mode bypassPermissions \"\$(cat $pf)\""'
+launch_pinned() { local v="$HERE/verbs/restart.sh"
+  one_launch "$v" || return 1
+  mutant "$v" "$T/r12.sh" 'lb="ctlr$$";' "$R12
+lb=\"ctlr\$\$\";" && ! one_launch "$T/r12.sh" || return 1
+  mutant "$v" "$T/r12i.sh" 'lb="ctlr$$";' "$R12; lb=\"ctlr\$\$\";" && ! one_launch "$T/r12i.sh" || return 1
+  mutant "$v" "$T/lit.sh" 'paste: $cmd;' 'paste: $launcher --permission-mode bypassPermissions \"\$(cat $pf)\";' && ! one_launch "$T/lit.sh"; }
+check "13.2036 one launch line, pinned by structure (the live paste cannot run in a test): over verbs/restart.sh without comment lines, exactly one cmd= assignment, the dry-run echo prints \`paste: \$cmd;\`, the only load-buffer is \`printf '%s' \"\$cmd\" | tmux load-buffer\`, and no line but cmd= carries --permission-mode; CONTROL in the same check: a copy with a flagless cmd= re-assigned before the paste (own line, and inline) and a copy whose dry-run echo prints the old literal are both rejected" 'launch_pinned'
 
 [ "$fails" -eq 0 ] && { echo "restart tests: all ok"; exit 0; } || { echo "restart tests: $fails FAILED"; exit 1; }
