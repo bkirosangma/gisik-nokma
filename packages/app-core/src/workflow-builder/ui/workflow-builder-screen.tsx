@@ -28,7 +28,7 @@ import { WorkflowCanvas } from './workflow-canvas.js';
  * workspaces (a session token this product does not have), must not share a
  * slot.
  */
-function draftStorageKey(workspaceId: string, workflowId: string): string {
+export function draftStorageKey(workspaceId: string, workflowId: string): string {
   return `gn-workflow-draft:${workspaceId}:${workflowId}`;
 }
 

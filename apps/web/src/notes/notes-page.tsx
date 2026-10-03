@@ -5,13 +5,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button, SegmentedControl, Toast } from '@gisik-nokma/ui';
 import type { ReadingMeta } from '@gisik-nokma/editor';
-import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { RosterMember } from '@gisik-nokma/app-core';
 import type { NoteScopeMode } from '@gisik-nokma/domain';
 import { AppNav } from '../app-nav.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { useMyWorkspaces } from '../use-my-workspaces.js';
 import { CreateNoteDialog } from './create-note-dialog.js';
 import { NoteDocument, markNoteAsNew } from './note-document.js';
+import { NoteDocumentSkeleton, NoteRowSkeleton } from './note-skeletons.js';
 import { NotesContents, NotesLauncher, NotesPanel, useNotesPanelBehaviour, useNotesPhone } from './notes-phone-panel.js';
 import { NotesSearchHeader } from './notes-search-header.js';
 import { TocLauncher } from './toc-launcher.js';
@@ -46,7 +48,10 @@ let pendingLostAccessToast = false;
  *
  * The read happens ONCE, in this component, and the answer is handed down. A
  * second read anywhere would be a second definition of "the workspaces you are
- * in" (case 18.183 asserts the once).
+ * in" (case 18.183 asserts the once). Since smoothness T9 the read is the shell's
+ * shared one (`useMyWorkspaces`, the nav's and the project list's too): a note
+ * change remounts this page, and the remount paints the tree from the last answer
+ * and asks again only once that answer is 30 s old (case 25.150).
  *
  * ## The three read states, and why they are three
  *
@@ -80,8 +85,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const signedIn = session.kind === 'signed-in' && user !== null;
   const [createOpen, setCreateOpen] = useState(false);
 
-  const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const { rows: workspaces, error: refusal } = useMyWorkspaces();
   /**
    * ONE filter for every section (18.190). It lives on the page rather than in
    * each section because "narrow the tree" is one act by one person, and two
@@ -174,28 +178,6 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const activePane = noteId === undefined ? 'notes' : pane;
   const launcherRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!signedIn) return;
-    let cancelled = false;
-    dataSource.query.getMyWorkspaces().then(
-      (rows) => {
-        if (cancelled) return;
-        // A later success clears an earlier refusal, so a retry that works does
-        // not leave the panel standing — the same device the workspaces page
-        // records for its own pair.
-        setRefusal(null);
-        setWorkspaces(rows);
-      },
-      (cause: unknown) => {
-        if (cancelled) return;
-        setRefusal(cause instanceof Error ? cause.message : String(cause));
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [dataSource, signedIn]);
 
   /**
    * Entering the Notes area with no note in the URL resumes the note this device last had open (G-3 addendum,
@@ -290,22 +272,18 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         </div>
       ) : null}
       {!signedIn ? (
-        <p className="gn-notes__session" role="status">
-          {session.kind === 'loading' ? (
-            'Checking your session…'
-          ) : (
-            <>
-              <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link>{' '}
-              to see your notes. You land back here.
-            </>
-          )}
-        </p>
+        session.kind === 'loading' ? (
+          <NoteRowSkeleton label="Checking your session" />
+        ) : (
+          <p className="gn-notes__session" role="status">
+            <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link>{' '}
+            to see your notes. You land back here.
+          </p>
+        )
       ) : refusal !== null ? (
         <ShellRefusal what="Your notes" message={refusal} />
       ) : workspaces === null ? (
-        <p className="gn-notes__loading" role="status">
-          Loading…
-        </p>
+        <NoteRowSkeleton label="Loading your notes" />
       ) : workspaces.length === 0 ? (
         <p className="gn-notes__empty" role="status">
           {EMPTY_NOTES_COPY}
@@ -410,16 +388,26 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           <section className="gn-notes__document" data-testid="note-document-region" ref={documentRegionRef}>
             {noteId === undefined ? (
               <p className="gn-notes__hint">{NO_NOTE_COPY}</p>
+            ) : !signedIn ? (
+              // Audit NP-03 (case 25.154): a signed-out note URL used to hold "Loading…" for ever, because the workspaces
+              // read is never asked without a session. Say how to get in, as the tree beside it does; while the session
+              // itself is still resolving the document is a wait.
+              session.kind === 'loading' ? (
+                <NoteDocumentSkeleton />
+              ) : (
+                <p className="gn-notes__hint" role="status">
+                  <Link href={`/sign-in?next=${encodeURIComponent(pathname)}`}>Sign in</Link> to read this note. You land
+                  back here.
+                </p>
+              )
             ) : workspaces === null && refusal === null ? (
               // R7b (case 18.462): the workspaces read is still in flight, so
               // the document has nothing to search. Mounting it with `[]` made
               // its search find nothing and draw "That note is no longer
               // shared with you." until the read landed. `[]` is a legitimate
               // ANSWER (no workspaces) and stays the document's to word; only
-              // "not asked yet" is held here.
-              <p className="gn-notes__hint" role="status">
-                Loading…
-              </p>
+              // "not asked yet" is held here, as the editor's own band (25.152).
+              <NoteDocumentSkeleton />
             ) : (
               <NoteDocument
                 noteId={noteId}

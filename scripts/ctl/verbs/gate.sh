@@ -47,7 +47,7 @@ orph=$(ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0,
 summary="$E · mode=${ran:-none} · $T · $C · $N · engine=$eng timeouts=$to orphans=$orph"
 [ "$E" = "EXIT=0" ] || ctl_fail gate "$summary (log $log)"
 [ "$ran" = "$mode" ] || ctl_fail gate "$summary — asked for $mode, gate.sh ran ${ran:-nothing} (log $log)"
-echo "$T" | grep -q '34 successful, 34 total' || ctl_fail gate "$summary (log $log)"
+echo "$T" | grep -q '36 successful, 36 total' || ctl_fail gate "$summary (log $log)"
 echo "$N" | grep -q 'NODE=v22\.' || ctl_fail gate "$summary (log $log)"
 [ "$eng" -eq 0 ] || ctl_fail gate "Unsupported engine ×$eng (log $log)"
 [ "$to" -eq 0 ] || ctl_fail gate "Hook timed out ×$to — re-gate on a quiet box (log $log)"
