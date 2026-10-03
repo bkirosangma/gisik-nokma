@@ -12,6 +12,7 @@ import {
 } from '@gisik-nokma/app-core';
 import type { NotificationKind, NotificationPreferences } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
+import { AccountSectionSkeleton } from '../../src/skeletons/screen-skeletons.js';
 import { AppearanceSection } from '../../src/account/appearance-section.js';
 import { createPasskeyClient, createSessionsClient } from '../../src/account/account-clients.js';
 import { McpTokensScreen } from '../../src/mcp-tokens-screen.js';
@@ -303,8 +304,10 @@ export default function AccountPage() {
             error={prefsError}
             saveError={prefsSaveError}
           />
-        ) : null}
-        {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
+        ) : (
+          <AccountSectionSkeleton title="Notifications" />
+        )}
+        {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : <AccountSectionSkeleton title="Your workspaces" />}
         {/* Trash series Plan 4 (spec §6.3): after "Your workspaces" because
             what it lists is the workspaces' contents, and before the three
             credential cards. Signed-in only: the read is the caller's own
@@ -318,7 +321,9 @@ export default function AccountPage() {
             onSignOutOthers={() => void signOutOthers()}
             error={sessionError}
           />
-        ) : null}
+        ) : (
+          <AccountSectionSkeleton title="Sign-in and devices" />
+        )}
         {passkeys !== null || passkeysListFailed ? (
           <PasskeysSection
             passkeys={passkeys ?? []}
@@ -327,6 +332,10 @@ export default function AccountPage() {
             error={passkeyError}
             listFailed={passkeysListFailed}
           />
+        ) : session.isPending || user !== null ? (
+          // Not signed out: `user` is null while the session is still PENDING too, so gating on it alone drew this card late
+          // and pushed Connected assistants down. A signed-out visitor makes no read, so no skeleton (25.128).
+          <AccountSectionSkeleton title="Passkeys" />
         ) : null}
         {/* Connected assistants — MOVED HERE in Round 21 (owner: "lets move MCP
             tokens to the account page. as this should not be scoped to a
