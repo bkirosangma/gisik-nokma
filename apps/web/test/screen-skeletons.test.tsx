@@ -215,8 +215,10 @@ describe('25.126 My work', () => {
     expect(body.querySelectorAll('.gn-my-work section.gn-my-work__section')).toHaveLength(4);
     expect(body.querySelectorAll('.gn-my-work__item').length).toBeGreaterThanOrEqual(4);
     expect(screen.queryByText('Loading…')).toBeNull();
-    act(() => attention.resolve([]));
-    await waitFor(() => expect(screen.queryByText('Loading what needs your attention')).toBeNull());
+    // AMENDED 2026-10-03 (smoothness-2 G1, 25.251): the band used to go when the strip answered; it now stays up until the body has
+    // answered too, and both regions swap in the body's commit. An ASYNC act, so the strip's answer has really landed before the band is read.
+    await act(async () => attention.resolve([]));
+    expect(screen.queryByText('Loading what needs your attention')).not.toBeNull();
     act(() => work.resolve({ assigned: [], inTransit: [], contested: [], shared: [] }));
     await screen.findByText('Nothing assigned to you.');
     expect(busyRegions()).toEqual([]);

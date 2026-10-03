@@ -6,7 +6,7 @@ import { openSeededBoard, readWorkspaceId, seededProjectHref } from './helpers/b
 import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 
 /**
- * Smoothness T14 (cases 25.231, 25.232, 25.235, 25.236, 25.237; spec §6, §7): the CLS / request-count ratchet, read from the deployed stack.
+ * Smoothness T14 (cases 25.231, 25.232, 25.235, 25.236, 25.237; spec §6, §7; 25.253 is smoothness-2 G1's forced-order cell): the CLS / request-count ratchet, read from the deployed stack.
  *
  * ## What 25.231 measures, per `${viewport}|${route}`
  *
@@ -298,6 +298,53 @@ test.describe('smoothness ratchet (spec §6, §7; cases 25.231-25.232, 25.235-25
         await page.waitForTimeout(800);
       }
     }
+  });
+
+  test('25.253 My work at 390 with each of its two reads FORCED to answer last: no layout shift beyond 0.02 in either order (the ratchet judges the best of three loads, which hides a coin flip)', async ({ page }) => {
+    test.setTimeout(120_000);
+    const limited: string[] = [];
+    page.on('response', (r) => {
+      if (r.status() === 429) limited.push(r.url());
+    });
+    await page.addInitScript(installProbe);
+    await signIn(page, OWNER_EMAIL);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/workspaces', { waitUntil: 'networkidle' });
+    const ws = await readWorkspaceId(page);
+    const DELAY_MS = 500;
+    const strip = (path: string): boolean => /\/v1\/workspaces\/[^/]+\/(attention|contests)$/.test(path);
+    const body = (path: string): boolean => /\/v1\/me\/work$/.test(path);
+    const shifts: Record<string, number[]> = {};
+    for (const slow of ['strip', 'body'] as const) {
+      const late = slow === 'strip' ? strip : body;
+      await page.route(
+        (url) => strip(url.pathname) || body(url.pathname),
+        async (route) => {
+          if (late(new URL(route.request().url()).pathname)) await new Promise((done) => setTimeout(done, DELAY_MS));
+          await route.continue();
+        },
+      );
+      shifts[slow] = [];
+      for (let i = 0; i < 3; i += 1) {
+        await page.waitForTimeout(PACE_MS);
+        await page.goto(`/w/${ws}/my-work`, { waitUntil: 'load' });
+        expect(await page.evaluate(() => window.innerWidth), 'the viewport did not apply').toBe(390);
+        const v = await settleAndRead(page);
+        // The instrument asserts itself: the read meant to be last really ended last, by most of the delay.
+        const ends = await page.evaluate(() => {
+          const end = (re: RegExp): number => Math.max(0, ...(performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter((e) => re.test(new URL(e.name).pathname)).map((e) => e.responseEnd));
+          return { strip: end(/\/v1\/workspaces\/[^/]+\/attention$/), body: end(/\/v1\/me\/work$/) };
+        });
+        const gap = slow === 'strip' ? ends.strip - ends.body : ends.body - ends.strip;
+        expect(gap, `forced order ${slow} last: the two reads ended ${JSON.stringify(ends)}`).toBeGreaterThan(DELAY_MS * 0.6);
+        shifts[slow]!.push(v.cls);
+        console.log(`[smoothness] 390|my-work, ${slow} read last: cls=${v.cls} (strip ends ${Math.round(ends.strip)} ms, body ends ${Math.round(ends.body)} ms) ${v.worst}`);
+      }
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+    expect(limited, 'a 429: STOP, back off, never retry in a loop').toEqual([]);
+    // The MAX over both orders, not the best: a swap that shifts in one order and not the other is the defect.
+    expect(Math.max(...Object.values(shifts).flat()), JSON.stringify(shifts)).toBeLessThanOrEqual(0.02);
   });
 
   test('25.235 a key with no baseline row fails, and the other keys are compared as usual', () => {
