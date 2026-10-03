@@ -96,6 +96,10 @@ d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 " · esc to interrupt"
 check "13.1820 panel: \"esc to interrupt\" in the footer is read with 12 agent rows below it" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"]")" = busy ]'
 d=$(fixture); mkpane "$d/6.pane" "⏺ x" "please review the diff" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
 check "13.1820 CONTROL: real text typed in the box with the panel open is still box text, and it is the typed text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box\"],d[\"box_text\"]")" = "text please review the diff" ]'
+d=$(fixture); mkpane "$d/6.pane" "⏺ x" "typed words" 12 sonnet-5-5 ""; grep -v "Ctx " "$d/6.pane" > "$d/6.tmp" && mv "$d/6.tmp" "$d/6.pane"; addpanel "$d/6.pane" 3; meta "$d" 6 planner 0
+check "13.1820 panel: with NO status line in the capture, the ❯ above a ─ rule still beats a later ❯ row" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "typed words" ]'
+d=$(fixture); printf '❯ an earlier message\n⏺ ok\n❯ real box text\n' > "$d/6.pane"; meta "$d" 6 planner 0
+check "13.1820 CONTROL: with no status line and no rule, the LAST ❯ is the box (not an echoed message above)" '[ "$(jv "$(run "$d" --json)" 6 "d[\"box_text\"]")" = "real box text" ]'
 d=$(fixture); mkpane "$d/6.pane" "⏺ x" "" 12 sonnet-5-5 ""; addpanel "$d/6.pane" 12; meta "$d" 6 planner 0
 check "13.1820 CONTROL: a panel alone makes an idle seat neither busy nor box-text" '[ "$(jv "$(run "$d" --json)" 6 "d[\"state\"],d[\"box\"]")" = "idle empty" ]'
 
