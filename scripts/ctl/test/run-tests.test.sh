@@ -282,13 +282,15 @@ for b in range(3600, 3990, 30):
         finally: s.close()
     if ok: print(b); break')
 export CTL_PW_PORT_BASE="$pwbase"; unset KG_PW_PORT FG_PW_PORT
+in_range() { local p; for p in "$@"; do [ "$p" -ge "$pwbase" ] && [ "$p" -lt $((pwbase+100)) ] || return 1; done; }   # a function, not `exit 1` inside check()'s eval: that would end the whole suite
 pw_cmd=(sh -c 'echo "${KG_PW_PORT:-unset} ${FG_PW_PORT:-unset}" > "$1"; sleep 3 # playwright' x)   # the word "playwright" in the command is what makes the verb pick ports
 reset; rm -f "$fx"/pw*.out
 rt_real --label pw1 -- "${pw_cmd[@]}" "$fx/pw1.out" >/dev/null & q1=$!; rt_real --label pw2 -- "${pw_cmd[@]}" "$fx/pw2.out" >/dev/null & q2=$!; wait $q1 $q2
 read -r k1 f1 < "$fx/pw1.out"; read -r k2 f2 < "$fx/pw2.out"
-check "13.2281 two CONCURRENT Playwright runs (two slots) get FOUR different ports (KG and FG of each: a KG port may not be the other run's FG port either), all inside the range, none of them 3191 / 3291 / 3192 / 3292" '[ "$(printf "%s\n" $k1 $f1 $k2 $f2 | sort -u | wc -l | tr -d " ")" = 4 ] && for p in $k1 $f1 $k2 $f2; do [ "$p" -ge "$pwbase" ] && [ "$p" -lt $((pwbase+100)) ] || exit 1; done'
+check "13.2281 two CONCURRENT Playwright runs (two slots) get FOUR different ports (KG and FG of each: a KG port may not be the other run's FG port either), all inside the range, none of them 3191 / 3291 / 3192 / 3292" '[ "$(printf "%s\n" $k1 $f1 $k2 $f2 | sort -u | wc -l | tr -d " ")" = 4 ] && in_range $k1 $f1 $k2 $f2'
 dry1=$(rt --dry-run -- sh -c ': # playwright'); dry2=$(rt --dry-run -- pnpm exec playwright test)
-check "13.2281 a --dry-run names the ports its run would get (inside the range, not 3191 / 3291) and a command with no Playwright in it names none" 'for d in "$dry1" "$dry2"; do kp=$(printf "%s" "$d" | sed -n "s/.* with KG_PW_PORT=\([0-9]*\) FG_PW_PORT=.*/\1/p"); [ -n "$kp" ] && [ "$kp" -ge "$pwbase" ] && [ "$kp" -lt $((pwbase+100)) ] || exit 1; done; ! rt --dry-run -- vitest run | grep -q KG_PW_PORT'
+dry_in_range() { local d kp; for d in "$@"; do kp=$(printf "%s" "$d" | sed -n "s/.* with KG_PW_PORT=\([0-9]*\) FG_PW_PORT=.*/\1/p"); [ -n "$kp" ] && in_range "$kp" || return 1; done; }
+check "13.2281 a --dry-run names the ports its run would get (inside the range, not 3191 / 3291) and a command with no Playwright in it names none" 'dry_in_range "$dry1" "$dry2" && ! rt --dry-run -- vitest run | grep -q KG_PW_PORT'
 
 mkdir -p "$repo/packages/flow-graph-browser"
 dry3=$(rt --dry-run -- pnpm turbo run test); dry4=$(rt --dry-run -- pnpm --filter @gisik-nokma/knowledge-graph-browser test); dry5=$( cd "$repo/packages/flow-graph-browser" && PATH="$FB:$PATH" "$HERE/ctl" run-tests --dry-run -- pnpm test 2>&1 )
