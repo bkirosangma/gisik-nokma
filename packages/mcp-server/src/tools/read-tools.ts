@@ -150,7 +150,8 @@ export function readTools(session: Session): ToolDefinition[] {
       name: 'get_ticket',
       description:
         'Read one ticket in full: its visibility row, its folded state (assignee, collaborators, ' +
-        'custom fields, transition history), its title, who last moved it, its parent and its rollup. ' +
+        'custom fields, transition history), its title, who last moved it, its parent, its rollup and its typed links ' +
+        '(`links`: kind, direction "out"/"in" and the other ticket, visible ends only). ' +
         'A ticket you cannot see is indistinguishable from one that does not exist — both answer not_found.',
       inputSchema: { workspaceId: z.string().min(1), ticketId: z.string().min(1) },
       handler: async (args) => {
@@ -159,13 +160,22 @@ export function readTools(session: Session): ToolDefinition[] {
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}`,
           'ticket',
-        )) as { ticketState?: { fields?: Record<string, { value: unknown }> } } & Record<string, unknown>;
+        )) as { ticketState?: { fields?: Record<string, { value: unknown }>; links?: unknown } } & Record<string, unknown>;
+        // Typed links, both directions, visible ends only (typed-links T4): the links route, not the folded outbound `ticketState.links`.
+        const linked = (await readOrNotFound(
+          session,
+          `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
+          'ticket',
+        )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string } }> };
         // The description is a document: answer it as Markdown (with what Markdown cannot show), never as the raw tree.
         const { description, ...fields } = detail.ticketState?.fields ?? {};
+        // One representation of links: `ticketState.links` (outbound ids only) is dropped in favour of `links`.
+        const { links: _outbound, ...state } = detail.ticketState ?? {};
         return {
           ...detail,
-          ...(detail.ticketState === undefined ? {} : { ticketState: { ...detail.ticketState, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
+          ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
           description: bodyAsMarkdown(description?.value ?? null),
+          links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
         };
       },
     },
