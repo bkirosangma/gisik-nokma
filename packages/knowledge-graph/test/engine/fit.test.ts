@@ -28,8 +28,8 @@ describe('the fit (port of computeFit, knowledge-graph-sigma.html:854-861)', () 
     const items = [{ x: -300, y: 0, l: 16, r: 120, t: 14, b: 14 }, { x: 300, y: 0, l: 16, r: 220, t: 14, b: 14 }, { x: 0, y: -185, l: 16, r: 90, t: 18, b: 36 }];
     const vp = { width: 800, height: 500 };
     const ratio = expectFramed(items, vp, TOP_PX.desktop); // width-bound
-    expectFramed(items, { width: 1200, height: 400 }, TOP_PX.desktop); // height-bound: the top bar decides
-    expectFramed(items, { width: 1600, height: 300 }, TOP_PX.desktop); // height-bound (the amendment's viewport)
+    expectFramed(items, { width: 1200, height: 400 }, TOP_PX.desktop); // near-bound on both axes (width binds by a hair): the top bar is still reserved
+    expectFramed(items, { width: 1600, height: 300 }, TOP_PX.desktop); // height-bound: the top bar decides (the amendment's viewport)
     // a phone: the centre card (key + 22-character title, §3.3), hop 1 as key-only taps on the phone ellipse, the fog ring
     const at = (deg: number) => ({ x: 150 * Math.cos((deg * Math.PI) / 180), y: 170 * Math.sin((deg * Math.PI) / 180) });
     const phone = fitItemsFor(
