@@ -9,6 +9,7 @@ export function extractCheckedIds(text: string): {
   malformed: { line: number; raw: string }[];
 };
 export function isCited(id: string, corpusText: string): boolean;
+export function isTestPath(relPath: string): boolean;
 export function computeUncited(
   caseFilesMap: Record<string, string[]>,
   corpusText: string,

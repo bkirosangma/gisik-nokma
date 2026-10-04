@@ -31,6 +31,7 @@ COPY packages/mcp-server/package.json packages/mcp-server/
 COPY packages/rule-engine/package.json packages/rule-engine/
 COPY packages/sync-client/package.json packages/sync-client/
 COPY packages/ui/package.json packages/ui/
+COPY packages/viewport/package.json packages/viewport/
 RUN pnpm fetch
 # Source last, so the edits above stay cache-warm for the fetch layer.
 COPY . .

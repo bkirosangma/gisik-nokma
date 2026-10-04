@@ -6,6 +6,7 @@ import {
   checkRatchet,
   extractCheckedIds,
   isCited,
+  isTestPath,
 } from '../../../../scripts/check-case-citations.mjs';
 
 /**
@@ -87,5 +88,23 @@ describe('check-case-citations ratchet', () => {
     expect(checkRatchet({ 'new.md': { uncited: 0 } }, {})).toEqual([
       { file: 'new.md', reason: 'missing-baseline', actual: 0 },
     ]);
+  });
+});
+
+describe('check-case-citations corpus', () => {
+  /**
+   * 29.007 — the flow/time browser suite's specs and the viewport package's tests are citation corpus, so a ✅ case in
+   * `test-cases/29-workflow-timeline-graphs.md` can be carried by a Playwright spec. Controls in the same `it`: the
+   * package's harness pages, its README and the viewport SOURCE are not corpus (an id written in prose would otherwise
+   * keep a case green with no test), and a `node_modules` copy of a spec directory is not either.
+   */
+  it('29.007 admits packages/flow-graph-browser/tests and packages/viewport/test; refuses the harness, the README, the source and node_modules', () => {
+    expect(isTestPath('packages/flow-graph-browser/tests/stress.spec.ts')).toBe(true);
+    expect(isTestPath('packages/viewport/test/pack.test.ts')).toBe(true);
+    expect(isTestPath('packages/knowledge-graph-browser/tests/stress.spec.ts')).toBe(true);
+    expect(isTestPath('packages/flow-graph-browser/harness/stress.tsx')).toBe(false);
+    expect(isTestPath('packages/flow-graph-browser/README.md')).toBe(false);
+    expect(isTestPath('packages/viewport/src/pack.ts')).toBe(false);
+    expect(isTestPath('packages/flow-graph-browser/node_modules/pkg/tests/a.spec.ts')).toBe(false);
   });
 });
