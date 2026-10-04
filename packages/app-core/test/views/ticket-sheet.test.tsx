@@ -328,7 +328,7 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     // `18.241`), and its LINKED FROM section (Knowledge Graph B, `27.149`) —
     // and each opens its own subscription.
     //
-    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add a ninth: it
+    // `queryNotes` (Plan 7 Task 6, case 18.285) does NOT add a tenth: it
     // fetches the workspace's note list ONCE on mount (`useEffect`, case
     // 18.288 — a final review caught that a `useLiveQuery` version here
     // would refetch on every unrelated workspace stream frame for as long
