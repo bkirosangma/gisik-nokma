@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GRAPH_GROUPS, newUlid, type Ulid } from '@gisik-nokma/domain';
 import { readGraphRing } from '../../src/read/graph-neighbours.js';
+import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
+import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
 import { verifyProjections } from '../../src/tools/verify-projections.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { linkWorld } from '../helpers/draft-link-world.js';
-import { buildReadTestApp, type ReadWorld } from '../helpers/read-app.js';
+import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
 
 let db: TestDatabase;
 let read: ReadWorld;
@@ -203,5 +205,94 @@ describe('28.105 events and History hide a link to a draft', () => {
     expect(key).toMatch(/-\d+$/); // else `{ key: null }` would equal a linkTarget that lost its key
     const line = (await historyOf('owner')).events.find((e) => e.type === 'ticket.link_added') as { linkTarget?: { key: string | null } } | undefined;
     expect(line?.linkTarget).toEqual({ key });
+  });
+});
+
+type BootTicket = { ticketId: string; snapshot: { seq: number; state: { links?: unknown } } | null; events: Array<{ type: string; payload: unknown }> };
+/** Both bootstrap doors' entry for one ticket, as `role` is served it (`undefined` when the door does not list it). */
+async function bootEntries(role: ReadRole, id: string): Promise<Array<[string, BootTicket | undefined]>> {
+  const get = (url: string) => read.app.inject({ method: 'GET', url, headers: read.authOf(role) });
+  const workspace = ((await get(`/v1/sync/bootstrap?workspaceId=${w.WS()}`)).json() as { tickets: BootTicket[] }).tickets.find((t) => t.ticketId === id);
+  const one = await get(`/v1/sync/bootstrap/ticket?workspaceId=${w.WS()}&ticketId=${id}`);
+  return [['workspace', workspace], ['per-ticket', one.statusCode === 200 ? (one.json() as { ticket: BootTicket }).ticket : undefined]];
+}
+/** Every stream item on `id` that `role`'s devices are served from the start. */
+async function streamOn(role: ReadRole, id: string): Promise<unknown[]> {
+  const out: unknown[] = [];
+  for await (const item of visibleEventsFor(db.pool, read.userIds[role], w.WS(), 0)) {
+    if ('entity' in item && item.entity.id === id) out.push(item);
+  }
+  return out;
+}
+const hideFromAllButOwner = (id: string) => w.send('owner', 'visibility.set', id, { ticketId: id, mode: 'explicit', userIds: [read.userIds.owner] });
+
+describe('28.119 the bootstrap and the doors that serve a stored link (KG->WG sync 4: K3, planner Q-B)', () => {
+  it('withholds from the author\'s bootstrap of D every end they can no longer see, in the snapshot and the tail; CONTROL: before, D carries both, and the owner is served T', async () => {
+    const [s, t, d] = [newUlid(), newUlid(), newUlid()];
+    await w.published(s);
+    await w.published(t);
+    await w.draft(d);
+    expect(await w.fromLink(d, s)).toMatchObject({ status: 'committed' }); // S blocks D, filed on D's stream
+    expect(await w.send('member', 'ticket.link_added', d, { kind: 'relates', targetId: t })).toMatchObject({ status: 'committed' }); // D relates T
+    await runSnapshotPass(db.pool, { minEvents: 1 });
+    // one more of each AFTER the snapshot, so the tail names S and T too
+    expect(await w.fromLink(d, s, 'relates')).toMatchObject({ status: 'committed' });
+    expect(await w.send('member', 'ticket.link_added', d, { kind: 'blocks', targetId: t })).toMatchObject({ status: 'committed' });
+    const tailLinks = (b: BootTicket) => b.events.filter((e) => e.type === 'ticket.link_added').map((e) => e.payload);
+
+    for (const [door, entry] of await bootEntries('member', d)) {
+      expect(entry?.snapshot, door).not.toBeNull(); // precondition: D's first two links are in a snapshot
+      expect(entry!.snapshot!.state.links, door).toEqual([{ kind: 'blocks', targetId: d, from: s }, { kind: 'relates', targetId: t }]); // CONTROL
+      expect(tailLinks(entry!), door).toEqual([{ kind: 'relates', targetId: d, from: s }, { kind: 'blocks', targetId: t }]); // CONTROL
+    }
+
+    for (const x of [s, t]) expect(await hideFromAllButOwner(x)).toMatchObject({ status: 'committed' });
+    for (const [door, entry] of await bootEntries('member', d)) {
+      expect(entry, door).toBeDefined(); // the author still opens D
+      expect(entry!.snapshot!.state, door).not.toHaveProperty('links');
+      expect(tailLinks(entry!), door).toEqual([{ kind: 'relates', targetId: null }, { kind: 'blocks', targetId: null }]);
+      expect(JSON.stringify(entry), door).not.toContain(s);
+      expect(JSON.stringify(entry), door).not.toContain(t);
+    }
+    // CONTROL: the owner, who still sees T, is served T's own entry, and never D
+    const [[, ownerT]] = await bootEntries('owner', t);
+    expect(ownerT?.ticketId).toBe(t);
+    expect((await bootEntries('owner', d)).map(([, e]) => e)).toEqual([undefined, undefined]);
+  });
+
+  it('publishes D1 alone while it links D2: no other viewer is served a D2 id on /events, the detail, either bootstrap or the stream; CONTROL: the author is served D2 on each', async () => {
+    const [d1, d2] = [newUlid(), newUlid()];
+    await w.draft(d1);
+    await w.draft(d2);
+    // a link between two drafts: plain, on the SOURCE draft's stream
+    expect(await w.send('member', 'ticket.link_added', d1, { kind: 'blocks', targetId: d2 })).toMatchObject({ status: 'committed' });
+    expect(await w.send('member', 'ticket.published', d1, { projectId: w.PROJECT() })).toMatchObject({ status: 'committed' });
+
+    type Served = { events: string; link: unknown; links: unknown; boot: string; stream: string };
+    const servedTo = async (role: ReadRole): Promise<Served> => {
+      const events = (await w.get(role, `/tickets/${d1}/events`)).json() as { events: Array<{ type: string; payload: unknown }> };
+      const boot = await bootEntries(role, d1);
+      for (const [door, entry] of boot) expect(entry?.ticketId, `${role} ${door}`).toBe(d1); // precondition: D1 is published, every door lists it
+      return {
+        events: JSON.stringify(events),
+        link: events.events.find((e) => e.type === 'ticket.link_added')?.payload,
+        links: (await w.stateOf(role, d1)).ticketState.links,
+        boot: JSON.stringify(boot),
+        stream: JSON.stringify(await streamOn(role, d1)),
+      };
+    };
+
+    const author = await servedTo('member'); // CONTROL: the author's own openable draft is served in full
+    expect(author.link).toEqual({ kind: 'blocks', targetId: d2 });
+    expect(author.links).toEqual([{ kind: 'blocks', targetId: d2 }]);
+    expect(author.boot).toContain(d2);
+    expect(author.stream).toContain(d2);
+
+    for (const role of ['owner', 'admin', 'projectLead'] as const) {
+      const other = await servedTo(role);
+      expect(other.link, role).toEqual({ kind: 'blocks', targetId: null });
+      expect(other.links, role).toBeUndefined();
+      for (const body of [other.events, other.boot, other.stream]) expect(body, role).not.toContain(d2);
+    }
   });
 });
