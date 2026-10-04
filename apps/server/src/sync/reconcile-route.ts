@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { canReadNoteById } from '../visibility/can-read-note.js';
-import { canSee } from '../visibility/can-see.js';
+import { canOpen } from '../visibility/can-open.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
 
 /**
@@ -65,7 +65,8 @@ export type ReconcileRouteDeps = { pool: Pool };
  *
  * ## Existence is never consulted, and that is a property of the code
  *
- * This handler asks `canSee` and nothing else. It does not check whether a row
+ * This handler asks `canOpen` (`canSee`, or the caller's own openable draft,
+ * drafts T4) and nothing else. It does not check whether a row
  * exists, and it must not: an answer that OMITTED unknown ids while marking
  * known-but-invisible ones `restricted` would make presence-versus-absence the
  * oracle, and "cannot distinguish lost from never-had" would come back through
@@ -75,7 +76,8 @@ export type ReconcileRouteDeps = { pool: Pool };
  * `proj_visibility` row answers `false`, identically to a ticket the viewer may
  * not see... giving them different answers here would put the oracle one layer
  * down instead of removing it."* This route is the second reader to depend on
- * that sentence. So a fabricated id comes back `restricted` exactly like a real
+ * that sentence, and `canOpen` keeps it: its draft half (`isOpenableDraft`) is
+ * `false` for a row that does not exist. So a fabricated id comes back `restricted` exactly like a real
  * one, and the client purges nothing for it, because it holds nothing to purge.
  * Case 12.286 presents an id that was never minted and asserts the answer is
  * indistinguishable from a genuine loss.
@@ -93,12 +95,12 @@ export type ReconcileRouteDeps = { pool: Pool };
  * take and imported rather than restated. `additionalProperties: false` matches
  * both. 403 `{error:'not_a_member'}` when `resolveEffectiveRole` answers null,
  * exactly as `/v1/sync/bootstrap` does — a stranger gets the membership answer
- * and never reaches `canSee`, so they cannot use this door as an id probe at
+ * and never reaches `canOpen`, so they cannot use this door as an id probe at
  * all. A client holding more than `MAX_BATCH_SIZE` tickets calls repeatedly;
  * the answer is per-request and order-independent, so chunking changes nothing.
  *
  * Duplicates in `heldIds` are answered once. That is not deduplication for
- * tidiness — repeating an id must not multiply the work `canSee` does per
+ * tidiness — repeating an id must not multiply the work `canOpen` does per
  * request.
  */
 /**
@@ -136,7 +138,7 @@ export type ReconcileRouteDeps = { pool: Pool };
  * as the route does.
  *
  * Duplicates in `heldIds` are answered once — not for tidiness, but so
- * repeating an id cannot multiply the `canSee` work one request does.
+ * repeating an id cannot multiply the `canOpen` work one request does.
  */
 export async function reconcileHeldIds(
   db: Queryable,
@@ -150,7 +152,9 @@ export async function reconcileHeldIds(
     asked.add(id);
     // The ONE question. Not "does it exist", not "did they hold it" — see the
     // route's docblock on why either would reopen what this door closes.
-    if (!(await canSee(db, userId, id))) {
+    // It is `canOpen`, not `canSee` (drafts G5): a device holding its author's own draft must not be told to
+    // purge it at every catch-up. A draft's author holds it; everyone else is told it is restricted.
+    if (!(await canOpen(db, userId, id))) {
       restricted.push({ kind: 'restricted', id });
     }
   }
@@ -163,7 +167,8 @@ export async function reconcileHeldIds(
  *
  * ## Why the predicate cannot be shared
  *
- * Tickets are answered by `canSee`, which resolves a row in `proj_visibility`.
+ * Tickets are answered by `canOpen` (`canSee`, which resolves a row in `proj_visibility`,
+ * or the caller's own openable draft).
  * A note has no row there, so `canSee` answers `false` for every note and every
  * caller — a device would be told to purge its entire note store on every
  * catch-up, which is the "answer that wipes a replica" failure `reconcile-route`'s

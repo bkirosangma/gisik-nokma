@@ -9,6 +9,7 @@ import { listTicketAttachments } from '../attachments/attachment-repo.js';
 import { sanitizeFilename } from '../attachments/filename.js';
 import { listTicketComments } from '../read/ticket-comments.js';
 import { canSee } from '../visibility/can-see.js';
+import { canOpen } from '../visibility/can-open.js';
 import { rollupFor, type RollupView } from '../visibility/rollup.js';
 import { listVisibleTickets } from '../visibility/visible-tickets.js';
 import { ticketNumber } from '../read/ticket-numbers.js';
@@ -205,7 +206,8 @@ export type AncestorRef =
  * `title` on the visible branch, and its ABSENCE on the restricted branch, are
  * one decision made once (ruling P25 clause 1).
  *
- * The rule applied is `canSee` (`../visibility/can-see.ts:227`), at the call the
+ * The rule applied is `canOpen` (`../visibility/can-open.ts`: `canSee`, or the viewer's own openable draft,
+ * drafts T4), at the call the
  * handler below already makes about the parent — the branch that chooses between
  * these two members IS the rule's answer. So the title travels on exactly the
  * arm where the viewer may read the parent, which is the arm on which a direct
@@ -315,9 +317,11 @@ export function toEventView(row: LedgerRow): LedgerEventView {
  * outsider gets `200 { tickets: [] }`, because "you may not see this" and
  * "there is nothing here" must not be tellable apart on a collection either.
  *
- * ## The visibility decision is `canSee`'s, always
+ * ## The visibility decision is `canOpen`'s on the detail route and `canSee`'s on every other read here
  *
- * No SQL here re-states who may see what. `canSee` resolves the viewer's
+ * No SQL here re-states who may see what. `canOpen` (drafts T4) is `canSee` or the viewer's own openable
+ * draft (`../visibility/can-open.ts`), so the author reads their draft and its crumbs on the detail route and
+ * nowhere else in this file. `canSee` resolves the viewer's
  * `EffectiveRole` itself (never a direct `proj_memberships` read, whose
  * project-scope rows survive a revocation by design) and answers `false` alike
  * for an invisible ticket and one with no row. This route adds exactly one
@@ -369,11 +373,14 @@ export function registerTicketRoutes(
       if (ticket === undefined) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
-      if (!(await canSee(deps.pool, request.currentUserId, ticketId))) {
+      // The author reads their own draft here (drafts G7). The response needs no `draft` member of its own:
+      // `ticketState` is the head state and carries `draft` (T3), and `key` is `null` because a draft has no
+      // numbering row (T2). Everyone else gets the not-found answer an unknown id gets.
+      if (!(await canOpen(deps.pool, request.currentUserId, ticketId))) {
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
-      // The ticket's own domain state, read AFTER `canSee` said yes and scoped
+      // The ticket's own domain state, read AFTER `canOpen` said yes and scoped
       // to the workspace the path names. `getTicketStateFromDb` is the reader
       // Plan 3 Task 12 shipped for `proj_tickets`; nothing here re-expresses it.
       const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
@@ -423,7 +430,7 @@ export function registerTicketRoutes(
           // A parent_id naming no row. The projection already resolved this
           // ticket as a root; claiming a restricted parent would invent one.
           parent = null;
-        } else if (await canSee(deps.pool, request.currentUserId, ticket.parent_id)) {
+        } else if (await canOpen(deps.pool, request.currentUserId, ticket.parent_id)) {
           // The title is read INSIDE this branch, so the read itself is gated by
           // the answer rather than being filtered afterwards — there is no code
           // path on which a restricted parent's title is in a variable at all.
@@ -590,19 +597,20 @@ export function registerTicketRoutes(
        * THE GRANDPARENT — the nearest PROPER ancestor whose type carries the
        * epic rank, or `null` when there is none.
        *
-       * ## Why this walks with `canSee` instead of calling `epicAncestors`
+       * ## Why this walks with `canOpen` instead of calling `epicAncestors`
        *
        * `routes/list.ts` groups a whole PAGE by epic with one recursive CTE,
        * and that CTE carries `visibleTicketsWhere` — a SQL visibility
        * expression. **This route may not have one.** Its own docblock is
-       * explicit (`:309-316`): *"The visibility decision is `canSee`'s,
-       * always. No SQL here re-states who may see what."*
+       * explicit (the "visibility decision" section above): the decision is
+       * `canOpen`'s here (`canSee`, or the viewer's own draft, drafts T4), and
+       * *"No SQL here re-states who may see what."*
        *
        * So the walk is the `parent` branch directly above, repeated: **the same
-       * `loadTicketRow` existence test FIRST**, then the same `canSee`, the
+       * `loadTicketRow` existence test FIRST**, then the same `canOpen`, the
        * same `getTicketStateFromDb`, the same soft-delete arm, the same
        * `restricted` shape for an ancestor this viewer may not see. **No
-       * visibility rule is restated** — each hop asks `canSee` the question it
+       * visibility rule is restated** — each hop asks `canOpen` the question it
        * already answers — and the two reads agree by construction because they
        * are the same calls.
        *
@@ -671,7 +679,7 @@ export function registerTicketRoutes(
         if (row === undefined) {
           break;
         }
-        if (!(await canSee(deps.pool, request.currentUserId, cursor))) {
+        if (!(await canOpen(deps.pool, request.currentUserId, cursor))) {
           epic = { kind: 'restricted', id: cursor };
           break;
         }
