@@ -16,6 +16,8 @@ A pass, in this order (each seat gets at most one action, each queue item and ea
   (a) a FREE REVIEWER (idle, box empty, 0 shells, holding no open TOOK) takes the open REVIEW item the pull rule ranks first:
       FIX re-checks, the critical path, the oldest; A/B their own pool first, C either (KG wins a tie).
   (c) a free lane with nothing startable becomes a reviewer (fluid rule B) for an item that passes the independence rules.
+Every pass also logs `WARN hold >10 min with waiters` when a `ctl run-tests` slot is held past 10 min while another run waits
+(slot_watch; read-only), and, live only, runs `ctl prune-gate-locks --apply` once an hour.
 Every item skips: needs-tip, an item addressed to another reviewer, a stale sha (origin/<branch> moved: a preflight or a tipmerge is
 in flight), a lane busy/dirty/unpushed on that branch (preflight in flight), and for a lane-reviewer its own work, a branch stacked on
 its own work and a branch its own work stacks on.
@@ -24,7 +26,7 @@ The DOOR (class Door) is the ONLY code that writes a file, appends a queue line,
 without --dry-run, or calls `ctl restart`; under --shadow it logs `WOULD …` and returns before any of that (13.2117).
 Seams (tests): CTL_LANES_DIR, CTL_LOG_DIR, CTL_AUTOPILOT_REPO, CTL_AUTOPILOT_SEATS_CMD, CTL_AUTOPILOT_CTL, CTL_AUTOPILOT_REVIEWER_BOOT,
 CTL_AUTOPILOT_NOW (epoch), CTL_AUTOPILOT_LANES ("1:WG,2:WG,3:KG,4:KG"), CTL_AUTOPILOT_REVIEWERS ("A:7:KG,B:9:WG,C:10:*"),
-CTL_AUTOPILOT_WT_ROOT (/Users/kiro/my_projects).
+CTL_AUTOPILOT_WT_ROOT (/Users/kiro/my_projects), CTL_AUTOPILOT_PS_CMD and CTL_SEM_DIR (the slot watch).
 """
 import argparse, fnmatch, json, os, re, subprocess, sys, time
 
