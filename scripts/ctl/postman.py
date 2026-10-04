@@ -690,17 +690,25 @@ def audit_scan(stats):
 # ───────────────────────────── the shadow parity audit ─────────────────────────────
 # `ctl postman audit --parity | --since T | --window N` compares the shadow log with the dispatcher's own record (DISPATCH-log.md, which also
 # carries the orchestrator's acks), QUEUE-dispatch.md and the ledger. Buckets:
-#   matched   (a) a delivery the dispatcher logged (verb, lane) paired one-to-one with a shadow queue record of that verb and lane, or (b) a
-#             BY-ORCH AGREEMENT (below); either way the record lies in the PAIRING WINDOW: no later than 2 min after the log line and no more
-#             than CTL_POSTMAN_AUDIT_TOL (45 min) before it. Dispatcher pairs are made first; agreements take the records left over;
-#   missed    a dispatcher delivery with no shadow record to pair with (named with the bridge's refusal reason when there is one), or a ledger
-#             message since the shadow baseline with no shadow record;                                            -> exit 1
+#   matched   (a) a delivery the dispatcher logged (verb, lane, ref words) paired one-to-one with a shadow queue record of that verb and lane
+#             whose name its REF WORDS agree with — the same ref rule and the same ref_agrees as a BY-ORCH agreement (planner ruling 2026-10-04
+#             17:54: REQUIRE, never prefer); among the agreeing records the earliest wins — or (b) a BY-ORCH AGREEMENT (below); either way the
+#             record lies in the PAIRING WINDOW: no later than 2 min after the log line and no more than CTL_POSTMAN_AUDIT_TOL (45 min) before
+#             it. Dispatcher pairs are made first; agreements take the records left over. Each MATCHED line prints its ref words and the name;
+#   unpaired  a dispatcher delivery with a record of its verb + lane in the window but none it can pair, printed with ONE reason and the
+#             candidates: `no-ref` when no ref word holds a letter (nothing can agree: `FIX 2 toolbar-brd08 delivered` names the task AFTER
+#             the verb, and the exact `HH:MM DELIVERED <VERB> <lane>` form's only word before it is a stop word), else `ref-mismatch`. The
+#             records stay unpaired (EXTRA, with their own reason). Every unpaired fails condition A (-> exit 2): a wrong pair whose leftover
+#             has a reason would otherwise pass it quietly. NOREF_NOTE: dispatcher lines before 2026-10-03 name the task after the verb and
+#             audit as no-ref; run condition A on windows from 10-03 on (planner ruling 18:57: one extraction rule, before the verb only);
+#   missed    a dispatcher delivery with NO shadow record of its verb + lane in the window (named with the bridge's refusal reason when there
+#             is one), or a ledger message since the shadow baseline with no shadow record;                     -> exit 1
 #   duplicate a surplus shadow record: the same queue src twice, the same ledger id twice, or two ledger messages to one seat with the same kind
 #             and body within CTL_POSTMAN_DUP_WINDOW (10 min);                                                     -> exit 1
 #   extra     a shadow queue delivery nothing matched, printed with ONE reason word (EXTRA REASONS below);
 #   by-orch   a DISPATCH-log line that says the orchestrator delivered it, each of its verbs marked agreed, or why not.
 # CONDITION A (planner ruling 2026-10-04 09:03, "count MATCHED, never shadow deliveries"): PASS = matched (dispatcher pairs + BY-ORCH
-# agreements) >= 20 AND missed = 0 AND duplicate = 0 AND every EXTRA has a reason. A miss or a duplicate exits 1; a clean parity whose
+# agreements) >= 20 AND missed = 0 AND duplicate = 0 AND unpaired = 0 AND every EXTRA has a reason. A miss or a duplicate exits 1; a clean parity whose
 # condition A fails prints `CONDITION A FAIL: <each failing clause>` and exits 2; exit 0 only with `CONDITION A PASS`. The queue deliveries in
 # the window and the ledger records (seats' own `ctl post` messages, which the dispatcher never carried) are printed beside it as information
 # and count toward nothing. `--window N` = the last N queue deliveries. Condition B (one gate cycle, zero missed) is the choice of window.
@@ -742,6 +750,7 @@ def audit_scan(stats):
 #   ?           none: printed `reason=?`, and condition A fails.
 DELIVER_VERBS = ("NEXT", "FIX", "MERGETIP")
 COND_A_MIN = 20          # planner condition A: matched >= 20
+NOREF_NOTE = "dispatcher lines before 2026-10-03 name the task after the verb and audit as no-ref; run condition A on windows from 10-03 on"
 AUDIT_TOL = int(os.environ.get("CTL_POSTMAN_AUDIT_TOL", "2700"))
 DUP_WINDOW = int(os.environ.get("CTL_POSTMAN_DUP_WINDOW", "600"))
 D_G0 = re.compile(r"^\d\d:\d\d DELIVERED (NEXT|FIX|MERGETIP) (?:lane\s*)?([0-9]{1,2})\b")
@@ -815,17 +824,18 @@ def clause_pairs(c, named=False):
 
 
 def parse_dispatch_line(line):
-    """-> (pairs [(verb, lane)], unparsed bool, by_orchestrator bool, BY-ORCH verbs [(verb, lane or None, ref words)]) for one DISPATCH-log line."""
+    """-> (pairs [(verb, lane, ref words)], unparsed bool, by_orchestrator bool, BY-ORCH verbs [(verb, lane or None, ref words)]) for one
+    DISPATCH-log line. The exact form's only word before its verb is DELIVERED, a stop word, so its ref words are always empty (no-ref)."""
     m0 = D_G0.match(line)
-    if m0: return [(m0.group(1), m0.group(2))], False, False, []
+    if m0: return [(m0.group(1), m0.group(2), ref_words(line[6:m0.start(1)]))], False, False, []
     pairs, cand, orch, opairs = [], False, False, []
     for clause in re.split(r";|(?<=[.!?])\s+", line[6:]):
         if not D_POS.search(clause) or D_NEG.search(clause): continue
         if D_ORCH.search(clause):
             orch = orch or bool(D_KEY.search(clause)); opairs += clause_pairs(clause, named=True); continue
-        for verb, lane, _ in clause_pairs(clause):
+        for verb, lane, ws in clause_pairs(clause):
             if lane is None: cand = True
-            else: pairs.append((verb, lane))
+            else: pairs.append((verb, lane, ws))
     return pairs, cand and not pairs, orch, opairs
 
 
@@ -860,7 +870,7 @@ def audit_parity(o):
     except (ValueError, AssertionError) as e: fail("postman", "audit: %s" % (e if str(e) else "--window needs a positive number"))
     inw = lambda r: r["epoch"] >= since
     near = lambda r, t: r["epoch"] <= t + 120 and t - r["epoch"] <= AUDIT_TOL          # the pairing window
-    missed, dups, extras, matched, unparsed, by_orch = [], [], [], [], [], []
+    missed, dups, extras, matched, unparsed, by_orch, unpaired = [], [], [], [], [], [], []
     # duplicates among shadow records
     seen = {}
     for r in queue:
@@ -893,15 +903,17 @@ def audit_parity(o):
     for i, line in enumerate(lines):
         if ts[i] is None or ts[i] < since - 60: continue
         pairs, cand, orch, opairs = parse_dispatch_line(line)
-        for verb, win in pairs: dis.append((ts[i], verb, str(int(win)), line))
+        for verb, win, ws in pairs: dis.append((ts[i], verb, str(int(win)), line, ws))
         if cand: unparsed.append(line)
         if orch: by_orch.append((line, [(ts[i], verb, None if win is None else str(int(win)), ws) for verb, win, ws in opairs]))
     lane = lambda r: str(int(r["win"]))
     avail = sorted([r for r in pool if r["verb"] in DELIVER_VERBS and not r.get("refused")], key=lambda r: r["epoch"])
     refused = [r for r in pool if r.get("refused")]
-    for t, verb, win, line in sorted(dis):
-        hit = next((r for r in avail if r["verb"] == verb and lane(r) == win and near(r, t)), None) if win.isdigit() else None
-        if hit: avail.remove(hit); matched.append((hit, line))
+    for t, verb, win, line, ws in sorted(dis):
+        cands = [r for r in avail if r["verb"] == verb and lane(r) == win and near(r, t)] if win.isdigit() else []
+        hit = next((r for r in cands if ref_agrees(ws, r)), None)          # REQUIRE the ref (the BY-ORCH rule's own function); the earliest agreeing wins
+        if hit: avail.remove(hit); matched.append((hit, line, ws))
+        elif cands: unpaired.append(("ref-mismatch" if re.search(r"[a-z]", "".join(ws)) else "no-ref", verb, win, ws, line, cands))
         else:
             why = next((" (the bridge refused it: %s)" % r["refused"] for r in refused if r["verb"] == verb and str(r["win"]).lstrip("0") == win.lstrip("0") and abs(t - r["epoch"]) <= AUDIT_TOL), "")
             missed.append("%s %s: the dispatcher delivered it, no shadow delivery to pair with%s — %s" % (verb, win, why, line[:160]))
@@ -910,34 +922,44 @@ def audit_parity(o):
         st = []
         for t, verb, win, ws in ops:
             hit = next((r for r in avail if r["verb"] == verb and lane(r) == win and ref_agrees(ws, r) and near(r, t)), None) if win else None
-            if hit: avail.remove(hit); matched.append((hit, "BY-ORCH " + line)); agreed += 1; st.append("%s lane %s agreed" % (verb, win))
+            if hit: avail.remove(hit); matched.append((hit, "BY-ORCH " + line, ws)); agreed += 1; st.append("%s lane %s agreed" % (verb, win))
             else: st.append("%s: names no lane" % verb if not win else "%s lane %s: no shadow record agrees on verb + lane + ref" % (verb, win))
         orch_out.append("%s [%s]" % (line[:200], "; ".join(st) or "no NEXT/FIX/MERGETIP"))
     # EXTRA REASONS (the docblock above)
     evid = [(t, x, None) for t, x in zip(ts, lines) if t is not None] + [(t, x, queue_src(x)) for t, x in zip(verdict_times(qlines), qlines) if t is not None]
-    lane_dl = [(t, win) for t, _, win, _ in dis] + [(t, win) for _, ops in by_orch for t, _, win, _ in ops if win]
+    lane_dl = [(t, win) for t, _, win, _, _ in dis] + [(t, win) for _, ops in by_orch for t, _, win, _ in ops if win]
     said = lambda r, pat: any(near(r, t) and s != r["src"] and names(x, r) and pat.search(name_cut(x, r)) for t, x, s in evid)     # never its own queue line
     superseded = lambda r: any(q["epoch"] > r["epoch"] and lane(q) == lane(r) and near(r, q["epoch"])
                                and not any(w == lane(r) and r["epoch"] - 60 <= t < q["epoch"] - 60 for t, w in lane_dl) for q in pool if not q.get("refused"))
     extras = [(r, "held" if said(r, D_HELD) else "no-deliver" if said(r, D_NODEL) else "superseded" if superseded(r) else "?") for r in avail]
     noreason = sum(1 for _, w in extras if w == "?")
     n_in, n_led = sum(1 for r in deliveries if inw(r)), sum(1 for r in lrecs if inw(r))
-    for x in matched: print("MATCHED   %s %s (shadow %s) = %s" % (x[0]["verb"], x[0]["win"], x[0]["ts"], x[1][:110]))
+    refs = lambda ws: "ref=%s" % ("-".join(ws) or "(none)")
+    for r, line, ws in matched: print("MATCHED   %s %s (shadow %s) %s ~ %s = %s" % (r["verb"], r["win"], r["ts"], refs(ws), " ".join(v for v in (r.get("brief"), r.get("ref")) if v) or "(no name)", line[:110]))
     for x in missed: print("MISSED    " + x)
+    for why, verb, win, ws, line, cands in unpaired:
+        names_ = ["%s %s" % (r["line_time"], " ".join(v for v in (r.get("brief"), r.get("ref")) if v) or "(no name)") for r in cands]
+        print("UNPAIRED  %s lane %s %s reason=%s; same verb + lane in the window, none agreeing: %s — %s" % (verb, win, refs(ws), why,
+              ", ".join(names_[:5]) + (" +%d more" % (len(names_) - 5) if len(names_) > 5 else ""), line[:160]))
     for x in dups: print("DUPLICATE " + x)
     for r, w in extras: print("EXTRA     %s %s %s %s (no dispatcher delivery, no BY-ORCH agreement) reason=%s" % (r["line_time"], r["verb"], r["win"], " ".join(v for v in (r.get("brief"), r.get("ref")) if v), w))
     for x in unparsed: print("UNPARSED  " + x[:200])
     for x in orch_out: print("BY-ORCH   " + x)
+    ureason = {k: sum(1 for u in unpaired if u[0] == k) for k in ("ref-mismatch", "no-ref")}
+    print("PAIRING   matched %d; unpaired %d (ref-mismatch %d, no-ref %d); extra %d" % (len(matched), len(unpaired), ureason["ref-mismatch"], ureason["no-ref"], len(extras)))
+    if ureason["no-ref"]: print("NOTE      " + NOREF_NOTE)
     print("window: %s; shadow queue deliveries in it: %d; ledger records beside them: %d (information only: condition A counts MATCHED)" % (desc, n_in, n_led))
     need = (["matched %d < %d" % (len(matched), COND_A_MIN)] if len(matched) < COND_A_MIN else []) + (["missed %d" % len(missed)] if missed else []) \
-        + (["duplicate %d" % len(dups)] if dups else []) + (["%d EXTRA without a reason" % noreason] if noreason else [])
+        + (["duplicate %d" % len(dups)] if dups else []) \
+        + (["unpaired %d (%s)" % (len(unpaired), ", ".join("%s %d" % kv for kv in ureason.items() if kv[1]))] if unpaired else []) \
+        + (["%d EXTRA without a reason" % noreason] if noreason else [])
     split = "matched %d = dispatcher pairs %d + BY-ORCH agreements %d" % (len(matched), len(matched) - agreed, agreed)
     if need: print("CONDITION A FAIL: %s (%s)" % ("; ".join(need), split))
     else:
         rs = ", ".join("%s %d" % (k, sum(1 for _, w in extras if w == k)) for k in ("held", "no-deliver", "superseded") if any(w == k for _, w in extras))
-        print("CONDITION A PASS: matched %d >= %d, missed 0, duplicate 0, every EXTRA has a reason (%s) (%s)" % (len(matched), COND_A_MIN, rs or "no EXTRA", split))
+        print("CONDITION A PASS: matched %d >= %d, missed 0, duplicate 0, unpaired 0, every EXTRA has a reason (%s) (%s)" % (len(matched), COND_A_MIN, rs or "no EXTRA", split))
     print("POSTMAN AUDIT %s %d/%d/%d" % (desc, len(matched), len(missed), len(dups)))
-    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d by_orchestrator=%d agreed=%d no_reason=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed), len(by_orch), agreed, noreason)
+    tail = "%s: matched=%d missed=%d duplicate=%d extra=%d unparsed=%d by_orchestrator=%d agreed=%d no_reason=%d unpaired=%d" % (desc, len(matched), len(missed), len(dups), len(extras), len(unparsed), len(by_orch), agreed, noreason, len(unpaired))
     if missed or dups: fail("postman", "audit parity %s" % tail)
     if need: print("FAIL postman audit parity %s; condition A not met" % tail); sys.exit(2)
     ok("postman", "audit parity %s" % tail)
