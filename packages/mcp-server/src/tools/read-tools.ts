@@ -45,8 +45,9 @@ type AttachedNote = { noteId: string; title: string; authorId: string; updatedAt
 
 /**
  * The notes attached to a ticket that THIS caller may read, as the Notes section of the ticket sheet reads them
- * (`GET …/tickets/:id/notes`, `apps/server/src/routes/notes.ts:87-96`). The route has no ticket check of its own, so the
- * caller reads the ticket first. Any failure here fails the call (GT-5).
+ * (`GET …/tickets/:id/notes`, `apps/server/src/routes/notes.ts:88-98`). The route has no visibility check of its own (it
+ * answers an empty list for another person's draft or an erased one, drafts T9, and nothing more), so the caller reads
+ * the ticket first. Any failure here fails the call (GT-5).
  */
 async function attachedNotes(session: Session, path: string): Promise<AttachedNote[]> {
   let body: unknown;

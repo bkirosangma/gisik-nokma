@@ -6,11 +6,12 @@ import type { Pool } from 'pg';
 import { EMBEDDABLE_IMAGE_MIME, newUlid } from '@gisik-nokma/domain';
 import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/require-session.js';
-import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
+import { getResolvedVisibility } from '../visibility/can-see.js';
+import { canOpen } from '../visibility/can-open.js';
 import { canReadNoteById } from '../visibility/can-read-note.js';
 import { getNoteStateFromDb } from '../projections/notes.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
-import { ticketIsLive } from '../read/live-ticket.js';
+import { ticketIsOpenable } from '../read/live-ticket.js';
 import { getAttachment, insertAttachment } from '../attachments/attachment-repo.js';
 import { sha256Hex } from '../attachments/content-hash.js';
 import { sanitizeFilename } from '../attachments/filename.js';
@@ -68,10 +69,11 @@ const NOTE_UPLOAD_FORBIDDEN_BODY = {
  * difference" either. Nothing measured that, and it is false as written. A
  * nonexistent ticket costs exactly one query — `getResolvedVisibility` returns
  * null and short-circuits the `||` — while a real-but-invisible ticket costs
- * that query plus `canSee`, which re-runs `getResolvedVisibility` and then
- * `resolveEffectiveRole` (`visibility/can-see.ts`). Three round-trips against
- * one, and the asymmetry runs in the direction an attacker would want: the real
- * ticket is the slow one.
+ * that query plus `canOpen`: `canSee`, which re-runs `getResolvedVisibility` and
+ * then `resolveEffectiveRole` (`visibility/can-see.ts`), and on its false answer
+ * the draft head read of `isOpenableDraft` (drafts T9, G10; `visibility/can-open.ts`).
+ * Four round-trips against one, and the asymmetry runs in the direction an
+ * attacker would want: the real ticket is the slow one.
  *
  * The constraint this plan imposes is BYTE-IDENTITY of the answer, and that is
  * met and tested. The timing channel is real but unmeasured and unclosed here:
@@ -165,7 +167,8 @@ function discardUnreadFile(file: Readable): void {
  *      and translated to this route's body
  *   3. no `file` part → 400
  *   4. no usable `ticketId` field (absent, or truncated by `fieldSize`) → 400
- *   5. ticket not visible, or not there → 404
+ *   5. ticket not openable (`canOpen`: not visible, and not the caller's own
+ *      draft, drafts T9 G10), or not there → 404
  *   6. ticket SOFT-DELETED → 404, the SAME body as step 5 (added 2026-09-20)
  *   7. file over `maxBytes` → 413
  *   8. bytes not an accepted type → 415
@@ -179,8 +182,8 @@ function discardUnreadFile(file: Readable): void {
  *
  * ⚠ **Step 6 is a SECOND, DISTINCT 404 reason and was missing from this list
  * until 2026-09-20** — the tombstone guard, added after step 5 rather than
- * folded into it because it is a different question (`canSee` is visibility and
- * does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
+ * folded into it because it is a different question (`canOpen`, like the
+ * `canSee` it asks first, is visibility and does not mean "not deleted"). It sits BELOW step 5 on purpose: a caller who
  * may not see the ticket must get step 5's answer whether or not the ticket is
  * also deleted, or the deleted-ness would be an inference they were never owed.
  * It is above steps 7 and 8 for the same reason step 5 is: a deleted ticket
@@ -390,15 +393,16 @@ export async function registerAttachmentRoutes(
     }
 
     // The ticket's OWN workspace, read from `proj_visibility` — the same table
-    // `canSee` decides on. The plan text read `proj_tickets` for this, which
-    // would put existence and permission on two different tables: a ticket
+    // `canSee` decides on (`canOpen`'s first question, drafts T9 G10). The
+    // plan text read `proj_tickets` for this, which would put existence and
+    // permission on two different tables: a ticket
     // present in one and absent from the other would be answerable or deniable
     // depending on which query ran first.
     //
     // One TABLE, and — stated precisely, because the first draft of this
     // comment said "one source, one answer" and meant something stronger than
-    // it delivered — two READS of it. `canSee` calls `getResolvedVisibility`
-    // itself, so `visibility.workspaceId` below comes from this read while the
+    // it delivered — two READS of it. `canOpen` asks `canSee`, which calls
+    // `getResolvedVisibility` itself, so `visibility.workspaceId` below comes from this read while the
     // permission answer comes from that one. A projection rewriting the row
     // between them would file the object under the workspace of read #1 having
     // been permitted by read #2. Not a hole worth a transaction here, but Task
@@ -409,14 +413,16 @@ export async function registerAttachmentRoutes(
     let workspaceId: string;
     if (ticketId !== null) {
       const visibility = await getResolvedVisibility(deps.pool, ticketId);
-      if (visibility === null || !(await canSee(deps.pool, request.currentUserId, ticketId))) {
+      // G10 (drafts spec R56): `canOpen`, not `canSee`. The author of a draft may upload to it; everyone else gets the
+      // not-found answer an unknown ticket gets.
+      if (visibility === null || !(await canOpen(deps.pool, request.currentUserId, ticketId))) {
         discardUnreadFile(data.file);
         return replyNotFound(reply);
       }
 
       // A TOMBSTONED ticket takes no new files, and this is the door where the
       // refusal matters most: the read doors DISCLOSE, this one lets content
-      // ACCRETE onto a ticket the product has removed from every view. `canSee`
+      // ACCRETE onto a ticket the product has removed from every view. `canOpen`
       // above cannot answer it — the visibility predicate deliberately does not
       // mean "not deleted" (`read/visible-where.ts`) — so the rule is asked
       // separately, in its one spelling.
@@ -424,7 +430,7 @@ export async function registerAttachmentRoutes(
       // `discardUnreadFile` runs on this path for the same reason as the refusal
       // above it: the multipart file stream must be drained or destroyed before
       // a handler returns, or the request is left holding a part nobody reads.
-      if (!(await ticketIsLive(deps.pool, visibility.workspaceId, ticketId))) {
+      if (!(await ticketIsOpenable(deps.pool, visibility.workspaceId, ticketId))) {
         discardUnreadFile(data.file);
         return replyNotFound(reply);
       }
@@ -522,8 +528,9 @@ export async function registerAttachmentRoutes(
   });
 
   /**
-   * The download door: bytes leave here, and `canSee` on the OWNING TICKET
-   * decides who gets to ask for them at all.
+   * The download door: bytes leave here, and `canOpen` on the OWNING TICKET
+   * decides who gets to ask for them at all (drafts T9, G10: a reader `canSee`
+   * admits, or the author of a draft).
    *
    * ## Same 404, three different reasons, deliberately
    *
@@ -541,13 +548,13 @@ export async function registerAttachmentRoutes(
    *
    * FOUR cases collapse into it:
    *
-   *   (a) the row exists but its ticket is invisible to this viewer — `canSee`
+   *   (a) the row exists but its ticket is invisible to this viewer — `canOpen`
    *       returns false;
    *   (b) the id names no row at all — `getAttachment` returns null;
-   *   (c) the row exists, `canSee` passes, but the OBJECT is gone from the
+   *   (c) the row exists, `canOpen` passes, but the OBJECT is gone from the
    *       store — `store.getStream` throws `ObjectNotFoundError`;
-   *   (d) the row exists and `canSee` passes, but its TICKET is soft-deleted —
-   *       `ticketIsLive` returns false. This is the case the door was missing
+   *   (d) the row exists and `canOpen` passes, but its TICKET is soft-deleted —
+   *       `ticketIsOpenable` returns false. This is the case the door was missing
    *       until 2026-09-20, and it is the sharpest of the four: what leaves is
    *       the file itself, so a 200 here is not a hint of a leak but the whole
    *       content, on a ticket whose own detail route already answers 404.
@@ -615,7 +622,7 @@ export async function registerAttachmentRoutes(
     const row = await getAttachment(deps.pool, id);
     if (!row) return replyNotFound(reply);
     // THE OWNER DECIDES WHO MAY ASK, and the two kinds ask different questions.
-    // A ticket-owned attachment is authorised by `canSee` on its ticket, plus
+    // A ticket-owned attachment is authorised by `canOpen` on its ticket, plus
     // the tombstone guard below; a note-owned one by `canReadNoteById`, which
     // is the ONE reader predicate every other note read goes through. Nothing
     // here is a second spelling of either rule.
@@ -624,7 +631,7 @@ export async function registerAttachmentRoutes(
         return replyNotFound(reply);
       }
     } else if (row.ticketId !== null) {
-      if (!(await canSee(deps.pool, request.currentUserId, row.ticketId))) {
+      if (!(await canOpen(deps.pool, request.currentUserId, row.ticketId))) {
         return replyNotFound(reply);
       }
       // The ticket this attachment belongs to is ASKED FOR BY ID — a caller who
@@ -633,7 +640,7 @@ export async function registerAttachmentRoutes(
       // well as at the list door. It IS the ticket's rule: the lookup resolves
       // through `row.ticketId`, and the tombstone makes the bytes leave nothing,
       // exactly as the ticket's own detail route refuses its name.
-      if (!(await ticketIsLive(deps.pool, row.workspaceId, row.ticketId))) {
+      if (!(await ticketIsOpenable(deps.pool, row.workspaceId, row.ticketId))) {
         return replyNotFound(reply);
       }
     } else {
