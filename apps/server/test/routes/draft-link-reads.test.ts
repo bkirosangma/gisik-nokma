@@ -70,7 +70,10 @@ describe('28.115 projection and rebuild', () => {
 });
 
 type LinksBody = { links: Array<{ kind: string; direction: string; ticket: { id: string; key: string | null; title: string } }> };
-const shape = (b: LinksBody) => b.links.map((l) => [l.kind, l.direction, l.ticket.id]);
+const shape = (b: LinksBody) => {
+  expect(Object.keys(b)).toEqual(['links']); // a not-found or error body fails HERE, as an assertion
+  return b.links.map((l) => [l.kind, l.direction, l.ticket.id]);
+};
 
 describe('28.117 the links read on a draft', () => {
   it('shows the author both directions, hides it from everyone else byte-identically, and keeps draft ends off a published sheet; CONTROL: after publish both sheets list it', async () => {

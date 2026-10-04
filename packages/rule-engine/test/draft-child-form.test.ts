@@ -5,7 +5,7 @@ import { buildMemoryContext } from '../src/memory-context.js';
 import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import { getTicketState } from '../src/checks/context-helpers.js';
 import {
-  AUTHOR, EPIC, OTHER, PROJECT, PROJECT_B, STORY, SUBTASK, TASK, WF, WS, created, draftCreated, onTicket, typeDefined,
+  AUTHOR, EPIC, OTHER, OTHER_WS, PROJECT, PROJECT_B, STORY, SUBTASK, TASK, WF, WS, created, createdIn, draftCreated, onTicket, typeDefined,
 } from '../src/checks/test-support.js';
 
 /**
@@ -22,6 +22,7 @@ const PUB = '01J9GCPB000000000000000000'; // published story
 const MINE = '01J9GCMN000000000000000000'; // AUTHOR's other draft, a task
 const THEIRS = '01J9GCTH000000000000000000'; // OTHER's draft story
 const GHOST = '01J9GCGH000000000000000000'; // no such ticket
+const ABROAD = '01J9GCAB000000000000000000'; // published task in ANOTHER workspace
 
 const world = (...after: EventEnvelope[]) =>
   buildMemoryContext(
@@ -37,6 +38,7 @@ const world = (...after: EventEnvelope[]) =>
       created(PUB, 'story', null),
       draftCreated(MINE, 'task', null),
       draftCreated(THEIRS, 'story', null, OTHER),
+      createdIn(OTHER_WS, ABROAD, 'task', PROJECT_B),
       ...after,
     ],
   );
@@ -70,8 +72,10 @@ describe('28.128 the childId form, engine half', () => {
     expect(await evaluateEvent(hold(PUB, C), world())).toEqual(UNKNOWN_PARENT);
     expect(await evaluateEvent(hold(D, C), world(onTicket(D, 'ticket.discarded', {})))).toMatchObject({ refused: true });
 
-    // the child: only a published one; an unknown id, another person's draft and the author's own draft read alike
+    // the child: only a published one of this workspace; an unknown id, another workspace's ticket, another person's
+    // draft and the author's own draft read alike
     expect(await evaluateEvent(hold(D, GHOST), world())).toEqual(UNKNOWN_PARENT);
+    expect(await evaluateEvent(hold(D, ABROAD), world())).toEqual(UNKNOWN_PARENT); // another workspace's ticket, not its project clash
     expect(await evaluateEvent(hold(D, THEIRS), world())).toEqual(UNKNOWN_PARENT);
     expect(await evaluateEvent(hold(D, MINE), world())).toEqual(UNKNOWN_PARENT);
   });
