@@ -30,7 +30,7 @@ describe('restore_note_version (package)', () => {
   it('14.611 a versionId that is not a listed version of the note (a rename event\'s id, a stranger\'s) answers the uniform version sentence and writes nothing', async () => {
     const s = recordingSession({ routes: routes() });
     for (const versionId of ['RENAMED-EVENT', 'NOT-A-THING']) {
-      await expect(restore(s.session).handler({ noteId: NOTE, versionId })).rejects.toThrow('note version not found or not visible to you');
+      await expect(restore(s.session).handler({ noteId: NOTE, versionId })).rejects.toThrow(new Error('note version not found or not visible to you')); // exact sentence (an Error argument compares the whole message; a string is a substring check)
     }
     expect(eventBatches(s.requests)).toEqual([]);
     expect(s.requests.some((r) => r.path.includes('/history/'))).toBe(false); // the body route is never asked for an unlisted id
@@ -74,7 +74,11 @@ describe('restore_note_version (package)', () => {
     expect(eventBatches(s.requests)).toEqual([]);
     // CONTROL, same `it`: a different current body is replaced.
     const t = recordingSession({ routes: routes() });
-    expect(await restore(t.session).handler({ noteId: NOTE, versionId: 'V1' })).toMatchObject({ restored: true });
+    // `toEqual`, not `toMatchObject`: the answer is `{ noteId, restoredFrom, restored: true, ...committed }` and a subset match passes
+    // whether or not the committed result (the new version's eventId) is spread in. COMMITTED is recordingSession's.
+    expect(await restore(t.session).handler({ noteId: NOTE, versionId: 'V1' })).toEqual({
+      noteId: NOTE, restoredFrom: 'V1', restored: true, status: 'committed', eventId: 'e', seq: 1, serverTime: '2026-10-03T00:00:00.000Z',
+    });
   });
 
   it('14.614 a deleted note is refused before any write, with a sentence that names restore_note', async () => {
