@@ -1,3 +1,10 @@
 export { PALETTE_ROLES, type PaletteRole, type ThemePalette } from './render/palette.js';
 export type { EdgeAttributes, IconSpec, Level, NodeAttributes } from './render/node-attributes.js';
 export { initialsOf } from './render/initials.js';
+export * from './engine/model.js';
+export * from './engine/walk.js';
+export * from './engine/zones.js';
+export * from './engine/layout.js';
+export * from './engine/levels.js';
+export * from './engine/sentences.js';
+export { kgNodeId, parseKgNodeId } from './ids.js';
