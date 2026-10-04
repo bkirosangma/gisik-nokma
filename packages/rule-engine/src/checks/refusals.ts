@@ -106,6 +106,9 @@ export const REFUSALS = {
   'link.reverse': 'The reverse of this link already exists.',
   /** A removal that names a link this stream does not hold (typed-links plan T3; not in the spec's list). */
   'link.absent': 'This ticket holds no such link, so there is nothing to remove.',
+  /** Leads-to labels (workflow-timeline-graphs LK-3). The duplicate reason is built by `labelDuplicateRefusal`; it names the label only. */
+  'link.label-required': 'Name the branch: a link from a Decision needs a label, such as "Yes" or "No".',
+  'link.label-duplicate': 'This Decision already has a branch with that label.',
 } as const;
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
@@ -115,6 +118,11 @@ export function rankRefusal(childTypeName: string, parentTypeName: string): stri
 /** `"<from>" already <reading> "<to>".`: titles, because the engine holds no ticket keys. */
 export function linkExistsRefusal(kind: TicketLinkKind, fromTitle: string, toTitle: string): string {
   return `"${fromTitle}" already ${linkReading(kind, 'out')} "${toTitle}".`;
+}
+
+/** The duplicate reason names ONLY the label: the sibling's target may be a ticket this reader cannot see, so no title. */
+export function labelDuplicateRefusal(label: string): string {
+  return `This Decision already has a branch labelled "${label.trim()}".`;
 }
 
 /**

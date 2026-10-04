@@ -188,6 +188,21 @@ describe('the read tools', () => {
     expect(raced.paths).toEqual(['/v1/workspaces/w1/tickets/t1', linksPath]); // the detail answered; the 404 is the links read's
   });
 
+  it('29.126 get_ticket.links carries a leads_to label and writes no label key when there is none', async () => {
+    const body = { key: 'CCSO-4', title: 'Go ahead?', rollup: null, ticketState: { kind: 'ticket', id: 't1', fields: {} } };
+    const rows = [
+      { kind: 'leads_to', direction: 'out', ticket: { id: 'b1', projectId: 'p1', key: 'GN-2', title: 'Chiller', stateCategory: 'open' }, label: 'Yes' },
+      { kind: 'blocks', direction: 'out', ticket: { id: 'c1', projectId: 'p1', key: 'GN-3', title: 'Freezer', stateCategory: 'open' } },
+    ];
+    const { session } = sessionRecording(body, { '/v1/workspaces/w1/tickets/t1/links': { links: rows }, ...NO_NOTES });
+    const out = (await tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })) as { links: Array<Record<string, unknown>> };
+    expect(out.links).toEqual([
+      { kind: 'leads_to', direction: 'out', ticket: { id: 'b1', key: 'GN-2', title: 'Chiller' }, label: 'Yes' },
+      { kind: 'blocks', direction: 'out', ticket: { id: 'c1', key: 'GN-3', title: 'Freezer' } },
+    ]);
+    expect('label' in out.links[1]!).toBe(false); // control: the spread is conditional
+  });
+
   it('14.458 get_ticket maps a 404 to the uniform sentence', async () => {
     const session = { ...sessionRecording({}).session, get: async () => { throw new HttpError(404, { error: 'not_found' }); } };
     await expect(tool('get_ticket', session).handler({ workspaceId: 'w1', ticketId: 't1' })).rejects.toThrow('ticket not found or not visible to you');

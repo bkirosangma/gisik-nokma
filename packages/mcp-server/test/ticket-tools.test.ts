@@ -262,6 +262,18 @@ describe('27.055–27.057 link_tickets', () => {
     expect(f.batches).toHaveLength(1);
   });
 
+  it("29.126 link_tickets still refuses kind 'leads_to' (no label argument until Part 5): the input schema lists three kinds, and a call is refused before anything is sent", async () => {
+    const f = fake();
+    const kindSchema = (tool('link_tickets', f.session).inputSchema as Record<string, { options?: unknown }>)['kind'];
+    expect(kindSchema?.options).toEqual(['blocks', 'relates', 'duplicates']);
+    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'leads_to', action: 'add' })).rejects.toThrow();
+    await expect(tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'leads_to', action: 'remove' })).rejects.toThrow();
+    expect(f.batches).toHaveLength(0);
+    // control: the same call with a kind it files is sent
+    await tool('link_tickets', f.session).handler({ workspaceId: WS, ticketId: T, targetId: B, kind: 'relates', action: 'add' });
+    expect(f.batches).toHaveLength(1);
+  });
+
   it("27.056 action 'remove' files link_removed on the STORED source, from either end; a links-read 404 is the uniform sentence and sends nothing; control: an outgoing link stays on this stream, a missing one is an error naming it", async () => {
     const removal = async (kind: string, targetId: string) => {
       const f = fake(linkRoutes);

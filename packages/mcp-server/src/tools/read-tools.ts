@@ -192,7 +192,7 @@ export function readTools(session: Session): ToolDefinition[] {
           session,
           `/v1/workspaces/${encodeURIComponent(parsed.workspaceId)}/tickets/${encodeURIComponent(parsed.ticketId)}/links`,
           'ticket',
-        )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string } }> };
+        )) as { links: Array<{ kind: string; direction: 'out' | 'in'; ticket: { id: string; key: string | null; title: string }; label?: string }> };
         // AFTER the ticket read: the notes route does not check the ticket (GT-1).
         const notes = await attachedNotes(
           session,
@@ -207,7 +207,13 @@ export function readTools(session: Session): ToolDefinition[] {
           ...detail,
           ...(detail.ticketState === undefined ? {} : { ticketState: { ...state, ...(detail.ticketState.fields === undefined ? {} : { fields }) } }),
           description: bodyAsMarkdown(description?.value ?? null),
-          links: linked.links.map((l) => ({ kind: l.kind, direction: l.direction, ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title } })),
+          // A `leads_to` branch label rides along when there is one (wtg2 T2, 29.126); no key otherwise.
+          links: linked.links.map((l) => ({
+            kind: l.kind,
+            direction: l.direction,
+            ticket: { id: l.ticket.id, key: l.ticket.key, title: l.ticket.title },
+            ...(l.label === undefined ? {} : { label: l.label }),
+          })),
           notes: notes.slice(0, MAX_TICKET_NOTES),
           notesTotal: notes.length,
         };

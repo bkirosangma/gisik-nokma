@@ -18,8 +18,10 @@ import type { Projection } from './registry.js';
  * draft's `ticket.published`: live, it was applied before that publish existed; on a rebuild, which replays stream by
  * stream (`readLedger`, entity order, not `workspaceSeq`), the source's stream can replay first, and a from-form add
  * replayed after the source's re-file and removal would bring the removed row back.
- * Every stored fact is the EVENT's (actor, `serverTime`, origin, `workspaceSeq`), never the moment of applying, so a
- * rebuild writes the same row.
+ * Every stored fact is the EVENT's (actor, `serverTime`, origin, `workspaceSeq`, `label`), never the moment of
+ * applying, so a rebuild writes the same row. `label` (workflow-timeline-graphs LK-5) is a `leads_to` branch name,
+ * NULL when none; the take-over leaves it alone because the re-file carries the from entry's label unchanged
+ * (`refileEvent`, `ingest/ingest-service.ts`), so the two can never differ.
  *
  * ## Trash keeps the row; purge erases it
  *
@@ -55,8 +57,8 @@ export const ticketLinksProjection: Projection = {
 
   async apply(event: LedgerEvent, tx: PoolClient): Promise<void> {
     if (!isTicketLinkEvent(event.type) || event.entity.kind !== 'ticket') return;
-    // One schema parses both: `ticketLinkRemovedPayload` is the same `{ kind, targetId, from? }`, strict.
-    const { kind, targetId, from } = ticketLinkAddedPayload.parse(event.payload);
+    // One schema parses both: `ticketLinkRemovedPayload` is the same `{ kind, targetId, from? }`, strict, minus `label`.
+    const { kind, targetId, from, label } = ticketLinkAddedPayload.parse(event.payload);
     // Drafts R42: a link filed from the other end is stored on the DRAFT's stream but belongs to its SOURCE.
     const sourceId = from ?? event.entity.id;
     if (from !== undefined && (await draftPublished(tx, event.entity.id))) return; // the re-file stands for it
@@ -66,10 +68,10 @@ export const ticketLinksProjection: Projection = {
     }
     if ((await purgedIdsAmong(tx, 'ticket', [sourceId, targetId])).size > 0) return;
     await tx.query(
-      `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, created_by, created_at, origin, seq)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO proj_ticket_links (workspace_id, source_id, target_id, kind, label, created_by, created_at, origin, seq)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (source_id, target_id, kind) DO ${from === undefined ? TAKE_OVER : 'NOTHING'}`,
-      [event.workspaceId, sourceId, targetId, kind, event.actorId, event.serverTime, event.origin, event.workspaceSeq],
+      [event.workspaceId, sourceId, targetId, kind, label ?? null, event.actorId, event.serverTime, event.origin, event.workspaceSeq],
     );
   },
 
