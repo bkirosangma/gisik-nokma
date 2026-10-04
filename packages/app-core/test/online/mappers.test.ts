@@ -2798,6 +2798,20 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     };
     expect(mapTicketLinks(two)).toEqual(two.links);
   });
+
+  it('28.126 mapTicketState carries a draft-side link\'s from and leaves the key off a plain one', () => {
+    const body = ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' });
+    (body['ticketState'] as Record<string, unknown>)['links'] = [
+      { kind: 'blocks', targetId: 'draft-1', from: 'src-1' },
+      { kind: 'relates', targetId: 'other-1' },
+    ];
+    const links = mapTicketRead(body).ticket.links;
+    expect(links).toEqual([
+      { kind: 'blocks', targetId: 'draft-1', from: 'src-1' },
+      { kind: 'relates', targetId: 'other-1' },
+    ]);
+    expect(links?.[1]).not.toHaveProperty('from');
+  });
 });
 
 /**
