@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_NOTE_DOC } from '@gisik-nokma/domain';
+import { HttpError } from '../src/http-client.js';
 import { noteTools } from '../src/tools/note-tools.js';
 import { eventBatches, recordingSession } from './fixtures/recording-session.js';
 
@@ -33,6 +34,12 @@ describe('restore_note_version (package)', () => {
     }
     expect(eventBatches(s.requests)).toEqual([]);
     expect(s.requests.some((r) => r.path.includes('/history/'))).toBe(false); // the body route is never asked for an unlisted id
+    // The list route: a 404 is the uniform NOTE sentence, any other failure passes through unchanged.
+    const noList = recordingSession({ routes: routes({ [`GET /v1/notes/${NOTE}/history`]: () => { throw new HttpError(404, null); } }) });
+    await expect(restore(noList.session).handler({ noteId: NOTE, versionId: 'V1' })).rejects.toThrow(new Error('note not found or not visible to you'));
+    const brokenList = recordingSession({ routes: routes({ [`GET /v1/notes/${NOTE}/history`]: () => { throw new HttpError(500, null); } }) });
+    await expect(restore(brokenList.session).handler({ noteId: NOTE, versionId: 'V1' })).rejects.toThrow(/answered 500/);
+    expect(eventBatches(noList.requests).concat(eventBatches(brokenList.requests))).toEqual([]);
     // CONTROL, same `it`: a listed version is restored.
     const out = await restore(s.session).handler({ noteId: NOTE, versionId: 'V1' });
     expect(out).toMatchObject({ noteId: NOTE, restoredFrom: 'V1', restored: true });
@@ -47,6 +54,10 @@ describe('restore_note_version (package)', () => {
     // one-paragraph document (OLD and NOW included), so a subset match passes whatever body was sent.
     expect(eventBatches(s.requests)[0]![0]).toMatchObject({ type: 'note.body_set' });
     expect((eventBatches(s.requests)[0]![0]!['payload'] as { body: unknown }).body).toEqual(EMPTY_NOTE_DOC);
+    // Only a 404 means "born without a body": a 500 from the body route is an error and writes nothing.
+    const broken = recordingSession({ routes: routes({ [`GET /v1/notes/${NOTE}/history/V1`]: () => { throw new HttpError(500, null); } }) });
+    await expect(restore(broken.session).handler({ noteId: NOTE, versionId: 'V1' })).rejects.toThrow(/answered 500/);
+    expect(eventBatches(broken.requests)).toEqual([]);
     // CONTROL, same `it`: a version WITH a body sends that body, not the empty one.
     const t = recordingSession({ routes: routes() });
     await restore(t.session).handler({ noteId: NOTE, versionId: 'V1' });
@@ -68,7 +79,7 @@ describe('restore_note_version (package)', () => {
 
   it('14.614 a deleted note is refused before any write, with a sentence that names restore_note', async () => {
     const s = recordingSession({ routes: routes({ [`GET /v1/notes/${NOTE}`]: detail({ deleted: true }) }) });
-    await expect(restore(s.session).handler({ noteId: NOTE, versionId: 'V1' })).rejects.toThrow(/restore_note/);
+    await expect(restore(s.session).handler({ noteId: NOTE, versionId: 'V1' })).rejects.toThrow(new Error('This note is in Deleted items. Bring it back with restore_note first, then restore a version.')); // exact sentence (an Error argument compares the whole message)
     expect(eventBatches(s.requests)).toEqual([]);
     // CONTROL, same `it`: the same call on a live note writes.
     const t = recordingSession({ routes: routes() });
