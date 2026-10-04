@@ -108,10 +108,10 @@ Plan `docs/superpowers/plans/2026-10-03-knowledge-graph-view.md`; spec `docs/sup
 - ✅ **27.229 — layout:** the centre sits at 0,0 and hop 1 spreads evenly from 12 o'clock on the first ellipse; control: the radii are the mockup's `CFG` (`packages/knowledge-graph/test/engine/layout.test.ts`)
 - ✅ **27.230 — layout:** children sit under their parent's angle, at least the ring's minimum step apart; control: a single child sits exactly on its parent's angle (`packages/knowledge-graph/test/engine/layout.test.ts`)
 - ✅ **27.231 — layout:** a radius past the table grows by 60 and 40 per hop; control: inside the table it is the table (`packages/knowledge-graph/test/engine/layout.test.ts`)
-- ❌ **27.232 — edge sentences:** every edge kind reads both ways, and a suggested tag reads "may include" / "may belong to"; control: `relates` is symmetric and no kind falls through (`packages/knowledge-graph/test/engine/sentences.test.ts`)
-- ❌ **27.233 — edge sentences:** the spec's three example sentences verbatim (§2.1), assignee reading person → ticket; control: the sentence always reads from the source (`packages/knowledge-graph/test/engine/sentences.test.ts`)
-- ❌ **27.234 — provenance:** who, when (IST, en-GB) and ", via Claude" for an MCP origin; control: a web origin has no "via", no author gives the date alone, and no author or date gives no line (`packages/knowledge-graph/test/engine/sentences.test.ts`)
-- ❌ **27.235 — how each edge kind came to be (the mockup's `how`), and a suggested tag's model sentence; control:** every kind has one, and a confirmed tag has the plain one (`packages/knowledge-graph/test/engine/sentences.test.ts`)
+- ✅ **27.232 — edge sentences:** every edge kind reads both ways, and a suggested tag reads "may include" / "may belong to"; control: `relates` is symmetric and no kind falls through (`packages/knowledge-graph/test/engine/sentences.test.ts`)
+- ✅ **27.233 — edge sentences:** the spec's three example sentences verbatim (§2.1), assignee reading person → ticket; control: the sentence always reads from the source (`packages/knowledge-graph/test/engine/sentences.test.ts`)
+- ✅ **27.234 — provenance:** who, when (IST, en-GB) and ", via Claude" for an MCP origin; control: a web origin has no "via", no author gives the date alone (September prints `Sept`: Node 22.22.2, ICU 78.2, measured 2026-10-04), an author with no date gives the name alone, and no author or date gives no line (`packages/knowledge-graph/test/engine/sentences.test.ts`)
+- ✅ **27.235 — how each edge kind came to be (the mockup's `how`), and a suggested tag's model sentence; control:** every kind has one, and a confirmed tag has the plain one (`packages/knowledge-graph/test/engine/sentences.test.ts`)
 <!-- KG-C T3 -->
 <!-- KG-C T4 -->
 <!-- KG-C T5 -->
