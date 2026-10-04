@@ -6,20 +6,23 @@ const bar = (day: number, row: number, days: number, ppd = 16): Box => ({ x: day
 const axisAligned = (pts: readonly { x: number; y: number }[]) => pts.every((p, i) => i === 0 || p.x === (pts[i - 1] as { x: number }).x || p.y === (pts[i - 1] as { y: number }).y);
 
 describe('29.065 edge routing on packed rows', () => {
-  it('29.065 same row, target later: a straight line from the end anchor to the start anchor; every step axis-aligned; control: a target EARLIER on the same row is no straight line, it takes the channel', () => {
+  it('29.065 same row, target later: a straight line from the end anchor to the start anchor (a 1 px gap too); every step axis-aligned; control: a target EARLIER on the same row is no straight line, it takes the channel in the middle of the gap below the row', () => {
     const r = routeEdge(bar(0, 0, 4), bar(8, 0, 3), []);
     expect(r.points).toEqual([{ x: 64, y: 14 }, { x: 128, y: 14 }]);
     expect(r.crossings).toBe(0);
     // a gap narrower than the 14 px gutter has no gutter candidate: only the straight-line candidate gives two points here
     expect(routeEdge(bar(0, 0, 4), { x: 72, y: 0, w: 48, h: 28 }, []).points).toEqual([{ x: 64, y: 14 }, { x: 72, y: 14 }]);
-    // CONTROL, same it: the target EARLIER on the same row: out past the source end, along the row's bottom edge, back to the
-    // gutter before the target, and in from the left (never a straight line drawn backwards)
+    // one pixel of gap is still a straight line (the guard is strict: s.x < t.x, not s.x + 1 < t.x)
+    expect(routeEdge(bar(0, 0, 4), { x: 65, y: 0, w: 48, h: 28 }, []).points).toEqual([{ x: 64, y: 14 }, { x: 65, y: 14 }]);
+    // CONTROL, same it: the target EARLIER on the same row: out past the source end, down into the middle of the 12 px gap
+    // below the row (28 + 6 = 34, never along the row's bottom edge at 28), back to the gutter before the target, and in from
+    // the left (never a straight line drawn backwards)
     expect(routeEdge(bar(8, 0, 3), bar(0, 0, 4), []).points).toEqual([
-      { x: 176, y: 14 }, { x: 190, y: 14 }, { x: 190, y: 28 }, { x: -14, y: 28 }, { x: -14, y: 14 }, { x: 0, y: 14 },
+      { x: 176, y: 14 }, { x: 190, y: 14 }, { x: 190, y: 34 }, { x: -14, y: 34 }, { x: -14, y: 14 }, { x: 0, y: 14 },
     ]);
   });
 
-  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor; a gutter behind the source end, or a gap of exactly the gutter, is not used', () => {
+  it('29.065 another row: the vertical run is in the gutter 14 px before the target; the path ends ON the start anchor; a gutter behind the source end, or a gap of exactly the gutter, is not used; one pixel inside each limit, it is', () => {
     const to = bar(8, 2, 3);
     const r = routeEdge(bar(0, 0, 4), to, []);
     expect(GUTTER_PX).toBe(14);
@@ -38,9 +41,14 @@ describe('29.065 edge routing on packed rows', () => {
     expect(routeEdge(bar(0, 0, 4), { x: 78, y: 80, w: 48, h: 28 }, []).points).toEqual([
       { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 54 }, { x: 64, y: 54 }, { x: 64, y: 94 }, { x: 78, y: 94 },
     ]);
+    // a gap of 15 px, one pixel more than the gutter: the gutter before the target (x = 65) is just past the source end and
+    // is used (the guard is strict: vx > s.x, not vx > s.x + 1, which would take the gutter after the source at x = 78)
+    expect(routeEdge(bar(0, 0, 4), { x: 79, y: 80, w: 48, h: 28 }, []).points).toEqual([
+      { x: 64, y: 14 }, { x: 65, y: 14 }, { x: 65, y: 94 }, { x: 79, y: 94 },
+    ]);
   });
 
-  it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ; a bar that only touches a run, or lies beside it, is not in the way; every candidate blocked: the fewest crossings, the first of equals, a bar counted once', () => {
+  it('29.065 a third bar in the way: the router takes the gutter after the source instead; control: with the bar absent the first candidate is used and the two differ; a bar that only touches a run, or lies beside it, is not in the way; every candidate blocked: the fewest crossings, the first of equals, a bar counted once; the gutter after the source one pixel before the target is used', () => {
     const from = bar(0, 0, 4);
     const to = bar(20, 2, 3);
     const blocker = bar(18, 1, 2); // x 288-320 on row 1: stands in the gutter before the target at x = 306
@@ -93,9 +101,14 @@ describe('29.065 edge routing on packed rows', () => {
     const fewest = routeEdge(from, to, [{ x: 290, y: 0, w: 30, h: 40 }, { x: 72, y: 40, w: 12, h: 10 }]);
     expect(fewest.points).toEqual(clean.points);
     expect(fewest.crossings).toBe(1);
+    // a gap of 15 px with a bar on the x = 65 run: the gutter after the source (x = 78) is one pixel before the target and is
+    // used, clean (the guard is strict: ux < t.x, not ux + 1 < t.x, which would fall back to the first candidate, crossing 1)
+    const tight = routeEdge(from, { x: 79, y: 80, w: 48, h: 28 }, [{ x: 60, y: 40, w: 10, h: 28 }]);
+    expect(tight.points).toEqual([{ x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 94 }, { x: 79, y: 94 }]);
+    expect(tight.crossings).toBe(0);
   });
 
-  it('29.065 the target starts before the source ends: a channel between the rows, five corners at most; a target on a higher row: between the rows too; a shorter target level with the source: under the source; mixed heights: no repeated point, no collinear corner', () => {
+  it('29.065 the target starts before the source ends: a channel between the rows, five corners at most; a target on a higher row: between the rows too; a target on the same row past a bar: the channel in the middle of the gap below the row, carrying the label; mixed heights (a target below or above): no repeated point, no collinear corner', () => {
     const from = bar(10, 0, 6);
     const to = bar(12, 1, 3);
     const r = routeEdge(from, to, []);
@@ -111,25 +124,56 @@ describe('29.065 edge routing on packed rows', () => {
     expect(routeEdge(bar(10, 2, 6), bar(12, 0, 3), []).points).toEqual([
       { x: 256, y: 94 }, { x: 270, y: 94 }, { x: 270, y: 54 }, { x: 178, y: 54 }, { x: 178, y: 14 }, { x: 192, y: 14 },
     ]);
-    // bars of mixed height (a 40 px box whose middle is level with the source's bottom): the channel's zero-length step and
-    // collinear corner are dropped, so no two points repeat and no three lie on one line. The ENTRY direction is deliberately
-    // not asserted here: on this input the last step runs leftwards from (78, 28) inside the target onto its start anchor,
-    // which breaks the "from the left" rule. Part 1 feeds only uniform 28 px bars on 40 px rows, where this cannot happen;
-    // mixed heights are Part 3's to settle (lane 1 NOTE to the planner, 2026-10-04)
-    // a shorter target EARLIER with its middle level with the source's (y = 14): the channel runs under the source's bottom
-    // (y = 28), not along the target's bottom (y = 24), which would cut through the source bar
-    expect(routeEdge({ x: 100, y: 0, w: 64, h: 28 }, { x: 0, y: 4, w: 48, h: 20 }, []).points).toEqual([
-      { x: 164, y: 14 }, { x: 178, y: 14 }, { x: 178, y: 28 }, { x: -14, y: 28 }, { x: -14, y: 14 }, { x: 0, y: 14 },
+    // a target LATER on the same row with a bar between them (x 96-112): the channel runs in the middle of the 12 px gap below
+    // the row (28 + 6 = 34), not along the row's bottom edge (28), which only grazes the bar; the label pill rides the channel
+    const sameRow = routeEdge(bar(0, 0, 4), bar(10, 0, 2), [bar(6, 0, 1)]);
+    expect(sameRow.points).toEqual([
+      { x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 34 }, { x: 146, y: 34 }, { x: 146, y: 14 }, { x: 160, y: 14 },
     ]);
-    const mixed = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: 8, w: 48, h: 40 }, []).points;
-    expect(mixed[0]).toEqual({ x: 64, y: 14 });
-    expect(mixed[mixed.length - 1]).toEqual({ x: 70, y: 28 });
-    expect(axisAligned(mixed)).toBe(true);
-    for (let i = 2; i < mixed.length; i += 1) {
-      const [a, b, c] = [mixed[i - 2], mixed[i - 1], mixed[i]] as [Pt, Pt, Pt];
-      expect(b, `point ${i - 1} repeats`).not.toEqual(a);
-      expect((a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y), `points ${i - 2}..${i} on one line`).toBe(false);
+    expect(sameRow.label).toEqual({ x: 112, y: 34 });
+    expect(sameRow.crossings).toBe(0);
+    // bars of mixed height, a target BELOW (a 40 px box whose middle is level with the channel, y = 34) and a target ABOVE (a
+    // 20 px box whose bottom is level with the source's middle, y = 14): the channel's zero-length step and collinear corner are
+    // dropped, so no two points repeat and no three lie on one line (below, the collinear triple is the LAST one; above, the
+    // FIRST). The geometry is deliberately not asserted: on these inputs the route runs leftwards inside the target (below)
+    // or backwards inside the source (above), which breaks the "from the left" rule. Part 1 feeds only uniform 28 px bars on
+    // 40 px rows, where this cannot happen; mixed heights are Part 3's to settle (E6; lane 1 NOTE and reviewer B QUESTION to
+    // the planner, 2026-10-04)
+    const mixedBelow = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: 14, w: 48, h: 40 }, []).points;
+    const mixedAbove = routeEdge({ x: 0, y: 0, w: 64, h: 28 }, { x: 70, y: -6, w: 48, h: 20 }, []).points;
+    expect(mixedBelow[0]).toEqual({ x: 64, y: 14 });
+    expect(mixedBelow[mixedBelow.length - 1]).toEqual({ x: 70, y: 34 });
+    for (const [name, mixed] of [['below', mixedBelow], ['above', mixedAbove]] as const) {
+      expect(axisAligned(mixed), `${name}: axis-aligned`).toBe(true);
+      for (let i = 2; i < mixed.length; i += 1) {
+        const [a, b, c] = [mixed[i - 2], mixed[i - 1], mixed[i]] as [Pt, Pt, Pt];
+        expect(b, `${name}: point ${i - 1} repeats`).not.toEqual(a);
+        expect((a.x === b.x && b.x === c.x) || (a.y === b.y && b.y === c.y), `${name}: points ${i - 2}..${i} on one line`).toBe(false);
+      }
     }
+  });
+
+  it('29.065 every horizontal segment lies strictly inside a row gap or on a bar middle, never on a bar edge: uniform rows, every pair among bars on two rows (same row and next row, later and earlier, the rest in the way); control: a route along an edge is caught', () => {
+    // 28 px bars on 40 px rows: tops 0 / 40, bottoms 28 / 68
+    const bars = [bar(0, 0, 4), bar(6, 0, 1), bar(10, 0, 2), bar(2, 1, 3), bar(12, 1, 3)];
+    const edges = new Set(bars.flatMap((b) => [b.y, b.y + b.h]));
+    const onEdge = (pts: readonly Pt[]) => pts.some((p, i) => i > 0 && p.y === (pts[i - 1] as Pt).y && edges.has(p.y));
+    // CONTROL, same it: the check sees a run along the row's bottom edge (the old same-row channel, y = 28)
+    expect(onEdge([{ x: 64, y: 14 }, { x: 78, y: 14 }, { x: 78, y: 28 }, { x: 146, y: 28 }, { x: 146, y: 14 }])).toBe(true);
+    const channels = new Set<number>();
+    for (const from of bars) {
+      for (const to of bars) {
+        if (from === to) continue;
+        const pts = routeEdge(from, to, bars.filter((b) => b !== from && b !== to)).points;
+        expect(onEdge(pts), `${JSON.stringify(from)} -> ${JSON.stringify(to)}: ${JSON.stringify(pts)}`).toBe(false);
+        for (let i = 1; i < pts.length; i += 1) {
+          const [a, b] = [pts[i - 1] as Pt, pts[i] as Pt];
+          if (a.y === b.y && a.y !== from.y + from.h / 2 && a.y !== to.y + to.h / 2) channels.add(a.y);
+        }
+      }
+    }
+    // the fixture reaches a channel in the gap below each row (34 under row 0, 74 under row 1), so the check is not vacuous
+    expect([...channels].sort((a, b) => a - b)).toEqual([34, 74]);
   });
 
   it('29.065 portrait is the same route transposed: time runs down, the arrowhead enters from above; a bar in the way is transposed with it and a crossing is reported', () => {
