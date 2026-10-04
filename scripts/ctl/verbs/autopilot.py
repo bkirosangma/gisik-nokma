@@ -39,6 +39,8 @@ FIX_GRACE_MIN = 15        # a fresh FIX verdict holds its pool's free lane this 
 MAX_STACK = 2             # fluid rule A.3: at most 2 unreviewed levels
 PTR_RECENT_S = 24 * 3600  # a hand-written PTR naming a branch this recently = the controller started that task
 PRUNE_EVERY_S = 3600
+DIRECTED_GRACE_MIN = 20     # an item ending `(… reviewer X)` waits this long for X (live 09:42: C took B's item after 28 min)
+ITEM_MAX_AGE_MIN = 12 * 60   # an item waiting longer is the controller's call (the queue keeps yesterday's never-closed lines)
 HHMM = re.compile(r"^(\d{1,2}:\d{2}) (\S+)\s*(.*)$")
 SHA40 = re.compile(r"\b[0-9a-f]{40}\b")
 
@@ -92,10 +94,13 @@ def parse_review_queue(text):
     """roles/QUEUE-review.md → (items, takes, dones, fix_verdicts, fix_takes), each with its line position. TOOK/DONE lines cite the
     REVIEW line's TIME (several REVIEW lines can share one), so closing an item needs its branch AND (its sha8 or its time)."""
     items, takes, dones, fixes, fix_takes = [], [], [], [], []
+    day, prev = 0, None   # the lines carry HH:MM and no date: a time more than 6 h BELOW the previous line's is the next day
     for pos, line in enumerate(text.split("\n")):
         m = HHMM.match(line.strip())
         if not m: continue
         t, kind, rest = m.groups()
+        if prev is not None and minutes(t) < prev - 360: day += 1
+        prev = minutes(t)
         if kind == "REVIEW":
             r = re.match(r"(task/\S+) ([0-9a-f]{40})\b(.*)$", rest)
             if not r: continue
@@ -103,7 +108,7 @@ def parse_review_queue(text):
             d = re.search(r"\breviewer ([A-Z])\)\s*$", line)
             items.append({"pos": pos, "time": t, "branch": r.group(1), "sha": r.group(2), "base": f.get("base", ""), "brief": f.get("brief", ""),
                           "lane": int(f["lane"]) if f.get("lane", "").isdigit() else None, "handoff": f.get("handoff"), "line": line.strip(),
-                          "rest": r.group(3), "directed": d.group(1) if d else None})
+                          "rest": r.group(3), "directed": d.group(1) if d else None, "day": day})
         elif kind in ("TOOK", "DONE"):
             ref = rest.split(" ", 1)[0] if re.match(r"\d{1,2}:\d{2}\b", rest) else None
             br = re.search(r"\b(task/\S+?)[,;)]?(?:\s|$)", rest)
@@ -116,6 +121,24 @@ def parse_review_queue(text):
                 b = re.search(r"\b(BRIEF-\S+?\.md)\b", rest)
                 fixes.append({"pos": pos, "time": t, "branch": br.group(1), "brief": b.group(1) if b else None})
     return items, takes, dones, fixes, fix_takes
+
+
+def item_age_min(items_text_last, it, now_hhmm):
+    """Minutes since the item's REVIEW line: its day index against the queue's last day (one more if now's clock is > 6 h below the
+    last line's, i.e. midnight passed since)."""
+    last_day, last_t = items_text_last
+    cur = last_day + (1 if last_t is not None and minutes(now_hhmm) < last_t - 360 else 0)
+    return (cur - it["day"]) * 1440 + minutes(now_hhmm) - minutes(it["time"])
+
+
+def last_stamp(text):
+    day, prev = 0, None
+    for line in text.split("\n"):
+        m = HHMM.match(line.strip())
+        if not m: continue
+        if prev is not None and minutes(m.group(1)) < prev - 360: day += 1
+        prev = minutes(m.group(1))
+    return day, prev
 
 
 def open_items(items, takes, dones):
@@ -131,9 +154,12 @@ def open_items(items, takes, dones):
 
 
 def open_takes(takes, dones):
-    """TOOK lines whose holder (`reviewer X` / `lane N as reviewer`) has not yet written a DONE citing the same REVIEW time."""
+    """TOOK lines whose holder (`reviewer X` / `lane N as reviewer`) has not yet written a DONE citing the same REVIEW time. A seat
+    reviews ONE item at a time, so a LATER TOOK by the same holder releases the earlier one (the live queue holds TOOKs from earlier
+    days whose DONE never named its holder; read live 2026-10-04 09:47: reviewer B 'held' 11:33 and 01:35 for ever)."""
     return [t for t in takes if t["holder"] and t["ref"] and not any(
-        d["pos"] > t["pos"] and d["ref"] == t["ref"] and d["holder"] == t["holder"] for d in dones)]
+        d["pos"] > t["pos"] and d["ref"] == t["ref"] and d["holder"] == t["holder"] for d in dones)
+        and not any(u["pos"] > t["pos"] and u["holder"] == t["holder"] for u in takes)]
 
 
 def parse_order(text):
@@ -235,6 +261,7 @@ class World:
         self.seats = {s["window"]: s for s in seats}
         rq = read(os.path.join(self.R, "QUEUE-review.md"))
         self.items, self.takes, self.dones, self.fix_verdicts, self.fix_takes = parse_review_queue(rq)
+        self.last = last_stamp(rq)
         self.open = open_items(self.items, self.takes, self.dones)
         self.held = open_takes(self.takes, self.dones)
         self.fixq = parse_fix_queue(read(os.path.join(self.R, "QUEUE-autopilot.md")))
@@ -413,9 +440,14 @@ def own_branches(w, lane):
 def item_skip(w, it, who, lane=None):
     """None = this seat may take the item; else why not."""
     if "needs-tip" in it["line"]: return "needs-tip"
-    if it["directed"] and (lane is not None or it["directed"] != who): return f"addressed to reviewer {it['directed']}"
+    age = item_age_min(w.last, it, w.hhmm)
+    if age > ITEM_MAX_AGE_MIN: return f"older than {ITEM_MAX_AGE_MIN // 60} h ({age // 60} h): the controller's call, never a pull"
+    if it["directed"] and (lane is not None or it["directed"] != who) and age <= DIRECTED_GRACE_MIN:
+        return f"addressed to reviewer {it['directed']} ({age} min; open to all after {DIRECTED_GRACE_MIN})"
     head = w.git.head(it["branch"])
     if head != it["sha"]: return f"stale: origin/{it['branch']} is {head[:8] if head else 'gone'}, the line says {it['sha'][:8]}"
+    on = next((r for r in list(RELEASE.values()) + ["main"] if w.git.head(r) and w.git.is_ancestor(it["sha"], w.git.head(r))), None)
+    if on: return f"already landed (on origin/{on})"
     for n, s in w.seats.items():
         if s.get("role") == "lane" and s.get("branch") == it["branch"] and (s.get("state") != "idle" or s.get("dirty") or s.get("unpushed") or s.get("box") != "empty"):
             return f"preflight in flight: lane {n} is {s.get('state')} dirty {s.get('dirty')} unpushed {s.get('unpushed')} on it"

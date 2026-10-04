@@ -7,6 +7,7 @@ set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 V="$HERE/ctl"
 fails=0
+grep() { /usr/bin/grep "$@"; }   # never the PATH grep (ugrep here: different -E / BRE semantics; a negated check must not pass on its error)
 check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
 NOW=$(date -j -f '%Y-%m-%d %H:%M:%S' '2026-10-04 12:00:00' +%s)
 H=3600; DAY=86400

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2127 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2129 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -9,7 +9,8 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 CTL="$HERE/ctl"
 AP="${CTL_AUTOPILOT_PY:-$HERE/verbs/autopilot.py}"
 fails=0
-check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); fi; }
+grep() { /usr/bin/grep "$@"; }   # never the PATH grep (ugrep here: different -E / BRE semantics; a negated check must not pass on its error)
+check() { if eval "$2"; then echo "  ok   $1"; else echo "  FAIL $1"; fails=$((fails+1)); [ -z "${AP_DEBUG:-}" ] || printf '%s\n' "${out:-}" | sed 's/^/    | /'; fi; }
 T="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$T"' EXIT
 G() { /usr/bin/git -C "$T/repo" "$@"; }
 export TZ=UTC
@@ -82,8 +83,9 @@ freelane() { local w="$1"; shift; seat "$w" state=idle shells=0 box=empty unpush
 freerev() { seat "$1" state=idle shells=0 box=empty "${@:2}"; }
 ap() { out=$(PATH="$T/shim:$PATH" python3 "$AP" once --shadow --no-fetch 2>&1); rc=$?; }
 aplive() { out=$(PATH="$T/shim:$PATH" python3 "$AP" once --no-fetch 2>&1); rc=$?; }
-would() { printf '%s\n' "$out" | grep -E "WOULD $1" >/dev/null; }
-said() { printf '%s\n' "$out" | grep -E "$1" >/dev/null; }
+# /usr/bin/grep, never the PATH `grep` (ugrep on this machine: its -E did not match a literal "(on origin/…)" group, 2026-10-04)
+would() { printf '%s\n' "$out" | /usr/bin/grep -E "WOULD $1" >/dev/null; }
+said() { printf '%s\n' "$out" | /usr/bin/grep -F -- "$1" >/dev/null; }
 nowould() { ! printf '%s\n' "$out" | grep -q "WOULD"; }
 # a REVIEW item for task/rev1 at its origin head (lane 1 = WG pool by default seat config? no: lane= decides the pool; 3 = KG)
 item1() { rq "09:10 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=${1:-1} handoff=HANDOFF-rev1.md (rev one)"; }
@@ -168,10 +170,20 @@ check "13.2112 an item whose LANE HAS A PREFLIGHT IN FLIGHT is skipped: lane 1 b
 world; rq "09:10 REVIEW task/rev1 $REV2 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (sha not at origin)"; freerev 7; ap; a=$out
 check "13.2112 a STALE sha (origin/task/rev1 is not the REVIEW line's sha: the lane re-pushed in its preflight, or a tipmerge moved it) is skipped; CONTROL: the 13.2107 world (sha at origin) was taken" \
   'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV2:0:8}: stale: origin/task/rev1 is ${REV1:0:8}" && ! printf "%s" "$a" | grep -q WOULD'
-world; rq "09:10 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; freerev 10; ap; a=$out
+world; rq "09:50 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; freerev 10; ap; a=$out
+world; rq "09:30 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (FIX 1 delta; reviewer C)"; freerev 7; seat 10 state=busy; ap; d=$out
 world; rq "09:10 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 needs-tip (x)"; freerev 7; ap; b=$out
-check "13.2119 an item ADDRESSED to reviewer C (\`… reviewer C)\` at the end) is skipped by A and taken by C; a needs-tip item is skipped; CONTROL in the same check: C takes the addressed one" \
-  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: addressed to reviewer C" && printf "%s" "$a" | grep -q "WOULD review: C gisik:10 takes 09:10 task/rev1" && printf "%s" "$b" | grep -q "needs-tip" && ! printf "%s" "$b" | grep -q WOULD'
+check "13.2119 an item ADDRESSED to reviewer C (\`… reviewer C)\` at the end) is skipped by A for its first 20 min (10 min old) and taken by C; a needs-tip item is skipped; CONTROL in the same check: C takes the addressed one, and at 30 min old (C busy) A takes it (live 09:42: C took B's item after 28 min)" \
+  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: addressed to reviewer C (10 min" && printf "%s" "$a" | grep -q "WOULD review: C gisik:10 takes 09:50 task/rev1" && printf "%s" "$b" | grep -q "needs-tip" && ! printf "%s" "$b" | grep -q WOULD && printf "%s" "$d" | grep -q "WOULD review: A gisik:7 takes 09:30 task/rev1"'
+
+G push -q origin "$KG:refs/heads/task/landed" 2>/dev/null; G fetch -q origin
+world; rq "09:10 REVIEW task/landed $KG base=origin/release/knowledge-graph brief=PTR-l.md lane=3 (its sha is on the KG tip)"; item1 1; freerev 7; ap
+check "13.2128 an item whose sha is ALREADY on a release tip or main (landed, its REVIEW line never closed) is skipped; CONTROL in the same check: the unlanded task/rev1 item behind it is taken" \
+  'said "SKIP reviewer A x task/landed ${KG:0:8}: already landed (on origin/release/knowledge-graph)" && would "review: A gisik:7 takes 09:10 task/rev1" && ! said "WOULD review: A gisik:7 takes 09:10 task/landed"'
+world; rq "21:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday)" "08:00 NOTE the next day"; freerev 7; ap; a=$out
+world; rq "23:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday, later)" "08:00 NOTE the next day"; freerev 7; ap
+check "13.2129 an item OLDER than 12 h is the controller's call, never a pull: a 21:00 line followed by the next day's 08:00 line is 13 h old at 10:00 (the queue has no dates: a time > 6 h below the previous line's is the next day) -> skipped; CONTROL in the same check: a 23:00 line (11 h old) is taken" \
+  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (13 h)" && ! printf "%s" "$a" | grep -q WOULD && would "review: A gisik:7 takes 23:00 task/rev1"'
 
 # ================================================================ the pull order
 world; seat 7 state=busy; seat 9 state=busy; freerev 10
