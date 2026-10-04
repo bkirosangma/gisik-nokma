@@ -40,6 +40,7 @@ MAX_STACK = 2             # fluid rule A.3: at most 2 unreviewed levels
 PTR_RECENT_S = 24 * 3600  # a hand-written PTR naming a branch this recently = the controller started that task
 PRUNE_EVERY_S = 3600
 DIRECTED_GRACE_MIN = 20     # an item ending `(… reviewer X)` waits this long for X (live 09:42: C took B's item after 28 min)
+SLOT_HOLD_WARN_S = 600     # a test-slot hold past 10 min while others wait is warned (orchestrator 11:10, planner finding P10)
 ITEM_MAX_AGE_MIN = 12 * 60   # an item waiting longer is the controller's call (the queue keeps yesterday's never-closed lines)
 HHMM = re.compile(r"^(\d{1,2}:\d{2}) (\S+)\s*(.*)$")
 SHA40 = re.compile(r"\b[0-9a-f]{40}\b")
@@ -686,6 +687,34 @@ def describe(a):
     return d
 
 
+# ---------------------------------------------------------------- the test-slot watch (read-only)
+def slot_watch(now, log):
+    """WARN hold >10 min with waiters: a `ctl run-tests` slot held longer than SLOT_HOLD_WARN_S while at least one other run-tests
+    waits (P10: one mutation driver held the only slot 51 min). Holders are CTL_SEM_DIR/slot-<n>/holder (`pid|lstart|label|epoch`);
+    a waiter is a running verbs/run-tests.sh that is no holder and no subshell of one (a fork keeps its parent's argv). Logs only."""
+    sem = os.environ.get("CTL_SEM_DIR") or os.path.expanduser("~/.cache/gisik-ctl/sem")
+    holds = []
+    try:
+        for e in sorted(os.listdir(sem)):
+            f = os.path.join(sem, e, "holder")
+            if e.startswith("slot-") and os.path.isfile(f):
+                pid, _, label, epoch = (read(f).strip().split("|") + ["", "", "", ""])[:4]
+                if pid.isdigit() and epoch.isdigit(): holds.append((e, int(pid), label, now - int(epoch)))
+    except OSError:
+        return
+    if not holds: return
+    cmd = os.environ.get("CTL_AUTOPILOT_PS_CMD") or "ps -axo pid=,ppid=,command="
+    procs = []
+    for line in subprocess.run(["sh", "-c", cmd], capture_output=True, text=True).stdout.split("\n"):
+        f = line.split(None, 2)
+        if len(f) == 3 and f[0].isdigit() and f[1].isdigit() and "verbs/run-tests.sh" in f[2]: procs.append((int(f[0]), int(f[1])))
+    runners = {p for p, _ in procs}; holders = {h[1] for h in holds}
+    waiters = [p for p, pp in procs if p not in holders and pp not in runners]
+    for slot, pid, label, held in holds:
+        if held > SLOT_HOLD_WARN_S and waiters:
+            log(f"WARN hold >10 min with waiters: {slot} '{label}' (pid {pid}) held {held // 60} min while {len(waiters)} run(s) wait — split it per run (STEPS-common: a mutation driver takes the slot PER MUTANT)")
+
+
 # ---------------------------------------------------------------- the pass and the loop
 def seats_now():
     cmd = os.environ.get("CTL_AUTOPILOT_SEATS_CMD") or f"bash {os.path.join(CTL_DIR, 'ctl')} seats --json"
@@ -708,6 +737,7 @@ def one_pass(lanes_dir, repo, shadow, fetch, logf):
         log(f"FAIL seats unreadable: {e}"); return 1
     if not seats: log("FAIL seats: no seat read (no gisik session?) — nothing decided"); return 1
     w = World(lanes_dir, repo, seats, now)
+    slot_watch(now, log)
     acts = decide(w, log)
     last_prune = max((r["t"] for r in w.ledger if r["kind"] == "PRUNE"), default=0)
     door = Door(w, shadow, log, repo)

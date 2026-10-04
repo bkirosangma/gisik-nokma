@@ -45,6 +45,7 @@ Inter-seat messages go through `roles/LEDGER.jsonl` (append-only; id, from, to, 
 - **A lane with nothing startable becomes a reviewer** (fluid rule B): `make-reviewer-boot.py C` + `ctl restart N <its own worktree> <boot> --override <file>` naming lane N, its worktree and its DONE-line tag `(lane N as reviewer; …)`.
 - **Item skips** (logged): `needs-tip`; addressed `(… reviewer X)` for its first 20 min; older than 12 h (the queue has no dates; a time > 6 h below the previous line's is the next day); a stale sha (origin/<branch> ≠ the line); already on a release tip or main; a lane busy/dirty/unpushed/box-text on that branch (preflight in flight); for a lane-reviewer its own work, a branch stacked on it (by `base=` or ancestry) and a branch it stacks on.
 - **Budget:** `ctl seats --json` now carries `weekly` (the status line's "weekly N%"): ≥ 95 → no lane launch; ≥ 85 or unknown → no H++.
+- **Slot watch (both modes, log only):** `WARN hold >10 min with waiters` when a `ctl run-tests` slot (`CTL_SEM_DIR/slot-<n>/holder`) is held past 600 s while another `run-tests.sh` (no holder, no subshell of one) waits — the P10 finding; seam `CTL_AUTOPILOT_PS_CMD`.
 - **Live only:** `ctl prune-gate-locks --apply` once an hour (a `PRUNE` ledger row).
 
 **The order files.** `QUEUE-kg-order.md` (KG) and `QUEUE-wg-order.md` (WG) in the lanes root carry, under their prose, ONE fenced block the planner maintains — a file without it starts nothing (13.2127):

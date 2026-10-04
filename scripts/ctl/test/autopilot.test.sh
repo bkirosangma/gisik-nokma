@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2131 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
+# scripts/ctl/test/autopilot.test.sh — cases 13.2106-13.2134 for `ctl autopilot` and scripts/ctl/make-lane-ptr.py; run by `ctl selftest`.
 # Nothing here reads or writes the live pipeline: a SCRATCH lanes root (CTL_LANES_DIR), a scratch origin + repo (CTL_AUTOPILOT_REPO),
 # a seats fixture (CTL_AUTOPILOT_SEATS_CMD), a stub `ctl` that logs its argv (CTL_AUTOPILOT_CTL), a stub make-reviewer-boot.py, a fixed
 # clock, and a PATH-front `tmux` shim that logs every call. A guard case has its CONTROL in the same check: the same world with the one
@@ -22,6 +22,7 @@ c() { echo "$1" > "$T/repo/$2"; G add -A; G commit -q -m "$1"; }
 c base README; G push -q origin main
 G checkout -q -b release/knowledge-graph; mkdir -p "$T/repo/docs" "$T/repo/packages/kg"
 printf '# Plan\n\n## Global Constraints\nx\n\n## Review Focus\ny\n\n### Task 1: One thing (cases 99.001–99.002)\nstep\n\n### Task 2: Two things (cases 99.003–99.009)\nstep\n\n### Task 3: Three\nstep\n\n## Planner rulings (2026-10-03)\nz\n' > "$T/repo/docs/plan.md"
+printf '# Dup\n\n### Task 1: a\nx\n\n### Task 1: b\ny\n' > "$T/repo/docs/dup.md"
 c kg packages/kg/a.txt; G push -q origin release/knowledge-graph
 G checkout -q -b task/kv1; c kv1 kv1.txt; G push -q origin task/kv1; G checkout -q release/knowledge-graph
 G merge -q --no-ff -m "Merge pull request #1 from o/task/kv1-gated" task/kv1; G push -q origin release/knowledge-graph; G push -q origin --delete task/kv1
@@ -93,6 +94,11 @@ item1() { rq "09:10 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph b
 # ================================================================ 13.2106 the REAL queue's shapes
 world
 cat > "$R/QUEUE-review.md" <<EOF
+07:00 TOOK 06:50 task/gone 1234abcd (reviewer C, pull, FULL)
+08:10 REVIEW task/own $OWN base=origin/release/knowledge-graph brief=PTR-o.md lane=3 (closed by the sha8 leg alone)
+08:11 TOOK 05:28 task/own ${OWN:0:8} (orchestrator: re-queued head)
+08:12 REVIEW task/onown $ONOWN base=origin/release/knowledge-graph brief=PTR-n.md lane=3 (closed by the time leg alone)
+08:13 TOOK 08:12 task/onown (orchestrator)
 08:17 REVIEW task/rev2 $OLD base=origin/release/knowledge-graph brief=PTR-a.md lane=2 (first)
 08:17 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-b.md lane=1 (shares 08:17)
 08:17 REVIEW task/kv2 $KV2 base=origin/release/knowledge-graph brief=PTR-c.md lane=3 (shares 08:17 too)
@@ -113,7 +119,7 @@ print("HELD " + " ".join(f"{t['holder']}:{t['ref']}:{t['branch']}" for t in held
 PY
 }
 P=$(parsed)
-check "13.2106 the real queue's shapes parse: three REVIEW lines sharing 08:17 stay three items, a TOOK closes only the one whose branch+sha8 it names, the 08:30 line SUPERSEDES the older sha of the same branch, a DONE that names no branch (\`DONE 08:56 needs-tip …\`) closes nothing on its own, a NOTE preflight line is not an item; the TOOK of reviewer C (no DONE) is still HELD, reviewer A's TOOK is released by its DONE citing 08:56; CONTROL in the same check: deleting the 08:18 TOOK reopens task/kv2" \
+check "13.2106 the real queue's shapes parse: three REVIEW lines sharing 08:17 stay three items, a TOOK closes only the one whose branch+sha8 it names, the 08:30 line SUPERSEDES the older sha of the same branch, a DONE that names no branch (\`DONE 08:56 needs-tip …\`) closes nothing on its own, a NOTE preflight line is not an item; a TOOK citing only the sha8 (another time) and one citing only the time (no sha) each close their item; the TOOK of reviewer C (no DONE) is still HELD while its 07:00 TOOK is released by that later one, reviewer A's TOOK is released by its DONE citing 08:56; CONTROL in the same check: deleting the 08:18 TOOK reopens task/kv2" \
   '[ "$(printf "%s\n" "$P" | grep ^OPEN)" = "OPEN 08:17:task/rev1:${REV1:0:8} 08:30:task/rev2:${REV2:0:8}" ] && [ "$(printf "%s\n" "$P" | grep ^HELD)" = "HELD reviewer C:08:17:task/kv2" ] && sed -i "" "/08:18 TOOK/d" "$R/QUEUE-review.md" && parsed | grep ^OPEN | grep -q "08:17:task/kv2:${KV2:0:8}"'
 cp "$HERE/test/fixtures/autopilot/QUEUE-review-2026-10-04.md" "$R/QUEUE-review.md" 2>/dev/null
 check "13.2106 the frozen live QUEUE-review.md (2026-10-04 09:20, fixtures/autopilot/) yields exactly the hand-checked open set: nothing but task/kg-tl2-projection a6330eb3 (09:14, FIX 1 delta addressed to reviewer B) and task/ctl-postman-followup 6ff89c41 is TAKEN (09:08 TOOK by reviewer A); held TOOKs = reviewer A 09:04 postman, reviewer C 09:19 kg-home-t2-brand" \
@@ -187,9 +193,10 @@ world; rq "21:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brie
 world; rq "23:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday, later)" "08:00 NOTE the next day"; freerev 7; ap
 world; rq "22:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (exactly 12 h)" "08:00 NOTE the next day"; freerev 7; ap; b=$out
 world; rq "21:59 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (12 h 1 min)" "08:00 NOTE the next day"; freerev 7; ap; c7=$out
+world; rq "20:00 NOTE yesterday" "02:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (after midnight)" "09:00 NOTE today"; freerev 7; ap; g=$out
 world; rq "23:00 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-rev1.md lane=1 (yesterday, later)" "08:00 NOTE the next day"; freerev 7; ap
 check "13.2129 an item OLDER than 12 h is the controller's call, never a pull: a 21:00 line followed by the next day's 08:00 line is 13 h old at 10:00 (the queue has no dates: a time > 6 h below the previous line's is the next day) -> skipped; CONTROL in the same check: a 23:00 line (11 h old) is taken" \
-  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (13 h)" && ! printf "%s" "$a" | grep -q WOULD && printf "%s" "$c7" | grep -q "older than 12 h (12 h)" && printf "%s" "$b" | grep -q "WOULD review: A gisik:7 takes 22:00 task/rev1" && would "review: A gisik:7 takes 23:00 task/rev1"'
+  'printf "%s" "$a" | grep -q "SKIP reviewer A x task/rev1 ${REV1:0:8}: older than 12 h (13 h)" && ! printf "%s" "$a" | grep -q WOULD && printf "%s" "$c7" | grep -q "older than 12 h (12 h)" && printf "%s" "$b" | grep -q "WOULD review: A gisik:7 takes 22:00 task/rev1" && printf "%s" "$g" | grep -q "WOULD review: A gisik:7 takes 02:00 task/rev1" && would "review: A gisik:7 takes 23:00 task/rev1"'
 
 # ================================================================ the pull order
 world; seat 7 state=busy; seat 9 state=busy; freerev 10
@@ -232,6 +239,21 @@ b=$out; world; freelane 3; rq "09:44 REVIEW task/rev1 $REV1 base=origin/release/
 world; freelane 3; rq "09:44 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:45 DONE 09:44 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; ap; out=$b
 check "13.2115 FIX-WAIT: a reviewer FIX verdict of the lane's pool 10 min old with no QUEUE-autopilot FIX line holds the free lane (WAIT lane 3, no start); CONTROL in the same check: 20 min old (past the 15-min grace) -> the lane takes new work" \
   'printf "%s" "$a" | grep -q "WAIT lane 3: FIX verdict 09:50 task/rev1 (10 min old)" && ! printf "%s" "$a" | grep -q WOULD && printf "%s" "$c8" | grep -q "WAIT lane 3: FIX verdict 09:46 task/rev1 (14 min old)" && would "start: lane 3 takes KG KV4" && ap && would "start: lane 3 takes KG KV4"'
+
+fv() { world; freelane 3; rq "09:50 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=PTR-r.md lane=4 (x)" "09:55 DONE 09:50 FIX task/rev1 ${REV1:0:8} → BRIEF-rev1-fix-1.md (reviewer A)"; }
+fv; rq "09:56 TOOK 09:50 FIX task/rev1 ${REV1:0:8} (orchestrator: lane 1, PTR-x.md)"; ap; a=$out
+fv; rq "09:58 REVIEW task/rev1 $REV1 base=origin/release/knowledge-graph brief=BRIEF-rev1-fix-1.md lane=4 (FIX 1 delta, same KG pool)"; ap; b=$out
+fv; printf 'RUNG: H+ (Opus/xhigh)\n' > "$L/PTR-f.md"; printf '09:57 FIX lane 4 PTR-f.md task/rev1\n' > "$R/QUEUE-autopilot.md"; ap; c=$out
+fv; ap
+check "13.2132 FIX-WAIT ends, each leg alone, when the verdict is already handled: the controller's \`TOOK … FIX task/rev1 (orchestrator: lane 1 …)\`, a newer REVIEW line for the branch (the FIX is done), or a QUEUE-autopilot FIX line for it (here addressed to lane 4) -> lane 3 takes KV4; CONTROL in the same check: the bare 5-min-old verdict holds lane 3 (WAIT)" \
+  '( for o in "$a" "$b" "$c"; do printf "%s" "$o" | grep -q "WOULD start: lane 3 takes KG KV4" || exit 1; done ) && said "WAIT lane 3: FIX verdict 09:55 task/rev1 (5 min old)" && ! said "WOULD"'
+fl() { world; freelane 3; printf '09:30 FIX KG PTR-f.md task/rev1\n' > "$R/QUEUE-autopilot.md"; }
+fl; printf 'RUNG: H+ (Opus/xhigh)\n' > "$L/PTR-f.md"; seat 4 branch=task/rev1; ap; a=$out
+fl; printf 'no rung line\n' > "$L/PTR-f.md"; ap; b=$out
+fl; ap; c=$out
+fl; printf 'RUNG: H+ (Opus/xhigh)\n' > "$L/PTR-f.md"; ap
+check "13.2133 a FIX line is NOT launched, each leg alone: its branch is checked out in another lane's worktree (window 4); its PTR has no \`RUNG:\` first line; its PTR file is missing — each logs the SKIP and the lane falls through to KV4; CONTROL in the same check: a PTR with RUNG H+ and the branch held nowhere -> WOULD fix at opus/xhigh" \
+  'printf "%s" "$a" | grep -q "SKIP lane 3 FIX task/rev1: checked out in window 4" && printf "%s" "$b" | grep -q "has no \`RUNG:\` first line" && printf "%s" "$c" | grep -q "SKIP lane 3 FIX task/rev1: no PTR PTR-f.md" && ! printf "%s%s%s" "$a" "$b" "$c" | grep -q "WOULD fix" && would "fix: lane 3 takes FIX 09:30 task/rev1 .PTR-f.md, RUNG H\\+.: TOOK \\+ restart --model opus --effort xhigh"'
 
 # ================================================================ budget, one-per-pass, no block
 world; freelane 3; seat 10 weekly=96; ap; a=$out; world; freelane 3; order 'KV4 H+ docs/plan.md 2 task/kv4 path:packages/kg'; seat 10 weekly=86; ap; b=$out
@@ -277,6 +299,14 @@ PY
 check "13.2131 the TOOK is written under the reviewers' mkdir lock with a RE-CHECK inside it: when another seat TOOK the item between the decision and the door, the autopilot appends nothing and restarts nobody (NOT TAKEN … taken by another seat); CONTROL in the same check: without the race it appends its TOOK and calls ctl restart; the lock dir is gone afterwards either way" \
   'o=$(race race) && printf "%s" "$o" | grep -q "NOT TAKEN task/rev1: taken by another seat" && [ ! -e "$T/ctl.log" ] && [ "$(grep -c " TOOK 09:10 task/rev1" "$R/QUEUE-review.md")" = 1 ] && [ ! -e "$R/.queue.lock.d" ] && o=$(race none) && grep -q "(reviewer A, autopilot, FULL)" "$R/QUEUE-review.md" && grep -q "^restart 7 " "$T/ctl.log" && [ ! -e "$R/.queue.lock.d" ]'
 
+# ================================================================ 13.2134 the slot-hold warning
+sw() { world; rm -rf "$T/sem"; mkdir -p "$T/sem/slot-1"; printf '4001|Sun Oct 4 05:40:06 2026 |mut-driver|%s\n' $((NOW - $1)) > "$T/sem/slot-1/holder"; printf '%s\n' "${@:2}" > "$T/ps.txt"
+  out=$(CTL_SEM_DIR="$T/sem" CTL_AUTOPILOT_PS_CMD="cat $T/ps.txt" PATH="$T/shim:$PATH" python3 "$AP" once --shadow --no-fetch 2>&1); }
+H='4001 1 bash /x/scripts/ctl/verbs/run-tests.sh --label mut-driver -- python3 m.py'; SUB='4002 4001 bash /x/scripts/ctl/verbs/run-tests.sh --label mut-driver -- python3 m.py'; WT='5001 1 bash /x/scripts/ctl/verbs/run-tests.sh --label lane2 -- pnpm vitest'
+sw 660 "$H" "$SUB" "$WT"; a=$out; sw 601 "$H" "$WT"; b=$out; sw 600 "$H" "$WT"; c=$out; sw 3060 "$H" "$SUB"; d=$out
+check "13.2134 WARN hold >10 min with waiters: a slot held 11 min (and 601 s) while another run-tests waits logs the WARN naming the slot, the label and the hold; CONTROL in the same check: exactly 600 s with a waiter, and 51 min with NO waiter (the holder's own subshell, which keeps its argv, is no waiter) log nothing" \
+  'printf "%s" "$a" | grep -q "WARN hold >10 min with waiters: slot-1 .mut-driver. (pid 4001) held 11 min while 1 run(s) wait" && printf "%s" "$b" | grep -q "WARN hold >10 min" && ! printf "%s%s" "$c" "$d" | grep -q "WARN hold"'
+
 # ================================================================ PULL protocol
 world; freerev 9; echo "$R/BOOT-x.md" > "$R/PULL-B.boot"; echo boot > "$R/BOOT-x.md"; ap; a=$out; seat 9 shells=1; ap; b=$out
 world; freerev 9; echo "$R/BOOT-gone.md" > "$R/PULL-B.boot"; ap
@@ -297,12 +327,12 @@ check "13.2117 the shadow test can fail: a copy of autopilot.py whose door does 
   'mutant "        if self.shadow:" "        if False:" && ! AP="$T/mut.py" shadow_clean && AP="$HERE/verbs/autopilot.py" shadow_clean'
 
 # ================================================================ make-lane-ptr
-MLP="$HERE/make-lane-ptr.py"
+MLP="${CTL_MAKE_LANE_PTR:-$HERE/make-lane-ptr.py}"   # a mutant copy through the same checks (the mutation pass)
 mlp() { python3 "$MLP" docs/plan.md "$@" --repo "$T/repo" --lanes-dir "$L" 2>&1; }
 check "13.2123 make-lane-ptr: the RUNG header is the table rung + 1 with its launch flags (L->M sonnet/high, M->H opus/high, H->H+ opus/xhigh, H+->H++ opus/max), the plan task's heading, its line range at origin/<base>, its case range and the REVIEW line template; table H++ is refused (FAIL, nothing written); CONTROL in the same check: the same call with M succeeds" \
   'world; o=$(mlp 2 M --lane 3 --branch task/kv4 --base release/knowledge-graph --print) && printf "%s" "$o" | head -1 | grep -q "^RUNG: H (Opus/high) = table M + 1" && printf "%s" "$o" | grep -q "TASK 2 - \"Two things (cases 99.003–99.009)\"" && printf "%s" "$o" | grep -q "\"### Task 2\" lines 12-14" && printf "%s" "$o" | grep -q "Re-grep case ids 99.003-99.009" && printf "%s" "$o" | grep -q "REVIEW task/kv4 <sha40> base=origin/release/knowledge-graph brief=PTR-kv4-lane3.md lane=3" && [ "$(mlp 2 L --lane 3 --branch task/a --base release/knowledge-graph --dry-run | grep -o "RUNG: .*")" = "RUNG: M sonnet high (dry-run: nothing written)" ] && [ "$(mlp 2 H+ --lane 3 --branch task/a --base release/knowledge-graph --dry-run | grep -o "RUNG: .*")" = "RUNG: H++ opus max (dry-run: nothing written)" ] && o=$(mlp 2 H++ --lane 3 --branch task/a --base release/knowledge-graph); [ $? = 1 ] && printf "%s" "$o" | grep -q "^FAIL make-lane-ptr table rung" && [ -z "$(ls "$L" | grep PTR-)" ]'
-check "13.2123 make-lane-ptr refuses what would make a vague brief: a task heading that is not in the plan, a plan not on origin/<base>, a base that is not release/*; --dry-run writes nothing; a STACKED brief says so in its cut line and its REVIEW template's base; CONTROL in the same check: a real write lands one file and a second run never overwrites it (-2 suffix)" \
-  'world; ! mlp 7 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && mlp 7 M --lane 3 --branch task/a --base release/knowledge-graph | grep -q "found 0 times" && ! python3 "$MLP" docs/nope.md 2 M --lane 3 --branch task/a --base release/knowledge-graph --repo "$T/repo" --lanes-dir "$L" >/dev/null && ! mlp 2 M --lane 3 --branch task/a --base main >/dev/null && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph --dry-run >/dev/null && [ -z "$(ls "$L" | grep PTR-)" ] && o=$(mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph --stacked-on "task/kv2@$KV2" --print) && printf "%s" "$o" | grep -q "STACKED on task/kv2@$KV2" && printf "%s" "$o" | grep -q "base=origin/task/kv2@${KV2:0:8}" && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && [ -f "$L/PTR-a-lane3.md" ] && [ -f "$L/PTR-a-lane3-2.md" ]'
+check "13.2123 make-lane-ptr refuses what would make a vague brief: a task heading that is not in the plan or is there TWICE, a plan not on origin/<base>, a base that is not release/*; --dry-run writes nothing; a STACKED brief says so in its cut line and its REVIEW template's base; CONTROL in the same check: a real write lands one file and a second run never overwrites it (-2 suffix)" \
+  'world; ! mlp 7 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && mlp 7 M --lane 3 --branch task/a --base release/knowledge-graph | grep -q "found 0 times" && ! python3 "$MLP" docs/nope.md 2 M --lane 3 --branch task/a --base release/knowledge-graph --repo "$T/repo" --lanes-dir "$L" >/dev/null && ! mlp 2 M --lane 3 --branch task/a --base main >/dev/null && python3 "$MLP" docs/dup.md 1 M --lane 3 --branch task/a --base release/knowledge-graph --repo "$T/repo" --lanes-dir "$L" --print | grep -q "found 2 times" && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph --dry-run >/dev/null && [ -z "$(ls "$L" | grep PTR-)" ] && o=$(mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph --stacked-on "task/kv2@$KV2" --print) && printf "%s" "$o" | grep -q "STACKED on task/kv2@$KV2" && printf "%s" "$o" | grep -q "base=origin/task/kv2@${KV2:0:8}" && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && mlp 2 M --lane 3 --branch task/a --base release/knowledge-graph >/dev/null && [ -f "$L/PTR-a-lane3.md" ] && [ -f "$L/PTR-a-lane3-2.md" ]'
 
 # ================================================================ wiring, loop lock
 STEP='^step "autopilot suite '
